@@ -132,6 +132,7 @@ export const dashboardApi = {
   getPorZona: () => api.get('/dashboard/por-zona'),
   getTendencia: (dias?: number) => api.get('/dashboard/tendencia', { params: dias ? { dias } : {} }),
   getMetricasAccion: () => api.get('/dashboard/metricas-accion'),
+  getRecurrentes: (dias?: number, minReclamos?: number) => api.get('/dashboard/recurrentes', { params: { dias: dias || 90, min_reclamos: minReclamos || 2 } }),
 };
 
 // Notificaciones

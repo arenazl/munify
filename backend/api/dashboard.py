@@ -614,3 +614,72 @@ async def get_metricas_accion(
         "cuadrillas_activas": cuadrillas_activas,
         "total_cuadrillas": total_cuadrillas
     }
+
+
+@router.get("/recurrentes")
+async def get_recurrentes(
+    dias: int = 90,
+    min_reclamos: int = 2,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Reclamos que se repiten en la misma dirección"""
+    from models.zona import Zona
+    from models.categoria import Categoria
+
+    municipio_id = current_user.municipio_id
+    fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)
+
+    # Buscar direcciones con múltiples reclamos
+    subquery = (
+        select(
+            Reclamo.direccion,
+            Reclamo.zona_id,
+            func.count(Reclamo.id).label('cantidad')
+        )
+        .where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.direccion != None,
+            Reclamo.direccion != '',
+            func.date(Reclamo.created_at) >= fecha_inicio
+        )
+        .group_by(Reclamo.direccion, Reclamo.zona_id)
+        .having(func.count(Reclamo.id) >= min_reclamos)
+        .subquery()
+    )
+
+    # Obtener las direcciones con más reclamos
+    query = await db.execute(
+        select(subquery.c.direccion, subquery.c.zona_id, subquery.c.cantidad)
+        .order_by(subquery.c.cantidad.desc())
+        .limit(10)
+    )
+
+    resultado = []
+    for direccion, zona_id, cantidad in query.all():
+        # Obtener nombre de zona
+        zona_nombre = "Sin zona"
+        if zona_id:
+            zona_query = await db.execute(select(Zona.nombre).where(Zona.id == zona_id))
+            zona_nombre = zona_query.scalar() or "Sin zona"
+
+        # Obtener categorías de esos reclamos
+        cat_query = await db.execute(
+            select(Categoria.nombre)
+            .join(Reclamo, Reclamo.categoria_id == Categoria.id)
+            .where(
+                Reclamo.direccion == direccion,
+                Reclamo.municipio_id == municipio_id
+            )
+            .distinct()
+        )
+        categorias = [c[0] for c in cat_query.all()]
+
+        resultado.append({
+            "direccion": direccion,
+            "zona": zona_nombre,
+            "cantidad": cantidad,
+            "categorias": categorias
+        })
+
+    return resultado

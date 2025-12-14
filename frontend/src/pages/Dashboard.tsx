@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Target, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2 } from 'lucide-react';
+import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags } from 'lucide-react';
 import { dashboardApi, analyticsApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -31,12 +31,19 @@ interface HeatmapPoint {
   categoria: string;
 }
 
-interface Cluster {
-  id: number;
-  centro: { lat: number; lng: number };
+interface ReclamoRecurrente {
+  direccion: string;
+  zona: string;
   cantidad: number;
-  prioridad_promedio: number;
+  categorias: string[];
 }
+
+interface TendenciaData {
+  fecha: string;
+  cantidad: number;
+}
+
+type VistaMetrica = 'barrios' | 'tiempos' | 'recurrentes' | 'tendencias' | 'categorias';
 
 interface CuadrillaDistancia {
   cuadrilla_nombre: string;
@@ -69,7 +76,9 @@ export default function Dashboard() {
 
   // Analytics avanzados
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
-  const [clusters, setClusters] = useState<Cluster[]>([]);
+  const [vistaActiva, setVistaActiva] = useState<VistaMetrica>('barrios');
+  const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
+  const [tendencias, setTendencias] = useState<TendenciaData[]>([]);
   const [distancias, setDistancias] = useState<CuadrillaDistancia[]>([]);
   const [cobertura, setCobertura] = useState<ZonaCobertura[]>([]);
   const [tiempoResolucion, setTiempoResolucion] = useState<TiempoCategoria[]>([]);
@@ -102,18 +111,18 @@ export default function Dashboard() {
         setPorZona(zonasRes.data.slice(0, 5));
 
         // Analytics avanzados
-        const [heatmapRes, clustersRes, distanciasRes, coberturaRes, tiempoRes, rendimientoRes, metricasRes] = await Promise.all([
+        const [heatmapRes, distanciasRes, coberturaRes, tiempoRes, rendimientoRes, metricasRes, tendenciasRes, recurrentesRes] = await Promise.all([
           analyticsApi.getHeatmap(30),
-          analyticsApi.getClusters(0.5, 3, 30),
           analyticsApi.getDistancias(30),
           analyticsApi.getCobertura(30),
           analyticsApi.getTiempoResolucion(90),
           analyticsApi.getRendimientoCuadrillas(4),
           dashboardApi.getMetricasAccion(),
+          dashboardApi.getTendencia(30),
+          dashboardApi.getRecurrentes(90, 2),
         ]);
 
         setHeatmapData(heatmapRes.data.puntos || []);
-        setClusters(clustersRes.data.clusters || []);
         setDistancias(distanciasRes.data.cuadrillas || []);
         setDistanciasResumen(distanciasRes.data.resumen || null);
         setCobertura(coberturaRes.data.zonas || []);
@@ -122,6 +131,8 @@ export default function Dashboard() {
         setRendimientoCuadrillas(rendimientoRes.data.semanas || []);
         setCuadrillasNames(rendimientoRes.data.cuadrillas || []);
         setMetricasAccion(metricasRes.data || null);
+        setTendencias(tendenciasRes.data || []);
+        setRecurrentes(recurrentesRes.data || []);
       } catch (error) {
         console.error('Error cargando dashboard:', error);
       } finally {
@@ -388,9 +399,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Fila 2: Clusters y Cobertura */}
+      {/* Fila 2: Métricas con botonera y Cobertura */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Clusters */}
+        {/* Panel de métricas con botonera */}
         <div
           className="rounded-xl p-6"
           style={{
@@ -398,50 +409,160 @@ export default function Dashboard() {
             border: `1px solid ${theme.border}`,
           }}
         >
-          <div className="flex items-center gap-2 mb-4">
-            <Target className="h-5 w-5" style={{ color: '#f59e0b' }} />
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Clusters de Reclamos
-            </h2>
-          </div>
-          {clusters.length > 0 ? (
-            <div className="space-y-3">
-              {clusters.slice(0, 5).map((cluster, index) => (
-                <div
-                  key={cluster.id}
-                  className="flex items-center justify-between p-3 rounded-lg"
-                  style={{ backgroundColor: `${theme.primary}10` }}
+          {/* Botonera de vistas */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {[
+              { id: 'barrios' as VistaMetrica, label: 'Barrios', icon: Building2 },
+              { id: 'tiempos' as VistaMetrica, label: 'Tiempos', icon: Clock },
+              { id: 'recurrentes' as VistaMetrica, label: 'Recurrentes', icon: Repeat },
+              { id: 'tendencias' as VistaMetrica, label: 'Tendencias', icon: TrendingUp },
+              { id: 'categorias' as VistaMetrica, label: 'Categorías', icon: Tags },
+            ].map((btn) => {
+              const Icon = btn.icon;
+              const isActive = vistaActiva === btn.id;
+              return (
+                <button
+                  key={btn.id}
+                  onClick={() => setVistaActiva(btn.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    backgroundColor: isActive ? theme.primary : `${theme.textSecondary}15`,
+                    color: isActive ? 'white' : theme.textSecondary,
+                  }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
-                      style={{ backgroundColor: lineColors[index % lineColors.length], color: 'white' }}
-                    >
-                      {cluster.cantidad}
+                  <Icon className="h-3.5 w-3.5" />
+                  {btn.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Contenido según vista activa */}
+          <div className="min-h-[200px]">
+            {/* Vista: Barrios/Zonas */}
+            {vistaActiva === 'barrios' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                  Reclamos por Barrio/Zona
+                </h3>
+                {porZona.length > 0 ? porZona.slice(0, 6).map((item, index) => {
+                  const maxVal = Math.max(...porZona.map(z => z.cantidad));
+                  const percent = maxVal > 0 ? (item.cantidad / maxVal) * 100 : 0;
+                  return (
+                    <div key={item.zona} className="flex items-center gap-3">
+                      <span className="text-xs w-20 truncate" style={{ color: theme.textSecondary }}>{item.zona}</span>
+                      <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}15` }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${percent}%`, backgroundColor: lineColors[index % lineColors.length] }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold w-8 text-right" style={{ color: theme.text }}>{item.cantidad}</span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: theme.text }}>
-                        Cluster #{cluster.id}
-                      </p>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>
-                        Prioridad prom: {cluster.prioridad_promedio}
-                      </p>
+                  );
+                }) : (
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>Sin datos</p>
+                )}
+              </div>
+            )}
+
+            {/* Vista: Tiempos de resolución */}
+            {vistaActiva === 'tiempos' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                  Tiempo Promedio de Resolución
+                </h3>
+                {tiempoResolucion.length > 0 ? tiempoResolucion.slice(0, 6).map((item) => {
+                  const color = item.dias_promedio <= 2 ? '#22c55e' : item.dias_promedio <= 5 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <div key={item.categoria} className="flex items-center justify-between p-2 rounded-lg" style={{ backgroundColor: `${color}10` }}>
+                      <span className="text-xs truncate flex-1" style={{ color: theme.text }}>{item.categoria}</span>
+                      <span className="text-sm font-bold px-2 py-0.5 rounded" style={{ backgroundColor: color, color: 'white' }}>
+                        {item.dias_promedio}d
+                      </span>
+                    </div>
+                  );
+                }) : (
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>Sin datos</p>
+                )}
+              </div>
+            )}
+
+            {/* Vista: Reclamos recurrentes */}
+            {vistaActiva === 'recurrentes' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                  Direcciones con Reclamos Recurrentes
+                </h3>
+                {recurrentes.length > 0 ? recurrentes.slice(0, 5).map((item, index) => (
+                  <div key={index} className="p-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10` }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium truncate flex-1" style={{ color: theme.text }}>{item.direccion}</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded ml-2" style={{ backgroundColor: '#ef4444', color: 'white' }}>
+                        {item.cantidad}x
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px]" style={{ color: theme.textSecondary }}>{item.zona}</span>
+                      <span className="text-[10px]" style={{ color: theme.textSecondary }}>•</span>
+                      <span className="text-[10px] truncate" style={{ color: theme.textSecondary }}>{item.categorias.join(', ')}</span>
                     </div>
                   </div>
-                  <span className="text-xs px-2 py-1 rounded" style={{ backgroundColor: theme.border, color: theme.textSecondary }}>
-                    {cluster.cantidad} reclamos
-                  </span>
+                )) : (
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>No hay reclamos recurrentes</p>
+                )}
+              </div>
+            )}
+
+            {/* Vista: Tendencias */}
+            {vistaActiva === 'tendencias' && (
+              <div>
+                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                  Tendencia de Reclamos (30 días)
+                </h3>
+                <div className="h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={tendencias}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="fecha" stroke={chartColors.text} fontSize={9} tickFormatter={(val) => val.slice(5)} />
+                      <YAxis stroke={chartColors.text} fontSize={10} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Line type="monotone" dataKey="cantidad" name="Reclamos" stroke={theme.primary} strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-              <p className="text-xs text-center pt-2" style={{ color: theme.textSecondary }}>
-                {clusters.length} clusters detectados (radio 500m, min 3 reclamos)
-              </p>
-            </div>
-          ) : (
-            <div className="h-48 flex items-center justify-center" style={{ color: theme.textSecondary }}>
-              <p>No se detectaron clusters</p>
-            </div>
-          )}
+              </div>
+            )}
+
+            {/* Vista: Categorías */}
+            {vistaActiva === 'categorias' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                  Distribución por Categoría
+                </h3>
+                {porCategoria.length > 0 ? porCategoria.slice(0, 6).map((item, index) => {
+                  const total = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
+                  const percent = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
+                  return (
+                    <div key={item.categoria}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs" style={{ color: theme.text }}>{item.categoria}</span>
+                        <span className="text-xs" style={{ color: theme.textSecondary }}>{item.cantidad} ({percent}%)</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}15` }}>
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${percent}%`, backgroundColor: lineColors[index % lineColors.length] }}
+                        />
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>Sin datos</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Cobertura por Zona */}
