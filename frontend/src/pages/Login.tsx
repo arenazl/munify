@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, Wrench, User } from 'lucide-react';

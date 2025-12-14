@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, Users, AlertTriangle, MapPin, Target, Route, Shield, AlertCircle, CalendarCheck, Zap, CheckCircle2 } from 'lucide-react';
+import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Target, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2 } from 'lucide-react';
 import { dashboardApi, analyticsApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';

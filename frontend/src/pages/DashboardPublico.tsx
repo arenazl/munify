@@ -45,7 +45,7 @@ export default function DashboardPublico() {
   const [registroData, setRegistroData] = useState({ nombre: '', apellido: '', direccion: '' });
   const [direccionSugerencias, setDireccionSugerencias] = useState<string[]>([]);
   const [buscandoDireccion, setBuscandoDireccion] = useState(false);
-  const direccionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const direccionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const municipioNombre = localStorage.getItem('municipio_nombre') || 'Mi Municipio';
   const municipioId = localStorage.getItem('municipio_id');
