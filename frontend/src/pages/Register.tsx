@@ -26,8 +26,14 @@ export default function Register() {
 
     try {
       await register(formData);
-      // Auto-login ya hecho en el contexto, navegar a la ruta del vecino
-      navigate(getDefaultRoute('vecino'));
+      // Verificar si el usuario venía de querer crear un reclamo
+      const pendingReclamo = localStorage.getItem('pending_reclamo');
+      if (pendingReclamo) {
+        localStorage.removeItem('pending_reclamo');
+        navigate('/nuevo-reclamo');
+      } else {
+        navigate(getDefaultRoute('vecino'));
+      }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || 'Error al registrarse');

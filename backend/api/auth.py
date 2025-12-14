@@ -21,7 +21,7 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="El email ya está registrado")
 
-    # Crear usuario
+    # Crear usuario (rol vecino por defecto para registro público)
     user = User(
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
@@ -29,7 +29,9 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
         apellido=user_data.apellido,
         telefono=user_data.telefono,
         dni=user_data.dni,
-        direccion=user_data.direccion
+        direccion=user_data.direccion,
+        municipio_id=user_data.municipio_id,
+        rol="vecino"
     )
     db.add(user)
     await db.commit()

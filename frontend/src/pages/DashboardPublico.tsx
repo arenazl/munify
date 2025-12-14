@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   Building2, MapPin, Clock, CheckCircle2, Plus,
   Search, ChevronRight, User, X, ArrowRight, Loader2,
-  MessageSquare, Calendar, TrendingUp, Navigation
+  MessageSquare, Calendar, TrendingUp, Navigation, LogOut
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Reclamo {
   id: number;
@@ -37,6 +38,7 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 export default function DashboardPublico() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({ total: 0, nuevos: 0, en_proceso: 0, resueltos: 0 });
   const [loading, setLoading] = useState(true);
@@ -87,16 +89,13 @@ export default function DashboardPublico() {
   };
 
   const handleCrearReclamo = () => {
-    // Verificar si ya hay datos guardados
-    const savedNombre = localStorage.getItem('vecino_nombre');
-    const savedDireccion = localStorage.getItem('vecino_direccion');
-
-    if (savedNombre && savedDireccion) {
-      // Ya tiene datos, ir directo a crear reclamo
-      navigate('/reclamos/nuevo');
+    if (user) {
+      // Usuario ya logueado, ir directo a crear reclamo
+      navigate('/nuevo-reclamo');
     } else {
-      // Mostrar modal de registro rápido
-      setShowRegistroModal(true);
+      // Guardar flag para redirigir después del registro
+      localStorage.setItem('pending_reclamo', 'true');
+      navigate('/register');
     }
   };
 
@@ -203,20 +202,43 @@ export default function DashboardPublico() {
             </div>
 
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/bienvenido')}
-                className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
-              >
-                <Navigation className="h-4 w-4" />
-                <span className="hidden sm:inline">Cambiar</span>
-              </button>
-              <span className="text-slate-700">|</span>
-              <button
-                onClick={() => navigate('/login')}
-                className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                Acceso empleados
-              </button>
+              {user ? (
+                <>
+                  <div className="flex items-center gap-2 text-sm text-slate-300">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">{user.nombre}</span>
+                  </div>
+                  <button
+                    onClick={() => navigate('/mi-panel')}
+                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+                  >
+                    Mi Panel
+                  </button>
+                  <button
+                    onClick={() => { logout(); navigate('/publico'); }}
+                    className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => navigate('/bienvenido')}
+                    className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
+                  >
+                    <Navigation className="h-4 w-4" />
+                    <span className="hidden sm:inline">Cambiar</span>
+                  </button>
+                  <span className="text-slate-700">|</span>
+                  <button
+                    onClick={() => navigate('/login')}
+                    className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    Acceso empleados
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

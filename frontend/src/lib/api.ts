@@ -43,8 +43,13 @@ export const authApi = {
     api.post('/auth/login', new URLSearchParams({ username: email, password }), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     }),
-  register: (data: { email: string; password: string; nombre: string; apellido: string }) =>
-    api.post('/auth/register', data),
+  register: (data: { email: string; password: string; nombre: string; apellido: string }) => {
+    const municipioId = localStorage.getItem('municipio_id');
+    return api.post('/auth/register', {
+      ...data,
+      municipio_id: municipioId ? parseInt(municipioId) : null
+    });
+  },
   me: () => api.get('/auth/me'),
 };
 

@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     telefono: Optional[str] = None
     dni: Optional[str] = None
     direccion: Optional[str] = None
+    municipio_id: Optional[int] = None  # Para registro de vecinos
 
 class UserUpdate(BaseModel):
     nombre: Optional[str] = None
