@@ -1,0 +1,489 @@
+import { useEffect, useState } from 'react';
+import { Edit, Trash2, User, Star, X, Check } from 'lucide-react';
+import { toast } from 'sonner';
+import { empleadosApi, zonasApi, categoriasApi } from '../lib/api';
+import { useTheme } from '../contexts/ThemeContext';
+import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import type { Empleado, Zona, Categoria } from '../types';
+
+export default function Empleados() {
+  const { theme } = useTheme();
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [zonas, setZonas] = useState<Zona[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
+  const [formData, setFormData] = useState({
+    nombre: '',
+    apellido: '',
+    descripcion: '',
+    especialidad: '',
+    capacidad_maxima: 10,
+    zona_id: '',
+    categoria_principal_id: '',
+    categoria_ids: [] as number[]
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const [empleadosRes, zonasRes, categoriasRes] = await Promise.all([
+        empleadosApi.getAll(),
+        zonasApi.getAll(true),
+        categoriasApi.getAll(true)
+      ]);
+      setEmpleados(empleadosRes.data);
+      setZonas(zonasRes.data);
+      setCategorias(categoriasRes.data);
+    } catch (error) {
+      toast.error('Error al cargar datos');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openSheet = (empleado: Empleado | null = null) => {
+    if (empleado) {
+      setFormData({
+        nombre: empleado.nombre,
+        apellido: empleado.apellido || '',
+        descripcion: empleado.descripcion || '',
+        especialidad: empleado.especialidad || '',
+        capacidad_maxima: empleado.capacidad_maxima,
+        zona_id: empleado.zona_id?.toString() || '',
+        categoria_principal_id: empleado.categoria_principal_id?.toString() || '',
+        categoria_ids: empleado.categorias?.map(c => c.id) || []
+      });
+      setSelectedEmpleado(empleado);
+    } else {
+      setFormData({
+        nombre: '',
+        apellido: '',
+        descripcion: '',
+        especialidad: '',
+        capacidad_maxima: 10,
+        zona_id: '',
+        categoria_principal_id: '',
+        categoria_ids: []
+      });
+      setSelectedEmpleado(null);
+    }
+    setSheetOpen(true);
+  };
+
+  const closeSheet = () => {
+    setSheetOpen(false);
+    setSelectedEmpleado(null);
+  };
+
+  const handleSubmit = async () => {
+    setSaving(true);
+    const payload = {
+      nombre: formData.nombre,
+      apellido: formData.apellido || null,
+      descripcion: formData.descripcion || null,
+      especialidad: formData.especialidad || null,
+      capacidad_maxima: formData.capacidad_maxima,
+      zona_id: formData.zona_id ? parseInt(formData.zona_id) : null,
+      categoria_principal_id: formData.categoria_principal_id ? parseInt(formData.categoria_principal_id) : null,
+      categoria_ids: formData.categoria_ids
+    };
+
+    try {
+      if (selectedEmpleado) {
+        await empleadosApi.update(selectedEmpleado.id, payload);
+        toast.success('Empleado actualizado correctamente');
+      } else {
+        await empleadosApi.create(payload);
+        toast.success('Empleado creado correctamente');
+      }
+      fetchData();
+      closeSheet();
+    } catch (error) {
+      toast.error('Error al guardar el empleado');
+      console.error('Error:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await empleadosApi.delete(id);
+      toast.success('Empleado desactivado');
+      fetchData();
+    } catch (error) {
+      toast.error('Error al desactivar el empleado');
+      console.error('Error:', error);
+    }
+  };
+
+  const toggleCategoria = (categoriaId: number) => {
+    setFormData(prev => {
+      const ids = prev.categoria_ids.includes(categoriaId)
+        ? prev.categoria_ids.filter(id => id !== categoriaId)
+        : [...prev.categoria_ids, categoriaId];
+
+      // Si quitamos la categoria principal, limpiarla
+      if (!ids.includes(parseInt(prev.categoria_principal_id))) {
+        return { ...prev, categoria_ids: ids, categoria_principal_id: '' };
+      }
+      return { ...prev, categoria_ids: ids };
+    });
+  };
+
+  const setPrincipal = (categoriaId: number) => {
+    // Si no esta seleccionada, agregarla primero
+    if (!formData.categoria_ids.includes(categoriaId)) {
+      setFormData(prev => ({
+        ...prev,
+        categoria_ids: [...prev.categoria_ids, categoriaId],
+        categoria_principal_id: categoriaId.toString()
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        categoria_principal_id: categoriaId.toString()
+      }));
+    }
+  };
+
+  const filteredEmpleados = empleados.filter(c =>
+    c.nombre.toLowerCase().includes(search.toLowerCase()) ||
+    c.apellido?.toLowerCase().includes(search.toLowerCase()) ||
+    c.especialidad?.toLowerCase().includes(search.toLowerCase()) ||
+    c.descripcion?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const getNombreCompleto = (e: Empleado) => {
+    if (e.apellido) {
+      return `${e.nombre} ${e.apellido}`;
+    }
+    return e.nombre;
+  };
+
+  const tableColumns = [
+    {
+      key: 'nombre',
+      header: 'Empleado',
+      sortValue: (c: Empleado) => getNombreCompleto(c),
+      render: (c: Empleado) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+            <User className="h-4 w-4 text-purple-600" />
+          </div>
+          <div>
+            <span className="font-medium">{getNombreCompleto(c)}</span>
+            {c.categoria_principal && (
+              <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color: c.categoria_principal.color || theme.textSecondary }}>
+                <Star className="h-3 w-3 fill-current" />
+                {c.categoria_principal.nombre}
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'especialidades',
+      header: 'Especialidades',
+      sortValue: (c: Empleado) => c.categorias?.length || 0,
+      render: (c: Empleado) => (
+        <div className="flex flex-wrap gap-1">
+          {c.categorias && c.categorias.length > 0 ? (
+            c.categorias.slice(0, 3).map(cat => (
+              <span
+                key={cat.id}
+                className="px-2 py-0.5 text-xs rounded-full text-white"
+                style={{ backgroundColor: cat.color || '#6b7280' }}
+              >
+                {cat.nombre}
+              </span>
+            ))
+          ) : (
+            <span style={{ color: theme.textSecondary }}>-</span>
+          )}
+          {c.categorias && c.categorias.length > 3 && (
+            <span className="px-2 py-0.5 text-xs rounded-full" style={{ backgroundColor: theme.border }}>
+              +{c.categorias.length - 3}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'zona',
+      header: 'Zona',
+      sortValue: (c: Empleado) => {
+        const zona = zonas.find(z => z.id === c.zona_id);
+        return zona?.nombre || '';
+      },
+      render: (c: Empleado) => {
+        const zona = zonas.find(z => z.id === c.zona_id);
+        return zona ? zona.nombre : '-';
+      },
+    },
+    {
+      key: 'activo',
+      header: 'Estado',
+      sortValue: (c: Empleado) => c.activo,
+      render: (c: Empleado) => <ABMBadge active={c.activo} />,
+    },
+  ];
+
+  return (
+    <ABMPage
+      title="Empleados"
+      buttonLabel="Nuevo Empleado"
+      onAdd={() => openSheet()}
+      searchPlaceholder="Buscar empleados..."
+      searchValue={search}
+      onSearchChange={setSearch}
+      loading={loading}
+      isEmpty={filteredEmpleados.length === 0}
+      emptyMessage="No se encontraron empleados"
+      sheetOpen={sheetOpen}
+      sheetTitle={selectedEmpleado ? 'Editar Empleado' : 'Nuevo Empleado'}
+      sheetDescription={selectedEmpleado ? 'Modifica los datos del empleado' : 'Completa los datos para crear un nuevo empleado'}
+      onSheetClose={closeSheet}
+      tableView={
+        <ABMTable
+          data={filteredEmpleados}
+          columns={tableColumns}
+          keyExtractor={(c) => c.id}
+          onRowClick={(c) => openSheet(c)}
+          actions={(c) => (
+            <>
+              <ABMTableAction
+                icon={<Edit className="h-4 w-4" />}
+                onClick={() => openSheet(c)}
+                title="Editar"
+              />
+              <ABMTableAction
+                icon={<Trash2 className="h-4 w-4" />}
+                onClick={() => handleDelete(c.id)}
+                title="Desactivar"
+                variant="danger"
+              />
+            </>
+          )}
+        />
+      }
+      sheetFooter={
+        <ABMSheetFooter
+          onCancel={closeSheet}
+          onSave={handleSubmit}
+          saving={saving}
+        />
+      }
+      sheetContent={
+        <form className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <ABMInput
+              label="Nombre"
+              required
+              value={formData.nombre}
+              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+              placeholder="Nombre"
+            />
+            <ABMInput
+              label="Apellido"
+              value={formData.apellido}
+              onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
+              placeholder="Apellido"
+            />
+          </div>
+
+          <ABMTextarea
+            label="Descripcion"
+            value={formData.descripcion}
+            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+            placeholder="Descripcion del empleado"
+            rows={2}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <ABMInput
+              label="Capacidad Maxima"
+              type="number"
+              value={formData.capacidad_maxima}
+              onChange={(e) => setFormData({ ...formData, capacidad_maxima: Number(e.target.value) })}
+              min={1}
+              max={50}
+            />
+            <ABMSelect
+              label="Zona Asignada"
+              value={formData.zona_id}
+              onChange={(e) => setFormData({ ...formData, zona_id: e.target.value })}
+              placeholder="Sin zona asignada"
+              options={zonas.map(z => ({ value: z.id, label: z.nombre }))}
+            />
+          </div>
+
+          {/* Selector de Especialidades (Categorias) */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+              Especialidades
+            </label>
+            <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>
+              Selecciona las categorias que puede atender. Haz clic en la estrella para marcar la principal.
+            </p>
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
+              {categorias.map(cat => {
+                const isSelected = formData.categoria_ids.includes(cat.id);
+                const isPrincipal = formData.categoria_principal_id === cat.id.toString();
+                return (
+                  <div
+                    key={cat.id}
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+                      isSelected ? 'ring-2' : ''
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? (cat.color ? `${cat.color}20` : theme.border) : theme.card,
+                      borderColor: cat.color || theme.border,
+                      ['--tw-ring-color' as string]: cat.color || theme.primary
+                    }}
+                    onClick={() => toggleCategoria(cat.id)}
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: cat.color || '#6b7280' }}
+                      />
+                      <span className="text-sm truncate">{cat.nombre}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {isSelected && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPrincipal(cat.id);
+                            }}
+                            className={`p-1 rounded transition-colors ${isPrincipal ? 'text-yellow-500' : ''}`}
+                            style={{ color: isPrincipal ? '#eab308' : theme.textSecondary }}
+                            title={isPrincipal ? 'Categoria principal' : 'Marcar como principal'}
+                          >
+                            <Star className={`h-4 w-4 ${isPrincipal ? 'fill-current' : ''}`} />
+                          </button>
+                          <Check className="h-4 w-4 text-green-500" />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {formData.categoria_ids.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {formData.categoria_ids.map(id => {
+                  const cat = categorias.find(c => c.id === id);
+                  if (!cat) return null;
+                  const isPrincipal = formData.categoria_principal_id === id.toString();
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full text-white"
+                      style={{ backgroundColor: cat.color || '#6b7280' }}
+                    >
+                      {isPrincipal && <Star className="h-3 w-3 fill-current" />}
+                      {cat.nombre}
+                      <button
+                        type="button"
+                        onClick={() => toggleCategoria(id)}
+                        className="ml-1 hover:bg-white/20 rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {selectedEmpleado && selectedEmpleado.miembros && selectedEmpleado.miembros.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+                Miembros Actuales
+              </label>
+              <div className="rounded-lg p-3 space-y-2" style={{ backgroundColor: theme.backgroundSecondary }}>
+                {selectedEmpleado.miembros.map((m) => (
+                  <div key={m.id} className="flex items-center text-sm">
+                    <div
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium mr-2"
+                      style={{ backgroundColor: theme.border, color: theme.text }}
+                    >
+                      {m.nombre[0]}{m.apellido[0]}
+                    </div>
+                    <span>{m.nombre} {m.apellido}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </form>
+      }
+    >
+      {filteredEmpleados.map((c) => (
+        <ABMCard key={c.id} onClick={() => openSheet(c)}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                <User className="h-5 w-5 text-purple-600" />
+              </div>
+              <div className="ml-3">
+                <p className="font-medium">{getNombreCompleto(c)}</p>
+                {c.categoria_principal && (
+                  <p className="text-sm flex items-center gap-1" style={{ color: c.categoria_principal.color || theme.textSecondary }}>
+                    <Star className="h-3 w-3 fill-current" />
+                    {c.categoria_principal.nombre}
+                  </p>
+                )}
+              </div>
+            </div>
+            <ABMBadge active={c.activo} />
+          </div>
+
+          {c.categorias && c.categorias.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-3">
+              {c.categorias.map(cat => (
+                <span
+                  key={cat.id}
+                  className="px-2 py-0.5 text-xs rounded-full text-white"
+                  style={{ backgroundColor: cat.color || '#6b7280' }}
+                >
+                  {cat.nombre}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {c.descripcion && (
+            <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
+              {c.descripcion}
+            </p>
+          )}
+
+          <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
+            <div className="text-sm" style={{ color: theme.textSecondary }}>
+              {zonas.find(z => z.id === c.zona_id)?.nombre || 'Sin zona'}
+            </div>
+            <ABMCardActions
+              onEdit={() => openSheet(c)}
+              onDelete={() => handleDelete(c.id)}
+            />
+          </div>
+        </ABMCard>
+      ))}
+    </ABMPage>
+  );
+}

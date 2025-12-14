@@ -1,0 +1,30 @@
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { getDefaultRoute } from '../config/navigation';
+
+interface Props {
+  children: React.ReactNode;
+  roles?: string[];
+}
+
+export default function ProtectedRoute({ children, roles }: Props) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/bienvenido" replace />;
+  }
+
+  if (roles && !roles.includes(user.rol)) {
+    return <Navigate to={getDefaultRoute(user.rol)} replace />;
+  }
+
+  return <>{children}</>;
+}
