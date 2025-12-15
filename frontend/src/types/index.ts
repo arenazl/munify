@@ -1,9 +1,10 @@
-export type RolUsuario = 'vecino' | 'cuadrilla' | 'supervisor' | 'admin';
+export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin';
 export type EstadoReclamo = 'nuevo' | 'asignado' | 'en_proceso' | 'resuelto' | 'rechazado';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
 export interface User {
   id: number;
+  municipio_id?: number;
   email: string;
   nombre: string;
   apellido: string;
@@ -12,7 +13,7 @@ export interface User {
   direccion?: string;
   rol: RolUsuario;
   activo: boolean;
-  cuadrilla_id?: number;
+  empleado_id?: number;
   created_at: string;
 }
 
@@ -46,7 +47,7 @@ export interface CategoriaSimple {
   icono?: string;
 }
 
-export interface Cuadrilla {
+export interface Empleado {
   id: number;
   nombre: string;
   apellido?: string;
@@ -61,9 +62,6 @@ export interface Cuadrilla {
   categorias: CategoriaSimple[];
   miembros: { id: number; nombre: string; apellido: string; email: string }[];
 }
-
-// Alias para Empleado (usa la misma estructura que Cuadrilla)
-export type Empleado = Cuadrilla;
 
 export interface Documento {
   id: number;
@@ -95,7 +93,7 @@ export interface Reclamo {
   categoria: { id: number; nombre: string; icono?: string; color?: string };
   zona?: { id: number; nombre: string; codigo?: string };
   creador: { id: number; nombre: string; apellido: string; email: string };
-  cuadrilla_asignada?: { id: number; nombre: string; apellido?: string; especialidad?: string };
+  empleado_asignado?: { id: number; nombre: string; apellido?: string; especialidad?: string };
   documentos: Documento[];
 }
 

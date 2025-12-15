@@ -20,12 +20,12 @@ class User(Base):
     telefono = Column(String(20), nullable=True)
     dni = Column(String(20), nullable=True)
     direccion = Column(String(255), nullable=True)
-    rol = Column(Enum(RolUsuario), default=RolUsuario.VECINO, nullable=False)
+    rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
 
-    # Relación con cuadrilla (si es usuario de cuadrilla)
-    cuadrilla_id = Column(Integer, ForeignKey("cuadrillas.id"), nullable=True)
-    cuadrilla = relationship("Cuadrilla", back_populates="miembros")
+    # Relacion con empleado (si es usuario empleado)
+    empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)
+    empleado = relationship("Empleado", back_populates="miembros")
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

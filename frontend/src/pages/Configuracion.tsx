@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { configuracionApi } from '../lib/api';
+import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 
 // Claves que se muestran en la sección especial del Municipio
 const MUNICIPIO_KEYS = ['nombre_municipio', 'direccion_municipio', 'latitud_municipio', 'longitud_municipio', 'telefono_contacto'];
+
+// Claves de configuración de registro
+const REGISTRO_KEYS = ['skip_email_validation'];
 
 interface Config {
   id: number;
@@ -14,6 +17,13 @@ interface Config {
   descripcion: string | null;
   tipo: string;
   editable: boolean;
+  municipio_id: number | null;
+}
+
+interface Municipio {
+  id: number;
+  nombre: string;
+  codigo: string;
 }
 
 interface AddressSuggestion {
@@ -29,6 +39,8 @@ export default function Configuracion() {
   const [saving, setSaving] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [modified, setModified] = useState<Record<string, boolean>>({});
+  const [, setMunicipios] = useState<Municipio[]>([]);
+  const [, setConfigMunicipioScope] = useState<Record<string, number | null>>({});
 
   // Estados para autocompletado de municipio (nombre)
   const [municipioSuggestions, setMunicipioSuggestions] = useState<AddressSuggestion[]>([]);
@@ -44,6 +56,7 @@ export default function Configuracion() {
 
   useEffect(() => {
     fetchConfigs();
+    fetchMunicipios();
   }, []);
 
   const fetchConfigs = async () => {
@@ -51,15 +64,27 @@ export default function Configuracion() {
       const response = await configuracionApi.getAll();
       setConfigs(response.data);
       const vals: Record<string, string> = {};
+      const scopes: Record<string, number | null> = {};
       response.data.forEach((c: Config) => {
         vals[c.clave] = c.valor || '';
+        scopes[c.clave] = c.municipio_id;
       });
       setValues(vals);
+      setConfigMunicipioScope(scopes);
     } catch (error) {
       toast.error('Error al cargar configuración');
       console.error('Error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMunicipios = async () => {
+    try {
+      const response = await municipiosApi.getAll();
+      setMunicipios(response.data);
+    } catch (error) {
+      console.error('Error cargando municipios:', error);
     }
   };
 
@@ -260,8 +285,8 @@ export default function Configuracion() {
   // Verificar si hay cambios en el municipio
   const hasMunicipioChanges = MUNICIPIO_KEYS.some(key => modified[key]);
 
-  // Filtrar configs para excluir las del municipio en la tabla general
-  const otherConfigs = configs.filter(c => !MUNICIPIO_KEYS.includes(c.clave));
+  // Filtrar configs para excluir las del municipio y registro en la tabla general
+  const otherConfigs = configs.filter(c => !MUNICIPIO_KEYS.includes(c.clave) && !REGISTRO_KEYS.includes(c.clave));
 
   if (loading) {
     return (

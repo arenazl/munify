@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
@@ -12,12 +12,38 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const municipioNombre = localStorage.getItem('municipio_nombre') || 'Mi Municipio';
-  const municipioCodigo = localStorage.getItem('municipio_codigo') || 'merlo';
-  const municipioColor = localStorage.getItem('municipio_color') || '#3b82f6';
+  // Leer valores de localStorage con state para forzar re-render
+  const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
+  const [municipioCodigo, setMunicipioCodigo] = useState<string | null>(null);
+  const [municipioColor, setMunicipioColor] = useState('#3b82f6');
 
-  // Construir dominio de emails basado en el municipio seleccionado
-  const domain = `${municipioCodigo}.test.com`;
+  // Cargar datos del municipio al montar
+  useEffect(() => {
+    // Limpiar sesión anterior si existe
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
+    const nombre = localStorage.getItem('municipio_nombre');
+    const codigo = localStorage.getItem('municipio_codigo');
+    const color = localStorage.getItem('municipio_color');
+
+    console.log('Login: municipio_nombre =', nombre);
+    console.log('Login: municipio_codigo =', codigo);
+
+    if (!codigo || !nombre) {
+      // Limpiar todo y redirigir
+      localStorage.removeItem('municipio_codigo');
+      localStorage.removeItem('municipio_id');
+      localStorage.removeItem('municipio_nombre');
+      localStorage.removeItem('municipio_color');
+      navigate('/bienvenido');
+      return;
+    }
+
+    setMunicipioNombre(nombre);
+    setMunicipioCodigo(codigo);
+    setMunicipioColor(color || '#3b82f6');
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,40 +80,51 @@ export default function Login() {
     }
   };
 
-  const testUsers = [
-    {
-      email: `admin@${domain}`,
-      password: '123456',
-      label: 'Administrador',
-      icon: Shield,
-      color: 'from-red-500 to-rose-600',
-      description: 'Control total del sistema'
-    },
-    {
-      email: `supervisor@${domain}`,
-      password: '123456',
-      label: 'Supervisor',
-      icon: Users,
-      color: 'from-orange-500 to-amber-600',
-      description: 'Asigna y supervisa reclamos'
-    },
-    {
-      email: `cuadrilla@${domain}`,
-      password: '123456',
-      label: 'Cuadrilla',
-      icon: Wrench,
-      color: 'from-green-500 to-emerald-600',
-      description: 'Resuelve reclamos en campo'
-    },
-    {
-      email: `vecino@${domain}`,
-      password: '123456',
-      label: 'Vecino',
-      icon: User,
-      color: 'from-blue-500 to-indigo-600',
-      description: 'Crea y sigue sus reclamos'
-    },
-  ];
+  // Configuración visual por rol
+  const rolConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
+    admin: { icon: Shield, color: 'from-red-500 to-rose-600', label: 'Administrador' },
+    supervisor: { icon: Users, color: 'from-orange-500 to-amber-600', label: 'Supervisor' },
+    empleado: { icon: Wrench, color: 'from-green-500 to-emerald-600', label: 'Empleado' },
+    vecino: { icon: User, color: 'from-blue-500 to-indigo-600', label: 'Vecino' },
+  };
+
+  // Estado para usuarios demo cargados desde la API
+  const [demoUsers, setDemoUsers] = useState<Array<{
+    email: string;
+    nombre: string;
+    apellido: string;
+    nombre_completo: string;
+    rol: string;
+  }>>([]);
+
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+  // Cargar usuarios demo desde la API
+  useEffect(() => {
+    if (municipioCodigo) {
+      const loadDemoUsers = async () => {
+        try {
+          const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/demo-users`);
+          if (response.ok) {
+            const users = await response.json();
+            setDemoUsers(users);
+          }
+        } catch (error) {
+          console.error('Error al cargar usuarios demo:', error);
+        }
+      };
+      loadDemoUsers();
+    }
+  }, [municipioCodigo]);
+
+  // No renderizar hasta que se carguen los datos del municipio
+  if (!municipioNombre || !municipioCodigo) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 relative overflow-hidden">
@@ -148,7 +185,7 @@ export default function Login() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                      placeholder={`usuario@${domain}`}
+                      placeholder="tu@email.com"
                     />
                   </div>
                 </div>
@@ -193,21 +230,22 @@ export default function Login() {
 
               {/* Quick login buttons */}
               <div className="grid grid-cols-2 gap-3">
-                {testUsers.map((user, index) => {
-                  const Icon = user.icon;
+                {demoUsers.map((user, index) => {
+                  const config = rolConfig[user.rol] || rolConfig.vecino;
+                  const Icon = config.icon;
                   return (
                     <button
-                      key={`${user.label}-${index}`}
+                      key={`${user.rol}-${index}`}
                       type="button"
-                      onClick={() => quickLogin(user.email, user.password)}
+                      onClick={() => quickLogin(user.email, '123456')}
                       disabled={loading}
-                      className={`relative overflow-hidden bg-gradient-to-r ${user.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                      className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
                     >
                       <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
-                        <div className="text-left">
-                          <div className="font-semibold">{user.label}</div>
-                          <div className="text-[10px] opacity-80">{user.description}</div>
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <div className="text-left min-w-0">
+                          <div className="font-semibold truncate">{user.nombre_completo}</div>
+                          <div className="text-[10px] opacity-80">{config.label}</div>
                         </div>
                       </div>
                     </button>
@@ -225,10 +263,10 @@ export default function Login() {
               <p className="text-slate-500 text-sm">
                 ¿Sos vecino?{' '}
                 <button
-                  onClick={() => navigate('/publico')}
+                  onClick={() => navigate('/nuevo-reclamo')}
                   className="text-blue-400 hover:text-blue-300 transition-colors"
                 >
-                  Creá tu reclamo sin registrarte
+                  Creá tu reclamo
                 </button>
               </p>
             </div>

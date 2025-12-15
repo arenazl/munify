@@ -3,7 +3,7 @@ from .auth import router as auth_router
 from .users import router as users_router
 from .categorias import router as categorias_router
 from .zonas import router as zonas_router
-from .cuadrillas import router as cuadrillas_router
+from .empleados import router as empleados_router
 from .reclamos import router as reclamos_router
 from .configuracion import router as configuracion_router
 from .notificaciones import router as notificaciones_router
@@ -19,6 +19,7 @@ from .escalado import router as escalado_router
 from .emails import router as emails_router
 from .portal_publico import router as portal_publico_router
 from .municipios import router as municipios_router
+from .imagenes import router as imagenes_router
 
 api_router = APIRouter()
 
@@ -27,7 +28,7 @@ api_router.include_router(auth_router, prefix="/auth", tags=["Autenticación"])
 api_router.include_router(users_router, prefix="/users", tags=["Usuarios"])
 api_router.include_router(categorias_router, prefix="/categorias", tags=["Categorías"])
 api_router.include_router(zonas_router, prefix="/zonas", tags=["Zonas"])
-api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
+api_router.include_router(empleados_router, prefix="/empleados", tags=["Empleados"])
 api_router.include_router(reclamos_router, prefix="/reclamos", tags=["Reclamos"])
 api_router.include_router(configuracion_router, prefix="/configuracion", tags=["Configuración"])
 api_router.include_router(notificaciones_router, prefix="/notificaciones", tags=["Notificaciones"])
@@ -42,6 +43,7 @@ api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=
 api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
 api_router.include_router(emails_router, prefix="/emails", tags=["Emails"])
 api_router.include_router(portal_publico_router, prefix="/publico", tags=["Portal Público"])
+api_router.include_router(imagenes_router, tags=["Imágenes"])
 
 # WebSockets
 from .ws import router as ws_router

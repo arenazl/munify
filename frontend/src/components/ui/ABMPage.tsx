@@ -295,7 +295,7 @@ export function ABMPage({
           onClose={onSheetClose}
           title={sheetTitle || ''}
           description={sheetDescription}
-          footer={sheetFooter}
+          stickyFooter={sheetFooter}
         >
           {sheetContent}
         </Sheet>
@@ -318,17 +318,14 @@ export function ABMCard({ children, onClick, index = 0 }: ABMCardProps) {
     <div
       onClick={onClick}
       className={`
-        rounded-xl p-4 sm:p-5
-        transition-all duration-300 ease-out
+        rounded-2xl p-4 sm:p-5
         ${onClick ? 'cursor-pointer' : ''}
-        sm:hover:scale-[1.03] sm:hover:-translate-y-2
-        hover:shadow-xl hover:shadow-black/5
-        active:scale-[0.98]
         group
         relative
         overflow-hidden
         animate-fade-in-up
         touch-manipulation
+        abm-card-hover
       `}
       style={{
         backgroundColor: theme.card,
@@ -336,21 +333,43 @@ export function ABMCard({ children, onClick, index = 0 }: ABMCardProps) {
         color: theme.text,
         animationDelay: `${index * 50}ms`,
         animationFillMode: 'both',
+        // Variables CSS para usar en las animaciones
+        ['--card-primary' as string]: theme.primary,
+        ['--card-border' as string]: theme.border,
       }}
     >
-      {/* Hover gradient overlay */}
+      {/* Animated border glow - sutil */}
       <div
-        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 pointer-events-none"
         style={{
-          background: `linear-gradient(135deg, ${theme.primary}08 0%, transparent 50%)`,
+          background: `linear-gradient(135deg, ${theme.primary}15, transparent 60%, ${theme.primary}10)`,
+          transition: 'opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       />
 
-      {/* Glow effect on hover */}
+      {/* Shine effect that moves on hover */}
       <div
-        className="absolute -inset-px rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none overflow-hidden rounded-2xl"
         style={{
-          background: `linear-gradient(135deg, ${theme.primary}20, transparent)`,
+          transition: 'opacity 0.3s ease',
+        }}
+      >
+        <div
+          className="absolute -inset-full group-hover:translate-x-full"
+          style={{
+            background: `linear-gradient(90deg, transparent, ${theme.primary}10, transparent)`,
+            transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+            transform: 'translateX(-100%)',
+          }}
+        />
+      </div>
+
+      {/* Subtle inner shadow on hover */}
+      <div
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 pointer-events-none"
+        style={{
+          boxShadow: `inset 0 1px 1px ${theme.primary}10, inset 0 -1px 1px ${theme.primary}05`,
+          transition: 'opacity 0.4s ease',
         }}
       />
 
@@ -1158,6 +1177,107 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 
     .animate-table-action-click {
       animation: table-action-click 0.3s ease-out;
+    }
+
+    /* ABMCard hover animations - SMOOTH & PROFESSIONAL */
+    .abm-card-hover {
+      transition:
+        transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+        border-color 0.3s ease;
+      will-cange: transform, box-shadow;
+    }
+
+    .abm-card-hover:hover {
+      transform: translateY(-6px) scale(1.01);
+      box-shadow:
+        0 20px 40px -12px rgba(0, 0, 0, 0.15),
+        0 12px 24px -8px rgba(0, 0, 0, 0.1),
+        0 0 0 1px var(--card-primary, #8b5cf6);
+      border-color: var(--card-primary, #8b5cf6) !important;
+    }
+
+    .abm-card-hover:active {
+      transform: translateY(-3px) scale(0.99);
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Glow effect behind card on hover */
+    .abm-card-hover::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      background: linear-gradient(135deg, var(--card-primary, #8b5cf6), transparent 60%);
+      opacity: 0;
+      z-index: -1;
+      transition: opacity 0.4s ease;
+      filter: blur(12px);
+    }
+
+    .abm-card-hover:hover::before {
+      opacity: 0.3;
+    }
+
+    /* Shine sweep animation - smooth gradient */
+    @keyframes shine-sweep {
+      0% {
+        transform: translateX(-100%) skewX(-15deg);
+        opacity: 0;
+      }
+      30% {
+        opacity: 0.6;
+      }
+      100% {
+        transform: translateX(200%) skewX(-15deg);
+        opacity: 0;
+      }
+    }
+
+    .abm-card-hover:hover .group-hover\\:translate-x-full {
+      animation: shine-sweep 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* Image zoom effect inside cards */
+    .abm-card-hover img {
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+    }
+
+    .abm-card-hover:hover img {
+      transform: scale(1.08);
+    }
+
+    /* Icon bounce on hover */
+    .abm-card-hover .group-hover\\:scale-110 {
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    /* Touch devices - reduce motion */
+    @media (hover: none) {
+      .abm-card-hover:hover {
+        transform: none;
+        box-shadow: none;
+      }
+      .abm-card-hover:hover::before {
+        opacity: 0;
+      }
+      .abm-card-hover:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+      }
+    }
+
+    /* Prefer reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      .abm-card-hover {
+        transition: opacity 0.2s ease, border-color 0.2s ease;
+      }
+      .abm-card-hover:hover {
+        transform: none;
+      }
+      .abm-card-hover:hover img {
+        transform: none;
+      }
     }
   `;
   document.head.appendChild(style);

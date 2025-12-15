@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -22,6 +22,18 @@ from schemas.historial import HistorialResponse
 
 router = APIRouter()
 
+
+def get_effective_municipio_id(request: Request, current_user: User) -> int:
+    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
+    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        header_municipio_id = request.headers.get('X-Municipio-ID')
+        if header_municipio_id:
+            try:
+                return int(header_municipio_id)
+            except (ValueError, TypeError):
+                pass
+    return current_user.municipio_id
+
 # Configurar Cloudinary
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,
@@ -34,29 +46,31 @@ def get_reclamos_query():
         selectinload(Reclamo.categoria),
         selectinload(Reclamo.zona),
         selectinload(Reclamo.creador),
-        selectinload(Reclamo.cuadrilla_asignada),
+        selectinload(Reclamo.empleado_asignado),
         selectinload(Reclamo.documentos)
     )
 
 @router.get("/", response_model=List[ReclamoResponse])
 async def get_reclamos(
+    request: Request,
     estado: Optional[EstadoReclamo] = None,
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
-    cuadrilla_id: Optional[int] = None,
+    empleado_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     query = get_reclamos_query()
 
-    # SIEMPRE filtrar por municipio del usuario
-    query = query.where(Reclamo.municipio_id == current_user.municipio_id)
+    # Filtrar por municipio (usa header para admins, o municipio del usuario)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    query = query.where(Reclamo.municipio_id == municipio_id)
 
     # Filtrar según rol
     if current_user.rol == RolUsuario.VECINO:
         query = query.where(Reclamo.creador_id == current_user.id)
-    elif current_user.rol == RolUsuario.CUADRILLA:
-        query = query.where(Reclamo.cuadrilla_id == current_user.cuadrilla_id)
+    elif current_user.rol == RolUsuario.EMPLEADO:
+        query = query.where(Reclamo.empleado_id == current_user.empleado_id)
 
     # Filtros opcionales
     if estado:
@@ -65,8 +79,8 @@ async def get_reclamos(
         query = query.where(Reclamo.categoria_id == categoria_id)
     if zona_id:
         query = query.where(Reclamo.zona_id == zona_id)
-    if cuadrilla_id:
-        query = query.where(Reclamo.cuadrilla_id == cuadrilla_id)
+    if empleado_id:
+        query = query.where(Reclamo.empleado_id == empleado_id)
 
     query = query.order_by(Reclamo.created_at.desc())
     result = await db.execute(query)
@@ -88,7 +102,7 @@ async def cambiar_estado_reclamo_drag(
     reclamo_id: int,
     nuevo_estado: str = Query(..., description="Nuevo estado del reclamo"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor", "cuadrilla"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
     """Cambiar el estado de un reclamo (usado por drag & drop en tablero Kanban)."""
     from datetime import datetime
@@ -119,9 +133,9 @@ async def cambiar_estado_reclamo_drag(
             detail=f"No se puede cambiar de {reclamo.estado.value} a {estado_enum.value}"
         )
 
-    # Verificar permisos de cuadrilla
-    if current_user.rol == RolUsuario.CUADRILLA:
-        if reclamo.cuadrilla_id != current_user.cuadrilla_id:
+    # Verificar permisos de empleado
+    if current_user.rol == RolUsuario.EMPLEADO:
+        if reclamo.empleado_id != current_user.empleado_id:
             raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
 
     estado_anterior = reclamo.estado
@@ -253,10 +267,10 @@ async def asignar_reclamo(
         raise HTTPException(status_code=400, detail="El reclamo no puede ser asignado en su estado actual")
 
     estado_anterior = reclamo.estado
-    reclamo.cuadrilla_id = data.cuadrilla_id
+    reclamo.empleado_id = data.empleado_id
     reclamo.estado = EstadoReclamo.ASIGNADO
 
-    # Programación del trabajo
+    # Programacion del trabajo
     if data.fecha_programada:
         reclamo.fecha_programada = data.fecha_programada
     if data.hora_inicio:
@@ -265,7 +279,7 @@ async def asignar_reclamo(
         reclamo.hora_fin = data.hora_fin
 
     # Construir comentario del historial
-    comentario_historial = data.comentario or f"Asignado a empleado #{data.cuadrilla_id}"
+    comentario_historial = data.comentario or f"Asignado a empleado #{data.empleado_id}"
     if data.fecha_programada:
         comentario_historial += f" - Programado para {data.fecha_programada}"
         if data.hora_inicio and data.hora_fin:
@@ -290,7 +304,7 @@ async def asignar_reclamo(
 async def iniciar_reclamo(
     reclamo_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor", "cuadrilla"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
@@ -300,8 +314,8 @@ async def iniciar_reclamo(
     if reclamo.estado != EstadoReclamo.ASIGNADO:
         raise HTTPException(status_code=400, detail="El reclamo debe estar asignado para iniciarlo")
 
-    # Verificar que la cuadrilla del usuario sea la asignada
-    if current_user.rol == RolUsuario.CUADRILLA and reclamo.cuadrilla_id != current_user.cuadrilla_id:
+    # Verificar que el empleado del usuario sea el asignado
+    if current_user.rol == RolUsuario.EMPLEADO and reclamo.empleado_id != current_user.empleado_id:
         raise HTTPException(status_code=403, detail="No tienes permiso para iniciar este reclamo")
 
     estado_anterior = reclamo.estado
@@ -327,7 +341,7 @@ async def resolver_reclamo(
     reclamo_id: int,
     data: ReclamoResolver,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor", "cuadrilla"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
     from datetime import datetime
 
@@ -339,7 +353,7 @@ async def resolver_reclamo(
     if reclamo.estado != EstadoReclamo.EN_PROCESO:
         raise HTTPException(status_code=400, detail="El reclamo debe estar en proceso para resolverlo")
 
-    if current_user.rol == RolUsuario.CUADRILLA and reclamo.cuadrilla_id != current_user.cuadrilla_id:
+    if current_user.rol == RolUsuario.EMPLEADO and reclamo.empleado_id != current_user.empleado_id:
         raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
 
     estado_anterior = reclamo.estado
@@ -398,6 +412,11 @@ async def rechazar_reclamo(
     return result.scalar_one()
 
 
+# Tipos de archivo permitidos y tamaño máximo
+ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/gif"]
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
 @router.post("/{reclamo_id}/upload")
 async def upload_documento(
     reclamo_id: int,
@@ -406,17 +425,42 @@ async def upload_documento(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Validar tipo de archivo
+    if file.content_type not in ALLOWED_FILE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Usa: jpg, png, webp, gif"
+        )
+
+    # Validar extensión (doble check de seguridad)
+    import os
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.gif']:
+        raise HTTPException(status_code=400, detail="Extensión de archivo no permitida")
+
+    # Leer contenido para validar tamaño
+    file_content = await file.read()
+    if len(file_content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Archivo muy grande. Máximo: {MAX_FILE_SIZE // 1024 // 1024}MB"
+        )
+
+    # Volver al inicio del archivo para Cloudinary
+    await file.seek(0)
+
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    # Subir a Cloudinary
+    # Subir a Cloudinary con tipos permitidos
     try:
         upload_result = cloudinary.uploader.upload(
             file.file,
             folder=f"reclamos/{reclamo_id}",
-            resource_type="auto"
+            resource_type="image",
+            allowed_formats=["jpg", "png", "jpeg", "webp", "gif"]
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
@@ -442,9 +486,9 @@ async def upload_documento(
     return {"message": "Archivo subido", "url": documento.url, "id": documento.id}
 
 
-@router.get("/empleado/{cuadrilla_id}/disponibilidad/{fecha}")
+@router.get("/empleado/{empleado_id}/disponibilidad/{fecha}")
 async def get_disponibilidad_empleado(
-    cuadrilla_id: int,
+    empleado_id: int,
     fecha: str,
     buscar_siguiente: bool = Query(False, description="Buscar siguiente día si el actual está lleno"),
     db: AsyncSession = Depends(get_db),
@@ -473,7 +517,7 @@ async def get_disponibilidad_empleado(
         result = await db.execute(
             select(Reclamo)
             .where(
-                Reclamo.cuadrilla_id == cuadrilla_id,
+                Reclamo.empleado_id == empleado_id,
                 Reclamo.fecha_programada == fecha_check,
                 Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
             )
@@ -563,9 +607,9 @@ async def get_sugerencia_asignacion(
     4. Disponibilidad próxima (peso: 15%)
     """
     from datetime import date as date_type, time as time_type, timedelta, datetime as datetime_type
-    from models.cuadrilla import Cuadrilla
+    from models.empleado import Empleado
     from models.categoria import Categoria
-    from models.cuadrilla_categoria import cuadrilla_categoria
+    from models.empleado_categoria import empleado_categoria
     import math
 
     # Obtener el reclamo
@@ -581,13 +625,13 @@ async def get_sugerencia_asignacion(
 
     # Obtener todos los empleados activos del municipio
     result = await db.execute(
-        select(Cuadrilla)
+        select(Empleado)
         .options(
-            selectinload(Cuadrilla.categorias),
-            selectinload(Cuadrilla.zona_asignada),
-            selectinload(Cuadrilla.categoria_principal)
+            selectinload(Empleado.categorias),
+            selectinload(Empleado.zona_asignada),
+            selectinload(Empleado.categoria_principal)
         )
-        .where(Cuadrilla.activo == True, Cuadrilla.municipio_id == current_user.municipio_id)
+        .where(Empleado.activo == True, Empleado.municipio_id == current_user.municipio_id)
     )
     empleados = result.scalars().all()
 
@@ -613,13 +657,25 @@ async def get_sugerencia_asignacion(
         categoria_score = 0
         categoria_ids = [cat.id for cat in empleado.categorias]
 
-        # Categoría principal = 40 puntos
-        if empleado.categoria_principal_id == reclamo.categoria_id:
+        # Normalizar nombre de categoría del reclamo para comparación
+        cat_reclamo_nombre = reclamo.categoria.nombre.lower().strip() if reclamo.categoria else ""
+        emp_especialidad = (empleado.especialidad or "").lower().strip()
+
+        # Categoría principal por ID = 40 puntos
+        if empleado.categoria_principal_id and empleado.categoria_principal_id == reclamo.categoria_id:
             categoria_score = 40
             detalles["categoria_match"] = True
-        # Tiene la categoría en su lista = 30 puntos
+        # Tiene la categoría en su lista de IDs = 30 puntos
         elif reclamo.categoria_id in categoria_ids:
             categoria_score = 30
+            detalles["categoria_match"] = True
+        # Match por nombre de especialidad (texto) = 35 puntos
+        elif emp_especialidad and cat_reclamo_nombre and (
+            emp_especialidad in cat_reclamo_nombre or
+            cat_reclamo_nombre in emp_especialidad or
+            emp_especialidad == cat_reclamo_nombre
+        ):
+            categoria_score = 35
             detalles["categoria_match"] = True
         # No tiene la categoría = 0 puntos
 
@@ -650,7 +706,7 @@ async def get_sugerencia_asignacion(
         result_carga = await db.execute(
             select(func.count(Reclamo.id))
             .where(
-                Reclamo.cuadrilla_id == empleado.id,
+                Reclamo.empleado_id == empleado.id,
                 Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
             )
         )
@@ -687,7 +743,7 @@ async def get_sugerencia_asignacion(
             result_dia = await db.execute(
                 select(Reclamo)
                 .where(
-                    Reclamo.cuadrilla_id == empleado.id,
+                    Reclamo.empleado_id == empleado.id,
                     Reclamo.fecha_programada == fecha_check,
                     Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
                 )

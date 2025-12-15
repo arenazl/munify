@@ -7,7 +7,7 @@ export const getNavigation = (userRole: string) => {
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
-  const isCuadrilla = userRole === 'cuadrilla';
+  const isEmpleado = userRole === 'empleado';
   const isVecino = userRole === 'vecino';
 
   return [
@@ -58,7 +58,7 @@ export const getNavigation = (userRole: string) => {
       name: 'Tablero',
       href: '/tablero',
       icon: Wrench,
-      show: isCuadrilla || isAdminOrSupervisor,
+      show: isEmpleado || isAdminOrSupervisor,
       description: 'Tablero de trabajo'
     },
 
@@ -113,7 +113,7 @@ export const getDefaultRoute = (role: string) => {
     case 'admin':
     case 'supervisor':
       return '/';
-    case 'cuadrilla':
+    case 'empleado':
       return '/tablero';
     case 'vecino':
       return '/mi-panel';

@@ -2,6 +2,15 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '../types';
 import { authApi } from '../lib/api';
+import api from '../lib/api';
+
+export interface Municipio {
+  id: number;
+  nombre: string;
+  codigo: string;
+  color_primario?: string;
+  logo_url?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -9,6 +18,11 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (data: { email: string; password: string; nombre: string; apellido: string }) => Promise<void>;
   logout: () => void;
+  // Multi-tenant
+  municipios: Municipio[];
+  municipioActual: Municipio | null;
+  setMunicipioActual: (municipio: Municipio) => void;
+  loadMunicipios: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -16,6 +30,51 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+  const [municipioActual, setMunicipioActualState] = useState<Municipio | null>(null);
+
+  // Cargar municipios disponibles para el usuario
+  const loadMunicipios = async () => {
+    try {
+      const response = await api.get('/municipios');
+      const munis = response.data;
+      setMunicipios(munis);
+
+      // Si no hay municipio seleccionado, seleccionar el del usuario o el primero
+      if (!municipioActual && munis.length > 0) {
+        const storedMuniId = localStorage.getItem('municipio_actual_id');
+        const userMuniId = user?.municipio_id;
+
+        let selectedMuni = munis[0];
+
+        if (storedMuniId) {
+          const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
+          if (found) selectedMuni = found;
+        } else if (userMuniId) {
+          const found = munis.find((m: Municipio) => m.id === userMuniId);
+          if (found) selectedMuni = found;
+        }
+
+        setMunicipioActualState(selectedMuni);
+        localStorage.setItem('municipio_actual_id', String(selectedMuni.id));
+        localStorage.setItem('municipio_id', String(selectedMuni.id));
+        localStorage.setItem('municipio_nombre', selectedMuni.nombre);
+        localStorage.setItem('municipio_codigo', selectedMuni.codigo);
+        localStorage.setItem('municipio_color', selectedMuni.color_primario || '#3b82f6');
+      }
+    } catch (e) {
+      console.error('Error cargando municipios:', e);
+    }
+  };
+
+  const setMunicipioActual = (municipio: Municipio) => {
+    setMunicipioActualState(municipio);
+    localStorage.setItem('municipio_actual_id', String(municipio.id));
+    localStorage.setItem('municipio_id', String(municipio.id));
+    localStorage.setItem('municipio_nombre', municipio.nombre);
+    localStorage.setItem('municipio_codigo', municipio.codigo);
+    localStorage.setItem('municipio_color', municipio.color_primario || '#3b82f6');
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -27,6 +86,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  // Cargar municipios cuando el usuario esté logueado
+  useEffect(() => {
+    if (user) {
+      loadMunicipios();
+    }
+  }, [user]);
+
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password);
     const { access_token, user } = response.data;
@@ -34,6 +100,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('token', access_token);
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
+
+    // Super Admin (sin municipio_id): cargar todos los municipios y seleccionar el primero
+    const isSuperAdmin = user.rol === 'admin' && !user.municipio_id;
+
+    if (isSuperAdmin) {
+      // Para super admin, cargar todos los municipios
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/municipios`, {
+          headers: { Authorization: `Bearer ${access_token}` }
+        });
+        if (res.ok) {
+          const munis = await res.json();
+          setMunicipios(munis);
+          if (munis.length > 0) {
+            // Usar el guardado en localStorage o el primero
+            const storedMuniId = localStorage.getItem('municipio_actual_id');
+            let selectedMuni = munis[0];
+            if (storedMuniId) {
+              const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
+              if (found) selectedMuni = found;
+            }
+            localStorage.setItem('municipio_actual_id', String(selectedMuni.id));
+            localStorage.setItem('municipio_id', String(selectedMuni.id));
+            localStorage.setItem('municipio_nombre', selectedMuni.nombre);
+            localStorage.setItem('municipio_codigo', selectedMuni.codigo);
+            localStorage.setItem('municipio_color', selectedMuni.color_primario || '#3b82f6');
+            setMunicipioActualState(selectedMuni);
+          }
+        }
+      } catch (e) {
+        console.error('Error cargando municipios para super admin:', e);
+      }
+    } else if (user.municipio_id) {
+      // Usuario normal: cargar solo su municipio
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/municipios/${user.municipio_id}`, {
+          headers: { Authorization: `Bearer ${access_token}` }
+        });
+        if (res.ok) {
+          const muni = await res.json();
+          localStorage.setItem('municipio_actual_id', String(muni.id));
+          localStorage.setItem('municipio_id', String(muni.id));
+          localStorage.setItem('municipio_nombre', muni.nombre);
+          localStorage.setItem('municipio_codigo', muni.codigo);
+          localStorage.setItem('municipio_color', muni.color_primario || '#3b82f6');
+          setMunicipioActualState(muni);
+        }
+      } catch (e) {
+        console.error('Error cargando municipio:', e);
+      }
+    }
   };
 
   const register = async (data: { email: string; password: string; nombre: string; apellido: string }) => {
@@ -45,11 +164,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('municipio_actual_id');
     setUser(null);
+    setMunicipioActualState(null);
+    setMunicipios([]);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{
+      user,
+      isLoading,
+      login,
+      register,
+      logout,
+      municipios,
+      municipioActual,
+      setMunicipioActual,
+      loadMunicipios
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -10,6 +10,10 @@ class SLAConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # Multi-tenant
+    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
+    municipio = relationship("Municipio")
+
     # Puede ser por categoría específica o general (categoria_id = null)
     categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=True)
     categoria = relationship("Categoria")

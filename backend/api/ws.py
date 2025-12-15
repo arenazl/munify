@@ -31,7 +31,7 @@ async def websocket_endpoint(
     Conexión: ws://host/api/ws?token=JWT_TOKEN
 
     Mensajes recibidos:
-    - {"type": "subscribe", "rooms": ["supervisores", "cuadrilla_1"]}
+    - {"type": "subscribe", "rooms": ["supervisores", "empleado_1"]}
     - {"type": "ping"}
 
     Mensajes enviados:
@@ -90,9 +90,9 @@ async def notify_reclamo_creado(reclamo_data: dict):
     })
 
 
-async def notify_reclamo_asignado(reclamo_data: dict, cuadrilla_id: int):
-    """Notificar a la cuadrilla cuando se les asigna un reclamo."""
-    await manager.send_to_room(f"cuadrilla_{cuadrilla_id}", {
+async def notify_reclamo_asignado(reclamo_data: dict, empleado_id: int):
+    """Notificar al empleado cuando se le asigna un reclamo."""
+    await manager.send_to_room(f"empleado_{empleado_id}", {
         "type": WSEvents.RECLAMO_ASIGNADO,
         "data": reclamo_data
     })

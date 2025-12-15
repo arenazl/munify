@@ -1,6 +1,24 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const getApiUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+
+  // Si hay URL configurada, usarla
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // Fallback: en desarrollo usar el host actual
+  if (import.meta.env.DEV) {
+    const host = window.location.hostname;
+    return `http://${host}:8002/api`;
+  }
+
+  return 'http://localhost:8002/api';
+};
+
+const API_URL = getApiUrl();
+console.log('🔗 API URL:', API_URL);
 
 if (!API_URL) {
   console.error('VITE_API_URL no está configurado en .env');
@@ -13,12 +31,19 @@ const api = axios.create({
   },
 });
 
-// Interceptor para agregar token
+// Interceptor para agregar token y municipio seleccionado
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Agregar municipio seleccionado (para multi-tenant)
+  const municipioId = localStorage.getItem('municipio_actual_id');
+  if (municipioId) {
+    config.headers['X-Municipio-ID'] = municipioId;
+  }
+
   return config;
 });
 
@@ -27,9 +52,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      // No redirigir en páginas públicas donde se espera que el usuario no esté autenticado
+      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register'];
+      const currentPath = window.location.pathname;
+      const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
+
+      if (!isPublicPath) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -62,7 +94,7 @@ export const reclamosApi = {
   create: (data: Record<string, unknown>) => api.post('/reclamos', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/reclamos/${id}`, data),
   asignar: (id: number, data: {
-    cuadrilla_id: number;
+    empleado_id: number;
     fecha_programada?: string;
     hora_inicio?: string;
     hora_fin?: string;
@@ -106,17 +138,14 @@ export const zonasApi = {
   delete: (id: number) => api.delete(`/zonas/${id}`),
 };
 
-// Cuadrillas / Empleados (mismo endpoint, diferentes nombres)
-export const cuadrillasApi = {
-  getAll: (activo?: boolean) => api.get('/cuadrillas', { params: activo !== undefined ? { activo } : {} }),
-  getOne: (id: number) => api.get(`/cuadrillas/${id}`),
-  create: (data: Record<string, unknown>) => api.post('/cuadrillas', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/cuadrillas/${id}`, data),
-  delete: (id: number) => api.delete(`/cuadrillas/${id}`),
+// Empleados
+export const empleadosApi = {
+  getAll: (activo?: boolean) => api.get('/empleados', { params: activo !== undefined ? { activo } : {} }),
+  getOne: (id: number) => api.get(`/empleados/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/empleados', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/empleados/${id}`, data),
+  delete: (id: number) => api.delete(`/empleados/${id}`),
 };
-
-// Alias para empleados (usa el mismo endpoint que cuadrillas)
-export const empleadosApi = cuadrillasApi;
 
 // Usuarios
 export const usersApi = {
@@ -132,11 +161,12 @@ export const dashboardApi = {
   getConfig: () => api.get('/dashboard/config'),
   getStats: () => api.get('/dashboard/stats'),
   getMisStats: () => api.get('/dashboard/mis-stats'),
-  getCuadrillaStats: () => api.get('/dashboard/cuadrilla-stats'),
+  getEmpleadoStats: () => api.get('/dashboard/empleado-stats'),
   getPorCategoria: () => api.get('/dashboard/por-categoria'),
   getPorZona: () => api.get('/dashboard/por-zona'),
   getTendencia: (dias?: number) => api.get('/dashboard/tendencia', { params: dias ? { dias } : {} }),
   getMetricasAccion: () => api.get('/dashboard/metricas-accion'),
+  getMetricasDetalle: () => api.get('/dashboard/metricas-detalle'),
   getRecurrentes: (dias?: number, minReclamos?: number) => api.get('/dashboard/recurrentes', { params: { dias: dias || 90, min_reclamos: minReclamos || 2 } }),
 };
 
@@ -153,16 +183,34 @@ export const configuracionApi = {
   getAll: () => api.get('/configuracion'),
   get: (clave: string) => api.get(`/configuracion/${clave}`),
   getPublica: (clave: string) => api.get(`/configuracion/publica/${clave}`),
-  update: (clave: string, data: { valor: string }) => api.put(`/configuracion/${clave}`, data),
+  update: (clave: string, data: { valor: string; municipio_id?: number | null }) => api.put(`/configuracion/${clave}`, data),
 };
 
-// Chat IA (Ollama)
+// Municipios
+export const municipiosApi = {
+  getAll: () => api.get('/municipios'),
+  getOne: (id: number) => api.get(`/municipios/${id}`),
+};
+
+// Chat IA
 export const chatApi = {
   sendMessage: async (message: string, history: Array<{role: string, content: string}> = []) => {
     const response = await api.post('/chat', { message, history });
     return response.data;
   },
   getStatus: () => api.get('/chat/status'),
+};
+
+// Clasificación IA
+export const clasificacionApi = {
+  clasificar: async (texto: string, municipioId: number, usarIa: boolean = true) => {
+    const response = await api.post('/publico/clasificar', {
+      texto,
+      municipio_id: municipioId,
+      usar_ia: usarIa,
+    });
+    return response.data;
+  },
 };
 
 // SLA
@@ -197,7 +245,7 @@ export const exportarApi = {
     estado?: string;
     categoria_id?: number;
     zona_id?: number;
-    cuadrilla_id?: number;
+    empleado_id?: number;
     fecha_desde?: string;
     fecha_hasta?: string;
   }) => api.get('/exportar/reclamos/csv', { params, responseType: 'blob' }),
@@ -213,6 +261,9 @@ export const exportarApi = {
 export const publicoApi = {
   getEstadisticas: () => api.get('/publico/estadisticas'),
   getTendencias: (dias?: number) => api.get('/publico/tendencias', { params: { dias } }),
+  getCategorias: (municipioId?: number) => api.get('/publico/categorias', { params: { municipio_id: municipioId } }),
+  getZonas: (municipioId?: number) => api.get('/publico/zonas', { params: { municipio_id: municipioId } }),
+  getConfigRegistro: () => api.get('/configuracion/publica/registro'),
 };
 
 // Analytics avanzados
@@ -227,6 +278,23 @@ export const analyticsApi = {
     api.get('/analytics/cobertura', { params: { dias } }),
   getTiempoResolucion: (dias?: number) =>
     api.get('/analytics/tiempo-resolucion', { params: { dias } }),
-  getRendimientoCuadrillas: (semanas?: number) =>
-    api.get('/analytics/rendimiento-cuadrillas', { params: { semanas } }),
+  getRendimientoEmpleados: (semanas?: number) =>
+    api.get('/analytics/rendimiento-empleados', { params: { semanas } }),
+};
+
+// Imágenes
+export const imagenesApi = {
+  buscar: (query: string, tipo: 'general' | 'categoria' = 'general') =>
+    api.get('/imagenes/buscar', { params: { q: query, tipo } }),
+  getCategoria: (nombre: string) =>
+    api.get(`/imagenes/categoria/${encodeURIComponent(nombre)}`),
+  // Helper para construir URL completa de imagen estática
+  getStaticUrl: (path: string | null): string | null => {
+    if (!path) return null;
+    // Si ya es URL absoluta, retornarla
+    if (path.startsWith('http')) return path;
+    // Construir URL del backend para archivos estáticos
+    const baseUrl = API_URL.replace('/api', '');
+    return `${baseUrl}${path}`;
+  },
 };

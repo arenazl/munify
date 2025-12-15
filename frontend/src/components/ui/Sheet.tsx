@@ -51,9 +51,9 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         onClick={onClose}
       />
 
-      {/* Side Panel con slide + scale desde la derecha */}
+      {/* Side Panel con slide + scale desde la derecha - 100% viewport visible */}
       <div
-        className="fixed inset-y-0 right-0 z-50 w-full max-w-lg flex flex-col overflow-hidden"
+        className="fixed top-0 right-0 z-50 w-full max-w-lg flex flex-col"
         style={{
           backgroundColor: theme.card,
           transform: isVisible
@@ -64,6 +64,8 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
             ? `-20px 0 60px rgba(0, 0, 0, 0.3), -5px 0 20px ${theme.primary}20`
             : 'none',
           transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          height: '100dvh', // Dynamic viewport height - sin contar scroll
+          maxHeight: '100dvh',
         }}
       >
         {/* Línea de acento animada */}

@@ -44,4 +44,6 @@ LIMITS = {
     "auth": "10/minute",      # Login/register más restrictivo
     "create": "30/minute",    # Crear reclamos
     "upload": "20/minute",    # Subir fotos
+    "ia": "10/minute",        # Endpoints que usan IA (cuestan $)
+    "publico": "60/minute",   # Endpoints públicos
 }

@@ -14,7 +14,7 @@ from models.user import User
 from models.reclamo import Reclamo
 from models.categoria import Categoria
 from models.zona import Zona
-from models.cuadrilla import Cuadrilla
+from models.empleado import Empleado
 from models.enums import EstadoReclamo
 
 router = APIRouter()
@@ -25,7 +25,7 @@ async def exportar_reclamos_csv(
     estado: Optional[str] = None,
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
-    cuadrilla_id: Optional[int] = None,
+    empleado_id: Optional[int] = None,
     fecha_desde: Optional[str] = None,
     fecha_hasta: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
@@ -36,7 +36,7 @@ async def exportar_reclamos_csv(
         selectinload(Reclamo.categoria),
         selectinload(Reclamo.zona),
         selectinload(Reclamo.creador),
-        selectinload(Reclamo.cuadrilla_asignada)
+        selectinload(Reclamo.empleado_asignado)
     )
 
     # Aplicar filtros
@@ -53,8 +53,8 @@ async def exportar_reclamos_csv(
     if zona_id:
         query = query.where(Reclamo.zona_id == zona_id)
 
-    if cuadrilla_id:
-        query = query.where(Reclamo.cuadrilla_id == cuadrilla_id)
+    if empleado_id:
+        query = query.where(Reclamo.empleado_id == empleado_id)
 
     if fecha_desde:
         try:
@@ -126,7 +126,7 @@ async def exportar_reclamos_csv(
             r.direccion,
             f"{r.creador.nombre} {r.creador.apellido}" if r.creador else '',
             r.creador.email if r.creador else '',
-            f"{r.cuadrilla_asignada.nombre} {r.cuadrilla_asignada.apellido or ''}" if r.cuadrilla_asignada else '',
+            f"{r.empleado_asignado.nombre} {r.empleado_asignado.apellido or ''}" if r.empleado_asignado else '',
             r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '',
             r.fecha_programada.strftime('%Y-%m-%d') if r.fecha_programada else '',
             r.hora_inicio.strftime('%H:%M') if r.hora_inicio else '',
@@ -189,14 +189,14 @@ async def exportar_estadisticas_csv(
     # Estadísticas por empleado
     result = await db.execute(
         select(
-            Cuadrilla.nombre,
-            Cuadrilla.apellido,
+            Empleado.nombre,
+            Empleado.apellido,
             func.count(Reclamo.id).label('total'),
             func.count(Reclamo.id).filter(Reclamo.estado == EstadoReclamo.RESUELTO).label('resueltos')
         )
-        .join(Reclamo, Reclamo.cuadrilla_id == Cuadrilla.id)
+        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
         .where(Reclamo.created_at >= fecha_desde)
-        .group_by(Cuadrilla.id, Cuadrilla.nombre, Cuadrilla.apellido)
+        .group_by(Empleado.id, Empleado.nombre, Empleado.apellido)
     )
     por_empleado = result.all()
 
@@ -287,13 +287,13 @@ async def exportar_empleados_csv(
     """Exportar listado de empleados con sus métricas"""
     # Obtener empleados con estadísticas
     result = await db.execute(
-        select(Cuadrilla)
+        select(Empleado)
         .options(
-            selectinload(Cuadrilla.categoria_principal),
-            selectinload(Cuadrilla.zona_asignada),
-            selectinload(Cuadrilla.categorias)
+            selectinload(Empleado.categoria_principal),
+            selectinload(Empleado.zona_asignada),
+            selectinload(Empleado.categorias)
         )
-        .where(Cuadrilla.activo == True)
+        .where(Empleado.activo == True)
     )
     empleados = result.scalars().all()
 

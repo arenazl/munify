@@ -1,10 +1,33 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, MapPin } from 'lucide-react';
+import { Edit, Trash2, MapPin, Navigation } from 'lucide-react';
 import { toast } from 'sonner';
 import { zonasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import type { Zona } from '../types';
+
+// Colores para las zonas (se asignan cíclicamente)
+const ZONE_COLORS = [
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#06b6d4', // cyan
+  '#ec4899', // pink
+  '#84cc16', // lime
+];
+
+// Genera URL de imagen estática de mapa basada en coordenadas
+const getMapImageUrl = (lat: number | null | undefined, lng: number | null | undefined): string | null => {
+  if (!lat || !lng) return null;
+  // Usando OpenStreetMap static tiles
+  const zoom = 14;
+  const n = Math.pow(2, zoom);
+  const xtile = Math.floor((lng + 180) / 360 * n);
+  const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+  return `https://tile.openstreetmap.org/${zoom}/${xtile}/${ytile}.png`;
+};
 
 export default function Zonas() {
   const { theme } = useTheme();
@@ -14,6 +37,9 @@ export default function Zonas() {
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedZona, setSelectedZona] = useState<Zona | null>(null);
+  // Estado para animación staggered (solo la primera vez)
+  const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
+  const [animationDone, setAnimationDone] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     codigo: '',
@@ -30,6 +56,7 @@ export default function Zonas() {
     try {
       const response = await zonasApi.getAll();
       setZonas(response.data);
+      setVisibleCards(new Set());
     } catch (error) {
       toast.error('Error al cargar zonas');
       console.error('Error:', error);
@@ -110,6 +137,28 @@ export default function Zonas() {
     z.codigo?.toLowerCase().includes(search.toLowerCase()) ||
     z.descripcion?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Efecto para animar cards de a una (staggered) - solo la primera vez
+  useEffect(() => {
+    if (loading || zonas.length === 0 || animationDone) return;
+
+    // Animar cada card con delay (una sola vez al cargar)
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    zonas.forEach((zona, index) => {
+      const timeout = setTimeout(() => {
+        setVisibleCards(prev => new Set([...prev, zona.id]));
+      }, 50 + index * 80);
+      timeouts.push(timeout);
+    });
+
+    // Marcar animación como completada
+    const finalTimeout = setTimeout(() => {
+      setAnimationDone(true);
+    }, 50 + zonas.length * 80 + 100);
+    timeouts.push(finalTimeout);
+
+    return () => timeouts.forEach(t => clearTimeout(t));
+  }, [loading, zonas.length, animationDone]);
 
   const tableColumns = [
     {
@@ -252,45 +301,129 @@ export default function Zonas() {
         </form>
       }
     >
-      {filteredZonas.map((z) => (
-        <ABMCard key={z.id} onClick={() => openSheet(z)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                <MapPin className="h-5 w-5 text-emerald-600" />
+      {filteredZonas.map((z, index) => {
+        const zoneColor = ZONE_COLORS[index % ZONE_COLORS.length];
+        const mapImage = getMapImageUrl(z.latitud_centro, z.longitud_centro);
+        // Si la animación terminó, siempre visible
+        const isVisible = animationDone || visibleCards.has(z.id);
+
+        return (
+          <div
+            key={z.id}
+            onClick={() => openSheet(z)}
+            className={`group relative rounded-2xl cursor-pointer overflow-hidden abm-card-hover transition-all duration-500 ${
+              isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+            }`}
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            {/* Imagen de mapa de fondo */}
+            {mapImage && (
+              <div className="absolute inset-0">
+                <img
+                  src={mapImage}
+                  alt=""
+                  className="w-full h-full object-cover opacity-15 group-hover:opacity-25 group-hover:scale-110 transition-all duration-700"
+                />
+                {/* Overlay con gradiente */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${theme.card}F5 0%, ${theme.card}E8 50%, ${zoneColor}25 100%)`,
+                  }}
+                />
               </div>
-              <div className="ml-3">
-                <p className="font-medium">{z.nombre}</p>
-                {z.codigo && (
-                  <p className="text-sm font-mono" style={{ color: theme.textSecondary }}>
-                    {z.codigo}
-                  </p>
+            )}
+
+            {/* Fondo con gradiente sutil (fallback si no hay coordenadas) */}
+            {!mapImage && (
+              <div
+                className="absolute inset-0 opacity-[0.08] group-hover:opacity-[0.15] transition-opacity duration-500"
+                style={{
+                  background: `
+                    radial-gradient(ellipse at top right, ${zoneColor}60 0%, transparent 50%),
+                    radial-gradient(ellipse at bottom left, ${zoneColor}40 0%, transparent 50%)
+                  `,
+                }}
+              />
+            )}
+
+            {/* Shine effect on hover */}
+            <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+              <div
+                className="absolute -inset-full opacity-0 group-hover:opacity-100"
+                style={{
+                  background: `linear-gradient(90deg, transparent 0%, ${zoneColor}15 50%, transparent 100%)`,
+                }}
+              />
+            </div>
+
+            {/* Contenido */}
+            <div className="relative z-10 p-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                    style={{
+                      backgroundColor: zoneColor,
+                      boxShadow: `0 4px 14px ${zoneColor}40`,
+                    }}
+                  >
+                    <MapPin className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="font-semibold text-lg" style={{ color: theme.text }}>{z.nombre}</p>
+                    {z.codigo && (
+                      <p className="text-sm font-mono" style={{ color: theme.textSecondary }}>
+                        {z.codigo}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <ABMBadge active={z.activo} />
+              </div>
+
+              {z.descripcion && (
+                <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
+                  {z.descripcion}
+                </p>
+              )}
+
+              {/* Footer con coordenadas */}
+              <div className="flex items-center justify-between mt-3">
+                {z.latitud_centro && z.longitud_centro ? (
+                  <span
+                    className="text-xs px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1"
+                    style={{
+                      backgroundColor: `${zoneColor}20`,
+                      color: zoneColor,
+                    }}
+                  >
+                    <Navigation className="h-3 w-3" />
+                    {z.latitud_centro.toFixed(4)}, {z.longitud_centro.toFixed(4)}
+                  </span>
+                ) : (
+                  <span
+                    className="text-xs px-2.5 py-1 rounded-full font-medium"
+                    style={{
+                      backgroundColor: `${theme.textSecondary}15`,
+                      color: theme.textSecondary,
+                    }}
+                  >
+                    Sin coordenadas
+                  </span>
                 )}
+                <ABMCardActions
+                  onEdit={() => openSheet(z)}
+                  onDelete={() => handleDelete(z.id)}
+                />
               </div>
             </div>
-            <ABMBadge active={z.activo} />
           </div>
-
-          {z.descripcion && (
-            <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
-              {z.descripcion}
-            </p>
-          )}
-
-          {(z.latitud_centro || z.longitud_centro) && (
-            <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
-              Coords: {z.latitud_centro?.toFixed(4)}, {z.longitud_centro?.toFixed(4)}
-            </p>
-          )}
-
-          <div className="flex items-center justify-end mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <ABMCardActions
-              onEdit={() => openSheet(z)}
-              onDelete={() => handleDelete(z.id)}
-            />
-          </div>
-        </ABMCard>
-      ))}
+        );
+      })}
     </ABMPage>
   );
 }

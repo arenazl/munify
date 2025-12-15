@@ -37,8 +37,8 @@ class Reclamo(Base):
     creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     creador = relationship("User", back_populates="reclamos_creados", foreign_keys=[creador_id])
 
-    cuadrilla_id = Column(Integer, ForeignKey("cuadrillas.id"), nullable=True)
-    cuadrilla_asignada = relationship("Cuadrilla", back_populates="reclamos_asignados")
+    empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)
+    empleado_asignado = relationship("Empleado", back_populates="reclamos_asignados")
 
     # Programación del trabajo
     fecha_programada = Column(Date, nullable=True)

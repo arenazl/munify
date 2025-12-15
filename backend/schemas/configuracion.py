@@ -8,10 +8,12 @@ class ConfiguracionCreate(BaseModel):
     descripcion: Optional[str] = None
     tipo: str = "string"
     editable: bool = True
+    municipio_id: Optional[int] = None  # NULL = global (todos los municipios)
 
 class ConfiguracionUpdate(BaseModel):
     valor: Optional[str] = None
     descripcion: Optional[str] = None
+    municipio_id: Optional[int] = None  # Permite cambiar el scope
 
 class ConfiguracionResponse(BaseModel):
     id: int
@@ -20,6 +22,7 @@ class ConfiguracionResponse(BaseModel):
     descripcion: Optional[str]
     tipo: str
     editable: bool
+    municipio_id: Optional[int]  # NULL = global
     created_at: datetime
     updated_at: Optional[datetime]
 

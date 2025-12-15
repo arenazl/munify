@@ -57,8 +57,11 @@ async def get_configuraciones(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Obtener todas las configuraciones de escalado"""
+    # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
-        select(ConfiguracionEscalado).order_by(ConfiguracionEscalado.nombre)
+        select(ConfiguracionEscalado)
+        .where(ConfiguracionEscalado.municipio_id == current_user.municipio_id)
+        .order_by(ConfiguracionEscalado.nombre)
     )
     return result.scalars().all()
 
@@ -70,7 +73,8 @@ async def crear_configuracion(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Crear nueva configuración de escalado"""
-    config = ConfiguracionEscalado(**data.model_dump())
+    # Multi-tenant: agregar municipio_id
+    config = ConfiguracionEscalado(**data.model_dump(), municipio_id=current_user.municipio_id)
     db.add(config)
     await db.commit()
     await db.refresh(config)
@@ -85,8 +89,11 @@ async def actualizar_configuracion(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Actualizar configuración de escalado"""
+    # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
-        select(ConfiguracionEscalado).where(ConfiguracionEscalado.id == config_id)
+        select(ConfiguracionEscalado)
+        .where(ConfiguracionEscalado.id == config_id)
+        .where(ConfiguracionEscalado.municipio_id == current_user.municipio_id)
     )
     config = result.scalar_one_or_none()
     if not config:
@@ -107,8 +114,11 @@ async def eliminar_configuracion(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Eliminar configuración de escalado"""
+    # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
-        select(ConfiguracionEscalado).where(ConfiguracionEscalado.id == config_id)
+        select(ConfiguracionEscalado)
+        .where(ConfiguracionEscalado.id == config_id)
+        .where(ConfiguracionEscalado.municipio_id == current_user.municipio_id)
     )
     config = result.scalar_one_or_none()
     if not config:
@@ -210,7 +220,7 @@ async def _escalar_reclamo(db: AsyncSession, reclamo: Reclamo, config: Configura
         return None  # Ya fue escalado recientemente
 
     prioridad_anterior = reclamo.prioridad
-    cuadrilla_anterior = reclamo.cuadrilla_id
+    empleado_anterior = reclamo.empleado_id
     accion_tomada = config.accion
 
     # Ejecutar acción según configuración
@@ -244,7 +254,7 @@ async def _escalar_reclamo(db: AsyncSession, reclamo: Reclamo, config: Configura
         accion_tomada=accion_tomada,
         prioridad_anterior=prioridad_anterior,
         prioridad_nueva=reclamo.prioridad if config.accion == "aumentar_prioridad" else None,
-        cuadrilla_anterior_id=cuadrilla_anterior,
+        empleado_anterior_id=empleado_anterior,
         notificacion_enviada_a=config.notificar_a,
         comentario=f"Escalado automático: {tipo}"
     )

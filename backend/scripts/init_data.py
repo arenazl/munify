@@ -12,28 +12,47 @@ from core.security import get_password_hash
 from models.user import User
 from models.categoria import Categoria
 from models.zona import Zona
-from models.cuadrilla import Cuadrilla
+from models.empleado import Empleado
 from models.configuracion import Configuracion
+from models.municipio import Municipio
 from models.enums import RolUsuario
+from services.categorias_default import crear_categorias_default
 
-async def create_categorias(db):
-    categorias = [
-        {"nombre": "Baches y Calles", "descripcion": "Reparacion de baches, hundimientos y problemas en calzada", "icono": "Construction", "color": "#EF4444", "tiempo_resolucion_estimado": 72, "prioridad_default": 2},
-        {"nombre": "Alumbrado Publico", "descripcion": "Luminarias rotas, falta de iluminacion", "icono": "Lightbulb", "color": "#F59E0B", "tiempo_resolucion_estimado": 48, "prioridad_default": 2},
-        {"nombre": "Recoleccion de Residuos", "descripcion": "Problemas con recoleccion de basura, contenedores", "icono": "Trash2", "color": "#10B981", "tiempo_resolucion_estimado": 24, "prioridad_default": 1},
-        {"nombre": "Espacios Verdes", "descripcion": "Mantenimiento de plazas, poda de arboles", "icono": "Trees", "color": "#22C55E", "tiempo_resolucion_estimado": 120, "prioridad_default": 4},
-        {"nombre": "Senalizacion", "descripcion": "Senales de transito danadas o faltantes", "icono": "SignpostBig", "color": "#3B82F6", "tiempo_resolucion_estimado": 72, "prioridad_default": 3},
-        {"nombre": "Desagues y Cloacas", "descripcion": "Obstrucciones, desbordes, olores", "icono": "Droplets", "color": "#6366F1", "tiempo_resolucion_estimado": 48, "prioridad_default": 1},
-        {"nombre": "Veredas", "descripcion": "Baldosas rotas, desniveles peligrosos", "icono": "Footprints", "color": "#8B5CF6", "tiempo_resolucion_estimado": 96, "prioridad_default": 3},
-        {"nombre": "Otros", "descripcion": "Otros reclamos no categorizados", "icono": "HelpCircle", "color": "#6B7280", "tiempo_resolucion_estimado": 120, "prioridad_default": 5},
-    ]
 
-    for cat_data in categorias:
-        result = await db.execute(select(Categoria).where(Categoria.nombre == cat_data["nombre"]))
-        if not result.scalar_one_or_none():
-            db.add(Categoria(**cat_data))
-    await db.commit()
-    print("[OK] Categorias creadas")
+async def create_municipio(db):
+    """Crear municipio de prueba si no existe"""
+    result = await db.execute(select(Municipio).where(Municipio.id == 1))
+    if not result.scalar_one_or_none():
+        municipio = Municipio(
+            id=1,
+            nombre="Municipalidad de San Martin",
+            codigo="san-martin",
+            descripcion="Municipio de prueba para desarrollo",
+            latitud=-34.5750,
+            longitud=-58.5250,
+            radio_km=15.0,
+            color_primario="#3B82F6",
+            color_secundario="#1E40AF",
+            direccion="Av. San Martin 1234",
+            telefono="0800-123-4567",
+            email="reclamos@sanmartin.gob.ar",
+            zoom_mapa_default=13,
+            activo=True
+        )
+        db.add(municipio)
+        await db.commit()
+        print("[OK] Municipio de prueba creado")
+    else:
+        print("[OK] Municipio ya existe")
+
+
+async def create_categorias(db, municipio_id: int = 1):
+    """Crear categorías default usando el servicio centralizado"""
+    creadas = await crear_categorias_default(db, municipio_id)
+    if creadas > 0:
+        print(f"[OK] {creadas} categorias creadas para municipio {municipio_id}")
+    else:
+        print(f"[OK] Categorias ya existen para municipio {municipio_id}")
 
 async def create_zonas(db):
     zonas = [
@@ -52,51 +71,123 @@ async def create_zonas(db):
     await db.commit()
     print("[OK] Zonas creadas")
 
-async def create_cuadrillas(db):
+async def create_empleados(db):
     result = await db.execute(select(Zona))
     zonas = {z.nombre: z.id for z in result.scalars().all()}
 
-    cuadrillas = [
-        {"nombre": "Cuadrilla Bacheo 1", "especialidad": "Bacheo y Calles", "zona_id": zonas.get("Centro"), "capacidad_maxima": 8},
-        {"nombre": "Cuadrilla Bacheo 2", "especialidad": "Bacheo y Calles", "zona_id": zonas.get("Norte"), "capacidad_maxima": 8},
-        {"nombre": "Cuadrilla Alumbrado", "especialidad": "Alumbrado Publico", "zona_id": None, "capacidad_maxima": 10},
-        {"nombre": "Cuadrilla Espacios Verdes", "especialidad": "Espacios Verdes", "zona_id": None, "capacidad_maxima": 12},
-        {"nombre": "Cuadrilla Cloacas", "especialidad": "Desagues y Cloacas", "zona_id": None, "capacidad_maxima": 6},
+    empleados = [
+        {"nombre": "Juan", "apellido": "Perez", "especialidad": "Bacheo y Calles", "zona_id": zonas.get("Centro"), "capacidad_maxima": 8},
+        {"nombre": "Carlos", "apellido": "Rodriguez", "especialidad": "Bacheo y Calles", "zona_id": zonas.get("Norte"), "capacidad_maxima": 8},
+        {"nombre": "Miguel", "apellido": "Fernandez", "especialidad": "Alumbrado Publico", "zona_id": None, "capacidad_maxima": 10},
+        {"nombre": "Luis", "apellido": "Garcia", "especialidad": "Espacios Verdes", "zona_id": None, "capacidad_maxima": 12},
+        {"nombre": "Roberto", "apellido": "Martinez", "especialidad": "Desagues y Cloacas", "zona_id": None, "capacidad_maxima": 6},
     ]
 
-    for cuad_data in cuadrillas:
-        result = await db.execute(select(Cuadrilla).where(Cuadrilla.nombre == cuad_data["nombre"]))
+    for emp_data in empleados:
+        result = await db.execute(select(Empleado).where(Empleado.nombre == emp_data["nombre"], Empleado.apellido == emp_data["apellido"]))
         if not result.scalar_one_or_none():
-            db.add(Cuadrilla(**cuad_data))
+            db.add(Empleado(**emp_data))
     await db.commit()
-    print("[OK] Cuadrillas creadas")
+    print("[OK] Empleados creados")
 
-async def create_users(db):
-    result = await db.execute(select(Cuadrilla).limit(1))
-    cuadrilla = result.scalar_one_or_none()
+# Nombres característicos de usuarios por municipio
+# Admin es genérico (rol de sistema), los demás tienen nombres de personas
+USUARIOS_POR_MUNICIPIO = {
+    "merlo": {"admin": ("Admin", "Sistema"), "supervisor": ("Graciela", "Fernández"), "empleado": ("Carlos", "Gómez"), "vecino": ("Marta", "Rodríguez")},
+    "san-isidro": {"admin": ("Admin", "Sistema"), "supervisor": ("Carolina", "Thompson"), "empleado": ("Federico", "Williams"), "vecino": ("Victoria", "Spencer")},
+    "vicente-lopez": {"admin": ("Admin", "Sistema"), "supervisor": ("Patricia", "Mendoza"), "empleado": ("Andrés", "Rivero"), "vecino": ("Claudia", "Aguirre")},
+    "tigre": {"admin": ("Admin", "Sistema"), "supervisor": ("Mónica", "Insúa"), "empleado": ("Sergio", "Bianchi"), "vecino": ("Elena", "Rossi")},
+    "la-plata": {"admin": ("Admin", "Sistema"), "supervisor": ("Beatriz", "Echeverría"), "empleado": ("Leandro", "Ibáñez"), "vecino": ("Rosa", "Domínguez")},
+    "quilmes": {"admin": ("Admin", "Sistema"), "supervisor": ("Alicia", "Giménez"), "empleado": ("Walter", "Figueroa"), "vecino": ("Carmen", "Álvarez")},
+}
 
+async def create_users_for_municipio(db, municipio_id: int, municipio_codigo: str):
+    """Crear usuarios de prueba para un municipio específico"""
+    result = await db.execute(
+        select(Empleado)
+        .where(Empleado.municipio_id == municipio_id)
+        .limit(1)
+    )
+    empleado = result.scalar_one_or_none()
+
+    # Obtener nombres característicos del municipio
+    nombres = USUARIOS_POR_MUNICIPIO.get(municipio_codigo, {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("María", "González"),
+        "empleado": ("Juan", "Pérez"),
+        "vecino": ("Pedro", "López")
+    })
+
+    # Formato de email: rol@codigo-municipio.gob
+    # Esto permite que cada municipio tenga sus propios usuarios de prueba
     users = [
-        {"email": "admin@municipio.gob", "nombre": "Admin", "apellido": "Sistema", "rol": RolUsuario.ADMIN},
-        {"email": "supervisor@municipio.gob", "nombre": "Maria", "apellido": "Gonzalez", "rol": RolUsuario.SUPERVISOR},
-        {"email": "cuadrilla@municipio.gob", "nombre": "Juan", "apellido": "Perez", "rol": RolUsuario.CUADRILLA, "cuadrilla_id": cuadrilla.id if cuadrilla else None},
-        {"email": "vecino@test.com", "nombre": "Pedro", "apellido": "Lopez", "rol": RolUsuario.VECINO, "direccion": "Av. San Martin 1234"},
+        {"email": f"admin@{municipio_codigo}.gob", "nombre": nombres["admin"][0], "apellido": nombres["admin"][1], "rol": RolUsuario.ADMIN},
+        {"email": f"supervisor@{municipio_codigo}.gob", "nombre": nombres["supervisor"][0], "apellido": nombres["supervisor"][1], "rol": RolUsuario.SUPERVISOR},
+        {"email": f"empleado@{municipio_codigo}.gob", "nombre": nombres["empleado"][0], "apellido": nombres["empleado"][1], "rol": RolUsuario.EMPLEADO, "empleado_id": empleado.id if empleado else None},
+        {"email": f"vecino@{municipio_codigo}.gob", "nombre": nombres["vecino"][0], "apellido": nombres["vecino"][1], "rol": RolUsuario.VECINO, "direccion": "Calle Principal 1234"},
     ]
 
+    created = 0
     for user_data in users:
         result = await db.execute(select(User).where(User.email == user_data["email"]))
         if not result.scalar_one_or_none():
             user = User(
+                municipio_id=municipio_id,
                 email=user_data["email"],
                 password_hash=get_password_hash("123456"),
                 nombre=user_data["nombre"],
                 apellido=user_data["apellido"],
                 rol=user_data["rol"],
-                cuadrilla_id=user_data.get("cuadrilla_id"),
+                empleado_id=user_data.get("empleado_id"),
                 direccion=user_data.get("direccion")
             )
             db.add(user)
-    await db.commit()
-    print("[OK] Usuarios de prueba creados")
+            created += 1
+
+    if created > 0:
+        await db.commit()
+    return created
+
+
+async def create_super_admin(db):
+    """Crear Super Admin global (sin municipio_id) que puede administrar todos los municipios"""
+    result = await db.execute(select(User).where(User.email == "superadmin@sistema.gob"))
+    if not result.scalar_one_or_none():
+        super_admin = User(
+            municipio_id=None,  # Sin municipio = Super Admin global
+            email="superadmin@sistema.gob",
+            password_hash=get_password_hash("superadmin123"),
+            nombre="Super",
+            apellido="Administrador",
+            rol=RolUsuario.ADMIN,
+        )
+        db.add(super_admin)
+        await db.commit()
+        print("[OK] Super Admin creado (superadmin@sistema.gob / superadmin123)")
+    else:
+        print("[OK] Super Admin ya existe")
+
+
+async def create_users(db):
+    """Crear usuarios de prueba para TODOS los municipios existentes"""
+    # Primero crear el Super Admin global
+    await create_super_admin(db)
+
+    # Obtener todos los municipios activos
+    result = await db.execute(select(Municipio).where(Municipio.activo == True))
+    municipios = result.scalars().all()
+
+    total_created = 0
+    for municipio in municipios:
+        created = await create_users_for_municipio(db, municipio.id, municipio.codigo)
+        if created > 0:
+            print(f"  [+] {created} usuarios creados para {municipio.nombre}")
+            total_created += created
+
+    if total_created > 0:
+        print(f"[OK] {total_created} usuarios de prueba creados en total")
+    else:
+        print("[OK] Usuarios de prueba ya existen para todos los municipios")
 
 async def create_configuracion(db):
     configs = [
@@ -109,6 +200,7 @@ async def create_configuracion(db):
         {"clave": "latitud_centro", "valor": "-34.5750", "descripcion": "Latitud del centro del mapa", "tipo": "number"},
         {"clave": "longitud_centro", "valor": "-58.5250", "descripcion": "Longitud del centro del mapa", "tipo": "number"},
         {"clave": "zoom_default", "valor": "13", "descripcion": "Zoom por defecto del mapa", "tipo": "number"},
+        {"clave": "skip_email_validation", "valor": "true", "descripcion": "Omitir validación de formato de email (para demos/desarrollo)", "tipo": "boolean"},
     ]
 
     for config_data in configs:
@@ -124,20 +216,26 @@ async def main():
     await init_db()
 
     async with AsyncSessionLocal() as db:
+        await create_municipio(db)  # Primero crear municipio
         await create_categorias(db)
         await create_zonas(db)
-        await create_cuadrillas(db)
+        await create_empleados(db)
         await create_users(db)
         await create_configuracion(db)
 
     print("")
     print("=== Datos iniciales cargados correctamente ===")
     print("")
-    print("Usuarios de prueba (password: 123456):")
-    print("   - admin@municipio.gob (Admin)")
-    print("   - supervisor@municipio.gob (Supervisor)")
-    print("   - cuadrilla@municipio.gob (Cuadrilla)")
-    print("   - vecino@test.com (Vecino)")
+    print("SUPER ADMIN (acceso a todos los municipios):")
+    print("   - superadmin@sistema.gob / superadmin123")
+    print("")
+    print("Usuarios de prueba por municipio (password: 123456):")
+    print("   Formato: rol@codigo-municipio.gob")
+    print("   Ejemplo para 'merlo':")
+    print("   - admin@merlo.gob (Admin)")
+    print("   - supervisor@merlo.gob (Supervisor)")
+    print("   - empleado@merlo.gob (Empleado)")
+    print("   - vecino@merlo.gob (Vecino)")
 
 if __name__ == "__main__":
     asyncio.run(main())

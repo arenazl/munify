@@ -1,5 +1,5 @@
 """API del Portal Público - Sin autenticación"""
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
@@ -8,9 +8,11 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 
 from core.database import get_db
+from core.rate_limit import limiter, LIMITS
 from models import Reclamo, Categoria, Zona
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
+from services.ia_service import clasificar_reclamo, CATEGORY_KEYWORDS
 
 router = APIRouter()
 
@@ -571,3 +573,73 @@ async def get_tendencias_publicas(
         "resueltos_por_dia": resueltos_por_dia,
         "top_categorias": top_categorias
     }
+
+
+# Schema para clasificación
+class ClasificarRequest(BaseModel):
+    texto: str
+    municipio_id: int
+    usar_ia: bool = True
+
+
+@router.post("/clasificar")
+@limiter.limit(LIMITS["ia"])  # 10/minute - Usa IA que cuesta $
+async def clasificar_reclamo_endpoint(
+    request: Request,
+    data: ClasificarRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Clasificar un reclamo basado en su descripción - SIN AUTENTICACIÓN
+
+    Usa clasificación híbrida:
+    1. Primero intenta matching local con palabras clave (rápido y gratis)
+    2. Si es ambiguo, usa Gemini AI para mejor precisión
+
+    Retorna las 3 categorías más probables con su score.
+    """
+    if not data.texto or len(data.texto) < 5:
+        raise HTTPException(status_code=400, detail="El texto debe tener al menos 5 caracteres")
+
+    # Obtener categorías del municipio
+    result = await db.execute(
+        select(Categoria)
+        .where(
+            Categoria.activo == True,
+            Categoria.municipio_id == data.municipio_id
+        )
+    )
+    categorias_db = result.scalars().all()
+
+    # Si no hay categorías en la base, usar las predefinidas de CATEGORY_KEYWORDS
+    if categorias_db:
+        categorias = [
+            {"id": c.id, "nombre": c.nombre}
+            for c in categorias_db
+        ]
+    else:
+        # Usar categorías predefinidas (mismas que init_data.py)
+        CATEGORIAS_DEFAULT = [
+            {"id": 1, "nombre": "Baches y Calles"},
+            {"id": 2, "nombre": "Alumbrado Publico"},
+            {"id": 3, "nombre": "Recoleccion de Residuos"},
+            {"id": 4, "nombre": "Espacios Verdes"},
+            {"id": 5, "nombre": "Senalizacion"},
+            {"id": 6, "nombre": "Desagues y Cloacas"},
+            {"id": 7, "nombre": "Veredas"},
+            {"id": 8, "nombre": "Agua y Canerias"},
+            {"id": 9, "nombre": "Plagas y Fumigacion"},
+            {"id": 10, "nombre": "Ruidos Molestos"},
+            {"id": 11, "nombre": "Animales Sueltos"},
+            {"id": 12, "nombre": "Otros"},
+        ]
+        categorias = CATEGORIAS_DEFAULT
+
+    # Clasificar
+    resultado = await clasificar_reclamo(
+        texto=data.texto,
+        categorias=categorias,
+        usar_ia=data.usar_ia
+    )
+
+    return resultado

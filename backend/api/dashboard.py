@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, timedelta
@@ -12,6 +12,18 @@ from models.user import User
 from models.enums import EstadoReclamo, RolUsuario
 
 router = APIRouter()
+
+
+def get_effective_municipio_id(request: Request, current_user: User) -> int:
+    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
+    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        header_municipio_id = request.headers.get('X-Municipio-ID')
+        if header_municipio_id:
+            try:
+                return int(header_municipio_id)
+            except (ValueError, TypeError):
+                pass
+    return current_user.municipio_id
 
 
 # =====================================================
@@ -105,8 +117,8 @@ def get_dashboard_config_vecino() -> DashboardConfig:
     )
 
 
-def get_dashboard_config_cuadrilla() -> DashboardConfig:
-    """Dashboard para cuadrillas - enfocado en trabajo asignado"""
+def get_dashboard_config_empleado() -> DashboardConfig:
+    """Dashboard para empleados - enfocado en trabajo asignado"""
     return DashboardConfig(
         titulo="Mi Trabajo",
         subtitulo="Tareas asignadas y pendientes",
@@ -124,7 +136,7 @@ def get_dashboard_config_cuadrilla() -> DashboardConfig:
                         {"key": "completados_hoy", "label": "Completados Hoy", "icon": "CheckCircle", "color": "#10b981"},
                         {"key": "pendientes", "label": "Pendientes", "icon": "Clock", "color": "#8b5cf6"},
                     ],
-                    "endpoint": "/dashboard/cuadrilla-stats"
+                    "endpoint": "/dashboard/empleado-stats"
                 }
             ),
             WidgetConfig(
@@ -231,12 +243,12 @@ def get_dashboard_config_admin() -> DashboardConfig:
             config={"endpoint": "/analytics/cobertura"}
         ),
         WidgetConfig(
-            id="rendimiento_cuadrillas",
+            id="rendimiento_empleados",
             tipo="chart_performance",
-            titulo="Rendimiento Cuadrillas",
+            titulo="Rendimiento Empleados",
             size="medium",
             orden=7,
-            config={"endpoint": "/analytics/rendimiento-cuadrillas"}
+            config={"endpoint": "/analytics/rendimiento-empleados"}
         ),
         WidgetConfig(
             id="tiempo_resolucion",
@@ -260,8 +272,8 @@ async def get_dashboard_config(
         return get_dashboard_config_admin()
     elif current_user.rol == RolUsuario.SUPERVISOR:
         return get_dashboard_config_supervisor()
-    elif current_user.rol == RolUsuario.CUADRILLA:
-        return get_dashboard_config_cuadrilla()
+    elif current_user.rol == RolUsuario.EMPLEADO:
+        return get_dashboard_config_empleado()
     else:  # vecino
         return get_dashboard_config_vecino()
 
@@ -293,21 +305,17 @@ async def get_mis_stats(
     }
 
 
-@router.get("/cuadrilla-stats")
-async def get_cuadrilla_stats(
+@router.get("/empleado-stats")
+async def get_empleado_stats(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["cuadrilla"]))
+    current_user: User = Depends(require_roles(["empleado"]))
 ):
-    """Estadísticas para cuadrillas - trabajo asignado"""
-    from models.cuadrilla import Cuadrilla
+    """Estadisticas para empleados - trabajo asignado"""
+    from models.empleado import Empleado
 
-    # Buscar cuadrilla del usuario
-    cuadrilla_query = await db.execute(
-        select(Cuadrilla).where(Cuadrilla.encargado_id == current_user.id)
-    )
-    cuadrilla = cuadrilla_query.scalar_one_or_none()
-
-    if not cuadrilla:
+    # Buscar empleado del usuario
+    empleado_id = current_user.empleado_id
+    if not empleado_id:
         return {
             "asignados_hoy": 0,
             "en_proceso": 0,
@@ -321,7 +329,7 @@ async def get_cuadrilla_stats(
     asignados_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.cuadrilla_id == cuadrilla.id,
+            Reclamo.empleado_id == empleado_id,
             func.date(Reclamo.fecha_programada) == hoy
         )
     )
@@ -331,7 +339,7 @@ async def get_cuadrilla_stats(
     en_proceso_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.cuadrilla_id == cuadrilla.id,
+            Reclamo.empleado_id == empleado_id,
             Reclamo.estado == EstadoReclamo.EN_PROCESO
         )
     )
@@ -341,7 +349,7 @@ async def get_cuadrilla_stats(
     completados_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.cuadrilla_id == cuadrilla.id,
+            Reclamo.empleado_id == empleado_id,
             Reclamo.estado == EstadoReclamo.RESUELTO,
             func.date(Reclamo.fecha_resolucion) == hoy
         )
@@ -352,7 +360,7 @@ async def get_cuadrilla_stats(
     pendientes_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.cuadrilla_id == cuadrilla.id,
+            Reclamo.empleado_id == empleado_id,
             Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
         )
     )
@@ -368,10 +376,11 @@ async def get_cuadrilla_stats(
 
 @router.get("/stats")
 async def get_stats(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
 
     # Total de reclamos por estado
     estados_query = await db.execute(
@@ -429,11 +438,12 @@ async def get_stats(
 
 @router.get("/por-categoria")
 async def get_por_categoria(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     from models.categoria import Categoria
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
 
     query = await db.execute(
         select(Categoria.nombre, func.count(Reclamo.id))
@@ -448,12 +458,13 @@ async def get_por_categoria(
 
 @router.get("/por-zona")
 async def get_por_zona(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     from models.zona import Zona
     from sqlalchemy import and_
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
 
     # LEFT JOIN para incluir todas las zonas activas del municipio, incluso sin reclamos
     query = await db.execute(
@@ -473,11 +484,12 @@ async def get_por_zona(
 
 @router.get("/tendencia")
 async def get_tendencia(
+    request: Request,
     dias: int = 30,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)
 
     query = await db.execute(
@@ -500,15 +512,16 @@ async def get_tendencia(
 
 @router.get("/metricas-accion")
 async def get_metricas_accion(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Métricas accionables para el resumen del dashboard"""
-    from models.cuadrilla import Cuadrilla
+    from models.empleado import Empleado
     from models.zona import Zona
     from sqlalchemy import and_, case
 
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     hoy = datetime.utcnow().date()
     hace_7_dias = hoy - timedelta(days=7)
     hace_14_dias = hoy - timedelta(days=14)
@@ -586,23 +599,23 @@ async def get_metricas_accion(
     else:
         cambio_eficiencia = 100 if resueltos_semana > 0 else 0
 
-    # 6. Cuadrillas activas (con reclamos asignados pendientes)
-    cuadrillas_activas_query = await db.execute(
-        select(func.count(func.distinct(Reclamo.cuadrilla_id)))
+    # 6. Empleados activos (con reclamos asignados pendientes)
+    empleados_activos_query = await db.execute(
+        select(func.count(func.distinct(Reclamo.empleado_id)))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.cuadrilla_id != None,
+            Reclamo.empleado_id != None,
             Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
         )
     )
-    cuadrillas_activas = cuadrillas_activas_query.scalar() or 0
+    empleados_activos = empleados_activos_query.scalar() or 0
 
-    # Total cuadrillas
-    total_cuadrillas_query = await db.execute(
-        select(func.count(Cuadrilla.id))
-        .where(Cuadrilla.municipio_id == municipio_id, Cuadrilla.activo == True)
+    # Total empleados
+    total_empleados_query = await db.execute(
+        select(func.count(Empleado.id))
+        .where(Empleado.municipio_id == municipio_id, Empleado.activo == True)
     )
-    total_cuadrillas = total_cuadrillas_query.scalar() or 0
+    total_empleados = total_empleados_query.scalar() or 0
 
     return {
         "urgentes": urgentes,
@@ -611,13 +624,124 @@ async def get_metricas_accion(
         "para_hoy": para_hoy,
         "resueltos_semana": resueltos_semana,
         "cambio_eficiencia": cambio_eficiencia,
-        "cuadrillas_activas": cuadrillas_activas,
-        "total_cuadrillas": total_cuadrillas
+        "empleados_activos": empleados_activos,
+        "total_empleados": total_empleados
+    }
+
+
+class ReclamoResumen(BaseModel):
+    """Resumen de reclamo para las métricas"""
+    id: int
+    titulo: str
+    direccion: Optional[str]
+    categoria: str
+    zona: Optional[str]
+    dias_antiguedad: int
+    prioridad: int
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/metricas-detalle")
+async def get_metricas_detalle(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Métricas con detalle de reclamos para cada tarjeta"""
+    from models.categoria import Categoria
+    from models.zona import Zona
+    from sqlalchemy.orm import selectinload
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+    hoy = datetime.utcnow().date()
+    hace_7_dias = hoy - timedelta(days=7)
+
+    async def get_reclamos_resumen(query_result) -> List[dict]:
+        """Convierte resultados de query a resumen"""
+        reclamos = []
+        for r in query_result:
+            dias = (hoy - r.created_at.date()).days
+            reclamos.append({
+                "id": r.id,
+                "titulo": r.titulo[:50] + "..." if len(r.titulo) > 50 else r.titulo,
+                "direccion": r.direccion[:40] + "..." if r.direccion and len(r.direccion) > 40 else r.direccion,
+                "categoria": r.categoria.nombre if r.categoria else "Sin categoría",
+                "zona": r.zona.nombre if r.zona else None,
+                "dias_antiguedad": dias,
+                "prioridad": r.prioridad or 1
+            })
+        return reclamos
+
+    # 1. Urgentes (prioridad alta, no resueltos, más de 3 días)
+    urgentes_query = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.prioridad >= 4,
+            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
+        )
+        .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
+        .limit(10)
+    )
+    urgentes = await get_reclamos_resumen(urgentes_query.scalars().all())
+
+    # 2. Sin asignar (nuevos que llevan más de 24h)
+    sin_asignar_query = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.estado == EstadoReclamo.NUEVO,
+            func.date(Reclamo.created_at) < hoy
+        )
+        .order_by(Reclamo.created_at.asc())
+        .limit(10)
+    )
+    sin_asignar = await get_reclamos_resumen(sin_asignar_query.scalars().all())
+
+    # 3. Para hoy (programados para hoy)
+    para_hoy_query = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            func.date(Reclamo.fecha_programada) == hoy
+        )
+        .order_by(Reclamo.prioridad.desc())
+        .limit(10)
+    )
+    para_hoy = await get_reclamos_resumen(para_hoy_query.scalars().all())
+
+    # 4. Resueltos esta semana
+    resueltos_query = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.estado == EstadoReclamo.RESUELTO,
+            func.date(Reclamo.fecha_resolucion) >= hace_7_dias
+        )
+        .order_by(Reclamo.fecha_resolucion.desc())
+        .limit(10)
+    )
+    resueltos = await get_reclamos_resumen(resueltos_query.scalars().all())
+
+    return {
+        "urgentes": urgentes,
+        "sin_asignar": sin_asignar,
+        "para_hoy": para_hoy,
+        "resueltos": resueltos
     }
 
 
 @router.get("/recurrentes")
 async def get_recurrentes(
+    request: Request,
     dias: int = 90,
     min_reclamos: int = 2,
     db: AsyncSession = Depends(get_db),
@@ -627,7 +751,7 @@ async def get_recurrentes(
     from models.zona import Zona
     from models.categoria import Categoria
 
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)
 
     # Buscar direcciones con múltiples reclamos

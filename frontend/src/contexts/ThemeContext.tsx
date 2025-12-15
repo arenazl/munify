@@ -14,6 +14,9 @@ interface Theme {
   primaryHover: string;
   card: string;
   sidebar: string;
+  sidebarText: string;
+  sidebarTextSecondary: string;
+  contentBackground: string;
 }
 
 export const themes: Record<ThemeName, Theme> = {
@@ -29,6 +32,9 @@ export const themes: Record<ThemeName, Theme> = {
     primaryHover: '#4338ca',
     card: '#1e293b',
     sidebar: '#0f172a',
+    sidebarText: '#ffffff',
+    sidebarTextSecondary: '#94a3b8',
+    contentBackground: '#1a1a2e',
   },
   light: {
     name: 'light',
@@ -42,6 +48,9 @@ export const themes: Record<ThemeName, Theme> = {
     primaryHover: '#2563eb',
     card: '#ffffff',
     sidebar: '#1e293b',
+    sidebarText: '#ffffff',
+    sidebarTextSecondary: '#94a3b8',
+    contentBackground: '#f1f5f9',
   },
   blue: {
     name: 'blue',
@@ -55,6 +64,9 @@ export const themes: Record<ThemeName, Theme> = {
     primaryHover: '#0284c7',
     card: '#132f4c',
     sidebar: '#071318',
+    sidebarText: '#e2e8f0',
+    sidebarTextSecondary: '#64748b',
+    contentBackground: '#0c1929',
   },
   green: {
     name: 'green',
@@ -68,13 +80,33 @@ export const themes: Record<ThemeName, Theme> = {
     primaryHover: '#059669',
     card: '#1a3a2a',
     sidebar: '#081410',
+    sidebarText: '#e2e8f0',
+    sidebarTextSecondary: '#64748b',
+    contentBackground: '#0d1f17',
   },
 };
+
+// Colores de acento predefinidos
+export const accentColors = [
+  { name: 'Negro', value: '#374151', hover: '#1f2937' },
+  { name: 'Indigo', value: '#4f46e5', hover: '#4338ca' },
+  { name: 'Azul', value: '#3b82f6', hover: '#2563eb' },
+  { name: 'Celeste', value: '#0ea5e9', hover: '#0284c7' },
+  { name: 'Verde', value: '#10b981', hover: '#059669' },
+  { name: 'Esmeralda', value: '#22c55e', hover: '#16a34a' },
+  { name: 'Amarillo', value: '#eab308', hover: '#ca8a04' },
+  { name: 'Naranja', value: '#f97316', hover: '#ea580c' },
+  { name: 'Rojo', value: '#ef4444', hover: '#dc2626' },
+  { name: 'Rosa', value: '#ec4899', hover: '#db2777' },
+  { name: 'Violeta', value: '#8b5cf6', hover: '#7c3aed' },
+];
 
 interface ThemeContextType {
   theme: Theme;
   themeName: ThemeName;
   setTheme: (name: ThemeName) => void;
+  customPrimary: string | null;
+  setCustomPrimary: (color: string | null) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -89,8 +121,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return 'dark';
   });
 
+  const [customPrimary, setCustomPrimaryState] = useState<string | null>(() => {
+    return localStorage.getItem('customPrimary');
+  });
+
   // Fallback to dark theme if themeName is invalid
-  const theme = themes[themeName] || themes.dark;
+  const baseTheme = themes[themeName] || themes.dark;
+
+  // Aplicar color de acento personalizado si existe
+  const theme: Theme = customPrimary
+    ? {
+        ...baseTheme,
+        primary: customPrimary,
+        primaryHover: accentColors.find(c => c.value === customPrimary)?.hover || customPrimary,
+      }
+    : baseTheme;
 
   useEffect(() => {
     localStorage.setItem('theme', themeName);
@@ -112,12 +157,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.body.style.color = theme.text;
   }, [theme, themeName]);
 
+  useEffect(() => {
+    if (customPrimary) {
+      localStorage.setItem('customPrimary', customPrimary);
+    } else {
+      localStorage.removeItem('customPrimary');
+    }
+  }, [customPrimary]);
+
   const setTheme = (name: ThemeName) => {
     setThemeName(name);
   };
 
+  const setCustomPrimary = (color: string | null) => {
+    setCustomPrimaryState(color);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, themeName, setTheme }}>
+    <ThemeContext.Provider value={{ theme, themeName, setTheme, customPrimary, setCustomPrimary }}>
       {children}
     </ThemeContext.Provider>
   );

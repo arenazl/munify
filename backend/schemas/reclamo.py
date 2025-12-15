@@ -26,7 +26,7 @@ class ReclamoUpdate(BaseModel):
     prioridad: Optional[int] = None
 
 class ReclamoAsignar(BaseModel):
-    cuadrilla_id: int
+    empleado_id: int
     fecha_programada: Optional[date] = None
     hora_inicio: Optional[time] = None
     hora_fin: Optional[time] = None
@@ -65,7 +65,7 @@ class ZonaSimple(BaseModel):
     class Config:
         from_attributes = True
 
-class CuadrillaSimple(BaseModel):
+class EmpleadoSimple(BaseModel):
     id: int
     nombre: str
     apellido: Optional[str] = None
@@ -107,7 +107,7 @@ class ReclamoResponse(BaseModel):
     categoria: CategoriaSimple
     zona: Optional[ZonaSimple]
     creador: CreadorSimple
-    cuadrilla_asignada: Optional[CuadrillaSimple]
+    empleado_asignado: Optional[EmpleadoSimple]
     documentos: List[DocumentoSimple] = []
 
     class Config:

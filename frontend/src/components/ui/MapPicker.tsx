@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import { useTheme } from '../../contexts/ThemeContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -32,6 +32,19 @@ function MapClickHandler({ onLocationSelect }: { onLocationSelect: (coords: { la
       onLocationSelect({ lat: e.latlng.lat, lng: e.latlng.lng });
     },
   });
+  return null;
+}
+
+// Componente para centrar el mapa cuando cambian las coordenadas
+function MapCenterUpdater({ coords }: { coords: { lat: number; lng: number } | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (coords) {
+      map.setView([coords.lat, coords.lng], 15);
+    }
+  }, [coords, map]);
+
   return null;
 }
 
@@ -90,6 +103,7 @@ export function MapPicker({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <MapCenterUpdater coords={value || null} />
         {!readOnly && <MapClickHandler onLocationSelect={handleLocationSelect} />}
         {position && <Marker position={[position.lat, position.lng]} />}
       </MapContainer>

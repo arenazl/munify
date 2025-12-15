@@ -2,7 +2,7 @@ import enum
 
 class RolUsuario(str, enum.Enum):
     VECINO = "vecino"
-    CUADRILLA = "cuadrilla"
+    EMPLEADO = "empleado"
     SUPERVISOR = "supervisor"
     ADMIN = "admin"
 

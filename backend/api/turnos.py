@@ -9,7 +9,7 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from core.database import get_db
-from models import User, Reclamo, Cuadrilla
+from models import User, Reclamo, Empleado
 from models.enums import EstadoReclamo
 from core.security import require_roles
 
@@ -59,7 +59,7 @@ async def get_calendario_empleado(
 
     # Verificar que el empleado existe
     result = await db.execute(
-        select(Cuadrilla).where(Cuadrilla.id == empleado_id)
+        select(Empleado).where(Empleado.id == empleado_id)
     )
     empleado = result.scalar_one_or_none()
     if not empleado:
@@ -69,7 +69,7 @@ async def get_calendario_empleado(
     result = await db.execute(
         select(Reclamo).where(
             and_(
-                Reclamo.cuadrilla_id == empleado_id,
+                Reclamo.empleado_id == empleado_id,
                 Reclamo.fecha_programada >= fecha_inicio,
                 Reclamo.fecha_programada <= fecha_fin,
                 Reclamo.estado.in_([EstadoReclamo.asignado, EstadoReclamo.en_proceso])
@@ -168,18 +168,18 @@ async def get_disponibilidad_general(
         }
 
     # Obtener todos los empleados activos
-    query = select(Cuadrilla).where(Cuadrilla.activo == True)
+    query = select(Empleado).where(Empleado.activo == True)
 
     # Filtrar por categoría si se especifica
     if categoria_id:
-        from ..models import cuadrilla_categoria
-        query = query.join(cuadrilla_categoria).where(
-            cuadrilla_categoria.c.categoria_id == categoria_id
+        from models.empleado_categoria import empleado_categoria
+        query = query.join(empleado_categoria).where(
+            empleado_categoria.c.categoria_id == categoria_id
         )
 
     # Filtrar por zona si se especifica
     if zona_id:
-        query = query.where(Cuadrilla.zona_id == zona_id)
+        query = query.where(Empleado.zona_id == zona_id)
 
     result = await db.execute(query)
     empleados = result.scalars().all()
@@ -191,7 +191,7 @@ async def get_disponibilidad_general(
         result = await db.execute(
             select(Reclamo).where(
                 and_(
-                    Reclamo.cuadrilla_id == empleado.id,
+                    Reclamo.empleado_id == empleado.id,
                     Reclamo.fecha_programada == fecha,
                     Reclamo.estado.in_([EstadoReclamo.asignado, EstadoReclamo.en_proceso])
                 )
@@ -326,7 +326,7 @@ async def get_planificacion_semanal(
 
     # Obtener todos los empleados activos
     result = await db.execute(
-        select(Cuadrilla).where(Cuadrilla.activo == True).order_by(Cuadrilla.nombre)
+        select(Empleado).where(Empleado.activo == True).order_by(Empleado.nombre)
     )
     empleados = result.scalars().all()
 
@@ -345,14 +345,14 @@ async def get_planificacion_semanal(
     # Agrupar tareas por empleado y día
     tareas_por_empleado = {}
     for tarea in tareas:
-        if tarea.cuadrilla_id not in tareas_por_empleado:
-            tareas_por_empleado[tarea.cuadrilla_id] = {}
+        if tarea.empleado_id not in tareas_por_empleado:
+            tareas_por_empleado[tarea.empleado_id] = {}
 
         dia = tarea.fecha_programada.isoformat() if tarea.fecha_programada else None
         if dia:
-            if dia not in tareas_por_empleado[tarea.cuadrilla_id]:
-                tareas_por_empleado[tarea.cuadrilla_id][dia] = []
-            tareas_por_empleado[tarea.cuadrilla_id][dia].append({
+            if dia not in tareas_por_empleado[tarea.empleado_id]:
+                tareas_por_empleado[tarea.empleado_id][dia] = []
+            tareas_por_empleado[tarea.empleado_id][dia].append({
                 "id": tarea.id,
                 "titulo": tarea.titulo[:30],
                 "hora_inicio": tarea.hora_inicio,

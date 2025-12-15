@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import time
 import os
+from pathlib import Path
 import sentry_sdk
 from slowapi.errors import RateLimitExceeded
 
@@ -56,10 +58,14 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # CORS - origenes desde configuracion (desarrollo + produccion)
+# En desarrollo permitimos cualquier origen para facilitar testing desde diferentes IPs
+cors_origins = settings.cors_origins_list
+allow_all_origins = "*" in cors_origins or settings.ENVIRONMENT == "development"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
+    allow_origins=["*"] if allow_all_origins else cors_origins,
+    allow_credentials=not allow_all_origins,  # No credentials con wildcard
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -80,6 +86,11 @@ async def log_requests(request: Request, call_next):
     )
 
     return response
+
+# Servir archivos estáticos (imágenes de categorías)
+static_path = Path(__file__).parent / "static"
+static_path.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 # Rutas
 app.include_router(api_router, prefix="/api")

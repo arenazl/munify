@@ -52,7 +52,7 @@ class Municipio(Base):
     usuarios = relationship("User", back_populates="municipio")
     zonas = relationship("Zona", back_populates="municipio")
     categorias = relationship("Categoria", back_populates="municipio")
-    cuadrillas = relationship("Cuadrilla", back_populates="municipio")
+    empleados = relationship("Empleado", back_populates="municipio")
     reclamos = relationship("Reclamo", back_populates="municipio")
 
     def __repr__(self):

@@ -94,7 +94,7 @@ export default function ReclamoDetalle() {
     );
   }
 
-  const canModify = user?.rol === 'cuadrilla' || user?.rol === 'supervisor' || user?.rol === 'admin';
+  const canModify = user?.rol === 'empleado' || user?.rol === 'supervisor' || user?.rol === 'admin';
 
   return (
     <div className="space-y-6">
@@ -153,12 +153,12 @@ export default function ReclamoDetalle() {
               </div>
             </div>
 
-            {reclamo.cuadrilla_asignada && (
+            {reclamo.empleado_asignado && (
               <div className="flex items-center">
                 <Users className="h-5 w-5 text-gray-400 mr-2" />
                 <div>
-                  <p className="text-gray-900">{reclamo.cuadrilla_asignada.nombre}</p>
-                  <p className="text-sm text-gray-500">{reclamo.cuadrilla_asignada.especialidad}</p>
+                  <p className="text-gray-900">{reclamo.empleado_asignado.nombre}</p>
+                  <p className="text-sm text-gray-500">{reclamo.empleado_asignado.especialidad}</p>
                 </div>
               </div>
             )}

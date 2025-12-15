@@ -11,6 +11,10 @@ class ConfiguracionEscalado(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # Multi-tenant
+    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
+    municipio = relationship("Municipio")
+
     nombre = Column(String(100), nullable=False)
     descripcion = Column(Text, nullable=True)
 
@@ -55,8 +59,8 @@ class HistorialEscalado(Base):
     # Detalles
     prioridad_anterior = Column(Integer, nullable=True)
     prioridad_nueva = Column(Integer, nullable=True)
-    cuadrilla_anterior_id = Column(Integer, nullable=True)
-    cuadrilla_nueva_id = Column(Integer, nullable=True)
+    empleado_anterior_id = Column(Integer, nullable=True)
+    empleado_nuevo_id = Column(Integer, nullable=True)
     notificacion_enviada_a = Column(String(500), nullable=True)
 
     comentario = Column(Text, nullable=True)

@@ -188,56 +188,36 @@ GROK_MODEL=grok-3-mini
 
 ---
 
-## 9. Ollama (IA Local - Sin API Key)
+## 9. Gemini (Google - Gratis con límites)
 
-Para ejecutar modelos de IA localmente sin depender de servicios externos.
+Obtener desde: https://aistudio.google.com/apikey
 
-**Instalación:** https://ollama.ai/download
+**Pasos para obtener API Key:**
+1. Ir a https://aistudio.google.com/apikey
+2. Loguearse con cuenta Google
+3. Click en "Create API Key"
+4. Copiar la key generada
 
 ```
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
+GEMINI_API_KEY=AIzaSyB1IOm-070frWwhpJOcWSh6yNt4wHCM4Wk
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
-**Modelos recomendados:**
-```bash
-# Instalar modelos
-ollama pull llama3.2      # Liviano, rápido
-ollama pull mistral       # Buena calidad
-ollama pull codellama     # Especializado en código
-```
+**Modelos disponibles:**
+| Modelo | Descripción |
+|--------|-------------|
+| `gemini-2.5-flash` | Rápido con "thinking" (recomendado, requiere maxOutputTokens: 1000+) |
+| `gemini-2.0-flash` | Rápido y económico |
+| `gemini-2.5-pro` | Mayor calidad, más lento |
 
-**Verificar instalación:**
-```bash
-ollama list
-curl http://localhost:11434/api/tags
-```
+**Límites tier gratuito:**
+- 15 RPM (requests por minuto)
+- 1 millón de tokens/día
+- Sin tarjeta de crédito
 
 ---
 
-## 10. Configuración de IA (Multi-provider)
-
-Para proyectos con soporte multi-proveedor de IA:
-
-```
-# Provider activo: ollama, groq, grok, openai
-AI_PROVIDER=ollama
-
-# Ollama (local - sin key)
-OLLAMA_URL=http://localhost:11434
-OLLAMA_MODEL=llama3.2
-
-# Groq (gratis, cloud)
-GROQ_API_KEY=gsk_xxxxxxxxxxxx
-
-# Grok (xAI)
-GROK_API_KEY=xai-xxxxxxxxxxxx
-GROK_MODEL=grok-3-mini
-```
-
----
-
-## 11. Mapas (Leaflet + OpenStreetMap - Sin API Key)
+## 10. Mapas (Leaflet + OpenStreetMap - Sin API Key)
 
 Leaflet usa OpenStreetMap que es **100% gratuito y sin límites**.
 

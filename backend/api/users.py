@@ -29,7 +29,12 @@ async def get_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Multi-tenant: filtrar por municipio_id del usuario actual
+    result = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .where(User.municipio_id == current_user.municipio_id)
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -68,7 +73,12 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Multi-tenant: filtrar por municipio_id del usuario actual
+    result = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .where(User.municipio_id == current_user.municipio_id)
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -87,7 +97,12 @@ async def delete_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(User).where(User.id == user_id))
+    # Multi-tenant: filtrar por municipio_id del usuario actual
+    result = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .where(User.municipio_id == current_user.municipio_id)
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

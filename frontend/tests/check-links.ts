@@ -44,7 +44,7 @@ async function checkLinks() {
     '/mapa',
     '/categorias',
     '/zonas',
-    '/cuadrillas',
+    '/empleados',
     '/usuarios',
   ];
 

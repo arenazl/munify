@@ -2,8 +2,8 @@ from .municipio import Municipio  # IMPORTANTE: Municipio debe ir primero por la
 from .user import User
 from .categoria import Categoria
 from .zona import Zona
-from .cuadrilla_categoria import cuadrilla_categoria
-from .cuadrilla import Cuadrilla
+from .empleado_categoria import empleado_categoria
+from .empleado import Empleado
 from .reclamo import Reclamo
 from .historial import HistorialReclamo
 from .documento import Documento
@@ -19,7 +19,7 @@ __all__ = [
     "User",
     "Categoria",
     "Zona",
-    "Cuadrilla",
+    "Empleado",
     "Reclamo",
     "HistorialReclamo",
     "Documento",

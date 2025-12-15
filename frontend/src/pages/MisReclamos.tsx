@@ -133,12 +133,12 @@ export default function MisReclamos() {
             </div>
           )}
 
-          {selectedReclamo.cuadrilla_asignada && (
+          {selectedReclamo.empleado_asignado && (
             <div className="p-3 rounded-lg" style={{ backgroundColor: '#dbeafe' }}>
-              <label className="block text-sm font-medium" style={{ color: '#1e40af' }}>Cuadrilla Asignada</label>
-              <p className="mt-1" style={{ color: '#1e3a8a' }}>{selectedReclamo.cuadrilla_asignada.nombre}</p>
-              {selectedReclamo.cuadrilla_asignada.especialidad && (
-                <p className="text-sm" style={{ color: '#3b82f6' }}>{selectedReclamo.cuadrilla_asignada.especialidad}</p>
+              <label className="block text-sm font-medium" style={{ color: '#1e40af' }}>Empleado Asignado</label>
+              <p className="mt-1" style={{ color: '#1e3a8a' }}>{selectedReclamo.empleado_asignado.nombre}</p>
+              {selectedReclamo.empleado_asignado.especialidad && (
+                <p className="text-sm" style={{ color: '#3b82f6' }}>{selectedReclamo.empleado_asignado.especialidad}</p>
               )}
             </div>
           )}

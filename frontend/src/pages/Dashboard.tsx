@@ -45,8 +45,8 @@ interface TendenciaData {
 
 type VistaMetrica = 'barrios' | 'tiempos' | 'recurrentes' | 'tendencias' | 'categorias';
 
-interface CuadrillaDistancia {
-  cuadrilla_nombre: string;
+interface EmpleadoDistancia {
+  empleado_nombre: string;
   reclamos_resueltos: number;
   distancia_total_km: number;
   distancia_promedio_km: number;
@@ -67,6 +67,23 @@ interface TiempoCategoria {
   dias_promedio: number;
 }
 
+interface ReclamoResumen {
+  id: number;
+  titulo: string;
+  direccion: string | null;
+  categoria: string;
+  zona: string | null;
+  dias_antiguedad: number;
+  prioridad: number;
+}
+
+interface MetricasDetalle {
+  urgentes: ReclamoResumen[];
+  sin_asignar: ReclamoResumen[];
+  para_hoy: ReclamoResumen[];
+  resueltos: ReclamoResumen[];
+}
+
 export default function Dashboard() {
   const { theme } = useTheme();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -79,11 +96,11 @@ export default function Dashboard() {
   const [vistaActiva, setVistaActiva] = useState<VistaMetrica>('barrios');
   const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
   const [tendencias, setTendencias] = useState<TendenciaData[]>([]);
-  const [distancias, setDistancias] = useState<CuadrillaDistancia[]>([]);
+  const [distancias, setDistancias] = useState<EmpleadoDistancia[]>([]);
   const [cobertura, setCobertura] = useState<ZonaCobertura[]>([]);
   const [tiempoResolucion, setTiempoResolucion] = useState<TiempoCategoria[]>([]);
-  const [rendimientoCuadrillas, setRendimientoCuadrillas] = useState<{ semana: string; [key: string]: string | number }[]>([]);
-  const [cuadrillasNames, setCuadrillasNames] = useState<string[]>([]);
+  const [rendimientoEmpleados, setRendimientoEmpleados] = useState<{ semana: string; [key: string]: string | number }[]>([]);
+  const [empleadosNames, setEmpleadosNames] = useState<string[]>([]);
   const [distanciasResumen, setDistanciasResumen] = useState<{ distancia_total_km: number; reclamos_total: number; distancia_promedio_por_reclamo_km: number } | null>(null);
   const [coberturaResumen, setCoberturaResumen] = useState<{ zonas_criticas: number; tasa_resolucion_global: number } | null>(null);
   const [metricasAccion, setMetricasAccion] = useState<{
@@ -93,9 +110,10 @@ export default function Dashboard() {
     para_hoy: number;
     resueltos_semana: number;
     cambio_eficiencia: number;
-    cuadrillas_activas: number;
-    total_cuadrillas: number;
+    empleados_activos: number;
+    total_empleados: number;
   } | null>(null);
+  const [metricasDetalle, setMetricasDetalle] = useState<MetricasDetalle | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -111,26 +129,28 @@ export default function Dashboard() {
         setPorZona(zonasRes.data.slice(0, 5));
 
         // Analytics avanzados
-        const [heatmapRes, distanciasRes, coberturaRes, tiempoRes, rendimientoRes, metricasRes, tendenciasRes, recurrentesRes] = await Promise.all([
+        const [heatmapRes, distanciasRes, coberturaRes, tiempoRes, rendimientoRes, metricasRes, metricasDetalleRes, tendenciasRes, recurrentesRes] = await Promise.all([
           analyticsApi.getHeatmap(30),
           analyticsApi.getDistancias(30),
           analyticsApi.getCobertura(30),
           analyticsApi.getTiempoResolucion(90),
-          analyticsApi.getRendimientoCuadrillas(4),
+          analyticsApi.getRendimientoEmpleados(4),
           dashboardApi.getMetricasAccion(),
+          dashboardApi.getMetricasDetalle(),
           dashboardApi.getTendencia(30),
           dashboardApi.getRecurrentes(90, 2),
         ]);
 
         setHeatmapData(heatmapRes.data.puntos || []);
-        setDistancias(distanciasRes.data.cuadrillas || []);
+        setDistancias(distanciasRes.data.empleados || []);
         setDistanciasResumen(distanciasRes.data.resumen || null);
         setCobertura(coberturaRes.data.zonas || []);
         setCoberturaResumen(coberturaRes.data.resumen || null);
         setTiempoResolucion(tiempoRes.data.categorias || []);
-        setRendimientoCuadrillas(rendimientoRes.data.semanas || []);
-        setCuadrillasNames(rendimientoRes.data.cuadrillas || []);
+        setRendimientoEmpleados(rendimientoRes.data.semanas || []);
+        setEmpleadosNames(rendimientoRes.data.empleados || []);
         setMetricasAccion(metricasRes.data || null);
+        setMetricasDetalle(metricasDetalleRes.data || null);
         setTendencias(tendenciasRes.data || []);
         setRecurrentes(recurrentesRes.data || []);
       } catch (error) {
@@ -144,18 +164,41 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <div className="relative">
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent"
-            style={{ borderColor: `${theme.primary}33`, borderTopColor: theme.primary }}
-          />
-          <Sparkles
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 animate-pulse"
-            style={{ color: theme.primary }}
-          />
+      <div className="space-y-6">
+        {/* Skeleton header */}
+        <div className="rounded-2xl p-6 animate-pulse" style={{ backgroundColor: theme.card }}>
+          <div className="h-8 w-48 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}20` }} />
+          <div className="h-4 w-72 mt-2 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10` }} />
         </div>
-        <p className="text-sm animate-pulse" style={{ color: theme.textSecondary }}>Cargando analytics...</p>
+        {/* Skeleton cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="rounded-2xl p-5 animate-pulse" style={{ backgroundColor: theme.card }}>
+              <div className="flex justify-between">
+                <div className="space-y-3">
+                  <div className="h-3 w-20 rounded" style={{ backgroundColor: `${theme.textSecondary}20` }} />
+                  <div className="h-8 w-16 rounded" style={{ backgroundColor: `${theme.textSecondary}30` }} />
+                  <div className="h-3 w-24 rounded" style={{ backgroundColor: `${theme.textSecondary}15` }} />
+                </div>
+                <div className="w-14 h-14 rounded-2xl" style={{ backgroundColor: `${theme.textSecondary}20` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Loading indicator */}
+        <div className="flex items-center justify-center gap-3 py-8">
+          <div className="relative">
+            <div
+              className="animate-spin rounded-full h-10 w-10 border-3 border-t-transparent"
+              style={{ borderColor: `${theme.primary}30`, borderTopColor: theme.primary }}
+            />
+            <Sparkles
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 animate-pulse"
+              style={{ color: theme.primary }}
+            />
+          </div>
+          <p className="text-sm font-medium" style={{ color: theme.textSecondary }}>Cargando analytics...</p>
+        </div>
       </div>
     );
   }
@@ -249,48 +292,127 @@ export default function Dashboard() {
     return null;
   };
 
+  // Obtener el color del municipio
+  const municipioColor = localStorage.getItem('municipio_color') || theme.primary;
+  const municipioNombre = localStorage.getItem('municipio_nombre') || 'Tu Municipio';
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: theme.text }}>Dashboard Analytics</h1>
-        <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          Datos en tiempo real
+      {/* Hero Header - Estilo Wok Express */}
+      <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '200px' }}>
+        {/* Imagen de fondo */}
+        <div className="absolute inset-0">
+          <img
+            src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"
+            alt="Ciudad"
+            className="w-full h-full object-cover"
+          />
+          {/* Gradiente oscuro que baja al color del tema */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(180deg,
+                rgba(15, 23, 42, 0.7) 0%,
+                rgba(15, 23, 42, 0.85) 40%,
+                ${municipioColor}90 100%
+              )`,
+            }}
+          />
+          {/* Overlay adicional para mejor legibilidad */}
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
+        </div>
+
+        {/* Contenido del header */}
+        <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
+          {/* Badge "Abierto" estilo Wok */}
+          <div className="absolute top-4 right-4">
+            <div
+              className="flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-sm"
+              style={{ backgroundColor: '#22c55eCC' }}
+            >
+              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span className="text-xs font-semibold text-white">En vivo</span>
+            </div>
+          </div>
+
+          {/* Info principal */}
+          <div className="mt-auto">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 drop-shadow-lg">
+              Dashboard Analytics
+            </h1>
+            <p className="text-slate-200 text-sm md:text-base mb-4">
+              Monitoreo en tiempo real de gestión municipal
+            </p>
+
+            {/* Stats rápidos estilo Wok */}
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-200">
+              <div className="flex items-center gap-1.5">
+                <ClipboardList className="w-4 h-4" />
+                <span>{stats?.total || 0} reclamos</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                <span>{stats?.tiempo_promedio_dias || 0}d promedio</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Building2 className="w-4 h-4" />
+                <span>{municipioNombre}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats cards - Glassmorphism */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className="rounded-xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+              className="group relative rounded-2xl p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
               style={{
                 backgroundColor: theme.card,
                 border: `1px solid ${theme.border}`,
               }}
             >
-              <div className="flex items-center justify-between">
+              {/* Gradient overlay on hover */}
+              <div
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
+              />
+              {/* Glow effect */}
+              <div
+                className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
+                style={{ backgroundColor: card.iconColor }}
+              />
+              <div className="relative flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide" style={{ color: theme.textSecondary }}>
+                  <p className="text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
                     {card.title}
                   </p>
-                  <p className="text-2xl font-bold mt-1" style={{ color: theme.text }}>{card.value}</p>
-                  <p
-                    className="text-xs mt-1 font-medium"
-                    style={{ color: card.trendUp ? '#22c55e' : '#ef4444' }}
-                  >
-                    {card.trend} vs mes anterior
-                  </p>
+                  <p className="text-3xl font-black mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span
+                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
+                        color: card.trendUp ? '#22c55e' : '#ef4444'
+                      }}
+                    >
+                      {card.trend}
+                    </span>
+                    <span className="text-[10px]" style={{ color: theme.textSecondary }}>vs mes ant.</span>
+                  </div>
                 </div>
                 <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: card.iconBg }}
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                  style={{
+                    backgroundColor: card.iconBg,
+                    boxShadow: `0 8px 32px ${card.iconColor}30`
+                  }}
                 >
-                  <Icon className="h-6 w-6" style={{ color: card.iconColor }} />
+                  <Icon className="h-7 w-7" style={{ color: card.iconColor }} />
                 </div>
               </div>
             </div>
@@ -302,10 +424,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Estado de reclamos - Donut Chart */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
@@ -345,10 +468,11 @@ export default function Dashboard() {
 
         {/* Mapa de Calor - Scatter simulando densidad */}
         <div
-          className="lg:col-span-2 rounded-xl p-6"
+          className="lg:col-span-2 rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <div className="flex items-center gap-2 mb-4">
@@ -403,14 +527,15 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Panel de métricas con botonera */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
-          {/* Botonera de vistas */}
-          <div className="flex flex-wrap gap-2 mb-4">
+          {/* Botonera de vistas - Modern pills */}
+          <div className="flex flex-wrap gap-2 mb-5 p-1 rounded-2xl" style={{ backgroundColor: `${theme.textSecondary}10` }}>
             {[
               { id: 'barrios' as VistaMetrica, label: 'Barrios', icon: Building2 },
               { id: 'tiempos' as VistaMetrica, label: 'Tiempos', icon: Clock },
@@ -424,13 +549,16 @@ export default function Dashboard() {
                 <button
                   key={btn.id}
                   onClick={() => setVistaActiva(btn.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300 ${
+                    isActive ? 'shadow-lg' : 'hover:bg-white/5'
+                  }`}
                   style={{
-                    backgroundColor: isActive ? theme.primary : `${theme.textSecondary}15`,
+                    background: isActive ? `linear-gradient(135deg, ${theme.primary} 0%, #8b5cf6 100%)` : 'transparent',
                     color: isActive ? 'white' : theme.textSecondary,
+                    boxShadow: isActive ? `0 4px 20px ${theme.primary}40` : 'none',
                   }}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className={`h-4 w-4 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
                   {btn.label}
                 </button>
               );
@@ -567,10 +695,11 @@ export default function Dashboard() {
 
         {/* Cobertura por Zona */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <div className="flex items-center gap-2 mb-4">
@@ -620,18 +749,19 @@ export default function Dashboard() {
 
       {/* Fila 3: Distancias y Zonas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Distancias de Cuadrillas */}
+        {/* Distancias de Empleados */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <div className="flex items-center gap-2 mb-4">
             <Route className="h-5 w-5" style={{ color: '#8b5cf6' }} />
             <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Distancia Recorrida por Cuadrilla
+              Distancia Recorrida por Empleado
             </h2>
           </div>
           <div className="h-56">
@@ -639,7 +769,7 @@ export default function Dashboard() {
               <BarChart data={distancias} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
                 <XAxis type="number" stroke={chartColors.text} fontSize={12} unit=" km" />
-                <YAxis dataKey="cuadrilla_nombre" type="category" stroke={chartColors.text} fontSize={11} width={100} />
+                <YAxis dataKey="empleado_nombre" type="category" stroke={chartColors.text} fontSize={11} width={100} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="distancia_total_km" name="Distancia (km)" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={16} />
               </BarChart>
@@ -659,10 +789,11 @@ export default function Dashboard() {
 
         {/* Reclamos por Zona */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
@@ -686,10 +817,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Tiempo de Resolución por Categoría */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
@@ -715,26 +847,27 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Rendimiento de Cuadrillas */}
+        {/* Rendimiento de Empleados */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Rendimiento de Cuadrillas (Ultimas 4 semanas)
+            Rendimiento de Empleados (Ultimas 4 semanas)
           </h2>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={rendimientoCuadrillas}>
+              <LineChart data={rendimientoEmpleados}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                 <XAxis dataKey="semana" stroke={chartColors.text} fontSize={12} />
                 <YAxis stroke={chartColors.text} fontSize={12} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                {cuadrillasNames.map((nombre, index) => (
+                {empleadosNames.map((nombre, index) => (
                   <Line
                     key={nombre}
                     type="monotone"
@@ -756,17 +889,20 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Top categorías */}
         <div
-          className="rounded-xl p-6"
+          className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
               Top Categorias
             </h2>
-            <AlertTriangle className="h-5 w-5" style={{ color: '#f59e0b' }} />
+            <div className="p-2 rounded-xl" style={{ backgroundColor: '#f59e0b20' }}>
+              <AlertTriangle className="h-5 w-5" style={{ color: '#f59e0b' }} />
+            </div>
           </div>
           <div className="space-y-4">
             {(porCategoria.length > 0 ? porCategoria : []).slice(0, 5).map((item, index) => {
@@ -793,7 +929,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Resumen rápido - Métricas Accionables */}
+        {/* Resumen rápido - Métricas Accionables con lista */}
         <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
@@ -802,7 +938,8 @@ export default function Dashboard() {
               value: metricasAccion?.urgentes ?? 0,
               color: '#ef4444',
               icon: AlertCircle,
-              alert: (metricasAccion?.urgentes ?? 0) > 0
+              alert: (metricasAccion?.urgentes ?? 0) > 0,
+              detailKey: 'urgentes' as keyof MetricasDetalle
             },
             {
               label: 'Sin Asignar',
@@ -810,7 +947,8 @@ export default function Dashboard() {
               value: metricasAccion?.sin_asignar ?? 0,
               color: '#f59e0b',
               icon: Clock,
-              alert: (metricasAccion?.sin_asignar ?? 0) > 3
+              alert: (metricasAccion?.sin_asignar ?? 0) > 3,
+              detailKey: 'sin_asignar' as keyof MetricasDetalle
             },
             {
               label: 'Para Hoy',
@@ -818,31 +956,88 @@ export default function Dashboard() {
               value: metricasAccion?.para_hoy ?? 0,
               color: theme.primary,
               icon: CalendarCheck,
-              alert: false
+              alert: false,
+              detailKey: 'para_hoy' as keyof MetricasDetalle
             },
             {
               label: 'Resueltos',
-              sublabel: `${metricasAccion?.cambio_eficiencia ?? 0 >= 0 ? '+' : ''}${metricasAccion?.cambio_eficiencia ?? 0}% vs sem. ant.`,
+              sublabel: `${(metricasAccion?.cambio_eficiencia ?? 0) >= 0 ? '+' : ''}${metricasAccion?.cambio_eficiencia ?? 0}% vs sem. ant.`,
               value: metricasAccion?.resueltos_semana ?? 0,
               color: '#22c55e',
               icon: CheckCircle2,
-              alert: false
+              alert: false,
+              detailKey: 'resueltos' as keyof MetricasDetalle
             },
           ].map((item) => {
             const Icon = item.icon;
+            const reclamos = metricasDetalle?.[item.detailKey] || [];
             return (
               <div
                 key={item.label}
-                className={`rounded-xl p-4 text-center transition-all duration-300 hover:scale-105 ${item.alert ? 'animate-pulse' : ''}`}
+                className={`group relative rounded-2xl p-4 flex flex-col transition-all duration-500 hover:-translate-y-1 overflow-hidden ${item.alert ? 'animate-pulse' : ''}`}
                 style={{
-                  backgroundColor: `${item.color}15`,
-                  border: `1px solid ${item.color}${item.alert ? '80' : '30'}`,
+                  backgroundColor: `${item.color}10`,
+                  border: `1px solid ${item.color}30`,
+                  boxShadow: `0 4px 20px ${item.color}15`,
                 }}
               >
-                <Icon className="h-6 w-6 mx-auto mb-2" style={{ color: item.color }} />
-                <p className="text-2xl font-bold" style={{ color: item.color }}>{item.value}</p>
-                <p className="text-xs font-medium mt-1" style={{ color: theme.text }}>{item.label}</p>
-                <p className="text-[10px] mt-0.5" style={{ color: theme.textSecondary }}>{item.sublabel}</p>
+                {/* Glow effect on hover */}
+                <div
+                  className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-500"
+                  style={{ backgroundColor: item.color }}
+                />
+                {/* Header */}
+                <div className="relative flex items-center justify-between mb-2">
+                  <div className="p-2 rounded-xl" style={{ backgroundColor: `${item.color}20` }}>
+                    <Icon className="h-4 w-4" style={{ color: item.color }} />
+                  </div>
+                  <p className="text-3xl font-black" style={{ color: item.color }}>{item.value}</p>
+                </div>
+                <p className="text-xs font-semibold" style={{ color: theme.text }}>{item.label}</p>
+                <p className="text-[10px] mb-2" style={{ color: theme.textSecondary }}>{item.sublabel}</p>
+
+                {/* Lista con scroll iOS */}
+                <div
+                  className="mt-2 pt-2 border-t overflow-y-auto scroll-smooth max-h-[120px]"
+                  style={{
+                    borderColor: `${item.color}30`,
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitOverflowScrolling: 'touch'
+                  }}
+                >
+                  <style>{`
+                    .ios-scroll::-webkit-scrollbar { display: none; }
+                  `}</style>
+                  <div className="space-y-1.5 ios-scroll">
+                    {reclamos.length > 0 ? reclamos.map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                        style={{ backgroundColor: `${item.color}10` }}
+                        onClick={() => window.location.href = `/reclamos/${r.id}`}
+                      >
+                        <p className="text-[10px] font-medium truncate" style={{ color: theme.text }}>
+                          {r.titulo}
+                        </p>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[9px] px-1 rounded" style={{ backgroundColor: `${item.color}20`, color: item.color }}>
+                            {r.categoria}
+                          </span>
+                          {r.dias_antiguedad > 0 && (
+                            <span className="text-[9px]" style={{ color: theme.textSecondary }}>
+                              {r.dias_antiguedad}d
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-[10px] text-center py-4" style={{ color: theme.textSecondary }}>
+                        Sin reclamos
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })}

@@ -1,5 +1,6 @@
 import { X, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export interface WizardStep {
@@ -53,7 +54,7 @@ export function WizardModal({
       setIsVisible(false);
       const timer = setTimeout(() => {
         setShouldRender(false);
-      }, 400);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [open]);
@@ -85,220 +86,177 @@ export function WizardModal({
 
   if (!shouldRender) return null;
 
-  return (
+  const modalContent = (
     <>
-      {/* Inyectar estilos de animación */}
+      {/* CSS Animations */}
       <style>{`
-        @keyframes wizard-pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(var(--wizard-primary-rgb), 0.4); }
-          50% { box-shadow: 0 0 0 8px rgba(var(--wizard-primary-rgb), 0); }
+        .wizard-modal-backdrop {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          z-index: 9998;
+          background-color: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(4px);
+          opacity: ${isVisible ? 1 : 0};
+          transition: opacity 0.3s ease;
         }
-        @keyframes wizard-slide-in-right {
-          from { opacity: 0; transform: translateX(30px); }
+        .wizard-modal-container {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          margin: 0 !important;
+          z-index: 9999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          overflow: hidden;
+        }
+        .wizard-modal-content {
+          width: 100%;
+          max-width: 900px;
+          max-height: calc(100vh - 48px);
+          margin: 0 !important;
+          display: flex;
+          flex-direction: column;
+          border-radius: 16px;
+          overflow: hidden;
+          transform: ${isVisible ? 'scale(1)' : 'scale(0.95)'};
+          opacity: ${isVisible ? 1 : 0};
+          transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        .wizard-slide-right {
+          animation: slideRight 0.3s ease-out;
+        }
+        .wizard-slide-left {
+          animation: slideLeft 0.3s ease-out;
+        }
+        @keyframes slideRight {
+          from { opacity: 0; transform: translateX(20px); }
           to { opacity: 1; transform: translateX(0); }
         }
-        @keyframes wizard-slide-in-left {
-          from { opacity: 0; transform: translateX(-30px); }
+        @keyframes slideLeft {
+          from { opacity: 0; transform: translateX(-20px); }
           to { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes wizard-fade-in {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes wizard-check-bounce {
-          0% { transform: scale(0); }
-          50% { transform: scale(1.2); }
-          100% { transform: scale(1); }
-        }
-        @keyframes wizard-icon-float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-3px); }
-        }
-        @keyframes wizard-progress-fill {
-          from { width: 0%; }
-          to { width: 100%; }
-        }
-        @keyframes wizard-glow {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.2); }
-        }
-        .wizard-step-content-enter {
-          animation: ${direction === 'next' ? 'wizard-slide-in-right' : 'wizard-slide-in-left'} 0.3s ease-out;
-        }
-        .wizard-check-animate {
-          animation: wizard-check-bounce 0.4s ease-out;
-        }
-        .wizard-icon-active {
-          animation: wizard-icon-float 2s ease-in-out infinite;
-        }
-        .wizard-glow {
-          animation: wizard-glow 2s ease-in-out infinite;
         }
       `}</style>
 
       {/* Backdrop */}
-      <div
-        className={`fixed inset-0 z-40 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
-        style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: isVisible ? 'blur(8px)' : 'blur(0px)',
-          transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-        onClick={onClose}
-      />
+      <div className="wizard-modal-backdrop" onClick={onClose} />
 
       {/* Modal Container */}
-      <div
-        className="fixed inset-x-0 top-0 bottom-0 z-50 flex items-start justify-center pt-4 pb-4 px-4 overflow-y-auto"
-        style={{
-          opacity: isVisible ? 1 : 0,
-          transition: 'opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
-      >
+      <div className="wizard-modal-container" onClick={onClose}>
         <div
-          className="w-full max-w-5xl flex flex-col rounded-2xl overflow-hidden"
+          className="wizard-modal-content"
           style={{
-            minHeight: '500px',
-            maxHeight: 'calc(100vh - 32px)',
-            transform: isVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(-20px)',
-            transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
             backgroundColor: theme.card,
-            boxShadow: `0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px ${theme.border}, 0 0 60px ${theme.primary}20`,
+            border: `1px solid ${theme.border}`,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div
-            className="relative px-6 py-4"
             style={{
-              background: `linear-gradient(135deg, ${theme.primary}15 0%, ${theme.card} 100%)`,
+              padding: '16px 20px',
               borderBottom: `1px solid ${theme.border}`,
+              background: `linear-gradient(135deg, ${theme.primary}10 0%, ${theme.card} 100%)`,
+              flexShrink: 0,
             }}
           >
-            {/* Decorative accent line */}
+            {/* Accent line */}
             <div
-              className="absolute top-0 left-0 right-0 h-1"
               style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
                 background: `linear-gradient(90deg, ${theme.primary}, ${theme.primaryHover})`,
-                transform: isVisible ? 'scaleX(1)' : 'scaleX(0)',
-                transformOrigin: 'left',
-                transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             />
 
-            <div className="flex items-center justify-between">
-              <div
-                style={{
-                  transform: isVisible ? 'translateX(0)' : 'translateX(-20px)',
-                  opacity: isVisible ? 1 : 0,
-                  transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                  transitionDelay: '100ms',
-                }}
-              >
-                <h2 className="text-xl font-bold" style={{ color: theme.text }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h2 style={{ fontSize: '18px', fontWeight: 700, color: theme.text, margin: 0 }}>
                   {title}
                 </h2>
-                <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                <p style={{ fontSize: '14px', color: theme.textSecondary, margin: '4px 0 0 0' }}>
                   Paso {currentStep + 1} de {steps.length}
                 </p>
               </div>
 
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl transition-all duration-200 hover:scale-110 hover:rotate-90 active:scale-95 relative overflow-hidden group"
-                style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}
+                style={{
+                  padding: '8px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.textSecondary,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <span className="absolute inset-0 bg-red-500/20 scale-0 group-hover:scale-100 transition-transform duration-200 rounded-xl" />
-                <X className="h-5 w-5 relative z-10 group-hover:text-red-500 transition-colors duration-200" />
+                <X style={{ width: '20px', height: '20px' }} />
               </button>
             </div>
 
             {/* Stepper */}
-            <div
-              className="mt-4 flex items-center justify-center"
-              style={{
-                transform: isVisible ? 'translateY(0)' : 'translateY(10px)',
-                opacity: isVisible ? 1 : 0,
-                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                transitionDelay: '150ms',
-              }}
-            >
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               {steps.map((step, index) => {
                 const isCompleted = index < currentStep;
                 const isCurrent = index === currentStep;
-                const isPending = index > currentStep;
 
                 return (
-                  <div key={step.id} className="flex items-center">
-                    {/* Step circle */}
+                  <div key={step.id} style={{ display: 'flex', alignItems: 'center' }}>
                     <button
                       onClick={() => handleStepClick(index)}
-                      disabled={isPending}
-                      className={`
-                        relative flex items-center justify-center w-10 h-10 rounded-full
-                        transition-all duration-300
-                        ${isCompleted ? 'cursor-pointer hover:scale-110' : ''}
-                        ${isCurrent ? 'wizard-glow' : ''}
-                      `}
+                      disabled={index > currentStep}
                       style={{
-                        backgroundColor: isCompleted
-                          ? theme.primary
-                          : isCurrent
-                          ? theme.primary
-                          : theme.backgroundSecondary,
-                        border: `2px solid ${
-                          isCompleted || isCurrent ? theme.primary : theme.border
-                        }`,
-                        boxShadow: isCurrent
-                          ? `0 0 15px ${theme.primary}50, 0 0 30px ${theme.primary}25`
-                          : 'none',
-                        transform: isCurrent ? 'scale(1.05)' : 'scale(1)',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        border: `2px solid ${isCompleted || isCurrent ? theme.primary : theme.border}`,
+                        backgroundColor: isCompleted || isCurrent ? theme.primary : theme.backgroundSecondary,
+                        color: isCompleted || isCurrent ? 'white' : theme.textSecondary,
+                        cursor: index <= currentStep ? 'pointer' : 'default',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                        boxShadow: isCurrent ? `0 0 0 4px ${theme.primary}30` : 'none',
                       }}
                     >
-                      {isCompleted ? (
-                        <Check
-                          className="h-5 w-5 wizard-check-animate"
-                          style={{ color: 'white' }}
-                        />
-                      ) : (
-                        <div
-                          className={isCurrent ? 'wizard-icon-active' : ''}
-                          style={{
-                            color: isCurrent ? 'white' : theme.textSecondary,
-                          }}
-                        >
-                          {step.icon}
-                        </div>
-                      )}
-
-                      {/* Pulse effect for current step */}
-                      {isCurrent && (
-                        <span
-                          className="absolute inset-0 rounded-full"
-                          style={{
-                            animation: 'wizard-pulse 2s infinite',
-                            '--wizard-primary-rgb': theme.primary
-                              .replace('#', '')
-                              .match(/.{2}/g)
-                              ?.map((x) => parseInt(x, 16))
-                              .join(', '),
-                          } as React.CSSProperties}
-                        />
-                      )}
+                      {isCompleted ? <Check style={{ width: '18px', height: '18px' }} /> : step.icon}
                     </button>
 
-                    {/* Connector line */}
                     {index < steps.length - 1 && (
                       <div
-                        className="w-16 sm:w-24 h-1 mx-1 sm:mx-2 rounded-full overflow-hidden"
-                        style={{ backgroundColor: theme.backgroundSecondary }}
+                        style={{
+                          width: '60px',
+                          height: '4px',
+                          marginLeft: '8px',
+                          marginRight: '8px',
+                          borderRadius: '2px',
+                          backgroundColor: theme.backgroundSecondary,
+                          overflow: 'hidden',
+                        }}
                       >
                         <div
-                          className="h-full rounded-full"
                           style={{
-                            backgroundColor: theme.primary,
+                            height: '100%',
                             width: isCompleted ? '100%' : '0%',
-                            transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                            backgroundColor: theme.primary,
+                            transition: 'width 0.3s ease',
                           }}
                         />
                       </div>
@@ -309,140 +267,148 @@ export function WizardModal({
             </div>
           </div>
 
-          {/* Content area */}
-          <div className="flex-1 overflow-hidden flex min-h-0">
-            {/* Main content */}
+          {/* Content */}
+          <div
+            style={{
+              flex: 1,
+              overflow: 'auto',
+              padding: '20px',
+              minHeight: '300px',
+            }}
+          >
             <div
-              className="flex-1 overflow-y-auto p-4"
-              style={{
-                transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-                opacity: isVisible ? 1 : 0,
-                transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                transitionDelay: '200ms',
-              }}
+              className={direction === 'next' ? 'wizard-slide-right' : 'wizard-slide-left'}
+              key={currentStep}
             >
-              {/* Step title and description */}
-              <div className="mb-4 wizard-step-content-enter" key={currentStep}>
-                <h3
-                  className="text-base font-semibold flex items-center gap-2"
-                  style={{ color: theme.text }}
+              {/* Step title */}
+              <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    backgroundColor: `${theme.primary}20`,
+                    color: theme.primary,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                 >
-                  <span
-                    className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{
-                      backgroundColor: `${theme.primary}20`,
-                      color: theme.primary,
-                    }}
-                  >
-                    {currentStepData?.icon}
-                  </span>
-                  {currentStepData?.title}
-                </h3>
-                {currentStepData?.description && (
-                  <p
-                    className="text-sm mt-1 ml-9"
-                    style={{ color: theme.textSecondary }}
-                  >
-                    {currentStepData.description}
-                  </p>
-                )}
+                  {currentStepData?.icon}
+                </span>
+                <div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: theme.text, margin: 0 }}>
+                    {currentStepData?.title}
+                  </h3>
+                  {currentStepData?.description && (
+                    <p style={{ fontSize: '13px', color: theme.textSecondary, margin: '2px 0 0 0' }}>
+                      {currentStepData.description}
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Step content */}
-              <div className="wizard-step-content-enter" key={`content-${currentStep}`}>
-                {currentStepData?.content}
-              </div>
+              {currentStepData?.content}
             </div>
-
-            {/* AI Panel (optional) */}
-            {aiPanel && (
-              <div
-                className="w-72 border-l p-4 hidden lg:block"
-                style={{
-                  borderColor: theme.border,
-                  backgroundColor: theme.backgroundSecondary,
-                  transform: isVisible ? 'translateX(0)' : 'translateX(20px)',
-                  opacity: isVisible ? 1 : 0,
-                  transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                  transitionDelay: '250ms',
-                }}
-              >
-                {aiPanel}
-              </div>
-            )}
           </div>
+
+          {/* AI Panel (optional) - solo en desktop */}
+          {aiPanel && (
+            <div
+              style={{
+                display: 'none',
+                padding: '16px',
+                borderTop: `1px solid ${theme.border}`,
+                backgroundColor: theme.backgroundSecondary,
+              }}
+              className="lg:block"
+            >
+              {aiPanel}
+            </div>
+          )}
 
           {/* Footer */}
           <div
-            className="px-6 py-4 flex items-center justify-between"
             style={{
+              padding: '16px 20px',
               borderTop: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,
-              transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-              opacity: isVisible ? 1 : 0,
-              transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-              transitionDelay: '250ms',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexShrink: 0,
             }}
           >
-            {/* Previous button */}
             <button
               onClick={handlePrev}
               disabled={currentStep === 0}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: `1px solid ${theme.border}`,
                 backgroundColor: theme.card,
                 color: theme.text,
-                border: `1px solid ${theme.border}`,
+                fontWeight: 500,
+                cursor: currentStep === 0 ? 'not-allowed' : 'pointer',
+                opacity: currentStep === 0 ? 0.5 : 1,
               }}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft style={{ width: '18px', height: '18px' }} />
               Anterior
             </button>
 
-            {/* Step indicators */}
-            <div className="flex items-center gap-2">
+            {/* Dots */}
+            <div style={{ display: 'flex', gap: '8px' }}>
               {steps.map((_, index) => (
                 <div
                   key={index}
-                  className="w-2 h-2 rounded-full transition-all duration-300"
                   style={{
-                    backgroundColor:
-                      index === currentStep
-                        ? theme.primary
-                        : index < currentStep
-                        ? theme.primary
-                        : theme.border,
-                    transform: index === currentStep ? 'scale(1.5)' : 'scale(1)',
+                    width: index === currentStep ? '24px' : '8px',
+                    height: '8px',
+                    borderRadius: '4px',
+                    backgroundColor: index <= currentStep ? theme.primary : theme.border,
+                    transition: 'all 0.3s ease',
                   }}
                 />
               ))}
             </div>
 
-            {/* Next/Complete button */}
             <button
               onClick={isLastStep ? onComplete : handleNext}
               disabled={loading || !canProceed}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                borderRadius: '10px',
+                border: 'none',
                 backgroundColor: theme.primary,
                 color: 'white',
-                boxShadow: canProceed ? `0 4px 14px ${theme.primary}40` : 'none',
+                fontWeight: 600,
+                cursor: loading || !canProceed ? 'not-allowed' : 'pointer',
+                opacity: loading || !canProceed ? 0.5 : 1,
+                boxShadow: `0 4px 14px ${theme.primary}40`,
               }}
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 style={{ width: '18px', height: '18px', animation: 'spin 1s linear infinite' }} />
                   Guardando...
                 </>
               ) : isLastStep ? (
                 <>
-                  <Check className="h-4 w-4" />
+                  <Check style={{ width: '18px', height: '18px' }} />
                   {completeLabel}
                 </>
               ) : (
                 <>
                   Siguiente
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight style={{ width: '18px', height: '18px' }} />
                 </>
               )}
             </button>
@@ -451,6 +417,9 @@ export function WizardModal({
       </div>
     </>
   );
+
+  // Usar portal para renderizar fuera del DOM normal
+  return createPortal(modalContent, document.body);
 }
 
 export default WizardModal;

@@ -76,8 +76,10 @@ async def get_sla_configs(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Obtener todas las configuraciones de SLA"""
+    # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
         select(SLAConfig)
+        .where(SLAConfig.municipio_id == current_user.municipio_id)
         .options(selectinload(SLAConfig.categoria))
         .order_by(SLAConfig.categoria_id, SLAConfig.prioridad)
     )
@@ -105,7 +107,8 @@ async def create_sla_config(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Crear nueva configuración de SLA"""
-    config = SLAConfig(**data.model_dump())
+    # Multi-tenant: agregar municipio_id
+    config = SLAConfig(**data.model_dump(), municipio_id=current_user.municipio_id)
     db.add(config)
     await db.commit()
     await db.refresh(config)
@@ -140,7 +143,12 @@ async def update_sla_config(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Actualizar configuración de SLA"""
-    result = await db.execute(select(SLAConfig).where(SLAConfig.id == config_id))
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(SLAConfig)
+        .where(SLAConfig.id == config_id)
+        .where(SLAConfig.municipio_id == current_user.municipio_id)
+    )
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Configuración no encontrada")
@@ -179,7 +187,12 @@ async def delete_sla_config(
     current_user: User = Depends(require_roles(["admin"]))
 ):
     """Eliminar configuración de SLA"""
-    result = await db.execute(select(SLAConfig).where(SLAConfig.id == config_id))
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(SLAConfig)
+        .where(SLAConfig.id == config_id)
+        .where(SLAConfig.municipio_id == current_user.municipio_id)
+    )
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Configuración no encontrada")
@@ -189,12 +202,14 @@ async def delete_sla_config(
     return {"message": "Configuración eliminada"}
 
 
-async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: int) -> dict:
+async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: int, municipio_id: int) -> dict:
     """Obtener configuración de SLA aplicable a un reclamo"""
+    # Multi-tenant: filtrar por municipio_id
     # Buscar SLA específico para categoría y prioridad
     result = await db.execute(
         select(SLAConfig)
         .where(
+            SLAConfig.municipio_id == municipio_id,
             SLAConfig.categoria_id == categoria_id,
             SLAConfig.prioridad == prioridad,
             SLAConfig.activo == True
@@ -207,6 +222,7 @@ async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: in
         result = await db.execute(
             select(SLAConfig)
             .where(
+                SLAConfig.municipio_id == municipio_id,
                 SLAConfig.categoria_id == categoria_id,
                 SLAConfig.prioridad.is_(None),
                 SLAConfig.activo == True
@@ -215,10 +231,11 @@ async def get_sla_for_reclamo(db: AsyncSession, categoria_id: int, prioridad: in
         config = result.scalar_one_or_none()
 
     if not config:
-        # Buscar SLA general
+        # Buscar SLA general del municipio
         result = await db.execute(
             select(SLAConfig)
             .where(
+                SLAConfig.municipio_id == municipio_id,
                 SLAConfig.categoria_id.is_(None),
                 SLAConfig.activo == True
             )
@@ -248,7 +265,10 @@ async def get_sla_estado_reclamos(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Obtener estado de SLA de todos los reclamos"""
-    query = select(Reclamo).options(selectinload(Reclamo.categoria))
+    # Multi-tenant: filtrar por municipio_id
+    query = select(Reclamo).options(selectinload(Reclamo.categoria)).where(
+        Reclamo.municipio_id == current_user.municipio_id
+    )
 
     if solo_activos:
         query = query.where(
@@ -263,7 +283,7 @@ async def get_sla_estado_reclamos(
     ahora = datetime.utcnow()
 
     for r in reclamos:
-        sla_config = await get_sla_for_reclamo(db, r.categoria_id, r.prioridad)
+        sla_config = await get_sla_for_reclamo(db, r.categoria_id, r.prioridad, current_user.municipio_id)
 
         tiempo_transcurrido = (ahora - r.created_at.replace(tzinfo=None)).total_seconds() / 3600
 
@@ -337,10 +357,12 @@ async def get_sla_resumen(
     porcentaje_cumplimiento = (en_tiempo / total * 100) if total > 0 else 100
 
     # Calcular tiempos promedio de reclamos resueltos (últimos 30 días)
+    # Multi-tenant: filtrar por municipio_id
     hace_30_dias = datetime.utcnow() - timedelta(days=30)
     result = await db.execute(
         select(Reclamo)
         .where(
+            Reclamo.municipio_id == current_user.municipio_id,
             Reclamo.estado == EstadoReclamo.RESUELTO,
             Reclamo.fecha_resolucion >= hace_30_dias
         )

@@ -3,7 +3,7 @@ import { Edit, Trash2, User, Star, X, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, zonasApi, categoriasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import type { Empleado, Zona, Categoria } from '../types';
 
 export default function Empleados() {
@@ -433,57 +433,133 @@ export default function Empleados() {
         </form>
       }
     >
-      {filteredEmpleados.map((c) => (
-        <ABMCard key={c.id} onClick={() => openSheet(c)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                <User className="h-5 w-5 text-purple-600" />
-              </div>
-              <div className="ml-3">
-                <p className="font-medium">{getNombreCompleto(c)}</p>
-                {c.categoria_principal && (
-                  <p className="text-sm flex items-center gap-1" style={{ color: c.categoria_principal.color || theme.textSecondary }}>
-                    <Star className="h-3 w-3 fill-current" />
-                    {c.categoria_principal.nombre}
-                  </p>
-                )}
-              </div>
-            </div>
-            <ABMBadge active={c.activo} />
-          </div>
+      {filteredEmpleados.map((c) => {
+        // Usar el color de la categoría principal, o un gradiente morado por defecto
+        const mainColor = c.categoria_principal?.color || '#8B5CF6';
+        const zona = zonas.find(z => z.id === c.zona_id);
 
-          {c.categorias && c.categorias.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-3">
-              {c.categorias.map(cat => (
-                <span
-                  key={cat.id}
-                  className="px-2 py-0.5 text-xs rounded-full text-white"
-                  style={{ backgroundColor: cat.color || '#6b7280' }}
-                >
-                  {cat.nombre}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {c.descripcion && (
-            <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
-              {c.descripcion}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <div className="text-sm" style={{ color: theme.textSecondary }}>
-              {zonas.find(z => z.id === c.zona_id)?.nombre || 'Sin zona'}
-            </div>
-            <ABMCardActions
-              onEdit={() => openSheet(c)}
-              onDelete={() => handleDelete(c.id)}
+        return (
+          <div
+            key={c.id}
+            onClick={() => openSheet(c)}
+            className="group relative rounded-2xl p-5 cursor-pointer overflow-hidden abm-card-hover animate-fade-in-up"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+              ['--card-primary' as string]: mainColor,
+            }}
+          >
+            {/* Fondo con gradiente sutil del color principal */}
+            <div
+              className="absolute inset-0 opacity-[0.06] group-hover:opacity-[0.12] transition-opacity duration-500"
+              style={{
+                background: `
+                  radial-gradient(ellipse at top left, ${mainColor}50 0%, transparent 50%),
+                  radial-gradient(ellipse at bottom right, ${mainColor}30 0%, transparent 50%)
+                `,
+              }}
             />
+
+            {/* Línea decorativa superior con el color */}
+            <div
+              className="absolute top-0 left-0 right-0 h-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300"
+              style={{
+                background: `linear-gradient(90deg, ${mainColor}, ${mainColor}50, transparent)`,
+              }}
+            />
+
+            {/* Contenido */}
+            <div className="relative z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  {/* Avatar con gradiente */}
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:rotate-3"
+                    style={{
+                      background: `linear-gradient(135deg, ${mainColor}, ${mainColor}CC)`,
+                      boxShadow: `0 4px 14px ${mainColor}40`,
+                    }}
+                  >
+                    <User className="h-6 w-6 text-white" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="font-semibold text-lg" style={{ color: theme.text }}>
+                      {getNombreCompleto(c)}
+                    </p>
+                    {c.categoria_principal && (
+                      <p className="text-sm flex items-center gap-1.5" style={{ color: mainColor }}>
+                        <Star className="h-3.5 w-3.5 fill-current" />
+                        {c.categoria_principal.nombre}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <ABMBadge active={c.activo} />
+              </div>
+
+              {/* Especialidades con chips */}
+              {c.categorias && c.categorias.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-4">
+                  {c.categorias.map(cat => (
+                    <span
+                      key={cat.id}
+                      className="px-2.5 py-1 text-xs rounded-full font-medium transition-transform duration-200 hover:scale-105"
+                      style={{
+                        backgroundColor: `${cat.color || '#6b7280'}20`,
+                        color: cat.color || '#6b7280',
+                        border: `1px solid ${cat.color || '#6b7280'}30`,
+                      }}
+                    >
+                      {cat.nombre}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {c.descripcion && (
+                <p className="text-sm mt-4 line-clamp-2" style={{ color: theme.textSecondary }}>
+                  {c.descripcion}
+                </p>
+              )}
+
+              <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
+                <div className="flex items-center gap-2">
+                  {zona ? (
+                    <span
+                      className="text-xs px-2.5 py-1 rounded-full font-medium flex items-center gap-1"
+                      style={{
+                        backgroundColor: `${mainColor}10`,
+                        color: theme.textSecondary,
+                      }}
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {zona.nombre}
+                    </span>
+                  ) : (
+                    <span className="text-xs" style={{ color: theme.textSecondary }}>Sin zona</span>
+                  )}
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      color: theme.textSecondary,
+                    }}
+                  >
+                    Cap. {c.capacidad_maxima}
+                  </span>
+                </div>
+                <ABMCardActions
+                  onEdit={() => openSheet(c)}
+                  onDelete={() => handleDelete(c.id)}
+                />
+              </div>
+            </div>
           </div>
-        </ABMCard>
-      ))}
+        );
+      })}
     </ABMPage>
   );
 }

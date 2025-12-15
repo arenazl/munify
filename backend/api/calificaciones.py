@@ -122,7 +122,7 @@ async def get_calificacion_reclamo(
 
 @router.get("/estadisticas", response_model=EstadisticasCalificaciones)
 async def get_estadisticas_calificaciones(
-    cuadrilla_id: Optional[int] = None,
+    empleado_id: Optional[int] = None,
     categoria_id: Optional[int] = None,
     dias: int = 30,
     db: AsyncSession = Depends(get_db),
@@ -137,10 +137,10 @@ async def get_estadisticas_calificaciones(
     query = select(Calificacion).where(Calificacion.created_at >= fecha_desde)
 
     # Filtros
-    if cuadrilla_id or categoria_id:
+    if empleado_id or categoria_id:
         query = query.join(Reclamo)
-        if cuadrilla_id:
-            query = query.where(Reclamo.cuadrilla_id == cuadrilla_id)
+        if empleado_id:
+            query = query.where(Reclamo.empleado_id == empleado_id)
         if categoria_id:
             query = query.where(Reclamo.categoria_id == categoria_id)
 
@@ -202,32 +202,32 @@ async def get_estadisticas_calificaciones(
     )
 
 
-@router.get("/ranking-cuadrillas")
-async def get_ranking_cuadrillas(
+@router.get("/ranking-empleados")
+async def get_ranking_empleados(
     dias: int = 30,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Obtener ranking de cuadrillas por calificación"""
+    """Obtener ranking de empleados por calificación"""
     from datetime import timedelta
-    from models import Cuadrilla
+    from models import Empleado
 
     fecha_desde = datetime.utcnow() - timedelta(days=dias)
 
-    # Obtener todas las cuadrillas activas
+    # Obtener todos los empleados activos
     result = await db.execute(
-        select(Cuadrilla).where(Cuadrilla.activo == True)
+        select(Empleado).where(Empleado.activo == True)
     )
-    cuadrillas = result.scalars().all()
+    empleados = result.scalars().all()
 
     ranking = []
-    for cuadrilla in cuadrillas:
-        # Obtener calificaciones de reclamos de esta cuadrilla
+    for empleado in empleados:
+        # Obtener calificaciones de reclamos de este empleado
         result = await db.execute(
             select(Calificacion)
             .join(Reclamo)
             .where(
-                Reclamo.cuadrilla_id == cuadrilla.id,
+                Reclamo.empleado_id == empleado.id,
                 Calificacion.created_at >= fecha_desde
             )
         )
@@ -236,8 +236,8 @@ async def get_ranking_cuadrillas(
         if calificaciones:
             promedio = sum(c.puntuacion for c in calificaciones) / len(calificaciones)
             ranking.append({
-                "cuadrilla_id": cuadrilla.id,
-                "cuadrilla_nombre": f"{cuadrilla.nombre} {cuadrilla.apellido or ''}".strip(),
+                "empleado_id": empleado.id,
+                "empleado_nombre": f"{empleado.nombre} {empleado.apellido or ''}".strip(),
                 "total_calificaciones": len(calificaciones),
                 "promedio": round(promedio, 2),
                 "calificaciones_5_estrellas": sum(1 for c in calificaciones if c.puntuacion == 5),
@@ -249,7 +249,7 @@ async def get_ranking_cuadrillas(
 
     return {
         "periodo_dias": dias,
-        "total_cuadrillas": len(ranking),
+        "total_empleados": len(ranking),
         "ranking": ranking
     }
 

@@ -110,7 +110,7 @@ export default function Tablero() {
       );
   };
 
-  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor' || user?.rol === 'cuadrilla';
+  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor' || user?.rol === 'empleado';
 
   if (loading) {
     return (

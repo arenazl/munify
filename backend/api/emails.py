@@ -74,7 +74,7 @@ async def notificar_cambio_reclamo(
         .options(
             selectinload(Reclamo.creador),
             selectinload(Reclamo.categoria),
-            selectinload(Reclamo.cuadrilla_asignada)
+            selectinload(Reclamo.empleado_asignado)
         )
     )
     reclamo = result.scalar_one_or_none()
@@ -93,10 +93,10 @@ async def notificar_cambio_reclamo(
         subject = f"Reclamo #{reclamo.id} registrado"
 
     elif reclamo.estado == EstadoReclamo.ASIGNADO:
-        cuadrilla_nombre = f"{reclamo.cuadrilla_asignada.nombre} {reclamo.cuadrilla_asignada.apellido or ''}" if reclamo.cuadrilla_asignada else "Equipo municipal"
+        empleado_nombre = f"{reclamo.empleado_asignado.nombre} {reclamo.empleado_asignado.apellido or ''}" if reclamo.empleado_asignado else "Equipo municipal"
         fecha = reclamo.fecha_programada.strftime("%d/%m/%Y") if reclamo.fecha_programada else None
         html = EmailTemplates.reclamo_asignado(
-            reclamo.titulo, reclamo.id, cuadrilla_nombre, fecha
+            reclamo.titulo, reclamo.id, empleado_nombre, fecha
         )
         subject = f"Reclamo #{reclamo.id} asignado"
 

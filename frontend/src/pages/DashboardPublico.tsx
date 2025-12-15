@@ -89,14 +89,8 @@ export default function DashboardPublico() {
   };
 
   const handleCrearReclamo = () => {
-    if (user) {
-      // Usuario ya logueado, ir directo a crear reclamo
-      navigate('/nuevo-reclamo');
-    } else {
-      // Guardar flag para redirigir después del registro
-      localStorage.setItem('pending_reclamo', 'true');
-      navigate('/register');
-    }
+    // Siempre ir a nuevo-reclamo, ahí se maneja el registro si es necesario
+    navigate('/nuevo-reclamo');
   };
 
   const buscarDireccion = async (query: string) => {

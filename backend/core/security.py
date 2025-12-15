@@ -63,3 +63,28 @@ def require_roles(allowed_roles: list):
             )
         return current_user
     return role_checker
+
+
+def get_municipio_id_from_header():
+    """
+    Obtiene el municipio_id del header X-Municipio-ID.
+    Solo admins/supervisores pueden cambiar de municipio.
+    """
+    from fastapi import Request
+
+    async def _get_municipio_id(
+        request: Request,
+        current_user = Depends(get_current_user)
+    ) -> int:
+        # Solo admins y supervisores pueden cambiar de municipio via header
+        if current_user.rol in ['admin', 'supervisor']:
+            header_municipio_id = request.headers.get('X-Municipio-ID')
+            if header_municipio_id:
+                try:
+                    return int(header_municipio_id)
+                except (ValueError, TypeError):
+                    pass
+        # Default: municipio del usuario
+        return current_user.municipio_id
+
+    return _get_municipio_id

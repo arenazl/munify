@@ -198,6 +198,78 @@ CUADRILLAS_DATA = [
     {"nombre": "Equipo Hidráulico", "especialidad": "Agua"},
 ]
 
+# Nombres característicos de usuarios por municipio
+# Cada municipio tiene sus propios funcionarios con nombres únicos
+# El admin es genérico (rol de sistema), los demás tienen nombres de personas
+USUARIOS_POR_MUNICIPIO = {
+    "merlo": {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("Graciela", "Fernández"),
+        "empleado": ("Carlos", "Gómez"),
+        "vecino": ("Marta", "Rodríguez"),
+        "vecinos_extra": [
+            ("Jorge", "Pérez"), ("Silvia", "Luna"), ("Raúl", "Castro"),
+            ("Norma", "Vega"), ("Hugo", "Ríos"), ("Estela", "Morales"),
+            ("Ramón", "Acosta"), ("Delia", "Benítez"), ("Oscar", "Romero")
+        ]
+    },
+    "san-isidro": {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("Carolina", "Thompson"),
+        "empleado": ("Federico", "Williams"),
+        "vecino": ("Victoria", "Spencer"),
+        "vecinos_extra": [
+            ("Agustín", "Murray"), ("Florencia", "Crawford"), ("Sebastián", "Bennett"),
+            ("Camila", "Harrison"), ("Tomás", "Mitchell"), ("Luciana", "Foster"),
+            ("Nicolás", "Sullivan"), ("Valentina", "Ross"), ("Matías", "Graham")
+        ]
+    },
+    "vicente-lopez": {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("Patricia", "Mendoza"),
+        "empleado": ("Andrés", "Rivero"),
+        "vecino": ("Claudia", "Aguirre"),
+        "vecinos_extra": [
+            ("Marcelo", "Quiroga"), ("Gabriela", "Navarro"), ("Diego", "Peralta"),
+            ("Mariana", "Soria"), ("Facundo", "Medina"), ("Laura", "Campos"),
+            ("Gonzalo", "Vera"), ("Natalia", "Herrera"), ("Ignacio", "Paz")
+        ]
+    },
+    "tigre": {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("Mónica", "Insúa"),
+        "empleado": ("Sergio", "Bianchi"),
+        "vecino": ("Elena", "Rossi"),
+        "vecinos_extra": [
+            ("Fabián", "Colombo"), ("Sandra", "Russo"), ("Alejandro", "Ferraro"),
+            ("Verónica", "Lombardi"), ("Pablo", "Marino"), ("Adriana", "Conti"),
+            ("Ricardo", "Greco"), ("Silvana", "Rizzo"), ("Damián", "Bruno")
+        ]
+    },
+    "la-plata": {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("Beatriz", "Echeverría"),
+        "empleado": ("Leandro", "Ibáñez"),
+        "vecino": ("Rosa", "Domínguez"),
+        "vecinos_extra": [
+            ("Hernán", "Bustos"), ("Cecilia", "Godoy"), ("Mauricio", "Leiva"),
+            ("Soledad", "Molina"), ("Cristian", "Ojeda"), ("Lorena", "Ramos"),
+            ("Ezequiel", "Sosa"), ("Mariela", "Torres"), ("Julián", "Vargas")
+        ]
+    },
+    "quilmes": {
+        "admin": ("Admin", "Sistema"),
+        "supervisor": ("Alicia", "Giménez"),
+        "empleado": ("Walter", "Figueroa"),
+        "vecino": ("Carmen", "Álvarez"),
+        "vecinos_extra": [
+            ("Néstor", "Cabrera"), ("Teresa", "Díaz"), ("Rubén", "Flores"),
+            ("Gloria", "Gutiérrez"), ("Alfredo", "Juárez"), ("Mirta", "López"),
+            ("Héctor", "Martínez"), ("Irene", "Núñez"), ("Víctor", "Ortiz")
+        ]
+    },
+}
+
 # Títulos de reclamos por categoría
 RECLAMOS_TITULOS = {
     "Alumbrado Público": [
@@ -396,17 +468,31 @@ async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, m
     print("[+] Creando usuarios...")
     usuarios_map = {}
 
-    # Dominio único por municipio (ej: admin@merlo.test.com)
-    domain = f"{codigo_muni}.test.com"
+    # Dominio único por municipio (ej: admin@merlo.gob)
+    domain = f"{codigo_muni}.gob"
     # Contraseña universal para demo
     password = pwd_context.hash("123456")
 
+    # Obtener nombres característicos del municipio
+    nombres_muni = USUARIOS_POR_MUNICIPIO.get(codigo_muni, {
+        "admin": ("Admin", "Municipal"),
+        "supervisor": ("Supervisor", "General"),
+        "empleado": ("Empleado", "Municipal"),
+        "vecino": ("Vecino", "Principal"),
+        "vecinos_extra": [
+            ("Ana", "López"), ("Carlos", "García"), ("Laura", "Martínez"),
+            ("Diego", "Rodríguez"), ("Sofía", "Fernández"), ("Pablo", "Sánchez"),
+            ("Lucía", "Romero"), ("Martín", "Torres"), ("Valentina", "Díaz")
+        ]
+    })
+
     # Admin del municipio
+    admin_nombre, admin_apellido = nombres_muni["admin"]
     admin = User(
         email=f"admin@{domain}",
         password_hash=password,
-        nombre="Admin",
-        apellido=codigo_muni.replace("-", " ").title(),
+        nombre=admin_nombre,
+        apellido=admin_apellido,
         rol=RolUsuario.ADMIN,
         municipio_id=municipio_id,
         activo=True
@@ -416,11 +502,12 @@ async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, m
     usuarios_map["admin"] = admin.id
 
     # Supervisor
+    sup_nombre, sup_apellido = nombres_muni["supervisor"]
     supervisor = User(
         email=f"supervisor@{domain}",
         password_hash=password,
-        nombre="María",
-        apellido="González",
+        nombre=sup_nombre,
+        apellido=sup_apellido,
         rol=RolUsuario.SUPERVISOR,
         municipio_id=municipio_id,
         activo=True
@@ -429,44 +516,28 @@ async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, m
     await session.flush()
     usuarios_map["supervisor"] = supervisor.id
 
-    # Usuario de cuadrilla principal (sin número para demo)
-    primera_cuadrilla_id = list(cuadrillas_map.values())[0] if cuadrillas_map else None
-    cuadrilla_user = User(
-        email=f"cuadrilla@{domain}",
+    # Empleado principal
+    emp_nombre, emp_apellido = nombres_muni["empleado"]
+    empleado = User(
+        email=f"empleado@{domain}",
         password_hash=password,
-        nombre="Operario",
-        apellido="Principal",
-        rol=RolUsuario.CUADRILLA,
-        cuadrilla_id=primera_cuadrilla_id,
+        nombre=emp_nombre,
+        apellido=emp_apellido,
+        rol=RolUsuario.EMPLEADO,
         municipio_id=municipio_id,
         activo=True
     )
-    session.add(cuadrilla_user)
+    session.add(empleado)
     await session.flush()
-    usuarios_map["cuadrilla_0"] = cuadrilla_user.id
+    usuarios_map["empleado_0"] = empleado.id
 
-    # Usuarios de cuadrilla adicionales
-    for i, (nombre, cuadrilla_id) in enumerate(list(cuadrillas_map.items())[1:], start=1):
-        user = User(
-            email=f"cuadrilla{i+1}@{domain}",
-            password_hash=password,
-            nombre=f"Operario {i+1}",
-            apellido=nombre.split()[-1],
-            rol=RolUsuario.CUADRILLA,
-            cuadrilla_id=cuadrilla_id,
-            municipio_id=municipio_id,
-            activo=True
-        )
-        session.add(user)
-        await session.flush()
-        usuarios_map[f"cuadrilla_{i}"] = user.id
-
-    # Vecino principal (sin número para demo)
+    # Vecino principal
+    vec_nombre, vec_apellido = nombres_muni["vecino"]
     vecino_principal = User(
         email=f"vecino@{domain}",
         password_hash=password,
-        nombre="Juan",
-        apellido="Pérez",
+        nombre=vec_nombre,
+        apellido=vec_apellido,
         telefono=f"11-{random.randint(1000, 9999)}-{random.randint(1000, 9999)}",
         rol=RolUsuario.VECINO,
         municipio_id=municipio_id,
@@ -476,13 +547,9 @@ async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, m
     await session.flush()
     usuarios_map["vecino_0"] = vecino_principal.id
 
-    # Vecinos adicionales
-    vecinos_nombres = [
-        ("Ana", "López"), ("Carlos", "García"), ("Laura", "Martínez"),
-        ("Diego", "Rodríguez"), ("Sofía", "Fernández"), ("Pablo", "Sánchez"),
-        ("Lucía", "Romero"), ("Martín", "Torres"), ("Valentina", "Díaz")
-    ]
-    for i, (nombre, apellido) in enumerate(vecinos_nombres, start=1):
+    # Vecinos adicionales con nombres característicos
+    vecinos_extra = nombres_muni.get("vecinos_extra", [])
+    for i, (nombre, apellido) in enumerate(vecinos_extra, start=1):
         vecino = User(
             email=f"vecino{i+1}@{domain}",
             password_hash=password,
@@ -881,12 +948,15 @@ async def main():
             for codigo, mid in municipios_map.items():
                 print(f"   - {codigo} (ID: {mid})")
             print("\nUsuarios de prueba (contraseña: 123456 para todos):")
-            print("   - Admin: admin@{codigo}.test.com")
-            print("   - Supervisor: supervisor@{codigo}.test.com")
-            print("   - Cuadrilla: cuadrilla@{codigo}.test.com")
-            print("   - Vecino: vecino@{codigo}.test.com")
+            print("   - Admin: admin@{codigo}.gob")
+            print("   - Supervisor: supervisor@{codigo}.gob")
+            print("   - Empleado: empleado@{codigo}.gob")
+            print("   - Vecino: vecino@{codigo}.gob")
             print("\nEjemplo para Merlo:")
-            print("   - admin@merlo.test.com / 123456")
+            print("   - admin@merlo.gob / 123456 (Admin Sistema)")
+            print("   - supervisor@merlo.gob / 123456 (Graciela Fernández)")
+            print("   - empleado@merlo.gob / 123456 (Carlos Gómez)")
+            print("   - vecino@merlo.gob / 123456 (Marta Rodríguez)")
             print()
 
         except Exception as e:

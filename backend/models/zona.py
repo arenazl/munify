@@ -28,4 +28,4 @@ class Zona(Base):
 
     # Relaciones
     reclamos = relationship("Reclamo", back_populates="zona")
-    cuadrillas = relationship("Cuadrilla", back_populates="zona_asignada")
+    empleados = relationship("Empleado", back_populates="zona_asignada")

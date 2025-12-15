@@ -2,10 +2,10 @@
 Endpoints de analytics avanzados para el Dashboard.
 - Mapa de calor (coordenadas de reclamos)
 - Clustering de reclamos cercanos
-- Distancia promedio de cuadrillas
+- Distancia promedio de empleados
 - Cobertura por zonas
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, case
 from datetime import datetime, timedelta
@@ -18,12 +18,24 @@ from models.reclamo import Reclamo
 from models.user import User
 from models.zona import Zona
 from models.categoria import Categoria
-from models.cuadrilla import Cuadrilla
+from models.empleado import Empleado
 from models.configuracion import Configuracion
 from models.municipio import Municipio
-from models.enums import EstadoReclamo
+from models.enums import EstadoReclamo, RolUsuario
 
 router = APIRouter()
+
+
+def get_effective_municipio_id(request: Request, current_user: User) -> int:
+    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
+    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        header_municipio_id = request.headers.get('X-Municipio-ID')
+        if header_municipio_id:
+            try:
+                return int(header_municipio_id)
+            except (ValueError, TypeError):
+                pass
+    return current_user.municipio_id
 
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -41,6 +53,7 @@ def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
 
 @router.get("/heatmap")
 async def get_heatmap_data(
+    request: Request,
     dias: int = Query(30, description="Últimos N días"),
     categoria_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
@@ -50,7 +63,7 @@ async def get_heatmap_data(
     Obtiene coordenadas de reclamos para el mapa de calor.
     Retorna puntos con latitud, longitud e intensidad (cantidad de reclamos cercanos).
     """
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
     query = select(
@@ -105,6 +118,7 @@ async def get_heatmap_data(
 
 @router.get("/clusters")
 async def get_clusters(
+    request: Request,
     radio_km: float = Query(0.5, description="Radio en km para agrupar reclamos"),
     min_reclamos: int = Query(3, description="Mínimo de reclamos para formar cluster"),
     dias: int = Query(30, description="Últimos N días"),
@@ -112,10 +126,10 @@ async def get_clusters(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """
-    Agrupa reclamos cercanos en clusters para optimizar rutas de cuadrillas.
+    Agrupa reclamos cercanos en clusters para optimizar rutas de empleados.
     Usa un algoritmo simple de clustering basado en distancia.
     """
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
     result = await db.execute(
@@ -180,16 +194,17 @@ async def get_clusters(
 
 
 @router.get("/distancias")
-async def get_distancias_cuadrillas(
+async def get_distancias_empleados(
+    request: Request,
     dias: int = Query(30, description="Últimos N días"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """
-    Calcula la distancia promedio recorrida por las cuadrillas.
+    Calcula la distancia promedio recorrida por los empleados.
     Basado en las coordenadas de reclamos resueltos.
     """
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
     # Obtener ubicación de la municipalidad desde tabla Municipio
@@ -200,16 +215,16 @@ async def get_distancias_cuadrillas(
     muni_lat = municipio.latitud if municipio and municipio.latitud else -34.5750
     muni_lon = municipio.longitud if municipio and municipio.longitud else -58.5250
 
-    # Obtener reclamos resueltos por cuadrilla (1 query optimizada)
+    # Obtener reclamos resueltos por empleado (1 query optimizada)
     result = await db.execute(
         select(
-            Cuadrilla.id,
-            Cuadrilla.nombre,
+            Empleado.id,
+            Empleado.nombre,
             Reclamo.latitud,
             Reclamo.longitud,
             Reclamo.id.label('reclamo_id')
         )
-        .join(Reclamo, Reclamo.cuadrilla_id == Cuadrilla.id)
+        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
         .where(
             and_(
                 Reclamo.estado == EstadoReclamo.RESUELTO,
@@ -219,19 +234,19 @@ async def get_distancias_cuadrillas(
                 Reclamo.municipio_id == municipio_id
             )
         )
-        .order_by(Cuadrilla.id, Reclamo.fecha_resolucion)
+        .order_by(Empleado.id, Reclamo.fecha_resolucion)
     )
     rows = result.all()
 
-    # Agrupar por cuadrilla
-    cuadrillas_data = {}
+    # Agrupar por empleado
+    empleados_data = {}
     for row in rows:
-        if row.id not in cuadrillas_data:
-            cuadrillas_data[row.id] = {
+        if row.id not in empleados_data:
+            empleados_data[row.id] = {
                 "nombre": row.nombre,
                 "reclamos": []
             }
-        cuadrillas_data[row.id]["reclamos"].append({
+        empleados_data[row.id]["reclamos"].append({
             "lat": row.latitud,
             "lon": row.longitud
         })
@@ -241,7 +256,7 @@ async def get_distancias_cuadrillas(
     distancia_total_todas = 0
     reclamos_total = 0
 
-    for cuadrilla_id, data in cuadrillas_data.items():
+    for empleado_id, data in empleados_data.items():
         reclamos = data["reclamos"]
         distancia_total = 0
 
@@ -265,8 +280,8 @@ async def get_distancias_cuadrillas(
         reclamos_total += len(reclamos)
 
         estadisticas.append({
-            "cuadrilla_id": cuadrilla_id,
-            "cuadrilla_nombre": data["nombre"],
+            "empleado_id": empleado_id,
+            "empleado_nombre": data["nombre"],
             "reclamos_resueltos": len(reclamos),
             "distancia_total_km": round(distancia_total, 2),
             "distancia_promedio_km": round(distancia_promedio, 2)
@@ -276,7 +291,7 @@ async def get_distancias_cuadrillas(
     estadisticas.sort(key=lambda x: x["reclamos_resueltos"], reverse=True)
 
     return {
-        "cuadrillas": estadisticas,
+        "empleados": estadisticas,
         "resumen": {
             "distancia_total_km": round(distancia_total_todas, 2),
             "reclamos_total": reclamos_total,
@@ -288,6 +303,7 @@ async def get_distancias_cuadrillas(
 
 @router.get("/cobertura")
 async def get_cobertura_zonas(
+    request: Request,
     dias: int = Query(30, description="Últimos N días"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
@@ -296,7 +312,7 @@ async def get_cobertura_zonas(
     Análisis de cobertura: qué zonas tienen más/menos atención.
     Compara reclamos recibidos vs resueltos por zona.
     """
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
     # Reclamos por zona con estados (filtrado por municipio)
@@ -380,6 +396,7 @@ async def get_cobertura_zonas(
 
 @router.get("/tiempo-resolucion")
 async def get_tiempo_resolucion_por_categoria(
+    request: Request,
     dias: int = Query(90, description="Últimos N días"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
@@ -387,7 +404,7 @@ async def get_tiempo_resolucion_por_categoria(
     """
     Tiempo promedio de resolución por categoría.
     """
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
     result = await db.execute(
@@ -426,45 +443,46 @@ async def get_tiempo_resolucion_por_categoria(
     }
 
 
-@router.get("/rendimiento-cuadrillas")
-async def get_rendimiento_cuadrillas(
+@router.get("/rendimiento-empleados")
+async def get_rendimiento_empleados(
+    request: Request,
     semanas: int = Query(4, description="Últimas N semanas"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """
-    Rendimiento de cuadrillas por semana - OPTIMIZADO.
-    Muestra cuántos reclamos resolvió cada equipo de trabajo por semana.
+    Rendimiento de empleados por semana - OPTIMIZADO.
+    Muestra cuántos reclamos resolvió cada empleado por semana.
     """
-    municipio_id = current_user.municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
 
-    # Obtener cuadrillas activas del municipio (1 query)
-    cuadrillas_result = await db.execute(
-        select(Cuadrilla).where(
-            Cuadrilla.activo == True,
-            Cuadrilla.municipio_id == municipio_id
+    # Obtener empleados activos del municipio (1 query)
+    empleados_result = await db.execute(
+        select(Empleado).where(
+            Empleado.activo == True,
+            Empleado.municipio_id == municipio_id
         )
     )
-    cuadrillas = cuadrillas_result.scalars().all()
+    empleados = empleados_result.scalars().all()
 
-    if len(cuadrillas) == 0:
-        return {"semanas": [], "cuadrillas": []}
+    if len(empleados) == 0:
+        return {"semanas": [], "empleados": []}
 
-    cuadrillas_map = {c.id: c.nombre for c in cuadrillas}
-    cuadrillas_names = [c.nombre for c in cuadrillas]
+    empleados_map = {e.id: e.nombre for e in empleados}
+    empleados_names = [e.nombre for e in empleados]
     ahora = datetime.utcnow()
 
     # Obtener todos los reclamos resueltos del período en 1 sola query
     fecha_inicio = ahora - timedelta(weeks=semanas)
     result = await db.execute(
         select(
-            Reclamo.cuadrilla_id,
+            Reclamo.empleado_id,
             Reclamo.fecha_resolucion
         ).where(
             and_(
                 Reclamo.estado == EstadoReclamo.RESUELTO,
                 Reclamo.fecha_resolucion >= fecha_inicio,
-                Reclamo.cuadrilla_id.isnot(None),
+                Reclamo.empleado_id.isnot(None),
                 Reclamo.municipio_id == municipio_id
             )
         )
@@ -475,15 +493,15 @@ async def get_rendimiento_cuadrillas(
     resultado = []
     for i in range(semanas):
         semana_data = {"semana": f"Sem {i + 1}"}
-        for nombre in cuadrillas_names:
+        for nombre in empleados_names:
             semana_data[nombre] = 0
         resultado.append(semana_data)
 
-    # Contar reclamos por semana y cuadrilla
-    for cuadrilla_id, fecha_resolucion in reclamos:
-        if cuadrilla_id not in cuadrillas_map:
+    # Contar reclamos por semana y empleado
+    for empleado_id, fecha_resolucion in reclamos:
+        if empleado_id not in empleados_map:
             continue
-        nombre = cuadrillas_map[cuadrilla_id]
+        nombre = empleados_map[empleado_id]
         # Calcular en qué semana cae
         dias_atras = (ahora - fecha_resolucion).days
         semana_idx = min(dias_atras // 7, semanas - 1)
@@ -494,5 +512,5 @@ async def get_rendimiento_cuadrillas(
 
     return {
         "semanas": resultado,
-        "cuadrillas": cuadrillas_names
+        "empleados": empleados_names
     }

@@ -22,12 +22,29 @@ import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamo from './pages/NuevoReclamo';
 
+// Demos de diseño
+import DemosIndex from './pages/demos';
+import DemoGlassmorphism from './pages/demos/DemoGlassmorphism';
+import DemoNeubrutalism from './pages/demos/DemoNeubrutalism';
+import DemoMinimal from './pages/demos/DemoMinimal';
+import DemoBento from './pages/demos/DemoBento';
+import DemoCyberpunk from './pages/demos/DemoCyberpunk';
+
 export const router = createBrowserRouter([
+  // === DEMOS DE DISEÑO ===
+  { path: '/demos', element: <DemosIndex /> },
+  { path: '/demos/glassmorphism', element: <DemoGlassmorphism /> },
+  { path: '/demos/neubrutalism', element: <DemoNeubrutalism /> },
+  { path: '/demos/minimal', element: <DemoMinimal /> },
+  { path: '/demos/bento', element: <DemoBento /> },
+  { path: '/demos/cyberpunk', element: <DemoCyberpunk /> },
+
   // === RUTAS PÚBLICAS ===
   { path: '/bienvenido', element: <Landing /> },
   { path: '/publico', element: <DashboardPublico /> },
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
+  { path: '/nuevo-reclamo', element: <NuevoReclamo /> },
 
   // === RUTAS PROTEGIDAS ===
   {
@@ -43,18 +60,20 @@ export const router = createBrowserRouter([
       // Dashboard Vecino
       { path: 'mi-panel', element: <ProtectedRoute roles={['vecino']}><DashboardVecino /></ProtectedRoute> },
 
+      // Nuevo Reclamo (dentro del Layout para usuarios logueados)
+      { path: 'crear-reclamo', element: <NuevoReclamo /> },
+
       // Reclamos (todo con Side Modal, sin páginas separadas)
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
-      { path: 'nuevo-reclamo', element: <ProtectedRoute roles={['vecino']}><NuevoReclamo /></ProtectedRoute> },
 
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },
 
-      // Tablero Cuadrilla
+      // Tablero Empleado
       {
         path: 'tablero',
-        element: <ProtectedRoute roles={['admin', 'supervisor', 'cuadrilla']}><Tablero /></ProtectedRoute>
+        element: <ProtectedRoute roles={['admin', 'supervisor', 'empleado']}><Tablero /></ProtectedRoute>
       },
 
       // Administración

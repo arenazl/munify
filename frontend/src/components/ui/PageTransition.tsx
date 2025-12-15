@@ -71,8 +71,8 @@ export function PageTransition({ children }: PageTransitionProps) {
     <div
       style={{
         ...getTransformStyle(),
-        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-        willChange: 'transform, opacity, filter',
+        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
+        
       }}
     >
       {displayChildren}

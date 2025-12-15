@@ -1,14 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, cuadrillasApi, categoriasApi, zonasApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
+import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
-import type { Reclamo, Cuadrilla, EstadoReclamo, HistorialReclamo, Categoria, Zona } from '../types';
+import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
   nuevo: { bg: '#6366f1', text: '#ffffff' },
@@ -24,6 +24,20 @@ const estadoLabels: Record<EstadoReclamo, string> = {
   en_proceso: 'En Proceso',
   resuelto: 'Resuelto',
   rechazado: 'Rechazado',
+};
+
+// Helper para generar URL de imagen local basada en el nombre de la categoría
+const getCategoryImageUrl = (nombre: string): string | null => {
+  // Convertir nombre a filename seguro (igual que en el backend)
+  const safeName = nombre.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[-\s]+/g, '_')
+    .trim();
+
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
+  const baseUrl = apiUrl.replace('/api', '');
+  return `${baseUrl}/static/images/categorias/${safeName}.jpeg`;
 };
 
 // Función para obtener el icono del estado
@@ -103,13 +117,16 @@ export default function Reclamos() {
   const { theme } = useTheme();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
-  const [cuadrillas, setCuadrillas] = useState<Cuadrilla[]>([]);
+  const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
+  // Estado para animación staggered - iniciar como completado para evitar parpadeo
+  const [visibleCards] = useState<Set<number>>(new Set());
+  const [animationDone] = useState(true);
 
   // Wizard states
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -136,7 +153,7 @@ export default function Reclamos() {
   });
 
   // Action states for view
-  const [cuadrillaSeleccionada, setCuadrillaSeleccionada] = useState<string>('');
+  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>('');
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
   const [fechaProgramada, setFechaProgramada] = useState('');
   const [horaInicio, setHoraInicio] = useState('09:00');
@@ -253,11 +270,15 @@ export default function Reclamos() {
     return R * c;
   };
 
-  // Cargar datos de la Municipalidad
+  // Cargar datos de la Municipalidad (multi-tenant)
   const fetchMunicipioData = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL;
-      const response = await fetch(`${apiUrl}/configuracion/publica/municipio`);
+      const municipioId = localStorage.getItem('municipio_id');
+      const url = municipioId
+        ? `${apiUrl}/configuracion/publica/municipio?municipio_id=${municipioId}`
+        : `${apiUrl}/configuracion/publica/municipio`;
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setMunicipioData(data);
@@ -383,14 +404,14 @@ export default function Reclamos() {
 
   const fetchData = async () => {
     try {
-      const [reclamosRes, cuadrillasRes, categoriasRes, zonasRes] = await Promise.all([
+      const [reclamosRes, empleadosRes, categoriasRes, zonasRes] = await Promise.all([
         reclamosApi.getAll(filtroEstado ? { estado: filtroEstado } : {}),
-        cuadrillasApi.getAll(true),
+        empleadosApi.getAll(true),
         categoriasApi.getAll(true),
         zonasApi.getAll(true),
       ]);
       setReclamos(reclamosRes.data);
-      setCuadrillas(cuadrillasRes.data);
+      setEmpleados(empleadosRes.data);
       setCategorias(categoriasRes.data);
       setZonas(zonasRes.data);
     } catch (error) {
@@ -445,7 +466,7 @@ export default function Reclamos() {
 
   const openViewSheet = async (reclamo: Reclamo) => {
     setSelectedReclamo(reclamo);
-    setCuadrillaSeleccionada(reclamo.cuadrilla_asignada?.id?.toString() || '');
+    setEmpleadoSeleccionado(reclamo.empleado_asignado?.id?.toString() || '');
     setComentarioAsignacion('');
     setResolucion('');
     setMotivoRechazo('');
@@ -483,7 +504,7 @@ export default function Reclamos() {
     setSelectedReclamo(null);
     setHistorial([]);
     // Reset asignación states
-    setCuadrillaSeleccionada('');
+    setEmpleadoSeleccionado('');
     setFechaProgramada('');
     setHoraInicio('09:00');
     setDuracion('1');
@@ -526,11 +547,11 @@ export default function Reclamos() {
   };
 
   const handleAsignar = async () => {
-    if (!selectedReclamo || !cuadrillaSeleccionada) return;
+    if (!selectedReclamo || !empleadoSeleccionado) return;
     setSaving(true);
     try {
       await reclamosApi.asignar(selectedReclamo.id, {
-        cuadrilla_id: Number(cuadrillaSeleccionada),
+        empleado_id: Number(empleadoSeleccionado),
         fecha_programada: fechaProgramada || undefined,
         hora_inicio: horaInicio || undefined,
         hora_fin: horaFin || undefined,
@@ -575,7 +596,7 @@ export default function Reclamos() {
 
   // Auto-cargar fecha y disponibilidad cuando se selecciona un empleado
   const handleEmpleadoChange = async (empleadoId: string) => {
-    setCuadrillaSeleccionada(empleadoId);
+    setEmpleadoSeleccionado(empleadoId);
     if (empleadoId) {
       // Usar fecha de hoy como punto de partida y buscar el próximo día disponible
       const hoy = new Date().toISOString().split('T')[0];
@@ -1202,12 +1223,12 @@ export default function Reclamos() {
       ),
     },
     {
-      key: 'cuadrilla',
-      header: 'Cuadrilla',
-      sortValue: (r: Reclamo) => r.cuadrilla_asignada?.nombre || '',
+      key: 'empleado',
+      header: 'Empleado',
+      sortValue: (r: Reclamo) => r.empleado_asignado?.nombre || '',
       render: (r: Reclamo) => (
-        <span style={{ color: r.cuadrilla_asignada ? theme.primary : theme.textSecondary }}>
-          {r.cuadrilla_asignada?.nombre || '-'}
+        <span style={{ color: r.empleado_asignado ? theme.primary : theme.textSecondary }}>
+          {r.empleado_asignado?.nombre || '-'}
         </span>
       ),
     },
@@ -1287,21 +1308,21 @@ export default function Reclamos() {
           fullWidth
         />
 
-        {/* Cuadrilla asignada */}
-        {selectedReclamo.cuadrilla_asignada && (
+        {/* Empleado asignado */}
+        {selectedReclamo.empleado_asignado && (
           <ABMInfoPanel
-            title="Cuadrilla Asignada"
+            title="Empleado Asignado"
             icon={<Users className="h-4 w-4" />}
             variant="info"
           >
             <ABMField
               label="Nombre"
-              value={selectedReclamo.cuadrilla_asignada.nombre}
+              value={selectedReclamo.empleado_asignado.nombre}
             />
-            {selectedReclamo.cuadrilla_asignada.especialidad && (
+            {selectedReclamo.empleado_asignado.especialidad && (
               <ABMField
                 label="Especialidad"
-                value={selectedReclamo.cuadrilla_asignada.especialidad}
+                value={selectedReclamo.empleado_asignado.especialidad}
               />
             )}
           </ABMInfoPanel>
@@ -1370,10 +1391,10 @@ export default function Reclamos() {
                       <button
                         key={sug.empleado_id}
                         onClick={() => handleEmpleadoChange(String(sug.empleado_id))}
-                        className={`w-full p-3 rounded-lg text-left transition-all hover:scale-[1.01] ${cuadrillaSeleccionada === String(sug.empleado_id) ? 'ring-2' : ''}`}
+                        className={`w-full p-3 rounded-lg text-left transition-all hover:scale-[1.01] ${empleadoSeleccionado === String(sug.empleado_id) ? 'ring-2' : ''}`}
                         style={{
-                          backgroundColor: cuadrillaSeleccionada === String(sug.empleado_id) ? `${theme.primary}20` : theme.card,
-                          border: `1px solid ${cuadrillaSeleccionada === String(sug.empleado_id) ? theme.primary : theme.border}`,
+                          backgroundColor: empleadoSeleccionado === String(sug.empleado_id) ? `${theme.primary}20` : theme.card,
+                          border: `1px solid ${empleadoSeleccionado === String(sug.empleado_id) ? theme.primary : theme.border}`,
                           ['--tw-ring-color' as string]: theme.primary,
                         }}
                       >
@@ -1432,12 +1453,12 @@ export default function Reclamos() {
 
               {/* Selector de empleado - muestra todos pero indica especialidad */}
               <ModernSelect
-                label="Empleado / Cuadrilla"
-                value={cuadrillaSeleccionada}
+                label="Empleado"
+                value={empleadoSeleccionado}
                 onChange={handleEmpleadoChange}
                 placeholder="Seleccionar empleado..."
-                searchable={cuadrillas.length > 5}
-                options={cuadrillas.map(emp => {
+                searchable={empleados.length > 5}
+                options={empleados.map(emp => {
                   const tieneEspecialidad = emp.categorias?.some(cat => cat.id === selectedReclamo.categoria.id);
                   return {
                     value: String(emp.id),
@@ -1450,7 +1471,7 @@ export default function Reclamos() {
                   };
                 })}
               />
-              {cuadrillaSeleccionada && !cuadrillas.find(c => c.id === Number(cuadrillaSeleccionada))?.categorias?.some(cat => cat.id === selectedReclamo.categoria.id) && (
+              {empleadoSeleccionado && !empleados.find(c => c.id === Number(empleadoSeleccionado))?.categorias?.some(cat => cat.id === selectedReclamo.categoria.id) && (
                 <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#f59e0b' }}>
                   <AlertTriangle className="h-3 w-3" />
                   Este empleado no tiene especialidad en {selectedReclamo.categoria.nombre}
@@ -1458,7 +1479,7 @@ export default function Reclamos() {
               )}
 
               {/* Programación - Solo se muestra cuando hay empleado seleccionado */}
-              {cuadrillaSeleccionada && (
+              {empleadoSeleccionado && (
                 <div className="space-y-3">
                   {/* Loading de disponibilidad */}
                   {loadingDisponibilidad && (
@@ -1482,8 +1503,8 @@ export default function Reclamos() {
                           min={new Date().toISOString().split('T')[0]}
                           onChange={(e) => {
                             setFechaProgramada(e.target.value);
-                            if (cuadrillaSeleccionada && e.target.value) {
-                              fetchDisponibilidad(cuadrillaSeleccionada, e.target.value, true);
+                            if (empleadoSeleccionado && e.target.value) {
+                              fetchDisponibilidad(empleadoSeleccionado, e.target.value, true);
                             }
                           }}
                           className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
@@ -1574,48 +1595,20 @@ export default function Reclamos() {
                 placeholder="Comentario (opcional)"
                 rows={2}
               />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleAsignar}
-                  disabled={saving || !cuadrillaSeleccionada || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
-                  className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                  style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-                >
-                  {saving ? 'Asignando...' : 'Asignar'}
-                </button>
-                <button
-                  onClick={() => setMotivoRechazo('otro')}
-                  className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-                  style={{ border: '1px solid #ef4444', color: '#ef4444' }}
-                >
-                  Rechazar
-                </button>
-              </div>
             </div>
           </ABMCollapsible>
         )}
 
         {selectedReclamo.estado === 'asignado' && (
-          <ABMCollapsible
+          <ABMInfoPanel
             title="Iniciar Trabajo"
             icon={<Play className="h-4 w-4" />}
-            defaultOpen={true}
             variant="warning"
           >
-            <div className="space-y-3">
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                Marcar que la cuadrilla ha comenzado a trabajar en este reclamo.
-              </p>
-              <button
-                onClick={handleIniciar}
-                disabled={saving}
-                className="w-full px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                style={{ backgroundColor: '#eab308', color: '#ffffff' }}
-              >
-                {saving ? 'Iniciando...' : 'Iniciar Trabajo'}
-              </button>
-            </div>
-          </ABMCollapsible>
+            <p className="text-sm" style={{ color: theme.textSecondary }}>
+              Marcar que el empleado ha comenzado a trabajar en este reclamo.
+            </p>
+          </ABMInfoPanel>
         )}
 
         {selectedReclamo.estado === 'en_proceso' && (
@@ -1634,14 +1627,6 @@ export default function Reclamos() {
                 rows={3}
                 required
               />
-              <button
-                onClick={handleResolver}
-                disabled={saving || !resolucion}
-                className="w-full px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
-              >
-                {saving ? 'Resolviendo...' : 'Marcar Resuelto'}
-              </button>
             </div>
           </ABMCollapsible>
         )}
@@ -1735,6 +1720,78 @@ export default function Reclamos() {
             <p className="text-sm" style={{ color: theme.textSecondary }}>Sin historial</p>
           )}
         </ABMCollapsible>
+      </div>
+    );
+  };
+
+  // Renderizar footer de acciones para el Sheet
+  const renderSheetFooter = () => {
+    if (!selectedReclamo) return null;
+
+    const canAsignar = selectedReclamo.estado === 'nuevo';
+    const canIniciar = selectedReclamo.estado === 'asignado';
+    const canResolver = selectedReclamo.estado === 'en_proceso';
+
+    return (
+      <div className="flex gap-2">
+        {/* Botón Asignar - para estado nuevo */}
+        {canAsignar && (
+          <>
+            <button
+              onClick={handleAsignar}
+              disabled={saving || !empleadoSeleccionado || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+            >
+              {saving ? 'Asignando...' : 'Asignar'}
+            </button>
+            <button
+              onClick={() => setMotivoRechazo('otro')}
+              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{ border: '1px solid #ef4444', color: '#ef4444' }}
+            >
+              Rechazar
+            </button>
+          </>
+        )}
+
+        {/* Botón Iniciar - para estado asignado */}
+        {canIniciar && (
+          <button
+            onClick={handleIniciar}
+            disabled={saving}
+            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            style={{ backgroundColor: '#eab308', color: '#ffffff' }}
+          >
+            {saving ? 'Iniciando...' : 'Iniciar Trabajo'}
+          </button>
+        )}
+
+        {/* Botón Resolver - para estado en_proceso */}
+        {canResolver && (
+          <button
+            onClick={handleResolver}
+            disabled={saving || !resolucion}
+            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+            style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
+          >
+            {saving ? 'Resolviendo...' : 'Marcar Resuelto'}
+          </button>
+        )}
+
+        {/* Estados finales - solo info */}
+        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'rechazado') && (
+          <div
+            className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
+            style={{
+              backgroundColor: theme.card,
+              color: theme.textSecondary,
+              border: `1px solid ${theme.border}`
+            }}
+          >
+            {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
+          </div>
+        )}
       </div>
     );
   };
@@ -1867,8 +1924,42 @@ export default function Reclamos() {
       >
         {filteredReclamos.map((r) => {
           const estado = estadoColors[r.estado];
+          const categoryColor = getCategoryColor(r.categoria.nombre);
+          const bgImage = getCategoryImageUrl(r.categoria.nombre);
+          // Si la animación terminó, siempre visible
+          const isVisible = animationDone || visibleCards.has(r.id);
           return (
-            <ABMCard key={r.id} onClick={() => openViewSheet(r)}>
+            <div
+              key={r.id}
+              onClick={() => openViewSheet(r)}
+              className={`group relative rounded-2xl cursor-pointer overflow-hidden abm-card-hover transition-all duration-500 ${
+                isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
+              }`}
+              style={{
+                backgroundColor: theme.card,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              {/* Imagen de fondo basada en la categoría */}
+              {bgImage && (
+                <div className="absolute inset-0">
+                  <img
+                    src={bgImage}
+                    alt=""
+                    className="w-full h-full object-cover opacity-10 group-hover:opacity-20 group-hover:scale-105 transition-all duration-700"
+                  />
+                  {/* Overlay con gradiente del color de la categoría */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.card}F8 0%, ${theme.card}F0 50%, ${categoryColor}20 100%)`,
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Contenido principal */}
+              <div className="relative z-10 p-5">
               {/* Header con gradiente */}
               <div
                 className="flex items-center justify-between -mx-5 -mt-5 mb-4 px-4 py-3 rounded-t-xl"
@@ -1950,13 +2041,14 @@ export default function Reclamos() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {r.cuadrilla_asignada && (
-                    <span style={{ color: theme.primary }} className="font-medium">{r.cuadrilla_asignada.nombre}</span>
+                  {r.empleado_asignado && (
+                    <span style={{ color: theme.primary }} className="font-medium">{r.empleado_asignado.nombre}</span>
                   )}
                   <Eye className="h-4 w-4" style={{ color: theme.primary }} />
                 </div>
               </div>
-            </ABMCard>
+              </div>
+            </div>
           );
         })}
       </ABMPage>
@@ -1967,6 +2059,7 @@ export default function Reclamos() {
         onClose={closeSheet}
         title={`Reclamo #${selectedReclamo?.id || ''}`}
         description={selectedReclamo?.titulo}
+        stickyFooter={renderSheetFooter()}
       >
         {renderViewContent()}
       </Sheet>

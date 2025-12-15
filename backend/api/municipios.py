@@ -13,6 +13,7 @@ from core.security import get_current_user, require_roles
 from models.municipio import Municipio
 from models.user import User
 from models.enums import RolUsuario
+from services.categorias_default import crear_categorias_default
 
 router = APIRouter()
 
@@ -199,6 +200,69 @@ async def obtener_municipio_por_codigo(
     return municipio
 
 
+class DemoUser(BaseModel):
+    """Usuario de prueba para acceso rápido"""
+    email: str
+    nombre: str
+    apellido: str
+    nombre_completo: str
+    rol: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/public/{codigo}/demo-users", response_model=List[DemoUser])
+async def obtener_usuarios_demo(
+    codigo: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene los usuarios de prueba de un municipio (endpoint PUBLICO).
+    Usado para los botones de acceso rápido en modo demo.
+    """
+    # Primero obtener el municipio
+    query = select(Municipio).where(
+        Municipio.codigo == codigo,
+        Municipio.activo == True
+    )
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Buscar usuarios de prueba (los que terminan en @codigo.gob)
+    email_pattern = f"%@{codigo}.gob"
+    query = select(User).where(
+        User.municipio_id == municipio.id,
+        User.email.like(email_pattern),
+        User.activo == True
+    )
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    # Ordenar por rol: admin, supervisor, empleado, vecino
+    rol_order = {
+        RolUsuario.ADMIN: 0,
+        RolUsuario.SUPERVISOR: 1,
+        RolUsuario.EMPLEADO: 2,
+        RolUsuario.VECINO: 3
+    }
+    users_sorted = sorted(users, key=lambda u: rol_order.get(u.rol, 99))
+
+    return [
+        DemoUser(
+            email=u.email,
+            nombre=u.nombre,
+            apellido=u.apellido,
+            nombre_completo=f"{u.nombre} {u.apellido}",
+            rol=u.rol.value
+        )
+        for u in users_sorted
+    ]
+
+
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
 @router.get("/", response_model=List[MunicipioDetalle])
@@ -248,6 +312,7 @@ async def crear_municipio(
 ):
     """
     Crea un nuevo municipio (solo admin).
+    Automáticamente crea las 12 categorías por defecto.
     """
     # Verificar que no exista un municipio con el mismo codigo
     query = select(Municipio).where(Municipio.codigo == data.codigo)
@@ -259,6 +324,10 @@ async def crear_municipio(
     db.add(municipio)
     await db.commit()
     await db.refresh(municipio)
+
+    # Crear categorías por defecto para el nuevo municipio
+    await crear_categorias_default(db, municipio.id)
+
     return municipio
 
 

@@ -18,7 +18,12 @@ async def get_configuraciones(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(Configuracion).order_by(Configuracion.clave))
+    # Multi-tenant: filtrar por municipio_id del usuario actual
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+        .order_by(Configuracion.clave)
+    )
     return result.scalars().all()
 
 @router.get("/{clave}", response_model=ConfiguracionResponse)
@@ -27,7 +32,12 @@ async def get_configuracion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(Configuracion).where(Configuracion.clave == clave))
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Configuración no encontrada")
@@ -39,11 +49,17 @@ async def create_configuracion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(Configuracion).where(Configuracion.clave == data.clave))
+    # Multi-tenant: verificar duplicado solo en el mismo municipio
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == data.clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Ya existe una configuración con esa clave")
 
-    config = Configuracion(**data.model_dump())
+    # Multi-tenant: agregar municipio_id
+    config = Configuracion(**data.model_dump(), municipio_id=current_user.municipio_id)
     db.add(config)
     await db.commit()
     await db.refresh(config)
@@ -56,7 +72,12 @@ async def update_configuracion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(Configuracion).where(Configuracion.clave == clave))
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Configuración no encontrada")
@@ -78,7 +99,12 @@ async def delete_configuracion(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    result = await db.execute(select(Configuracion).where(Configuracion.clave == clave))
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
     config = result.scalar_one_or_none()
     if not config:
         raise HTTPException(status_code=404, detail="Configuración no encontrada")
@@ -89,11 +115,32 @@ async def delete_configuracion(
 
 
 @router.get("/publica/municipio")
-async def get_datos_municipio(db: AsyncSession = Depends(get_db)):
+async def get_datos_municipio(
+    municipio_id: int = None,
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Endpoint público para obtener datos de la Municipalidad.
-    No requiere autenticación para que el wizard de reclamos pueda calcular distancias.
+    Endpoint público para obtener datos de un Municipio.
+    Si se pasa municipio_id, devuelve datos de ese municipio desde la tabla municipios.
+    Si no, fallback a configuración global (legacy).
     """
+    from models.municipio import Municipio
+
+    # Si tenemos municipio_id, usar tabla municipios (multi-tenant correcto)
+    if municipio_id:
+        result = await db.execute(select(Municipio).where(Municipio.id == municipio_id))
+        muni = result.scalar_one_or_none()
+        if muni:
+            return {
+                "nombre_municipio": muni.nombre,
+                "direccion_municipio": muni.direccion,
+                "latitud_municipio": str(muni.latitud) if muni.latitud else None,
+                "longitud_municipio": str(muni.longitud) if muni.longitud else None,
+                "telefono_contacto": muni.telefono,
+                "email_contacto": muni.email
+            }
+
+    # Fallback: configuración global (legacy, para compatibilidad)
     claves = ['nombre_municipio', 'direccion_municipio', 'latitud_municipio', 'longitud_municipio', 'telefono_contacto']
     result = await db.execute(select(Configuracion).where(Configuracion.clave.in_(claves)))
     configs = result.scalars().all()
@@ -103,6 +150,22 @@ async def get_datos_municipio(db: AsyncSession = Depends(get_db)):
         datos[config.clave] = config.valor
 
     return datos
+
+
+@router.get("/publica/registro")
+async def get_config_registro(db: AsyncSession = Depends(get_db)):
+    """
+    Endpoint público para obtener configuración relacionada al registro.
+    No requiere autenticación para que el formulario de registro sepa cómo validar.
+    """
+    result = await db.execute(
+        select(Configuracion).where(Configuracion.clave == "skip_email_validation")
+    )
+    config = result.scalar_one_or_none()
+
+    return {
+        "skip_email_validation": config.valor.lower() == "true" if config and config.valor else False
+    }
 
 
 @router.get("/barrios/{municipio}")
@@ -178,8 +241,12 @@ async def cargar_barrios_como_zonas(
     existentes = 0
 
     for nombre in barrios:
-        # Verificar si ya existe
-        result = await db.execute(select(Zona).where(Zona.nombre == nombre))
+        # Multi-tenant: Verificar si ya existe en el mismo municipio
+        result = await db.execute(
+            select(Zona)
+            .where(Zona.nombre == nombre)
+            .where(Zona.municipio_id == current_user.municipio_id)
+        )
         if result.scalar_one_or_none():
             existentes += 1
             continue
@@ -187,11 +254,13 @@ async def cargar_barrios_como_zonas(
         # Crear código único
         codigo = f"Z-{nombre[:3].upper()}"
 
+        # Multi-tenant: agregar municipio_id
         zona = Zona(
             nombre=nombre,
             codigo=codigo,
             descripcion=f"Barrio {nombre}",
-            activo=True
+            activo=True,
+            municipio_id=current_user.municipio_id
         )
         db.add(zona)
         creados += 1
