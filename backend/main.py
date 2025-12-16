@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import time
 import os
@@ -92,13 +93,51 @@ static_path = Path(__file__).parent / "static"
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-# Rutas
+# Rutas API
 app.include_router(api_router, prefix="/api")
-
-@app.get("/")
-async def root():
-    return {"message": "Sistema de Reclamos Municipales API", "version": "1.0.0"}
 
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# Servir frontend (PWA)
+frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
+
+if frontend_path.exists():
+    # Servir assets estáticos del frontend
+    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="frontend_assets")
+
+    # Servir archivos en la raíz del frontend (manifest, sw, icons)
+    @app.get("/manifest.webmanifest")
+    async def manifest():
+        return FileResponse(frontend_path / "manifest.webmanifest")
+
+    @app.get("/sw.js")
+    async def service_worker():
+        return FileResponse(frontend_path / "sw.js", media_type="application/javascript")
+
+    @app.get("/registerSW.js")
+    async def register_sw():
+        return FileResponse(frontend_path / "registerSW.js", media_type="application/javascript")
+
+    @app.get("/workbox-{rest:path}")
+    async def workbox(rest: str):
+        return FileResponse(frontend_path / f"workbox-{rest}")
+
+    @app.get("/favicon.svg")
+    async def favicon():
+        return FileResponse(frontend_path / "favicon.svg", media_type="image/svg+xml")
+
+    # Catch-all: servir index.html para todas las rutas del SPA
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Si es un archivo que existe, servirlo
+        file_path = frontend_path / full_path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        # Sino, servir index.html (SPA routing)
+        return FileResponse(frontend_path / "index.html")
+else:
+    @app.get("/")
+    async def root():
+        return {"message": "Sistema de Reclamos Municipales API", "version": "1.0.0"}
