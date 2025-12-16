@@ -101,7 +101,7 @@ async def health():
     return {"status": "ok"}
 
 # Servir frontend (PWA)
-frontend_path = Path(__file__).parent.parent / "frontend" / "dist"
+frontend_path = Path(__file__).parent / "frontend_dist"
 
 if frontend_path.exists():
     # Servir assets estáticos del frontend
