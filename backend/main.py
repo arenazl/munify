@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -102,42 +102,31 @@ async def health():
 
 # Servir frontend (PWA)
 frontend_path = Path(__file__).parent / "frontend_dist"
+logger.info(f"Frontend path: {frontend_path}")
+logger.info(f"Frontend exists: {frontend_path.exists()}")
 
 if frontend_path.exists():
-    # Servir assets estáticos del frontend
-    app.mount("/assets", StaticFiles(directory=str(frontend_path / "assets")), name="frontend_assets")
+    logger.info(f"Frontend files: {list(frontend_path.iterdir())}")
 
-    # Servir archivos en la raíz del frontend (manifest, sw, icons)
-    @app.get("/manifest.webmanifest")
-    async def manifest():
-        return FileResponse(frontend_path / "manifest.webmanifest")
+    # Clase para manejar SPA routing
+    from starlette.exceptions import HTTPException as StarletteHTTPException
 
-    @app.get("/sw.js")
-    async def service_worker():
-        return FileResponse(frontend_path / "sw.js", media_type="application/javascript")
+    class SPAStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope):
+            try:
+                return await super().get_response(path, scope)
+            except (HTTPException, StarletteHTTPException) as ex:
+                if ex.status_code == 404:
+                    return await super().get_response("index.html", scope)
+                else:
+                    raise ex
 
-    @app.get("/registerSW.js")
-    async def register_sw():
-        return FileResponse(frontend_path / "registerSW.js", media_type="application/javascript")
-
-    @app.get("/workbox-{rest:path}")
-    async def workbox(rest: str):
-        return FileResponse(frontend_path / f"workbox-{rest}")
-
-    @app.get("/favicon.svg")
-    async def favicon():
-        return FileResponse(frontend_path / "favicon.svg", media_type="image/svg+xml")
-
-    # Catch-all: servir index.html para todas las rutas del SPA
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        # Si es un archivo que existe, servirlo
-        file_path = frontend_path / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-        # Sino, servir index.html (SPA routing)
-        return FileResponse(frontend_path / "index.html")
+    # Montar el SPA al final (después de /api y /static)
+    app.mount("/", SPAStaticFiles(directory=str(frontend_path), html=True), name="spa")
+    logger.info("Frontend PWA montado correctamente")
 else:
+    logger.warning(f"Frontend no encontrado en {frontend_path}")
+
     @app.get("/")
     async def root():
         return {"message": "Sistema de Reclamos Municipales API", "version": "1.0.0"}
