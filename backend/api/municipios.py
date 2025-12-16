@@ -232,8 +232,8 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Buscar usuarios de prueba (los que terminan en @codigo.gob)
-    email_pattern = f"%@{codigo}.gob"
+    # Buscar usuarios de prueba (los que terminan en @codigo.test.com)
+    email_pattern = f"%@{codigo}.test.com"
     query = select(User).where(
         User.municipio_id == municipio.id,
         User.email.like(email_pattern),

@@ -14,7 +14,10 @@
       "Bash(npx expo start)",
       "Bash(npx expo start:*)",
       "Bash(node:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(heroku apps:info:*)",
+      "Bash(heroku apps:*)",
+      "Bash(netlify deploy:*)"
     ],
     "deny": [],
     "ask": []
