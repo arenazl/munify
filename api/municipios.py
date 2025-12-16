@@ -177,6 +177,69 @@ async def buscar_municipio_cercano(
     return None
 
 
+class DemoUser(BaseModel):
+    """Usuario demo para acceso rápido"""
+    email: str
+    nombre: str
+    apellido: str
+    nombre_completo: str
+    rol: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/public/{codigo}/demo-users", response_model=List[DemoUser])
+async def obtener_usuarios_demo(
+    codigo: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene los usuarios de prueba de un municipio (endpoint PUBLICO).
+    Usado para los botones de acceso rápido en modo demo.
+    """
+    # Primero obtener el municipio
+    query = select(Municipio).where(
+        Municipio.codigo == codigo,
+        Municipio.activo == True
+    )
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Buscar usuarios de prueba (los que terminan en @codigo.test.com)
+    email_pattern = f"%@{codigo}.test.com"
+    query = select(User).where(
+        User.municipio_id == municipio.id,
+        User.email.like(email_pattern),
+        User.activo == True
+    )
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    # Ordenar por rol: admin, supervisor, empleado, vecino
+    rol_order = {
+        RolUsuario.ADMIN: 0,
+        RolUsuario.SUPERVISOR: 1,
+        RolUsuario.EMPLEADO: 2,
+        RolUsuario.VECINO: 3
+    }
+    users_sorted = sorted(users, key=lambda u: rol_order.get(u.rol, 99))
+
+    return [
+        DemoUser(
+            email=u.email,
+            nombre=u.nombre,
+            apellido=u.apellido,
+            nombre_completo=f"{u.nombre} {u.apellido}",
+            rol=u.rol.value
+        )
+        for u in users_sorted
+    ]
+
+
 @router.get("/public/{codigo}", response_model=MunicipioDetalle)
 async def obtener_municipio_por_codigo(
     codigo: str,
