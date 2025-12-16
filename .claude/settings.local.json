@@ -9,7 +9,12 @@
       "Bash(python -m uvicorn:*)",
       "Bash(timeout:*)",
       "Bash(grep:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npm install:*)",
+      "Bash(npx expo start)",
+      "Bash(npx expo start:*)",
+      "Bash(node:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
