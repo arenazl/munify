@@ -20,7 +20,7 @@ class User(Base):
     telefono = Column(String(20), nullable=True)
     dni = Column(String(20), nullable=True)
     direccion = Column(String(255), nullable=True)
-    rol = Column(Enum(RolUsuario), default=RolUsuario.VECINO, nullable=False)
+    rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
 
     # Relación con cuadrilla (si es usuario de cuadrilla)
