@@ -1,0 +1,1 @@
+{"name":"Reclamos Municipal","short_name":"Reclamos","description":"Sistema de gestión de reclamos municipales","start_url":"/","display":"standalone","background_color":"#0f0f1a","theme_color":"#4f46e5","lang":"en","scope":"/","orientation":"portrait","icons":[{"src":"favicon.svg","sizes":"192x192 512x512","type":"image/svg+xml","purpose":"any maskable"}]}
