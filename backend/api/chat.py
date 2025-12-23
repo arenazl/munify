@@ -1,19 +1,15 @@
 """
-Chat API con IA usando Ollama (local) como default.
-Sin dependencias externas - usa httpx para llamar a Ollama.
+Chat API con IA usando Gemini (Google) como default.
+Funciona en la nube sin necesidad de Ollama local.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 import httpx
-import os
 
 from core.security import get_current_user
+from core.config import settings
 
 router = APIRouter()
-
-# Configuración de Ollama (default)
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
 SYSTEM_PROMPT = """Eres un asistente virtual del Sistema de Reclamos Municipales.
 Tu rol es ayudar a los usuarios con:
@@ -42,54 +38,93 @@ class CategoryQuestionRequest(BaseModel):
     pregunta: str
 
 
-@router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest, current_user = Depends(get_current_user)):
-    """
-    Endpoint de chat con IA usando Ollama local.
-    """
+async def call_gemini(prompt: str, system_prompt: str = SYSTEM_PROMPT) -> str:
+    """Llama a Gemini API"""
+    if not settings.GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="API de IA no configurada. Contacte al administrador."
+        )
+
+    full_prompt = f"{system_prompt}\n\nUsuario: {prompt}\n\nAsistente:" if system_prompt else prompt
+
     try:
-        # Construir mensajes para Ollama
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-        # Agregar historial (últimos 10 mensajes)
-        for msg in request.history[-10:]:
-            messages.append(msg)
-
-        # Agregar mensaje actual
-        messages.append({"role": "user", "content": request.message})
-
-        # Llamar a Ollama
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{OLLAMA_URL}/api/chat",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                headers={"Content-Type": "application/json"},
                 json={
-                    "model": OLLAMA_MODEL,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
+                    "contents": [{"parts": [{"text": full_prompt}]}],
+                    "generationConfig": {
                         "temperature": 0.7,
-                        "num_predict": 500
+                        "maxOutputTokens": 500,
                     }
                 }
             )
 
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Ollama no disponible. Asegurate de que esté corriendo en {OLLAMA_URL}"
-                )
+            if response.status_code == 200:
+                data = response.json()
+                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                return text.strip() if text else "No pude procesar tu mensaje. Intentá de nuevo."
+            else:
+                error_msg = response.json().get('error', {}).get('message', 'Error desconocido')
+                print(f"Error Gemini: {response.status_code} - {error_msg}")
+                raise HTTPException(status_code=503, detail="El servicio de IA no está disponible temporalmente.")
 
-            data = response.json()
-            ai_response = data.get("message", {}).get("content", "Lo siento, no pude procesar tu mensaje.")
-
-            return ChatResponse(response=ai_response)
-
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=503, detail="La consulta tardó demasiado. Intentá de nuevo.")
     except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="No se puede conectar al servicio de IA.")
+
+
+@router.post("", response_model=ChatResponse)
+async def chat(request: ChatRequest, current_user = Depends(get_current_user)):
+    """
+    Endpoint de chat con IA usando Gemini.
+    """
+    if not settings.GEMINI_API_KEY:
         raise HTTPException(
             status_code=503,
-            detail=f"No se puede conectar a Ollama en {OLLAMA_URL}. Verificá que Ollama esté corriendo."
+            detail="El asistente no está disponible. Contacte al administrador."
         )
+
+    # Construir contexto con historial
+    context = SYSTEM_PROMPT + "\n\n"
+
+    for msg in request.history[-10:]:
+        role = "Usuario" if msg.get("role") == "user" else "Asistente"
+        context += f"{role}: {msg.get('content', '')}\n"
+
+    context += f"Usuario: {request.message}\n\nAsistente:"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": context}]}],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 500,
+                    }
+                }
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                return ChatResponse(response=text.strip() if text else "No pude procesar tu mensaje.")
+            else:
+                raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=503, detail="La consulta tardó demasiado. Intentá de nuevo.")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=503, detail="No se puede conectar al asistente de IA.")
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -99,8 +134,10 @@ async def chat_categoria(request: CategoryQuestionRequest):
     Endpoint para preguntas sobre una categoría específica.
     No requiere autenticación para permitir consultas durante el wizard.
     """
-    try:
-        prompt = f"""Sos un asistente virtual de la Municipalidad que ayuda a los ciudadanos a realizar reclamos.
+    if not settings.GEMINI_API_KEY:
+        return ChatResponse(response="El asistente no está disponible en este momento.")
+
+    prompt = f"""Sos un asistente virtual de la Municipalidad que ayuda a los ciudadanos a realizar reclamos.
 
 El usuario está creando un reclamo en la categoría: "{request.categoria}"
 
@@ -111,58 +148,53 @@ indicá amablemente que solo podés ayudar con temas relacionados a reclamos de 
 
 Respuesta:"""
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{OLLAMA_URL}/api/generate",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.7,
-                        "num_predict": 150
-                    }
-                }
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                return ChatResponse(response=data.get("response", "No pude procesar tu pregunta. Intentá de nuevo."))
-            else:
-                return ChatResponse(response="El servicio de IA no está disponible en este momento.")
-
-    except httpx.TimeoutException:
-        return ChatResponse(response="La consulta tardó demasiado. Intentá con una pregunta más simple.")
-    except httpx.ConnectError:
-        return ChatResponse(response="No se puede conectar al asistente de IA. Verificá que Ollama esté corriendo.")
-    except Exception as e:
-        return ChatResponse(response="No pude conectar con el asistente. Intentá más tarde.")
+    try:
+        response_text = await call_gemini(prompt, "")
+        return ChatResponse(response=response_text)
+    except HTTPException:
+        return ChatResponse(response="El asistente no está disponible en este momento. Intentá más tarde.")
+    except Exception:
+        return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
 
 
 @router.get("/status")
 async def chat_status():
     """
-    Verificar si Ollama está disponible.
+    Verificar si el servicio de IA está disponible.
     """
+    if not settings.GEMINI_API_KEY:
+        return {
+            "status": "unavailable",
+            "provider": "gemini",
+            "message": "GEMINI_API_KEY no configurada"
+        }
+
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{OLLAMA_URL}/api/tags")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": "Hola"}]}],
+                    "generationConfig": {"maxOutputTokens": 10}
+                }
+            )
+
             if response.status_code == 200:
-                data = response.json()
-                models = [m.get("name") for m in data.get("models", [])]
                 return {
                     "status": "ok",
-                    "provider": "ollama",
-                    "url": OLLAMA_URL,
-                    "model": OLLAMA_MODEL,
-                    "available_models": models
+                    "provider": "gemini",
+                    "model": settings.GEMINI_MODEL
                 }
-    except:
-        pass
-
-    return {
-        "status": "unavailable",
-        "provider": "ollama",
-        "url": OLLAMA_URL,
-        "message": "Ollama no está corriendo. Ejecutá 'ollama serve' para iniciarlo."
-    }
+            else:
+                return {
+                    "status": "error",
+                    "provider": "gemini",
+                    "message": f"Error {response.status_code}"
+                }
+    except Exception as e:
+        return {
+            "status": "unavailable",
+            "provider": "gemini",
+            "message": str(e)
+        }
