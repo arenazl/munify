@@ -1,27 +1,23 @@
 """
 Chat API con IA usando Gemini (Google) como default.
 Funciona en la nube sin necesidad de Ollama local.
+Usa las categorías reales del municipio del usuario.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import httpx
+from typing import Optional
 
 from core.security import get_current_user
 from core.config import settings
+from core.database import get_db
+from models.categoria import Categoria
+from models.user import User
+
 
 router = APIRouter()
-
-SYSTEM_PROMPT = """Eres un asistente virtual del Sistema de Reclamos Municipales.
-Tu rol es ayudar a los usuarios con:
-- Información sobre cómo crear reclamos
-- Categorías de reclamos disponibles (Baches, Alumbrado, Limpieza, Agua, Veredas, etc.)
-- Estados de reclamos: Nuevo, Asignado, En Proceso, Resuelto, Rechazado
-- Tiempos estimados de resolución
-- Proceso de gestión de reclamos
-
-Responde de forma amable, concisa y útil en español.
-Si no sabes algo específico, indica que el usuario debe contactar a la municipalidad.
-Respuestas de máximo 3-4 oraciones."""
 
 
 class ChatRequest(BaseModel):
@@ -38,49 +34,57 @@ class CategoryQuestionRequest(BaseModel):
     pregunta: str
 
 
-async def call_gemini(prompt: str, system_prompt: str = SYSTEM_PROMPT) -> str:
-    """Llama a Gemini API"""
-    if not settings.GEMINI_API_KEY:
-        raise HTTPException(
-            status_code=503,
-            detail="API de IA no configurada. Contacte al administrador."
-        )
+def build_system_prompt(categorias: list[dict]) -> str:
+    """Construye el prompt del sistema con las categorías reales del municipio"""
 
-    full_prompt = f"{system_prompt}\n\nUsuario: {prompt}\n\nAsistente:" if system_prompt else prompt
+    cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']})" for c in categorias])
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": full_prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 500,
-                    }
-                }
-            )
+    return f"""Eres un asistente virtual del Sistema de Reclamos Municipales. Tu nombre es "Asistente Municipal".
 
-            if response.status_code == 200:
-                data = response.json()
-                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                return text.strip() if text else "No pude procesar tu mensaje. Intentá de nuevo."
-            else:
-                error_msg = response.json().get('error', {}).get('message', 'Error desconocido')
-                print(f"Error Gemini: {response.status_code} - {error_msg}")
-                raise HTTPException(status_code=503, detail="El servicio de IA no está disponible temporalmente.")
+CATEGORÍAS DISPONIBLES EN ESTE MUNICIPIO:
+{cats_list}
 
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=503, detail="La consulta tardó demasiado. Intentá de nuevo.")
-    except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="No se puede conectar al servicio de IA.")
+TU ROL:
+- Ayudar a los usuarios a reportar problemas en la ciudad
+- Identificar qué categoría corresponde a su problema
+- Guiarlos para crear un reclamo
+
+REGLAS IMPORTANTES:
+1. Cuando el usuario describe un problema, SIEMPRE indica la categoría exacta que corresponde de la lista anterior
+2. SIEMPRE incluye un link para crear el reclamo con este formato: [Crear reclamo de CATEGORIA](/reclamos?crear=CATEGORIA_ID)
+3. Si el problema puede corresponder a varias categorías, menciona las opciones con sus links
+4. Responde de forma breve (2-3 oraciones máximo) y amigable
+5. Usa el español rioplatense (vos, podés, etc.)
+
+EJEMPLOS DE RESPUESTAS:
+- "¡Claro! Un bache corresponde a la categoría **Baches y Calles**. [Crear reclamo de Baches](/reclamos?crear=1)"
+- "Ese problema es de **Alumbrado Público**. Podés reportarlo acá: [Crear reclamo](/reclamos?crear=2)"
+
+Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
+
+
+async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
+    """Obtiene las categorías activas del municipio"""
+    query = select(Categoria).where(
+        Categoria.municipio_id == municipio_id,
+        Categoria.activo == True
+    ).order_by(Categoria.nombre)
+
+    result = await db.execute(query)
+    categorias = result.scalars().all()
+
+    return [{"id": c.id, "nombre": c.nombre} for c in categorias]
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest, current_user = Depends(get_current_user)):
+async def chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Endpoint de chat con IA usando Gemini.
+    Usa las categorías reales del municipio del usuario.
     """
     if not settings.GEMINI_API_KEY:
         raise HTTPException(
@@ -88,8 +92,23 @@ async def chat(request: ChatRequest, current_user = Depends(get_current_user)):
             detail="El asistente no está disponible. Contacte al administrador."
         )
 
+    # Obtener categorías del municipio del usuario
+    categorias = await get_categorias_municipio(db, current_user.municipio_id)
+
+    if not categorias:
+        # Categorías por defecto si no hay
+        categorias = [
+            {"id": 1, "nombre": "Baches y Calles"},
+            {"id": 2, "nombre": "Alumbrado Público"},
+            {"id": 3, "nombre": "Agua y Cloacas"},
+            {"id": 4, "nombre": "Limpieza"},
+            {"id": 5, "nombre": "Espacios Verdes"},
+        ]
+
+    system_prompt = build_system_prompt(categorias)
+
     # Construir contexto con historial
-    context = SYSTEM_PROMPT + "\n\n"
+    context = system_prompt + "\n\nCONVERSACIÓN:\n"
 
     for msg in request.history[-10:]:
         role = "Usuario" if msg.get("role") == "user" else "Asistente"
@@ -149,10 +168,26 @@ indicá amablemente que solo podés ayudar con temas relacionados a reclamos de 
 Respuesta:"""
 
     try:
-        response_text = await call_gemini(prompt, "")
-        return ChatResponse(response=response_text)
-    except HTTPException:
-        return ChatResponse(response="El asistente no está disponible en este momento. Intentá más tarde.")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 200,
+                    }
+                }
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                return ChatResponse(response=text.strip() if text else "No pude procesar tu pregunta.")
+            else:
+                return ChatResponse(response="El asistente no está disponible en este momento.")
+
     except Exception:
         return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
 
