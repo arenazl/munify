@@ -17,7 +17,8 @@
       "Bash(git add:*)",
       "Bash(heroku apps:info:*)",
       "Bash(heroku apps:*)",
-      "Bash(netlify deploy:*)"
+      "Bash(netlify deploy:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []
