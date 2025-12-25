@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect, useRef } from 'react';
 import { Plus, Search, Sparkles, ChevronDown, LayoutGrid, List } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from './Sheet';
@@ -19,6 +19,9 @@ interface ABMPageProps {
 
   // Extra filters (opcional)
   extraFilters?: ReactNode;
+
+  // Secondary filters bar (opcional - barra completa debajo del header)
+  secondaryFilters?: ReactNode;
 
   // Grid
   children: ReactNode;
@@ -48,6 +51,7 @@ export function ABMPage({
   searchValue,
   onSearchChange,
   extraFilters,
+  secondaryFilters,
   children,
   emptyMessage = 'No se encontraron resultados',
   isEmpty = false,
@@ -62,6 +66,23 @@ export function ABMPage({
 }: ABMPageProps) {
   const { theme } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [isSticky, setIsSticky] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Detectar scroll para activar sticky
+  useEffect(() => {
+    const handleScroll = () => {
+      if (headerRef.current) {
+        const rect = headerRef.current.getBoundingClientRect();
+        // Activar sticky cuando el header llega al top (considerando el navbar ~64px)
+        setIsSticky(rect.top <= 64);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   if (loading) {
     return (
@@ -83,33 +104,50 @@ export function ABMPage({
 
   return (
     <div className="space-y-6">
-      {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
+      {/* Contenedor sticky para header y secondary filters */}
       <div
-        className="rounded-xl px-5 py-3 relative overflow-hidden"
+        ref={headerRef}
+        className={`transition-all duration-300 ease-out ${
+          isSticky ? 'sticky top-16 z-40' : ''
+        }`}
         style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
+          marginLeft: isSticky ? '-1rem' : 0,
+          marginRight: isSticky ? '-1rem' : 0,
+          paddingLeft: isSticky ? '1rem' : 0,
+          paddingRight: isSticky ? '1rem' : 0,
         }}
       >
-        <div className="flex items-center gap-3 relative z-10">
-          {/* Título con icono decorativo */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
+        <div
+          className={`rounded-xl px-5 py-3 relative overflow-hidden transition-all duration-300 ${
+            isSticky ? 'rounded-b-none shadow-lg' : ''
+          }`}
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+            borderBottom: isSticky && secondaryFilters ? 'none' : `1px solid ${theme.border}`,
+            boxShadow: isSticky ? `0 4px 20px ${theme.primary}15` : 'none',
+          }}
+        >
+        <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
+          {/* Título con icono decorativo - se oculta cuando el search está enfocado en mobile */}
+          <div className={`flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : 'flex'}`}>
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
               style={{ backgroundColor: `${theme.primary}20` }}
             >
               <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
             </div>
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
+            <h1 className="text-lg font-bold tracking-tight hidden sm:block" style={{ color: theme.text }}>
               {title}
             </h1>
           </div>
 
-          {/* Separador vertical */}
-          <div className="h-8 w-px" style={{ backgroundColor: theme.border }} />
+          {/* Separador vertical - se oculta en mobile cuando search enfocado */}
+          <div className={`h-8 w-px hidden sm:block ${searchFocused ? 'sm:hidden md:block' : ''}`} style={{ backgroundColor: theme.border }} />
 
-          {/* Buscador con mejor contraste */}
-          <div className="relative flex-1 group">
+          {/* Buscador que se expande en mobile al focus */}
+          <div className={`relative group transition-all duration-300 ${searchFocused ? 'flex-1' : 'flex-1 sm:flex-1'}`}>
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-all duration-300 group-focus-within:scale-110"
               style={{ color: theme.textSecondary }}
@@ -119,6 +157,8 @@ export function ABMPage({
               placeholder={searchPlaceholder}
               value={searchValue}
               onChange={(e) => onSearchChange(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               className="w-full pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-2 focus:outline-none transition-all duration-300"
               style={{
                 backgroundColor: theme.background,
@@ -128,39 +168,10 @@ export function ABMPage({
             />
           </div>
 
-          {/* Filtros extra */}
-          {extraFilters && (
-            <div className="flex-shrink-0 abm-filter-wrapper">
-              <style>{`
-                .abm-filter-wrapper select {
-                  background: linear-gradient(135deg, ${theme.backgroundSecondary} 0%, ${theme.card} 100%);
-                  border: 1px solid ${theme.border};
-                  color: ${theme.text};
-                  font-weight: 500;
-                  padding: 0.5rem 2rem 0.5rem 1rem;
-                  border-radius: 0.5rem;
-                  font-size: 0.875rem;
-                  cursor: pointer;
-                  transition: all 0.2s;
-                }
-                .abm-filter-wrapper select:hover {
-                  border-color: ${theme.primary};
-                  box-shadow: 0 0 0 2px ${theme.primary}20;
-                }
-                .abm-filter-wrapper select:focus {
-                  outline: none;
-                  border-color: ${theme.primary};
-                  box-shadow: 0 0 0 3px ${theme.primary}30;
-                }
-              `}</style>
-              {extraFilters}
-            </div>
-          )}
-
-          {/* Toggle Vista Tarjetas/Tabla */}
+          {/* Toggle Vista - solo desktop */}
           {tableView && (
             <div
-              className="flex items-center rounded-lg p-1 flex-shrink-0"
+              className="hidden sm:flex items-center rounded-lg p-1 flex-shrink-0"
               style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
             >
               <button
@@ -210,35 +221,113 @@ export function ABMPage({
             </div>
           )}
 
-          {/* Botón agregar con gradiente basado en theme.primary */}
+          {/* Botón agregar - solo desktop en esta línea */}
           <button
             onClick={onAdd}
-            className="
-              inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
+            className={`
+              hidden sm:inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
               transition-all duration-300 ease-out
               hover:scale-105 hover:-translate-y-0.5
               active:scale-95
               group
               relative overflow-hidden
               flex-shrink-0
-            "
+            `}
             style={{
               background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
               color: '#ffffff',
               boxShadow: `0 4px 14px ${theme.primary}40`,
             }}
           >
-            {/* Shimmer effect */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
             <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />
             {buttonLabel}
           </button>
+
+          {/* Filtros extra - en mobile van debajo */}
+          {extraFilters && (
+            <div className={`flex-shrink-0 abm-filter-wrapper overflow-x-auto transition-all duration-300 hidden sm:block`} style={{ scrollbarWidth: 'none' }}>
+              <style>{`
+                .abm-filter-wrapper select {
+                  background: linear-gradient(135deg, ${theme.backgroundSecondary} 0%, ${theme.card} 100%);
+                  border: 1px solid ${theme.border};
+                  color: ${theme.text};
+                  font-weight: 500;
+                  padding: 0.5rem 2rem 0.5rem 1rem;
+                  border-radius: 0.5rem;
+                  font-size: 0.875rem;
+                  cursor: pointer;
+                  transition: all 0.2s;
+                }
+                .abm-filter-wrapper select:hover {
+                  border-color: ${theme.primary};
+                  box-shadow: 0 0 0 2px ${theme.primary}20;
+                }
+                .abm-filter-wrapper select:focus {
+                  outline: none;
+                  border-color: ${theme.primary};
+                  box-shadow: 0 0 0 3px ${theme.primary}30;
+                }
+              `}</style>
+              {extraFilters}
+            </div>
+          )}
+
         </div>
+
+          {/* Mobile: Botón 100% + Filtros de estado */}
+          <div className="flex sm:hidden flex-col gap-2 mt-3">
+            {/* Botón agregar - 100% en mobile */}
+            <button
+              onClick={onAdd}
+              className="
+                w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg font-semibold text-sm
+                transition-all duration-300 ease-out
+                active:scale-95
+                group
+                relative overflow-hidden 
+              "
+              style={{
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                color: '#ffffff',
+                boxShadow: `0 4px 14px ${theme.primary}40`,
+                marginBottom: '0.5rem',
+              }}
+            >
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+              <Plus className="h-4 w-4 mr-1.5" />
+              {buttonLabel}
+            </button>
+
+            {/* Filtros extra - scroll horizontal en mobile */}
+            {extraFilters && (
+              <div className="overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                {extraFilters}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Secondary Filters Bar (full width) - dentro del sticky container */}
+        {secondaryFilters && (
+          <div
+            className={`px-5 py-3 relative overflow-hidden transition-all duration-300 ${
+              isSticky ? 'rounded-b-xl' : 'rounded-xl mt-3'
+            }`}
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+              borderTop: isSticky ? 'none' : `1px solid ${theme.border}`,
+            }}
+          >
+            {secondaryFilters}
+          </div>
+        )}
       </div>
 
       {/* Grid de contenido con animación de transición */}
       {!isEmpty ? (
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden mt-4">
           {/* Vista Tarjetas - 1 columna en móvil, 2 en tablet, 3 en desktop */}
           <div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5"

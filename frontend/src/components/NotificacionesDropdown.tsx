@@ -162,11 +162,12 @@ export function NotificacionesDropdown() {
             onClick={() => setIsOpen(false)}
           />
           <div
-            className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in origin-top-right"
+            className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto mt-2 sm:w-96 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in origin-top-right"
             style={{
               backgroundColor: theme.card,
               border: `1px solid ${theme.border}`,
               maxHeight: '70vh',
+              top: 'auto',
             }}
           >
             {/* Header */}

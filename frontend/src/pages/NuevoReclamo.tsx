@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, publicoApi, clasificacionApi } from '../lib/api';
+import { validationSchemas } from '../lib/validations';
 import { Categoria, Zona } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -169,6 +170,17 @@ export default function NuevoReclamo() {
     longitud: null as number | null,
   });
 
+  // Estado para campos tocados (para mostrar errores de validación)
+  const [fieldsTouched, setFieldsTouched] = useState({
+    titulo: false,
+    descripcion: false,
+    direccion: false,
+  });
+
+  const handleFieldBlur = (field: 'titulo' | 'descripcion' | 'direccion') => {
+    setFieldsTouched(t => ({ ...t, [field]: true }));
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -295,9 +307,7 @@ export default function NuevoReclamo() {
         const municipioIdStr = localStorage.getItem('municipio_id');
         const municipioId = municipioIdStr ? parseInt(municipioIdStr) : 1;
 
-        console.log('🔍 Clasificando texto:', text.substring(0, 50), '... municipio:', municipioId);
         const resultado = await clasificacionApi.clasificar(text, municipioId);
-        console.log('📊 Resultado clasificación:', resultado);
 
         if (resultado.sugerencias && resultado.sugerencias.length > 0) {
           const top3 = resultado.sugerencias
@@ -307,8 +317,6 @@ export default function NuevoReclamo() {
               return cat ? { categoria: cat, confianza: sug.confianza || sug.score || 0 } : null;
             })
             .filter((x: { categoria: Categoria; confianza: number } | null): x is { categoria: Categoria; confianza: number } => x !== null);
-
-          console.log('🎯 Top 3 sugerencias:', top3.map((s: { categoria: Categoria; confianza: number }) => `${s.categoria.nombre} (${s.confianza}%)`));
 
           if (top3.length > 0) {
             setSuggestedCategorias(top3);
@@ -321,8 +329,8 @@ export default function NuevoReclamo() {
           setSuggestedCategorias([]);
           setShowSuggestion(false);
         }
-      } catch (error) {
-        console.error('❌ Error al clasificar:', error);
+      } catch {
+        // Silent fail - classification is optional
       } finally {
         setAnalyzing(false);
       }
@@ -404,11 +412,16 @@ export default function NuevoReclamo() {
     }
   };
 
-  // Validaciones de steps
+  // Validaciones de steps usando el sistema centralizado
   const isRegisterValid = !!registerData.nombre && !!registerData.email && registerData.password.length >= 6;
-  const isCategoriaValid = !!formData.categoria_id;
-  const isUbicacionValid = !!formData.direccion;
-  const isDetallesValid = !!formData.titulo && !!formData.descripcion;
+  const categoriaValidation = validationSchemas.reclamo.categoria_id(formData.categoria_id);
+  const direccionValidation = validationSchemas.reclamo.direccion(formData.direccion);
+  const tituloValidation = validationSchemas.reclamo.titulo(formData.titulo);
+  const descripcionValidation = validationSchemas.reclamo.descripcion(formData.descripcion);
+
+  const isCategoriaValid = categoriaValidation.isValid;
+  const isUbicacionValid = direccionValidation.isValid;
+  const isDetallesValid = tituloValidation.isValid && descripcionValidation.isValid;
 
   // Mostrar loading mientras se verifica autenticación
   if (authLoading) {
@@ -588,13 +601,14 @@ export default function NuevoReclamo() {
               value={formData.direccion}
               onChange={(e) => handleAddressChange(e.target.value)}
               onFocus={() => addressSuggestions.length > 0 && setShowSuggestions(true)}
+              onBlur={() => handleFieldBlur('direccion')}
               placeholder="Escribí para buscar direcciones..."
               maxLength={120}
               className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
               style={{
                 backgroundColor: theme.backgroundSecondary,
                 color: theme.text,
-                border: `1px solid ${theme.border}`,
+                border: `1px solid ${fieldsTouched.direccion && !direccionValidation.isValid ? '#ef4444' : theme.border}`,
               }}
             />
             {searchingAddress && (
@@ -603,6 +617,9 @@ export default function NuevoReclamo() {
               </div>
             )}
           </div>
+          {fieldsTouched.direccion && !direccionValidation.isValid && (
+            <p className="mt-1 text-xs text-red-500">{direccionValidation.error}</p>
+          )}
 
           {/* Sugerencias de direcciones */}
           {showSuggestions && addressSuggestions.length > 0 && (
@@ -696,14 +713,22 @@ export default function NuevoReclamo() {
             type="text"
             value={formData.titulo}
             onChange={(e) => handleTituloChange(e.target.value)}
+            onBlur={() => handleFieldBlur('titulo')}
             placeholder="Ej: Bache peligroso en esquina"
+            maxLength={100}
             className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
             style={{
               backgroundColor: theme.backgroundSecondary,
               color: theme.text,
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${fieldsTouched.titulo && !tituloValidation.isValid ? '#ef4444' : theme.border}`,
             }}
           />
+          {fieldsTouched.titulo && !tituloValidation.isValid && (
+            <p className="mt-1 text-xs text-red-500">{tituloValidation.error}</p>
+          )}
+          <p className="mt-1 text-xs" style={{ color: theme.textSecondary }}>
+            {formData.titulo.length}/100 caracteres
+          </p>
         </div>
 
         <div>
@@ -713,15 +738,23 @@ export default function NuevoReclamo() {
           <textarea
             value={formData.descripcion}
             onChange={(e) => handleDescripcionChange(e.target.value)}
+            onBlur={() => handleFieldBlur('descripcion')}
             placeholder="Describe el problema con el mayor detalle posible..."
             rows={4}
+            maxLength={2000}
             className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all resize-none"
             style={{
               backgroundColor: theme.backgroundSecondary,
               color: theme.text,
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${fieldsTouched.descripcion && !descripcionValidation.isValid ? '#ef4444' : theme.border}`,
             }}
           />
+          {fieldsTouched.descripcion && !descripcionValidation.isValid && (
+            <p className="mt-1 text-xs text-red-500">{descripcionValidation.error}</p>
+          )}
+          <p className="mt-1 text-xs" style={{ color: theme.textSecondary }}>
+            {formData.descripcion.length}/2000 caracteres (mínimo 10)
+          </p>
         </div>
 
         <div>

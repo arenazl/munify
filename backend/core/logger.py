@@ -155,44 +155,34 @@ class RequestLogFilter(logging.Filter):
 
 def setup_logging(level: str = "INFO"):
     """
-    Configurar logging con Rich para toda la aplicación.
+    Configurar logging simple para toda la aplicación.
     """
     log_level = getattr(logging, level.upper(), logging.INFO)
+
+    # Formato simple sin Rich (más compatible con Windows)
+    formatter = logging.Formatter(
+        '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+        datefmt='%H:%M:%S'
+    )
 
     # Root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     root_logger.handlers.clear()
 
-    # Handler con Rich
-    rich_handler = RichHandler(
-        console=console,
-        show_time=False,
-        show_level=False,
-        show_path=False,
-        markup=True,
-        rich_tracebacks=True,
-        tracebacks_show_locals=False,
-    )
-    rich_handler.setLevel(log_level)
-    rich_handler.setFormatter(RichFormatter())
-    root_logger.addHandler(rich_handler)
+    # Handler simple a stdout
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(log_level)
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
 
-    # Configurar uvicorn.access
+    # Desactivar uvicorn.access (usamos nuestro middleware)
     access_logger = logging.getLogger("uvicorn.access")
     access_logger.handlers.clear()
-    access_logger.addFilter(RequestLogFilter())
-    access_handler = RichHandler(
-        console=console,
-        show_time=False,
-        show_level=False,
-        show_path=False,
-        markup=True,
-    )
-    access_logger.addHandler(access_handler)
     access_logger.propagate = False
+    access_logger.setLevel(logging.CRITICAL)
 
-    # Silenciar loggers ruidosos (excepto uvicorn.error para ver errores)
+    # Silenciar loggers ruidosos
     noisy_loggers = [
         "httpx", "httpcore", "sqlalchemy", "sqlalchemy.engine",
         "sqlalchemy.engine.Engine", "sqlalchemy.pool", "sqlalchemy.dialects",
@@ -218,42 +208,18 @@ def get_logger(name: str) -> logging.Logger:
 
 
 def print_startup_banner(app_name: str = "Sistema de Reclamos Municipales", version: str = "1.0.0", port: int = None):
-    """Imprimir banner de inicio bonito con Rich."""
-    # Si no se especifica puerto, usar variable de entorno PORT
+    """Imprimir banner de inicio simple."""
     if port is None:
         port = int(os.environ.get("PORT", 8000))
-    console.print()
 
-    # Banner principal
-    banner_content = Text()
-    banner_content.append("🏛️  ", style="bold")
-    banner_content.append(app_name, style="bold cyan")
-    banner_content.append(f"\n   v{version}", style="dim")
-
-    console.print(Panel(
-        banner_content,
-        border_style="cyan",
-        box=box.DOUBLE,
-        padding=(0, 2),
-    ))
-
-    console.print()
-
-    # Info de servidor
-    info_table = Table(show_header=False, box=None, padding=(0, 2))
-    info_table.add_column(style="green")
-    info_table.add_column()
-
-    info_table.add_row("✓", f"Server:  [link=http://localhost:{port}]http://localhost:{port}[/link]")
-    info_table.add_row("✓", f"API Docs: [link=http://localhost:{port}/docs]http://localhost:{port}/docs[/link]")
-    info_table.add_row("✓", f"ReDoc:   [link=http://localhost:{port}/redoc]http://localhost:{port}/redoc[/link]")
-
-    console.print(info_table)
-    console.print()
-    console.print("[dim]  Press CTRL+C to stop[/dim]")
-    console.print()
-    console.rule(style="dim")
-    console.print()
+    print("\n" + "="*60, flush=True)
+    print(f"  {app_name} v{version}", flush=True)
+    print("="*60, flush=True)
+    print(f"  Server:   http://localhost:{port}", flush=True)
+    print(f"  API Docs: http://localhost:{port}/docs", flush=True)
+    print(f"  ReDoc:    http://localhost:{port}/redoc", flush=True)
+    print("="*60, flush=True)
+    print("  Press CTRL+C to stop\n", flush=True)
 
 
 def print_panel(title: str, content: str, style: str = "cyan"):
@@ -335,3 +301,5 @@ def print_request_log(method: str, path: str, status: int, duration_ms: float, u
         f"[dim]{duration_ms:.0f}ms[/dim]"
         f"{user_str}"
     )
+    # Forzar flush para que se muestre inmediatamente
+    sys.stdout.flush()

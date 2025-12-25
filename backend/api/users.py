@@ -14,7 +14,7 @@ router = APIRouter()
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     result = await db.execute(
         select(User)
@@ -27,7 +27,7 @@ async def get_users(
 async def get_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id del usuario actual
     result = await db.execute(
@@ -44,7 +44,7 @@ async def get_user(
 async def create_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Verificar si el email ya existe
     result = await db.execute(select(User).where(User.email == user_data.email))
@@ -71,7 +71,7 @@ async def update_user(
     user_id: int,
     user_data: UserUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id del usuario actual
     result = await db.execute(
@@ -95,7 +95,7 @@ async def update_user(
 async def delete_user(
     user_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id del usuario actual
     result = await db.execute(

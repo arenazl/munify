@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { User, Mail, Lock, ArrowRight } from 'lucide-react';
+import { validationSchemas } from '../lib/validations';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -12,11 +13,22 @@ export default function Register() {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({ nombre: false, email: false, password: false });
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  // Validaciones
+  const nombreValidation = validationSchemas.register.nombre(formData.nombre);
+  const emailValidation = validationSchemas.register.email(formData.email);
+  const passwordValidation = validationSchemas.register.password(formData.password);
+  const isFormValid = nombreValidation.isValid && emailValidation.isValid && passwordValidation.isValid;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleBlur = (field: 'nombre' | 'email' | 'password') => {
+    setTouched(t => ({ ...t, [field]: true }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,18 +94,25 @@ export default function Register() {
               Tu nombre
             </label>
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+              <User className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${touched.nombre && !nombreValidation.isValid ? 'text-red-400' : 'text-slate-500'}`} />
               <input
                 id="nombre"
                 name="nombre"
                 type="text"
-                required
                 placeholder="Juan Pérez"
                 value={formData.nombre}
                 onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                onBlur={() => handleBlur('nombre')}
+                className={`w-full pl-10 pr-4 py-3 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                  touched.nombre && !nombreValidation.isValid
+                    ? 'border-red-500/50 focus:border-red-500/50'
+                    : 'border-slate-700 focus:border-transparent'
+                }`}
               />
             </div>
+            {touched.nombre && !nombreValidation.isValid && (
+              <p className="mt-1 text-xs text-red-400">{nombreValidation.error}</p>
+            )}
           </div>
 
           {/* Email */}
@@ -102,18 +121,25 @@ export default function Register() {
               Email
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+              <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${touched.email && !emailValidation.isValid ? 'text-red-400' : 'text-slate-500'}`} />
               <input
                 id="email"
                 name="email"
                 type="email"
-                required
                 placeholder="tu@email.com"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                onBlur={() => handleBlur('email')}
+                className={`w-full pl-10 pr-4 py-3 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                  touched.email && !emailValidation.isValid
+                    ? 'border-red-500/50 focus:border-red-500/50'
+                    : 'border-slate-700 focus:border-transparent'
+                }`}
               />
             </div>
+            {touched.email && !emailValidation.isValid && (
+              <p className="mt-1 text-xs text-red-400">{emailValidation.error}</p>
+            )}
           </div>
 
           {/* Contraseña */}
@@ -122,25 +148,31 @@ export default function Register() {
               Contraseña
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+              <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${touched.password && !passwordValidation.isValid ? 'text-red-400' : 'text-slate-500'}`} />
               <input
                 id="password"
                 name="password"
                 type="password"
-                required
-                minLength={6}
                 placeholder="Mínimo 6 caracteres"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                onBlur={() => handleBlur('password')}
+                className={`w-full pl-10 pr-4 py-3 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                  touched.password && !passwordValidation.isValid
+                    ? 'border-red-500/50 focus:border-red-500/50'
+                    : 'border-slate-700 focus:border-transparent'
+                }`}
               />
             </div>
+            {touched.password && !passwordValidation.isValid && (
+              <p className="mt-1 text-xs text-red-400">{passwordValidation.error}</p>
+            )}
           </div>
 
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !isFormValid}
             className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-6"
           >
             {loading ? (

@@ -67,12 +67,20 @@ export default function Layout() {
               transition: 'justify-content 0.3s ease',
             }}
           >
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)` }}
-            >
-              <Building2 className="h-5 w-5 text-white" />
-            </div>
+            {municipioActual?.logo_url ? (
+              <img
+                src={municipioActual.logo_url}
+                alt={`Logo ${nombreMunicipio}`}
+                className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
+              />
+            ) : (
+              <div
+                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, ${municipioActual?.color_primario || theme.primary} 0%, ${municipioActual?.color_secundario || theme.primaryHover} 100%)` }}
+              >
+                <Building2 className="h-5 w-5 text-white" />
+              </div>
+            )}
             <div
               className="flex flex-col leading-tight min-w-0"
               style={{
@@ -234,12 +242,13 @@ export default function Layout() {
                       onClick={() => setThemeMenuOpen(false)}
                     />
                     <div
-                      className="absolute right-0 mt-2 w-64 rounded-xl shadow-2xl z-50 theme-dropdown-enter"
+                      className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto mt-2 sm:w-64 rounded-xl shadow-2xl z-50 theme-dropdown-enter"
                       style={{
                         backgroundColor: theme.card,
                         border: `1px solid ${theme.border}`,
                         maxHeight: 'calc(100vh - 100px)',
                         overflowY: 'auto',
+                        top: 'auto',
                       }}
                     >
                       {/* Sección: Temas base */}

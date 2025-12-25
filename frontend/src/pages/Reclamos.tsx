@@ -1,14 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
-import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona } from '../types';
+import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
   nuevo: { bg: '#6366f1', text: '#ffffff' },
@@ -111,10 +112,40 @@ function getCategoryColor(nombre: string): string {
   return categoryColors.default;
 }
 
+// Placeholders dinámicos según categoría
+const categoryPlaceholders: Record<string, { titulo: string; descripcion: string }> = {
+  'alumbrado': { titulo: 'Ej: Luminaria apagada en esquina', descripcion: 'Ej: La luminaria frente a mi casa lleva 3 días sin funcionar. Es el poste #1234.' },
+  'bache': { titulo: 'Ej: Bache peligroso en calle principal', descripcion: 'Ej: Hay un bache profundo de aprox. 50cm que ya dañó varios autos.' },
+  'agua': { titulo: 'Ej: Pérdida de agua en vereda', descripcion: 'Ej: Hay agua saliendo de una cañería rota hace 2 días, se está formando un charco grande.' },
+  'cloaca': { titulo: 'Ej: Desborde de cloaca en esquina', descripcion: 'Ej: La cloaca está desbordando y hay mal olor. Sucede cada vez que llueve.' },
+  'arbolado': { titulo: 'Ej: Árbol a punto de caer', descripcion: 'Ej: Un árbol grande está inclinado hacia la calle y sus ramas rozan los cables de luz.' },
+  'espacio': { titulo: 'Ej: Plaza con juegos rotos', descripcion: 'Ej: Los juegos infantiles de la plaza están oxidados y hay partes sueltas, es peligroso.' },
+  'basura': { titulo: 'Ej: Contenedor desbordando hace días', descripcion: 'Ej: El contenedor de la cuadra no se vacía hace una semana y hay basura en la vereda.' },
+  'limpieza': { titulo: 'Ej: Calle sin barrer hace semanas', descripcion: 'Ej: La cuadra está llena de hojas y residuos, no pasa la barredora hace mucho.' },
+  'transito': { titulo: 'Ej: Semáforo no funciona', descripcion: 'Ej: El semáforo de la intersección está apagado, hay mucha confusión vehicular.' },
+  'señal': { titulo: 'Ej: Cartel de PARE caído', descripcion: 'Ej: El cartel de señalización está tirado en la vereda, los autos no frenan.' },
+  'plaga': { titulo: 'Ej: Roedores en terreno baldío', descripcion: 'Ej: Hay ratas saliendo de un terreno abandonado, se las ve a toda hora.' },
+  'semaforo': { titulo: 'Ej: Semáforo mal sincronizado', descripcion: 'Ej: El semáforo peatonal da muy poco tiempo para cruzar, es peligroso para ancianos.' },
+  'vereda': { titulo: 'Ej: Vereda rota y peligrosa', descripcion: 'Ej: Las baldosas están levantadas por raíces, ya hubo gente que se cayó.' },
+  'mobiliario': { titulo: 'Ej: Banco de plaza destruido', descripcion: 'Ej: Los bancos de la plaza tienen las maderas rotas, no se puede sentar nadie.' },
+  'ruido': { titulo: 'Ej: Local con música alta de noche', descripcion: 'Ej: Un bar pone música muy fuerte después de las 23hs, no nos deja dormir.' },
+  'default': { titulo: 'Ej: Describí brevemente el problema', descripcion: 'Ej: Explica qué sucede, desde cuándo, y cualquier detalle relevante.' }
+};
+
+function getCategoryPlaceholders(nombre: string) {
+  const key = nombre.toLowerCase();
+  for (const [k, p] of Object.entries(categoryPlaceholders)) {
+    if (key.includes(k)) return p;
+  }
+  return categoryPlaceholders.default;
+}
+
+
 type SheetMode = 'closed' | 'view';
 
 export default function Reclamos() {
   const { theme } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
@@ -124,6 +155,7 @@ export default function Reclamos() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
+  const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   // Estado para animación staggered - iniciar como completado para evitar parpadeo
   const [visibleCards] = useState<Set<number>>(new Set());
   const [animationDone] = useState(true);
@@ -150,7 +182,13 @@ export default function Reclamos() {
     zona_id: '',
     latitud: null as number | null,
     longitud: null as number | null,
+    // Datos de contacto
+    nombre_contacto: '',
+    telefono_contacto: '',
+    email_contacto: '',
+    recibir_notificaciones: true,
   });
+
 
   // Action states for view
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>('');
@@ -185,6 +223,14 @@ export default function Reclamos() {
     razon_principal: string;
   }[]>([]);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
+
+  // Búsqueda de usuarios para datos de contacto
+  const [userSearchResults, setUserSearchResults] = useState<UserType[]>([]);
+  const [allUsers, setAllUsers] = useState<UserType[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [showUserResults, setShowUserResults] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
 
   // Opciones de duración
   const duracionOptions = [
@@ -221,6 +267,11 @@ export default function Reclamos() {
   const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
+  // AI Panel debounce state - mostrar sugerencias 3 segundos después de escribir descripción
+  const [showAISuggestions, setShowAISuggestions] = useState(false);
+  const [aiSuggestionsLoading, setAISuggestionsLoading] = useState(false);
+  const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Address autocomplete states
   const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -241,6 +292,20 @@ export default function Reclamos() {
     fetchData();
     fetchMunicipioData();
   }, [filtroEstado]);
+
+  // Detectar parámetro ?crear=ID para abrir wizard desde chat
+  useEffect(() => {
+    const crearCategoriaId = searchParams.get('crear');
+    if (crearCategoriaId && categorias.length > 0) {
+      const categoriaExiste = categorias.find(c => c.id === parseInt(crearCategoriaId));
+      if (categoriaExiste) {
+        setFormData(prev => ({ ...prev, categoria_id: crearCategoriaId }));
+        setWizardStep(1); // Saltar al paso de detalles
+        setWizardOpen(true);
+        setSearchParams({}); // Limpiar URL
+      }
+    }
+  }, [searchParams, categorias, setSearchParams]);
 
   // Calcular distancia cuando cambian las coordenadas
   useEffect(() => {
@@ -293,6 +358,47 @@ export default function Reclamos() {
     setAiResponse('');
     setAiQuestion('');
   }, [formData.categoria_id]);
+
+  // Debounce para mostrar sugerencias de IA - 3 segundos después de escribir
+  useEffect(() => {
+    // Solo aplicar debounce si estamos en el paso de detalles (paso 2)
+    if (wizardStep !== 2) {
+      setShowAISuggestions(false);
+      setAISuggestionsLoading(false);
+      return;
+    }
+
+    // Si no hay descripción, ocultar sugerencias
+    if (!formData.descripcion.trim()) {
+      setShowAISuggestions(false);
+      setAISuggestionsLoading(false);
+      if (aiDebounceRef.current) {
+        clearTimeout(aiDebounceRef.current);
+      }
+      return;
+    }
+
+    // Limpiar timeout anterior
+    if (aiDebounceRef.current) {
+      clearTimeout(aiDebounceRef.current);
+    }
+
+    // Mostrar loading mientras espera
+    setShowAISuggestions(false);
+    setAISuggestionsLoading(true);
+
+    // Esperar 3 segundos antes de mostrar las sugerencias
+    aiDebounceRef.current = setTimeout(() => {
+      setAISuggestionsLoading(false);
+      setShowAISuggestions(true);
+    }, 3000);
+
+    return () => {
+      if (aiDebounceRef.current) {
+        clearTimeout(aiDebounceRef.current);
+      }
+    };
+  }, [formData.descripcion, wizardStep]);
 
   const askAI = async () => {
     if (!aiQuestion.trim() || !selectedCategoria) return;
@@ -375,9 +481,42 @@ export default function Reclamos() {
   };
 
   const selectAddress = (suggestion: { display_name: string; lat: string; lon: string }) => {
-    // Simplificar el nombre de la dirección
-    const parts = suggestion.display_name.split(',');
-    const simplifiedAddress = parts.slice(0, 3).join(',').trim();
+    // Extraer número de calle del input del usuario (si existe)
+    const userInput = formData.direccion.trim();
+
+    // Buscar patrones como "cochabamba 150" o "av. mitre 1234"
+    // El número debe estar entre palabras (nombre calle + número + localidad opcional)
+    const numberMatch = userInput.match(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ.\s]+?\s+(\d{1,5})(?:\s|$)/i);
+    const streetNumber = numberMatch ? numberMatch[1] : '';
+
+    // Simplificar el nombre de la dirección de la sugerencia
+    const parts = suggestion.display_name.split(',').map(p => p.trim());
+
+    // La primera parte es el nombre de la calle (puede incluir número de Nominatim)
+    let streetName = parts[0];
+    // Si la calle de Nominatim tiene número, quitarlo para usar el del usuario
+    if (streetNumber) {
+      streetName = streetName.replace(/\s+\d+$/, '').trim();
+    }
+
+    // Filtrar partes que no queremos
+    const locationParts = parts.slice(1).filter(part => {
+      // Excluir códigos postales (4-5 dígitos solos)
+      if (/^\d{4,5}$/.test(part)) return false;
+      // Excluir "Argentina"
+      if (part.toLowerCase() === 'argentina') return false;
+      // Excluir provincias comunes
+      if (/^(buenos aires|provincia de buenos aires|caba)$/i.test(part)) return false;
+      return true;
+    });
+
+    // Tomar las primeras 2 partes de ubicación (localidad, partido)
+    const locality = locationParts.slice(0, 2).join(', ');
+
+    // Construir dirección final: "Calle 123, Localidad, Partido" o "Calle, Localidad, Partido"
+    const finalAddress = streetNumber
+      ? `${streetName} ${streetNumber}, ${locality}`
+      : `${streetName}, ${locality}`;
 
     // Buscar zona/barrio que coincida con la dirección
     const addressLower = suggestion.display_name.toLowerCase();
@@ -393,7 +532,7 @@ export default function Reclamos() {
 
     setFormData({
       ...formData,
-      direccion: simplifiedAddress,
+      direccion: finalAddress,
       latitud: parseFloat(suggestion.lat),
       longitud: parseFloat(suggestion.lon),
       zona_id: matchedZonaId || formData.zona_id
@@ -422,6 +561,68 @@ export default function Reclamos() {
     }
   };
 
+  // Cargar usuarios para búsqueda
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const response = await usersApi.getAll();
+      // Filtrar solo vecinos activos
+      const vecinos = response.data.filter((u: UserType) => u.rol === 'vecino' && u.activo);
+      setAllUsers(vecinos);
+    } catch (error) {
+      console.error('Error cargando usuarios:', error);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Buscar usuarios por nombre/apellido
+  const handleUserSearch = (query: string) => {
+    if (query.length < 2) {
+      setUserSearchResults([]);
+      setShowUserResults(false);
+      setSearchingUsers(false);
+      return;
+    }
+    setSearchingUsers(true);
+    // Simular pequeño delay para mostrar el spinner
+    setTimeout(() => {
+      const queryLower = query.toLowerCase();
+      const results = allUsers.filter(u =>
+        u.nombre.toLowerCase().includes(queryLower) ||
+        u.apellido.toLowerCase().includes(queryLower) ||
+        `${u.nombre} ${u.apellido}`.toLowerCase().includes(queryLower)
+      ).slice(0, 10);
+      setUserSearchResults(results);
+      setShowUserResults(results.length > 0);
+      setSearchingUsers(false);
+    }, 300);
+  };
+
+  // Seleccionar usuario y cargar datos
+  const selectUser = (user: UserType) => {
+    setSelectedUser(user);
+    setFormData({
+      ...formData,
+      nombre_contacto: `${user.nombre} ${user.apellido}`,
+      telefono_contacto: user.telefono || '',
+      email_contacto: user.email || '',
+    });
+    setShowUserResults(false);
+    toast.success(`Datos de ${user.nombre} cargados`);
+  };
+
+  // Limpiar selección de usuario
+  const clearUserSelection = () => {
+    setSelectedUser(null);
+    setFormData({
+      ...formData,
+      nombre_contacto: '',
+      telefono_contacto: '',
+      email_contacto: '',
+    });
+  };
+
   const openWizard = () => {
     setFormData({
       titulo: '',
@@ -432,11 +633,21 @@ export default function Reclamos() {
       zona_id: '',
       latitud: null,
       longitud: null,
+      nombre_contacto: '',
+      telefono_contacto: '',
+      email_contacto: '',
+      recibir_notificaciones: true,
     });
     setSelectedFiles([]);
     setPreviewUrls([]);
     setWizardStep(0);
+    setSelectedUser(null);
+    setUserSearchResults([]);
     setWizardOpen(true);
+    // Cargar usuarios si no están cargados
+    if (allUsers.length === 0) {
+      fetchUsers();
+    }
   };
 
   const closeWizard = () => {
@@ -524,6 +735,11 @@ export default function Reclamos() {
         zona_id: formData.zona_id ? Number(formData.zona_id) : null,
         latitud: formData.latitud,
         longitud: formData.longitud,
+        // Datos de contacto del ciudadano
+        nombre_contacto: formData.nombre_contacto || null,
+        telefono_contacto: formData.telefono_contacto || null,
+        email_contacto: formData.email_contacto || null,
+        recibir_notificaciones: formData.recibir_notificaciones,
       };
       const response = await reclamosApi.create(payload);
       const reclamoId = response.data.id;
@@ -659,12 +875,19 @@ export default function Reclamos() {
     }
   };
 
-  const filteredReclamos = reclamos.filter(r =>
-    r.titulo.toLowerCase().includes(search.toLowerCase()) ||
-    r.descripcion.toLowerCase().includes(search.toLowerCase()) ||
-    r.direccion.toLowerCase().includes(search.toLowerCase()) ||
-    r.categoria.nombre.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredReclamos = reclamos.filter(r => {
+    // Filtro por texto de búsqueda
+    const matchSearch = search === '' ||
+      r.titulo.toLowerCase().includes(search.toLowerCase()) ||
+      r.descripcion.toLowerCase().includes(search.toLowerCase()) ||
+      r.direccion.toLowerCase().includes(search.toLowerCase()) ||
+      r.categoria.nombre.toLowerCase().includes(search.toLowerCase());
+
+    // Filtro por categoría
+    const matchCategoria = filtroCategoria === null || r.categoria.id === filtroCategoria;
+
+    return matchSearch && matchCategoria;
+  });
 
   const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
   const selectedZona = zonas.find(z => z.id === Number(formData.zona_id));
@@ -683,7 +906,7 @@ export default function Reclamos() {
             <button
               key={cat.id}
               type="button"
-              onClick={() => setFormData({ ...formData, categoria_id: String(cat.id) })}
+              onClick={() => { setFormData({ ...formData, categoria_id: String(cat.id) }); setTimeout(() => setWizardStep(1), 300); }}
               className={`relative p-3 rounded-xl border-2 transition-all duration-300 hover:scale-105 active:scale-95 ${isSelected ? 'border-current' : 'border-transparent'}`}
               style={{
                 backgroundColor: isSelected ? `${catColor}20` : theme.backgroundSecondary,
@@ -844,7 +1067,7 @@ export default function Reclamos() {
           type="text"
           value={formData.titulo}
           onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-          placeholder="Ej: Bache peligroso en esquina"
+          placeholder={selectedCategoria ? getCategoryPlaceholders(selectedCategoria.nombre).titulo : 'Ej: Describí brevemente el problema'}
           className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
           style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
         />
@@ -856,7 +1079,7 @@ export default function Reclamos() {
         <textarea
           value={formData.descripcion}
           onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-          placeholder="Describe el problema con el mayor detalle posible..."
+          placeholder={selectedCategoria ? getCategoryPlaceholders(selectedCategoria.nombre).descripcion : 'Ej: Explica qué sucede, desde cuándo, y cualquier detalle relevante.'}
           rows={4}
           className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all resize-none"
           style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
@@ -957,6 +1180,214 @@ export default function Reclamos() {
             </div>
           </div>
         )}
+        {/* Datos de contacto */}
+        <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#25D366', color: 'white' }}>
+            <Phone className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Contacto</span>
+            <p className="font-medium" style={{ color: theme.text }}>{formData.nombre_contacto || 'No especificado'}</p>
+            <div className="flex items-center gap-3 mt-1">
+              <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                <MessageCircle className="h-3 w-3" />
+                {formData.telefono_contacto || 'Sin WhatsApp'}
+              </span>
+              {formData.email_contacto && (
+                <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                  <Mail className="h-3 w-3" />
+                  {formData.email_contacto}
+                </span>
+              )}
+            </div>
+          </div>
+          {formData.recibir_notificaciones && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ backgroundColor: '#25D36620', color: '#25D366' }}>
+              <Bell className="h-3 w-3" />
+              Notificaciones
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Wizard Step 5: Datos de contacto
+  const wizardStepContacto = (
+    <div className="space-y-4">
+      <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+        <div className="flex items-center gap-2 mb-2">
+          <MessageCircle className="h-5 w-5" style={{ color: theme.primary }} />
+          <span className="font-medium" style={{ color: theme.primary }}>Datos de contacto para seguimiento</span>
+        </div>
+        <p className="text-sm" style={{ color: theme.textSecondary }}>
+          Ingresa tus datos para recibir actualizaciones sobre el estado de tu reclamo por WhatsApp.
+        </p>
+      </div>
+
+      {/* Nombre completo con búsqueda integrada */}
+      <div className="relative">
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          Nombre completo <span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+          {selectedUser ? (
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.primary }} />
+          ) : (
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
+          )}
+          <input
+            type="text"
+            value={formData.nombre_contacto}
+            onChange={(e) => {
+              setFormData({ ...formData, nombre_contacto: e.target.value });
+              handleUserSearch(e.target.value);
+            }}
+            onFocus={() => {
+              if (formData.nombre_contacto.length >= 2 && !selectedUser) {
+                handleUserSearch(formData.nombre_contacto);
+              }
+            }}
+            placeholder="Buscar o escribir nombre..."
+            className="w-full pl-11 pr-10 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              border: `1px solid ${selectedUser ? theme.primary : theme.border}`
+            }}
+          />
+          {(loadingUsers || searchingUsers) && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin" style={{ color: theme.textSecondary }} />
+          )}
+          {selectedUser && !loadingUsers && !searchingUsers && (
+            <button
+              type="button"
+              onClick={clearUserSelection}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-red-500/20 transition-colors"
+              title="Limpiar selección"
+            >
+              <X className="h-4 w-4 text-red-500" />
+            </button>
+          )}
+        </div>
+        {selectedUser ? (
+          <p className="text-xs mt-1" style={{ color: theme.primary }}>
+            Usuario encontrado - datos cargados automáticamente
+          </p>
+        ) : (
+          <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+            Escribí para buscar un vecino o completar manualmente
+          </p>
+        )}
+
+        {/* Resultados de búsqueda */}
+        {showUserResults && userSearchResults.length > 0 && !selectedUser && (
+          <div
+            className="absolute z-50 w-full mt-1 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            {userSearchResults.map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => selectUser(user)}
+                className="w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:opacity-90"
+                style={{ color: theme.text }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.backgroundSecondary}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
+                  <User className="h-4 w-4" style={{ color: theme.primary }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{user.nombre} {user.apellido}</p>
+                  <p className="text-xs truncate" style={{ color: theme.textSecondary }}>
+                    {user.telefono && <span>{user.telefono}</span>}
+                    {user.telefono && user.email && <span> • </span>}
+                    {user.email && <span>{user.email}</span>}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          WhatsApp <span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
+          <input
+            type="tel"
+            value={formData.telefono_contacto}
+            onChange={(e) => setFormData({ ...formData, telefono_contacto: e.target.value })}
+            placeholder="Ej: 11 1234-5678"
+            className="w-full pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+          />
+        </div>
+        <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+          Recibirás notificaciones cuando tu reclamo cambie de estado
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          Email (opcional)
+        </label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
+          <input
+            type="email"
+            value={formData.email_contacto}
+            onChange={(e) => setFormData({ ...formData, email_contacto: e.target.value })}
+            placeholder="Ej: juan@email.com"
+            className="w-full pl-11 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+          />
+        </div>
+      </div>
+
+      <div
+        className="p-4 rounded-xl cursor-pointer transition-all"
+        style={{
+          backgroundColor: formData.recibir_notificaciones ? `${theme.primary}10` : theme.backgroundSecondary,
+          border: `1px solid ${formData.recibir_notificaciones ? theme.primary : theme.border}`,
+        }}
+        onClick={() => setFormData({ ...formData, recibir_notificaciones: !formData.recibir_notificaciones })}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {formData.recibir_notificaciones ? (
+              <Bell className="h-5 w-5" style={{ color: theme.primary }} />
+            ) : (
+              <BellOff className="h-5 w-5" style={{ color: theme.textSecondary }} />
+            )}
+            <div>
+              <p className="font-medium" style={{ color: theme.text }}>
+                Recibir notificaciones por WhatsApp
+              </p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Te avisaremos cuando el reclamo sea asignado, esté en proceso o se resuelva
+              </p>
+            </div>
+          </div>
+          <div
+            className="w-12 h-6 rounded-full p-1 transition-all"
+            style={{
+              backgroundColor: formData.recibir_notificaciones ? theme.primary : theme.border,
+            }}
+          >
+            <div
+              className="w-4 h-4 rounded-full bg-white transition-transform"
+              style={{
+                transform: formData.recibir_notificaciones ? 'translateX(24px)' : 'translateX(0)',
+              }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1045,6 +1476,8 @@ export default function Reclamos() {
     }
   };
 
+
+
   // Función para obtener descripción de categoría
   const getCategoryDescription = (nombre: string) => {
     const key = nombre.toLowerCase();
@@ -1064,9 +1497,10 @@ export default function Reclamos() {
         <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente IA</span>
       </div>
       <div className="flex-1 space-y-3 overflow-y-auto">
-        {/* Contenido dinámico según el paso y la categoría seleccionada */}
+        {/* Contenido dinámico según el paso */}
+
+        {/* Paso 0: Categoría */}
         {wizardStep === 0 && selectedCategoria ? (
-          // Mostrar info de la categoría seleccionada
           <div className="space-y-3">
             <div className="p-3 rounded-lg" style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}>
               <div className="flex items-center gap-2 mb-2">
@@ -1100,52 +1534,242 @@ export default function Reclamos() {
                 </p>
               </div>
             </div>
+          </div>
+        ) : wizardStep === 0 ? (
+          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+            <div className="flex items-start gap-2">
+              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+              <p style={{ color: theme.textSecondary }}>
+                Selecciona la categoría que mejor describa tu problema. Esto nos ayuda a asignarlo al equipo correcto.
+              </p>
+            </div>
+          </div>
+        ) : null}
 
-            {/* Respuesta de la IA */}
-            {aiResponse && (
+        {/* Paso 1: Ubicación */}
+        {wizardStep === 1 && (
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+                <p style={{ color: theme.textSecondary }}>
+                  Escribe la dirección y selecciona del autocompletado. Luego ajusta el punto en el mapa si es necesario.
+                </p>
+              </div>
+            </div>
+            {formData.direccion && (
               <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-                <div className="flex items-start gap-2">
-                  <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-                  <p style={{ color: theme.text }}>{aiResponse}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="h-4 w-4" style={{ color: '#22c55e' }} />
+                  <span className="font-medium" style={{ color: theme.text }}>Ubicación detectada</span>
                 </div>
+                <p style={{ color: theme.textSecondary }}>{formData.direccion}</p>
               </div>
             )}
           </div>
-        ) : (
-          // Mensaje por defecto según el paso
-          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card, color: theme.textSecondary }}>
-            <div className="flex items-start gap-2">
-              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-              <p>
-                {wizardStep === 0 && 'Selecciona la categoría que mejor describa tu problema. Esto nos ayuda a asignarlo al equipo correcto.'}
-                {wizardStep === 1 && 'Marca la ubicación exacta en el mapa para que el equipo pueda encontrar el problema fácilmente.'}
-                {wizardStep === 2 && 'Un título claro y una descripción detallada ayudan a resolver tu reclamo más rápido.'}
-                {wizardStep === 3 && 'Revisa que todos los datos estén correctos antes de enviar.'}
+        )}
+
+        {/* Paso 2: Detalles - Panel con sugerencias basadas en categoría */}
+        {wizardStep === 2 && selectedCategoria && (
+          <div className="space-y-3">
+            {/* Estado inicial: esperando que escriba descripción */}
+            {!formData.descripcion.trim() && !aiSuggestionsLoading && (
+              <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+                  <p style={{ color: theme.textSecondary }}>
+                    Escribí una descripción del problema y te daré sugerencias personalizadas.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Estado: analizando (debounce loading) */}
+            {aiSuggestionsLoading && (
+              <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
+                  <div>
+                    <span className="font-medium text-sm" style={{ color: theme.text }}>Analizando descripción...</span>
+                    <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                      Preparando sugerencias personalizadas
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sugerencias mostradas después del debounce */}
+            {showAISuggestions && formData.descripcion.trim() && (
+              <>
+                <div className="p-3 rounded-lg" style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}10`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wrench className="h-4 w-4" style={{ color: getCategoryColor(selectedCategoria.nombre) }} />
+                    <span className="font-medium text-sm" style={{ color: theme.text }}>Posibles soluciones</span>
+                  </div>
+                  <ul className="space-y-1 text-xs">
+                    {selectedCategoria.nombre.toLowerCase().includes('alumbrado') && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Revisión de conexiones eléctricas</li>
+                        <li style={{ color: theme.textSecondary }}>• Cambio de lámpara o luminaria</li>
+                        <li style={{ color: theme.textSecondary }}>• Reparación de poste o brazo</li>
+                      </>
+                    )}
+                    {(selectedCategoria.nombre.toLowerCase().includes('bache') || selectedCategoria.nombre.toLowerCase().includes('calle')) && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Bacheo con mezcla asfáltica</li>
+                        <li style={{ color: theme.textSecondary }}>• Reparación de calzada</li>
+                        <li style={{ color: theme.textSecondary }}>• Nivelación de terreno</li>
+                      </>
+                    )}
+                    {(selectedCategoria.nombre.toLowerCase().includes('agua') || selectedCategoria.nombre.toLowerCase().includes('cloaca')) && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Reparación de cañerías</li>
+                        <li style={{ color: theme.textSecondary }}>• Destape de conductos</li>
+                        <li style={{ color: theme.textSecondary }}>• Cambio de válvulas</li>
+                      </>
+                    )}
+                    {selectedCategoria.nombre.toLowerCase().includes('arbol') && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Poda de ramas</li>
+                        <li style={{ color: theme.textSecondary }}>• Extracción de árbol seco</li>
+                        <li style={{ color: theme.textSecondary }}>• Tratamiento fitosanitario</li>
+                      </>
+                    )}
+                    {selectedCategoria.nombre.toLowerCase().includes('basura') && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Recolección extraordinaria</li>
+                        <li style={{ color: theme.textSecondary }}>• Limpieza de microbasural</li>
+                        <li style={{ color: theme.textSecondary }}>• Instalación de contenedor</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Timer className="h-4 w-4" style={{ color: '#f59e0b' }} />
+                    <span className="font-medium text-sm" style={{ color: theme.text }}>Tiempo estimado</span>
+                  </div>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>
+                    {selectedCategoria.nombre.toLowerCase().includes('alumbrado') && '24-72 horas para reparación'}
+                    {(selectedCategoria.nombre.toLowerCase().includes('bache') || selectedCategoria.nombre.toLowerCase().includes('calle')) && '3-7 días según complejidad'}
+                    {(selectedCategoria.nombre.toLowerCase().includes('agua') || selectedCategoria.nombre.toLowerCase().includes('cloaca')) && '24-48 horas (urgente)'}
+                    {selectedCategoria.nombre.toLowerCase().includes('arbol') && '5-15 días según riesgo'}
+                    {selectedCategoria.nombre.toLowerCase().includes('basura') && '24-72 horas'}
+                    {!['alumbrado', 'bache', 'calle', 'agua', 'cloaca', 'arbol', 'basura'].some(k => selectedCategoria.nombre.toLowerCase().includes(k)) && '3-10 días según disponibilidad'}
+                  </p>
+                </div>
+
+                {formData.titulo && formData.descripcion && (
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: '#22c55e15', border: '1px solid #22c55e30' }}>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4" style={{ color: '#22c55e' }} />
+                      <span className="font-medium text-sm" style={{ color: '#22c55e' }}>Reclamo bien detallado</span>
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                      Los reclamos con buena descripción se resuelven hasta 40% más rápido.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Paso 3: Contacto */}
+        {wizardStep === 3 && (
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: '#25D36610', border: '1px solid #25D36630' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <MessageCircle className="h-4 w-4" style={{ color: '#25D366' }} />
+                <span className="font-medium" style={{ color: '#25D366' }}>WhatsApp</span>
+              </div>
+              <p style={{ color: theme.textSecondary }}>
+                Te notificaremos automáticamente cuando:
               </p>
+              <ul className="mt-2 space-y-1 text-xs" style={{ color: theme.textSecondary }}>
+                <li>• Se asigne un empleado a tu reclamo</li>
+                <li>• El trabajo esté en proceso</li>
+                <li>• Tu reclamo sea resuelto</li>
+              </ul>
+            </div>
+
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+              <div className="flex items-start gap-2">
+                <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: '#f59e0b' }} />
+                <p style={{ color: theme.textSecondary }}>
+                  Usa el formato <strong style={{ color: theme.text }}>11 1234-5678</strong> para tu número de WhatsApp (código de área + número).
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 4: Resumen */}
+        {wizardStep === 4 && (
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="h-4 w-4" style={{ color: theme.primary }} />
+                <span className="font-medium text-sm" style={{ color: theme.text }}>Casi listo</span>
+              </div>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Revisa que toda la información sea correcta y presiona "Enviar Reclamo".
+              </p>
+            </div>
+
+            <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+              <p className="font-medium mb-2" style={{ color: theme.text }}>¿Qué sigue?</p>
+              <ol className="space-y-2 text-xs" style={{ color: theme.textSecondary }}>
+                <li className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0">1</span>
+                  Tu reclamo será registrado
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0">2</span>
+                  Se asignará al equipo correspondiente
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center flex-shrink-0">3</span>
+                  Recibirás notificaciones del avance
+                </li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {/* Respuesta de la IA */}
+        {aiResponse && (
+          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <div className="flex items-start gap-2">
+              <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+              <p style={{ color: theme.text }}>{aiResponse}</p>
             </div>
           </div>
         )}
       </div>
-      {/* Input para preguntar - solo habilitado cuando hay categoría seleccionada */}
+
+      {/* Input para preguntar */}
       <div className="mt-4 p-3 rounded-lg flex items-center gap-2" style={{ backgroundColor: theme.card }}>
         <input
           type="text"
           value={aiQuestion}
           onChange={(e) => setAiQuestion(e.target.value)}
           onKeyPress={handleAiKeyPress}
-          placeholder={selectedCategoria ? "Pregunta algo sobre esta categoría..." : "Selecciona una categoría primero"}
-          disabled={!selectedCategoria || aiLoading}
+          placeholder="Hacé una pregunta..."
+          disabled={aiLoading}
           className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
           style={{ color: theme.text }}
         />
         <button
           onClick={askAI}
-          disabled={!selectedCategoria || !aiQuestion.trim() || aiLoading}
+          disabled={!aiQuestion.trim() || aiLoading}
           className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
           style={{ backgroundColor: theme.primary, color: 'white' }}
         >
           {aiLoading ? (
-            <div className="h-3 w-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
             <Send className="h-3 w-3" />
           )}
@@ -1158,6 +1782,7 @@ export default function Reclamos() {
     { id: 'categoria', title: 'Categoría', description: 'Selecciona el tipo de problema', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: !!formData.categoria_id },
     { id: 'ubicacion', title: 'Ubicación', description: 'Indica dónde está el problema', icon: <MapPin className="h-5 w-5" />, content: wizardStep2, isValid: !!formData.direccion },
     { id: 'detalles', title: 'Detalles', description: 'Describe el problema', icon: <FileText className="h-5 w-5" />, content: wizardStep3, isValid: !!formData.titulo && !!formData.descripcion },
+    { id: 'contacto', title: 'Contacto', description: 'Tus datos para seguimiento', icon: <Phone className="h-5 w-5" />, content: wizardStepContacto, isValid: !!formData.nombre_contacto && !!formData.telefono_contacto },
     { id: 'resumen', title: 'Confirmar', description: 'Revisa y envía', icon: <CheckCircle2 className="h-5 w-5" />, content: wizardStep4, isValid: true },
   ];
 
@@ -1250,37 +1875,14 @@ export default function Reclamos() {
 
     return (
       <div className="space-y-4">
-        {/* Estado y fecha en header compacto */}
-        <div className="flex items-center justify-between py-2">
-          <span
-            className="px-3 py-1.5 text-sm font-semibold rounded-full"
-            style={{
-              backgroundColor: estadoColors[selectedReclamo.estado].bg,
-              color: estadoColors[selectedReclamo.estado].text
-            }}
-          >
-            {estadoLabels[selectedReclamo.estado]}
-          </span>
-          <span className="text-xs font-medium" style={{ color: theme.textSecondary }}>
-            {new Date(selectedReclamo.created_at).toLocaleString()}
-          </span>
-        </div>
-
-        {/* Información básica con ABMFieldGrid */}
-        <ABMFieldGrid columns={2}>
+        {/* Zona si existe */}
+        {selectedReclamo.zona && (
           <ABMField
-            label="Categoría"
-            value={selectedReclamo.categoria.nombre}
-            icon={<Tag className="h-4 w-4" style={{ color: theme.textSecondary }} />}
+            label="Zona"
+            value={selectedReclamo.zona.nombre}
+            icon={<MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />}
           />
-          {selectedReclamo.zona && (
-            <ABMField
-              label="Zona"
-              value={selectedReclamo.zona.nombre}
-              icon={<MapPin className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-            />
-          )}
-        </ABMFieldGrid>
+        )}
 
         <ABMField
           label="Dirección"
@@ -1724,6 +2326,45 @@ export default function Reclamos() {
     );
   };
 
+  // Renderizar sticky header para el Sheet (estado + categoría)
+  const renderSheetStickyHeader = () => {
+    if (!selectedReclamo) return null;
+
+    return (
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          {/* Estado con badge */}
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-full"
+            style={{
+              backgroundColor: estadoColors[selectedReclamo.estado].bg,
+              color: estadoColors[selectedReclamo.estado].text
+            }}
+          >
+            {getEstadoIcon(selectedReclamo.estado)}
+            {estadoLabels[selectedReclamo.estado]}
+          </span>
+          {/* Categoría */}
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+            style={{
+              backgroundColor: `${theme.primary}15`,
+              color: theme.primary,
+              border: `1px solid ${theme.primary}30`
+            }}
+          >
+            <Tag className="h-3.5 w-3.5" />
+            {selectedReclamo.categoria.nombre}
+          </span>
+        </div>
+        {/* Fecha */}
+        <span className="text-xs font-medium whitespace-nowrap" style={{ color: theme.textSecondary }}>
+          {new Date(selectedReclamo.created_at).toLocaleString()}
+        </span>
+      </div>
+    );
+  };
+
   // Renderizar footer de acciones para el Sheet
   const renderSheetFooter = () => {
     if (!selectedReclamo) return null;
@@ -1813,12 +2454,12 @@ export default function Reclamos() {
         sheetDescription=""
         onSheetClose={() => {}}
         extraFilters={
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 w-full">
             {/* Botón Todos */}
             <button
               onClick={() => setFiltroEstado('')}
               title="Todos"
-              className="p-2 rounded-lg transition-all duration-200"
+              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
               style={{
                 background: filtroEstado === ''
                   ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}80 100%)`
@@ -1834,7 +2475,7 @@ export default function Reclamos() {
             <button
               onClick={() => setFiltroEstado(filtroEstado === 'nuevo' ? '' : 'nuevo')}
               title="Nuevos"
-              className="p-2 rounded-lg transition-all duration-200"
+              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
               style={{
                 background: filtroEstado === 'nuevo'
                   ? `linear-gradient(135deg, ${estadoColors.nuevo.bg} 0%, ${estadoColors.nuevo.bg}80 100%)`
@@ -1850,7 +2491,7 @@ export default function Reclamos() {
             <button
               onClick={() => setFiltroEstado(filtroEstado === 'asignado' ? '' : 'asignado')}
               title="Asignados"
-              className="p-2 rounded-lg transition-all duration-200"
+              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
               style={{
                 background: filtroEstado === 'asignado'
                   ? 'linear-gradient(135deg, rgb(74 79 160 / 0%) 0%, rgba(59, 130, 246, 0.5) 100%)'
@@ -1866,7 +2507,7 @@ export default function Reclamos() {
             <button
               onClick={() => setFiltroEstado(filtroEstado === 'en_proceso' ? '' : 'en_proceso')}
               title="En Proceso"
-              className="p-2 rounded-lg transition-all duration-200"
+              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
               style={{
                 background: filtroEstado === 'en_proceso'
                   ? `linear-gradient(135deg, ${estadoColors.en_proceso.bg} 0%, ${estadoColors.en_proceso.bg}80 100%)`
@@ -1882,7 +2523,7 @@ export default function Reclamos() {
             <button
               onClick={() => setFiltroEstado(filtroEstado === 'resuelto' ? '' : 'resuelto')}
               title="Resueltos"
-              className="p-2 rounded-lg transition-all duration-200"
+              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
               style={{
                 background: filtroEstado === 'resuelto'
                   ? `linear-gradient(135deg, ${estadoColors.resuelto.bg} 0%, ${estadoColors.resuelto.bg}80 100%)`
@@ -1898,7 +2539,7 @@ export default function Reclamos() {
             <button
               onClick={() => setFiltroEstado(filtroEstado === 'rechazado' ? '' : 'rechazado')}
               title="Rechazados"
-              className="p-2 rounded-lg transition-all duration-200"
+              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
               style={{
                 background: filtroEstado === 'rechazado'
                   ? `linear-gradient(135deg, ${estadoColors.rechazado.bg} 0%, ${estadoColors.rechazado.bg}80 100%)`
@@ -1910,6 +2551,61 @@ export default function Reclamos() {
             >
               <XCircle className="h-4 w-4" />
             </button>
+          </div>
+        }
+        secondaryFilters={
+          <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            {/* Botón Todas las categorías */}
+            <button
+              onClick={() => setFiltroCategoria(null)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0"
+              style={{
+                background: filtroCategoria === null
+                  ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
+                  : theme.backgroundSecondary,
+                border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
+                color: filtroCategoria === null ? '#ffffff' : theme.textSecondary,
+              }}
+            >
+              <Tag className="h-4 w-4" />
+              <span className="text-sm font-medium whitespace-nowrap">Todas</span>
+            </button>
+            {/* Botones por categoría */}
+            {categorias.map((cat) => {
+              const isSelected = filtroCategoria === cat.id;
+              const catColor = getCategoryColor(cat.nombre);
+              const count = reclamos.filter(r => r.categoria.id === cat.id).length;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0"
+                  style={{
+                    background: isSelected
+                      ? `linear-gradient(135deg, ${catColor} 0%, ${catColor}80 100%)`
+                      : theme.backgroundSecondary,
+                    border: `1px solid ${isSelected ? catColor : theme.border}`,
+                    color: isSelected ? '#ffffff' : theme.textSecondary,
+                  }}
+                >
+                  <span style={{ color: isSelected ? '#ffffff' : catColor }}>
+                    {getCategoryIcon(cat.nombre)}
+                  </span>
+                  <span className="text-sm font-medium whitespace-nowrap">{cat.nombre}</span>
+                  {count > 0 && (
+                    <span
+                      className="text-xs px-1.5 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : `${catColor}20`,
+                        color: isSelected ? '#ffffff' : catColor,
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         }
         tableView={
@@ -2059,6 +2755,7 @@ export default function Reclamos() {
         onClose={closeSheet}
         title={`Reclamo #${selectedReclamo?.id || ''}`}
         description={selectedReclamo?.titulo}
+        stickyHeader={renderSheetStickyHeader()}
         stickyFooter={renderSheetFooter()}
       >
         {renderViewContent()}
@@ -2076,6 +2773,11 @@ export default function Reclamos() {
         loading={saving}
         completeLabel="Enviar Reclamo"
         aiPanel={wizardAIPanel}
+        headerBadge={selectedCategoria ? {
+          icon: getCategoryIcon(selectedCategoria.nombre),
+          label: selectedCategoria.nombre,
+          color: getCategoryColor(selectedCategoria.nombre),
+        } : undefined}
       />
     </>
   );

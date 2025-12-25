@@ -92,7 +92,7 @@ export interface Reclamo {
   updated_at?: string;
   categoria: { id: number; nombre: string; icono?: string; color?: string };
   zona?: { id: number; nombre: string; codigo?: string };
-  creador: { id: number; nombre: string; apellido: string; email: string };
+  creador: { id: number; nombre: string; apellido: string; email: string; telefono?: string };
   empleado_asignado?: { id: number; nombre: string; apellido?: string; especialidad?: string };
   documentos: Documento[];
 }

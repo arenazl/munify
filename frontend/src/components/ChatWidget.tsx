@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { chatApi } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
+import { parseMarkdown } from './parseMarkdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -10,6 +12,12 @@ interface Message {
 
 export function ChatWidget() {
   const { theme } = useTheme();
+  const navigate = useNavigate();
+
+  const handleLinkClick = (url: string) => {
+    setIsOpen(false);
+    navigate(url);
+  };
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -143,7 +151,7 @@ export function ChatWidget() {
                   color: msg.role === 'user' ? '#ffffff' : theme.text
                 }}
               >
-                {msg.content}
+                {msg.role === 'assistant' ? parseMarkdown(msg.content, handleLinkClick, theme.primary) : msg.content}
               </div>
               {msg.role === 'user' && (
                 <div

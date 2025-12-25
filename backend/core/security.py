@@ -56,11 +56,19 @@ async def get_current_user(
 
 def require_roles(allowed_roles: list):
     async def role_checker(current_user = Depends(get_current_user)):
-        if current_user.rol not in allowed_roles:
+        # Debug: mostrar rol del usuario
+        user_rol = current_user.rol.value if hasattr(current_user.rol, 'value') else str(current_user.rol)
+        print(f"[AUTH] Usuario: {current_user.email}, Rol: {user_rol}, Roles permitidos: {allowed_roles}", flush=True)
+
+        # Comparar tanto con el enum como con el string
+        rol_str = current_user.rol.value if hasattr(current_user.rol, 'value') else str(current_user.rol)
+        if rol_str not in allowed_roles and current_user.rol not in allowed_roles:
+            print(f"[AUTH] DENEGADO - rol '{rol_str}' no está en {allowed_roles}", flush=True)
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No tienes permisos para realizar esta acción"
             )
+        print(f"[AUTH] PERMITIDO", flush=True)
         return current_user
     return role_checker
 

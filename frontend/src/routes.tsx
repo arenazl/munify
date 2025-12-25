@@ -21,6 +21,8 @@ import Configuracion from './pages/Configuracion';
 import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamo from './pages/NuevoReclamo';
+import WhatsAppConfig from './pages/WhatsAppConfig';
+import Gamificacion from './pages/Gamificacion';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -30,6 +32,17 @@ import DemoMinimal from './pages/demos/DemoMinimal';
 import DemoBento from './pages/demos/DemoBento';
 import DemoCyberpunk from './pages/demos/DemoCyberpunk';
 
+// Mobile App para ciudadanos
+import MobileLayout from './layouts/MobileLayout';
+import {
+  MobileHome,
+  MobileMisReclamos,
+  MobilePerfil,
+  MobileLogin,
+  MobileRegister,
+  MobileNuevoReclamo,
+} from './pages/mobile';
+
 export const router = createBrowserRouter([
   // === DEMOS DE DISEÑO ===
   { path: '/demos', element: <DemosIndex /> },
@@ -38,6 +51,20 @@ export const router = createBrowserRouter([
   { path: '/demos/minimal', element: <DemoMinimal /> },
   { path: '/demos/bento', element: <DemoBento /> },
   { path: '/demos/cyberpunk', element: <DemoCyberpunk /> },
+
+  // === APP MOBILE PARA CIUDADANOS ===
+  {
+    path: '/app',
+    element: <MobileLayout />,
+    children: [
+      { index: true, element: <MobileHome /> },
+      { path: 'mis-reclamos', element: <MobileMisReclamos /> },
+      { path: 'perfil', element: <MobilePerfil /> },
+    ],
+  },
+  { path: '/app/login', element: <MobileLogin /> },
+  { path: '/app/register', element: <MobileRegister /> },
+  { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
 
   // === RUTAS PÚBLICAS ===
   { path: '/bienvenido', element: <Landing /> },
@@ -70,6 +97,9 @@ export const router = createBrowserRouter([
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },
 
+      // Logros/Gamificación (para todos los usuarios autenticados)
+      { path: 'logros', element: <Gamificacion /> },
+
       // Tablero Empleado
       {
         path: 'tablero',
@@ -83,7 +113,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'usuarios',
-        element: <ProtectedRoute roles={['admin']}><Usuarios /></ProtectedRoute>
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Usuarios /></ProtectedRoute>
       },
       {
         path: 'categorias',
@@ -104,6 +134,10 @@ export const router = createBrowserRouter([
       {
         path: 'sla',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><SLA /></ProtectedRoute>
+      },
+      {
+        path: 'whatsapp',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><WhatsAppConfig /></ProtectedRoute>
       },
     ],
   },

@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map, Users,
-  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle
+  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle, Trophy, MessageCircle
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -55,6 +55,13 @@ export const getNavigation = (userRole: string) => {
       description: 'Ver reclamos en el mapa'
     },
     {
+      name: 'Logros',
+      href: '/logros',
+      icon: Trophy,
+      show: true,
+      description: 'Mis puntos, badges y leaderboard'
+    },
+    {
       name: 'Tablero',
       href: '/tablero',
       icon: Wrench,
@@ -74,7 +81,7 @@ export const getNavigation = (userRole: string) => {
       name: 'Usuarios',
       href: '/usuarios',
       icon: Users,
-      show: isAdmin,
+      show: isAdminOrSupervisor,
       description: 'Gestionar usuarios'
     },
     {
@@ -104,6 +111,13 @@ export const getNavigation = (userRole: string) => {
       icon: FileDown,
       show: isAdminOrSupervisor,
       description: 'Exportar informes CSV'
+    },
+    {
+      name: 'WhatsApp',
+      href: '/whatsapp',
+      icon: MessageCircle,
+      show: isAdminOrSupervisor,
+      description: 'Configurar WhatsApp Business'
     },
   ].filter(item => item.show);
 };

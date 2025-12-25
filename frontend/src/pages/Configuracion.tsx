@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2 } from 'lucide-react';
+import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, Image } from 'lucide-react';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 // Claves que se muestran en la sección especial del Municipio
 const MUNICIPIO_KEYS = ['nombre_municipio', 'direccion_municipio', 'latitud_municipio', 'longitud_municipio', 'telefono_contacto'];
@@ -32,8 +33,23 @@ interface AddressSuggestion {
   lon: string;
 }
 
+// Colores predefinidos para branding
+const BRAND_COLORS = [
+  { name: 'Azul', value: '#3b82f6' },
+  { name: 'Indigo', value: '#6366f1' },
+  { name: 'Celeste', value: '#0ea5e9' },
+  { name: 'Verde', value: '#22c55e' },
+  { name: 'Esmeralda', value: '#10b981' },
+  { name: 'Rojo', value: '#ef4444' },
+  { name: 'Naranja', value: '#f97316' },
+  { name: 'Rosa', value: '#ec4899' },
+  { name: 'Violeta', value: '#8b5cf6' },
+  { name: 'Gris', value: '#6b7280' },
+];
+
 export default function Configuracion() {
   const { theme } = useTheme();
+  const { municipioActual, loadMunicipios } = useAuth();
   const [configs, setConfigs] = useState<Config[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -41,6 +57,15 @@ export default function Configuracion() {
   const [modified, setModified] = useState<Record<string, boolean>>({});
   const [, setMunicipios] = useState<Municipio[]>([]);
   const [, setConfigMunicipioScope] = useState<Record<string, number | null>>({});
+
+  // Branding states
+  const [brandingLoading, setBrandingLoading] = useState(false);
+  const [colorPrimario, setColorPrimario] = useState(municipioActual?.color_primario || '#3b82f6');
+  const [colorSecundario, setColorSecundario] = useState(municipioActual?.color_secundario || '#1e40af');
+  const [logoUrl, setLogoUrl] = useState(municipioActual?.logo_url || '');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados para autocompletado de municipio (nombre)
   const [municipioSuggestions, setMunicipioSuggestions] = useState<AddressSuggestion[]>([]);
@@ -58,6 +83,89 @@ export default function Configuracion() {
     fetchConfigs();
     fetchMunicipios();
   }, []);
+
+  // Actualizar estados de branding cuando cambia el municipio
+  useEffect(() => {
+    if (municipioActual) {
+      setColorPrimario(municipioActual.color_primario || '#3b82f6');
+      setColorSecundario(municipioActual.color_secundario || '#1e40af');
+      setLogoUrl(municipioActual.logo_url || '');
+    }
+  }, [municipioActual]);
+
+  // Handle logo file selection
+  const handleLogoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor selecciona una imagen válida');
+        return;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('La imagen no debe superar los 2MB');
+        return;
+      }
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Generar color secundario basado en el primario
+  const generateSecondaryColor = (primary: string) => {
+    // Oscurecer el color primario para el secundario
+    const hex = primary.replace('#', '');
+    const r = Math.max(0, parseInt(hex.slice(0, 2), 16) - 40);
+    const g = Math.max(0, parseInt(hex.slice(2, 4), 16) - 40);
+    const b = Math.max(0, parseInt(hex.slice(4, 6), 16) - 40);
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  };
+
+  // Guardar branding
+  const handleSaveBranding = async () => {
+    if (!municipioActual) {
+      toast.error('No hay municipio seleccionado');
+      return;
+    }
+
+    setBrandingLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('color_primario', colorPrimario);
+      formData.append('color_secundario', colorSecundario);
+
+      if (logoFile) {
+        formData.append('logo', logoFile);
+      }
+
+      const response = await municipiosApi.updateBranding(municipioActual.id, formData);
+
+      if (response.data) {
+        toast.success('Branding actualizado correctamente');
+        // Actualizar logo_url con la respuesta del servidor
+        if (response.data.logo_url) {
+          setLogoUrl(response.data.logo_url);
+        }
+        // Recargar municipios para reflejar cambios
+        await loadMunicipios();
+        setLogoFile(null);
+        setLogoPreview(null);
+      }
+    } catch (error) {
+      toast.error('Error al guardar branding');
+      console.error('Error:', error);
+    } finally {
+      setBrandingLoading(false);
+    }
+  };
+
+  const hasBrandingChanges =
+    colorPrimario !== (municipioActual?.color_primario || '#3b82f6') ||
+    colorSecundario !== (municipioActual?.color_secundario || '#1e40af') ||
+    logoFile !== null;
 
   const fetchConfigs = async () => {
     try {
@@ -540,6 +648,194 @@ export default function Configuracion() {
               {saving === 'municipio' ? 'Guardando...' : 'Guardar datos del municipio'}
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Sección Branding y Personalización */}
+      <div
+        className="rounded-xl p-5"
+        style={{
+          backgroundColor: theme.card,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${theme.primary}20` }}
+          >
+            <Palette className="h-5 w-5" style={{ color: theme.primary }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: theme.text }}>
+              Branding y Personalización
+            </h2>
+            <p className="text-sm" style={{ color: theme.textSecondary }}>
+              Logo y colores del municipio
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Logo del Municipio */}
+          <div>
+            <label className="block text-sm font-medium mb-3" style={{ color: theme.text }}>
+              Logo del Municipio
+            </label>
+            <div className="flex items-start gap-4">
+              {/* Preview del logo */}
+              <div
+                className="w-24 h-24 rounded-xl flex items-center justify-center overflow-hidden"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `2px dashed ${theme.border}`,
+                }}
+              >
+                {logoPreview || logoUrl ? (
+                  <img
+                    src={logoPreview || logoUrl}
+                    alt="Logo municipio"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <Image className="h-8 w-8" style={{ color: theme.textSecondary }} />
+                )}
+              </div>
+
+              {/* Botones de upload */}
+              <div className="flex-1 space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoSelect}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-80"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.text,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <Upload className="h-4 w-4" />
+                  Subir logo
+                </button>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>
+                  PNG, JPG o SVG. Máximo 2MB.
+                </p>
+                {logoFile && (
+                  <p className="text-xs" style={{ color: theme.primary }}>
+                    Archivo seleccionado: {logoFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Colores del Municipio */}
+          <div>
+            <label className="block text-sm font-medium mb-3" style={{ color: theme.text }}>
+              Colores Institucionales
+            </label>
+
+            {/* Color primario */}
+            <div className="mb-4">
+              <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>
+                Color primario
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {BRAND_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => {
+                      setColorPrimario(color.value);
+                      setColorSecundario(generateSecondaryColor(color.value));
+                    }}
+                    className="w-8 h-8 rounded-lg transition-all duration-200 hover:scale-110"
+                    style={{
+                      backgroundColor: color.value,
+                      boxShadow: colorPrimario === color.value
+                        ? `0 0 0 2px ${theme.card}, 0 0 0 4px ${color.value}`
+                        : 'none',
+                    }}
+                    title={color.name}
+                  />
+                ))}
+                {/* Color personalizado */}
+                <div className="relative">
+                  <input
+                    type="color"
+                    value={colorPrimario}
+                    onChange={(e) => {
+                      setColorPrimario(e.target.value);
+                      setColorSecundario(generateSecondaryColor(e.target.value));
+                    }}
+                    className="w-8 h-8 rounded-lg cursor-pointer border-0"
+                    style={{ backgroundColor: colorPrimario }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Preview de colores */}
+            <div
+              className="p-3 rounded-lg flex items-center gap-3"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+            >
+              <div
+                className="w-12 h-12 rounded-lg flex items-center justify-center"
+                style={{ background: `linear-gradient(135deg, ${colorPrimario} 0%, ${colorSecundario} 100%)` }}
+              >
+                <Building2 className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-medium" style={{ color: theme.text }}>
+                  Vista previa
+                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span
+                    className="w-4 h-4 rounded"
+                    style={{ backgroundColor: colorPrimario }}
+                  />
+                  <span className="text-xs" style={{ color: theme.textSecondary }}>
+                    {colorPrimario}
+                  </span>
+                  <span
+                    className="w-4 h-4 rounded"
+                    style={{ backgroundColor: colorSecundario }}
+                  />
+                  <span className="text-xs" style={{ color: theme.textSecondary }}>
+                    {colorSecundario}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Botón guardar branding */}
+        <div className="pt-4 mt-4 border-t" style={{ borderColor: theme.border }}>
+          <button
+            onClick={handleSaveBranding}
+            disabled={brandingLoading || !hasBrandingChanges}
+            className="w-full py-3 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2"
+            style={{
+              background: hasBrandingChanges
+                ? `linear-gradient(135deg, ${colorPrimario} 0%, ${colorSecundario} 100%)`
+                : theme.backgroundSecondary,
+              color: hasBrandingChanges ? '#ffffff' : theme.textSecondary,
+            }}
+          >
+            {brandingLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            {brandingLoading ? 'Guardando...' : 'Guardar branding'}
+          </button>
         </div>
       </div>
 

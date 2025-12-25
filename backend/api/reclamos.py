@@ -14,13 +14,127 @@ from models.historial import HistorialReclamo
 from models.documento import Documento
 from models.user import User
 from models.enums import EstadoReclamo, RolUsuario
+from models.whatsapp_config import WhatsAppConfig
 from schemas.reclamo import (
     ReclamoCreate, ReclamoUpdate, ReclamoResponse,
     ReclamoAsignar, ReclamoRechazar, ReclamoResolver
 )
 from schemas.historial import HistorialResponse
+from services.gamificacion_service import GamificacionService
 
 router = APIRouter()
+
+
+# ===========================================
+# HELPER: NOTIFICACIONES WHATSAPP AUTOMÁTICAS
+# ===========================================
+
+async def enviar_notificacion_whatsapp(
+    db: AsyncSession,
+    reclamo: Reclamo,
+    tipo_notificacion: str,
+    municipio_id: int
+):
+    """
+    Envía notificación WhatsApp si está configurado y el usuario tiene teléfono.
+    tipo_notificacion: 'reclamo_recibido', 'reclamo_asignado', 'cambio_estado', 'reclamo_resuelto'
+    """
+    print(f"[WhatsApp] Iniciando notificacion: {tipo_notificacion} para reclamo #{reclamo.id}, municipio {municipio_id}")
+
+    try:
+        # Obtener configuración WhatsApp del municipio
+        result = await db.execute(
+            select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == municipio_id)
+        )
+        config = result.scalar_one_or_none()
+
+        if not config:
+            print(f"[WhatsApp] No hay config para municipio {municipio_id}")
+            return
+
+        if not config.habilitado:
+            print(f"[WhatsApp] WhatsApp deshabilitado para municipio {municipio_id}")
+            return
+
+        # Verificar si este tipo de notificación está habilitado
+        notif_habilitada = {
+            'reclamo_recibido': config.notificar_reclamo_recibido,
+            'reclamo_asignado': config.notificar_reclamo_asignado,
+            'cambio_estado': config.notificar_cambio_estado,
+            'reclamo_resuelto': config.notificar_reclamo_resuelto,
+        }.get(tipo_notificacion, False)
+
+        if not notif_habilitada:
+            print(f"[WhatsApp] Notificacion '{tipo_notificacion}' deshabilitada en config")
+            return
+
+        # Obtener usuario creador del reclamo
+        result = await db.execute(
+            select(User).where(User.id == reclamo.creador_id)
+        )
+        user = result.scalar_one_or_none()
+
+        if not user:
+            print(f"[WhatsApp] Usuario creador no encontrado (id={reclamo.creador_id})")
+            return
+
+        if not user.telefono:
+            print(f"[WhatsApp] Usuario {user.email} no tiene telefono registrado")
+            return
+
+        print(f"[WhatsApp] Enviando a {user.telefono} ({user.email})")
+
+        # Importar función de envío (evitar import circular)
+        from api.whatsapp import send_whatsapp_message_with_config
+
+        # Preparar mensaje según tipo
+        estado_texto = reclamo.estado.value.replace('_', ' ').title() if reclamo.estado else "Desconocido"
+
+        plantillas = {
+            'reclamo_recibido': (
+                f"✅ *Reclamo Recibido*\n\n"
+                f"Tu reclamo #{reclamo.id} ha sido registrado.\n\n"
+                f"📝 *{reclamo.titulo}*\n\n"
+                f"Te notificaremos cuando haya actualizaciones."
+            ),
+            'reclamo_asignado': (
+                f"👤 *Reclamo Asignado*\n\n"
+                f"Tu reclamo #{reclamo.id} ha sido asignado a un empleado.\n\n"
+                f"📝 *{reclamo.titulo}*\n\n"
+                f"Pronto comenzarán a trabajar en él."
+            ),
+            'cambio_estado': (
+                f"🔄 *Actualización de Reclamo*\n\n"
+                f"Tu reclamo #{reclamo.id} ha cambiado a: *{estado_texto}*\n\n"
+                f"📝 *{reclamo.titulo}*"
+            ),
+            'reclamo_resuelto': (
+                f"✅ *¡Reclamo Resuelto!*\n\n"
+                f"Tu reclamo #{reclamo.id} ha sido resuelto.\n\n"
+                f"📝 *{reclamo.titulo}*\n\n"
+                f"¡Gracias por tu paciencia!"
+            ),
+        }
+
+        mensaje = plantillas.get(tipo_notificacion, "")
+        if not mensaje:
+            return
+
+        # Enviar mensaje
+        message_id = await send_whatsapp_message_with_config(
+            config=config,
+            to=user.telefono,
+            message=mensaje,
+            db=db,
+            tipo_mensaje=tipo_notificacion,
+            usuario_id=user.id,
+            reclamo_id=reclamo.id
+        )
+        print(f"[WhatsApp] OK! Mensaje enviado (id={message_id})")
+
+    except Exception as e:
+        # No fallar si hay error en WhatsApp, solo loguear
+        print(f"[WhatsApp] ERROR: {e}")
 
 
 def get_effective_municipio_id(request: Request, current_user: User) -> int:
@@ -156,6 +270,12 @@ async def cambiar_estado_reclamo_drag(
 
     await db.commit()
 
+    # Notificación WhatsApp: cambio de estado o resuelto
+    if estado_enum == EstadoReclamo.RESUELTO:
+        await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
+    else:
+        await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
+
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
 
@@ -197,8 +317,32 @@ async def create_reclamo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Actualizar datos de contacto del usuario si se proporcionan
+    if data.nombre_contacto or data.telefono_contacto or data.email_contacto:
+        if data.nombre_contacto:
+            # Separar nombre y apellido si viene con espacio
+            partes = data.nombre_contacto.strip().split(' ', 1)
+            current_user.nombre = partes[0]
+            if len(partes) > 1:
+                current_user.apellido = partes[1]
+        if data.telefono_contacto:
+            current_user.telefono = data.telefono_contacto
+        if data.email_contacto and data.email_contacto != current_user.email:
+            # Solo actualizar email si es diferente (y válido)
+            # El email es unique, así que verificamos que no exista otro usuario con ese email
+            existing = await db.execute(
+                select(User).where(User.email == data.email_contacto, User.id != current_user.id)
+            )
+            if not existing.scalar_one_or_none():
+                current_user.email = data.email_contacto
+
+    # Extraer solo los campos del reclamo (excluyendo datos de contacto)
+    reclamo_data = data.model_dump(exclude={
+        'nombre_contacto', 'telefono_contacto', 'email_contacto', 'recibir_notificaciones'
+    })
+
     reclamo = Reclamo(
-        **data.model_dump(),
+        **reclamo_data,
         creador_id=current_user.id,
         municipio_id=current_user.municipio_id,
         estado=EstadoReclamo.NUEVO
@@ -217,6 +361,18 @@ async def create_reclamo(
     db.add(historial)
 
     await db.commit()
+
+    # Gamificación: otorgar puntos por crear reclamo
+    try:
+        puntos, badges = await GamificacionService.procesar_reclamo_creado(
+            db, reclamo, current_user
+        )
+    except Exception as e:
+        # No fallar si hay error en gamificación
+        pass
+
+    # Notificación WhatsApp: reclamo recibido
+    await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
 
     # Recargar con relaciones
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo.id))
@@ -297,6 +453,9 @@ async def asignar_reclamo(
 
     await db.commit()
 
+    # Notificación WhatsApp: reclamo asignado
+    await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_asignado', current_user.municipio_id)
+
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
 
@@ -332,6 +491,9 @@ async def iniciar_reclamo(
     db.add(historial)
 
     await db.commit()
+
+    # Notificación WhatsApp: cambio de estado (en proceso)
+    await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -372,6 +534,16 @@ async def resolver_reclamo(
     db.add(historial)
 
     await db.commit()
+
+    # Gamificación: otorgar puntos al creador por reclamo resuelto
+    try:
+        await GamificacionService.procesar_reclamo_resuelto(db, reclamo)
+    except Exception as e:
+        # No fallar si hay error en gamificación
+        pass
+
+    # Notificación WhatsApp: reclamo resuelto
+    await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()

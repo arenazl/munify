@@ -12,6 +12,12 @@ export interface WizardStep {
   isValid?: boolean;
 }
 
+interface HeaderBadge {
+  icon: ReactNode;
+  label: string;
+  color: string;
+}
+
 interface WizardModalProps {
   open: boolean;
   onClose: () => void;
@@ -23,6 +29,7 @@ interface WizardModalProps {
   loading?: boolean;
   completeLabel?: string;
   aiPanel?: ReactNode;
+  headerBadge?: HeaderBadge;
 }
 
 export function WizardModal({
@@ -36,6 +43,7 @@ export function WizardModal({
   loading = false,
   completeLabel = 'Finalizar',
   aiPanel,
+  headerBadge,
 }: WizardModalProps) {
   const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
@@ -120,7 +128,7 @@ export function WizardModal({
         }
         .wizard-modal-content {
           width: 100%;
-          max-width: 900px;
+          max-width: ${aiPanel ? '1200px' : '900px'};
           max-height: calc(100vh - 48px);
           margin: 0 !important;
           display: flex;
@@ -130,6 +138,29 @@ export function WizardModal({
           transform: ${isVisible ? 'scale(1)' : 'scale(0.95)'};
           opacity: ${isVisible ? 1 : 0};
           transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        .wizard-main-layout {
+          display: flex;
+          flex: 1;
+          overflow: hidden;
+        }
+        .wizard-content-area {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+        .wizard-ai-panel {
+          width: 320px;
+          border-left: 1px solid ${theme.border};
+          background-color: ${theme.backgroundSecondary};
+          overflow-y: auto;
+          display: none;
+        }
+        @media (min-width: 1024px) {
+          .wizard-ai-panel {
+            display: block;
+          }
         }
         .wizard-slide-right {
           animation: slideRight 0.3s ease-out;
@@ -183,13 +214,46 @@ export function WizardModal({
             />
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, color: theme.text, margin: 0 }}>
-                  {title}
-                </h2>
-                <p style={{ fontSize: '14px', color: theme.textSecondary, margin: '4px 0 0 0' }}>
-                  Paso {currentStep + 1} de {steps.length}
-                </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: theme.text, margin: 0 }}>
+                    {title}
+                  </h2>
+                  <p style={{ fontSize: '14px', color: theme.textSecondary, margin: '4px 0 0 0' }}>
+                    Paso {currentStep + 1} de {steps.length}
+                  </p>
+                </div>
+                {headerBadge && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      backgroundColor: `${headerBadge.color}20`,
+                      border: `1px solid ${headerBadge.color}40`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: headerBadge.color,
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {headerBadge.icon}
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: headerBadge.color }}>
+                      {headerBadge.label}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <button
@@ -267,66 +331,63 @@ export function WizardModal({
             </div>
           </div>
 
-          {/* Content */}
-          <div
-            style={{
-              flex: 1,
-              overflow: 'auto',
-              padding: '20px',
-              minHeight: '300px',
-            }}
-          >
-            <div
-              className={direction === 'next' ? 'wizard-slide-right' : 'wizard-slide-left'}
-              key={currentStep}
-            >
-              {/* Step title */}
-              <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    backgroundColor: `${theme.primary}20`,
-                    color: theme.primary,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+          {/* Main Layout with Content and AI Panel */}
+          <div className="wizard-main-layout">
+            {/* Content Area */}
+            <div className="wizard-content-area">
+              <div
+                style={{
+                  flex: 1,
+                  overflow: 'auto',
+                  padding: '20px',
+                  minHeight: '300px',
+                }}
+              >
+                <div
+                  className={direction === 'next' ? 'wizard-slide-right' : 'wizard-slide-left'}
+                  key={currentStep}
                 >
-                  {currentStepData?.icon}
-                </span>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: theme.text, margin: 0 }}>
-                    {currentStepData?.title}
-                  </h3>
-                  {currentStepData?.description && (
-                    <p style={{ fontSize: '13px', color: theme.textSecondary, margin: '2px 0 0 0' }}>
-                      {currentStepData.description}
-                    </p>
-                  )}
+                  {/* Step title */}
+                  <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        backgroundColor: `${theme.primary}20`,
+                        color: theme.primary,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {currentStepData?.icon}
+                    </span>
+                    <div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 600, color: theme.text, margin: 0 }}>
+                        {currentStepData?.title}
+                      </h3>
+                      {currentStepData?.description && (
+                        <p style={{ fontSize: '13px', color: theme.textSecondary, margin: '2px 0 0 0' }}>
+                          {currentStepData.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Step content */}
+                  {currentStepData?.content}
                 </div>
               </div>
-
-              {/* Step content */}
-              {currentStepData?.content}
             </div>
+
+            {/* AI Panel (optional) - solo en desktop */}
+            {aiPanel && (
+              <div className="wizard-ai-panel" style={{ padding: '20px' }}>
+                {aiPanel}
+              </div>
+            )}
           </div>
-
-          {/* AI Panel (optional) - solo en desktop */}
-          {aiPanel && (
-            <div
-              style={{
-                display: 'none',
-                padding: '16px',
-                borderTop: `1px solid ${theme.border}`,
-                backgroundColor: theme.backgroundSecondary,
-              }}
-              className="lg:block"
-            >
-              {aiPanel}
-            </div>
-          )}
 
           {/* Footer */}
           <div

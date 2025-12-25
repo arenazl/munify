@@ -1,21 +1,31 @@
 """
 API de Municipios - Endpoints publicos y protegidos
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
 from pydantic import BaseModel
 from math import radians, cos, sin, asin, sqrt
+import cloudinary
+import cloudinary.uploader
 
 from core.database import get_db
 from core.security import get_current_user, require_roles
+from core.config import settings
 from models.municipio import Municipio
 from models.user import User
 from models.enums import RolUsuario
 from services.categorias_default import crear_categorias_default
 
 router = APIRouter()
+
+# Configurar Cloudinary
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET
+)
 
 
 # ============ Schemas ============
@@ -43,8 +53,8 @@ class MunicipioDetalle(MunicipioPublic):
     telefono: Optional[str] = None
     email: Optional[str] = None
     sitio_web: Optional[str] = None
-    zoom_mapa_default: int
-    color_secundario: str
+    zoom_mapa_default: int = 13
+    color_secundario: str = "#1E40AF"
 
 
 class MunicipioCreate(BaseModel):
@@ -271,12 +281,19 @@ async def listar_municipios(
     limit: int = 100,
     activo: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Lista todos los municipios (solo admin).
+    Lista municipios según permisos del usuario:
+    - Super admin (sin municipio_id): ve todos
+    - Admin/otros con municipio_id: ve solo su municipio
     """
     query = select(Municipio)
+
+    # Si NO es super admin (tiene municipio_id), filtrar por su municipio
+    if current_user.municipio_id:
+        query = query.where(Municipio.id == current_user.municipio_id)
+
     if activo is not None:
         query = query.where(Municipio.activo == activo)
     query = query.offset(skip).limit(limit)
@@ -376,3 +393,86 @@ async def eliminar_municipio(
     await db.commit()
 
     return {"message": "Municipio desactivado correctamente"}
+
+
+@router.post("/{municipio_id}/branding", response_model=MunicipioDetalle)
+async def actualizar_branding(
+    municipio_id: int,
+    color_primario: str = Form(default=None),
+    color_secundario: str = Form(default=None),
+    logo: Optional[UploadFile] = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Actualiza el branding (logo y colores) de un municipio.
+    Solo admin puede modificar.
+    Sube el logo a Cloudinary.
+    """
+    print(f"DEBUG branding: municipio_id={municipio_id}, color_primario={color_primario}, color_secundario={color_secundario}, logo={logo}")
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Verificar que el usuario es admin del municipio o super admin
+    if current_user.municipio_id and current_user.municipio_id != municipio_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este municipio")
+
+    # Actualizar colores (solo si se proporcionaron)
+    if color_primario:
+        municipio.color_primario = color_primario
+    if color_secundario:
+        municipio.color_secundario = color_secundario
+
+    # Procesar logo si se subió uno
+    if logo and logo.filename:
+        # Validar tipo de archivo
+        allowed_types = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/webp", "image/gif", "image/bmp", "image/x-icon", "image/vnd.microsoft.icon"]
+        print(f"DEBUG logo content_type: {logo.content_type}, filename: {logo.filename}")
+        if logo.content_type and logo.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail=f"Tipo de archivo no permitido: {logo.content_type}. Tipos permitidos: {', '.join(allowed_types)}")
+
+        # Validar tamaño (2MB max)
+        content = await logo.read()
+        if len(content) > 2 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="El archivo excede el tamaño máximo de 2MB")
+
+        # Subir a Cloudinary
+        try:
+            # Eliminar logo anterior de Cloudinary si existe
+            if municipio.logo_url and "cloudinary" in municipio.logo_url:
+                # Extraer public_id del URL anterior
+                try:
+                    old_public_id = municipio.logo_url.split("/")[-1].split(".")[0]
+                    old_folder = f"municipios/{municipio.codigo}"
+                    cloudinary.uploader.destroy(f"{old_folder}/{old_public_id}")
+                except Exception:
+                    pass  # Ignorar errores al eliminar logo anterior
+
+            # Subir nuevo logo
+            await logo.seek(0)  # Resetear el puntero del archivo
+            upload_result = cloudinary.uploader.upload(
+                logo.file,
+                folder=f"municipios/{municipio.codigo}",
+                resource_type="image",
+                transformation=[
+                    {"width": 400, "height": 400, "crop": "limit"},
+                    {"quality": "auto:good"},
+                    {"fetch_format": "auto"}
+                ]
+            )
+
+            # Actualizar URL del logo con la URL de Cloudinary
+            municipio.logo_url = upload_result["secure_url"]
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
+
+    await db.commit()
+    await db.refresh(municipio)
+
+    return municipio

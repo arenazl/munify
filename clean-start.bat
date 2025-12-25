@@ -4,28 +4,43 @@ echo   LIMPIANDO Y REINICIANDO SERVIDORES
 echo ==========================================
 
 echo.
-echo [1/4] Matando procesos Python y Node...
-taskkill /F /IM python.exe 2>nul
-taskkill /F /IM node.exe 2>nul
-timeout /t 2 /nobreak >nul
+echo [1/5] Matando procesos en puertos 8001 y 5173...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8001.*LISTENING" 2^>nul') do (
+    taskkill /F /PID %%a 2>nul
+)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":5173.*LISTENING" 2^>nul') do (
+    taskkill /F /PID %%a 2>nul
+)
+timeout /t 1 /nobreak >nul
 
 echo.
-echo [2/4] Limpiando cache de Python...
+echo [2/5] Limpiando cache de Python...
 cd /d %~dp0backend
-if exist __pycache__ rmdir /s /q __pycache__
-if exist api\__pycache__ rmdir /s /q api\__pycache__
-if exist core\__pycache__ rmdir /s /q core\__pycache__
-if exist models\__pycache__ rmdir /s /q models\__pycache__
-if exist services\__pycache__ rmdir /s /q services\__pycache__
+for /d /r %%d in (__pycache__) do @if exist "%%d" rmdir /s /q "%%d" 2>nul
 if exist .pytest_cache rmdir /s /q .pytest_cache
 
 echo.
-echo [3/4] Limpiando cache de Vite...
+echo [3/5] Limpiando cache de Vite...
 cd /d %~dp0frontend
 if exist node_modules\.vite rmdir /s /q node_modules\.vite
 
 echo.
-echo [4/4] Listo!
+echo [4/5] Verificando puertos libres...
+netstat -ano | findstr ":8001.*LISTENING" >nul 2>&1
+if %errorlevel%==0 (
+    echo   [ERROR] Puerto 8001 sigue ocupado!
+) else (
+    echo   [OK] Puerto 8001 libre
+)
+netstat -ano | findstr ":5173.*LISTENING" >nul 2>&1
+if %errorlevel%==0 (
+    echo   [ERROR] Puerto 5173 sigue ocupado!
+) else (
+    echo   [OK] Puerto 5173 libre
+)
+
+echo.
+echo [5/5] Listo!
 echo.
 echo ==========================================
 echo   PARA INICIAR LOS SERVIDORES:

@@ -3,14 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, Wrench, User } from 'lucide-react';
+import { validationSchemas } from '../lib/validations';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState({ email: false, password: false });
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Validaciones
+  const emailValidation = validationSchemas.login.email(email);
+  const passwordValidation = validationSchemas.login.password(password);
 
   // Leer valores de localStorage con state para forzar re-render
   const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
@@ -26,9 +32,6 @@ export default function Login() {
     const nombre = localStorage.getItem('municipio_nombre');
     const codigo = localStorage.getItem('municipio_codigo');
     const color = localStorage.getItem('municipio_color');
-
-    console.log('Login: municipio_nombre =', nombre);
-    console.log('Login: municipio_codigo =', codigo);
 
     if (!codigo || !nombre) {
       // Limpiar todo y redirigir
@@ -178,37 +181,51 @@ export default function Login() {
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Email</label>
                   <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+                    <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${touched.email && !emailValidation.isValid ? 'text-red-400' : 'text-slate-500'}`} />
                     <input
                       type="email"
-                      required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                      onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                      className={`w-full pl-12 pr-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all ${
+                        touched.email && !emailValidation.isValid
+                          ? 'border-red-500/50 focus:border-red-500/50'
+                          : 'border-white/10 focus:border-blue-500/50'
+                      }`}
                       placeholder="tu@email.com"
                     />
                   </div>
+                  {touched.email && !emailValidation.isValid && (
+                    <p className="mt-1 text-xs text-red-400">{emailValidation.error}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Contraseña</label>
                   <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+                    <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 ${touched.password && !passwordValidation.isValid ? 'text-red-400' : 'text-slate-500'}`} />
                     <input
                       type="password"
-                      required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                      onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                      className={`w-full pl-12 pr-4 py-3 bg-white/5 border rounded-xl text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all ${
+                        touched.password && !passwordValidation.isValid
+                          ? 'border-red-500/50 focus:border-red-500/50'
+                          : 'border-white/10 focus:border-blue-500/50'
+                      }`}
                       placeholder="Tu contraseña"
                     />
                   </div>
+                  {touched.password && !passwordValidation.isValid && (
+                    <p className="mt-1 text-xs text-red-400">{passwordValidation.error}</p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                  disabled={loading || !emailValidation.isValid || !passwordValidation.isValid}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>

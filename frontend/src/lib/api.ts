@@ -11,10 +11,10 @@ const getApiUrl = () => {
   // Fallback: en desarrollo usar el host actual
   if (import.meta.env.DEV) {
     const host = window.location.hostname;
-    return `http://${host}:8002/api`;
+    return `http://${host}:8001/api`;
   }
 
-  return 'http://localhost:8002/api';
+  return 'http://localhost:8001/api';
 };
 
 const API_URL = getApiUrl();
@@ -190,6 +190,10 @@ export const configuracionApi = {
 export const municipiosApi = {
   getAll: () => api.get('/municipios'),
   getOne: (id: number) => api.get(`/municipios/${id}`),
+  updateBranding: (id: number, formData: FormData) =>
+    api.post(`/municipios/${id}/branding`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // Chat IA
@@ -297,4 +301,112 @@ export const imagenesApi = {
     const baseUrl = API_URL.replace('/api', '');
     return `${baseUrl}${path}`;
   },
+};
+
+// Gamificación
+export const gamificacionApi = {
+  // Perfil y puntos
+  getMiPerfil: () => api.get('/gamificacion/mi-perfil'),
+  getPerfil: (userId: number) => api.get(`/gamificacion/perfil/${userId}`),
+  getMisPuntos: () => api.get('/gamificacion/mis-puntos'),
+
+  // Badges
+  getMisBadges: () => api.get('/gamificacion/mis-badges'),
+  getBadgesDisponibles: () => api.get('/gamificacion/badges-disponibles'),
+
+  // Leaderboard
+  getLeaderboard: (params?: { zona_id?: number; periodo?: 'mes' | 'total'; limite?: number }) =>
+    api.get('/gamificacion/leaderboard', { params }),
+  getMiPosicion: (periodo?: 'mes' | 'total') =>
+    api.get('/gamificacion/mi-posicion', { params: { periodo } }),
+
+  // Historial
+  getHistorial: (limite?: number) =>
+    api.get('/gamificacion/historial', { params: { limite } }),
+
+  // Recompensas
+  getRecompensas: () => api.get('/gamificacion/recompensas'),
+  canjearRecompensa: (recompensaId: number) =>
+    api.post('/gamificacion/recompensas/canjear', { recompensa_id: recompensaId }),
+  getMisCanjes: () => api.get('/gamificacion/mis-canjes'),
+
+  // Admin
+  crearRecompensa: (data: {
+    nombre: string;
+    descripcion?: string;
+    icono?: string;
+    puntos_requeridos: number;
+    stock?: number;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }) => api.post('/gamificacion/recompensas', data),
+  actualizarRecompensa: (id: number, data: {
+    nombre: string;
+    descripcion?: string;
+    icono?: string;
+    puntos_requeridos: number;
+    stock?: number;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }) => api.put(`/gamificacion/recompensas/${id}`, data),
+  eliminarRecompensa: (id: number) => api.delete(`/gamificacion/recompensas/${id}`),
+  getCanjesPendientes: () => api.get('/gamificacion/admin/canjes-pendientes'),
+  entregarCanje: (canjeId: number) => api.post(`/gamificacion/admin/entregar-canje/${canjeId}`),
+};
+
+// WhatsApp
+export const whatsappApi = {
+  // Configuración
+  getConfig: () => api.get('/whatsapp/config'),
+  getConfigFull: () => api.get('/whatsapp/config/full'),
+  createConfig: (data: {
+    habilitado?: boolean;
+    provider?: 'meta' | 'twilio';
+    meta_phone_number_id?: string;
+    meta_access_token?: string;
+    meta_business_account_id?: string;
+    meta_webhook_verify_token?: string;
+    twilio_account_sid?: string;
+    twilio_auth_token?: string;
+    twilio_phone_number?: string;
+    notificar_reclamo_recibido?: boolean;
+    notificar_reclamo_asignado?: boolean;
+    notificar_cambio_estado?: boolean;
+    notificar_reclamo_resuelto?: boolean;
+    notificar_comentarios?: boolean;
+  }) => api.post('/whatsapp/config', data),
+  updateConfig: (data: {
+    habilitado?: boolean;
+    provider?: 'meta' | 'twilio';
+    meta_phone_number_id?: string;
+    meta_access_token?: string;
+    meta_business_account_id?: string;
+    meta_webhook_verify_token?: string;
+    twilio_account_sid?: string;
+    twilio_auth_token?: string;
+    twilio_phone_number?: string;
+    notificar_reclamo_recibido?: boolean;
+    notificar_reclamo_asignado?: boolean;
+    notificar_cambio_estado?: boolean;
+    notificar_reclamo_resuelto?: boolean;
+    notificar_comentarios?: boolean;
+  }) => api.put('/whatsapp/config', data),
+  deleteConfig: () => api.delete('/whatsapp/config'),
+
+  // Test
+  testMessage: (data: { telefono: string; mensaje?: string }) =>
+    api.post('/whatsapp/test', data),
+
+  // Logs y estadísticas
+  getLogs: (params?: { skip?: number; limit?: number }) =>
+    api.get('/whatsapp/logs', { params }),
+  getStats: () => api.get('/whatsapp/stats'),
+
+  // Notificaciones manuales
+  notificarReclamoRecibido: (reclamoId: number) =>
+    api.post(`/whatsapp/notificar/reclamo-recibido/${reclamoId}`),
+  notificarCambioEstado: (reclamoId: number) =>
+    api.post(`/whatsapp/notificar/cambio-estado/${reclamoId}`),
+  notificarReclamoResuelto: (reclamoId: number) =>
+    api.post(`/whatsapp/notificar/reclamo-resuelto/${reclamoId}`),
 };

@@ -3,6 +3,7 @@ import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, Ma
 import { dashboardApi, analyticsApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import {
   XAxis,
   YAxis,
@@ -86,6 +87,7 @@ interface MetricasDetalle {
 
 export default function Dashboard() {
   const { theme } = useTheme();
+  const { municipioActual } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [porCategoria, setPorCategoria] = useState<{ categoria: string; cantidad: number }[]>([]);
   const [porZona, setPorZona] = useState<{ zona: string; cantidad: number }[]>([]);
@@ -300,11 +302,11 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Hero Header - Estilo Wok Express */}
       <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '200px' }}>
-        {/* Imagen de fondo */}
+        {/* Imagen de fondo - usa la imagen del municipio si está disponible */}
         <div className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"
-            alt="Ciudad"
+            src={municipioActual?.logo_url || "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"}
+            alt={municipioActual?.nombre || "Ciudad"}
             className="w-full h-full object-cover"
           />
           {/* Gradiente oscuro que baja al color del tema */}
@@ -364,13 +366,14 @@ export default function Dashboard() {
       </div>
 
       {/* Stats cards - Glassmorphism */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Mobile: 2x2 grid, Desktop: 4 columnas */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
             <div
               key={card.title}
-              className="group relative rounded-2xl p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
+              className="group relative rounded-2xl p-3 md:p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
               style={{
                 backgroundColor: theme.card,
                 border: `1px solid ${theme.border}`,
@@ -386,15 +389,15 @@ export default function Dashboard() {
                 className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
                 style={{ backgroundColor: card.iconColor }}
               />
-              <div className="relative flex items-center justify-between">
+              <div className="relative flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
+                  <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
                     {card.title}
                   </p>
-                  <p className="text-3xl font-black mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
-                  <div className="flex items-center gap-1.5 mt-2">
+                  <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
+                  <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
                     <span
-                      className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
                       style={{
                         backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
                         color: card.trendUp ? '#22c55e' : '#ef4444'
@@ -402,17 +405,17 @@ export default function Dashboard() {
                     >
                       {card.trend}
                     </span>
-                    <span className="text-[10px]" style={{ color: theme.textSecondary }}>vs mes ant.</span>
+                    <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>vs mes ant.</span>
                   </div>
                 </div>
                 <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                  className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
                   style={{
                     backgroundColor: card.iconBg,
                     boxShadow: `0 8px 32px ${card.iconColor}30`
                   }}
                 >
-                  <Icon className="h-7 w-7" style={{ color: card.iconColor }} />
+                  <Icon className="h-5 w-5 md:h-7 md:w-7" style={{ color: card.iconColor }} />
                 </div>
               </div>
             </div>
@@ -535,7 +538,7 @@ export default function Dashboard() {
           }}
         >
           {/* Botonera de vistas - Modern pills */}
-          <div className="flex flex-wrap gap-2 mb-5 p-1 rounded-2xl" style={{ backgroundColor: `${theme.textSecondary}10` }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-5 p-1 rounded-2xl" style={{ backgroundColor: `${theme.textSecondary}10` }}>
             {[
               { id: 'barrios' as VistaMetrica, label: 'Barrios', icon: Building2 },
               { id: 'tiempos' as VistaMetrica, label: 'Tiempos', icon: Clock },
@@ -549,7 +552,7 @@ export default function Dashboard() {
                 <button
                   key={btn.id}
                   onClick={() => setVistaActiva(btn.id)}
-                  className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300 ${
+                  className={`relative flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-xs font-semibold transition-all duration-300 ${
                     isActive ? 'shadow-lg' : 'hover:bg-white/5'
                   }`}
                   style={{
@@ -558,8 +561,8 @@ export default function Dashboard() {
                     boxShadow: isActive ? `0 4px 20px ${theme.primary}40` : 'none',
                   }}
                 >
-                  <Icon className={`h-4 w-4 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
-                  {btn.label}
+                  <Icon className={`h-4 w-4 flex-shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : ''}`} />
+                  <span className="truncate">{btn.label}</span>
                 </button>
               );
             })}

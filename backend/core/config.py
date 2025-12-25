@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # Pexels API (imagenes gratuitas)
     PEXELS_API_KEY: str = ""
 
+    # WhatsApp Business API (Meta Cloud API)
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+    WHATSAPP_ACCESS_TOKEN: str = ""
+    WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = "reclamos_municipales_2024"
+
     # CORS - URLs permitidas (separadas por coma en .env)
     CORS_ORIGINS: str = ""
 

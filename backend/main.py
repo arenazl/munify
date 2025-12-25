@@ -11,7 +11,6 @@ from slowapi.errors import RateLimitExceeded
 
 from core.database import init_db
 from core.config import settings
-from core.logger import setup_logging, print_startup_banner, get_logger, print_request_log
 from core.rate_limit import limiter, rate_limit_exceeded_handler
 from api import api_router
 
@@ -27,29 +26,21 @@ if settings.SENTRY_DSN:
 # Importar todos los modelos para que se registren con Base.metadata
 import models  # noqa: F401
 
-# Configurar logging con colores
-setup_logging("INFO")
-logger = get_logger("main")
-
 # Frontend path
 frontend_path = Path(__file__).parent / "frontend_dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    port = settings.PORT
-    print_startup_banner("Sistema de Reclamos Municipales", "1.0.0", port)
-    logger.info(f"Entorno: {settings.ENVIRONMENT}")
-    logger.info(f"Frontend path: {frontend_path}, exists: {frontend_path.exists()}")
-    if settings.SENTRY_DSN:
-        logger.info("Sentry inicializado correctamente")
-    logger.info("Rate limiting activado")
-    logger.info("Inicializando base de datos...")
+    print(f"\n{'='*50}", flush=True)
+    print(f"  Sistema de Reclamos v1.0.0", flush=True)
+    print(f"  http://localhost:{settings.PORT}", flush=True)
+    print(f"{'='*50}\n", flush=True)
+    print(f"Inicializando base de datos...", flush=True)
     await init_db()
-    logger.info("Base de datos inicializada correctamente")
+    print(f"Base de datos OK", flush=True)
     yield
-    # Shutdown
-    logger.info("Cerrando aplicación...")
+    print("Cerrando...", flush=True)
 
 app = FastAPI(
     title="Sistema de Reclamos Municipales",
@@ -74,24 +65,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware para loguear requests
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    duration_ms = (time.time() - start_time) * 1000
-    print_request_log(
-        method=request.method,
-        path=request.url.path,
-        status=response.status_code,
-        duration_ms=duration_ms
-    )
-    return response
+# NO middleware custom - dejar que uvicorn maneje los logs
 
 # Archivos estáticos del backend (imágenes subidas)
 static_path = Path(__file__).parent / "static"
 static_path.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
+# Uploads (logos de municipios, documentos, etc.)
+uploads_path = Path(__file__).parent / "uploads"
+uploads_path.mkdir(exist_ok=True)
+(uploads_path / "logos").mkdir(exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 # ============ RUTAS API ============
 app.include_router(api_router, prefix="/api")

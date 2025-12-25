@@ -1,28 +1,41 @@
 """
 API para integración con WhatsApp Business API.
 Permite recibir reclamos vía WhatsApp y enviar notificaciones.
+Incluye configuración persistente por municipio.
 """
 from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import Optional
+from sqlalchemy import select, func
+from typing import Optional, List
 import json
 import httpx
 import re
+import os
+from datetime import datetime, timedelta
 
 from core.database import get_db
+from core.security import get_current_user
+from core.config import settings
+
+# Variables de entorno para WhatsApp (fallback cuando no hay config en DB)
+WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID
+WHATSAPP_ACCESS_TOKEN = settings.WHATSAPP_ACCESS_TOKEN
+WHATSAPP_BUSINESS_ACCOUNT_ID = settings.WHATSAPP_BUSINESS_ACCOUNT_ID
+WHATSAPP_WEBHOOK_VERIFY_TOKEN = settings.WHATSAPP_WEBHOOK_VERIFY_TOKEN
 from models import User, Reclamo, Categoria, Zona, Notificacion
 from models.enums import EstadoReclamo, RolUsuario
+from models.whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
+from schemas.whatsapp import (
+    WhatsAppConfigCreate, WhatsAppConfigUpdate, WhatsAppConfigResponse, WhatsAppConfigPublic,
+    WhatsAppTestMessage, WhatsAppTestResponse, WhatsAppLogResponse, WhatsAppStats
+)
 
 router = APIRouter()
 
-# Configuración (en producción usar variables de entorno)
-WHATSAPP_TOKEN = ""  # Token de WhatsApp Business API
-WHATSAPP_PHONE_ID = ""  # ID del número de WhatsApp
-VERIFY_TOKEN = "reclamos_municipales_2024"  # Token de verificación para webhook
+# Token de verificación por defecto para webhooks
+DEFAULT_VERIFY_TOKEN = "reclamos_municipales_2024"
 
-
-# Estado de conversación por usuario
+# Estado de conversación por usuario (en memoria - considerar Redis para producción)
 conversation_states = {}
 
 
@@ -41,18 +54,349 @@ class ConversationState:
         }
 
 
+# ===========================================
+# ENDPOINTS DE CONFIGURACIÓN
+# ===========================================
+
+@router.get("/config", response_model=WhatsAppConfigPublic)
+async def get_config(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene la configuración de WhatsApp del municipio (vista pública sin credenciales)"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        # Retornar config vacía si no existe
+        return WhatsAppConfigPublic(
+            id=0,
+            municipio_id=current_user.municipio_id,
+            habilitado=False,
+            provider=WhatsAppProvider.META,
+            meta_configurado=False,
+            twilio_configurado=False,
+            notificar_reclamo_recibido=True,
+            notificar_reclamo_asignado=True,
+            notificar_cambio_estado=True,
+            notificar_reclamo_resuelto=True,
+            notificar_comentarios=False,
+            created_at=datetime.utcnow(),
+            updated_at=None
+        )
+
+    return WhatsAppConfigPublic(
+        id=config.id,
+        municipio_id=config.municipio_id,
+        habilitado=config.habilitado,
+        provider=config.provider,
+        meta_configurado=bool(config.meta_phone_number_id and config.meta_access_token),
+        twilio_configurado=bool(config.twilio_account_sid and config.twilio_auth_token),
+        notificar_reclamo_recibido=config.notificar_reclamo_recibido,
+        notificar_reclamo_asignado=config.notificar_reclamo_asignado,
+        notificar_cambio_estado=config.notificar_cambio_estado,
+        notificar_reclamo_resuelto=config.notificar_reclamo_resuelto,
+        notificar_comentarios=config.notificar_comentarios,
+        created_at=config.created_at,
+        updated_at=config.updated_at
+    )
+
+
+@router.get("/config/full", response_model=WhatsAppConfigResponse)
+async def get_config_full(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene la configuración completa de WhatsApp (admin o supervisor)"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="Solo administradores o supervisores")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    return config
+
+
+@router.post("/config", response_model=WhatsAppConfigResponse)
+async def create_config(
+    config_data: WhatsAppConfigCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Crea la configuración de WhatsApp para el municipio"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="Solo administradores o supervisores")
+
+    # Verificar si ya existe
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Ya existe configuración. Use PUT para actualizar.")
+
+    config = WhatsAppConfig(
+        municipio_id=current_user.municipio_id,
+        **config_data.model_dump()
+    )
+
+    db.add(config)
+    await db.commit()
+    await db.refresh(config)
+
+    return config
+
+
+@router.put("/config", response_model=WhatsAppConfigResponse)
+async def update_config(
+    config_data: WhatsAppConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Actualiza la configuración de WhatsApp"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="Solo administradores o supervisores")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        # Crear si no existe
+        config = WhatsAppConfig(municipio_id=current_user.municipio_id)
+        db.add(config)
+
+    # Actualizar solo campos proporcionados
+    update_data = config_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if value is not None:
+            setattr(config, field, value)
+
+    config.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(config)
+
+    return config
+
+
+@router.delete("/config")
+async def delete_config(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Elimina la configuración de WhatsApp"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="Solo administradores o supervisores")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    await db.delete(config)
+    await db.commit()
+
+    return {"message": "Configuración eliminada"}
+
+
+# ===========================================
+# ENDPOINTS DE TEST
+# ===========================================
+
+@router.post("/test", response_model=WhatsAppTestResponse)
+async def test_whatsapp(
+    test_data: WhatsAppTestMessage,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía un mensaje de prueba para verificar la configuración"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="Solo administradores o supervisores")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        return WhatsAppTestResponse(
+            success=False,
+            message="Configuración no encontrada",
+            error="No hay configuración de WhatsApp para este municipio"
+        )
+
+    mensaje = test_data.mensaje or "🧪 Este es un mensaje de prueba del Sistema de Reclamos Municipales."
+
+    try:
+        message_id = await send_whatsapp_message_with_config(
+            config=config,
+            to=test_data.telefono,
+            message=mensaje,
+            db=db,
+            tipo_mensaje="test"
+        )
+
+        return WhatsAppTestResponse(
+            success=True,
+            message="Mensaje enviado correctamente",
+            message_id=message_id
+        )
+    except Exception as e:
+        return WhatsAppTestResponse(
+            success=False,
+            message="Error al enviar mensaje",
+            error=str(e)
+        )
+
+
+# ===========================================
+# ENDPOINTS DE LOGS
+# ===========================================
+
+@router.get("/logs", response_model=List[WhatsAppLogResponse])
+async def get_logs(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene los logs de mensajes de WhatsApp"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        return []
+
+    result = await db.execute(
+        select(WhatsAppLog)
+        .where(WhatsAppLog.config_id == config.id)
+        .order_by(WhatsAppLog.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+
+    return result.scalars().all()
+
+
+@router.get("/stats", response_model=WhatsAppStats)
+async def get_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene estadísticas de mensajes de WhatsApp"""
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        return WhatsAppStats()
+
+    # Total enviados
+    result = await db.execute(
+        select(func.count(WhatsAppLog.id))
+        .where(WhatsAppLog.config_id == config.id, WhatsAppLog.enviado == True)
+    )
+    total_enviados = result.scalar() or 0
+
+    # Total fallidos
+    result = await db.execute(
+        select(func.count(WhatsAppLog.id))
+        .where(WhatsAppLog.config_id == config.id, WhatsAppLog.enviado == False)
+    )
+    total_fallidos = result.scalar() or 0
+
+    # Enviados hoy
+    hoy = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    result = await db.execute(
+        select(func.count(WhatsAppLog.id))
+        .where(
+            WhatsAppLog.config_id == config.id,
+            WhatsAppLog.enviado == True,
+            WhatsAppLog.created_at >= hoy
+        )
+    )
+    enviados_hoy = result.scalar() or 0
+
+    # Enviados esta semana
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+    result = await db.execute(
+        select(func.count(WhatsAppLog.id))
+        .where(
+            WhatsAppLog.config_id == config.id,
+            WhatsAppLog.enviado == True,
+            WhatsAppLog.created_at >= inicio_semana
+        )
+    )
+    enviados_semana = result.scalar() or 0
+
+    # Por tipo
+    result = await db.execute(
+        select(WhatsAppLog.tipo_mensaje, func.count(WhatsAppLog.id))
+        .where(WhatsAppLog.config_id == config.id, WhatsAppLog.enviado == True)
+        .group_by(WhatsAppLog.tipo_mensaje)
+    )
+    por_tipo = {row[0]: row[1] for row in result.all()}
+
+    return WhatsAppStats(
+        total_enviados=total_enviados,
+        total_fallidos=total_fallidos,
+        enviados_hoy=enviados_hoy,
+        enviados_semana=enviados_semana,
+        por_tipo=por_tipo
+    )
+
+
+# ===========================================
+# WEBHOOKS
+# ===========================================
+
 @router.get("/webhook")
 async def verify_webhook(
     hub_mode: str = Query(None, alias="hub.mode"),
     hub_verify_token: str = Query(None, alias="hub.verify_token"),
-    hub_challenge: str = Query(None, alias="hub.challenge")
+    hub_challenge: str = Query(None, alias="hub.challenge"),
+    municipio_id: int = Query(None),
+    db: AsyncSession = Depends(get_db)
 ):
-    """
-    Verificación del webhook de WhatsApp.
-    Meta envía una solicitud GET para verificar el endpoint.
-    """
-    if hub_mode == "subscribe" and hub_verify_token == VERIFY_TOKEN:
+    """Verificación del webhook de WhatsApp."""
+    if hub_mode != "subscribe":
+        raise HTTPException(status_code=403, detail="Modo inválido")
+
+    # Si se proporciona municipio_id, buscar su token
+    verify_token = DEFAULT_VERIFY_TOKEN
+    if municipio_id:
+        result = await db.execute(
+            select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == municipio_id)
+        )
+        config = result.scalar_one_or_none()
+        if config and config.meta_webhook_verify_token:
+            verify_token = config.meta_webhook_verify_token
+
+    if hub_verify_token == verify_token:
         return int(hub_challenge)
+
     raise HTTPException(status_code=403, detail="Token de verificación inválido")
 
 
@@ -61,13 +405,10 @@ async def receive_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Recibe mensajes de WhatsApp y los procesa.
-    """
+    """Recibe mensajes de WhatsApp y los procesa."""
     try:
         body = await request.json()
 
-        # Verificar estructura del mensaje
         if "entry" not in body:
             return {"status": "ok"}
 
@@ -85,6 +426,302 @@ async def receive_webhook(
         print(f"Error procesando webhook: {e}")
         return {"status": "error", "message": str(e)}
 
+
+# ===========================================
+# NOTIFICACIONES AUTOMÁTICAS
+# ===========================================
+
+@router.post("/notificar/reclamo-recibido/{reclamo_id}")
+async def notificar_reclamo_recibido(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía notificación de reclamo recibido"""
+    return await enviar_notificacion_reclamo(
+        reclamo_id, db, current_user, "reclamo_recibido",
+        "✅ *Reclamo Recibido*\n\nTu reclamo #{id} ha sido registrado.\n\n📝 *{titulo}*\n\nTe notificaremos cuando haya actualizaciones."
+    )
+
+
+@router.post("/notificar/cambio-estado/{reclamo_id}")
+async def notificar_cambio_estado(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía notificación de cambio de estado"""
+    return await enviar_notificacion_reclamo(
+        reclamo_id, db, current_user, "cambio_estado",
+        "🔄 *Actualización de Reclamo*\n\nTu reclamo #{id} ha cambiado a: *{estado}*\n\n📝 *{titulo}*"
+    )
+
+
+@router.post("/notificar/reclamo-resuelto/{reclamo_id}")
+async def notificar_reclamo_resuelto(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía notificación de reclamo resuelto"""
+    return await enviar_notificacion_reclamo(
+        reclamo_id, db, current_user, "reclamo_resuelto",
+        "✅ *¡Reclamo Resuelto!*\n\nTu reclamo #{id} ha sido resuelto.\n\n📝 *{titulo}*\n\n¡Gracias por tu paciencia!"
+    )
+
+
+async def enviar_notificacion_reclamo(
+    reclamo_id: int,
+    db: AsyncSession,
+    current_user: User,
+    tipo: str,
+    plantilla: str
+):
+    """Helper para enviar notificaciones de reclamo"""
+    # Obtener reclamo
+    result = await db.execute(
+        select(Reclamo).where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Obtener config
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config or not config.habilitado:
+        raise HTTPException(status_code=400, detail="WhatsApp no configurado o deshabilitado")
+
+    # Obtener usuario creador
+    result = await db.execute(
+        select(User).where(User.id == reclamo.creador_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user or not user.telefono:
+        raise HTTPException(status_code=400, detail="Usuario sin teléfono registrado")
+
+    # Formatear mensaje
+    estado_texto = reclamo.estado.value.replace('_', ' ').title() if reclamo.estado else "Desconocido"
+    mensaje = plantilla.format(
+        id=reclamo.id,
+        titulo=reclamo.titulo,
+        estado=estado_texto
+    )
+
+    try:
+        message_id = await send_whatsapp_message_with_config(
+            config=config,
+            to=user.telefono,
+            message=mensaje,
+            db=db,
+            tipo_mensaje=tipo,
+            usuario_id=user.id,
+            reclamo_id=reclamo.id
+        )
+        return {"success": True, "message_id": message_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error enviando mensaje: {str(e)}")
+
+
+# Endpoint para enviar notificación manual (retrocompatibilidad)
+@router.post("/send-notification/{reclamo_id}")
+async def send_notification(
+    reclamo_id: int,
+    message: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía notificación personalizada de WhatsApp al creador de un reclamo"""
+    result = await db.execute(
+        select(Reclamo).where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Obtener teléfono del creador
+    result = await db.execute(
+        select(User).where(User.id == reclamo.creador_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user or not user.telefono:
+        raise HTTPException(status_code=400, detail="Usuario sin teléfono registrado")
+
+    # Obtener config
+    result = await db.execute(
+        select(WhatsAppConfig).where(WhatsAppConfig.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if config and config.habilitado:
+        message_id = await send_whatsapp_message_with_config(
+            config=config,
+            to=user.telefono,
+            message=message,
+            db=db,
+            tipo_mensaje="manual",
+            usuario_id=user.id,
+            reclamo_id=reclamo.id
+        )
+        return {"status": "sent", "to": user.telefono, "message_id": message_id}
+    else:
+        # Fallback sin config
+        await send_whatsapp_message(user.telefono, message)
+        return {"status": "sent", "to": user.telefono}
+
+
+# ===========================================
+# FUNCIONES DE ENVÍO DE MENSAJES
+# ===========================================
+
+async def send_whatsapp_message_with_config(
+    config: WhatsAppConfig,
+    to: str,
+    message: str,
+    db: AsyncSession,
+    tipo_mensaje: str = "general",
+    usuario_id: int = None,
+    reclamo_id: int = None
+) -> Optional[str]:
+    """Envía mensaje usando la configuración del municipio y registra en logs"""
+
+    # Crear log
+    log = WhatsAppLog(
+        config_id=config.id,
+        telefono=to,
+        tipo_mensaje=tipo_mensaje,
+        mensaje=message[:500] if message else None,
+        usuario_id=usuario_id,
+        reclamo_id=reclamo_id,
+        enviado=False
+    )
+    db.add(log)
+
+    try:
+        message_id = None
+
+        if config.provider == WhatsAppProvider.META:
+            message_id = await send_via_meta(config, to, message)
+        elif config.provider == WhatsAppProvider.TWILIO:
+            message_id = await send_via_twilio(config, to, message)
+
+        log.enviado = True
+        log.message_id = message_id
+        await db.commit()
+
+        return message_id
+
+    except Exception as e:
+        log.error = str(e)[:500]
+        await db.commit()
+        raise
+
+
+async def send_via_meta(config: WhatsAppConfig, to: str, message: str) -> Optional[str]:
+    """Envía mensaje via Meta Cloud API"""
+    # Usar config de DB o fallback a variables de entorno
+    phone_number_id = config.meta_phone_number_id or WHATSAPP_PHONE_NUMBER_ID
+    access_token = config.meta_access_token or WHATSAPP_ACCESS_TOKEN
+
+    if not phone_number_id or not access_token:
+        raise ValueError("Configuración de Meta incompleta. Configure en DB o variables de entorno.")
+
+    url = f"https://graph.facebook.com/v18.0/{phone_number_id}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"body": message}
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(url, headers=headers, json=payload)
+
+        if response.status_code != 200:
+            error_data = response.json() if response.text else {}
+            raise ValueError(f"Error de Meta API: {error_data}")
+
+        data = response.json()
+        return data.get("messages", [{}])[0].get("id")
+
+
+async def send_via_twilio(config: WhatsAppConfig, to: str, message: str) -> Optional[str]:
+    """Envía mensaje via Twilio"""
+    if not config.twilio_account_sid or not config.twilio_auth_token or not config.twilio_phone_number:
+        raise ValueError("Configuración de Twilio incompleta")
+
+    url = f"https://api.twilio.com/2010-04-01/Accounts/{config.twilio_account_sid}/Messages.json"
+
+    # Asegurar formato de número WhatsApp
+    to_whatsapp = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
+    from_whatsapp = config.twilio_phone_number if config.twilio_phone_number.startswith("whatsapp:") else f"whatsapp:{config.twilio_phone_number}"
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            url,
+            auth=(config.twilio_account_sid, config.twilio_auth_token),
+            data={
+                "To": to_whatsapp,
+                "From": from_whatsapp,
+                "Body": message
+            }
+        )
+
+        if response.status_code not in [200, 201]:
+            error_data = response.json() if response.text else {}
+            raise ValueError(f"Error de Twilio: {error_data}")
+
+        data = response.json()
+        return data.get("sid")
+
+
+async def send_whatsapp_message(to: str, message: str):
+    """Envía un mensaje de WhatsApp usando variables de entorno (fallback sin config de DB)"""
+    if not WHATSAPP_PHONE_NUMBER_ID or not WHATSAPP_ACCESS_TOKEN:
+        print(f"[WhatsApp Mock] To: {to}\nMessage: {message}\n")
+        return
+
+    url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+
+    headers = {
+        "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "text",
+        "text": {"body": message}
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=payload)
+            if response.status_code != 200:
+                print(f"Error enviando WhatsApp: {response.text}")
+            else:
+                print(f"[WhatsApp] Mensaje enviado a {to}")
+    except Exception as e:
+        print(f"Error enviando WhatsApp: {e}")
+
+
+# ===========================================
+# FLUJO DE CONVERSACIÓN (CHATBOT)
+# ===========================================
 
 async def process_message(message: dict, db: AsyncSession):
     """Procesa un mensaje individual de WhatsApp"""
@@ -110,7 +747,6 @@ async def process_message(message: dict, db: AsyncSession):
         await handle_location_message(phone, location, state, db)
 
     elif msg_type == "image":
-        # Por ahora solo confirmamos recepción
         await send_whatsapp_message(
             phone,
             "Recibimos tu imagen. Por ahora solo procesamos texto y ubicación."
@@ -175,7 +811,6 @@ async def handle_text_message(phone: str, text: str, state: ConversationState, d
         await send_categorias(phone, db)
 
     elif state.step == "categoria":
-        # Buscar categoría por número o nombre
         categoria = await find_categoria(text, db)
         if categoria:
             state.data["categoria_id"] = categoria.id
@@ -300,13 +935,11 @@ async def find_categoria(text: str, db: AsyncSession) -> Optional[Categoria]:
     )
     categorias = result.scalars().all()
 
-    # Buscar por número
     if text.isdigit():
         idx = int(text) - 1
         if 0 <= idx < len(categorias):
             return categorias[idx]
 
-    # Buscar por nombre
     text_lower = text.lower()
     for cat in categorias:
         if text_lower in cat.nombre.lower():
@@ -317,7 +950,6 @@ async def find_categoria(text: str, db: AsyncSession) -> Optional[Categoria]:
 
 async def send_confirmation(phone: str, state: ConversationState, db: AsyncSession):
     """Envía mensaje de confirmación antes de crear el reclamo"""
-    # Obtener nombre de categoría
     cat_name = "No especificada"
     if state.data["categoria_id"]:
         result = await db.execute(
@@ -348,10 +980,8 @@ async def send_confirmation(phone: str, state: ConversationState, db: AsyncSessi
 async def create_reclamo_from_whatsapp(phone: str, state: ConversationState, db: AsyncSession):
     """Crea el reclamo en la base de datos"""
     try:
-        # Buscar o crear usuario por teléfono
         user = await get_or_create_user(phone, db)
 
-        # Crear reclamo
         reclamo = Reclamo(
             titulo=state.data["titulo"],
             descripcion=state.data["descripcion"],
@@ -360,7 +990,7 @@ async def create_reclamo_from_whatsapp(phone: str, state: ConversationState, db:
             latitud=state.data["latitud"],
             longitud=state.data["longitud"],
             estado=EstadoReclamo.nuevo,
-            prioridad=2,  # Prioridad media por defecto
+            prioridad=2,
             creador_id=user.id,
         )
 
@@ -368,7 +998,6 @@ async def create_reclamo_from_whatsapp(phone: str, state: ConversationState, db:
         await db.commit()
         await db.refresh(reclamo)
 
-        # Limpiar estado
         state.step = "inicio"
         state.data = {k: None for k in state.data}
 
@@ -390,10 +1019,8 @@ async def create_reclamo_from_whatsapp(phone: str, state: ConversationState, db:
 
 async def get_or_create_user(phone: str, db: AsyncSession) -> User:
     """Obtiene o crea un usuario por número de teléfono"""
-    # Normalizar teléfono
     phone_clean = re.sub(r'\D', '', phone)
 
-    # Buscar usuario existente
     result = await db.execute(
         select(User).where(User.telefono == phone_clean)
     )
@@ -402,7 +1029,6 @@ async def get_or_create_user(phone: str, db: AsyncSession) -> User:
     if user:
         return user
 
-    # Crear nuevo usuario
     user = User(
         email=f"whatsapp_{phone_clean}@temporal.local",
         nombre="Usuario",
@@ -410,7 +1036,7 @@ async def get_or_create_user(phone: str, db: AsyncSession) -> User:
         telefono=phone_clean,
         rol=RolUsuario.vecino,
         activo=True,
-        password_hash="whatsapp_user_no_login",  # No puede hacer login
+        password_hash="whatsapp_user_no_login",
     )
 
     db.add(user)
@@ -424,7 +1050,6 @@ async def send_user_reclamos(phone: str, db: AsyncSession):
     """Envía lista de reclamos del usuario"""
     phone_clean = re.sub(r'\D', '', phone)
 
-    # Buscar usuario
     result = await db.execute(
         select(User).where(User.telefono == phone_clean)
     )
@@ -438,7 +1063,6 @@ async def send_user_reclamos(phone: str, db: AsyncSession):
         )
         return
 
-    # Buscar reclamos
     result = await db.execute(
         select(Reclamo)
         .where(Reclamo.creador_id == user.id)
@@ -470,62 +1094,3 @@ async def send_user_reclamos(phone: str, db: AsyncSession):
 
     msg += "Escribe *hola* para crear un nuevo reclamo."
     await send_whatsapp_message(phone, msg)
-
-
-async def send_whatsapp_message(to: str, message: str):
-    """Envía un mensaje de WhatsApp usando la API de Meta"""
-    if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_ID:
-        print(f"[WhatsApp Mock] To: {to}\nMessage: {message}\n")
-        return
-
-    url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_ID}/messages"
-
-    headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-        "Content-Type": "application/json",
-    }
-
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to,
-        "type": "text",
-        "text": {"body": message}
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=payload)
-            if response.status_code != 200:
-                print(f"Error enviando WhatsApp: {response.text}")
-    except Exception as e:
-        print(f"Error enviando WhatsApp: {e}")
-
-
-# Endpoint para enviar notificación manual
-@router.post("/send-notification/{reclamo_id}")
-async def send_notification(
-    reclamo_id: int,
-    message: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """Envía notificación de WhatsApp al creador de un reclamo"""
-    result = await db.execute(
-        select(Reclamo).where(Reclamo.id == reclamo_id)
-    )
-    reclamo = result.scalar_one_or_none()
-
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
-
-    # Obtener teléfono del creador
-    result = await db.execute(
-        select(User).where(User.id == reclamo.creador_id)
-    )
-    user = result.scalar_one_or_none()
-
-    if not user or not user.telefono:
-        raise HTTPException(status_code=400, detail="Usuario sin teléfono registrado")
-
-    await send_whatsapp_message(user.telefono, message)
-
-    return {"status": "sent", "to": user.telefono}

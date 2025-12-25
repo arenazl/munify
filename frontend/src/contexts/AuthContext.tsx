@@ -3,12 +3,14 @@ import type { ReactNode } from 'react';
 import type { User } from '../types';
 import { authApi } from '../lib/api';
 import api from '../lib/api';
+import { useMunicipioFromUrl, buildMunicipioUrl } from '../hooks/useSubdomain';
 
 export interface Municipio {
   id: number;
   nombre: string;
   codigo: string;
   color_primario?: string;
+  color_secundario?: string;
   logo_url?: string;
 }
 
@@ -23,6 +25,9 @@ interface AuthContextType {
   municipioActual: Municipio | null;
   setMunicipioActual: (municipio: Municipio) => void;
   loadMunicipios: () => Promise<void>;
+  // Subdominio
+  municipioFromUrl: string | null;
+  getMunicipioUrl: (codigo: string, path?: string) => string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -32,6 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [municipioActual, setMunicipioActualState] = useState<Municipio | null>(null);
+
+  // Detectar municipio desde URL (subdominio o query param)
+  const municipioFromUrl = useMunicipioFromUrl();
+
+  // Helper para generar URLs con subdominio
+  const getMunicipioUrl = (codigo: string, path: string = '/') => {
+    return buildMunicipioUrl(codigo, path);
+  };
 
   // Cargar municipios disponibles para el usuario
   const loadMunicipios = async () => {
@@ -180,7 +193,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       municipios,
       municipioActual,
       setMunicipioActual,
-      loadMunicipios
+      loadMunicipios,
+      municipioFromUrl,
+      getMunicipioUrl
     }}>
       {children}
     </AuthContext.Provider>

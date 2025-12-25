@@ -14,7 +14,7 @@ from models.municipio import Municipio
 from models.user import User
 from models.zona import Zona
 from models.categoria import Categoria
-from models.cuadrilla import Cuadrilla
+from models.empleado import Empleado
 from models.reclamo import Reclamo
 from models.historial import HistorialReclamo
 from models.calificacion import Calificacion
@@ -190,12 +190,15 @@ CATEGORIAS_DATA = [
     {"nombre": "Veredas", "icono": "Footprints", "color": "#64748b", "tiempo": 120, "prioridad": 3},
 ]
 
-CUADRILLAS_DATA = [
-    {"nombre": "Equipo Alumbrado", "especialidad": "Electricidad"},
-    {"nombre": "Equipo Vial", "especialidad": "Baches"},
-    {"nombre": "Equipo Limpieza", "especialidad": "Residuos"},
-    {"nombre": "Equipo Verde", "especialidad": "Arbolado"},
-    {"nombre": "Equipo Hidráulico", "especialidad": "Agua"},
+EMPLEADOS_DATA = [
+    {"nombre": "Carlos", "apellido": "Ramírez", "especialidad": "Electricidad"},
+    {"nombre": "Miguel", "apellido": "Torres", "especialidad": "Baches"},
+    {"nombre": "José", "apellido": "Gutiérrez", "especialidad": "Residuos"},
+    {"nombre": "Roberto", "apellido": "Sosa", "especialidad": "Arbolado"},
+    {"nombre": "Fernando", "apellido": "Molina", "especialidad": "Agua"},
+    {"nombre": "Luis", "apellido": "Castro", "especialidad": "Electricidad"},
+    {"nombre": "Andrés", "apellido": "Vega", "especialidad": "Baches"},
+    {"nombre": "Daniel", "apellido": "Herrera", "especialidad": "General"},
 ]
 
 # Títulos de reclamos por categoría
@@ -275,8 +278,8 @@ async def clear_data(session: AsyncSession):
     await session.execute(delete(HistorialReclamo))
     await session.execute(delete(Reclamo))
     await session.execute(delete(User).where(User.email != "admin@test.com"))
-    await session.execute(text("DELETE FROM cuadrilla_categorias"))
-    await session.execute(delete(Cuadrilla))
+    await session.execute(text("DELETE FROM empleado_categoria"))
+    await session.execute(delete(Empleado))
     await session.execute(delete(Zona))
     await session.execute(delete(Categoria))
     await session.execute(delete(Municipio))
@@ -368,30 +371,34 @@ async def seed_categorias(session: AsyncSession, municipio_id: int) -> dict:
     return categorias_map
 
 
-async def seed_cuadrillas(session: AsyncSession, zonas_map: dict, categorias_map: dict, municipio_id: int) -> dict:
-    """Crea cuadrillas y devuelve dict {nombre: id}"""
-    print("[+] Creando cuadrillas...")
-    cuadrillas_map = {}
+async def seed_empleados(session: AsyncSession, zonas_map: dict, categorias_map: dict, municipio_id: int) -> dict:
+    """Crea empleados y devuelve dict {nombre_completo: id}"""
+    print("[+] Creando empleados...")
+    empleados_map = {}
     zona_ids = [z["id"] for z in zonas_map.values()]
+    categoria_ids = list(categorias_map.values())
 
-    for i, c in enumerate(CUADRILLAS_DATA):
-        cuadrilla = Cuadrilla(
-            nombre=c["nombre"],
-            especialidad=c["especialidad"],
+    for i, e in enumerate(EMPLEADOS_DATA):
+        empleado = Empleado(
+            nombre=e["nombre"],
+            apellido=e["apellido"],
+            especialidad=e["especialidad"],
             zona_id=zona_ids[i % len(zona_ids)],
+            categoria_principal_id=categoria_ids[i % len(categoria_ids)],
             municipio_id=municipio_id,
             capacidad_maxima=10,
             activo=True
         )
-        session.add(cuadrilla)
+        session.add(empleado)
         await session.flush()
-        cuadrillas_map[c["nombre"]] = cuadrilla.id
+        nombre_completo = f"{e['nombre']} {e['apellido']}"
+        empleados_map[nombre_completo] = empleado.id
     await session.commit()
-    print(f"    [OK] {len(cuadrillas_map)} cuadrillas creadas")
-    return cuadrillas_map
+    print(f"    [OK] {len(empleados_map)} empleados creados")
+    return empleados_map
 
 
-async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, municipio_id: int, codigo_muni: str) -> dict:
+async def seed_usuarios_municipio(session: AsyncSession, empleados_map: dict, municipio_id: int, codigo_muni: str) -> dict:
     """Crea usuarios de prueba con emails únicos por municipio"""
     print("[+] Creando usuarios...")
     usuarios_map = {}
@@ -429,37 +436,37 @@ async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, m
     await session.flush()
     usuarios_map["supervisor"] = supervisor.id
 
-    # Usuario de cuadrilla principal (sin número para demo)
-    primera_cuadrilla_id = list(cuadrillas_map.values())[0] if cuadrillas_map else None
-    cuadrilla_user = User(
-        email=f"cuadrilla@{domain}",
+    # Usuario empleado principal (sin número para demo)
+    primer_empleado_id = list(empleados_map.values())[0] if empleados_map else None
+    empleado_user = User(
+        email=f"empleado@{domain}",
         password_hash=password,
         nombre="Operario",
         apellido="Principal",
-        rol=RolUsuario.CUADRILLA,
-        cuadrilla_id=primera_cuadrilla_id,
+        rol=RolUsuario.EMPLEADO,
+        empleado_id=primer_empleado_id,
         municipio_id=municipio_id,
         activo=True
     )
-    session.add(cuadrilla_user)
+    session.add(empleado_user)
     await session.flush()
-    usuarios_map["cuadrilla_0"] = cuadrilla_user.id
+    usuarios_map["empleado_0"] = empleado_user.id
 
-    # Usuarios de cuadrilla adicionales
-    for i, (nombre, cuadrilla_id) in enumerate(list(cuadrillas_map.items())[1:], start=1):
+    # Usuarios empleados adicionales
+    for i, (nombre, empleado_id) in enumerate(list(empleados_map.items())[1:], start=1):
         user = User(
-            email=f"cuadrilla{i+1}@{domain}",
+            email=f"empleado{i+1}@{domain}",
             password_hash=password,
             nombre=f"Operario {i+1}",
             apellido=nombre.split()[-1],
-            rol=RolUsuario.CUADRILLA,
-            cuadrilla_id=cuadrilla_id,
+            rol=RolUsuario.EMPLEADO,
+            empleado_id=empleado_id,
             municipio_id=municipio_id,
             activo=True
         )
         session.add(user)
         await session.flush()
-        usuarios_map[f"cuadrilla_{i}"] = user.id
+        usuarios_map[f"empleado_{i}"] = user.id
 
     # Vecino principal (sin número para demo)
     vecino_principal = User(
@@ -503,7 +510,7 @@ async def seed_usuarios_municipio(session: AsyncSession, cuadrillas_map: dict, m
 
 
 async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: dict,
-                        cuadrillas_map: dict, usuarios_map: dict, municipio_id: int):
+                        empleados_map: dict, usuarios_map: dict, municipio_id: int):
     """Crea reclamos con distribucion realista para un dashboard útil"""
     print("[+] Creando reclamos...")
 
@@ -518,7 +525,7 @@ async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: 
     ]
 
     vecino_ids = [v for k, v in usuarios_map.items() if k.startswith("vecino_")]
-    cuadrilla_ids = list(cuadrillas_map.values())
+    empleado_ids = list(empleados_map.values())
     zona_nombres = list(zonas_map.keys())
     categoria_nombres = list(categorias_map.keys())
 
@@ -562,7 +569,7 @@ async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: 
         )
 
         if estado != EstadoReclamo.NUEVO:
-            reclamo.cuadrilla_id = random.choice(cuadrilla_ids)
+            reclamo.empleado_id = random.choice(empleado_ids)
 
         session.add(reclamo)
         reclamos_creados += 1
@@ -602,7 +609,7 @@ async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: 
             creador_id=random.choice(vecino_ids),
             municipio_id=municipio_id,
             created_at=created_at,
-            cuadrilla_id=random.choice(cuadrilla_ids),
+            empleado_id=random.choice(empleado_ids),
             # Fecha programada en el PASADO (vencido)
             fecha_programada=(datetime.now() - timedelta(days=random.randint(1, 3))).date()
         )
@@ -641,7 +648,7 @@ async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: 
             creador_id=random.choice(vecino_ids),
             municipio_id=municipio_id,
             created_at=created_at,
-            cuadrilla_id=random.choice(cuadrilla_ids),
+            empleado_id=random.choice(empleado_ids),
             fecha_programada=datetime.now().date()  # HOY
         )
 
@@ -694,7 +701,7 @@ async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: 
             )
 
             if estado == EstadoReclamo.ASIGNADO:
-                reclamo.cuadrilla_id = random.choice(cuadrilla_ids)
+                reclamo.empleado_id = random.choice(empleado_ids)
 
             session.add(reclamo)
             reclamos_creados += 1
@@ -749,9 +756,9 @@ async def seed_reclamos(session: AsyncSession, zonas_map: dict, categorias_map: 
             created_at=created_at
         )
 
-        # Si está asignado o más avanzado, asignar cuadrilla
+        # Si está asignado o más avanzado, asignar empleado
         if estado in [EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO, EstadoReclamo.RESUELTO]:
-            reclamo.cuadrilla_id = random.choice(cuadrilla_ids)
+            reclamo.empleado_id = random.choice(empleado_ids)
 
             # Programar fecha para los próximos días si está asignado
             if estado == EstadoReclamo.ASIGNADO:
@@ -870,9 +877,9 @@ async def main():
 
                 zonas_map = await seed_zonas(session, municipio_id, codigo)
                 categorias_map = await seed_categorias(session, municipio_id)
-                cuadrillas_map = await seed_cuadrillas(session, zonas_map, categorias_map, municipio_id)
-                usuarios_map = await seed_usuarios_municipio(session, cuadrillas_map, municipio_id, codigo)
-                await seed_reclamos(session, zonas_map, categorias_map, cuadrillas_map, usuarios_map, municipio_id)
+                empleados_map = await seed_empleados(session, zonas_map, categorias_map, municipio_id)
+                usuarios_map = await seed_usuarios_municipio(session, empleados_map, municipio_id, codigo)
+                await seed_reclamos(session, zonas_map, categorias_map, empleados_map, usuarios_map, municipio_id)
 
             print("\n" + "="*60)
             print("[OK] SEED COMPLETADO EXITOSAMENTE")
@@ -883,10 +890,12 @@ async def main():
             print("\nUsuarios de prueba (contraseña: 123456 para todos):")
             print("   - Admin: admin@{codigo}.test.com")
             print("   - Supervisor: supervisor@{codigo}.test.com")
-            print("   - Cuadrilla: cuadrilla@{codigo}.test.com")
+            print("   - Empleado: empleado@{codigo}.test.com")
             print("   - Vecino: vecino@{codigo}.test.com")
             print("\nEjemplo para Merlo:")
             print("   - admin@merlo.test.com / 123456")
+            print("   - empleado@merlo.test.com / 123456")
+            print("   - vecino@merlo.test.com / 123456")
             print()
 
         except Exception as e:

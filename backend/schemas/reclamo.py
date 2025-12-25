@@ -13,6 +13,11 @@ class ReclamoCreate(BaseModel):
     categoria_id: int
     zona_id: Optional[int] = None
     prioridad: int = 3
+    # Datos de contacto del ciudadano (para registro automático)
+    nombre_contacto: Optional[str] = None
+    telefono_contacto: Optional[str] = None
+    email_contacto: Optional[str] = None
+    recibir_notificaciones: bool = True
 
 class ReclamoUpdate(BaseModel):
     titulo: Optional[str] = None
@@ -44,6 +49,7 @@ class CreadorSimple(BaseModel):
     nombre: str
     apellido: str
     email: str
+    telefono: Optional[str] = None
 
     class Config:
         from_attributes = True

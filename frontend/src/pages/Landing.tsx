@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, Wrench, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
+import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
 
 interface Municipio {
   id: number;
@@ -19,22 +20,16 @@ interface Municipio {
 
 const getApiUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
-  console.log('🔧 VITE_API_URL desde .env:', envUrl);
   if (envUrl) {
-    console.log('✅ Usando URL del .env:', envUrl);
     return envUrl;
   }
   if (import.meta.env.DEV) {
     const host = window.location.hostname;
-    const url = `http://${host}:8001/api`;
-    console.log('🔧 DEV mode, usando host:', host, '-> URL:', url);
-    return url;
+    return `http://${host}:8001/api`;
   }
-  console.log('🔧 Fallback a localhost');
   return 'http://localhost:8001/api';
 };
 const API_URL = getApiUrl();
-console.log('🔗 API_URL final:', API_URL);
 
 // Calcular distancia entre dos puntos (Haversine)
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -57,6 +52,9 @@ export default function Landing() {
   const [suggestedMunicipio, setSuggestedMunicipio] = useState<Municipio | null>(null);
   const [locationStatus, setLocationStatus] = useState<string>('');
 
+  // Detectar municipio desde subdominio o query param
+  const municipioFromUrl = useMunicipioFromUrl();
+
   // Debug mode - mostrar usuarios de prueba después de seleccionar municipio
   const [selectedMunicipio, setSelectedMunicipio] = useState<Municipio | null>(null);
   const [debugLoading, setDebugLoading] = useState(false);
@@ -75,30 +73,40 @@ export default function Landing() {
   }>>([]);
 
   useEffect(() => {
-    // Limpiar selección anterior de municipio al entrar al landing
-    localStorage.removeItem('municipio_codigo');
-    localStorage.removeItem('municipio_id');
-    localStorage.removeItem('municipio_nombre');
-    localStorage.removeItem('municipio_color');
+    // No limpiar si viene de un subdominio específico
+    if (!municipioFromUrl) {
+      localStorage.removeItem('municipio_codigo');
+      localStorage.removeItem('municipio_id');
+      localStorage.removeItem('municipio_nombre');
+      localStorage.removeItem('municipio_color');
+    }
     fetchMunicipios();
   }, []);
 
-  // Detectar ubicación cuando tengamos municipios
+  // Auto-seleccionar municipio si viene desde subdominio o query param
   useEffect(() => {
-    if (municipios.length > 0) {
+    if (municipioFromUrl && municipios.length > 0 && !selectedMunicipio) {
+      const found = municipios.find(m => m.codigo.toLowerCase() === municipioFromUrl.toLowerCase());
+      if (found) {
+        seleccionarMunicipio(found);
+      }
+    }
+  }, [municipioFromUrl, municipios]);
+
+  // Detectar ubicación cuando tengamos municipios (solo si no hay municipio desde URL)
+  useEffect(() => {
+    if (municipios.length > 0 && !municipioFromUrl) {
       detectarUbicacion();
     }
-  }, [municipios]);
+  }, [municipios, municipioFromUrl]);
 
   const detectarUbicacion = () => {
-    console.log('📍 Intentando detectar ubicación...');
     setLocationStatus('Detectando ubicación...');
 
     // En desarrollo sin HTTPS, usar ubicación fija (Merlo, Buenos Aires)
     const isSecureOrigin = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
 
     if (!isSecureOrigin) {
-      console.log('⚠️ No es origen seguro, usando ubicación fija de desarrollo (Merlo)');
       // Coordenadas de Merlo, Buenos Aires
       const devLatitude = -34.6637;
       const devLongitude = -58.7276;
@@ -107,7 +115,6 @@ export default function Landing() {
     }
 
     if (!navigator.geolocation) {
-      console.log('❌ Geolocalización no soportada');
       setLocationStatus('Geolocalización no soportada');
       return;
     }
@@ -115,11 +122,9 @@ export default function Landing() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        console.log('📍 Ubicación detectada:', latitude, longitude);
         procesarUbicacion(latitude, longitude);
       },
-      (error) => {
-        console.log('❌ Error de geolocalización:', error.code, error.message);
+      () => {
         setLocationStatus('No se pudo detectar ubicación');
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -127,15 +132,12 @@ export default function Landing() {
   };
 
   const procesarUbicacion = (latitude: number, longitude: number) => {
-    console.log('🔍 Procesando ubicación:', latitude, longitude);
-
     // Encontrar municipio más cercano
     let municipioCercano: Municipio | null = null;
     let menorDistancia = Infinity;
 
     municipios.forEach(muni => {
       const distancia = calcularDistancia(latitude, longitude, muni.latitud, muni.longitud);
-      console.log(`  📏 Distancia a ${muni.nombre}: ${distancia.toFixed(2)} km`);
       if (distancia < menorDistancia) {
         menorDistancia = distancia;
         municipioCercano = { ...muni, distancia_km: distancia };
@@ -144,26 +146,20 @@ export default function Landing() {
 
     if (municipioCercano) {
       const cercano = municipioCercano as Municipio;
-      console.log('✅ Municipio más cercano:', cercano.nombre, `(${menorDistancia.toFixed(2)} km)`);
       setSuggestedMunicipio(cercano);
       setLocationStatus(`Cerca de ${cercano.nombre}`);
     }
   };
 
   const fetchMunicipios = async () => {
-    console.log('🔄 Fetching municipios desde:', `${API_URL}/municipios/public`);
     try {
       const response = await fetch(`${API_URL}/municipios/public`);
-      console.log('📡 Response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Municipios cargados:', data.length, data.map((m: Municipio) => m.nombre));
         setMunicipios(data);
-      } else {
-        console.error('❌ Error response:', response.status, response.statusText);
       }
-    } catch (error) {
-      console.error('❌ Error al cargar municipios:', error);
+    } catch {
+      // Silently fail - municipios list will be empty
     } finally {
       setLoading(false);
     }
@@ -185,8 +181,8 @@ export default function Landing() {
         const users = await response.json();
         setDemoUsers(users);
       }
-    } catch (error) {
-      console.error('Error al cargar usuarios demo:', error);
+    } catch {
+      // Silent fail - demo users won't be shown
     }
   };
 

@@ -10,9 +10,10 @@ interface SheetProps {
   children: ReactNode;
   footer?: ReactNode;
   stickyFooter?: ReactNode; // Footer que siempre está fijo abajo
+  stickyHeader?: ReactNode; // Header adicional que queda sticky debajo del título
 }
 
-export function Sheet({ open, onClose, title, description, children, footer, stickyFooter }: SheetProps) {
+export function Sheet({ open, onClose, title, description, children, footer, stickyFooter, stickyHeader }: SheetProps) {
   const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
@@ -53,8 +54,9 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
       {/* Side Panel con slide + scale desde la derecha - 100% viewport visible */}
       <div
-        className="fixed top-0 right-0 z-50 w-full max-w-lg flex flex-col"
+        className="fixed inset-y-0 right-0 z-50 w-full max-w-lg flex flex-col"
         style={{
+          height: '100dvh', // Dynamic viewport height para mobile (fallback to 100vh in older browsers)
           backgroundColor: theme.card,
           transform: isVisible
             ? 'translateX(0) scale(1)'
@@ -64,8 +66,6 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
             ? `-20px 0 60px rgba(0, 0, 0, 0.3), -5px 0 20px ${theme.primary}20`
             : 'none',
           transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-          height: '100dvh', // Dynamic viewport height - sin contar scroll
-          maxHeight: '100dvh',
         }}
       >
         {/* Línea de acento animada */}
@@ -110,9 +110,26 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           </button>
         </div>
 
+        {/* Sticky Header adicional (ej: estado y categoría) */}
+        {stickyHeader && (
+          <div
+            className="flex-shrink-0 px-6 py-3"
+            style={{
+              borderBottom: `1px solid ${theme.border}`,
+              backgroundColor: theme.backgroundSecondary,
+              transform: isVisible ? 'translateX(0)' : 'translateX(25px)',
+              opacity: isVisible ? 1 : 0,
+              transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+              transitionDelay: isVisible ? '120ms' : '0ms',
+            }}
+          >
+            {stickyHeader}
+          </div>
+        )}
+
         {/* Content con animación escalonada */}
         <div
-          className="flex-1 overflow-y-auto px-6 py-4"
+          className="flex-1 overflow-y-auto px-6 py-4 min-h-0"
           style={{
             color: theme.text,
             transform: isVisible ? 'translateX(0)' : 'translateX(30px)',
@@ -124,10 +141,10 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           {children}
         </div>
 
-        {/* Footer sticky - siempre pegado al fondo del viewport */}
+        {/* Footer - pegado al fondo del viewport usando flexbox */}
         {(footer || stickyFooter) && (
           <div
-            className="px-6 py-4 flex-shrink-0 sticky bottom-0 left-0 right-0 z-10"
+            className="px-6 py-4 flex-shrink-0"
             style={{
               borderTop: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,

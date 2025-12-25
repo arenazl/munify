@@ -13,6 +13,12 @@ from .sla import SLAConfig, SLAViolacion
 from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
 from .enums import EstadoReclamo, RolUsuario, MotivoRechazo
+from .gamificacion import (
+    PuntosUsuario, HistorialPuntos, BadgeUsuario,
+    LeaderboardMensual, RecompensaDisponible, RecompensaCanjeada,
+    TipoAccion, TipoBadge, PUNTOS_POR_ACCION, BADGES_CONFIG
+)
+from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 
 __all__ = [
     "Municipio",
@@ -32,5 +38,20 @@ __all__ = [
     "HistorialEscalado",
     "EstadoReclamo",
     "RolUsuario",
-    "MotivoRechazo"
+    "MotivoRechazo",
+    # Gamificación
+    "PuntosUsuario",
+    "HistorialPuntos",
+    "BadgeUsuario",
+    "LeaderboardMensual",
+    "RecompensaDisponible",
+    "RecompensaCanjeada",
+    "TipoAccion",
+    "TipoBadge",
+    "PUNTOS_POR_ACCION",
+    "BADGES_CONFIG",
+    # WhatsApp
+    "WhatsAppConfig",
+    "WhatsAppLog",
+    "WhatsAppProvider"
 ]

@@ -90,7 +90,6 @@ export default function Categorias() {
     }
 
     // Las imágenes no existen, descargarlas automáticamente
-    console.log('📷 Primera vez en este municipio, descargando imágenes de categorías...');
     setDownloadingImages(true);
     toast.info('Descargando imágenes de categorías por primera vez...');
 
