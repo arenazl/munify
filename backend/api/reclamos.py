@@ -17,7 +17,7 @@ from models.enums import EstadoReclamo, RolUsuario
 from models.whatsapp_config import WhatsAppConfig
 from schemas.reclamo import (
     ReclamoCreate, ReclamoUpdate, ReclamoResponse,
-    ReclamoAsignar, ReclamoRechazar, ReclamoResolver
+    ReclamoAsignar, ReclamoRechazar, ReclamoResolver, ReclamoComentario
 )
 from schemas.historial import HistorialResponse
 from services.gamificacion_service import GamificacionService
@@ -39,7 +39,12 @@ async def enviar_notificacion_whatsapp(
     Envía notificación WhatsApp si está configurado y el usuario tiene teléfono.
     tipo_notificacion: 'reclamo_recibido', 'reclamo_asignado', 'cambio_estado', 'reclamo_resuelto'
     """
-    print(f"[WhatsApp] Iniciando notificacion: {tipo_notificacion} para reclamo #{reclamo.id}, municipio {municipio_id}")
+    print(f"\n{'='*50}", flush=True)
+    print(f"📱 WHATSAPP NOTIFICATION", flush=True)
+    print(f"{'='*50}", flush=True)
+    print(f"   Tipo:      {tipo_notificacion}", flush=True)
+    print(f"   Reclamo:   #{reclamo.id} - {reclamo.titulo[:30]}...", flush=True)
+    print(f"   Municipio: {municipio_id}", flush=True)
 
     try:
         # Obtener configuración WhatsApp del municipio
@@ -49,11 +54,13 @@ async def enviar_notificacion_whatsapp(
         config = result.scalar_one_or_none()
 
         if not config:
-            print(f"[WhatsApp] No hay config para municipio {municipio_id}")
+            print(f"   ❌ SKIP: No hay config WhatsApp para este municipio", flush=True)
+            print(f"{'='*50}\n", flush=True)
             return
 
         if not config.habilitado:
-            print(f"[WhatsApp] WhatsApp deshabilitado para municipio {municipio_id}")
+            print(f"   ❌ SKIP: WhatsApp está deshabilitado", flush=True)
+            print(f"{'='*50}\n", flush=True)
             return
 
         # Verificar si este tipo de notificación está habilitado
@@ -65,7 +72,8 @@ async def enviar_notificacion_whatsapp(
         }.get(tipo_notificacion, False)
 
         if not notif_habilitada:
-            print(f"[WhatsApp] Notificacion '{tipo_notificacion}' deshabilitada en config")
+            print(f"   ❌ SKIP: Notificacion '{tipo_notificacion}' deshabilitada", flush=True)
+            print(f"{'='*50}\n", flush=True)
             return
 
         # Obtener usuario creador del reclamo
@@ -75,14 +83,17 @@ async def enviar_notificacion_whatsapp(
         user = result.scalar_one_or_none()
 
         if not user:
-            print(f"[WhatsApp] Usuario creador no encontrado (id={reclamo.creador_id})")
+            print(f"   ❌ SKIP: Usuario creador no encontrado (id={reclamo.creador_id})", flush=True)
+            print(f"{'='*50}\n", flush=True)
             return
 
         if not user.telefono:
-            print(f"[WhatsApp] Usuario {user.email} no tiene telefono registrado")
+            print(f"   ❌ SKIP: Usuario {user.email} sin teléfono", flush=True)
+            print(f"{'='*50}\n", flush=True)
             return
 
-        print(f"[WhatsApp] Enviando a {user.telefono} ({user.email})")
+        print(f"   Usuario:   {user.nombre} {user.apellido} ({user.email})", flush=True)
+        print(f"   Teléfono:  {user.telefono}", flush=True)
 
         # Importar función de envío (evitar import circular)
         from api.whatsapp import send_whatsapp_message_with_config
@@ -90,35 +101,60 @@ async def enviar_notificacion_whatsapp(
         # Preparar mensaje según tipo
         estado_texto = reclamo.estado.value.replace('_', ' ').title() if reclamo.estado else "Desconocido"
 
+        # URL del reclamo para que el usuario pueda verlo
+        reclamo_url = f"{settings.FRONTEND_URL}/reclamos/{reclamo.id}"
+
+        # Truncar descripción si es muy larga
+        descripcion_corta = reclamo.descripcion[:150] + "..." if len(reclamo.descripcion) > 150 else reclamo.descripcion
+
         plantillas = {
             'reclamo_recibido': (
                 f"✅ *Reclamo Recibido*\n\n"
-                f"Tu reclamo #{reclamo.id} ha sido registrado.\n\n"
-                f"📝 *{reclamo.titulo}*\n\n"
-                f"Te notificaremos cuando haya actualizaciones."
+                f"Hola {user.nombre}! Tu reclamo ha sido registrado correctamente.\n\n"
+                f"📋 *Número:* #{reclamo.id}\n"
+                f"📝 *Asunto:* {reclamo.titulo}\n"
+                f"_{descripcion_corta}_\n\n"
+                f"📍 *Ubicación:* {reclamo.direccion or 'No especificada'}\n\n"
+                f"Te notificaremos cuando haya novedades.\n\n"
+                f"🔗 *Ver detalle:* {reclamo_url}"
             ),
             'reclamo_asignado': (
-                f"👤 *Reclamo Asignado*\n\n"
-                f"Tu reclamo #{reclamo.id} ha sido asignado a un empleado.\n\n"
-                f"📝 *{reclamo.titulo}*\n\n"
-                f"Pronto comenzarán a trabajar en él."
+                f"👷 *Reclamo Asignado*\n\n"
+                f"Hola {user.nombre}! Tu reclamo ha sido asignado a un técnico.\n\n"
+                f"📋 *Número:* #{reclamo.id}\n"
+                f"📝 *Asunto:* {reclamo.titulo}\n"
+                f"_{descripcion_corta}_\n\n"
+                f"Pronto comenzarán a trabajar en él.\n\n"
+                f"💬 Puedes agregar comentarios o información adicional desde el siguiente enlace:\n"
+                f"🔗 *Ver detalle:* {reclamo_url}"
             ),
             'cambio_estado': (
                 f"🔄 *Actualización de Reclamo*\n\n"
-                f"Tu reclamo #{reclamo.id} ha cambiado a: *{estado_texto}*\n\n"
-                f"📝 *{reclamo.titulo}*"
+                f"Hola {user.nombre}! Tu reclamo ha cambiado de estado.\n\n"
+                f"📋 *Número:* #{reclamo.id}\n"
+                f"📝 *Asunto:* {reclamo.titulo}\n"
+                f"_{descripcion_corta}_\n\n"
+                f"🚦 *Nuevo estado:* {estado_texto}\n\n"
+                f"💬 Puedes agregar comentarios desde:\n"
+                f"🔗 *Ver detalle:* {reclamo_url}"
             ),
             'reclamo_resuelto': (
                 f"✅ *¡Reclamo Resuelto!*\n\n"
-                f"Tu reclamo #{reclamo.id} ha sido resuelto.\n\n"
-                f"📝 *{reclamo.titulo}*\n\n"
-                f"¡Gracias por tu paciencia!"
+                f"Hola {user.nombre}! Tu reclamo ha sido resuelto.\n\n"
+                f"📋 *Número:* #{reclamo.id}\n"
+                f"📝 *Asunto:* {reclamo.titulo}\n"
+                f"_{descripcion_corta}_\n\n"
+                f"¡Gracias por tu paciencia!\n\n"
+                f"⭐ *Por favor califica la atención recibida:*\n"
+                f"🔗 {reclamo_url}"
             ),
         }
 
         mensaje = plantillas.get(tipo_notificacion, "")
         if not mensaje:
             return
+
+        print(f"   Enviando mensaje...", flush=True)
 
         # Enviar mensaje
         message_id = await send_whatsapp_message_with_config(
@@ -130,11 +166,13 @@ async def enviar_notificacion_whatsapp(
             usuario_id=user.id,
             reclamo_id=reclamo.id
         )
-        print(f"[WhatsApp] OK! Mensaje enviado (id={message_id})")
+        print(f"   ✅ ENVIADO! Message ID: {message_id}", flush=True)
+        print(f"{'='*50}\n", flush=True)
 
     except Exception as e:
         # No fallar si hay error en WhatsApp, solo loguear
-        print(f"[WhatsApp] ERROR: {e}")
+        print(f"   ❌ ERROR: {e}", flush=True)
+        print(f"{'='*50}\n", flush=True)
 
 
 def get_effective_municipio_id(request: Request, current_user: User) -> int:
@@ -317,6 +355,15 @@ async def create_reclamo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    print(f"\n{'='*80}", flush=True)
+    print(f"🆕 CREANDO NUEVO RECLAMO", flush=True)
+    print(f"{'='*80}", flush=True)
+    print(f"Usuario: {current_user.email} (ID: {current_user.id})", flush=True)
+    print(f"Título: {data.titulo}", flush=True)
+    print(f"Categoría ID: {data.categoria_id}", flush=True)
+    print(f"Municipio ID: {current_user.municipio_id}", flush=True)
+    print(f"{'='*80}\n", flush=True)
+
     # Actualizar datos de contacto del usuario si se proporcionan
     if data.nombre_contacto or data.telefono_contacto or data.email_contacto:
         if data.nombre_contacto:
@@ -361,13 +408,17 @@ async def create_reclamo(
     db.add(historial)
 
     await db.commit()
+    print(f"✅ Reclamo #{reclamo.id} creado exitosamente en BD", flush=True)
 
     # Gamificación: otorgar puntos por crear reclamo
     try:
+        print(f"🎮 Procesando gamificación...", flush=True)
         puntos, badges = await GamificacionService.procesar_reclamo_creado(
             db, reclamo, current_user
         )
+        print(f"✅ Gamificación procesada: {puntos} puntos, {len(badges)} badges", flush=True)
     except Exception as e:
+        print(f"⚠️ Error en gamificación: {e}", flush=True)
         # No fallar si hay error en gamificación
         pass
 
@@ -375,8 +426,12 @@ async def create_reclamo(
     await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
 
     # Recargar con relaciones
+    print(f"🔄 Recargando reclamo con relaciones...", flush=True)
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo.id))
-    return result.scalar_one()
+    reclamo_final = result.scalar_one()
+    print(f"✅ Reclamo #{reclamo_final.id} listo para retornar", flush=True)
+    print(f"{'='*80}\n", flush=True)
+    return reclamo_final
 
 @router.put("/{reclamo_id}", response_model=ReclamoResponse)
 async def update_reclamo(
@@ -582,6 +637,40 @@ async def rechazar_reclamo(
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
+
+
+@router.post("/{reclamo_id}/comentario", response_model=HistorialResponse)
+async def agregar_comentario(
+    reclamo_id: int,
+    data: ReclamoComentario,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Agrega un comentario a un reclamo (disponible para vecinos en sus propios reclamos)"""
+    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
+    reclamo = result.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Verificar permisos: admin/supervisor pueden comentar en cualquiera,
+    # vecinos solo en sus propios reclamos
+    if current_user.rol == RolUsuario.VECINO and reclamo.creador_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para comentar en este reclamo")
+
+    # Crear entrada en el historial
+    historial = HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=current_user.id,
+        estado_anterior=reclamo.estado,
+        estado_nuevo=reclamo.estado,  # El estado no cambia
+        accion="comentario",
+        comentario=data.comentario
+    )
+    db.add(historial)
+    await db.commit()
+    await db.refresh(historial)
+
+    return historial
 
 
 # Tipos de archivo permitidos y tamaño máximo

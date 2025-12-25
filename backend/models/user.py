@@ -20,6 +20,7 @@ class User(Base):
     telefono = Column(String(20), nullable=True)
     dni = Column(String(20), nullable=True)
     direccion = Column(String(255), nullable=True)
+    es_anonimo = Column(Boolean, default=False)  # Usuario anónimo (identidad oculta para el municipio)
     rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
 

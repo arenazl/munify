@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Puerto del servidor
     PORT: int = 8000
 
+    # URL del frontend (para links en notificaciones)
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # Gemini (Google - gratis con límites) - IA por defecto
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"

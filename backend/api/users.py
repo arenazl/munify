@@ -7,9 +7,40 @@ from core.database import get_db
 from core.security import get_current_user, require_roles, get_password_hash
 from models.user import User
 from models.enums import RolUsuario
-from schemas.user import UserResponse, UserUpdate, UserCreate
+from schemas.user import UserResponse, UserUpdate, UserCreate, UserProfileUpdate
 
 router = APIRouter()
+
+# ============================================
+# ENDPOINTS DE PERFIL PROPIO (cualquier usuario autenticado)
+# ============================================
+
+@router.get("/me", response_model=UserResponse)
+async def get_my_profile(
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener el perfil del usuario actual"""
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+async def update_my_profile(
+    profile_data: UserProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Actualizar el perfil del usuario actual (campos limitados)"""
+    update_data = profile_data.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
+        setattr(current_user, key, value)
+
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+# ============================================
+# ENDPOINTS DE ADMINISTRACIÓN (admin/supervisor)
+# ============================================
 
 @router.get("/", response_model=List[UserResponse])
 async def get_users(

@@ -9,7 +9,8 @@ import {
   ChevronRight,
   Loader2,
   ArrowLeft,
-  Tag
+  Tag,
+  ClipboardList
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -38,11 +39,11 @@ export default function MobileMisReclamos() {
   const [filter, setFilter] = useState<'todos' | 'pendientes' | 'resueltos'>('todos');
 
   useEffect(() => {
-    if (!user) {
-      navigate('/app/login');
-      return;
+    if (user) {
+      loadReclamos();
+    } else {
+      setLoading(false);
     }
-    loadReclamos();
   }, [user]);
 
   useEffect(() => {
@@ -91,6 +92,63 @@ export default function MobileMisReclamos() {
     if (filter === 'resueltos') return r.estado === 'resuelto';
     return true;
   });
+
+  // Si no está logueado, mostrar pantalla de invitación
+  if (!user) {
+    return (
+      <div className="p-4">
+        <div
+          className="rounded-2xl p-6 text-center"
+          style={{
+            background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}dd)`,
+          }}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-white/20 flex items-center justify-center">
+            <ClipboardList className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">
+            Seguí tus reclamos
+          </h2>
+          <p className="text-white/80 text-sm mb-6">
+            Creá una cuenta para ver el estado de todos tus reclamos y recibir notificaciones
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate('/app/register')}
+              className="w-full py-3 px-4 bg-white text-slate-900 font-semibold rounded-xl"
+            >
+              Crear Cuenta Gratis
+            </button>
+            <button
+              onClick={() => navigate('/app/login')}
+              className="w-full py-3 px-4 bg-white/20 text-white font-semibold rounded-xl"
+            >
+              Ya tengo cuenta
+            </button>
+          </div>
+        </div>
+
+        <div
+          className="mt-4 rounded-xl p-4"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <h3 className="font-medium mb-2" style={{ color: theme.text }}>
+            ¿Todavía no creaste un reclamo?
+          </h3>
+          <p className="text-sm mb-3" style={{ color: theme.textSecondary }}>
+            Podés crear reclamos sin cuenta, pero no podrás ver su seguimiento.
+          </p>
+          <button
+            onClick={() => navigate('/app/nuevo')}
+            className="w-full py-2.5 rounded-xl font-medium"
+            style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+          >
+            Crear Reclamo
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedReclamo) {
     const config = estadoConfig[selectedReclamo.estado];

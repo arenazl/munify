@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -145,6 +145,7 @@ type SheetMode = 'closed' | 'view';
 
 export default function Reclamos() {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
@@ -1919,7 +1920,7 @@ export default function Reclamos() {
           >
             <ABMField
               label="Nombre"
-              value={selectedReclamo.empleado_asignado.nombre}
+              value={`${selectedReclamo.empleado_asignado.nombre || ''}${selectedReclamo.empleado_asignado.apellido ? ' ' + selectedReclamo.empleado_asignado.apellido : ''}`.trim() || 'Sin nombre'}
             />
             {selectedReclamo.empleado_asignado.especialidad && (
               <ABMField
@@ -2374,7 +2375,21 @@ export default function Reclamos() {
     const canResolver = selectedReclamo.estado === 'en_proceso';
 
     return (
-      <div className="flex gap-2">
+      <div className="space-y-2">
+        {/* Botón Ver Historial Completo */}
+        <button
+          onClick={() => {
+            closeSheet();
+            navigate(`/reclamos/${selectedReclamo.id}`);
+          }}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+        >
+          <ExternalLink className="h-4 w-4" />
+          Ver Historial Completo
+        </button>
+
+        <div className="flex gap-2">
         {/* Botón Asignar - para estado nuevo */}
         {canAsignar && (
           <>
@@ -2433,6 +2448,7 @@ export default function Reclamos() {
             {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
           </div>
         )}
+        </div>
       </div>
     );
   };

@@ -44,6 +44,9 @@ class ReclamoRechazar(BaseModel):
 class ReclamoResolver(BaseModel):
     resolucion: str
 
+class ReclamoComentario(BaseModel):
+    comentario: str
+
 class CreadorSimple(BaseModel):
     id: int
     nombre: str

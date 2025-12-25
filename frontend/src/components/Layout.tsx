@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, themes, ThemeName, accentColors } from '../contexts/ThemeContext';
 import { getNavigation } from '../config/navigation';
@@ -8,6 +8,8 @@ import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { MunicipioSelector } from './MunicipioSelector';
+import { Sheet } from './ui/Sheet';
+import { usersApi } from '../lib/api';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -16,7 +18,17 @@ export default function Layout() {
     return saved === 'true';
   });
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-  const { user, logout, municipioActual } = useAuth();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+  const [profileData, setProfileData] = useState({
+    nombre: '',
+    apellido: '',
+    telefono: '',
+    dni: '',
+    direccion: '',
+  });
+  const [savingProfile, setSavingProfile] = useState(false);
+  const { user, logout, municipioActual, refreshUser } = useAuth();
   const { theme, themeName, setTheme, customPrimary, setCustomPrimary } = useTheme();
   const location = useLocation();
 
@@ -24,6 +36,38 @@ export default function Layout() {
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Cargar datos del usuario cuando se abre el sheet de perfil
+  useEffect(() => {
+    if (profileSheetOpen && user) {
+      setProfileData({
+        nombre: user.nombre || '',
+        apellido: user.apellido || '',
+        telefono: user.telefono || '',
+        dni: user.dni || '',
+        direccion: user.direccion || '',
+      });
+    }
+  }, [profileSheetOpen, user]);
+
+  const handleOpenProfile = () => {
+    setUserMenuOpen(false);
+    setProfileSheetOpen(true);
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await usersApi.updateMyProfile(profileData);
+      // Refrescar datos del usuario en el context
+      await refreshUser();
+      setProfileSheetOpen(false);
+    } catch (error) {
+      console.error('Error al guardar perfil:', error);
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // Obtener nombre del municipio actual (del context o localStorage)
   const nombreMunicipio = municipioActual
@@ -207,22 +251,99 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center space-x-3">
-              {/* User info */}
-              <div className="hidden sm:flex items-center gap-3 pr-3 border-r" style={{ borderColor: theme.border }}>
-                <div
-                  className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                  style={{ backgroundColor: theme.primary }}
+              {/* User info con dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="hidden sm:flex items-center gap-3 pr-3 border-r cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ borderColor: theme.border }}
                 >
-                  {user.nombre[0]}{user.apellido[0]}
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-sm font-medium leading-none" style={{ color: theme.text }}>
-                    {user.nombre} {user.apellido}
-                  </p>
-                  <p className="text-xs capitalize mt-0.5" style={{ color: theme.textSecondary }}>
-                    {user.rol}
-                  </p>
-                </div>
+                  <div
+                    className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    {user.nombre[0]}{user.apellido[0]}
+                  </div>
+                  <div className="hidden md:flex items-center gap-2">
+                    <div>
+                      <p className="text-sm font-medium leading-none text-left" style={{ color: theme.text }}>
+                        {user.nombre} {user.apellido}
+                      </p>
+                      <p className="text-xs capitalize mt-0.5" style={{ color: theme.textSecondary }}>
+                        {user.rol}
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`}
+                      style={{ color: theme.textSecondary }}
+                    />
+                  </div>
+                </button>
+
+                {/* Dropdown menu del usuario */}
+                {userMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setUserMenuOpen(false)}
+                    />
+                    <div
+                      className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl z-50 theme-dropdown-enter overflow-hidden"
+                      style={{
+                        backgroundColor: theme.card,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      {/* Header del menú */}
+                      <div className="px-4 py-3 border-b" style={{ borderColor: theme.border, backgroundColor: theme.backgroundSecondary }}>
+                        <p className="text-sm font-medium" style={{ color: theme.text }}>
+                          {user.nombre} {user.apellido}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: theme.textSecondary }}>
+                          {user.email}
+                        </p>
+                      </div>
+
+                      {/* Opciones */}
+                      <div className="py-1">
+                        <button
+                          onClick={handleOpenProfile}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
+                          style={{ color: theme.text }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.backgroundSecondary;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <User className="h-4 w-4" style={{ color: theme.primary }} />
+                          Mi Perfil
+                        </button>
+
+                        <div className="my-1 border-t" style={{ borderColor: theme.border }} />
+
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            logout();
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
+                          style={{ color: '#ef4444' }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Cerrar sesión
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Theme selector */}
@@ -349,15 +470,6 @@ export default function Layout() {
                   <Settings className="h-5 w-5" />
                 </Link>
               )}
-
-              <button
-                onClick={logout}
-                className="flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 group"
-                style={{ color: theme.text }}
-              >
-                <LogOut className="h-4 w-4 mr-2 transition-transform duration-200 group-hover:-translate-x-1" />
-                Salir
-              </button>
             </div>
           </div>
         </header>
@@ -558,6 +670,152 @@ export default function Layout() {
 
       {/* Chat Widget con IA */}
       <ChatWidget />
+
+      {/* Sheet de edición de perfil */}
+      <Sheet
+        open={profileSheetOpen}
+        onClose={() => setProfileSheetOpen(false)}
+        title="Mi Perfil"
+        description="Edita tus datos personales"
+        stickyFooter={
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setProfileSheetOpen(false)}
+              className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{ border: `1px solid ${theme.border}`, color: theme.text }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveProfile}
+              disabled={savingProfile}
+              className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
+              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+            >
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+              <span className="relative">{savingProfile ? 'Guardando...' : 'Guardar'}</span>
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Avatar y Email (solo lectura) */}
+          <div className="flex items-center gap-4 pb-4 border-b" style={{ borderColor: theme.border }}>
+            <div
+              className="h-16 w-16 rounded-full flex items-center justify-center text-white text-xl font-bold"
+              style={{ backgroundColor: theme.primary }}
+            >
+              {user.nombre[0]}{user.apellido[0]}
+            </div>
+            <div>
+              <p className="text-lg font-semibold" style={{ color: theme.text }}>
+                {user.nombre} {user.apellido}
+              </p>
+              <p className="text-sm" style={{ color: theme.textSecondary }}>
+                {user.email}
+              </p>
+              <span
+                className="inline-block px-2 py-0.5 mt-1 text-xs font-medium rounded-full capitalize"
+                style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+              >
+                {user.rol}
+              </span>
+            </div>
+          </div>
+
+          {/* Campos editables */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+                Nombre <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={profileData.nombre}
+                onChange={(e) => setProfileData({ ...profileData, nombre: e.target.value })}
+                className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-300"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+                Apellido <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={profileData.apellido}
+                onChange={(e) => setProfileData({ ...profileData, apellido: e.target.value })}
+                className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-300"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+                required
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              Teléfono
+            </label>
+            <input
+              type="tel"
+              value={profileData.telefono}
+              onChange={(e) => setProfileData({ ...profileData, telefono: e.target.value })}
+              placeholder="Ej: +54 9 11 1234-5678"
+              className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-300"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              DNI
+            </label>
+            <input
+              type="text"
+              value={profileData.dni}
+              onChange={(e) => setProfileData({ ...profileData, dni: e.target.value })}
+              placeholder="Ej: 12345678"
+              className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-300"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              Dirección
+            </label>
+            <input
+              type="text"
+              value={profileData.direccion}
+              onChange={(e) => setProfileData({ ...profileData, direccion: e.target.value })}
+              placeholder="Ej: Av. San Martín 1234"
+              className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-300"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+          </div>
+        </div>
+      </Sheet>
     </div>
   );
 }

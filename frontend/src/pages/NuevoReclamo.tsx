@@ -28,10 +28,12 @@ import {
   Loader2,
   User,
   Mail,
-  Lock
+  Lock,
+  ShieldCheck,
+  Phone
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, publicoApi, clasificacionApi } from '../lib/api';
+import { reclamosApi, publicoApi, clasificacionApi, authApi } from '../lib/api';
 import { validationSchemas } from '../lib/validations';
 import { Categoria, Zona } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -116,7 +118,7 @@ function getCategoryColor(nombre: string): string {
 
 export default function NuevoReclamo() {
   const { theme } = useTheme();
-  const { user, isLoading: authLoading, register } = useAuth();
+  const { user, isLoading: authLoading, register, login } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -131,13 +133,19 @@ export default function NuevoReclamo() {
   const [registerError, setRegisterError] = useState('');
   const [suggestedCategorias, setSuggestedCategorias] = useState<Array<{categoria: Categoria, confianza: number}>>([]);
   const [showSuggestion, setShowSuggestion] = useState(false);
+  const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
   // Datos de registro (solo se usan si no hay usuario)
   const [registerData, setRegisterData] = useState({
     nombre: '',
     email: '',
     password: '',
+    telefono: '',
   });
+  const [isAnonymous, setIsAnonymous] = useState(true); // Por defecto anónimo
+  const [emailExists, setEmailExists] = useState<boolean | null>(null); // null = no verificado, true = existe, false = nuevo
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const emailCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Esperar a que termine la carga de auth antes de decidir
   const showOnlyRegister = !authLoading && !user;
@@ -183,6 +191,10 @@ export default function NuevoReclamo() {
 
   useEffect(() => {
     const fetchData = async () => {
+      // Evitar carga múltiple (React Strict Mode ejecuta efectos 2 veces)
+      if (dataLoadedRef.current) return;
+      dataLoadedRef.current = true;
+
       try {
         const municipioId = localStorage.getItem('municipio_id');
         const [categoriasRes, zonasRes] = await Promise.all([
@@ -215,7 +227,7 @@ export default function NuevoReclamo() {
     setPreviewUrls(urls);
   };
 
-  // Buscar direcciones con Nominatim (OpenStreetMap)
+  // Buscar direcciones con Nominatim (OpenStreetMap) - limitado al área del municipio
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setAddressSuggestions([]);
@@ -225,8 +237,27 @@ export default function NuevoReclamo() {
 
     setSearchingAddress(true);
     try {
+      // Obtener datos del municipio para limitar la búsqueda
+      const municipioLat = localStorage.getItem('municipio_lat');
+      const municipioLon = localStorage.getItem('municipio_lon');
+      const municipioNombre = localStorage.getItem('municipio_nombre') || '';
+
+      // Construir el viewbox si tenemos coordenadas del municipio (±0.3 grados ≈ 30km)
+      let viewboxParam = '';
+      if (municipioLat && municipioLon) {
+        const lat = parseFloat(municipioLat);
+        const lon = parseFloat(municipioLon);
+        const delta = 0.3; // ~30km de radio
+        viewboxParam = `&viewbox=${lon - delta},${lat + delta},${lon + delta},${lat - delta}&bounded=1`;
+      }
+
+      // Agregar el nombre del municipio a la búsqueda para mejores resultados
+      const searchQuery = municipioNombre
+        ? `${query}, ${municipioNombre.replace('Municipalidad de ', '')}, Argentina`
+        : `${query}, Argentina`;
+
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ar&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1${viewboxParam}`,
         {
           headers: {
             'Accept-Language': 'es',
@@ -334,18 +365,58 @@ export default function NuevoReclamo() {
       } finally {
         setAnalyzing(false);
       }
-    }, 800);
+    }, 5000); // 5 segundos de debounce para no interrumpir mientras escribe
   }, [categorias]);
 
   // Analizar cuando cambia el título o descripción
   const handleTituloChange = (value: string) => {
     setFormData({ ...formData, titulo: value });
+    // Solo analizar con debounce largo mientras escribe
     analyzeTextForCategory(value + ' ' + formData.descripcion);
   };
 
   const handleDescripcionChange = (value: string) => {
     setFormData({ ...formData, descripcion: value });
+    // Solo analizar con debounce largo mientras escribe
     analyzeTextForCategory(formData.titulo + ' ' + value);
+  };
+
+  // Analizar inmediatamente al salir del campo (blur)
+  const handleDescripcionBlur = () => {
+    handleFieldBlur('descripcion');
+    // Cancelar el timeout pendiente y analizar inmediatamente
+    if (analyzeTimeoutRef.current) {
+      clearTimeout(analyzeTimeoutRef.current);
+    }
+    const text = formData.titulo + ' ' + formData.descripcion;
+    if (text.length >= 10 && categorias.length > 0) {
+      // Análisis inmediato al hacer blur
+      (async () => {
+        try {
+          setAnalyzing(true);
+          const municipioIdStr = localStorage.getItem('municipio_id');
+          const municipioId = municipioIdStr ? parseInt(municipioIdStr) : 1;
+          const resultado = await clasificacionApi.clasificar(text, municipioId);
+          if (resultado.sugerencias && resultado.sugerencias.length > 0) {
+            const top3 = resultado.sugerencias
+              .slice(0, 3)
+              .map((sug: { categoria_id: number; confianza?: number; score?: number }) => {
+                const cat = categorias.find(c => c.id === sug.categoria_id);
+                return cat ? { categoria: cat, confianza: sug.confianza || sug.score || 0 } : null;
+              })
+              .filter((x: { categoria: Categoria; confianza: number } | null): x is { categoria: Categoria; confianza: number } => x !== null);
+            if (top3.length > 0) {
+              setSuggestedCategorias(top3);
+              setShowSuggestion(true);
+            }
+          }
+        } catch {
+          // Silent fail
+        } finally {
+          setAnalyzing(false);
+        }
+      })();
+    }
   };
 
   // Aceptar una sugerencia de categoría
@@ -359,6 +430,7 @@ export default function NuevoReclamo() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
+      console.log('Creando reclamo...', formData);
       const data = {
         ...formData,
         categoria_id: Number(formData.categoria_id),
@@ -366,17 +438,29 @@ export default function NuevoReclamo() {
       };
 
       const response = await reclamosApi.create(data);
+      console.log('Reclamo creado:', response.data);
       const reclamoId = response.data.id;
 
       if (selectedFiles.length > 0) {
+        console.log('Subiendo archivos...');
         for (const file of selectedFiles) {
           await reclamosApi.upload(reclamoId, file, 'creacion');
         }
+        console.log('Archivos subidos');
       }
 
       toast.success('¡Reclamo creado exitosamente!');
-      navigate(user ? getDefaultRoute(user.rol) : '/mis-reclamos');
+
+      // Esperar un momento para que el toast se muestre antes de navegar
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Si viene de mobile (/app/nuevo), volver a /app. Si no, ir a la ruta por defecto
+      const isMobile = window.location.pathname.startsWith('/app');
+      const destino = isMobile ? '/app' : (user ? getDefaultRoute(user.rol) : '/mis-reclamos');
+      console.log('Navegando a:', destino);
+      navigate(destino, { replace: true });
     } catch (err: unknown) {
+      console.error('Error al crear reclamo:', err);
       const error = err as { response?: { data?: { detail?: string } } };
       toast.error(error.response?.data?.detail || 'Error al crear el reclamo');
     } finally {
@@ -387,33 +471,97 @@ export default function NuevoReclamo() {
   const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
   const selectedZona = zonas.find(z => z.id === Number(formData.zona_id));
 
-  // Función para manejar el registro
-  const handleRegister = async () => {
+  // Función para verificar si el email existe (con debounce)
+  const checkEmailExists = useCallback(async (email: string) => {
+    if (!email || email.length < 3) {
+      setEmailExists(null);
+      return;
+    }
+
+    if (emailCheckTimeoutRef.current) {
+      clearTimeout(emailCheckTimeoutRef.current);
+    }
+
+    emailCheckTimeoutRef.current = setTimeout(async () => {
+      setCheckingEmail(true);
+      try {
+        const res = await authApi.checkEmail(email);
+        setEmailExists(res.data.exists);
+      } catch {
+        setEmailExists(null);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }, 500);
+  }, []);
+
+  // Handler para cambio de email
+  const handleEmailChange = (email: string) => {
+    setRegisterData({ ...registerData, email });
+    setRegisterError('');
+    checkEmailExists(email);
+  };
+
+  // Función para manejar el registro o login
+  const handleRegisterOrLogin = async () => {
     setRegistering(true);
     setRegisterError('');
     try {
-      const partes = registerData.nombre.trim().split(' ');
-      const nombre = partes[0] || '';
-      const apellido = partes.slice(1).join(' ') || '-';
+      if (emailExists) {
+        // Usuario existe - hacer login
+        await login(registerData.email, registerData.password);
+        toast.success('¡Sesión iniciada! Continuá con tu reclamo');
+      } else {
+        // Usuario nuevo - registrar
+        const partes = registerData.nombre.trim().split(' ');
+        const nombre = partes[0] || '';
+        const apellido = partes.slice(1).join(' ') || '-';
 
-      await register({
-        email: registerData.email,
-        password: registerData.password,
-        nombre,
-        apellido,
-      });
+        await register({
+          email: registerData.email,
+          password: registerData.password,
+          nombre,
+          apellido,
+          es_anonimo: isAnonymous,
+          telefono: !isAnonymous && registerData.telefono ? registerData.telefono : undefined,
+        });
 
-      toast.success('¡Cuenta creada! Continuá con tu reclamo');
-      window.location.href = '/crear-reclamo';
+        toast.success(isAnonymous
+          ? '¡Cuenta anónima creada! Continuá con tu reclamo'
+          : '¡Cuenta creada! Continuá con tu reclamo'
+        );
+      }
+      // Después del login, el array steps se regenera sin el paso de registro
+      // Necesitamos esperar un tick para que React actualice el array
+      // y luego ir al paso de "Confirmar" (que estará en baseSteps[3])
+      setTimeout(() => {
+        setCurrentStep(3); // Paso "Confirmar" en baseSteps
+      }, 0);
+      setRegistering(false);
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
-      setRegisterError(error.response?.data?.detail || 'Error al registrarse');
+      setRegisterError(error.response?.data?.detail || (emailExists ? 'Contraseña incorrecta' : 'Error al registrarse'));
       setRegistering(false);
     }
   };
 
   // Validaciones de steps usando el sistema centralizado
-  const isRegisterValid = !!registerData.nombre && !!registerData.email && registerData.password.length >= 6;
+  // - emailExists === true: login (solo email + password)
+  // - emailExists === false: registro (nombre + email + password)
+  // - emailExists === null: aún no verificado, requiere que escriba email primero
+  const isRegisterValid = (() => {
+    // Siempre requiere email y password
+    if (!registerData.email || registerData.password.length < 6) return false;
+
+    // Si el email existe (login), con email + password alcanza
+    if (emailExists === true) return true;
+
+    // Si el email no existe (registro), requiere nombre
+    if (emailExists === false) return !!registerData.nombre;
+
+    // Si aún no se verificó (null), no es válido todavía
+    return false;
+  })();
   const categoriaValidation = validationSchemas.reclamo.categoria_id(formData.categoria_id);
   const direccionValidation = validationSchemas.reclamo.direccion(formData.direccion);
   const tituloValidation = validationSchemas.reclamo.titulo(formData.titulo);
@@ -435,9 +583,79 @@ export default function NuevoReclamo() {
     );
   }
 
-  // Contenido del paso de Registro
+  // Contenido del paso de Registro - Flujo unificado login/registro
   const RegistroStepContent = (
-    <WizardStepContent title="Primero, creá tu cuenta" description="Solo necesitamos 3 datos para empezar">
+    <WizardStepContent
+      title={emailExists ? '¡Hola de nuevo!' : '¿Cómo querés identificarte?'}
+      description={emailExists ? 'Ingresá tu contraseña para continuar' : 'Elegí cómo querés que se registre tu reclamo'}
+    >
+      {/* Toggle de privacidad - solo si es usuario nuevo */}
+      {!emailExists && (
+        <div className="space-y-3 mb-6">
+          {/* Opción Anónimo */}
+          <button
+            type="button"
+            onClick={() => setIsAnonymous(true)}
+            className="w-full p-4 rounded-xl text-left transition-all"
+            style={{
+              backgroundColor: isAnonymous ? `${theme.primary}15` : theme.backgroundSecondary,
+              border: `2px solid ${isAnonymous ? theme.primary : theme.border}`,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ borderColor: isAnonymous ? theme.primary : theme.border }}
+              >
+                {isAnonymous && (
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" style={{ color: theme.primary }} />
+                  <span className="font-medium" style={{ color: theme.text }}>Reclamo anónimo</span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                  Tu identidad será privada para el municipio. Solo vos podrás ver y dar seguimiento a tu reclamo.
+                </p>
+              </div>
+            </div>
+          </button>
+
+          {/* Opción Con datos */}
+          <button
+            type="button"
+            onClick={() => setIsAnonymous(false)}
+            className="w-full p-4 rounded-xl text-left transition-all"
+            style={{
+              backgroundColor: !isAnonymous ? `${theme.primary}15` : theme.backgroundSecondary,
+              border: `2px solid ${!isAnonymous ? theme.primary : theme.border}`,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ borderColor: !isAnonymous ? theme.primary : theme.border }}
+              >
+                {!isAnonymous && (
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4" style={{ color: theme.primary }} />
+                  <span className="font-medium" style={{ color: theme.text }}>Con mis datos</span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                  El municipio podrá contactarte directamente para resolver tu reclamo más rápido.
+                </p>
+              </div>
+            </div>
+          </button>
+        </div>
+      )}
+
       {registerError && (
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm mb-4">
           {registerError}
@@ -445,48 +663,68 @@ export default function NuevoReclamo() {
       )}
 
       <div className="space-y-4">
+        {/* Campo de email - PRIMERO para verificar si existe */}
         <div>
           <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-            Tu nombre
-          </label>
-          <div className="relative">
-            <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
-            <input
-              type="text"
-              value={registerData.nombre}
-              onChange={(e) => setRegisterData({ ...registerData, nombre: e.target.value })}
-              placeholder="Juan Pérez"
-              className="w-full pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                color: theme.text,
-                border: `1px solid ${theme.border}`,
-              }}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-            Email / Usuario
+            {isAnonymous ? 'Usuario (para ingresar)' : 'Email'}
           </label>
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
             <input
-              type="text"
+              type={isAnonymous ? 'text' : 'email'}
               value={registerData.email}
-              onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-              placeholder="tu@email.com o usuario"
+              onChange={(e) => handleEmailChange(e.target.value)}
+              placeholder={isAnonymous ? 'mi_usuario' : 'tu@email.com'}
               className="w-full pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
               style={{
                 backgroundColor: theme.backgroundSecondary,
                 color: theme.text,
-                border: `1px solid ${theme.border}`,
+                border: `1px solid ${emailExists ? theme.primary : theme.border}`,
               }}
             />
+            {checkingEmail && (
+              <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin" style={{ color: theme.textSecondary }} />
+            )}
           </div>
+          {/* Mensaje de usuario encontrado */}
+          {emailExists && (
+            <p className="text-xs mt-1 flex items-center gap-1" style={{ color: theme.primary }}>
+              <CheckCircle2 className="h-3 w-3" />
+              ¡Te encontramos! Ingresá tu contraseña para continuar.
+            </p>
+          )}
+          {emailExists === false && registerData.email.length > 3 && (
+            <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+              {isAnonymous ? 'Usá un nombre de usuario que puedas recordar' : 'Usuario nuevo - completá los datos para registrarte'}
+            </p>
+          )}
         </div>
 
+        {/* Campo de nombre - solo para registro nuevo (después de verificar email) */}
+        {emailExists === false && (
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+              {isAnonymous ? 'Apodo o nombre' : 'Tu nombre completo'}
+            </label>
+            <div className="relative">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
+              <input
+                type="text"
+                value={registerData.nombre}
+                onChange={(e) => setRegisterData({ ...registerData, nombre: e.target.value })}
+                placeholder={isAnonymous ? 'Vecino123' : 'Juan Pérez'}
+                className="w-full pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Campo de contraseña */}
         <div>
           <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
             Contraseña
@@ -497,7 +735,7 @@ export default function NuevoReclamo() {
               type="password"
               value={registerData.password}
               onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-              placeholder="Mínimo 6 caracteres"
+              placeholder={emailExists ? 'Tu contraseña' : 'Mínimo 6 caracteres'}
               minLength={6}
               className="w-full pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
               style={{
@@ -509,16 +747,56 @@ export default function NuevoReclamo() {
           </div>
         </div>
 
-        <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
-          ¿Ya tenés cuenta?{' '}
-          <button
-            onClick={() => navigate('/login')}
-            className="font-medium"
-            style={{ color: theme.primary }}
-          >
-            Iniciá sesión
-          </button>
-        </p>
+        {/* Campo de teléfono - solo si NO es anónimo y es registro nuevo */}
+        {!isAnonymous && !emailExists && (
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+              Teléfono (opcional)
+            </label>
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
+              <input
+                type="tel"
+                value={registerData.telefono}
+                onChange={(e) => setRegisterData({ ...registerData, telefono: e.target.value })}
+                placeholder="Ej: 11 2345-6789"
+                className="w-full pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+              />
+            </div>
+            <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+              Para que el municipio pueda contactarte más rápido
+            </p>
+          </div>
+        )}
+
+        {/* Enlace a login externo - solo si no encontró el email */}
+        {!emailExists && (
+          <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
+            ¿Ya tenés cuenta? Ingresá tu email arriba y te reconoceremos.
+          </p>
+        )}
+
+        {/* Si el email existe, mostrar opción de cambiar email */}
+        {emailExists && (
+          <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
+            ¿No sos vos?{' '}
+            <button
+              onClick={() => {
+                setRegisterData({ ...registerData, email: '', password: '' });
+                setEmailExists(null);
+              }}
+              className="font-medium"
+              style={{ color: theme.primary }}
+            >
+              Usar otro email
+            </button>
+          </p>
+        )}
       </div>
     </WizardStepContent>
   );
@@ -550,7 +828,11 @@ export default function NuevoReclamo() {
                 key={cat.id}
                 type="button"
                 onClick={() => {
-                  setFormData({ ...formData, categoria_id: String(cat.id) });
+                  setFormData({
+                    ...formData,
+                    categoria_id: String(cat.id),
+                    titulo: formData.titulo || `Problema de ${cat.nombre.toLowerCase()}`,
+                  });
                 }}
                 className="relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 active:scale-95 touch-manipulation"
                 style={{
@@ -704,6 +986,25 @@ export default function NuevoReclamo() {
   // Contenido del paso de Detalles
   const DetallesStepContent = (
     <WizardStepContent title="Contanos más detalles" description="Describí el problema con la mayor precisión posible">
+      {/* Mostrar categoría seleccionada */}
+      {selectedCategoria && (
+        <div
+          className="flex items-center gap-3 p-3 rounded-xl mb-4"
+          style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}
+        >
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}25`, color: getCategoryColor(selectedCategoria.nombre) }}
+          >
+            {getCategoryIcon(selectedCategoria.nombre)}
+          </div>
+          <div>
+            <p className="text-xs" style={{ color: theme.textSecondary }}>Categoría seleccionada</p>
+            <p className="font-medium" style={{ color: theme.text }}>{selectedCategoria.nombre}</p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
@@ -738,7 +1039,7 @@ export default function NuevoReclamo() {
           <textarea
             value={formData.descripcion}
             onChange={(e) => handleDescripcionChange(e.target.value)}
-            onBlur={() => handleFieldBlur('descripcion')}
+            onBlur={handleDescripcionBlur}
             placeholder="Describe el problema con el mayor detalle posible..."
             rows={4}
             maxLength={2000}
@@ -815,8 +1116,32 @@ export default function NuevoReclamo() {
 
   // Contenido del paso de Confirmar
   const ConfirmarStepContent = (
-    <WizardStepContent title="Revisá tu reclamo antes de enviar">
+    <WizardStepContent title="Confirmá los datos">
       <div className="space-y-3">
+        {/* Usuario */}
+        {user && (
+          <div
+            className="flex items-center gap-3 p-4 rounded-xl"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+            >
+              <User className="h-5 w-5" />
+            </div>
+            <div>
+              <span className="text-xs" style={{ color: theme.textSecondary }}>Usuario</span>
+              <p className="font-medium" style={{ color: theme.text }}>
+                {user.nombre} {user.apellido}
+              </p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                {user.email}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Categoría */}
         <div
           className="flex items-center gap-3 p-4 rounded-xl"
@@ -969,22 +1294,28 @@ export default function NuevoReclamo() {
     },
   ];
 
-  // Si no hay usuario, agregar paso de registro al inicio
+  // Si no hay usuario, agregar paso de registro ANTES de confirmar (al final del flujo)
   const registerStep: WizardStep = {
     id: 'registro',
-    label: 'Registro',
+    label: 'Cuenta',
     icon: <User className="h-4 w-4" />,
     content: RegistroStepContent,
     isValid: isRegisterValid,
   };
 
-  const steps = showOnlyRegister ? [registerStep, ...baseSteps] : baseSteps;
+  // Flujo: Categoría -> Ubicación -> Detalles -> [Registro si no logueado] -> Confirmar
+  const steps = showOnlyRegister
+    ? [...baseSteps.slice(0, 3), registerStep, baseSteps[3]] // Insertar registro antes de confirmar
+    : baseSteps;
 
-  // Manejar el cambio de step y posible registro
+  // Índice del paso de registro (si existe)
+  const registerStepIndex = showOnlyRegister ? 3 : -1;
+
+  // Manejar el cambio de step y posible registro/login
   const handleStepChange = (newStep: number) => {
-    // Si estamos en el paso de registro y vamos al siguiente, primero registrar
-    if (showOnlyRegister && currentStep === 0 && newStep === 1) {
-      handleRegister();
+    // Si estamos en el paso de registro y vamos al siguiente (confirmar), primero registrar/login
+    if (showOnlyRegister && currentStep === registerStepIndex && newStep === registerStepIndex + 1) {
+      handleRegisterOrLogin();
       return;
     }
     setCurrentStep(newStep);
@@ -1089,6 +1420,38 @@ export default function NuevoReclamo() {
 
     // Paso de detalles
     if (currentStepId === 'detalles') {
+      // Si está analizando para sugerir categorías
+      if (analyzing) {
+        return {
+          loading: true,
+          title: 'Analizando tu descripción...',
+          message: 'Buscando la mejor categoría para tu reclamo.',
+        };
+      }
+      // Si hay sugerencias de categoría (mostrar siempre que haya, igual que desktop)
+      if (showSuggestion && suggestedCategorias.length > 0) {
+        // Verificar si la mejor sugerencia es diferente a la seleccionada
+        const mejorSugerencia = suggestedCategorias[0];
+        const esDiferente = !selectedCategoria || mejorSugerencia.categoria.id !== selectedCategoria.id;
+
+        if (esDiferente) {
+          return {
+            title: 'Categoría sugerida por IA',
+            message: `Basado en tu descripción, te sugiero:`,
+            actions: suggestedCategorias.slice(0, 2).map((sug) => ({
+              label: `${sug.categoria.nombre} (${Math.round(sug.confianza)}%)`,
+              onClick: () => acceptSuggestedCategory(sug.categoria),
+              variant: 'primary' as const,
+            })),
+          };
+        } else {
+          // La categoría seleccionada coincide con la sugerencia
+          return {
+            title: '¡Buena elección!',
+            message: `La IA confirma que "${selectedCategoria.nombre}" es la categoría correcta para tu descripción.`,
+          };
+        }
+      }
       if (!formData.titulo && !formData.descripcion) {
         return {
           title: 'Describí el problema',
@@ -1117,13 +1480,7 @@ export default function NuevoReclamo() {
       }
     }
 
-    // Paso de confirmación
-    if (currentStepId === 'confirmar') {
-      return {
-        title: 'Revisá tu reclamo',
-        message: 'Verificá que toda la información sea correcta antes de enviar. Si necesitás cambiar algo, podés volver a los pasos anteriores.',
-      };
-    }
+    // Paso de confirmación - sin AI suggestion
 
     return undefined;
   };

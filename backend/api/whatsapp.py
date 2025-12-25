@@ -296,6 +296,36 @@ async def get_logs(
     return result.scalars().all()
 
 
+@router.get("/logs/reclamo/{reclamo_id}", response_model=List[WhatsAppLogResponse])
+async def get_logs_by_reclamo(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene los logs de mensajes de WhatsApp para un reclamo específico"""
+    # Verificar que el reclamo existe
+    result = await db.execute(
+        select(Reclamo).where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Verificar permisos: admin/supervisor pueden ver todos, vecinos solo sus propios reclamos
+    if current_user.rol == RolUsuario.VECINO and reclamo.creador_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+    # Obtener logs de WhatsApp para este reclamo
+    result = await db.execute(
+        select(WhatsAppLog)
+        .where(WhatsAppLog.reclamo_id == reclamo_id)
+        .order_by(WhatsAppLog.created_at.asc())
+    )
+
+    return result.scalars().all()
+
+
 @router.get("/stats", response_model=WhatsAppStats)
 async def get_stats(
     db: AsyncSession = Depends(get_db),
@@ -440,7 +470,30 @@ async def notificar_reclamo_recibido(
     """Envía notificación de reclamo recibido"""
     return await enviar_notificacion_reclamo(
         reclamo_id, db, current_user, "reclamo_recibido",
-        "✅ *Reclamo Recibido*\n\nTu reclamo #{id} ha sido registrado.\n\n📝 *{titulo}*\n\nTe notificaremos cuando haya actualizaciones."
+        "✅ *Reclamo Recibido*\n\n"
+        "Tu reclamo *#{id}* ha sido registrado.\n\n"
+        "📝 *{titulo}*\n"
+        "_{descripcion}_\n\n"
+        "🔗 Ver detalle: {url}\n\n"
+        "Te notificaremos cuando haya actualizaciones."
+    )
+
+
+@router.post("/notificar/reclamo-asignado/{reclamo_id}")
+async def notificar_reclamo_asignado(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía notificación de reclamo asignado"""
+    return await enviar_notificacion_reclamo(
+        reclamo_id, db, current_user, "reclamo_asignado",
+        "👷 *Reclamo Asignado*\n\n"
+        "Tu reclamo *#{id}* ha sido asignado a un técnico.\n\n"
+        "📝 *{titulo}*\n"
+        "_{descripcion}_\n\n"
+        "🔗 Ver detalle y agregar comentarios: {url}\n\n"
+        "Pronto comenzarán a trabajar en él."
     )
 
 
@@ -453,7 +506,11 @@ async def notificar_cambio_estado(
     """Envía notificación de cambio de estado"""
     return await enviar_notificacion_reclamo(
         reclamo_id, db, current_user, "cambio_estado",
-        "🔄 *Actualización de Reclamo*\n\nTu reclamo #{id} ha cambiado a: *{estado}*\n\n📝 *{titulo}*"
+        "🔄 *Actualización de Reclamo*\n\n"
+        "Tu reclamo *#{id}* ha cambiado a: *{estado}*\n\n"
+        "📝 *{titulo}*\n"
+        "_{descripcion}_\n\n"
+        "🔗 Ver detalle y agregar comentarios: {url}"
     )
 
 
@@ -466,7 +523,12 @@ async def notificar_reclamo_resuelto(
     """Envía notificación de reclamo resuelto"""
     return await enviar_notificacion_reclamo(
         reclamo_id, db, current_user, "reclamo_resuelto",
-        "✅ *¡Reclamo Resuelto!*\n\nTu reclamo #{id} ha sido resuelto.\n\n📝 *{titulo}*\n\n¡Gracias por tu paciencia!"
+        "✅ *¡Reclamo Resuelto!*\n\n"
+        "Tu reclamo *#{id}* ha sido resuelto.\n\n"
+        "📝 *{titulo}*\n"
+        "_{descripcion}_\n\n"
+        "🔗 Ver detalle y calificar: {url}\n\n"
+        "¡Gracias por tu paciencia! Por favor califica la atención recibida."
     )
 
 
@@ -507,10 +569,17 @@ async def enviar_notificacion_reclamo(
 
     # Formatear mensaje
     estado_texto = reclamo.estado.value.replace('_', ' ').title() if reclamo.estado else "Desconocido"
+    # Truncar descripción si es muy larga
+    descripcion_corta = reclamo.descripcion[:150] + "..." if len(reclamo.descripcion) > 150 else reclamo.descripcion
+    # Construir URL del reclamo
+    reclamo_url = f"{settings.FRONTEND_URL}/reclamos/{reclamo.id}"
+
     mensaje = plantilla.format(
         id=reclamo.id,
         titulo=reclamo.titulo,
-        estado=estado_texto
+        estado=estado_texto,
+        descripcion=descripcion_corta,
+        url=reclamo_url
     )
 
     try:

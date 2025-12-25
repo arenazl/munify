@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import {
   Building2, MapPin, Clock, CheckCircle2, Plus,
   Search, ChevronRight, User, X, ArrowRight, Loader2,
@@ -466,9 +467,9 @@ export default function DashboardPublico() {
       </main>
 
       {/* Modal de datos del vecino */}
-      {showRegistroModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-800 rounded-3xl border border-white/10 p-6 w-full max-w-md shadow-2xl">
+      {showRegistroModal && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="bg-slate-800 rounded-3xl border border-white/10 p-6 w-full max-w-md shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
@@ -567,7 +568,8 @@ export default function DashboardPublico() {
               </p>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

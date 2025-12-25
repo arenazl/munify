@@ -19,6 +19,7 @@ from .gamificacion import (
     TipoAccion, TipoBadge, PUNTOS_POR_ACCION, BADGES_CONFIG
 )
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
+from .noticia import Noticia
 
 __all__ = [
     "Municipio",
@@ -53,5 +54,7 @@ __all__ = [
     # WhatsApp
     "WhatsAppConfig",
     "WhatsAppLog",
-    "WhatsAppProvider"
+    "WhatsAppProvider",
+    # Noticias
+    "Noticia"
 ]

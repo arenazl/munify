@@ -373,8 +373,8 @@ class GamificacionService:
 
         return {
             "puntos": {
-                "totales": puntos.puntos_totales,
-                "mes_actual": puntos.puntos_mes_actual,
+                "puntos_totales": puntos.puntos_totales,
+                "puntos_mes_actual": puntos.puntos_mes_actual,
                 "nivel": nivel_actual,
                 "progreso_nivel": progreso_nivel,
                 "puntos_para_siguiente": 100 - progreso_nivel,

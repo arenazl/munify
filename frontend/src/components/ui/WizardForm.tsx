@@ -60,6 +60,14 @@ export function WizardForm({
   const isLastStep = currentStep === steps.length - 1;
   const currentStepData = steps[currentStep];
 
+  // Validación de seguridad: si el step está fuera de rango, resetear
+  useEffect(() => {
+    if (currentStep >= steps.length || currentStep < 0) {
+      console.error(`Invalid step index: ${currentStep}, total steps: ${steps.length}`);
+      setCurrentStep(0);
+    }
+  }, [currentStep, steps.length]);
+
   // Marcar step como visitado
   useEffect(() => {
     setVisitedSteps(prev => new Set([...prev, currentStep]));
@@ -75,11 +83,21 @@ export function WizardForm({
   };
 
   const handleNext = () => {
+    console.log('[WizardForm] handleNext called');
+    console.log('[WizardForm] isLastStep:', isLastStep);
+    console.log('[WizardForm] currentStep:', currentStep);
+    console.log('[WizardForm] steps.length:', steps.length);
+    console.log('[WizardForm] currentStepData:', currentStepData);
+    console.log('[WizardForm] currentStepData?.isValid:', currentStepData?.isValid);
+
     if (!isLastStep) {
+      console.log('[WizardForm] Not last step, advancing to:', currentStep + 1);
       setDirection('right');
       setCurrentStep(currentStep + 1);
     } else {
+      console.log('[WizardForm] Last step reached, calling onComplete');
       onComplete();
+      console.log('[WizardForm] onComplete called');
     }
   };
 
@@ -146,9 +164,9 @@ export function WizardForm({
         </div>
       )}
 
-      {/* Tabs de navegación */}
+      {/* Tabs de navegación - compactos para mobile */}
       <div
-        className="px-6 py-3 flex items-center gap-2 overflow-x-auto scrollbar-hide"
+        className="px-4 py-3 flex items-center justify-center gap-3"
         style={{ backgroundColor: theme.backgroundSecondary }}
       >
         {steps.map((step, index) => {
@@ -161,49 +179,32 @@ export function WizardForm({
               onClick={() => isClickable && goToStep(index)}
               disabled={!isClickable}
               className={`
-                flex items-center gap-2 px-4 py-2.5 rounded-xl
-                transition-all duration-300 whitespace-nowrap
+                w-10 h-10 rounded-full flex items-center justify-center
+                transition-all duration-300
                 ${isClickable ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}
-                ${status === 'current' ? 'scale-105' : 'hover:scale-102'}
+                ${status === 'current' ? 'scale-110' : 'hover:scale-105'}
               `}
               style={{
                 backgroundColor: status === 'current'
                   ? theme.primary
                   : status === 'completed'
                     ? `${theme.primary}20`
-                    : 'transparent',
+                    : theme.card,
                 color: status === 'current'
                   ? '#ffffff'
                   : status === 'completed'
                     ? theme.primary
                     : theme.textSecondary,
-                border: `1px solid ${status === 'current' ? theme.primary : theme.border}`,
+                border: `2px solid ${status === 'current' ? theme.primary : status === 'completed' ? theme.primary : theme.border}`,
+                boxShadow: status === 'current' ? `0 4px 12px ${theme.primary}40` : 'none',
               }}
+              title={step.label}
             >
-              {/* Número o check */}
-              <span
-                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
-                style={{
-                  backgroundColor: status === 'current'
-                    ? 'rgba(255,255,255,0.2)'
-                    : status === 'completed'
-                      ? theme.primary
-                      : theme.backgroundSecondary,
-                  color: status === 'completed' ? '#ffffff' : 'inherit',
-                }}
-              >
-                {status === 'completed' ? (
-                  <Check className="h-3.5 w-3.5" />
-                ) : (
-                  index + 1
-                )}
-              </span>
-
-              {/* Icono del step */}
-              <span className="flex-shrink-0">{step.icon}</span>
-
-              {/* Label */}
-              <span className="font-medium text-sm">{step.label}</span>
+              {status === 'completed' ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <span className="text-sm font-bold">{index + 1}</span>
+              )}
             </button>
           );
         })}
@@ -222,15 +223,17 @@ export function WizardForm({
 
       {/* Contenido del step actual - flex-1 para ocupar todo el espacio disponible */}
       <div className="p-6 flex-1 overflow-y-auto">
-        <div
-          key={currentStep}
-          className={`animate-slide-${direction}`}
-          style={{
-            animation: `slide-${direction} 0.3s ease-out`,
-          }}
-        >
-          {currentStepData.content}
-        </div>
+        {currentStepData && (
+          <div
+            key={currentStep}
+            className={`animate-slide-${direction}`}
+            style={{
+              animation: `slide-${direction} 0.3s ease-out`,
+            }}
+          >
+            {currentStepData.content}
+          </div>
+        )}
       </div>
 
       {/* Panel de sugerencia IA */}
@@ -297,15 +300,15 @@ export function WizardForm({
         </div>
       )}
 
-      {/* Footer con navegación */}
+      {/* Footer con navegación - 2 botones: Cancelar y Siguiente/Enviar */}
       <div
-        className="px-6 py-4 flex items-center justify-between"
+        className="px-6 py-4 flex items-center justify-between gap-3"
         style={{
           borderTop: `1px solid ${theme.border}`,
           backgroundColor: theme.backgroundSecondary,
         }}
       >
-        {/* Lado izquierdo: Cancelar */}
+        {/* Cancelar */}
         <button
           onClick={onCancel}
           className="px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105"
@@ -317,54 +320,37 @@ export function WizardForm({
           Cancelar
         </button>
 
-        {/* Lado derecho: Anterior / Siguiente */}
-        <div className="flex items-center gap-3">
-          {!isFirstStep && (
-            <button
-              onClick={handlePrev}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 hover:scale-105"
-              style={{
-                color: theme.text,
-                backgroundColor: theme.card,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Anterior
-            </button>
+        {/* Siguiente/Enviar */}
+        <button
+          onClick={handleNext}
+          disabled={saving || !currentStepData || (currentStepData.isValid === false)}
+          className="flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
+          style={{
+            background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+            color: '#ffffff',
+            boxShadow: `0 4px 14px ${theme.primary}40`,
+          }}
+        >
+          {/* Shimmer effect */}
+          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
+          {saving ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Guardando...
+            </>
+          ) : isLastStep ? (
+            <>
+              <Check className="h-4 w-4" />
+              {completeLabel}
+            </>
+          ) : (
+            <>
+              Siguiente
+              <ChevronRight className="h-4 w-4" />
+            </>
           )}
-
-          <button
-            onClick={handleNext}
-            disabled={saving || (currentStepData.isValid === false)}
-            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden group"
-            style={{
-              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-              color: '#ffffff',
-              boxShadow: `0 4px 14px ${theme.primary}40`,
-            }}
-          >
-            {/* Shimmer effect */}
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : isLastStep ? (
-              <>
-                <Check className="h-4 w-4" />
-                {completeLabel}
-              </>
-            ) : (
-              <>
-                Siguiente
-                <ChevronRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        </div>
+        </button>
       </div>
 
       {/* Estilos de animación */}

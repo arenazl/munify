@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, Wrench, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
@@ -83,15 +84,21 @@ export default function Landing() {
     fetchMunicipios();
   }, []);
 
-  // Auto-seleccionar municipio si viene desde subdominio o query param
+  // Auto-redirigir a /app si viene desde subdominio o query param de municipio
   useEffect(() => {
-    if (municipioFromUrl && municipios.length > 0 && !selectedMunicipio) {
+    if (municipioFromUrl && municipios.length > 0) {
       const found = municipios.find(m => m.codigo.toLowerCase() === municipioFromUrl.toLowerCase());
       if (found) {
-        seleccionarMunicipio(found);
+        // Guardar datos del municipio en localStorage
+        localStorage.setItem('municipio_codigo', found.codigo);
+        localStorage.setItem('municipio_id', found.id.toString());
+        localStorage.setItem('municipio_nombre', found.nombre);
+        localStorage.setItem('municipio_color', found.color_primario);
+        // Redirigir directo a la app del vecino
+        navigate('/app');
       }
     }
-  }, [municipioFromUrl, municipios]);
+  }, [municipioFromUrl, municipios, navigate]);
 
   // Detectar ubicación cuando tengamos municipios (solo si no hay municipio desde URL)
   useEffect(() => {
@@ -372,20 +379,30 @@ export default function Landing() {
                         </div>
                       )}
 
-                      {/* Botón Dashboard Público */}
+                      {/* Botón principal: App Ciudadano */}
+                      <button
+                        onClick={() => navigate('/app')}
+                        disabled={debugLoading}
+                        className="w-full mb-3 flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                      >
+                        <User className="h-5 w-5" />
+                        Entrar como Vecino
+                      </button>
+
+                      {/* Botón secundario: Dashboard Público */}
                       <button
                         onClick={irADashboardPublico}
                         disabled={debugLoading}
-                        className="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-slate-600 to-slate-700 text-white font-semibold rounded-xl hover:from-slate-500 hover:to-slate-600 transition-all disabled:opacity-50"
+                        className="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 bg-white/10 border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
                       >
                         <MapPinned className="h-5 w-5" />
-                        Ver Dashboard Público (sin login)
+                        Ver Mapa de Reclamos
                       </button>
 
                       {/* Divider */}
                       <div className="relative flex items-center gap-3 my-4">
                         <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-slate-500 text-xs">O INGRESAR COMO</span>
+                        <span className="text-slate-500 text-xs">MODO DEMO</span>
                         <div className="flex-1 h-px bg-white/10" />
                       </div>
 
@@ -544,16 +561,16 @@ export default function Landing() {
       </div>
 
       {/* Modal Super Admin Login */}
-      {showSuperAdminLogin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {showSuperAdminLogin && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
             onClick={() => setShowSuperAdminLogin(false)}
           />
 
           {/* Modal */}
-          <div className="relative bg-slate-800 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
+          <div className="relative bg-slate-800 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
@@ -622,7 +639,8 @@ export default function Landing() {
               El Super Admin puede administrar todos los municipios
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Custom scrollbar styles */}

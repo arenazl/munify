@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface SheetProps {
@@ -39,24 +40,40 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
   if (!shouldRender) return null;
 
-  return (
+  // Usar portal para renderizar fuera del DOM normal y evitar problemas de contexto de posicionamiento
+  const sheetContent = (
     <>
       {/* Backdrop con fade y blur */}
       <div
-        className={`fixed inset-0 z-40 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+        className="sheet-backdrop"
         style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9998,
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           backdropFilter: isVisible ? 'blur(4px)' : 'blur(0px)',
+          opacity: isVisible ? 1 : 0,
           transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
         onClick={onClose}
       />
 
-      {/* Side Panel con slide + scale desde la derecha - 100% viewport visible */}
+      {/* Side Panel - dockeado al lado derecho, 100% del viewport */}
       <div
-        className="fixed inset-y-0 right-0 z-50 w-full max-w-lg flex flex-col"
+        className="sheet-panel"
         style={{
-          height: '100dvh', // Dynamic viewport height para mobile (fallback to 100vh in older browsers)
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 9999,
+          width: '100%',
+          maxWidth: '32rem', // max-w-lg
+          display: 'flex',
+          flexDirection: 'column',
           backgroundColor: theme.card,
           transform: isVisible
             ? 'translateX(0) scale(1)'
@@ -70,8 +87,12 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
       >
         {/* Línea de acento animada */}
         <div
-          className="absolute left-0 top-0 bottom-0 w-1"
           style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: '4px',
             background: `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
             transform: isVisible ? 'scaleY(1)' : 'scaleY(0)',
             transformOrigin: 'top',
@@ -88,6 +109,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
             opacity: isVisible ? 1 : 0,
             transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
             transitionDelay: isVisible ? '100ms' : '0ms',
+            flexShrink: 0,
           }}
         >
           <div>
@@ -113,7 +135,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         {/* Sticky Header adicional (ej: estado y categoría) */}
         {stickyHeader && (
           <div
-            className="flex-shrink-0 px-6 py-3"
+            className="px-6 py-3"
             style={{
               borderBottom: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,
@@ -121,16 +143,20 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
               opacity: isVisible ? 1 : 0,
               transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
               transitionDelay: isVisible ? '120ms' : '0ms',
+              flexShrink: 0,
             }}
           >
             {stickyHeader}
           </div>
         )}
 
-        {/* Content con animación escalonada */}
+        {/* Content con scroll interno */}
         <div
-          className="flex-1 overflow-y-auto px-6 py-4 min-h-0"
+          className="px-6 py-4"
           style={{
+            flex: 1,
+            overflowY: 'auto',
+            minHeight: 0,
             color: theme.text,
             transform: isVisible ? 'translateX(0)' : 'translateX(30px)',
             opacity: isVisible ? 1 : 0,
@@ -141,10 +167,10 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           {children}
         </div>
 
-        {/* Footer - pegado al fondo del viewport usando flexbox */}
+        {/* Footer - pegado al fondo del panel */}
         {(footer || stickyFooter) && (
           <div
-            className="px-6 py-4 flex-shrink-0"
+            className="px-6 py-4"
             style={{
               borderTop: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,
@@ -153,6 +179,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
               transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
               transitionDelay: isVisible ? '200ms' : '0ms',
               boxShadow: `0 -4px 20px rgba(0, 0, 0, 0.1)`,
+              flexShrink: 0,
             }}
           >
             {footer || stickyFooter}
@@ -161,4 +188,6 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
       </div>
     </>
   );
+
+  return createPortal(sheetContent, document.body);
 }

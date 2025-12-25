@@ -4,3 +4,6 @@ export { default as MobilePerfil } from './MobilePerfil';
 export { default as MobileLogin } from './MobileLogin';
 export { default as MobileRegister } from './MobileRegister';
 export { default as MobileNuevoReclamo } from './MobileNuevoReclamo';
+export { default as MobileLogros } from './MobileLogros';
+export { default as MobileConsulta } from './MobileConsulta';
+export { default as MobileEstadisticas } from './MobileEstadisticas';

@@ -37,9 +37,9 @@ async def sync_database():
                 FOREIGN KEY (municipio_id) REFERENCES municipios(id)
             """,
 
-            # Gamificación - puntos_usuario
+            # Gamificación - puntos_usuarios
             """
-            CREATE TABLE IF NOT EXISTS puntos_usuario (
+            CREATE TABLE IF NOT EXISTS puntos_usuarios (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
                 municipio_id INT NOT NULL,
@@ -53,6 +53,7 @@ async def sync_database():
                 semanas_consecutivas INT DEFAULT 0,
                 ultima_actividad DATETIME,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME,
                 FOREIGN KEY (user_id) REFERENCES usuarios(id),
                 FOREIGN KEY (municipio_id) REFERENCES municipios(id),
                 UNIQUE KEY unique_user_municipio (user_id, municipio_id)
@@ -78,7 +79,7 @@ async def sync_database():
 
             # Badges de usuario
             """
-            CREATE TABLE IF NOT EXISTS badges_usuario (
+            CREATE TABLE IF NOT EXISTS badges_usuarios (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 user_id INT NOT NULL,
                 municipio_id INT NOT NULL,
@@ -140,6 +141,27 @@ async def sync_database():
                 FOREIGN KEY (recompensa_id) REFERENCES recompensas_disponibles(id),
                 FOREIGN KEY (municipio_id) REFERENCES municipios(id)
             )
+            """,
+
+            # Fix empleado_id foreign key in reclamos (was pointing to cuadrillas)
+            # Step 1: Drop the old incorrect constraint if exists
+            """
+            ALTER TABLE reclamos DROP FOREIGN KEY IF EXISTS reclamos_ibfk_5
+            """,
+
+            # Step 2: Clear invalid empleado_id values that don't exist in empleados table
+            """
+            UPDATE reclamos r
+            SET r.empleado_id = NULL
+            WHERE r.empleado_id IS NOT NULL
+              AND r.empleado_id NOT IN (SELECT id FROM empleados)
+            """,
+
+            # Step 3: Add the correct foreign key constraint
+            """
+            ALTER TABLE reclamos
+            ADD CONSTRAINT fk_reclamos_empleado
+            FOREIGN KEY (empleado_id) REFERENCES empleados(id)
             """,
 
             # WhatsApp configs

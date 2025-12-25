@@ -53,7 +53,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // No redirigir en páginas públicas donde se espera que el usuario no esté autenticado
-      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register'];
+      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register', '/app'];
       const currentPath = window.location.pathname;
       const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
 
@@ -75,7 +75,7 @@ export const authApi = {
     api.post('/auth/login', new URLSearchParams({ username: email, password }), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     }),
-  register: (data: { email: string; password: string; nombre: string; apellido: string }) => {
+  register: (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => {
     const municipioId = localStorage.getItem('municipio_id');
     return api.post('/auth/register', {
       ...data,
@@ -83,6 +83,7 @@ export const authApi = {
     });
   },
   me: () => api.get('/auth/me'),
+  checkEmail: (email: string) => api.get<{ exists: boolean }>('/auth/check-email', { params: { email } }),
 };
 
 // Reclamos
@@ -104,6 +105,8 @@ export const reclamosApi = {
   resolver: (id: number, data: { resolucion: string }) => api.post(`/reclamos/${id}/resolver`, data),
   rechazar: (id: number, data: { motivo: string; descripcion?: string }) =>
     api.post(`/reclamos/${id}/rechazar`, data),
+  agregarComentario: (id: number, comentario: string) =>
+    api.post(`/reclamos/${id}/comentario`, { comentario }),
   // PATCH para cambiar estado via drag & drop en Kanban
   cambiarEstado: (id: number, estado: string) =>
     api.patch(`/reclamos/${id}`, null, { params: { nuevo_estado: estado } }),
@@ -154,6 +157,10 @@ export const usersApi = {
   create: (data: Record<string, unknown>) => api.post('/users', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/users/${id}`, data),
   delete: (id: number) => api.delete(`/users/${id}`),
+  // Perfil propio
+  getMyProfile: () => api.get('/users/me'),
+  updateMyProfile: (data: { nombre?: string; apellido?: string; telefono?: string; dni?: string; direccion?: string }) =>
+    api.put('/users/me', data),
 };
 
 // Dashboard
@@ -264,11 +271,17 @@ export const exportarApi = {
 // Portal público (sin auth)
 export const publicoApi = {
   getEstadisticas: () => api.get('/publico/estadisticas'),
+  getEstadisticasMunicipio: (municipioId: number) => api.get('/publico/estadisticas/municipio', { params: { municipio_id: municipioId } }),
   getTendencias: (dias?: number) => api.get('/publico/tendencias', { params: { dias } }),
   getCategorias: (municipioId?: number) => api.get('/publico/categorias', { params: { municipio_id: municipioId } }),
   getZonas: (municipioId?: number) => api.get('/publico/zonas', { params: { municipio_id: municipioId } }),
   getConfigRegistro: () => api.get('/configuracion/publica/registro'),
+  chatConsulta: (message: string, history: { role: string; content: string }[], municipioId?: number) =>
+    api.post('/publico/chat', { message, history, municipio_id: municipioId }),
 };
+
+// Alias para compatibilidad
+export const publicApi = publicoApi;
 
 // Analytics avanzados
 export const analyticsApi = {
@@ -400,6 +413,8 @@ export const whatsappApi = {
   // Logs y estadísticas
   getLogs: (params?: { skip?: number; limit?: number }) =>
     api.get('/whatsapp/logs', { params }),
+  getLogsByReclamo: (reclamoId: number) =>
+    api.get(`/whatsapp/logs/reclamo/${reclamoId}`),
   getStats: () => api.get('/whatsapp/stats'),
 
   // Notificaciones manuales
@@ -409,4 +424,17 @@ export const whatsappApi = {
     api.post(`/whatsapp/notificar/cambio-estado/${reclamoId}`),
   notificarReclamoResuelto: (reclamoId: number) =>
     api.post(`/whatsapp/notificar/reclamo-resuelto/${reclamoId}`),
+
+  // Reenviar mensaje fallido
+  resend: (reclamoId: number, tipoMensaje: string) => {
+    // Mapear tipo de mensaje al endpoint correspondiente
+    const endpointMap: Record<string, string> = {
+      reclamo_recibido: 'reclamo-recibido',
+      reclamo_asignado: 'reclamo-asignado',
+      cambio_estado: 'cambio-estado',
+      reclamo_resuelto: 'reclamo-resuelto',
+    };
+    const endpoint = endpointMap[tipoMensaje] || 'cambio-estado';
+    return api.post(`/whatsapp/notificar/${endpoint}/${reclamoId}`);
+  },
 };

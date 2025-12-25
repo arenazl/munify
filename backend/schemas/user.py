@@ -16,6 +16,7 @@ class UserCreate(BaseModel):
     dni: Optional[str] = None
     direccion: Optional[str] = None
     municipio_id: Optional[int] = None  # Para registro de vecinos
+    es_anonimo: Optional[bool] = False  # Usuario anónimo (identidad oculta para el municipio)
 
 class UserUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -27,6 +28,14 @@ class UserUpdate(BaseModel):
     activo: Optional[bool] = None
     empleado_id: Optional[int] = None
 
+class UserProfileUpdate(BaseModel):
+    """Schema para que el usuario actualice su propio perfil (campos limitados)"""
+    nombre: Optional[str] = None
+    apellido: Optional[str] = None
+    telefono: Optional[str] = None
+    dni: Optional[str] = None
+    direccion: Optional[str] = None
+
 class UserResponse(BaseModel):
     id: int
     municipio_id: Optional[int]
@@ -36,6 +45,7 @@ class UserResponse(BaseModel):
     telefono: Optional[str]
     dni: Optional[str]
     direccion: Optional[str]
+    es_anonimo: bool
     rol: RolUsuario
     activo: bool
     empleado_id: Optional[int]

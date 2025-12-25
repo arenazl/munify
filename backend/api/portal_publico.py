@@ -6,9 +6,11 @@ from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+import httpx
 
 from core.database import get_db
 from core.rate_limit import limiter, LIMITS
+from core.config import settings
 from models import Reclamo, Categoria, Zona
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
@@ -643,3 +645,113 @@ async def clasificar_reclamo_endpoint(
     )
 
     return resultado
+
+
+# Schema para chat público
+class ChatPublicoRequest(BaseModel):
+    message: str
+    history: List[dict] = []
+    municipio_id: Optional[int] = None
+
+
+class ChatPublicoResponse(BaseModel):
+    response: str
+
+
+@router.post("/chat", response_model=ChatPublicoResponse)
+@limiter.limit(LIMITS["ia"])
+async def chat_publico(
+    request: Request,
+    data: ChatPublicoRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Chat público con IA para consultas - SIN AUTENTICACIÓN
+    Permite a los usuarios hacer consultas sobre el sistema sin necesidad de loguearse.
+    """
+    if not settings.GEMINI_API_KEY:
+        return ChatPublicoResponse(
+            response="El asistente no está disponible en este momento. Por favor intentá más tarde."
+        )
+
+    # Obtener categorías del municipio si se especifica
+    categorias = []
+    if data.municipio_id:
+        result = await db.execute(
+            select(Categoria)
+            .where(
+                Categoria.municipio_id == data.municipio_id,
+                Categoria.activo == True
+            )
+            .order_by(Categoria.nombre)
+        )
+        categorias = [{"id": c.id, "nombre": c.nombre} for c in result.scalars().all()]
+
+    if not categorias:
+        categorias = [
+            {"id": 1, "nombre": "Baches y Calles"},
+            {"id": 2, "nombre": "Alumbrado Público"},
+            {"id": 3, "nombre": "Agua y Cloacas"},
+            {"id": 4, "nombre": "Limpieza y Residuos"},
+            {"id": 5, "nombre": "Espacios Verdes"},
+        ]
+
+    cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']})" for c in categorias])
+
+    system_prompt = f"""Sos un asistente virtual del Sistema de Reclamos Municipales. Tu nombre es "Asistente Municipal".
+
+CATEGORÍAS DISPONIBLES:
+{cats_list}
+
+TU ROL:
+- Ayudar a los usuarios a entender cómo funciona el sistema de reclamos
+- Explicar qué tipos de problemas pueden reportar
+- Guiarlos para crear un reclamo cuando lo necesiten
+
+REGLAS:
+1. Respondé de forma breve y amigable (2-3 oraciones máximo)
+2. Usá español rioplatense (vos, podés, etc.)
+3. Si el usuario describe un problema específico, sugerí la categoría correcta e incluí un link así:
+   [Crear reclamo de CATEGORIA](/app/nuevo?categoria=ID)
+4. Si preguntan sobre el estado de un reclamo, explicá que pueden consultar ingresando el número
+5. Sé proactivo sugiriendo acciones concretas
+
+EJEMPLO DE RESPUESTA CON LINK:
+"¡Claro! Un bache en la calle corresponde a **Baches y Calles**. Podés [Crear reclamo de Baches y Calles](/app/nuevo?categoria=1) y en minutos lo reportás."
+
+Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
+
+    # Construir contexto con historial
+    context = system_prompt + "\n\nCONVERSACIÓN:\n"
+
+    for msg in data.history[-8:]:
+        role = "Usuario" if msg.get("role") == "user" else "Asistente"
+        context += f"{role}: {msg.get('content', '')}\n"
+
+    context += f"Usuario: {data.message}\n\nAsistente:"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": context}]}],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 300,
+                    }
+                }
+            )
+
+            if response.status_code == 200:
+                response_data = response.json()
+                text = response_data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                return ChatPublicoResponse(response=text.strip() if text else "No pude procesar tu mensaje.")
+            else:
+                return ChatPublicoResponse(response="El asistente no está disponible temporalmente.")
+
+    except httpx.TimeoutException:
+        return ChatPublicoResponse(response="La consulta tardó demasiado. Intentá de nuevo.")
+    except Exception:
+        return ChatPublicoResponse(response="Hubo un error. Por favor intentá de nuevo.")

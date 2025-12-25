@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Clock,
   Plus,
@@ -507,15 +508,16 @@ export default function SLA() {
       </div>
 
       {/* Form Modal */}
-      {showForm && (
-        <>
+      {showForm && createPortal(
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
             onClick={resetForm}
           />
           <div
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md rounded-xl p-6 animate-in fade-in zoom-in-95 duration-200"
+            className="relative w-full max-w-md rounded-xl p-6 animate-in fade-in zoom-in-95 duration-200"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold" style={{ color: theme.text }}>
@@ -664,7 +666,8 @@ export default function SLA() {
               </button>
             </div>
           </div>
-        </>
+        </div>,
+        document.body
       )}
     </div>
   );

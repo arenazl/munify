@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import RootRedirect from './components/RootRedirect';
 
 // Pages
 import Landing from './pages/Landing';
@@ -23,6 +24,7 @@ import SLA from './pages/SLA';
 import NuevoReclamo from './pages/NuevoReclamo';
 import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
+import ReclamoDetalle from './pages/ReclamoDetalle';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -41,6 +43,9 @@ import {
   MobileLogin,
   MobileRegister,
   MobileNuevoReclamo,
+  MobileLogros,
+  MobileConsulta,
+  MobileEstadisticas,
 } from './pages/mobile';
 
 export const router = createBrowserRouter([
@@ -59,12 +64,16 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <MobileHome /> },
       { path: 'mis-reclamos', element: <MobileMisReclamos /> },
+      { path: 'logros', element: <MobileLogros /> },
       { path: 'perfil', element: <MobilePerfil /> },
+      { path: 'consulta', element: <MobileConsulta /> },
+      { path: 'estadisticas', element: <MobileEstadisticas /> },
     ],
   },
+  // Rutas mobile fuera del layout (pantalla completa)
+  { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
   { path: '/app/login', element: <MobileLogin /> },
   { path: '/app/register', element: <MobileRegister /> },
-  { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
 
   // === RUTAS PÚBLICAS ===
   { path: '/bienvenido', element: <Landing /> },
@@ -73,9 +82,12 @@ export const router = createBrowserRouter([
   { path: '/register', element: <Register /> },
   { path: '/nuevo-reclamo', element: <NuevoReclamo /> },
 
-  // === RUTAS PROTEGIDAS ===
+  // === RUTA RAÍZ - Redirección inteligente ===
+  { path: '/', element: <RootRedirect /> },
+
+  // === RUTAS PROTEGIDAS (Panel de Gestión) ===
   {
-    path: '/',
+    path: '/gestion',
     element: <ProtectedRoute><Layout /></ProtectedRoute>,
     children: [
       // Dashboard (solo admin/supervisor)
@@ -92,6 +104,7 @@ export const router = createBrowserRouter([
 
       // Reclamos (todo con Side Modal, sin páginas separadas)
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
+      { path: 'reclamos/:id', element: <ReclamoDetalle /> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
 
       // Mapa (público para usuarios autenticados)

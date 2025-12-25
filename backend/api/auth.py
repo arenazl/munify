@@ -31,6 +31,7 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
         dni=user_data.dni,
         direccion=user_data.direccion,
         municipio_id=user_data.municipio_id,
+        es_anonimo=user_data.es_anonimo or False,
         rol="vecino"
     )
     db.add(user)
@@ -69,3 +70,11 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.get("/check-email")
+async def check_email(email: str, db: AsyncSession = Depends(get_db)):
+    """Verificar si un email ya está registrado (para flujo de registro/login unificado)"""
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    return {"exists": user is not None}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, Clock, Eye, Plus } from 'lucide-react';
+import { MapPin, Calendar, Tag, Clock, Eye, Plus, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -303,6 +303,21 @@ export default function MisReclamos() {
         onClose={closeSheet}
         title={`Reclamo #${selectedReclamo?.id || ''}`}
         description={selectedReclamo?.titulo}
+        stickyFooter={
+          selectedReclamo && (
+            <button
+              onClick={() => {
+                closeSheet();
+                navigate(`/reclamos/${selectedReclamo.id}`);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Ver Historial Completo
+            </button>
+          )
+        }
       >
         {renderViewContent()}
       </Sheet>

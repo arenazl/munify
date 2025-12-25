@@ -12,14 +12,17 @@ export interface Municipio {
   color_primario?: string;
   color_secundario?: string;
   logo_url?: string;
+  latitud?: number;
+  longitud?: number;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { email: string; password: string; nombre: string; apellido: string }) => Promise<void>;
+  register: (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   // Multi-tenant
   municipios: Municipio[];
   municipioActual: Municipio | null;
@@ -74,6 +77,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('municipio_nombre', selectedMuni.nombre);
         localStorage.setItem('municipio_codigo', selectedMuni.codigo);
         localStorage.setItem('municipio_color', selectedMuni.color_primario || '#3b82f6');
+        if (selectedMuni.latitud) localStorage.setItem('municipio_lat', String(selectedMuni.latitud));
+        if (selectedMuni.longitud) localStorage.setItem('municipio_lon', String(selectedMuni.longitud));
       }
     } catch (e) {
       console.error('Error cargando municipios:', e);
@@ -87,6 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('municipio_nombre', municipio.nombre);
     localStorage.setItem('municipio_codigo', municipio.codigo);
     localStorage.setItem('municipio_color', municipio.color_primario || '#3b82f6');
+    if (municipio.latitud) localStorage.setItem('municipio_lat', String(municipio.latitud));
+    if (municipio.longitud) localStorage.setItem('municipio_lon', String(municipio.longitud));
   };
 
   useEffect(() => {
@@ -140,6 +147,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.setItem('municipio_nombre', selectedMuni.nombre);
             localStorage.setItem('municipio_codigo', selectedMuni.codigo);
             localStorage.setItem('municipio_color', selectedMuni.color_primario || '#3b82f6');
+            if (selectedMuni.latitud) localStorage.setItem('municipio_lat', String(selectedMuni.latitud));
+            if (selectedMuni.longitud) localStorage.setItem('municipio_lon', String(selectedMuni.longitud));
             setMunicipioActualState(selectedMuni);
           }
         }
@@ -160,6 +169,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem('municipio_nombre', muni.nombre);
           localStorage.setItem('municipio_codigo', muni.codigo);
           localStorage.setItem('municipio_color', muni.color_primario || '#3b82f6');
+          if (muni.latitud) localStorage.setItem('municipio_lat', String(muni.latitud));
+          if (muni.longitud) localStorage.setItem('municipio_lon', String(muni.longitud));
           setMunicipioActualState(muni);
         }
       } catch (e) {
@@ -168,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (data: { email: string; password: string; nombre: string; apellido: string }) => {
+  const register = async (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => {
     await authApi.register(data);
     // Auto-login después del registro
     await login(data.email, data.password);
@@ -183,6 +194,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMunicipios([]);
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await authApi.me();
+      const updatedUser = response.data;
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    } catch (error) {
+      console.error('Error refrescando usuario:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -190,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      refreshUser,
       municipios,
       municipioActual,
       setMunicipioActual,

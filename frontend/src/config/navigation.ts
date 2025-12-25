@@ -11,59 +11,31 @@ export const getNavigation = (userRole: string) => {
   const isVecino = userRole === 'vecino';
 
   return [
-    // === SECCIÓN PRINCIPAL ===
+    // === SECCIÓN PRINCIPAL (Panel de Gestión) ===
     {
       name: 'Dashboard',
-      href: '/',
+      href: '/gestion',
       icon: Home,
       show: isAdminOrSupervisor,
       description: 'Resumen y métricas'
     },
     {
-      name: 'Inicio',
-      href: '/mi-panel',
-      icon: Home,
-      show: isVecino,
-      description: 'Mi panel personal'
-    },
-    {
-      name: 'Mis Reclamos',
-      href: '/mis-reclamos',
-      icon: FileText,
-      show: isVecino,
-      description: 'Ver mis reclamos'
-    },
-    {
-      name: 'Nuevo Reclamo',
-      href: '/nuevo-reclamo',
-      icon: PlusCircle,
-      show: isVecino,
-      description: 'Crear un nuevo reclamo'
-    },
-    {
       name: 'Reclamos',
-      href: '/reclamos',
+      href: '/gestion/reclamos',
       icon: ClipboardList,
       show: isAdminOrSupervisor,
       description: 'Gestionar todos los reclamos'
     },
     {
       name: 'Mapa',
-      href: '/mapa',
+      href: '/gestion/mapa',
       icon: Map,
-      show: true,
+      show: isAdminOrSupervisor || isEmpleado,
       description: 'Ver reclamos en el mapa'
     },
     {
-      name: 'Logros',
-      href: '/logros',
-      icon: Trophy,
-      show: true,
-      description: 'Mis puntos, badges y leaderboard'
-    },
-    {
       name: 'Tablero',
-      href: '/tablero',
+      href: '/gestion/tablero',
       icon: Wrench,
       show: isEmpleado || isAdminOrSupervisor,
       description: 'Tablero de trabajo'
@@ -72,49 +44,49 @@ export const getNavigation = (userRole: string) => {
     // === SECCIÓN ADMINISTRACIÓN ===
     {
       name: 'Empleados',
-      href: '/empleados',
+      href: '/gestion/empleados',
       icon: Users,
       show: isAdminOrSupervisor,
       description: 'Gestionar empleados'
     },
     {
       name: 'Usuarios',
-      href: '/usuarios',
+      href: '/gestion/usuarios',
       icon: Users,
       show: isAdminOrSupervisor,
       description: 'Gestionar usuarios'
     },
     {
       name: 'Categorías',
-      href: '/categorias',
+      href: '/gestion/categorias',
       icon: FolderTree,
       show: isAdmin,
       description: 'Gestionar categorías'
     },
     {
       name: 'Zonas',
-      href: '/zonas',
+      href: '/gestion/zonas',
       icon: MapPin,
       show: isAdmin,
       description: 'Gestionar zonas/barrios'
     },
     {
       name: 'SLA',
-      href: '/sla',
+      href: '/gestion/sla',
       icon: Clock,
       show: isAdminOrSupervisor,
       description: 'Gestión de SLA'
     },
     {
       name: 'Exportar',
-      href: '/exportar',
+      href: '/gestion/exportar',
       icon: FileDown,
       show: isAdminOrSupervisor,
       description: 'Exportar informes CSV'
     },
     {
       name: 'WhatsApp',
-      href: '/whatsapp',
+      href: '/gestion/whatsapp',
       icon: MessageCircle,
       show: isAdminOrSupervisor,
       description: 'Configurar WhatsApp Business'
@@ -126,12 +98,13 @@ export const getDefaultRoute = (role: string) => {
   switch (role) {
     case 'admin':
     case 'supervisor':
-      return '/';
+      return '/gestion';
     case 'empleado':
-      return '/tablero';
+      return '/gestion/tablero';
     case 'vecino':
-      return '/mi-panel';
+      // Vecinos van a la app mobile-first
+      return '/app';
     default:
-      return '/mis-reclamos';
+      return '/app';
   }
 };

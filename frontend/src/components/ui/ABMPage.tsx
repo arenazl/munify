@@ -107,26 +107,21 @@ export function ABMPage({
       {/* Contenedor sticky para header y secondary filters */}
       <div
         ref={headerRef}
-        className={`transition-all duration-300 ease-out ${
-          isSticky ? 'sticky top-16 z-40' : ''
-        }`}
+        className={`${isSticky ? 'sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8' : ''}`}
         style={{
-          marginLeft: isSticky ? '-1rem' : 0,
-          marginRight: isSticky ? '-1rem' : 0,
-          paddingLeft: isSticky ? '1rem' : 0,
-          paddingRight: isSticky ? '1rem' : 0,
+          backgroundColor: isSticky ? theme.background : 'transparent',
+          paddingTop: isSticky ? '0.5rem' : 0,
+          paddingBottom: isSticky ? '0.5rem' : 0,
         }}
       >
         {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
         <div
-          className={`rounded-xl px-5 py-3 relative overflow-hidden transition-all duration-300 ${
-            isSticky ? 'rounded-b-none shadow-lg' : ''
-          }`}
+          className={`px-5 py-3 relative overflow-hidden ${isSticky ? 'rounded-t-xl' : 'rounded-xl'}`}
           style={{
             backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            borderBottom: isSticky && secondaryFilters ? 'none' : `1px solid ${theme.border}`,
-            boxShadow: isSticky ? `0 4px 20px ${theme.primary}15` : 'none',
+            border: isSticky ? 'none' : `1px solid ${theme.border}`,
+            borderBottom: isSticky && secondaryFilters ? 'none' : (isSticky ? 'none' : `1px solid ${theme.border}`),
+            boxShadow: isSticky ? `0 4px 20px rgba(0,0,0,0.15)` : 'none',
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
@@ -311,13 +306,10 @@ export function ABMPage({
         {/* Secondary Filters Bar (full width) - dentro del sticky container */}
         {secondaryFilters && (
           <div
-            className={`px-5 py-3 relative overflow-hidden transition-all duration-300 ${
-              isSticky ? 'rounded-b-xl' : 'rounded-xl mt-3'
-            }`}
+            className={`px-5 py-3 relative overflow-hidden ${isSticky ? 'rounded-b-xl' : 'rounded-xl mt-3'}`}
             style={{
               backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-              borderTop: isSticky ? 'none' : `1px solid ${theme.border}`,
+              border: isSticky ? 'none' : `1px solid ${theme.border}`,
             }}
           >
             {secondaryFilters}
@@ -778,22 +770,28 @@ interface ABMCollapsibleProps {
   variant?: 'default' | 'info' | 'success' | 'warning' | 'danger';
 }
 
-const variantStyles = {
-  default: { bg: 'transparent', border: '', text: '' },
-  info: { bg: '#dbeafe', border: '#93c5fd', text: '#1e40af' },
-  success: { bg: '#d1fae5', border: '#6ee7b7', text: '#065f46' },
-  warning: { bg: '#fef3c7', border: '#fcd34d', text: '#92400e' },
-  danger: { bg: '#fee2e2', border: '#fca5a5', text: '#991b1b' },
-};
+// All variants now use theme-aware colors derived from theme.primary
+// This ensures consistent styling across all themes
 
 export function ABMCollapsible({ title, icon, children, defaultOpen = false, variant = 'default' }: ABMCollapsibleProps) {
   const { theme } = useTheme();
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const styles = variantStyles[variant];
 
-  const bgColor = variant === 'default' ? theme.backgroundSecondary : styles.bg;
-  const borderColor = variant === 'default' ? theme.border : styles.border;
-  const textColor = variant === 'default' ? theme.text : styles.text;
+  // All variants use theme-aware colors derived from theme.primary
+  let bgColor: string;
+  let borderColor: string;
+  let textColor: string;
+
+  if (variant === 'default') {
+    bgColor = theme.backgroundSecondary;
+    borderColor = theme.border;
+    textColor = theme.text;
+  } else {
+    // All semantic variants (info, success, warning, danger) use theme.primary
+    bgColor = `${theme.primary}15`;
+    borderColor = `${theme.primary}40`;
+    textColor = theme.text;
+  }
 
   return (
     <div
@@ -839,11 +837,22 @@ interface ABMInfoPanelProps {
 
 export function ABMInfoPanel({ title, icon, children, variant = 'default' }: ABMInfoPanelProps) {
   const { theme } = useTheme();
-  const styles = variantStyles[variant];
 
-  const bgColor = variant === 'default' ? theme.backgroundSecondary : styles.bg;
-  const borderColor = variant === 'default' ? theme.border : styles.border;
-  const textColor = variant === 'default' ? theme.text : styles.text;
+  // All variants use theme-aware colors derived from theme.primary
+  let bgColor: string;
+  let borderColor: string;
+  let textColor: string;
+
+  if (variant === 'default') {
+    bgColor = theme.backgroundSecondary;
+    borderColor = theme.border;
+    textColor = theme.text;
+  } else {
+    // All semantic variants (info, success, warning, danger) use theme.primary
+    bgColor = `${theme.primary}15`;
+    borderColor = `${theme.primary}40`;
+    textColor = theme.text;
+  }
 
   return (
     <div
@@ -859,7 +868,7 @@ export function ABMInfoPanel({ title, icon, children, variant = 'default' }: ABM
           {title}
         </div>
       )}
-      <div style={{ color: variant === 'default' ? theme.text : textColor }}>
+      <div style={{ color: theme.text }}>
         {children}
       </div>
     </div>
