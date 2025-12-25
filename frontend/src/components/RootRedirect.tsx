@@ -18,11 +18,9 @@ import { getDefaultRoute } from '../config/navigation';
 export default function RootRedirect() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Esperar a que termine de cargar auth
-    if (loading) return;
 
     // Si hay usuario logueado, ir a su ruta por defecto
     if (user) {
@@ -47,7 +45,7 @@ export default function RootRedirect() {
 
     // Si no hay nada, ir a la landing de selección
     navigate('/bienvenido', { replace: true });
-  }, [user, loading, searchParams, navigate]);
+  }, [user, searchParams, navigate]);
 
   // Mostrar loading mientras decide
   return (

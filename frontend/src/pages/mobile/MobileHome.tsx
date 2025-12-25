@@ -11,102 +11,11 @@ import {
   Loader2,
   MessageCircle,
   BarChart3,
-  Zap,
-  Construction,
-  Droplets,
-  TreeDeciduous,
-  Leaf,
-  Trash2,
-  Recycle,
-  Brush,
-  Car,
-  Signpost,
-  Bug,
-  Building2,
-  TrafficCone,
-  Footprints,
-  Lamp,
-  VolumeX,
-  MoreHorizontal,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { reclamosApi, publicApi } from '../../lib/api';
-import type { Reclamo, EstadoReclamo, Categoria } from '../../types';
-
-// Iconos por categoría (mismo patrón que NuevoReclamo)
-const categoryIcons: Record<string, React.ReactNode> = {
-  'alumbrado': <Zap className="h-5 w-5" />,
-  'bache': <Construction className="h-5 w-5" />,
-  'calle': <Construction className="h-5 w-5" />,
-  'agua': <Droplets className="h-5 w-5" />,
-  'cloaca': <Droplets className="h-5 w-5" />,
-  'desague': <Droplets className="h-5 w-5" />,
-  'arbolado': <TreeDeciduous className="h-5 w-5" />,
-  'espacio': <Leaf className="h-5 w-5" />,
-  'verde': <Leaf className="h-5 w-5" />,
-  'basura': <Trash2 className="h-5 w-5" />,
-  'residuo': <Recycle className="h-5 w-5" />,
-  'recolec': <Recycle className="h-5 w-5" />,
-  'limpieza': <Brush className="h-5 w-5" />,
-  'transito': <Car className="h-5 w-5" />,
-  'señal': <Signpost className="h-5 w-5" />,
-  'plaga': <Bug className="h-5 w-5" />,
-  'fumiga': <Bug className="h-5 w-5" />,
-  'edificio': <Building2 className="h-5 w-5" />,
-  'semaforo': <TrafficCone className="h-5 w-5" />,
-  'semáforo': <TrafficCone className="h-5 w-5" />,
-  'vereda': <Footprints className="h-5 w-5" />,
-  'cordon': <Footprints className="h-5 w-5" />,
-  'mobiliario': <Lamp className="h-5 w-5" />,
-  'ruido': <VolumeX className="h-5 w-5" />,
-  'default': <MoreHorizontal className="h-5 w-5" />,
-};
-
-// Colores por categoría (mismo patrón que NuevoReclamo)
-const categoryColors: Record<string, string> = {
-  'alumbrado': '#f59e0b',
-  'bache': '#ef4444',
-  'calle': '#ef4444',
-  'agua': '#3b82f6',
-  'cloaca': '#0ea5e9',
-  'desague': '#0ea5e9',
-  'arbolado': '#22c55e',
-  'espacio': '#10b981',
-  'verde': '#10b981',
-  'basura': '#6b7280',
-  'residuo': '#78716c',
-  'recolec': '#78716c',
-  'limpieza': '#14b8a6',
-  'transito': '#8b5cf6',
-  'señal': '#f97316',
-  'plaga': '#dc2626',
-  'fumiga': '#dc2626',
-  'edificio': '#a855f7',
-  'semaforo': '#ef4444',
-  'semáforo': '#ef4444',
-  'vereda': '#78716c',
-  'cordon': '#78716c',
-  'mobiliario': '#6366f1',
-  'ruido': '#f97316',
-  'default': '#6366f1',
-};
-
-function getCategoryIcon(nombre: string): React.ReactNode {
-  const key = nombre.toLowerCase();
-  for (const [k, icon] of Object.entries(categoryIcons)) {
-    if (key.includes(k)) return icon;
-  }
-  return categoryIcons.default;
-}
-
-function getCategoryColor(nombre: string): string {
-  const key = nombre.toLowerCase();
-  for (const [k, color] of Object.entries(categoryColors)) {
-    if (key.includes(k)) return color;
-  }
-  return categoryColors.default;
-}
+import { reclamosApi } from '../../lib/api';
+import type { Reclamo, EstadoReclamo } from '../../types';
 
 const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; label: string }> = {
   nuevo: { icon: Clock, color: '#6b7280', label: 'Nuevo' },
@@ -116,108 +25,21 @@ const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; l
   rechazado: { icon: AlertCircle, color: '#ef4444', label: 'Rechazado' },
 };
 
-// Componente de estadística circular
-interface CircularStatProps {
-  value: number;
-  total: number;
-  label: string;
-  color: string;
-  theme: any;
-}
-
-function CircularStat({ value, total, label, color, theme }: CircularStatProps) {
-  const percentage = total > 0 ? (value / total) * 100 : 0;
-  const circumference = 2 * Math.PI * 36; // radio 36
-  const strokeDashoffset = circumference - (percentage / 100) * circumference;
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-24 h-24">
-        {/* Círculo de fondo */}
-        <svg className="w-full h-full transform -rotate-90">
-          <circle
-            cx="48"
-            cy="48"
-            r="36"
-            stroke={theme.border}
-            strokeWidth="8"
-            fill="none"
-          />
-          {/* Círculo de progreso */}
-          <circle
-            cx="48"
-            cy="48"
-            r="36"
-            stroke={color}
-            strokeWidth="8"
-            fill="none"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            className="transition-all duration-1000 ease-out"
-          />
-        </svg>
-        {/* Número en el centro */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-2xl font-bold" style={{ color }}>
-            {value}
-          </span>
-        </div>
-      </div>
-      <p className="text-xs mt-2 text-center" style={{ color: theme.textSecondary }}>
-        {label}
-      </p>
-    </div>
-  );
-}
-
 export default function MobileHome() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingCategorias, setLoadingCategorias] = useState(true);
   const [stats, setStats] = useState({ total: 0, pendientes: 0, resueltos: 0 });
-  const [noticias, setNoticias] = useState<any[]>([]);
-
-  // Cargar categorías del municipio
-  useEffect(() => {
-    const loadCategorias = async () => {
-      try {
-        const municipioId = localStorage.getItem('municipio_id');
-        const res = await publicApi.getCategorias(municipioId ? parseInt(municipioId) : undefined);
-        setCategorias(res.data);
-      } catch (error) {
-        // Silenciar error - las categorías son opcionales
-      } finally {
-        setLoadingCategorias(false);
-      }
-    };
-    loadCategorias();
-  }, []);
 
   useEffect(() => {
     if (user) {
       loadReclamos();
-      loadNoticias();
     } else {
       setLoading(false);
     }
   }, [user]);
-
-  const loadNoticias = async () => {
-    try {
-      const municipioId = localStorage.getItem('municipio_id');
-      if (municipioId) {
-        const res = await publicApi.get(`/noticias/publico?municipio_id=${municipioId}`);
-        setNoticias(res.data);
-      }
-    } catch (error) {
-      console.error('Error cargando noticias:', error);
-    }
-  };
 
   const loadReclamos = async () => {
     try {
@@ -342,11 +164,6 @@ export default function MobileHome() {
 
   const municipioNombre = localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '') || 'Municipio';
 
-  // Calcular porcentajes para las estadísticas
-  const totalReclamos = stats.total || 1; // Evitar división por 0
-  const porcentajePendientes = Math.round((stats.pendientes / totalReclamos) * 100);
-  const porcentajeResueltos = Math.round((stats.resueltos / totalReclamos) * 100);
-
   return (
     <div className="space-y-0">
       {/* Banner superior con imagen de fondo */}
@@ -359,7 +176,7 @@ export default function MobileHome() {
         }}
       >
         <h1 className="text-2xl font-bold text-white mb-1">
-          Dashboard Analytics
+          {localStorage.getItem('municipio_nombre') || 'Municipalidad'}
         </h1>
         <p className="text-sm text-white/90">
           Monitoreo en tiempo real de gestión municipal
