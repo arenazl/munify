@@ -1914,6 +1914,43 @@ export default function Reclamos() {
                         <li style={{ color: theme.textSecondary }}>• Instalación de contenedor</li>
                       </>
                     )}
+                    {(selectedCategoria.nombre.toLowerCase().includes('espacio') || selectedCategoria.nombre.toLowerCase().includes('verde') || selectedCategoria.nombre.toLowerCase().includes('plaza')) && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Mantenimiento de césped</li>
+                        <li style={{ color: theme.textSecondary }}>• Reparación de juegos infantiles</li>
+                        <li style={{ color: theme.textSecondary }}>• Instalación de mobiliario urbano</li>
+                        <li style={{ color: theme.textSecondary }}>• Limpieza general del espacio</li>
+                      </>
+                    )}
+                    {(selectedCategoria.nombre.toLowerCase().includes('vereda') || selectedCategoria.nombre.toLowerCase().includes('acera')) && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Reparación de baldosas</li>
+                        <li style={{ color: theme.textSecondary }}>• Nivelación de vereda</li>
+                        <li style={{ color: theme.textSecondary }}>• Reconstrucción de tramo</li>
+                      </>
+                    )}
+                    {(selectedCategoria.nombre.toLowerCase().includes('semaforo') || selectedCategoria.nombre.toLowerCase().includes('transito') || selectedCategoria.nombre.toLowerCase().includes('tránsito')) && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Reparación de semáforo</li>
+                        <li style={{ color: theme.textSecondary }}>• Sincronización de tiempos</li>
+                        <li style={{ color: theme.textSecondary }}>• Instalación de señalización</li>
+                      </>
+                    )}
+                    {selectedCategoria.nombre.toLowerCase().includes('limpieza') && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Barrido de calles</li>
+                        <li style={{ color: theme.textSecondary }}>• Limpieza de sumideros</li>
+                        <li style={{ color: theme.textSecondary }}>• Desmalezado de terrenos</li>
+                      </>
+                    )}
+                    {/* Fallback para categorías no específicas */}
+                    {!['alumbrado', 'bache', 'calle', 'agua', 'cloaca', 'arbol', 'basura', 'espacio', 'verde', 'plaza', 'vereda', 'acera', 'semaforo', 'transito', 'tránsito', 'limpieza'].some(k => selectedCategoria.nombre.toLowerCase().includes(k)) && (
+                      <>
+                        <li style={{ color: theme.textSecondary }}>• Evaluación técnica del problema</li>
+                        <li style={{ color: theme.textSecondary }}>• Asignación de equipo especializado</li>
+                        <li style={{ color: theme.textSecondary }}>• Resolución según prioridad</li>
+                      </>
+                    )}
                   </ul>
                 </div>
 
@@ -1928,7 +1965,11 @@ export default function Reclamos() {
                     {(selectedCategoria.nombre.toLowerCase().includes('agua') || selectedCategoria.nombre.toLowerCase().includes('cloaca')) && '24-48 horas (urgente)'}
                     {selectedCategoria.nombre.toLowerCase().includes('arbol') && '5-15 días según riesgo'}
                     {selectedCategoria.nombre.toLowerCase().includes('basura') && '24-72 horas'}
-                    {!['alumbrado', 'bache', 'calle', 'agua', 'cloaca', 'arbol', 'basura'].some(k => selectedCategoria.nombre.toLowerCase().includes(k)) && '3-10 días según disponibilidad'}
+                    {(selectedCategoria.nombre.toLowerCase().includes('espacio') || selectedCategoria.nombre.toLowerCase().includes('verde') || selectedCategoria.nombre.toLowerCase().includes('plaza')) && '5-10 días según tipo de trabajo'}
+                    {(selectedCategoria.nombre.toLowerCase().includes('vereda') || selectedCategoria.nombre.toLowerCase().includes('acera')) && '7-15 días según extensión'}
+                    {(selectedCategoria.nombre.toLowerCase().includes('semaforo') || selectedCategoria.nombre.toLowerCase().includes('transito') || selectedCategoria.nombre.toLowerCase().includes('tránsito')) && '24-72 horas (urgente)'}
+                    {selectedCategoria.nombre.toLowerCase().includes('limpieza') && '24-72 horas'}
+                    {!['alumbrado', 'bache', 'calle', 'agua', 'cloaca', 'arbol', 'basura', 'espacio', 'verde', 'plaza', 'vereda', 'acera', 'semaforo', 'transito', 'tránsito', 'limpieza'].some(k => selectedCategoria.nombre.toLowerCase().includes(k)) && '3-10 días según disponibilidad'}
                   </p>
                 </div>
 

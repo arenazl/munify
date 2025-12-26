@@ -29,7 +29,7 @@ export default function Layout() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const { user, logout, municipioActual, refreshUser } = useAuth();
-  const { theme, themeName, setTheme, customPrimary, setCustomPrimary } = useTheme();
+  const { theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar } = useTheme();
   const location = useLocation();
 
   // Guardar estado del sidebar en localStorage
@@ -71,8 +71,8 @@ export default function Layout() {
 
   // Obtener nombre del municipio actual (del context o localStorage)
   const nombreMunicipio = municipioActual
-    ? municipioActual.nombre.replace('Municipalidad de ', '')
-    : localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '') || 'Mi Municipio';
+    ? municipioActual.nombre
+    : localStorage.getItem('municipio_nombre') || 'Municipalidad';
 
   if (!user) return null;
 
@@ -99,39 +99,26 @@ export default function Layout() {
         style={{
           backgroundColor: theme.sidebar,
           width: sidebarWidthPx,
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out',
+          transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
         }}
       >
         {/* Header del sidebar */}
-        <div className="flex items-center justify-between h-16 px-3 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30` }}>
+        <div className="flex items-center justify-between h-16 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30`, paddingLeft: sidebarCollapsed ? '8px' : '12px', paddingRight: sidebarCollapsed ? '8px' : '12px', transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <div
             className="flex items-center gap-3 flex-1 min-w-0"
             style={{
               justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-              transition: 'justify-content 0.3s ease',
+              transition: 'justify-content 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            {municipioActual?.logo_url ? (
-              <img
-                src={municipioActual.logo_url}
-                alt={`Logo ${nombreMunicipio}`}
-                className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
-              />
-            ) : (
-              <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ background: `linear-gradient(135deg, ${municipioActual?.color_primario || theme.primary} 0%, ${municipioActual?.color_secundario || theme.primaryHover} 100%)` }}
-              >
-                <Building2 className="h-5 w-5 text-white" />
-              </div>
-            )}
+            <Building2 className="h-10 w-10 flex-shrink-0" style={{ color: theme.sidebarText }} />
             <div
-              className="flex flex-col leading-tight min-w-0"
+              className="flex flex-col leading-tight min-w-0 flex-1"
               style={{
-                width: sidebarCollapsed ? 0 : 'auto',
+                width: sidebarCollapsed ? 0 : '100%',
                 opacity: sidebarCollapsed ? 0 : 1,
                 overflow: 'hidden',
-                transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
               <span className="text-[10px] font-light tracking-wide whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>Municipalidad</span>
@@ -179,7 +166,7 @@ export default function Layout() {
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                   paddingLeft: sidebarCollapsed ? '8px' : '12px',
                   paddingRight: sidebarCollapsed ? '8px' : '12px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
                 onClick={() => setSidebarOpen(false)}
                 title={sidebarCollapsed ? item.name : undefined}
@@ -205,7 +192,7 @@ export default function Layout() {
                   className="h-5 w-5 flex-shrink-0"
                   style={{
                     marginRight: sidebarCollapsed ? 0 : '12px',
-                    transition: 'margin 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transition: 'margin 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 />
                 <span
@@ -214,7 +201,7 @@ export default function Layout() {
                     width: sidebarCollapsed ? 0 : 'auto',
                     opacity: sidebarCollapsed ? 0 : 1,
                     overflow: 'hidden',
-                    transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+                    transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
                   {item.name}
@@ -453,6 +440,57 @@ export default function Layout() {
                           </button>
                         )}
                       </div>
+
+                      {/* Sección: Color del sidebar */}
+                      <div className="px-3 py-2 border-t border-b" style={{ borderColor: theme.border }}>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                          Color del sidebar
+                        </span>
+                      </div>
+                      <div className="p-3">
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { name: 'Negro', value: '#000000' },
+                            { name: 'Gris oscuro', value: '#1e293b' },
+                            { name: 'Azul oscuro', value: '#071318' },
+                            { name: 'Verde oscuro', value: '#081410' },
+                            { name: 'Violeta oscuro', value: '#1e1b4b' },
+                            { name: 'Rojo oscuro', value: '#4c0519' },
+                          ].map((color) => {
+                            const isSelected = customSidebar === color.value;
+                            return (
+                              <button
+                                key={color.value}
+                                onClick={() => {
+                                  setCustomSidebar(color.value);
+                                }}
+                                className="w-7 h-7 rounded-full transition-all duration-200 hover:scale-110 flex items-center justify-center"
+                                style={{
+                                  backgroundColor: color.value,
+                                  boxShadow: isSelected ? `0 0 0 2px ${theme.card}, 0 0 0 4px ${color.value}` : 'none',
+                                  border: `1px solid ${theme.border}`,
+                                }}
+                                title={color.name}
+                              >
+                                {isSelected && (
+                                  <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {customSidebar && (
+                          <button
+                            onClick={() => setCustomSidebar(null)}
+                            className="mt-2 w-full text-xs py-1.5 rounded-md transition-colors"
+                            style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}
+                          >
+                            Restablecer al tema
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -487,7 +525,7 @@ export default function Layout() {
         /* Main content responsive padding for sidebar */
         .main-content-area {
           padding-left: 0;
-          transition: padding-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          transition: padding-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         @media (min-width: 1024px) {

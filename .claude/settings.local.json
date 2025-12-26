@@ -19,7 +19,10 @@
       "Bash(heroku apps:*)",
       "Bash(netlify deploy:*)",
       "Bash(npm run dev:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Reclamos similares, anónimos y mejoras en búsqueda de vecinos\n\n- Agregar sistema de detección de reclamos similares por categoría y ubicación\n- Endpoint /reclamos/similares para buscar reclamos cercanos \\(100m, 30 días\\)\n- Endpoint /reclamos/recurrentes para dashboard de gestores\n- Componente ReclamosSimilares con alerta modal al crear reclamos\n- Badge \"X vecinos\" en cards de reclamos mostrando reportes similares\n- Sección \"Reclamos Recurrentes\" en Dashboard para gestores\n- Opción de reclamo anónimo en wizard de creación \\(sin datos de contacto\\)\n- Mostrar teléfono del vecino en detalle del reclamo\n- Búsqueda de usuarios por nombre, apellido, DNI y teléfono\n- Utilidades geoespaciales \\(Haversine\\) en backend/utils/geo.py\n- Scripts de seed para datos de prueba en Merlo\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

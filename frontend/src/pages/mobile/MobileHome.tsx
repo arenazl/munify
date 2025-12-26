@@ -11,6 +11,7 @@ import {
   Loader2,
   MessageCircle,
   BarChart3,
+  Building2,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -166,34 +167,27 @@ export default function MobileHome() {
 
   return (
     <div className="space-y-0">
-      {/* Banner superior con imagen de fondo */}
+      {/* Banner superior */}
       <div
-        className="relative h-40 flex flex-col justify-end p-6"
+        className="relative flex items-center gap-4 p-6"
         style={{
-          backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.6)), url(https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
         }}
       >
-        <h1 className="text-2xl font-bold text-white mb-1">
-          {localStorage.getItem('municipio_nombre') || 'Municipalidad'}
-        </h1>
-        <p className="text-sm text-white/90">
-          Monitoreo en tiempo real de gestión municipal
-        </p>
-        <div className="flex items-center gap-4 mt-3 text-xs text-white/80">
-          <div className="flex items-center gap-1">
-            <ClipboardList className="h-3 w-3" />
-            <span>{stats.total} reclamos</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>4.9d promedio</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            <span>{municipioNombre}</span>
-          </div>
+        <div
+          className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+        >
+          <Building2 className="h-8 w-8 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-3xl md:text-4xl text-white mb-2 drop-shadow-lg">
+            <span className="font-light">Municipalidad de </span>
+            <span className="font-bold">{localStorage.getItem('municipio_nombre') || 'Municipalidad'}</span>
+          </h1>
+          <p className="text-sm text-white/90">
+            Monitoreo en tiempo real de gestión municipal
+          </p>
         </div>
       </div>
 

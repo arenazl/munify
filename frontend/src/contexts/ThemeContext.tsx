@@ -107,6 +107,8 @@ interface ThemeContextType {
   setTheme: (name: ThemeName) => void;
   customPrimary: string | null;
   setCustomPrimary: (color: string | null) => void;
+  customSidebar: string | null;
+  setCustomSidebar: (color: string | null) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -125,17 +127,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem('customPrimary');
   });
 
+  const [customSidebar, setCustomSidebarState] = useState<string | null>(() => {
+    return localStorage.getItem('customSidebar');
+  });
+
   // Fallback to dark theme if themeName is invalid
   const baseTheme = themes[themeName] || themes.dark;
 
   // Aplicar color de acento personalizado si existe
-  const theme: Theme = customPrimary
+  let theme: Theme = customPrimary
     ? {
         ...baseTheme,
         primary: customPrimary,
         primaryHover: accentColors.find(c => c.value === customPrimary)?.hover || customPrimary,
       }
     : baseTheme;
+
+  // Aplicar color de sidebar personalizado si existe, sino usar el del tema base
+  const sidebarColor = customSidebar || theme.sidebar;
+
+  theme = {
+    ...theme,
+    sidebar: sidebarColor,
+  };
 
   useEffect(() => {
     localStorage.setItem('theme', themeName);
@@ -165,6 +179,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [customPrimary]);
 
+  useEffect(() => {
+    if (customSidebar) {
+      localStorage.setItem('customSidebar', customSidebar);
+    } else {
+      localStorage.removeItem('customSidebar');
+    }
+  }, [customSidebar]);
+
   const setTheme = (name: ThemeName) => {
     setThemeName(name);
   };
@@ -173,8 +195,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setCustomPrimaryState(color);
   };
 
+  const setCustomSidebar = (color: string | null) => {
+    setCustomSidebarState(color);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, themeName, setTheme, customPrimary, setCustomPrimary }}>
+    <ThemeContext.Provider value={{ theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar }}>
       {children}
     </ThemeContext.Provider>
   );
