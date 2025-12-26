@@ -60,20 +60,55 @@ export default function MobileHome() {
   };
 
   if (!user) {
-    const municipioNombre = localStorage.getItem('municipio_nombre') || 'tu Municipio';
+    const municipioNombre = localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '') || 'tu Municipio';
+    const logoUrl = localStorage.getItem('municipio_logo_url');
 
     return (
-      <div className="p-4 space-y-4">
-        {/* Header de bienvenida - compacto */}
-        <div className="text-center pt-2">
-          <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-            {municipioNombre}
-          </h1>
-          <p className="text-sm" style={{ color: theme.textSecondary }}>
-            Sistema de Reclamos Vecinales
-          </p>
+      <div className="space-y-0">
+        {/* Banner superior con imagen de fondo del municipio */}
+        <div className="relative overflow-hidden" style={{ minHeight: '180px' }}>
+          {/* Imagen de fondo */}
+          <div className="absolute inset-0">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={municipioNombre}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                }}
+              />
+            )}
+            {/* Gradiente oscuro para legibilidad */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(180deg,
+                  rgba(15, 23, 42, 0.5) 0%,
+                  rgba(15, 23, 42, 0.7) 50%,
+                  ${theme.primary}90 100%
+                )`,
+              }}
+            />
+          </div>
+
+          {/* Contenido del banner */}
+          <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '180px' }}>
+            <h1 className="text-2xl text-white mb-1 drop-shadow-lg">
+              <span className="font-light">Municipalidad de </span>
+              <span className="font-bold">{municipioNombre}</span>
+            </h1>
+            <p className="text-sm text-white/90">
+              Sistema de Reclamos Vecinales
+            </p>
+          </div>
         </div>
 
+        <div className="p-4 space-y-4">
         {/* Acciones principales */}
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -143,23 +178,30 @@ export default function MobileHome() {
             Crear Cuenta
           </button>
         </div>
+        </div>
       </div>
     );
   }
 
-  // Datos hardcodeados de noticias para demo
+  // Datos hardcodeados de noticias genéricas para demo
   const noticiasHardcoded = [
     {
       id: 1,
-      titulo: "Nueva pavimentación en Barrio Centro",
-      descripcion: "Se iniciaron los trabajos de pavimentación en las calles principales del barrio centro, beneficiando a más de 500 familias.",
-      imagen_url: "https://images.unsplash.com/photo-1581094271901-8022df4466f9?w=400"
+      titulo: "Mejoras en el servicio de recolección de residuos",
+      descripcion: "Se implementó un nuevo sistema de rutas optimizadas para la recolección de residuos, mejorando la frecuencia y cobertura en todos los barrios del municipio.",
+      imagen_url: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=400"
     },
     {
       id: 2,
-      titulo: "Inauguración de Plaza Renovada",
-      descripcion: "Este sábado se inaugura la renovación completa de Plaza San Martín con nuevos juegos y espacios verdes para toda la familia.",
-      imagen_url: "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400"
+      titulo: "Nueva iluminación LED en espacios públicos",
+      descripcion: "El municipio continúa con el plan de modernización del alumbrado público, instalando luminarias LED de bajo consumo en plazas y calles principales.",
+      imagen_url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400"
+    },
+    {
+      id: 3,
+      titulo: "Trabajos de mantenimiento en calles y veredas",
+      descripcion: "Se realizan trabajos de bacheo y reparación de veredas en diversos puntos del distrito para mejorar la transitabilidad y seguridad de los vecinos.",
+      imagen_url: "https://images.unsplash.com/photo-1581094271901-8022df4466f9?w=400"
     }
   ];
 
@@ -168,35 +210,45 @@ export default function MobileHome() {
 
   return (
     <div className="space-y-0">
-      {/* Banner superior */}
-      <div
-        className="relative flex items-center gap-4 p-6"
-        style={{
-          background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-        }}
-      >
-        {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt={municipioNombre}
-            className="w-16 h-16 rounded-2xl object-contain flex-shrink-0"
-            style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}
-          />
-        ) : (
+      {/* Banner superior con imagen de fondo del municipio */}
+      <div className="relative overflow-hidden" style={{ minHeight: '180px' }}>
+        {/* Imagen de fondo */}
+        <div className="absolute inset-0">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={municipioNombre}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-full h-full"
+              style={{
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+              }}
+            />
+          )}
+          {/* Gradiente oscuro para legibilidad */}
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-          >
-            <Building2 className="h-8 w-8" style={{ color: '#ffffff' }} />
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <h1 className="text-3xl md:text-4xl text-white mb-2 drop-shadow-lg">
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(180deg,
+                rgba(15, 23, 42, 0.5) 0%,
+                rgba(15, 23, 42, 0.7) 50%,
+                ${theme.primary}90 100%
+              )`,
+            }}
+          />
+        </div>
+
+        {/* Contenido del banner */}
+        <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '180px' }}>
+          <h1 className="text-2xl text-white mb-1 drop-shadow-lg">
             <span className="font-light">Municipalidad de </span>
-            <span className="font-bold">{localStorage.getItem('municipio_nombre') || 'Municipalidad'}</span>
+            <span className="font-bold">{municipioNombre}</span>
           </h1>
           <p className="text-sm text-white/90">
-            Monitoreo en tiempo real de gestión municipal
+            Sistema de Reclamos Vecinales
           </p>
         </div>
       </div>
