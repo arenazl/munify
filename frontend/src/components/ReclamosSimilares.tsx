@@ -129,11 +129,11 @@ export function ReclamosSimilares({
             <div>
               <h2
                 className="text-xl font-bold"
-                style={{ color: theme.foreground }}
+                style={{ color: theme.text }}
               >
                 Encontramos reclamos similares
               </h2>
-              <p className="text-sm mt-1" style={{ color: theme.mutedForeground }}>
+              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
                 Ya hay {similares.length} {similares.length === 1 ? 'reclamo similar' : 'reclamos similares'} reportados en la zona
               </p>
             </div>
@@ -141,9 +141,9 @@ export function ReclamosSimilares({
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-opacity-80 transition-colors"
-            style={{ backgroundColor: theme.muted }}
+            style={{ backgroundColor: theme.backgroundSecondary }}
           >
-            <X className="h-5 w-5" style={{ color: theme.foreground }} />
+            <X className="h-5 w-5" style={{ color: theme.text }} />
           </button>
         </div>
 
@@ -166,7 +166,7 @@ export function ReclamosSimilares({
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <h3
                     className="font-semibold text-base flex-1"
-                    style={{ color: theme.foreground }}
+                    style={{ color: theme.text }}
                   >
                     {reclamo.titulo}
                   </h3>
@@ -183,7 +183,7 @@ export function ReclamosSimilares({
 
                 {/* Información */}
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.mutedForeground }}>
+                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
                     <MapPin className="h-4 w-4" />
                     <span>{reclamo.direccion}</span>
                     {reclamo.distancia_metros && (
@@ -192,7 +192,7 @@ export function ReclamosSimilares({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.mutedForeground }}>
+                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
                     <Calendar className="h-4 w-4" />
                     <span>Reportado {formatFecha(reclamo.created_at)}</span>
                     {reclamo.creador && (
@@ -225,8 +225,8 @@ export function ReclamosSimilares({
             onClick={onClose}
             className="flex-1 px-4 py-3 rounded-lg font-medium transition-colors"
             style={{
-              backgroundColor: theme.muted,
-              color: theme.foreground,
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
             }}
           >
             Cancelar
