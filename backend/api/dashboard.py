@@ -456,6 +456,82 @@ async def get_por_categoria(
 
     return result
 
+
+@router.get("/conteo-categorias")
+async def get_conteo_categorias(
+    request: Request,
+    estado: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Endpoint optimizado que devuelve el conteo de reclamos por categoría
+    sin traer todos los datos. Mucho más eficiente que traer todos los reclamos.
+    """
+    from models.categoria import Categoria
+    from sqlalchemy import and_
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    # Construir condiciones
+    conditions = [Reclamo.municipio_id == municipio_id]
+    if estado:
+        conditions.append(Reclamo.estado == estado)
+
+    query = await db.execute(
+        select(
+            Categoria.id,
+            Categoria.nombre,
+            func.count(Reclamo.id).label('cantidad')
+        )
+        .join(Reclamo, Reclamo.categoria_id == Categoria.id, isouter=True)
+        .where(and_(*conditions))
+        .group_by(Categoria.id, Categoria.nombre)
+        .order_by(func.count(Reclamo.id).desc())
+    )
+
+    result = [
+        {
+            "categoria_id": cat_id,
+            "categoria": nombre,
+            "cantidad": count or 0
+        }
+        for cat_id, nombre, count in query.all()
+    ]
+
+    return result
+
+@router.get("/conteo-estados")
+async def get_conteo_estados(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Endpoint optimizado que devuelve el conteo de reclamos por estado.
+    Mucho más eficiente que traer todos los reclamos.
+    """
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    query = await db.execute(
+        select(
+            Reclamo.estado,
+            func.count(Reclamo.id).label('cantidad')
+        )
+        .where(Reclamo.municipio_id == municipio_id)
+        .group_by(Reclamo.estado)
+    )
+
+    result = [
+        {
+            "estado": estado,
+            "cantidad": count or 0
+        }
+        for estado, count in query.all()
+    ]
+
+    return result
+
 @router.get("/por-zona")
 async def get_por_zona(
     request: Request,

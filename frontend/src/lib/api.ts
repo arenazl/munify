@@ -121,6 +121,21 @@ export const reclamosApi = {
     api.get(`/reclamos/empleado/${empleadoId}/disponibilidad/${fecha}`, { params: { buscar_siguiente: buscarSiguiente } }),
   getSugerenciaAsignacion: (reclamoId: number) =>
     api.get(`/reclamos/${reclamoId}/sugerencia-asignacion`),
+  getSimilares: (params: {
+    categoria_id: number;
+    latitud?: number;
+    longitud?: number;
+    radio_metros?: number;
+    dias_atras?: number;
+    limit?: number;
+  }) => api.get('/reclamos/similares', { params }),
+  getRecurrentes: (params?: {
+    limit?: number;
+    dias_atras?: number;
+    min_similares?: number;
+  }) => api.get('/reclamos/recurrentes', { params }),
+  getCantidadSimilares: (reclamoId: number) =>
+    api.get(`/reclamos/${reclamoId}/cantidad-similares`),
 };
 
 // Categorías
@@ -175,6 +190,8 @@ export const dashboardApi = {
   getMetricasAccion: () => api.get('/dashboard/metricas-accion'),
   getMetricasDetalle: () => api.get('/dashboard/metricas-detalle'),
   getRecurrentes: (dias?: number, minReclamos?: number) => api.get('/dashboard/recurrentes', { params: { dias: dias || 90, min_reclamos: minReclamos || 2 } }),
+  getConteoCategorias: (estado?: string) => api.get('/dashboard/conteo-categorias', { params: estado ? { estado } : {} }),
+  getConteoEstados: () => api.get('/dashboard/conteo-estados'),
 };
 
 // Notificaciones

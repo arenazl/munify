@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags } from 'lucide-react';
-import { dashboardApi, analyticsApi } from '../lib/api';
+import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users } from 'lucide-react';
+import { dashboardApi, analyticsApi, reclamosApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { ChartSkeleton, DashboardStatSkeleton } from '../components/ui/Skeleton';
 import {
   XAxis,
   YAxis,
@@ -37,6 +38,16 @@ interface ReclamoRecurrente {
   zona: string;
   cantidad: number;
   categorias: string[];
+}
+
+interface ReclamoSimilarGrupo {
+  id: number;
+  titulo: string;
+  direccion: string;
+  categoria: { id: number; nombre: string } | null;
+  zona: string | null;
+  cantidad_reportes: number;
+  created_at: string;
 }
 
 interface TendenciaData {
@@ -92,11 +103,14 @@ export default function Dashboard() {
   const [porCategoria, setPorCategoria] = useState<{ categoria: string; cantidad: number }[]>([]);
   const [porZona, setPorZona] = useState<{ zona: string; cantidad: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingCharts, setLoadingCharts] = useState(true);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
 
   // Analytics avanzados
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   const [vistaActiva, setVistaActiva] = useState<VistaMetrica>('barrios');
   const [recurrentes, setRecurrentes] = useState<ReclamoRecurrente[]>([]);
+  const [reclamosSimilares, setReclamosSimilares] = useState<ReclamoSimilarGrupo[]>([]);
   const [tendencias, setTendencias] = useState<TendenciaData[]>([]);
   const [distancias, setDistancias] = useState<EmpleadoDistancia[]>([]);
   const [cobertura, setCobertura] = useState<ZonaCobertura[]>([]);
@@ -120,45 +134,97 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Datos básicos
-        const [statsRes, categoriaRes, zonasRes] = await Promise.all([
-          dashboardApi.getStats(),
-          dashboardApi.getPorCategoria(),
-          dashboardApi.getPorZona(),
-        ]);
-        setStats(statsRes.data);
-        setPorCategoria(categoriaRes.data);
-        setPorZona(zonasRes.data.slice(0, 5));
+        // Paso 1: Cargar datos básicos primero (más rápido)
+        try {
+          const statsRes = await dashboardApi.getStats();
+          setStats(statsRes.data);
+          setLoading(false);
+        } catch (error) {
+          console.error('Error cargando stats:', error);
+          setLoading(false);
+        }
 
-        // Analytics avanzados
-        const [heatmapRes, distanciasRes, coberturaRes, tiempoRes, rendimientoRes, metricasRes, metricasDetalleRes, tendenciasRes, recurrentesRes] = await Promise.all([
-          analyticsApi.getHeatmap(30),
-          analyticsApi.getDistancias(30),
-          analyticsApi.getCobertura(30),
-          analyticsApi.getTiempoResolucion(90),
-          analyticsApi.getRendimientoEmpleados(4),
-          dashboardApi.getMetricasAccion(),
-          dashboardApi.getMetricasDetalle(),
-          dashboardApi.getTendencia(30),
-          dashboardApi.getRecurrentes(90, 2),
-        ]);
+        // Paso 2: Cargar gráficos básicos (independientemente)
+        try {
+          const [categoriaRes, zonasRes, metricasRes] = await Promise.all([
+            dashboardApi.getPorCategoria().catch(e => ({ data: [] })),
+            dashboardApi.getPorZona().catch(e => ({ data: [] })),
+            dashboardApi.getMetricasAccion().catch(e => ({ data: null })),
+          ]);
+          setPorCategoria(categoriaRes.data || []);
+          setPorZona((zonasRes.data || []).slice(0, 5));
+          setMetricasAccion(metricasRes.data || null);
+        } catch (error) {
+          console.error('Error cargando gráficos básicos:', error);
+        }
+        setLoadingCharts(false);
 
-        setHeatmapData(heatmapRes.data.puntos || []);
-        setDistancias(distanciasRes.data.empleados || []);
-        setDistanciasResumen(distanciasRes.data.resumen || null);
-        setCobertura(coberturaRes.data.zonas || []);
-        setCoberturaResumen(coberturaRes.data.resumen || null);
-        setTiempoResolucion(tiempoRes.data.categorias || []);
-        setRendimientoEmpleados(rendimientoRes.data.semanas || []);
-        setEmpleadosNames(rendimientoRes.data.empleados || []);
-        setMetricasAccion(metricasRes.data || null);
-        setMetricasDetalle(metricasDetalleRes.data || null);
-        setTendencias(tendenciasRes.data || []);
-        setRecurrentes(recurrentesRes.data || []);
+        // Paso 3: Cargar datos para la vista de métricas (livianos)
+        try {
+          const [tendenciasRes, recurrentesRes, similaresRes] = await Promise.all([
+            dashboardApi.getTendencia(30).catch(e => ({ data: [] })),
+            dashboardApi.getRecurrentes(90, 2).catch(e => ({ data: [] })),
+            reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2 }).catch(e => ({ data: [] })),
+          ]);
+          setTendencias(tendenciasRes.data || []);
+          setRecurrentes(recurrentesRes.data || []);
+          setReclamosSimilares(similaresRes.data || []);
+        } catch (error) {
+          console.error('Error cargando tendencias y recurrentes:', error);
+        }
+
+        // Paso 4: Cargar analytics avanzados (más pesados) de a uno
+        try {
+          const heatmapRes = await analyticsApi.getHeatmap(30).catch(e => ({ data: { puntos: [] } }));
+          setHeatmapData(heatmapRes.data.puntos || []);
+        } catch (error) {
+          console.error('Error cargando heatmap:', error);
+        }
+
+        try {
+          const distanciasRes = await analyticsApi.getDistancias(30).catch(e => ({ data: { empleados: [], resumen: null } }));
+          setDistancias(distanciasRes.data.empleados || []);
+          setDistanciasResumen(distanciasRes.data.resumen || null);
+        } catch (error) {
+          console.error('Error cargando distancias:', error);
+        }
+
+        try {
+          const coberturaRes = await analyticsApi.getCobertura(30).catch(e => ({ data: { zonas: [], resumen: null } }));
+          setCobertura(coberturaRes.data.zonas || []);
+          setCoberturaResumen(coberturaRes.data.resumen || null);
+        } catch (error) {
+          console.error('Error cargando cobertura:', error);
+        }
+
+        try {
+          const tiempoRes = await analyticsApi.getTiempoResolucion(90).catch(e => ({ data: { categorias: [] } }));
+          setTiempoResolucion(tiempoRes.data.categorias || []);
+        } catch (error) {
+          console.error('Error cargando tiempo resolución:', error);
+        }
+
+        try {
+          const rendimientoRes = await analyticsApi.getRendimientoEmpleados(4).catch(e => ({ data: { semanas: [], empleados: [] } }));
+          setRendimientoEmpleados(rendimientoRes.data.semanas || []);
+          setEmpleadosNames(rendimientoRes.data.empleados || []);
+        } catch (error) {
+          console.error('Error cargando rendimiento empleados:', error);
+        }
+
+        try {
+          const metricasDetalleRes = await dashboardApi.getMetricasDetalle().catch(e => ({ data: null }));
+          setMetricasDetalle(metricasDetalleRes.data || null);
+        } catch (error) {
+          console.error('Error cargando métricas detalle:', error);
+        }
+
+        setLoadingAnalytics(false);
       } catch (error) {
-        console.error('Error cargando dashboard:', error);
-      } finally {
+        console.error('Error general cargando dashboard:', error);
         setLoading(false);
+        setLoadingCharts(false);
+        setLoadingAnalytics(false);
       }
     };
     fetchData();
@@ -300,6 +366,20 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Definiciones de gradientes SVG para los gráficos */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={theme.primary} stopOpacity={0.8} />
+            <stop offset="100%" stopColor={theme.primaryHover} stopOpacity={0.3} />
+          </linearGradient>
+          <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor={theme.primary} stopOpacity={1} />
+            <stop offset="100%" stopColor={theme.primaryHover} stopOpacity={0.8} />
+          </linearGradient>
+        </defs>
+      </svg>
+
       {/* Hero Header - Estilo Wok Express */}
       <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '200px' }}>
         {/* Imagen de fondo - usa la imagen del municipio si está disponible */}
@@ -339,8 +419,9 @@ export default function Dashboard() {
 
           {/* Info principal */}
           <div className="mt-auto">
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 drop-shadow-lg">
-              Dashboard Analytics
+            <h1 className="text-3xl md:text-4xl text-white mb-2 drop-shadow-lg">
+              <span className="font-light">Municipalidad de </span>
+              <span className="font-bold">{localStorage.getItem('municipio_nombre') || 'Municipalidad'}</span>
             </h1>
             <p className="text-slate-200 text-sm md:text-base mb-4">
               Monitoreo en tiempo real de gestión municipal
@@ -366,8 +447,15 @@ export default function Dashboard() {
       </div>
 
       {/* Stats cards - Glassmorphism */}
-      {/* Mobile: 2x2 grid, Desktop: 4 columnas */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* Grid dinámico que se adapta a la cantidad de cards */}
+      <div className={`grid gap-3 md:gap-4 ${
+        cards.length === 1 ? 'grid-cols-1' :
+        cards.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+        cards.length === 3 ? 'grid-cols-2 lg:grid-cols-3' :
+        cards.length === 4 ? 'grid-cols-2 lg:grid-cols-4' :
+        cards.length === 5 ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5' :
+        'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+      }`}>
         {cards.map((card) => {
           const Icon = card.icon;
           return (
@@ -423,8 +511,16 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* Fila 1: Estado y Mapa de Calor */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Fila 1: Estado, Mapa de Calor y Top Categorías */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {loadingCharts ? (
+          <>
+            <ChartSkeleton height={300} />
+            <div className="lg:col-span-2"><ChartSkeleton height={300} /></div>
+            <ChartSkeleton height={300} />
+          </>
+        ) : (
+          <>
         {/* Estado de reclamos - Donut Chart */}
         <div
           className="rounded-2xl p-6 backdrop-blur-sm"
@@ -509,8 +605,8 @@ export default function Dashboard() {
                   />
                   <Scatter
                     data={heatmapData}
-                    fill={theme.primary}
-                    fillOpacity={0.6}
+                    fill="url(#colorGradient)"
+                    fillOpacity={0.8}
                   />
                 </ScatterChart>
               </ResponsiveContainer>
@@ -524,6 +620,50 @@ export default function Dashboard() {
             {heatmapData.length} puntos en los ultimos 30 dias
           </p>
         </div>
+
+        {/* Top categorías */}
+        <div
+          className="rounded-2xl p-6 backdrop-blur-sm"
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
+          }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
+              Top Categorias
+            </h2>
+            <div className="p-2 rounded-xl" style={{ backgroundColor: '#f59e0b20' }}>
+              <AlertTriangle className="h-5 w-5" style={{ color: '#f59e0b' }} />
+            </div>
+          </div>
+          <div className="space-y-4">
+            {(porCategoria.length > 0 ? porCategoria : []).slice(0, 5).map((item, index) => {
+              const total = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
+              const percent = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
+              const colors = [theme.primary, '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444'];
+              return (
+                <div key={item.categoria}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm" style={{ color: theme.text }}>{item.categoria}</span>
+                    <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>
+                      {item.cantidad} ({percent}%)
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}20` }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${percent}%`, backgroundColor: colors[index % colors.length] }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+          </>
+        )}
       </div>
 
       {/* Fila 2: Métricas con botonera y Cobertura */}
@@ -621,27 +761,66 @@ export default function Dashboard() {
 
             {/* Vista: Reclamos recurrentes */}
             {vistaActiva === 'recurrentes' && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                  Direcciones con Reclamos Recurrentes
-                </h3>
-                {recurrentes.length > 0 ? recurrentes.slice(0, 5).map((item, index) => (
-                  <div key={index} className="p-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10` }}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium truncate flex-1" style={{ color: theme.text }}>{item.direccion}</span>
-                      <span className="text-xs font-bold px-2 py-0.5 rounded ml-2" style={{ backgroundColor: '#ef4444', color: 'white' }}>
-                        {item.cantidad}x
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px]" style={{ color: theme.textSecondary }}>{item.zona}</span>
-                      <span className="text-[10px]" style={{ color: theme.textSecondary }}>•</span>
-                      <span className="text-[10px] truncate" style={{ color: theme.textSecondary }}>{item.categorias.join(', ')}</span>
+              <div className="space-y-4">
+                {/* Reclamos similares por ubicacion */}
+                {reclamosSimilares.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: theme.text }}>
+                      <Users className="h-4 w-4" style={{ color: '#f59e0b' }} />
+                      Reclamos Similares en la Zona
+                    </h3>
+                    <div className="space-y-2">
+                      {reclamosSimilares.slice(0, 5).map((item) => (
+                        <div
+                          key={item.id}
+                          className="p-3 rounded-lg cursor-pointer hover:scale-[1.01] transition-all"
+                          style={{ backgroundColor: '#f59e0b15', border: '1px solid #f59e0b30' }}
+                          onClick={() => window.location.href = `/gestion/reclamos/${item.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <span className="text-xs font-medium line-clamp-1" style={{ color: theme.text }}>{item.titulo}</span>
+                            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: '#f59e0b', color: 'white' }}>
+                              <Users className="h-3 w-3" />
+                              {item.cantidad_reportes}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px]" style={{ color: theme.textSecondary }}>
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">{item.direccion}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>{item.categoria?.nombre || 'Sin categoría'}</span>
+                            {item.zona && <span className="text-[10px]" style={{ color: theme.textSecondary }}>{item.zona}</span>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                )) : (
-                  <p className="text-sm" style={{ color: theme.textSecondary }}>No hay reclamos recurrentes</p>
                 )}
+
+                {/* Direcciones recurrentes */}
+                <div>
+                  <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                    Direcciones con Reclamos Recurrentes
+                  </h3>
+                  {recurrentes.length > 0 ? recurrentes.slice(0, 5).map((item, index) => (
+                    <div key={index} className="p-2 rounded-lg mb-2" style={{ backgroundColor: `${theme.primary}10` }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium truncate flex-1" style={{ color: theme.text }}>{item.direccion}</span>
+                        <span className="text-xs font-bold px-2 py-0.5 rounded ml-2" style={{ backgroundColor: '#ef4444', color: 'white' }}>
+                          {item.cantidad}x
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px]" style={{ color: theme.textSecondary }}>{item.zona}</span>
+                        <span className="text-[10px]" style={{ color: theme.textSecondary }}>•</span>
+                        <span className="text-[10px] truncate" style={{ color: theme.textSecondary }}>{item.categorias.join(', ')}</span>
+                      </div>
+                    </div>
+                  )) : (
+                    <p className="text-sm" style={{ color: theme.textSecondary }}>No hay reclamos recurrentes</p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -658,7 +837,7 @@ export default function Dashboard() {
                       <XAxis dataKey="fecha" stroke={chartColors.text} fontSize={9} tickFormatter={(val) => val.slice(5)} />
                       <YAxis stroke={chartColors.text} fontSize={10} />
                       <Tooltip content={<CustomTooltip />} />
-                      <Line type="monotone" dataKey="cantidad" name="Reclamos" stroke={theme.primary} strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="cantidad" name="Reclamos" stroke={theme.primary} strokeWidth={3} dot={false} fill="url(#colorGradient)" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -750,6 +929,26 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Fila 3, 4, 5: Analytics Avanzados */}
+      {loadingAnalytics ? (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartSkeleton height={300} />
+            <ChartSkeleton height={300} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartSkeleton height={300} />
+            <ChartSkeleton height={300} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <DashboardStatSkeleton />
+            <DashboardStatSkeleton />
+            <DashboardStatSkeleton />
+            <DashboardStatSkeleton />
+          </div>
+        </>
+      ) : (
+      <>
       {/* Fila 3: Distancias y Zonas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Distancias de Empleados */}
@@ -774,7 +973,7 @@ export default function Dashboard() {
                 <XAxis type="number" stroke={chartColors.text} fontSize={12} unit=" km" />
                 <YAxis dataKey="empleado_nombre" type="category" stroke={chartColors.text} fontSize={11} width={100} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="distancia_total_km" name="Distancia (km)" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={16} />
+                <Bar dataKey="distancia_total_km" name="Distancia (km)" fill="url(#barGradient)" radius={[0, 4, 4, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -809,7 +1008,7 @@ export default function Dashboard() {
                 <XAxis type="number" stroke={chartColors.text} fontSize={12} />
                 <YAxis dataKey="zona" type="category" stroke={chartColors.text} fontSize={12} width={60} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="cantidad" name="Reclamos" fill={theme.primary} radius={[0, 4, 4, 0]} barSize={18} />
+                <Bar dataKey="cantidad" name="Reclamos" fill="url(#barGradient)" radius={[0, 4, 4, 0]} barSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -888,53 +1087,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Fila 5: Top Categorías y Resumen */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top categorías */}
-        <div
-          className="rounded-2xl p-6 backdrop-blur-sm"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
-          }}
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Top Categorias
-            </h2>
-            <div className="p-2 rounded-xl" style={{ backgroundColor: '#f59e0b20' }}>
-              <AlertTriangle className="h-5 w-5" style={{ color: '#f59e0b' }} />
-            </div>
-          </div>
-          <div className="space-y-4">
-            {(porCategoria.length > 0 ? porCategoria : []).slice(0, 5).map((item, index) => {
-              const total = porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0);
-              const percent = total > 0 ? Math.round((item.cantidad / total) * 100) : 0;
-              const colors = [theme.primary, '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444'];
-              return (
-                <div key={item.categoria}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm" style={{ color: theme.text }}>{item.categoria}</span>
-                    <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>
-                      {item.cantidad} ({percent}%)
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}20` }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percent}%`, backgroundColor: colors[index % colors.length] }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Resumen rápido - Métricas Accionables con lista */}
-        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
+      {/* Fila 5: Métricas Accionables */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
             {
               label: 'Urgentes',
               sublabel: 'Prioridad alta +3 días',
@@ -979,9 +1134,9 @@ export default function Dashboard() {
                 key={item.label}
                 className={`group relative rounded-2xl p-4 flex flex-col transition-all duration-500 hover:-translate-y-1 overflow-hidden ${item.alert ? 'animate-pulse' : ''}`}
                 style={{
-                  backgroundColor: `${item.color}10`,
-                  border: `1px solid ${item.color}30`,
-                  boxShadow: `0 4px 20px ${item.color}15`,
+                  backgroundColor: `${item.color}15`,
+                  border: `1px solid ${item.color}40`,
+                  boxShadow: `0 4px 20px ${item.color}20`,
                 }}
               >
                 {/* Glow effect on hover */}
@@ -991,7 +1146,7 @@ export default function Dashboard() {
                 />
                 {/* Header */}
                 <div className="relative flex items-center justify-between mb-2">
-                  <div className="p-2 rounded-xl" style={{ backgroundColor: `${item.color}20` }}>
+                  <div className="p-2 rounded-xl" style={{ backgroundColor: `${item.color}25` }}>
                     <Icon className="h-4 w-4" style={{ color: item.color }} />
                   </div>
                   <p className="text-3xl font-black" style={{ color: item.color }}>{item.value}</p>
@@ -1003,7 +1158,7 @@ export default function Dashboard() {
                 <div
                   className="mt-2 pt-2 border-t overflow-y-auto scroll-smooth max-h-[120px]"
                   style={{
-                    borderColor: `${item.color}30`,
+                    borderColor: `${item.color}40`,
                     scrollbarWidth: 'none',
                     msOverflowStyle: 'none',
                     WebkitOverflowScrolling: 'touch'
@@ -1017,14 +1172,14 @@ export default function Dashboard() {
                       <div
                         key={r.id}
                         className="p-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{ backgroundColor: `${item.color}10` }}
+                        style={{ backgroundColor: `${item.color}15` }}
                         onClick={() => window.location.href = `/reclamos/${r.id}`}
                       >
                         <p className="text-[10px] font-medium truncate" style={{ color: theme.text }}>
                           {r.titulo}
                         </p>
                         <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-[9px] px-1 rounded" style={{ backgroundColor: `${item.color}20`, color: item.color }}>
+                          <span className="text-[9px] px-1 rounded" style={{ backgroundColor: `${item.color}25`, color: item.color }}>
                             {r.categoria}
                           </span>
                           {r.dias_antiguedad > 0 && (
@@ -1044,8 +1199,9 @@ export default function Dashboard() {
               </div>
             );
           })}
-        </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

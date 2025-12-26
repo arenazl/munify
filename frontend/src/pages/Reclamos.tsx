@@ -1,14 +1,15 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
@@ -153,10 +154,18 @@ export default function Reclamos() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const ITEMS_PER_PAGE = 20;
+  const [allReclamosData, setAllReclamosData] = useState<Reclamo[]>([]);
+  const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
+  const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
+  const observerTarget = useRef<HTMLDivElement>(null);
   // Estado para animación staggered - iniciar como completado para evitar parpadeo
   const [visibleCards] = useState<Set<number>>(new Set());
   const [animationDone] = useState(true);
@@ -233,6 +242,9 @@ export default function Reclamos() {
   const [showUserResults, setShowUserResults] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
 
+  // Estado para reclamo anónimo
+  const [esAnonimo, setEsAnonimo] = useState(false);
+
   // Opciones de duración
   const duracionOptions = [
     { value: '0.5', label: '30 min' },
@@ -289,10 +301,48 @@ export default function Reclamos() {
   } | null>(null);
   const [distanciaAlMunicipio, setDistanciaAlMunicipio] = useState<number | null>(null);
 
+  // Estado para conteos de reclamos similares (por reclamo_id)
+  const [similaresCounts, setSimilaresCounts] = useState<Record<number, number>>({});
+
+  // Cargar datos del municipio UNA SOLA VEZ al montar
   useEffect(() => {
-    fetchData();
     fetchMunicipioData();
+  }, []);
+
+  // Recargar cuando cambia el filtro de estado
+  useEffect(() => {
+    fetchData(true); // Reset page cuando cambia el filtro
   }, [filtroEstado]);
+
+  // Cargar más cuando cambia la página
+  useEffect(() => {
+    if (page > 1) {
+      fetchData(false);
+    }
+  }, [page]);
+
+  // Intersection Observer para scroll infinito
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          setPage(prev => prev + 1);
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loadingMore, loading]);
 
   // Detectar parámetro ?crear=ID para abrir wizard desde chat
   useEffect(() => {
@@ -437,6 +487,41 @@ export default function Reclamos() {
     }
   };
 
+  // Cargar conteos de reclamos similares para los reclamos visibles
+  useEffect(() => {
+    const loadSimilaresCounts = async () => {
+      if (reclamos.length === 0) return;
+
+      // Solo cargar para reclamos que no tienen conteo aún
+      const reclamosToFetch = reclamos.filter(r => similaresCounts[r.id] === undefined);
+      if (reclamosToFetch.length === 0) return;
+
+      // Cargar en paralelo (máximo 10 a la vez para no saturar)
+      const batch = reclamosToFetch.slice(0, 10);
+      const results = await Promise.all(
+        batch.map(async (r) => {
+          try {
+            const res = await reclamosApi.getCantidadSimilares(r.id);
+            return { id: r.id, count: res.data.cantidad || 0 };
+          } catch {
+            return { id: r.id, count: 0 };
+          }
+        })
+      );
+
+      // Actualizar estado con los nuevos conteos
+      setSimilaresCounts(prev => {
+        const newCounts = { ...prev };
+        results.forEach(r => {
+          newCounts[r.id] = r.count;
+        });
+        return newCounts;
+      });
+    };
+
+    loadSimilaresCounts();
+  }, [reclamos]);
+
   // Address autocomplete with Nominatim (OpenStreetMap - free)
   const searchAddress = async (query: string) => {
     if (query.length < 3) {
@@ -542,23 +627,95 @@ export default function Reclamos() {
     setAddressSuggestions([]);
   };
 
-  const fetchData = async () => {
+  const fetchData = async (resetPage = false) => {
     try {
-      const [reclamosRes, empleadosRes, categoriasRes, zonasRes] = await Promise.all([
-        reclamosApi.getAll(filtroEstado ? { estado: filtroEstado } : {}),
-        empleadosApi.getAll(true),
-        categoriasApi.getAll(true),
-        zonasApi.getAll(true),
-      ]);
-      setReclamos(reclamosRes.data);
-      setEmpleados(empleadosRes.data);
-      setCategorias(categoriasRes.data);
-      setZonas(zonasRes.data);
+      const currentPage = resetPage ? 1 : page;
+
+      // PRIORIDAD 1: Cargar reclamos INMEDIATAMENTE (primeros 20)
+      if (resetPage) {
+        setLoadingMore(false);
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const reclamosRes = await reclamosApi.getAll(
+        filtroEstado ? { estado: filtroEstado } : {}
+      );
+
+      const allReclamos = reclamosRes.data;
+
+      // Guardar todos los reclamos (filtrados) para referencia
+      if (resetPage) {
+        setAllReclamosData(allReclamos);
+      }
+
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const paginatedReclamos = allReclamos.slice(startIndex, endIndex);
+
+      if (resetPage) {
+        setReclamos(paginatedReclamos);
+        setPage(1);
+
+        // DESPUÉS de mostrar los primeros 20, cargar conteos en background
+        // Solo si NO estamos cargando más páginas (scroll)
+        setTimeout(() => {
+          // PRIORIDAD 2: Cargar datos básicos en BACKGROUND (solo primera vez)
+          if (categorias.length === 0) {
+            Promise.all([
+              categoriasApi.getAll(true),
+              zonasApi.getAll(true),
+              empleadosApi.getAll(true),
+            ]).then(([categoriasRes, zonasRes, empleadosRes]) => {
+              setCategorias(categoriasRes.data);
+              setZonas(zonasRes.data);
+              setEmpleados(empleadosRes.data);
+            }).catch(error => {
+              console.error('Error cargando datos básicos:', error);
+            });
+          }
+
+          // PRIORIDAD 3: Cargar conteos de categorías en BACKGROUND
+          dashboardApi.getConteoCategorias(filtroEstado || undefined)
+            .then(conteosRes => {
+              const conteosMap: Record<number, number> = {};
+              conteosRes.data.forEach((item: any) => {
+                conteosMap[item.categoria_id] = item.cantidad;
+              });
+              setConteosCategorias(conteosMap);
+            })
+            .catch(error => {
+              console.error('Error cargando conteos de categorías:', error);
+            });
+
+          // PRIORIDAD 4: Cargar conteos de TODOS los estados UNA SOLA VEZ (optimizado)
+          if (Object.keys(conteosEstados).length === 0) {
+            dashboardApi.getConteoEstados()
+              .then(conteosRes => {
+                const estadosMap: Record<string, number> = {};
+                conteosRes.data.forEach((item: any) => {
+                  estadosMap[item.estado] = item.cantidad;
+                });
+                setConteosEstados(estadosMap);
+              })
+              .catch(error => {
+                console.error('Error cargando conteos de estados:', error);
+              });
+          }
+        }, 100); // Esperar 100ms para que se renderice primero
+      } else {
+        // Cargando más páginas (scroll) - prioridad total al scroll
+        setReclamos(prev => [...prev, ...paginatedReclamos]);
+      }
+
+      setHasMore(endIndex < allReclamos.length);
     } catch (error) {
       toast.error('Error al cargar datos');
       console.error('Error:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -577,7 +734,7 @@ export default function Reclamos() {
     }
   };
 
-  // Buscar usuarios por nombre/apellido
+  // Buscar usuarios por nombre, apellido, DNI o teléfono
   const handleUserSearch = (query: string) => {
     if (query.length < 2) {
       setUserSearchResults([]);
@@ -592,7 +749,9 @@ export default function Reclamos() {
       const results = allUsers.filter(u =>
         u.nombre.toLowerCase().includes(queryLower) ||
         u.apellido.toLowerCase().includes(queryLower) ||
-        `${u.nombre} ${u.apellido}`.toLowerCase().includes(queryLower)
+        `${u.nombre} ${u.apellido}`.toLowerCase().includes(queryLower) ||
+        (u.dni && u.dni.toLowerCase().includes(queryLower)) ||
+        (u.telefono && u.telefono.includes(query))
       ).slice(0, 10);
       setUserSearchResults(results);
       setShowUserResults(results.length > 0);
@@ -654,6 +813,7 @@ export default function Reclamos() {
   const closeWizard = () => {
     setWizardOpen(false);
     setWizardStep(0);
+    setEsAnonimo(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1183,29 +1343,44 @@ export default function Reclamos() {
         )}
         {/* Datos de contacto */}
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#25D366', color: 'white' }}>
-            <Phone className="h-5 w-5" />
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: esAnonimo ? theme.primary : '#25D366', color: 'white' }}>
+            {esAnonimo ? <ShieldCheck className="h-5 w-5" /> : <Phone className="h-5 w-5" />}
           </div>
           <div className="flex-1">
             <span className="text-xs" style={{ color: theme.textSecondary }}>Contacto</span>
-            <p className="font-medium" style={{ color: theme.text }}>{formData.nombre_contacto || 'No especificado'}</p>
-            <div className="flex items-center gap-3 mt-1">
-              <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                <MessageCircle className="h-3 w-3" />
-                {formData.telefono_contacto || 'Sin WhatsApp'}
-              </span>
-              {formData.email_contacto && (
-                <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                  <Mail className="h-3 w-3" />
-                  {formData.email_contacto}
-                </span>
-              )}
-            </div>
+            {esAnonimo ? (
+              <>
+                <p className="font-medium" style={{ color: theme.text }}>Reclamo anónimo</p>
+                <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>Sin datos de contacto</p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium" style={{ color: theme.text }}>{formData.nombre_contacto || 'No especificado'}</p>
+                <div className="flex items-center gap-3 mt-1">
+                  <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                    <MessageCircle className="h-3 w-3" />
+                    {formData.telefono_contacto || 'Sin WhatsApp'}
+                  </span>
+                  {formData.email_contacto && (
+                    <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                      <Mail className="h-3 w-3" />
+                      {formData.email_contacto}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
-          {formData.recibir_notificaciones && (
+          {!esAnonimo && formData.recibir_notificaciones && (
             <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ backgroundColor: '#25D36620', color: '#25D366' }}>
               <Bell className="h-3 w-3" />
               Notificaciones
+            </div>
+          )}
+          {esAnonimo && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
+              <ShieldCheck className="h-3 w-3" />
+              Anónimo
             </div>
           )}
         </div>
@@ -1216,18 +1391,96 @@ export default function Reclamos() {
   // Wizard Step 5: Datos de contacto
   const wizardStepContacto = (
     <div className="space-y-4">
-      <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-        <div className="flex items-center gap-2 mb-2">
-          <MessageCircle className="h-5 w-5" style={{ color: theme.primary }} />
-          <span className="font-medium" style={{ color: theme.primary }}>Datos de contacto para seguimiento</span>
-        </div>
-        <p className="text-sm" style={{ color: theme.textSecondary }}>
-          Ingresa tus datos para recibir actualizaciones sobre el estado de tu reclamo por WhatsApp.
-        </p>
+      {/* Toggle entre anónimo y con datos */}
+      <div className="space-y-3">
+        {/* Opción Anónimo */}
+        <button
+          type="button"
+          onClick={() => {
+            setEsAnonimo(true);
+            setFormData({
+              ...formData,
+              nombre_contacto: '',
+              telefono_contacto: '',
+              email_contacto: '',
+              recibir_notificaciones: false,
+            });
+            setSelectedUser(null);
+          }}
+          className="w-full p-4 rounded-xl text-left transition-all"
+          style={{
+            backgroundColor: esAnonimo ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `2px solid ${esAnonimo ? theme.primary : theme.border}`,
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
+              style={{ borderColor: esAnonimo ? theme.primary : theme.border }}
+            >
+              {esAnonimo && (
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4" style={{ color: theme.primary }} />
+                <span className="font-medium" style={{ color: theme.text }}>Reclamo anónimo</span>
+              </div>
+              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                No se requieren datos personales. El reclamo se registra sin identificar al vecino.
+              </p>
+            </div>
+          </div>
+        </button>
+
+        {/* Opción Con datos */}
+        <button
+          type="button"
+          onClick={() => setEsAnonimo(false)}
+          className="w-full p-4 rounded-xl text-left transition-all"
+          style={{
+            backgroundColor: !esAnonimo ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `2px solid ${!esAnonimo ? theme.primary : theme.border}`,
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
+              style={{ borderColor: !esAnonimo ? theme.primary : theme.border }}
+            >
+              {!esAnonimo && (
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4" style={{ color: theme.primary }} />
+                <span className="font-medium" style={{ color: theme.text }}>Con datos de contacto</span>
+              </div>
+              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                Proporciona tus datos para recibir actualizaciones sobre el estado del reclamo.
+              </p>
+            </div>
+          </div>
+        </button>
       </div>
 
-      {/* Nombre completo con búsqueda integrada */}
-      <div className="relative">
+      {/* Formulario de contacto - solo si NO es anónimo */}
+      {!esAnonimo && (
+        <>
+          <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <MessageCircle className="h-5 w-5" style={{ color: theme.primary }} />
+              <span className="font-medium" style={{ color: theme.primary }}>Datos de contacto para seguimiento</span>
+            </div>
+            <p className="text-sm" style={{ color: theme.textSecondary }}>
+              Ingresa tus datos para recibir actualizaciones sobre el estado de tu reclamo por WhatsApp.
+            </p>
+          </div>
+
+          {/* Nombre completo con búsqueda integrada */}
+          <div className="relative">
         <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
           Nombre completo <span className="text-red-500">*</span>
         </label>
@@ -1249,7 +1502,7 @@ export default function Reclamos() {
                 handleUserSearch(formData.nombre_contacto);
               }
             }}
-            placeholder="Buscar o escribir nombre..."
+            placeholder="Buscar por nombre, DNI o teléfono..."
             className="w-full pl-11 pr-10 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
             style={{
               backgroundColor: theme.backgroundSecondary,
@@ -1277,7 +1530,7 @@ export default function Reclamos() {
           </p>
         ) : (
           <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-            Escribí para buscar un vecino o completar manualmente
+            Buscá por nombre, apellido, DNI o teléfono
           </p>
         )}
 
@@ -1303,8 +1556,10 @@ export default function Reclamos() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{user.nombre} {user.apellido}</p>
                   <p className="text-xs truncate" style={{ color: theme.textSecondary }}>
+                    {user.dni && <span>DNI: {user.dni}</span>}
+                    {user.dni && user.telefono && <span> • </span>}
                     {user.telefono && <span>{user.telefono}</span>}
-                    {user.telefono && user.email && <span> • </span>}
+                    {(user.dni || user.telefono) && user.email && <span> • </span>}
                     {user.email && <span>{user.email}</span>}
                   </p>
                 </div>
@@ -1390,6 +1645,21 @@ export default function Reclamos() {
           </div>
         </div>
       </div>
+        </>
+      )}
+
+      {/* Mensaje de confirmación para reclamo anónimo */}
+      {esAnonimo && (
+        <div className="p-4 rounded-xl" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="h-5 w-5" style={{ color: theme.primary }} />
+            <span className="font-medium" style={{ color: theme.primary }}>Reclamo anónimo</span>
+          </div>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            Tu reclamo será registrado sin datos de contacto. No podrás recibir actualizaciones sobre el estado del mismo, pero igualmente será atendido por el municipio.
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -1783,7 +2053,7 @@ export default function Reclamos() {
     { id: 'categoria', title: 'Categoría', description: 'Selecciona el tipo de problema', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: !!formData.categoria_id },
     { id: 'ubicacion', title: 'Ubicación', description: 'Indica dónde está el problema', icon: <MapPin className="h-5 w-5" />, content: wizardStep2, isValid: !!formData.direccion },
     { id: 'detalles', title: 'Detalles', description: 'Describe el problema', icon: <FileText className="h-5 w-5" />, content: wizardStep3, isValid: !!formData.titulo && !!formData.descripcion },
-    { id: 'contacto', title: 'Contacto', description: 'Tus datos para seguimiento', icon: <Phone className="h-5 w-5" />, content: wizardStepContacto, isValid: !!formData.nombre_contacto && !!formData.telefono_contacto },
+    { id: 'contacto', title: 'Contacto', description: 'Tus datos para seguimiento', icon: <Phone className="h-5 w-5" />, content: wizardStepContacto, isValid: esAnonimo || (!!formData.nombre_contacto && !!formData.telefono_contacto) },
     { id: 'resumen', title: 'Confirmar', description: 'Revisa y envía', icon: <CheckCircle2 className="h-5 w-5" />, content: wizardStep4, isValid: true },
   ];
 
@@ -1904,12 +2174,28 @@ export default function Reclamos() {
         </ABMCollapsible>
 
         {/* Creador */}
-        <ABMField
-          label="Creado por"
-          value={`${selectedReclamo.creador.nombre} ${selectedReclamo.creador.apellido} · ${selectedReclamo.creador.email}`}
-          icon={<User className="h-4 w-4" style={{ color: theme.textSecondary }} />}
-          fullWidth
-        />
+        <ABMInfoPanel
+          title="Datos del Vecino"
+          icon={<User className="h-4 w-4" />}
+          variant="default"
+        >
+          <ABMField
+            label="Nombre"
+            value={`${selectedReclamo.creador.nombre} ${selectedReclamo.creador.apellido}`}
+          />
+          <ABMField
+            label="Email"
+            value={selectedReclamo.creador.email}
+            icon={<Mail className="h-4 w-4" style={{ color: theme.textSecondary }} />}
+          />
+          {selectedReclamo.creador.telefono && (
+            <ABMField
+              label="Teléfono"
+              value={selectedReclamo.creador.telefono}
+              icon={<Phone className="h-4 w-4" style={{ color: theme.textSecondary }} />}
+            />
+          )}
+        </ABMInfoPanel>
 
         {/* Empleado asignado */}
         {selectedReclamo.empleado_asignado && (
@@ -2380,7 +2666,7 @@ export default function Reclamos() {
         <button
           onClick={() => {
             closeSheet();
-            navigate(`/reclamos/${selectedReclamo.id}`);
+            navigate(`/gestion/reclamos/${selectedReclamo.id}`);
           }}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
           style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
@@ -2462,155 +2748,69 @@ export default function Reclamos() {
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}
-        loading={loading}
-        isEmpty={filteredReclamos.length === 0}
+        loading={false}
+        isEmpty={!loading && filteredReclamos.length === 0}
         emptyMessage="No se encontraron reclamos"
         sheetOpen={false}
         sheetTitle=""
         sheetDescription=""
         onSheetClose={() => {}}
-        extraFilters={
-          <div className="flex items-center gap-1.5 w-full">
-            {/* Botón Todos */}
-            <button
-              onClick={() => setFiltroEstado('')}
-              title="Todos"
-              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
-              style={{
-                background: filtroEstado === ''
-                  ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}80 100%)`
-                  : theme.card,
-                border: `1px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
-                color: filtroEstado === '' ? '#ffffff' : theme.textSecondary,
-                opacity: filtroEstado === '' ? 1 : 0.6,
-              }}
-            >
-              <Eye className="h-4 w-4" />
-            </button>
-            {/* Botón Nuevos */}
-            <button
-              onClick={() => setFiltroEstado(filtroEstado === 'nuevo' ? '' : 'nuevo')}
-              title="Nuevos"
-              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
-              style={{
-                background: filtroEstado === 'nuevo'
-                  ? `linear-gradient(135deg, ${estadoColors.nuevo.bg} 0%, ${estadoColors.nuevo.bg}80 100%)`
-                  : theme.card,
-                border: `1px solid ${filtroEstado === 'nuevo' ? estadoColors.nuevo.bg : theme.border}`,
-                color: filtroEstado === 'nuevo' ? '#ffffff' : theme.textSecondary,
-                opacity: filtroEstado === 'nuevo' ? 1 : 0.6,
-              }}
-            >
-              <Sparkles className="h-4 w-4" />
-            </button>
-            {/* Botón Asignados */}
-            <button
-              onClick={() => setFiltroEstado(filtroEstado === 'asignado' ? '' : 'asignado')}
-              title="Asignados"
-              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
-              style={{
-                background: filtroEstado === 'asignado'
-                  ? 'linear-gradient(135deg, rgb(74 79 160 / 0%) 0%, rgba(59, 130, 246, 0.5) 100%)'
-                  : theme.card,
-                border: `1px solid ${filtroEstado === 'asignado' ? estadoColors.asignado.bg : theme.border}`,
-                color: filtroEstado === 'asignado' ? '#ffffff' : theme.textSecondary,
-                opacity: filtroEstado === 'asignado' ? 1 : 0.6,
-              }}
-            >
-              <UserPlus className="h-4 w-4" />
-            </button>
-            {/* Botón En Proceso */}
-            <button
-              onClick={() => setFiltroEstado(filtroEstado === 'en_proceso' ? '' : 'en_proceso')}
-              title="En Proceso"
-              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
-              style={{
-                background: filtroEstado === 'en_proceso'
-                  ? `linear-gradient(135deg, ${estadoColors.en_proceso.bg} 0%, ${estadoColors.en_proceso.bg}80 100%)`
-                  : theme.card,
-                border: `1px solid ${filtroEstado === 'en_proceso' ? estadoColors.en_proceso.bg : theme.border}`,
-                color: filtroEstado === 'en_proceso' ? '#ffffff' : theme.textSecondary,
-                opacity: filtroEstado === 'en_proceso' ? 1 : 0.6,
-              }}
-            >
-              <Play className="h-4 w-4" />
-            </button>
-            {/* Botón Resueltos */}
-            <button
-              onClick={() => setFiltroEstado(filtroEstado === 'resuelto' ? '' : 'resuelto')}
-              title="Resueltos"
-              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
-              style={{
-                background: filtroEstado === 'resuelto'
-                  ? `linear-gradient(135deg, ${estadoColors.resuelto.bg} 0%, ${estadoColors.resuelto.bg}80 100%)`
-                  : theme.card,
-                border: `1px solid ${filtroEstado === 'resuelto' ? estadoColors.resuelto.bg : theme.border}`,
-                color: filtroEstado === 'resuelto' ? '#ffffff' : theme.textSecondary,
-                opacity: filtroEstado === 'resuelto' ? 1 : 0.6,
-              }}
-            >
-              <CheckCircle className="h-4 w-4" />
-            </button>
-            {/* Botón Rechazados */}
-            <button
-              onClick={() => setFiltroEstado(filtroEstado === 'rechazado' ? '' : 'rechazado')}
-              title="Rechazados"
-              className="p-2 rounded-lg transition-all duration-200 flex-1 flex items-center justify-center"
-              style={{
-                background: filtroEstado === 'rechazado'
-                  ? `linear-gradient(135deg, ${estadoColors.rechazado.bg} 0%, ${estadoColors.rechazado.bg}80 100%)`
-                  : theme.card,
-                border: `1px solid ${filtroEstado === 'rechazado' ? estadoColors.rechazado.bg : theme.border}`,
-                color: filtroEstado === 'rechazado' ? '#ffffff' : theme.textSecondary,
-                opacity: filtroEstado === 'rechazado' ? 1 : 0.6,
-              }}
-            >
-              <XCircle className="h-4 w-4" />
-            </button>
-          </div>
-        }
+        extraFilters={undefined}
         secondaryFilters={
-          <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-            {/* Botón Todas las categorías */}
-            <button
-              onClick={() => setFiltroCategoria(null)}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0"
-              style={{
-                background: filtroCategoria === null
-                  ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
-                  : theme.backgroundSecondary,
-                border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
-                color: filtroCategoria === null ? '#ffffff' : theme.textSecondary,
-              }}
-            >
-              <Tag className="h-4 w-4" />
-              <span className="text-sm font-medium whitespace-nowrap">Todas</span>
-            </button>
-            {/* Botones por categoría */}
-            {categorias.map((cat) => {
-              const isSelected = filtroCategoria === cat.id;
-              const catColor = getCategoryColor(cat.nombre);
-              const count = reclamos.filter(r => r.categoria.id === cat.id).length;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 flex-shrink-0"
+          <div className="w-full flex flex-col gap-3">
+            {/* Grid de categorías - se adapta al espacio disponible, máximo 2 renglones */}
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 w-full">
+              {/* Botón Todas las categorías */}
+              <button
+                onClick={() => setFiltroCategoria(null)}
+                className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  background: filtroCategoria === null
+                    ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
+                    : theme.backgroundSecondary,
+                  border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
+                }}
+              >
+                <Tag className="h-4 w-4 flex-shrink-0" style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
+                <span className="text-xs font-medium flex-1 text-left" style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
+                  Categorías
+                </span>
+                <span
+                  className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                   style={{
-                    background: isSelected
-                      ? `linear-gradient(135deg, ${catColor} 0%, ${catColor}80 100%)`
-                      : theme.backgroundSecondary,
-                    border: `1px solid ${isSelected ? catColor : theme.border}`,
-                    color: isSelected ? '#ffffff' : theme.textSecondary,
+                    backgroundColor: filtroCategoria === null ? 'rgba(255,255,255,0.2)' : `${theme.primary}20`,
+                    color: filtroCategoria === null ? '#ffffff' : theme.primary,
                   }}
                 >
-                  <span style={{ color: isSelected ? '#ffffff' : catColor }}>
-                    {getCategoryIcon(cat.nombre)}
-                  </span>
-                  <span className="text-sm font-medium whitespace-nowrap">{cat.nombre}</span>
-                  {count > 0 && (
+                  {allReclamosData.length}
+                </span>
+              </button>
+
+              {/* Botones por categoría */}
+              {categorias.map((cat) => {
+                const isSelected = filtroCategoria === cat.id;
+                const catColor = getCategoryColor(cat.nombre);
+                const count = conteosCategorias[cat.id] || 0;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
+                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+                    style={{
+                      background: isSelected
+                        ? `linear-gradient(135deg, ${catColor} 0%, ${catColor}80 100%)`
+                        : theme.backgroundSecondary,
+                      border: `1px solid ${isSelected ? catColor : theme.border}`,
+                    }}
+                  >
+                    <span className="flex-shrink-0" style={{ color: isSelected ? '#ffffff' : catColor }}>
+                      {getCategoryIcon(cat.nombre)}
+                    </span>
+                    <span className="text-xs font-medium flex-1 text-left truncate" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                      {cat.nombre}
+                    </span>
                     <span
-                      className="text-xs px-1.5 py-0.5 rounded-full"
+                      className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
                       style={{
                         backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : `${catColor}20`,
                         color: isSelected ? '#ffffff' : catColor,
@@ -2618,10 +2818,78 @@ export default function Reclamos() {
                     >
                       {count}
                     </span>
-                  )}
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Filtros de Estado - Sección separada debajo de categorías */}
+            <div className="flex gap-4 w-full">
+              {[
+                { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: allReclamosData.length },
+                { key: 'nuevo', label: 'Nuevos', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
+                { key: 'asignado', label: 'Asignados', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
+                { key: 'en_proceso', label: 'En Proceso', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
+                { key: 'resuelto', label: 'Resueltos', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
+                { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
+              ].map((estado) => {
+                const Icon = estado.icon;
+                const isActive = filtroEstado === estado.key;
+                return (
+                  <button
+                    key={estado.key}
+                    onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                    className="relative group flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95 overflow-hidden flex-1"
+                    style={{
+                      background: isActive
+                        ? `linear-gradient(135deg, ${estado.color} 0%, ${estado.color}DD 100%)`
+                        : `${estado.color}10`,
+                      border: `2px solid ${isActive ? estado.color : `${estado.color}40`}`,
+                      boxShadow: isActive ? `0 8px 16px ${estado.color}40` : 'none',
+                    }}
+                  >
+                    {/* Icono */}
+                    <div
+                      className="p-1 rounded-lg transition-all duration-300 flex-shrink-0"
+                      style={{
+                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : `${estado.color}20`,
+                      }}
+                    >
+                      <Icon
+                        className="h-3.5 w-3.5"
+                        style={{ color: isActive ? '#ffffff' : estado.color }}
+                      />
+                    </div>
+
+                    {/* Label y contador en columna */}
+                    <div className="flex flex-col items-start flex-1 min-w-0">
+                      <span
+                        className="text-[9px] font-semibold uppercase tracking-tight leading-none"
+                        style={{ color: isActive ? '#ffffff' : estado.color }}
+                      >
+                        {estado.label}
+                      </span>
+                      <span
+                        className="text-base font-bold leading-none mt-0.5"
+                        style={{ color: isActive ? '#ffffff' : estado.color }}
+                      >
+                        {estado.count}
+                      </span>
+                    </div>
+
+                    {/* Efecto de brillo al hover */}
+                    {isActive && (
+                      <div
+                        className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
+                        style={{
+                          background: 'radial-gradient(circle at center, rgba(255,255,255,0.8) 0%, transparent 70%)',
+                        }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         }
         tableView={
@@ -2634,13 +2902,19 @@ export default function Reclamos() {
         }
         sheetContent={null}
       >
-        {filteredReclamos.map((r) => {
-          const estado = estadoColors[r.estado];
-          const categoryColor = getCategoryColor(r.categoria.nombre);
-          const bgImage = getCategoryImageUrl(r.categoria.nombre);
-          // Si la animación terminó, siempre visible
-          const isVisible = animationDone || visibleCards.has(r.id);
-          return (
+        {loading ? (
+          // Mostrar skeletons mientras carga
+          Array.from({ length: 6 }).map((_, i) => (
+            <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
+          ))
+        ) : (
+          filteredReclamos.map((r) => {
+            const estado = estadoColors[r.estado];
+            const categoryColor = getCategoryColor(r.categoria.nombre);
+            const bgImage = getCategoryImageUrl(r.categoria.nombre);
+            // Si la animación terminó, siempre visible
+            const isVisible = animationDone || visibleCards.has(r.id);
+            return (
             <div
               key={r.id}
               onClick={() => openViewSheet(r)}
@@ -2713,17 +2987,19 @@ export default function Reclamos() {
                 <div
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
                   style={{
-                    backgroundColor: `${getCategoryColor(r.categoria.nombre)}15`,
-                    border: `1px solid ${getCategoryColor(r.categoria.nombre)}40`,
+                    backgroundColor: `${categoryColor}15`,
+                    border: `1px solid ${categoryColor}40`,
                   }}
                 >
                   <div
                     className="w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: getCategoryColor(r.categoria.nombre), color: 'white' }}
+                    style={{ backgroundColor: categoryColor }}
                   >
-                    {getCategoryIcon(r.categoria.nombre)}
+                    <span style={{ color: '#ffffff' }}>
+                      {getCategoryIcon(r.categoria.nombre)}
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold" style={{ color: getCategoryColor(r.categoria.nombre) }}>
+                  <span className="text-xs font-semibold" style={{ color: categoryColor }}>
                     {r.categoria.nombre}
                   </span>
                 </div>
@@ -2751,6 +3027,20 @@ export default function Reclamos() {
                     <Calendar className="h-3 w-3 mr-1" />
                     {new Date(r.created_at).toLocaleDateString()}
                   </span>
+                  {/* Badge de reclamos similares */}
+                  {similaresCounts[r.id] > 0 && (
+                    <span
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        backgroundColor: '#f59e0b20',
+                        color: '#d97706',
+                        border: '1px solid #f59e0b40'
+                      }}
+                    >
+                      <Users className="h-3 w-3" />
+                      {similaresCounts[r.id]} {similaresCounts[r.id] === 1 ? 'vecino' : 'vecinos'}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {r.empleado_asignado && (
@@ -2762,7 +3052,27 @@ export default function Reclamos() {
               </div>
             </div>
           );
-        })}
+        })
+        )}
+
+        {/* Skeleton para "Cargar más" */}
+        {loadingMore && (
+          Array.from({ length: 4 }).map((_, i) => (
+            <ABMCardSkeleton key={`skeleton-more-${i}`} index={i} />
+          ))
+        )}
+
+        {/* Div observado para scroll infinito */}
+        <div ref={observerTarget} className="h-4" />
+
+        {/* Mensaje cuando ya se cargaron todos */}
+        {!loading && !hasMore && reclamos.length > 0 && (
+          <div className="flex justify-center mt-6">
+            <p className="text-sm px-4 py-2 rounded-lg" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+              ✓ Todos los reclamos cargados ({reclamos.length} en total)
+            </p>
+          </div>
+        )}
       </ABMPage>
 
       {/* Sheet separado para ver detalle */}

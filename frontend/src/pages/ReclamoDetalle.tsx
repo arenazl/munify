@@ -221,12 +221,8 @@ export default function ReclamoDetalle() {
   }, [historial, whatsappLogs]);
 
   const handleBack = () => {
-    // Navegar a la lista correcta según el rol
-    if (user?.rol === 'vecino') {
-      navigate('/mis-reclamos');
-    } else {
-      navigate('/reclamos');
-    }
+    // Usar navigate(-1) para volver atrás sin recargar la lista
+    navigate(-1);
   };
 
   if (loading) {

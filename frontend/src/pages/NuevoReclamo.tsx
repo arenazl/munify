@@ -41,6 +41,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getDefaultRoute } from '../config/navigation';
 import { MapPicker } from '../components/ui/MapPicker';
 import { WizardForm, WizardStep, WizardStepContent } from '../components/ui/WizardForm';
+import { ReclamosSimilares } from '../components/ReclamosSimilares';
 
 // Iconos por categoría
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -133,6 +134,9 @@ export default function NuevoReclamo() {
   const [registerError, setRegisterError] = useState('');
   const [suggestedCategorias, setSuggestedCategorias] = useState<Array<{categoria: Categoria, confianza: number}>>([]);
   const [showSuggestion, setShowSuggestion] = useState(false);
+  const [showSimilaresAlert, setShowSimilaresAlert] = useState(false);
+  const [ignorarSimilares, setIgnorarSimilares] = useState(false);
+  const [similaresCargados, setSimilaresCargados] = useState(false);
   const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
   // Datos de registro (solo se usan si no hay usuario)
@@ -212,6 +216,38 @@ export default function NuevoReclamo() {
     };
     fetchData();
   }, []);
+
+  // Buscar reclamos similares cuando cambia categoría o ubicación
+  useEffect(() => {
+    const buscarSimilares = async () => {
+      // Solo buscar si tenemos categoría Y coordenadas Y usuario logueado
+      if (!formData.categoria_id || !formData.latitud || !formData.longitud || !user) {
+        setSimilaresCargados(false);
+        return;
+      }
+
+      try {
+        const response = await reclamosApi.getSimilares({
+          categoria_id: Number(formData.categoria_id),
+          latitud: formData.latitud,
+          longitud: formData.longitud,
+          radio_metros: 100,
+          dias_atras: 30,
+          limit: 5,
+        });
+
+        // Si hay similares, mostrar la alerta automáticamente
+        if (response.data.length > 0 && !ignorarSimilares) {
+          setShowSimilaresAlert(true);
+        }
+        setSimilaresCargados(true);
+      } catch (err) {
+        console.error('Error buscando similares:', err);
+      }
+    };
+
+    buscarSimilares();
+  }, [formData.categoria_id, formData.latitud, formData.longitud, user, ignorarSimilares]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -428,6 +464,11 @@ export default function NuevoReclamo() {
   };
 
   const handleSubmit = async () => {
+    // Si hay alerta de similares mostrándose, no hacer nada (esperar decisión del usuario)
+    if (showSimilaresAlert) {
+      return;
+    }
+
     setSubmitting(true);
     try {
       console.log('Creando reclamo...', formData);
@@ -1533,6 +1574,31 @@ export default function NuevoReclamo() {
           aiSuggestion={aiSuggestion}
         />
       </div>
+
+      {/* Modal de reclamos similares */}
+      {showSimilaresAlert && (
+        <ReclamosSimilares
+          categoriaId={formData.categoria_id ? Number(formData.categoria_id) : null}
+          latitud={formData.latitud}
+          longitud={formData.longitud}
+          onClose={() => {
+            setShowSimilaresAlert(false);
+            setIgnorarSimilares(false);
+          }}
+          onContinueAnyway={() => {
+            setShowSimilaresAlert(false);
+            setIgnorarSimilares(true);
+            // Llamar a handleSubmit nuevamente ahora que ignorarSimilares es true
+            setTimeout(() => handleSubmit(), 100);
+          }}
+          onViewSimilar={(id) => {
+            // Navegar al detalle del reclamo similar
+            const isMobile = window.location.pathname.startsWith('/app');
+            const route = isMobile ? `/app/reclamo/${id}` : `/gestion/reclamos/${id}`;
+            window.open(route, '_blank');
+          }}
+        />
+      )}
     </div>
   );
 }

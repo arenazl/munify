@@ -1102,3 +1102,246 @@ def _get_razon_principal(detalles: dict, cat_score: int, zona_score: int, carga_
         razones.append("disponible")
 
     return ", ".join(razones).capitalize()
+
+
+# ===========================================
+# RECLAMOS SIMILARES / RECURRENTES
+# ===========================================
+
+@router.get("/similares")
+async def buscar_reclamos_similares(
+    categoria_id: int = Query(..., description="ID de la categoría"),
+    latitud: Optional[float] = Query(None, description="Latitud del reclamo"),
+    longitud: Optional[float] = Query(None, description="Longitud del reclamo"),
+    radio_metros: int = Query(100, description="Radio de búsqueda en metros"),
+    dias_atras: int = Query(30, description="Buscar reclamos de los últimos N días"),
+    limit: int = Query(10, description="Máximo de resultados"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Busca reclamos similares basándose en:
+    - Misma categoría
+    - Ubicación cercana (radio configurable)
+    - Creados recientemente (últimos N días)
+    - Estados activos (no resueltos ni rechazados)
+
+    Útil para:
+    - Mostrar al ciudadano antes de crear un reclamo duplicado
+    - Identificar problemas recurrentes para el municipio
+    """
+    from datetime import datetime, timedelta
+    from utils.geo import are_locations_close
+
+    # Fecha límite (últimos N días)
+    fecha_limite = datetime.utcnow() - timedelta(days=dias_atras)
+
+    # Query base: misma categoría, fecha reciente, estados activos
+    query = select(Reclamo).where(
+        Reclamo.categoria_id == categoria_id,
+        Reclamo.created_at >= fecha_limite,
+        Reclamo.estado.in_([
+            EstadoReclamo.NUEVO,
+            EstadoReclamo.ASIGNADO,
+            EstadoReclamo.EN_PROCESO
+        ]),
+        Reclamo.municipio_id == current_user.municipio_id
+    ).options(
+        selectinload(Reclamo.categoria),
+        selectinload(Reclamo.zona),
+        selectinload(Reclamo.creador)
+    ).order_by(Reclamo.created_at.desc())
+
+    result = await db.execute(query)
+    reclamos_candidatos = result.scalars().all()
+
+    # Filtrar por ubicación si se proporcionaron coordenadas
+    reclamos_similares = []
+    if latitud and longitud:
+        for reclamo in reclamos_candidatos:
+            if are_locations_close(
+                latitud, longitud,
+                reclamo.latitud, reclamo.longitud,
+                radius_meters=radio_metros
+            ):
+                reclamos_similares.append(reclamo)
+
+                # Limitar resultados
+                if len(reclamos_similares) >= limit:
+                    break
+    else:
+        # Si no hay coordenadas, devolver los primeros N
+        reclamos_similares = reclamos_candidatos[:limit]
+
+    # Formatear respuesta
+    return [
+        {
+            "id": r.id,
+            "titulo": r.titulo,
+            "descripcion": r.descripcion,
+            "direccion": r.direccion,
+            "estado": r.estado.value,
+            "categoria": r.categoria.nombre if r.categoria else None,
+            "zona": r.zona.nombre if r.zona else None,
+            "created_at": r.created_at.isoformat(),
+            "creador": {
+                "nombre": r.creador.nombre,
+                "apellido": r.creador.apellido
+            } if r.creador else None,
+            "distancia_metros": round(
+                __import__('utils.geo', fromlist=['haversine_distance']).haversine_distance(
+                    latitud, longitud, r.latitud, r.longitud
+                )
+            ) if (latitud and longitud and r.latitud and r.longitud) else None
+        }
+        for r in reclamos_similares
+    ]
+
+
+@router.get("/recurrentes")
+async def get_reclamos_recurrentes(
+    limit: int = Query(10, description="Máximo de resultados"),
+    dias_atras: int = Query(30, description="Buscar reclamos de los últimos N días"),
+    min_similares: int = Query(3, description="Mínimo de reclamos similares para considerarlo recurrente"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Devuelve reclamos con alta recurrencia (muchos reportes similares).
+    Útil para identificar problemas críticos que afectan a muchos vecinos.
+    """
+    from datetime import datetime, timedelta
+    from utils.geo import are_locations_close
+    from collections import defaultdict
+
+    # Fecha límite
+    fecha_limite = datetime.utcnow() - timedelta(days=dias_atras)
+
+    # Obtener todos los reclamos activos recientes
+    query = select(Reclamo).where(
+        Reclamo.created_at >= fecha_limite,
+        Reclamo.estado.in_([
+            EstadoReclamo.NUEVO,
+            EstadoReclamo.ASIGNADO,
+            EstadoReclamo.EN_PROCESO
+        ]),
+        Reclamo.municipio_id == current_user.municipio_id
+    ).options(
+        selectinload(Reclamo.categoria),
+        selectinload(Reclamo.zona)
+    )
+
+    result = await db.execute(query)
+    todos_reclamos = result.scalars().all()
+
+    # Agrupar por categoría y proximidad
+    grupos = []
+    procesados = set()
+
+    for reclamo_base in todos_reclamos:
+        if reclamo_base.id in procesados:
+            continue
+
+        # Buscar similares a este reclamo
+        similares = [reclamo_base]
+        procesados.add(reclamo_base.id)
+
+        for reclamo_comp in todos_reclamos:
+            if reclamo_comp.id in procesados:
+                continue
+
+            # Mismo criterio que el endpoint de similares
+            if (reclamo_comp.categoria_id == reclamo_base.categoria_id and
+                are_locations_close(
+                    reclamo_base.latitud, reclamo_base.longitud,
+                    reclamo_comp.latitud, reclamo_comp.longitud,
+                    radius_meters=100
+                )):
+                similares.append(reclamo_comp)
+                procesados.add(reclamo_comp.id)
+
+        # Si tiene suficientes similares, agregar al resultado
+        if len(similares) >= min_similares:
+            # Ordenar por fecha (más reciente primero)
+            similares.sort(key=lambda r: r.created_at, reverse=True)
+            reclamo_principal = similares[0]
+
+            grupos.append({
+                "id": reclamo_principal.id,
+                "titulo": reclamo_principal.titulo,
+                "descripcion": reclamo_principal.descripcion,
+                "direccion": reclamo_principal.direccion,
+                "estado": reclamo_principal.estado.value,
+                "categoria": {
+                    "id": reclamo_principal.categoria.id,
+                    "nombre": reclamo_principal.categoria.nombre
+                } if reclamo_principal.categoria else None,
+                "zona": reclamo_principal.zona.nombre if reclamo_principal.zona else None,
+                "cantidad_reportes": len(similares),
+                "reclamos_relacionados": [r.id for r in similares],
+                "created_at": reclamo_principal.created_at.isoformat(),
+                "prioridad_sugerida": "alta" if len(similares) >= 5 else "media"
+            })
+
+    # Ordenar por cantidad de reportes (más reportes primero)
+    grupos.sort(key=lambda g: g["cantidad_reportes"], reverse=True)
+
+    return grupos[:limit]
+
+
+@router.get("/{reclamo_id}/cantidad-similares")
+async def get_cantidad_similares(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Devuelve la cantidad de reclamos similares a uno específico.
+    Útil para mostrar badge "X vecinos reportaron esto".
+    """
+    from utils.geo import are_locations_close
+
+    # Obtener el reclamo base
+    result = await db.execute(
+        select(Reclamo).where(Reclamo.id == reclamo_id)
+    )
+    reclamo_base = result.scalar_one_or_none()
+
+    if not reclamo_base:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Buscar similares
+    from datetime import datetime, timedelta
+    fecha_limite = datetime.utcnow() - timedelta(days=30)
+
+    query = select(Reclamo).where(
+        Reclamo.id != reclamo_id,
+        Reclamo.categoria_id == reclamo_base.categoria_id,
+        Reclamo.created_at >= fecha_limite,
+        Reclamo.estado.in_([
+            EstadoReclamo.NUEVO,
+            EstadoReclamo.ASIGNADO,
+            EstadoReclamo.EN_PROCESO,
+            EstadoReclamo.RESUELTO
+        ]),
+        Reclamo.municipio_id == current_user.municipio_id
+    )
+
+    result = await db.execute(query)
+    candidatos = result.scalars().all()
+
+    # Contar similares por ubicación
+    cantidad = 0
+    for reclamo in candidatos:
+        if are_locations_close(
+            reclamo_base.latitud, reclamo_base.longitud,
+            reclamo.latitud, reclamo.longitud,
+            radius_meters=100
+        ):
+            cantidad += 1
+
+    return {
+        "reclamo_id": reclamo_id,
+        "cantidad_similares": cantidad,
+        "total_reportes": cantidad + 1  # +1 incluye el reclamo base
+    }
