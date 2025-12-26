@@ -187,7 +187,7 @@ export default function MobileHome() {
             className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
           >
-            <Building2 className="h-8 w-8 text-white" />
+            <Building2 className="h-8 w-8" style={{ color: '#ffffff' }} />
           </div>
         )}
         <div className="flex-1 min-w-0">
