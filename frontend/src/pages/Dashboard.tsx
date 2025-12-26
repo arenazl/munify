@@ -161,10 +161,11 @@ export default function Dashboard() {
 
         // Paso 3: Cargar datos para la vista de métricas (livianos)
         try {
+          const muniId = municipioActual?.id;
           const [tendenciasRes, recurrentesRes, similaresRes] = await Promise.all([
             dashboardApi.getTendencia(30).catch(e => ({ data: [] })),
             dashboardApi.getRecurrentes(90, 2).catch(e => ({ data: [] })),
-            reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2 }).catch(e => ({ data: [] })),
+            muniId ? reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2, municipio_id: muniId }).catch(e => ({ data: [] })) : Promise.resolve({ data: [] }),
           ]);
           setTendencias(tendenciasRes.data || []);
           setRecurrentes(recurrentesRes.data || []);

@@ -212,6 +212,20 @@ async def sync_database():
                 FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
                 FOREIGN KEY (reclamo_id) REFERENCES reclamos(id)
             )
+            """,
+
+            # Tramites - agregar empleado_id y prioridad si no existen
+            """
+            ALTER TABLE tramites
+            ADD COLUMN IF NOT EXISTS empleado_id INT NULL,
+            ADD COLUMN IF NOT EXISTS prioridad INT DEFAULT 3
+            """,
+
+            # FK para tramites.empleado_id
+            """
+            ALTER TABLE tramites
+            ADD CONSTRAINT fk_tramites_empleado
+            FOREIGN KEY (empleado_id) REFERENCES empleados(id)
             """
         ]
 

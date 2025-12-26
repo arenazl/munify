@@ -144,7 +144,11 @@ function getCategoryPlaceholders(nombre: string) {
 
 type SheetMode = 'closed' | 'view';
 
-export default function Reclamos() {
+interface ReclamosProps {
+  soloMisTrabajos?: boolean;
+}
+
+export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -162,7 +166,6 @@ export default function Reclamos() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 20;
-  const [allReclamosData, setAllReclamosData] = useState<Reclamo[]>([]);
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -272,6 +275,8 @@ export default function Reclamos() {
 
   const horaFin = calcularHoraFin(horaInicio, duracion);
   const [resolucion, setResolucion] = useState('');
+  const [tipoFinalizacion, setTipoFinalizacion] = useState<'resuelto' | 'no_finalizado'>('resuelto');
+  const [motivoNoFinalizado, setMotivoNoFinalizado] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [descripcionRechazo, setDescripcionRechazo] = useState('');
 
@@ -304,28 +309,74 @@ export default function Reclamos() {
   // Estado para conteos de reclamos similares (por reclamo_id)
   const [similaresCounts, setSimilaresCounts] = useState<Record<number, number>>({});
 
-  // Cargar datos del municipio UNA SOLA VEZ al montar
+  // Cargar datos del municipio y conteos UNA SOLA VEZ al montar
   useEffect(() => {
     fetchMunicipioData();
+
+    // Cargar conteos UNA SOLA VEZ (GROUP BY optimizado)
+    Promise.all([
+      dashboardApi.getConteoEstados(),
+      dashboardApi.getConteoCategorias(),
+    ]).then(([estadosRes, categoriasRes]) => {
+      const estadosMap: Record<string, number> = {};
+      estadosRes.data.forEach((item: any) => {
+        estadosMap[item.estado] = item.cantidad;
+      });
+      setConteosEstados(estadosMap);
+
+      const categoriasMap: Record<number, number> = {};
+      categoriasRes.data.forEach((item: any) => {
+        categoriasMap[item.categoria_id] = item.cantidad;
+      });
+      setConteosCategorias(categoriasMap);
+    }).catch(error => {
+      console.error('Error cargando conteos:', error);
+    });
+
+    // Cargar datos básicos (categorías, zonas, empleados) UNA SOLA VEZ
+    Promise.all([
+      categoriasApi.getAll(true),
+      zonasApi.getAll(true),
+      empleadosApi.getAll(true),
+    ]).then(([categoriasRes, zonasRes, empleadosRes]) => {
+      setCategorias(categoriasRes.data);
+      setZonas(zonasRes.data);
+      setEmpleados(empleadosRes.data);
+    }).catch(error => {
+      console.error('Error cargando datos básicos:', error);
+    });
   }, []);
 
-  // Recargar cuando cambia el filtro de estado
+  // Cargar reclamos cuando cambia el filtro de estado o categoría
   useEffect(() => {
-    fetchData(true); // Reset page cuando cambia el filtro
-  }, [filtroEstado]);
+    fetchReclamos(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroEstado, filtroCategoria]);
 
   // Cargar más cuando cambia la página
   useEffect(() => {
     if (page > 1) {
-      fetchData(false);
+      fetchReclamos(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  // Intersection Observer para scroll infinito
+  // Intersection Observer para scroll infinito - usar refs para evitar recrear el observer
+  const hasMoreRef = useRef(hasMore);
+  const loadingMoreRef = useRef(loadingMore);
+  const loadingRef = useRef(loading);
+
+  // Mantener refs actualizados
+  useEffect(() => {
+    hasMoreRef.current = hasMore;
+    loadingMoreRef.current = loadingMore;
+    loadingRef.current = loading;
+  }, [hasMore, loadingMore, loading]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
           setPage(prev => prev + 1);
         }
       },
@@ -342,7 +393,7 @@ export default function Reclamos() {
         observer.unobserve(currentTarget);
       }
     };
-  }, [hasMore, loadingMore, loading]);
+  }, []); // Solo crear el observer UNA VEZ
 
   // Detectar parámetro ?crear=ID para abrir wizard desde chat
   useEffect(() => {
@@ -627,11 +678,12 @@ export default function Reclamos() {
     setAddressSuggestions([]);
   };
 
-  const fetchData = async (resetPage = false) => {
+  // Función simplificada: SOLO carga reclamos con paginación
+  const fetchReclamos = async (resetPage = false) => {
     try {
       const currentPage = resetPage ? 1 : page;
+      const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
-      // PRIORIDAD 1: Cargar reclamos INMEDIATAMENTE (primeros 20)
       if (resetPage) {
         setLoadingMore(false);
         setLoading(true);
@@ -639,79 +691,33 @@ export default function Reclamos() {
         setLoadingMore(true);
       }
 
-      const reclamosRes = await reclamosApi.getAll(
-        filtroEstado ? { estado: filtroEstado } : {}
-      );
-
-      const allReclamos = reclamosRes.data;
-
-      // Guardar todos los reclamos (filtrados) para referencia
-      if (resetPage) {
-        setAllReclamosData(allReclamos);
+      // Construir params para la API con paginación
+      const params: Record<string, string | number> = {
+        skip,
+        limit: ITEMS_PER_PAGE,
+      };
+      if (filtroEstado) {
+        params.estado = filtroEstado;
+      }
+      if (filtroCategoria) {
+        params.categoria_id = filtroCategoria;
       }
 
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      const paginatedReclamos = allReclamos.slice(startIndex, endIndex);
+      const reclamosRes = await reclamosApi.getAll(params);
+      const newReclamos = reclamosRes.data;
 
       if (resetPage) {
-        setReclamos(paginatedReclamos);
-        setPage(1);
-
-        // DESPUÉS de mostrar los primeros 20, cargar conteos en background
-        // Solo si NO estamos cargando más páginas (scroll)
-        setTimeout(() => {
-          // PRIORIDAD 2: Cargar datos básicos en BACKGROUND (solo primera vez)
-          if (categorias.length === 0) {
-            Promise.all([
-              categoriasApi.getAll(true),
-              zonasApi.getAll(true),
-              empleadosApi.getAll(true),
-            ]).then(([categoriasRes, zonasRes, empleadosRes]) => {
-              setCategorias(categoriasRes.data);
-              setZonas(zonasRes.data);
-              setEmpleados(empleadosRes.data);
-            }).catch(error => {
-              console.error('Error cargando datos básicos:', error);
-            });
-          }
-
-          // PRIORIDAD 3: Cargar conteos de categorías en BACKGROUND
-          dashboardApi.getConteoCategorias(filtroEstado || undefined)
-            .then(conteosRes => {
-              const conteosMap: Record<number, number> = {};
-              conteosRes.data.forEach((item: any) => {
-                conteosMap[item.categoria_id] = item.cantidad;
-              });
-              setConteosCategorias(conteosMap);
-            })
-            .catch(error => {
-              console.error('Error cargando conteos de categorías:', error);
-            });
-
-          // PRIORIDAD 4: Cargar conteos de TODOS los estados UNA SOLA VEZ (optimizado)
-          if (Object.keys(conteosEstados).length === 0) {
-            dashboardApi.getConteoEstados()
-              .then(conteosRes => {
-                const estadosMap: Record<string, number> = {};
-                conteosRes.data.forEach((item: any) => {
-                  estadosMap[item.estado] = item.cantidad;
-                });
-                setConteosEstados(estadosMap);
-              })
-              .catch(error => {
-                console.error('Error cargando conteos de estados:', error);
-              });
-          }
-        }, 100); // Esperar 100ms para que se renderice primero
+        setReclamos(newReclamos);
+        if (page !== 1) {
+          setPage(1);
+        }
       } else {
-        // Cargando más páginas (scroll) - prioridad total al scroll
-        setReclamos(prev => [...prev, ...paginatedReclamos]);
+        setReclamos(prev => [...prev, ...newReclamos]);
       }
 
-      setHasMore(endIndex < allReclamos.length);
+      setHasMore(newReclamos.length === ITEMS_PER_PAGE);
     } catch (error) {
-      toast.error('Error al cargar datos');
+      toast.error('Error al cargar reclamos');
       console.error('Error:', error);
     } finally {
       setLoading(false);
@@ -913,7 +919,7 @@ export default function Reclamos() {
       }
 
       toast.success('Reclamo creado correctamente');
-      fetchData();
+      fetchReclamos();
       closeWizard();
     } catch (error) {
       toast.error('Error al crear el reclamo');
@@ -935,7 +941,7 @@ export default function Reclamos() {
         comentario: comentarioAsignacion || undefined
       });
       toast.success('Reclamo asignado correctamente');
-      fetchData();
+      fetchReclamos();
       closeSheet();
     } catch (error) {
       toast.error('Error al asignar reclamo');
@@ -991,7 +997,7 @@ export default function Reclamos() {
     try {
       await reclamosApi.iniciar(selectedReclamo.id);
       toast.success('Trabajo iniciado');
-      fetchData();
+      fetchReclamos();
       closeSheet();
     } catch (error) {
       toast.error('Error al iniciar trabajo');
@@ -1007,7 +1013,7 @@ export default function Reclamos() {
     try {
       await reclamosApi.resolver(selectedReclamo.id, { resolucion });
       toast.success('Reclamo resuelto');
-      fetchData();
+      fetchReclamos();
       closeSheet();
     } catch (error) {
       toast.error('Error al resolver reclamo');
@@ -1026,7 +1032,7 @@ export default function Reclamos() {
         descripcion: descripcionRechazo || undefined
       });
       toast.success('Reclamo rechazado');
-      fetchData();
+      fetchReclamos();
       closeSheet();
     } catch (error) {
       toast.error('Error al rechazar reclamo');
@@ -1036,18 +1042,36 @@ export default function Reclamos() {
     }
   };
 
+  const handleNoFinalizado = async () => {
+    if (!selectedReclamo || !motivoNoFinalizado) return;
+    setSaving(true);
+    try {
+      // Volver a estado asignado con comentario
+      const comentario = `Trabajo no finalizado: ${motivoNoFinalizado}${resolucion ? `. ${resolucion}` : ''}`;
+      await reclamosApi.cambiarEstado(selectedReclamo.id, 'asignado', comentario);
+      toast.success('Reclamo vuelto a asignado para reprogramar');
+      fetchReclamos();
+      closeSheet();
+      // Reset estados
+      setTipoFinalizacion('resuelto');
+      setMotivoNoFinalizado('');
+      setResolucion('');
+    } catch (error) {
+      toast.error('Error al procesar el reclamo');
+      console.error('Error:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Solo filtro local por búsqueda de texto - el filtro de categoría y estado se hace en el servidor
   const filteredReclamos = reclamos.filter(r => {
-    // Filtro por texto de búsqueda
-    const matchSearch = search === '' ||
-      r.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      r.descripcion.toLowerCase().includes(search.toLowerCase()) ||
-      r.direccion.toLowerCase().includes(search.toLowerCase()) ||
-      r.categoria.nombre.toLowerCase().includes(search.toLowerCase());
-
-    // Filtro por categoría
-    const matchCategoria = filtroCategoria === null || r.categoria.id === filtroCategoria;
-
-    return matchSearch && matchCategoria;
+    if (search === '') return true;
+    const searchLower = search.toLowerCase();
+    return r.titulo.toLowerCase().includes(searchLower) ||
+      r.descripcion.toLowerCase().includes(searchLower) ||
+      r.direccion.toLowerCase().includes(searchLower) ||
+      r.categoria.nombre.toLowerCase().includes(searchLower);
   });
 
   const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
@@ -2543,20 +2567,84 @@ export default function Reclamos() {
 
         {selectedReclamo.estado === 'en_proceso' && (
           <ABMCollapsible
-            title="Marcar como Resuelto"
+            title="Finalizar Trabajo"
             icon={<CheckCircle className="h-4 w-4" />}
             defaultOpen={true}
-            variant="success"
+            variant={tipoFinalizacion === 'resuelto' ? 'success' : 'warning'}
           >
-            <div className="space-y-3">
-              <ABMTextarea
-                label=""
-                value={resolucion}
-                onChange={(e) => setResolucion(e.target.value)}
-                placeholder="Describe cómo se resolvió el problema"
-                rows={3}
-                required
-              />
+            <div className="space-y-4">
+              {/* Selector de tipo de finalización */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTipoFinalizacion('resuelto')}
+                  className="flex-1 p-3 rounded-xl text-sm font-medium transition-all"
+                  style={{
+                    backgroundColor: tipoFinalizacion === 'resuelto' ? '#22c55e20' : theme.backgroundSecondary,
+                    border: `2px solid ${tipoFinalizacion === 'resuelto' ? '#22c55e' : 'transparent'}`,
+                    color: tipoFinalizacion === 'resuelto' ? '#22c55e' : theme.textSecondary,
+                  }}
+                >
+                  <CheckCircle className="h-5 w-5 mx-auto mb-1" />
+                  Trabajo Exitoso
+                </button>
+                <button
+                  onClick={() => setTipoFinalizacion('no_finalizado')}
+                  className="flex-1 p-3 rounded-xl text-sm font-medium transition-all"
+                  style={{
+                    backgroundColor: tipoFinalizacion === 'no_finalizado' ? '#f59e0b20' : theme.backgroundSecondary,
+                    border: `2px solid ${tipoFinalizacion === 'no_finalizado' ? '#f59e0b' : 'transparent'}`,
+                    color: tipoFinalizacion === 'no_finalizado' ? '#f59e0b' : theme.textSecondary,
+                  }}
+                >
+                  <XCircle className="h-5 w-5 mx-auto mb-1" />
+                  No Finalizado
+                </button>
+              </div>
+
+              {/* Campos según tipo */}
+              {tipoFinalizacion === 'resuelto' ? (
+                <ABMTextarea
+                  label=""
+                  value={resolucion}
+                  onChange={(e) => setResolucion(e.target.value)}
+                  placeholder="Describe cómo se resolvió el problema"
+                  rows={3}
+                  required
+                />
+              ) : (
+                <>
+                  <select
+                    value={motivoNoFinalizado}
+                    onChange={(e) => setMotivoNoFinalizado(e.target.value)}
+                    className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-200"
+                    style={{
+                      backgroundColor: theme.card,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`
+                    }}
+                  >
+                    <option value="">Seleccionar motivo...</option>
+                    <option value="falta_materiales">Falta de materiales</option>
+                    <option value="falta_herramientas">Falta de herramientas</option>
+                    <option value="acceso_imposible">No se pudo acceder al lugar</option>
+                    <option value="clima">Condiciones climáticas</option>
+                    <option value="requiere_mas_personal">Requiere más personal</option>
+                    <option value="requiere_otra_area">Requiere intervención de otra área</option>
+                    <option value="vecino_ausente">Vecino ausente</option>
+                    <option value="otro">Otro motivo</option>
+                  </select>
+                  <ABMTextarea
+                    label=""
+                    value={resolucion}
+                    onChange={(e) => setResolucion(e.target.value)}
+                    placeholder="Describe por qué no se pudo finalizar el trabajo..."
+                    rows={2}
+                  />
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>
+                    El reclamo volverá a estado "Asignado" para reprogramar el trabajo.
+                  </p>
+                </>
+              )}
             </div>
           </ABMCollapsible>
         )}
@@ -2750,8 +2838,8 @@ export default function Reclamos() {
           </button>
         )}
 
-        {/* Botón Resolver - para estado en_proceso */}
-        {canResolver && (
+        {/* Botón Resolver/No Finalizar - para estado en_proceso */}
+        {canResolver && tipoFinalizacion === 'resuelto' && (
           <button
             onClick={handleResolver}
             disabled={saving || !resolucion}
@@ -2759,6 +2847,16 @@ export default function Reclamos() {
             style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
           >
             {saving ? 'Resolviendo...' : 'Marcar Resuelto'}
+          </button>
+        )}
+        {canResolver && tipoFinalizacion === 'no_finalizado' && (
+          <button
+            onClick={handleNoFinalizado}
+            disabled={saving || !motivoNoFinalizado}
+            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+            style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
+          >
+            {saving ? 'Procesando...' : 'Volver a Asignado'}
           </button>
         )}
 
@@ -2783,9 +2881,9 @@ export default function Reclamos() {
   return (
     <>
       <ABMPage
-        title="Reclamos"
-        buttonLabel="Nuevo Reclamo"
-        onAdd={openWizard}
+        title={soloMisTrabajos ? "Mis Trabajos" : "Reclamos"}
+        buttonLabel={soloMisTrabajos ? undefined : "Nuevo Reclamo"}
+        onAdd={soloMisTrabajos ? undefined : openWizard}
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -2799,35 +2897,26 @@ export default function Reclamos() {
         extraFilters={undefined}
         secondaryFilters={
           <div className="w-full flex flex-col gap-3">
-            {/* Grid de categorías - se adapta al espacio disponible, máximo 2 renglones */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2 w-full">
+            {/* Categorías - chips verticales con scroll horizontal */}
+            <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
               {/* Botón Todas las categorías */}
               <button
                 onClick={() => setFiltroCategoria(null)}
-                className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+                className="flex flex-col items-center justify-center py-1.5 rounded-lg transition-all flex-shrink-0 w-[48px] h-[52px]"
                 style={{
                   background: filtroCategoria === null
-                    ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
+                    ? theme.primary
                     : theme.backgroundSecondary,
                   border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
                 }}
               >
-                <Tag className="h-4 w-4 flex-shrink-0" style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
-                <span className="text-xs font-medium flex-1 text-left" style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
+                <Tag className="h-4 w-4" style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
+                <span className="text-[8px] font-semibold leading-tight text-center mt-0.5" style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
                   Categorías
-                </span>
-                <span
-                  className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                  style={{
-                    backgroundColor: filtroCategoria === null ? 'rgba(255,255,255,0.2)' : `${theme.primary}20`,
-                    color: filtroCategoria === null ? '#ffffff' : theme.primary,
-                  }}
-                >
-                  {allReclamosData.length}
                 </span>
               </button>
 
-              {/* Botones por categoría */}
+              {/* Chips por categoría - número arriba, icono medio, texto abajo */}
               {categorias.map((cat) => {
                 const isSelected = filtroCategoria === cat.id;
                 const catColor = getCategoryColor(cat.nombre);
@@ -2836,100 +2925,94 @@ export default function Reclamos() {
                   <button
                     key={cat.id}
                     onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
-                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+                    title={cat.nombre}
+                    className="flex flex-col items-center justify-center py-1 rounded-lg transition-all flex-shrink-0 w-[48px] h-[52px]"
                     style={{
-                      background: isSelected
-                        ? `linear-gradient(135deg, ${catColor} 0%, ${catColor}80 100%)`
-                        : theme.backgroundSecondary,
+                      background: isSelected ? catColor : theme.backgroundSecondary,
                       border: `1px solid ${isSelected ? catColor : theme.border}`,
                     }}
                   >
-                    <span className="flex-shrink-0" style={{ color: isSelected ? '#ffffff' : catColor }}>
-                      {getCategoryIcon(cat.nombre)}
-                    </span>
-                    <span className="text-xs font-medium flex-1 text-left truncate" style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                      {cat.nombre}
-                    </span>
+                    {/* Número arriba */}
                     <span
-                      className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                      className="text-[9px] font-bold leading-none"
                       style={{
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : `${catColor}20`,
                         color: isSelected ? '#ffffff' : catColor,
                       }}
                     >
                       {count}
+                    </span>
+                    {/* Icono */}
+                    <span className="[&>svg]:h-4 [&>svg]:w-4 my-0.5" style={{ color: isSelected ? '#ffffff' : catColor }}>
+                      {getCategoryIcon(cat.nombre)}
+                    </span>
+                    {/* Texto abajo */}
+                    <span className="text-[8px] font-medium leading-none text-center w-full truncate px-0.5" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                      {cat.nombre.split(' ')[0]}
                     </span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Filtros de Estado - Sección separada debajo de categorías */}
-            <div className="flex gap-4 w-full">
-              {[
-                { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: allReclamosData.length },
-                { key: 'nuevo', label: 'Nuevos', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
-                { key: 'asignado', label: 'Asignados', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
-                { key: 'en_proceso', label: 'En Proceso', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
-                { key: 'resuelto', label: 'Resueltos', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
-                { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
-              ].map((estado) => {
-                const Icon = estado.icon;
-                const isActive = filtroEstado === estado.key;
-                return (
-                  <button
-                    key={estado.key}
-                    onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
-                    className="relative group flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-lg active:scale-95 overflow-hidden flex-1"
-                    style={{
-                      background: isActive
-                        ? `linear-gradient(135deg, ${estado.color} 0%, ${estado.color}DD 100%)`
-                        : `${estado.color}10`,
-                      border: `2px solid ${isActive ? estado.color : `${estado.color}40`}`,
-                      boxShadow: isActive ? `0 8px 16px ${estado.color}40` : 'none',
-                    }}
-                  >
-                    {/* Icono */}
+            {/* Estados - ocupan 100% del contenedor */}
+            <div className="flex gap-1.5 pb-2 w-full">
+              {Object.keys(conteosEstados).length === 0 ? (
+                // Skeleton mientras cargan los conteos
+                <>
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
-                      className="p-1 rounded-lg transition-all duration-300 flex-shrink-0"
+                      key={`skeleton-estado-${i}`}
+                      className="flex-1 h-[52px] rounded-lg animate-pulse"
+                      style={{ background: `${theme.border}40` }}
+                    />
+                  ))}
+                </>
+              ) : (
+                [
+                  { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
+                  { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
+                  { key: 'asignado', label: 'Asignado', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
+                  { key: 'en_proceso', label: 'Proceso', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
+                  { key: 'resuelto', label: 'Resuelto', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
+                  { key: 'rechazado', label: 'Rechazado', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
+                ].map((estado) => {
+                  const Icon = estado.icon;
+                  const isActive = filtroEstado === estado.key;
+                  return (
+                    <button
+                      key={estado.key}
+                      onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                      className="flex flex-col items-center justify-center py-1 rounded-lg transition-all flex-1 min-w-0 h-[52px]"
                       style={{
-                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : `${estado.color}20`,
+                        background: isActive ? estado.color : `${estado.color}15`,
+                        border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                       }}
                     >
+                      {/* Número arriba */}
+                      <span
+                        className="text-[9px] font-bold leading-none"
+                        style={{
+                          color: isActive ? '#ffffff' : estado.color,
+                        }}
+                      >
+                        {estado.count}
+                      </span>
+                      {/* Icono */}
                       <Icon
-                        className="h-3.5 w-3.5"
+                        className="h-4 w-4 my-0.5"
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       />
-                    </div>
-
-                    {/* Label y contador en columna */}
-                    <div className="flex flex-col items-start flex-1 min-w-0">
+                      {/* Texto abajo */}
                       <span
-                        className="text-[9px] font-semibold uppercase tracking-tight leading-none"
+                        className="text-[8px] font-medium leading-none text-center truncate w-full px-0.5"
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       >
                         {estado.label}
                       </span>
-                      <span
-                        className="text-base font-bold leading-none mt-0.5"
-                        style={{ color: isActive ? '#ffffff' : estado.color }}
-                      >
-                        {estado.count}
-                      </span>
-                    </div>
-
-                    {/* Efecto de brillo al hover */}
-                    {isActive && (
-                      <div
-                        className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-300"
-                        style={{
-                          background: 'radial-gradient(circle at center, rgba(255,255,255,0.8) 0%, transparent 70%)',
-                        }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
         }

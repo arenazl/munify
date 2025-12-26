@@ -25,6 +25,10 @@ import NuevoReclamo from './pages/NuevoReclamo';
 import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
+import Tramites from './pages/Tramites';
+import MisTramites from './pages/MisTramites';
+import GestionTramites from './pages/GestionTramites';
+import CalificarReclamo from './pages/CalificarReclamo';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -72,6 +76,8 @@ export const router = createBrowserRouter([
   },
   // Rutas mobile fuera del layout (pantalla completa)
   { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
+  { path: '/app/tramites', element: <Tramites /> },
+  { path: '/app/mis-tramites', element: <MisTramites /> },
   { path: '/app/login', element: <MobileLogin /> },
   { path: '/app/register', element: <MobileRegister /> },
 
@@ -81,6 +87,8 @@ export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
   { path: '/nuevo-reclamo', element: <NuevoReclamo /> },
+  { path: '/tramites', element: <Tramites /> },
+  { path: '/calificar/:id', element: <CalificarReclamo /> },  // Link directo desde WhatsApp
 
   // === RUTA RAÍZ - Redirección inteligente ===
   { path: '/', element: <RootRedirect /> },
@@ -106,6 +114,8 @@ export const router = createBrowserRouter([
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
       { path: 'reclamos/:id', element: <ReclamoDetalle /> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
+      // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
+      { path: 'mis-trabajos', element: <ProtectedRoute roles={['empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
 
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },
@@ -151,6 +161,15 @@ export const router = createBrowserRouter([
       {
         path: 'whatsapp',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><WhatsAppConfig /></ProtectedRoute>
+      },
+      // Trámites
+      {
+        path: 'tramites',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionTramites /></ProtectedRoute>
+      },
+      {
+        path: 'mis-tramites',
+        element: <MisTramites />
       },
     ],
   },

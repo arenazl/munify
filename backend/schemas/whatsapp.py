@@ -30,12 +30,22 @@ class WhatsAppConfigBase(BaseModel):
     twilio_auth_token: Optional[str] = None
     twilio_phone_number: Optional[str] = None
 
-    # Notificaciones
+    # Notificaciones al usuario (vecino)
     notificar_reclamo_recibido: bool = True
     notificar_reclamo_asignado: bool = True
     notificar_cambio_estado: bool = True
     notificar_reclamo_resuelto: bool = True
     notificar_comentarios: bool = False
+
+    # Notificaciones al empleado
+    notificar_empleado_asignacion: bool = True
+    notificar_empleado_nuevo_comentario: bool = True
+    notificar_empleado_cambio_prioridad: bool = True
+
+    # Notificaciones al supervisor
+    notificar_supervisor_reclamo_nuevo: bool = True
+    notificar_supervisor_reclamo_resuelto: bool = True
+    notificar_supervisor_reclamo_vencido: bool = True
 
     # Templates
     template_reclamo_recibido: Optional[str] = None
@@ -68,6 +78,16 @@ class WhatsAppConfigUpdate(BaseModel):
     notificar_cambio_estado: Optional[bool] = None
     notificar_reclamo_resuelto: Optional[bool] = None
     notificar_comentarios: Optional[bool] = None
+
+    # Notificaciones al empleado
+    notificar_empleado_asignacion: Optional[bool] = None
+    notificar_empleado_nuevo_comentario: Optional[bool] = None
+    notificar_empleado_cambio_prioridad: Optional[bool] = None
+
+    # Notificaciones al supervisor
+    notificar_supervisor_reclamo_nuevo: Optional[bool] = None
+    notificar_supervisor_reclamo_resuelto: Optional[bool] = None
+    notificar_supervisor_reclamo_vencido: Optional[bool] = None
 
     template_reclamo_recibido: Optional[str] = None
     template_reclamo_asignado: Optional[str] = None
@@ -102,6 +122,16 @@ class WhatsAppConfigPublic(BaseModel):
     notificar_cambio_estado: bool
     notificar_reclamo_resuelto: bool
     notificar_comentarios: bool
+
+    # Notificaciones al empleado
+    notificar_empleado_asignacion: bool = True
+    notificar_empleado_nuevo_comentario: bool = True
+    notificar_empleado_cambio_prioridad: bool = True
+
+    # Notificaciones al supervisor
+    notificar_supervisor_reclamo_nuevo: bool = True
+    notificar_supervisor_reclamo_resuelto: bool = True
+    notificar_supervisor_reclamo_vencido: bool = True
 
     created_at: datetime
     updated_at: Optional[datetime] = None

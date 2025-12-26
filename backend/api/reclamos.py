@@ -7,7 +7,7 @@ import cloudinary
 import cloudinary.uploader
 
 from core.database import get_db
-from core.security import get_current_user, require_roles
+from core.security import get_current_user, get_current_user_optional, require_roles
 from core.config import settings
 from models.reclamo import Reclamo
 from models.historial import HistorialReclamo
@@ -175,6 +175,47 @@ async def enviar_notificacion_whatsapp(
         print(f"{'='*50}\n", flush=True)
 
 
+# ===========================================
+# HELPER: NOTIFICACIONES PUSH AUTOMÁTICAS
+# ===========================================
+
+def enviar_notificacion_push(
+    db: AsyncSession,
+    reclamo: Reclamo,
+    tipo_notificacion: str,
+    empleado_nombre: str = None,
+    estado_anterior: str = None,
+    estado_nuevo: str = None
+):
+    """
+    Envía notificación push al creador del reclamo.
+    tipo_notificacion: 'reclamo_recibido', 'reclamo_asignado', 'cambio_estado', 'reclamo_resuelto'
+    """
+    try:
+        from services.push_service import (
+            notificar_reclamo_recibido,
+            notificar_reclamo_asignado,
+            notificar_cambio_estado,
+            notificar_reclamo_resuelto
+        )
+
+        # Usar db.sync_session para operaciones síncronas
+        sync_db = db.sync_session
+
+        if tipo_notificacion == 'reclamo_recibido':
+            notificar_reclamo_recibido(sync_db, reclamo)
+        elif tipo_notificacion == 'reclamo_asignado' and empleado_nombre:
+            notificar_reclamo_asignado(sync_db, reclamo, empleado_nombre)
+        elif tipo_notificacion == 'cambio_estado' and estado_anterior and estado_nuevo:
+            notificar_cambio_estado(sync_db, reclamo, estado_anterior, estado_nuevo)
+        elif tipo_notificacion == 'reclamo_resuelto':
+            notificar_reclamo_resuelto(sync_db, reclamo)
+
+        print(f"🔔 Push notification enviada: {tipo_notificacion}", flush=True)
+    except Exception as e:
+        print(f"❌ Error enviando push: {e}", flush=True)
+
+
 def get_effective_municipio_id(request: Request, current_user: User) -> int:
     """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
     if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
@@ -209,6 +250,8 @@ async def get_reclamos(
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
     empleado_id: Optional[int] = None,
+    skip: int = Query(0, ge=0, description="Número de registros a saltar"),
+    limit: int = Query(20, ge=1, le=100, description="Número de registros a retornar"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -235,6 +278,7 @@ async def get_reclamos(
         query = query.where(Reclamo.empleado_id == empleado_id)
 
     query = query.order_by(Reclamo.created_at.desc())
+    query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -274,7 +318,8 @@ async def cambiar_estado_reclamo_drag(
     transiciones_validas = {
         EstadoReclamo.NUEVO: [EstadoReclamo.ASIGNADO, EstadoReclamo.RECHAZADO],
         EstadoReclamo.ASIGNADO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.RESUELTO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.EN_PROCESO: [EstadoReclamo.RESUELTO, EstadoReclamo.ASIGNADO],
+        EstadoReclamo.EN_PROCESO: [EstadoReclamo.RESUELTO, EstadoReclamo.PENDIENTE_CONFIRMACION, EstadoReclamo.ASIGNADO],
+        EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.RESUELTO, EstadoReclamo.EN_PROCESO],  # Supervisor confirma o devuelve
         EstadoReclamo.RESUELTO: [EstadoReclamo.EN_PROCESO],
         EstadoReclamo.RECHAZADO: [],
     }
@@ -311,11 +356,121 @@ async def cambiar_estado_reclamo_drag(
     # Notificación WhatsApp: cambio de estado o resuelto
     if estado_enum == EstadoReclamo.RESUELTO:
         await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
+        enviar_notificacion_push(db, reclamo, 'reclamo_resuelto')
     else:
         await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
+        enviar_notificacion_push(db, reclamo, 'cambio_estado',
+                                  estado_anterior=estado_anterior.value,
+                                  estado_nuevo=estado_enum.value)
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
+
+
+# ===========================================
+# RECLAMOS RECURRENTES (PÚBLICO - solo municipio_id)
+# IMPORTANTE: Este endpoint debe estar ANTES de /{reclamo_id}
+# ===========================================
+@router.get("/recurrentes")
+async def get_reclamos_recurrentes(
+    request: Request,
+    limit: int = Query(10, description="Máximo de resultados"),
+    dias_atras: int = Query(30, description="Buscar reclamos de los últimos N días"),
+    min_similares: int = Query(3, description="Mínimo de reclamos similares para considerarlo recurrente"),
+    municipio_id: Optional[int] = Query(None, description="ID del municipio (requerido si no está autenticado)"),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user_optional)
+):
+    """
+    Devuelve reclamos con alta recurrencia (muchos reportes similares).
+    Útil para identificar problemas críticos que afectan a muchos vecinos.
+    Público: requiere municipio_id como parámetro.
+    Autenticado: usa el municipio del usuario.
+    """
+    from datetime import datetime, timedelta
+    from utils.geo import are_locations_close
+
+    # Determinar municipio_id
+    if current_user:
+        muni_id = current_user.municipio_id
+    elif municipio_id:
+        muni_id = municipio_id
+    else:
+        raise HTTPException(status_code=400, detail="Se requiere municipio_id")
+
+    # Fecha límite
+    fecha_limite = datetime.utcnow() - timedelta(days=dias_atras)
+
+    # Obtener todos los reclamos activos recientes
+    query = select(Reclamo).where(
+        Reclamo.created_at >= fecha_limite,
+        Reclamo.estado.in_([
+            EstadoReclamo.NUEVO,
+            EstadoReclamo.ASIGNADO,
+            EstadoReclamo.EN_PROCESO
+        ]),
+        Reclamo.municipio_id == muni_id
+    ).options(
+        selectinload(Reclamo.categoria),
+        selectinload(Reclamo.zona)
+    )
+
+    result = await db.execute(query)
+    todos_reclamos = result.scalars().all()
+
+    # Agrupar por categoría y proximidad
+    grupos = []
+    procesados = set()
+
+    for reclamo_base in todos_reclamos:
+        if reclamo_base.id in procesados:
+            continue
+
+        # Buscar similares a este reclamo
+        similares = [reclamo_base]
+        procesados.add(reclamo_base.id)
+
+        for reclamo_comp in todos_reclamos:
+            if reclamo_comp.id in procesados:
+                continue
+
+            # Mismo criterio que el endpoint de similares
+            if (reclamo_comp.categoria_id == reclamo_base.categoria_id and
+                are_locations_close(
+                    reclamo_base.latitud, reclamo_base.longitud,
+                    reclamo_comp.latitud, reclamo_comp.longitud,
+                    radius_meters=100
+                )):
+                similares.append(reclamo_comp)
+                procesados.add(reclamo_comp.id)
+
+        # Si tiene suficientes similares, agregar al resultado
+        if len(similares) >= min_similares:
+            # Ordenar por fecha (más reciente primero)
+            similares.sort(key=lambda r: r.created_at, reverse=True)
+            reclamo_principal = similares[0]
+
+            grupos.append({
+                "id": reclamo_principal.id,
+                "titulo": reclamo_principal.titulo,
+                "descripcion": reclamo_principal.descripcion,
+                "direccion": reclamo_principal.direccion,
+                "estado": reclamo_principal.estado.value,
+                "categoria": {
+                    "id": reclamo_principal.categoria.id,
+                    "nombre": reclamo_principal.categoria.nombre
+                } if reclamo_principal.categoria else None,
+                "zona": reclamo_principal.zona.nombre if reclamo_principal.zona else None,
+                "cantidad_reportes": len(similares),
+                "reclamos_relacionados": [r.id for r in similares],
+                "created_at": reclamo_principal.created_at.isoformat(),
+                "prioridad_sugerida": "alta" if len(similares) >= 5 else "media"
+            })
+
+    # Ordenar por cantidad de reportes (más reportes primero)
+    grupos.sort(key=lambda g: g["cantidad_reportes"], reverse=True)
+
+    return grupos[:limit]
 
 
 @router.get("/{reclamo_id}", response_model=ReclamoResponse)
@@ -425,6 +580,9 @@ async def create_reclamo(
     # Notificación WhatsApp: reclamo recibido
     await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
 
+    # Notificación Push: reclamo recibido
+    enviar_notificacion_push(db, reclamo, 'reclamo_recibido')
+
     # Recargar con relaciones
     print(f"🔄 Recargando reclamo con relaciones...", flush=True)
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo.id))
@@ -511,6 +669,9 @@ async def asignar_reclamo(
     # Notificación WhatsApp: reclamo asignado
     await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_asignado', current_user.municipio_id)
 
+    # Notificación Push: reclamo asignado
+    enviar_notificacion_push(db, reclamo, 'reclamo_asignado', empleado_nombre=f"Empleado #{data.empleado_id}")
+
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
 
@@ -550,6 +711,11 @@ async def iniciar_reclamo(
     # Notificación WhatsApp: cambio de estado (en proceso)
     await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
 
+    # Notificación Push: cambio de estado
+    enviar_notificacion_push(db, reclamo, 'cambio_estado',
+                              estado_anterior=estado_anterior.value,
+                              estado_nuevo=EstadoReclamo.EN_PROCESO.value)
+
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
 
@@ -560,7 +726,14 @@ async def resolver_reclamo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
+    """
+    Resolver un reclamo.
+    - Empleado: cambia a 'pendiente_confirmacion' y notifica al supervisor
+    - Admin/Supervisor: resuelve directamente
+    """
     from datetime import datetime
+    from services.notificacion_service import NotificacionService
+    from models.empleado import Empleado
 
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
@@ -574,8 +747,125 @@ async def resolver_reclamo(
         raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
 
     estado_anterior = reclamo.estado
-    reclamo.estado = EstadoReclamo.RESUELTO
     reclamo.resolucion = data.resolucion
+
+    # Si es empleado, va a pendiente_confirmacion y notifica al supervisor
+    if current_user.rol == RolUsuario.EMPLEADO:
+        reclamo.estado = EstadoReclamo.PENDIENTE_CONFIRMACION
+
+        historial = HistorialReclamo(
+            reclamo_id=reclamo.id,
+            usuario_id=current_user.id,
+            estado_anterior=estado_anterior,
+            estado_nuevo=EstadoReclamo.PENDIENTE_CONFIRMACION,
+            accion="pendiente_confirmacion",
+            comentario=f"Trabajo terminado por empleado. Resolución: {data.resolucion}"
+        )
+        db.add(historial)
+
+        await db.commit()
+
+        # Obtener nombre del empleado
+        result_emp = await db.execute(
+            select(Empleado).where(Empleado.id == current_user.empleado_id)
+        )
+        empleado = result_emp.scalar_one_or_none()
+        empleado_nombre = f"{empleado.nombre} {empleado.apellido or ''}".strip() if empleado else "Empleado"
+
+        # Notificar a supervisores (in-app + WhatsApp)
+        mensaje_supervisor = NotificacionService.generar_mensaje_pendiente_confirmacion(
+            reclamo_id=reclamo.id,
+            titulo_reclamo=reclamo.titulo,
+            empleado_nombre=empleado_nombre,
+            resolucion=data.resolucion
+        )
+
+        await NotificacionService.notificar_supervisores(
+            db=db,
+            municipio_id=current_user.municipio_id,
+            titulo="Trabajo pendiente de confirmación",
+            mensaje=mensaje_supervisor,
+            tipo="warning",
+            reclamo_id=reclamo.id,
+            enviar_whatsapp=True
+        )
+
+        # Notificar al vecino que está en revisión
+        await NotificacionService.notificar_vecino(
+            db=db,
+            reclamo=reclamo,
+            titulo="Tu reclamo está en revisión",
+            mensaje=f"El trabajo sobre tu reclamo #{reclamo.id} ha sido completado y está siendo revisado por un supervisor.",
+            tipo="info",
+            tipo_whatsapp="cambio_estado",
+            enviar_whatsapp=True
+        )
+
+    else:
+        # Admin/Supervisor resuelve directamente
+        reclamo.estado = EstadoReclamo.RESUELTO
+        reclamo.fecha_resolucion = datetime.utcnow()
+
+        historial = HistorialReclamo(
+            reclamo_id=reclamo.id,
+            usuario_id=current_user.id,
+            estado_anterior=estado_anterior,
+            estado_nuevo=EstadoReclamo.RESUELTO,
+            accion="resuelto",
+            comentario=data.resolucion
+        )
+        db.add(historial)
+
+        await db.commit()
+
+        # Gamificación: otorgar puntos al creador por reclamo resuelto
+        try:
+            await GamificacionService.procesar_reclamo_resuelto(db, reclamo)
+        except Exception as e:
+            pass
+
+        # Notificación WhatsApp: reclamo resuelto con link de calificación
+        await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
+
+        # Notificación Push: reclamo resuelto
+        enviar_notificacion_push(db, reclamo, 'reclamo_resuelto')
+
+    result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
+    return result.scalar_one()
+
+
+@router.post("/{reclamo_id}/confirmar", response_model=ReclamoResponse)
+async def confirmar_reclamo(
+    reclamo_id: int,
+    comentario: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Confirmar un reclamo pendiente de confirmación.
+    Solo supervisores/admins pueden confirmar.
+    Cambia el estado a RESUELTO y notifica al vecino con link de calificación.
+    """
+    from datetime import datetime
+    from services.notificacion_service import NotificacionService
+
+    result = await db.execute(
+        select(Reclamo).options(
+            selectinload(Reclamo.creador)
+        ).where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    if reclamo.estado != EstadoReclamo.PENDIENTE_CONFIRMACION:
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se pueden confirmar reclamos en estado 'pendiente_confirmacion'"
+        )
+
+    estado_anterior = reclamo.estado
+    reclamo.estado = EstadoReclamo.RESUELTO
     reclamo.fecha_resolucion = datetime.utcnow()
 
     historial = HistorialReclamo(
@@ -583,8 +873,8 @@ async def resolver_reclamo(
         usuario_id=current_user.id,
         estado_anterior=estado_anterior,
         estado_nuevo=EstadoReclamo.RESUELTO,
-        accion="resuelto",
-        comentario=data.resolucion
+        accion="confirmado",
+        comentario=comentario or "Trabajo confirmado por supervisor"
     )
     db.add(historial)
 
@@ -594,14 +884,89 @@ async def resolver_reclamo(
     try:
         await GamificacionService.procesar_reclamo_resuelto(db, reclamo)
     except Exception as e:
-        # No fallar si hay error en gamificación
         pass
 
-    # Notificación WhatsApp: reclamo resuelto
-    await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
+    # Notificar al vecino con link de calificación
+    link_calificacion = NotificacionService.generar_link_calificacion(reclamo.id)
+    user = reclamo.creador
+
+    if user and not user.es_anonimo:
+        mensaje_resuelto = NotificacionService.generar_mensaje_resuelto(
+            nombre_usuario=user.nombre,
+            reclamo_id=reclamo.id,
+            titulo_reclamo=reclamo.titulo,
+            descripcion=reclamo.descripcion,
+            incluir_link_calificacion=True
+        )
+
+        await NotificacionService.notificar_vecino(
+            db=db,
+            reclamo=reclamo,
+            titulo="¡Tu reclamo fue resuelto!",
+            mensaje=mensaje_resuelto,
+            tipo="success",
+            tipo_whatsapp="reclamo_resuelto",
+            enviar_whatsapp=True
+        )
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
+
+
+@router.post("/{reclamo_id}/devolver", response_model=ReclamoResponse)
+async def devolver_reclamo(
+    reclamo_id: int,
+    motivo: str = Query(..., description="Motivo por el que se devuelve al empleado"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Devolver un reclamo pendiente de confirmación al empleado.
+    Cambia el estado a EN_PROCESO y notifica al empleado.
+    """
+    from services.notificacion_service import NotificacionService
+
+    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
+    reclamo = result.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    if reclamo.estado != EstadoReclamo.PENDIENTE_CONFIRMACION:
+        raise HTTPException(
+            status_code=400,
+            detail="Solo se pueden devolver reclamos en estado 'pendiente_confirmacion'"
+        )
+
+    estado_anterior = reclamo.estado
+    reclamo.estado = EstadoReclamo.EN_PROCESO
+
+    historial = HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=current_user.id,
+        estado_anterior=estado_anterior,
+        estado_nuevo=EstadoReclamo.EN_PROCESO,
+        accion="devuelto",
+        comentario=f"Devuelto por supervisor: {motivo}"
+    )
+    db.add(historial)
+
+    await db.commit()
+
+    # Notificar al empleado asignado
+    if reclamo.empleado_id:
+        await NotificacionService.notificar_empleado(
+            db=db,
+            empleado_id=reclamo.empleado_id,
+            titulo="Trabajo devuelto",
+            mensaje=f"El reclamo #{reclamo.id} '{reclamo.titulo}' fue devuelto.\n\nMotivo: {motivo}",
+            tipo="warning",
+            reclamo_id=reclamo.id,
+            enviar_whatsapp=True
+        )
+
+    result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
+    return result.scalar_one()
+
 
 @router.post("/{reclamo_id}/rechazar", response_model=ReclamoResponse)
 async def rechazar_reclamo(
@@ -1196,97 +1561,6 @@ async def buscar_reclamos_similares(
         }
         for r in reclamos_similares
     ]
-
-
-@router.get("/recurrentes")
-async def get_reclamos_recurrentes(
-    limit: int = Query(10, description="Máximo de resultados"),
-    dias_atras: int = Query(30, description="Buscar reclamos de los últimos N días"),
-    min_similares: int = Query(3, description="Mínimo de reclamos similares para considerarlo recurrente"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor"]))
-):
-    """
-    Devuelve reclamos con alta recurrencia (muchos reportes similares).
-    Útil para identificar problemas críticos que afectan a muchos vecinos.
-    """
-    from datetime import datetime, timedelta
-    from utils.geo import are_locations_close
-    from collections import defaultdict
-
-    # Fecha límite
-    fecha_limite = datetime.utcnow() - timedelta(days=dias_atras)
-
-    # Obtener todos los reclamos activos recientes
-    query = select(Reclamo).where(
-        Reclamo.created_at >= fecha_limite,
-        Reclamo.estado.in_([
-            EstadoReclamo.NUEVO,
-            EstadoReclamo.ASIGNADO,
-            EstadoReclamo.EN_PROCESO
-        ]),
-        Reclamo.municipio_id == current_user.municipio_id
-    ).options(
-        selectinload(Reclamo.categoria),
-        selectinload(Reclamo.zona)
-    )
-
-    result = await db.execute(query)
-    todos_reclamos = result.scalars().all()
-
-    # Agrupar por categoría y proximidad
-    grupos = []
-    procesados = set()
-
-    for reclamo_base in todos_reclamos:
-        if reclamo_base.id in procesados:
-            continue
-
-        # Buscar similares a este reclamo
-        similares = [reclamo_base]
-        procesados.add(reclamo_base.id)
-
-        for reclamo_comp in todos_reclamos:
-            if reclamo_comp.id in procesados:
-                continue
-
-            # Mismo criterio que el endpoint de similares
-            if (reclamo_comp.categoria_id == reclamo_base.categoria_id and
-                are_locations_close(
-                    reclamo_base.latitud, reclamo_base.longitud,
-                    reclamo_comp.latitud, reclamo_comp.longitud,
-                    radius_meters=100
-                )):
-                similares.append(reclamo_comp)
-                procesados.add(reclamo_comp.id)
-
-        # Si tiene suficientes similares, agregar al resultado
-        if len(similares) >= min_similares:
-            # Ordenar por fecha (más reciente primero)
-            similares.sort(key=lambda r: r.created_at, reverse=True)
-            reclamo_principal = similares[0]
-
-            grupos.append({
-                "id": reclamo_principal.id,
-                "titulo": reclamo_principal.titulo,
-                "descripcion": reclamo_principal.descripcion,
-                "direccion": reclamo_principal.direccion,
-                "estado": reclamo_principal.estado.value,
-                "categoria": {
-                    "id": reclamo_principal.categoria.id,
-                    "nombre": reclamo_principal.categoria.nombre
-                } if reclamo_principal.categoria else None,
-                "zona": reclamo_principal.zona.nombre if reclamo_principal.zona else None,
-                "cantidad_reportes": len(similares),
-                "reclamos_relacionados": [r.id for r in similares],
-                "created_at": reclamo_principal.created_at.isoformat(),
-                "prioridad_sugerida": "alta" if len(similares) >= 5 else "media"
-            })
-
-    # Ordenar por cantidad de reportes (más reportes primero)
-    grupos.sort(key=lambda g: g["cantidad_reportes"], reverse=True)
-
-    return grupos[:limit]
 
 
 @router.get("/{reclamo_id}/cantidad-similares")

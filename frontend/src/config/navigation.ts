@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map, Users,
-  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle, Trophy, MessageCircle
+  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle, Trophy, MessageCircle, FileCheck
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -39,6 +39,13 @@ export const getNavigation = (userRole: string) => {
       icon: Wrench,
       show: isEmpleado || isAdminOrSupervisor,
       description: 'Tablero de trabajo'
+    },
+    {
+      name: 'Mis Trabajos',
+      href: '/gestion/mis-trabajos',
+      icon: ClipboardList,
+      show: isEmpleado,
+      description: 'Reclamos asignados a mí'
     },
 
     // === SECCIÓN ADMINISTRACIÓN ===
@@ -90,6 +97,42 @@ export const getNavigation = (userRole: string) => {
       icon: MessageCircle,
       show: isAdminOrSupervisor,
       description: 'Configurar WhatsApp Business'
+    },
+    {
+      name: 'Trámites',
+      href: '/gestion/tramites',
+      icon: FileCheck,
+      show: isAdminOrSupervisor,
+      description: 'Gestionar trámites'
+    },
+    // === SECCIÓN VECINOS ===
+    {
+      name: 'Mi Panel',
+      href: '/gestion/mi-panel',
+      icon: Home,
+      show: isVecino,
+      description: 'Tu panel personal'
+    },
+    {
+      name: 'Mis Reclamos',
+      href: '/gestion/mis-reclamos',
+      icon: ClipboardList,
+      show: isVecino,
+      description: 'Ver tus reclamos'
+    },
+    {
+      name: 'Mis Trámites',
+      href: '/gestion/mis-tramites',
+      icon: FileCheck,
+      show: isVecino,
+      description: 'Ver tus trámites'
+    },
+    {
+      name: 'Logros',
+      href: '/gestion/logros',
+      icon: Trophy,
+      show: isVecino,
+      description: 'Tus logros y puntos'
     },
   ].filter(item => item.show);
 };

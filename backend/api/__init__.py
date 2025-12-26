@@ -24,6 +24,8 @@ from .gamificacion import router as gamificacion_router
 # Temporalmente deshabilitado por error de reportlab en Heroku
 # from .reportes import router as reportes_router
 from .noticias import router as noticias_router
+from .tramites import router as tramites_router
+from .push import router as push_router
 
 api_router = APIRouter()
 
@@ -51,6 +53,8 @@ api_router.include_router(imagenes_router, tags=["Imágenes"])
 api_router.include_router(gamificacion_router, prefix="/gamificacion", tags=["Gamificación"])
 # api_router.include_router(reportes_router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(noticias_router, prefix="/noticias", tags=["Noticias"])
+api_router.include_router(tramites_router, prefix="/tramites", tags=["Trámites"])
+api_router.include_router(push_router, tags=["Push Notifications"])
 
 # WebSockets
 from .ws import router as ws_router

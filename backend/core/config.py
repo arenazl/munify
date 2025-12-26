@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # Validación de email (desactivar para demos/desarrollo)
     SKIP_EMAIL_VALIDATION: bool = True
 
+    # Web Push (VAPID keys)
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_EMAIL: str = "mailto:admin@municipio.gob.ar"
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Retorna lista de origenes CORS permitidos"""

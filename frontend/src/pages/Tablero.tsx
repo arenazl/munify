@@ -35,6 +35,14 @@ const columnas: Columna[] = [
     badgeClass: 'badge-gradient-orange',
   },
   {
+    id: 'pendiente_confirmacion',
+    titulo: 'Pendiente Confirmación',
+    color: '#8b5cf6',
+    headerClass: 'column-header-purple',
+    cardClass: 'card-gradient-purple',
+    badgeClass: 'badge-gradient-purple',
+  },
+  {
     id: 'resuelto',
     titulo: 'Resueltos',
     color: '#22c55e',
@@ -110,7 +118,7 @@ export default function Tablero() {
       );
   };
 
-  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor' || user?.rol === 'empleado';
+  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
 
   if (loading) {
     return (
@@ -125,7 +133,7 @@ export default function Tablero() {
       {/* Header con título y buscador */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold gradient-text-rainbow">
-          Vista Kanban
+          Tablero de Reclamos
         </h1>
 
         {/* Buscador */}
@@ -155,7 +163,7 @@ export default function Tablero() {
 
       {/* Tablero Kanban */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {columnas.map((col) => (
             <Droppable droppableId={col.id} key={col.id} isDropDisabled={!canDrag}>
               {(provided, snapshot) => (

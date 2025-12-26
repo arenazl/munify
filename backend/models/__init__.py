@@ -20,6 +20,8 @@ from .gamificacion import (
 )
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .noticia import Noticia
+from .tramite import ServicioTramite, Tramite, HistorialTramite, EstadoTramite
+from .push_subscription import PushSubscription
 
 __all__ = [
     "Municipio",
@@ -56,5 +58,12 @@ __all__ = [
     "WhatsAppLog",
     "WhatsAppProvider",
     # Noticias
-    "Noticia"
+    "Noticia",
+    # Tramites
+    "ServicioTramite",
+    "Tramite",
+    "HistorialTramite",
+    "EstadoTramite",
+    # Push Notifications
+    "PushSubscription"
 ]

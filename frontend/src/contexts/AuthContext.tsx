@@ -4,6 +4,7 @@ import type { User } from '../types';
 import { authApi } from '../lib/api';
 import api from '../lib/api';
 import { useMunicipioFromUrl, buildMunicipioUrl } from '../hooks/useSubdomain';
+import { subscribeToPush, isPushSupported } from '../lib/pushNotifications';
 
 export interface Municipio {
   id: number;
@@ -175,6 +176,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (e) {
         console.error('Error cargando municipio:', e);
+      }
+    }
+
+    // Auto-suscribir a push notifications por defecto
+    if (isPushSupported()) {
+      try {
+        await subscribeToPush();
+        console.log('Push notifications activadas automáticamente');
+      } catch (e) {
+        console.log('No se pudo activar push automáticamente:', e);
       }
     }
   };

@@ -286,3 +286,114 @@ async def get_calificaciones_pendientes(
             for r in reclamos
         ]
     }
+
+
+# ============================================================
+# ENDPOINT PÚBLICO PARA CALIFICACIÓN RÁPIDA (vía link WhatsApp)
+# ============================================================
+
+class CalificacionPublicaCreate(BaseModel):
+    """Schema para calificación pública sin login"""
+    puntuacion: int = Field(..., ge=1, le=5)
+    comentario: Optional[str] = None
+
+
+class ReclamoInfoCalificacion(BaseModel):
+    """Info del reclamo para mostrar en página de calificación"""
+    id: int
+    titulo: str
+    descripcion: str
+    categoria: str
+    fecha_resolucion: Optional[str]
+    resolucion: Optional[str]
+    ya_calificado: bool
+    creador_nombre: str
+
+
+@router.get("/calificar/{reclamo_id}", response_model=ReclamoInfoCalificacion)
+async def get_info_calificacion_publica(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtener información del reclamo para la página de calificación pública.
+    No requiere autenticación - se accede vía link directo.
+    """
+    result = await db.execute(
+        select(Reclamo)
+        .options(
+            selectinload(Reclamo.categoria),
+            selectinload(Reclamo.creador)
+        )
+        .where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    if reclamo.estado != EstadoReclamo.RESUELTO:
+        raise HTTPException(status_code=400, detail="Este reclamo aún no ha sido resuelto")
+
+    # Verificar si ya fue calificado
+    result = await db.execute(
+        select(Calificacion).where(Calificacion.reclamo_id == reclamo_id)
+    )
+    ya_calificado = result.scalar_one_or_none() is not None
+
+    return ReclamoInfoCalificacion(
+        id=reclamo.id,
+        titulo=reclamo.titulo,
+        descripcion=reclamo.descripcion[:200] + "..." if len(reclamo.descripcion) > 200 else reclamo.descripcion,
+        categoria=reclamo.categoria.nombre if reclamo.categoria else "Sin categoría",
+        fecha_resolucion=reclamo.fecha_resolucion.isoformat() if reclamo.fecha_resolucion else None,
+        resolucion=reclamo.resolucion,
+        ya_calificado=ya_calificado,
+        creador_nombre=reclamo.creador.nombre if reclamo.creador else "Anónimo"
+    )
+
+
+@router.post("/calificar/{reclamo_id}")
+async def crear_calificacion_publica(
+    reclamo_id: int,
+    data: CalificacionPublicaCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Crear calificación desde link público (WhatsApp).
+    No requiere autenticación - se asocia al creador del reclamo.
+    """
+    result = await db.execute(
+        select(Reclamo).where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    if reclamo.estado != EstadoReclamo.RESUELTO:
+        raise HTTPException(status_code=400, detail="Este reclamo aún no ha sido resuelto")
+
+    # Verificar que no existe calificación previa
+    result = await db.execute(
+        select(Calificacion).where(Calificacion.reclamo_id == reclamo_id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Este reclamo ya fue calificado. ¡Gracias!")
+
+    # Crear calificación asociada al creador del reclamo
+    calificacion = Calificacion(
+        reclamo_id=reclamo_id,
+        usuario_id=reclamo.creador_id,
+        puntuacion=data.puntuacion,
+        comentario=data.comentario
+    )
+
+    db.add(calificacion)
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": "¡Gracias por tu calificación!",
+        "puntuacion": data.puntuacion
+    }

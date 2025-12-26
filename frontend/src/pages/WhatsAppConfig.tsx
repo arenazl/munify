@@ -19,11 +19,20 @@ interface WhatsAppConfig {
   provider: Provider;
   meta_configurado: boolean;
   twilio_configurado: boolean;
+  // Notificaciones al usuario
   notificar_reclamo_recibido: boolean;
   notificar_reclamo_asignado: boolean;
   notificar_cambio_estado: boolean;
   notificar_reclamo_resuelto: boolean;
   notificar_comentarios: boolean;
+  // Notificaciones al empleado
+  notificar_empleado_asignacion: boolean;
+  notificar_empleado_nuevo_comentario: boolean;
+  notificar_empleado_cambio_prioridad: boolean;
+  // Notificaciones al supervisor
+  notificar_supervisor_reclamo_nuevo: boolean;
+  notificar_supervisor_reclamo_resuelto: boolean;
+  notificar_supervisor_reclamo_vencido: boolean;
   created_at: string;
   updated_at: string | null;
 }
@@ -77,12 +86,20 @@ export default function WhatsAppConfigPage() {
     twilio_account_sid: '',
     twilio_auth_token: '',
     twilio_phone_number: '',
-    // Notificaciones
+    // Notificaciones al usuario
     notificar_reclamo_recibido: true,
     notificar_reclamo_asignado: true,
     notificar_cambio_estado: true,
     notificar_reclamo_resuelto: true,
     notificar_comentarios: false,
+    // Notificaciones al empleado
+    notificar_empleado_asignacion: true,
+    notificar_empleado_nuevo_comentario: true,
+    notificar_empleado_cambio_prioridad: true,
+    // Notificaciones al supervisor
+    notificar_supervisor_reclamo_nuevo: true,
+    notificar_supervisor_reclamo_resuelto: true,
+    notificar_supervisor_reclamo_vencido: true,
   });
 
   // Test
@@ -143,6 +160,12 @@ export default function WhatsAppConfigPage() {
             notificar_cambio_estado: fullRes.data.notificar_cambio_estado,
             notificar_reclamo_resuelto: fullRes.data.notificar_reclamo_resuelto,
             notificar_comentarios: fullRes.data.notificar_comentarios,
+            notificar_empleado_asignacion: fullRes.data.notificar_empleado_asignacion ?? true,
+            notificar_empleado_nuevo_comentario: fullRes.data.notificar_empleado_nuevo_comentario ?? true,
+            notificar_empleado_cambio_prioridad: fullRes.data.notificar_empleado_cambio_prioridad ?? true,
+            notificar_supervisor_reclamo_nuevo: fullRes.data.notificar_supervisor_reclamo_nuevo ?? true,
+            notificar_supervisor_reclamo_resuelto: fullRes.data.notificar_supervisor_reclamo_resuelto ?? true,
+            notificar_supervisor_reclamo_vencido: fullRes.data.notificar_supervisor_reclamo_vencido ?? true,
           });
         } catch {
           // Si falla obtener la completa, usamos la pública
@@ -155,6 +178,12 @@ export default function WhatsAppConfigPage() {
             notificar_cambio_estado: publicConfig.notificar_cambio_estado,
             notificar_reclamo_resuelto: publicConfig.notificar_reclamo_resuelto,
             notificar_comentarios: publicConfig.notificar_comentarios,
+            notificar_empleado_asignacion: publicConfig.notificar_empleado_asignacion ?? true,
+            notificar_empleado_nuevo_comentario: publicConfig.notificar_empleado_nuevo_comentario ?? true,
+            notificar_empleado_cambio_prioridad: publicConfig.notificar_empleado_cambio_prioridad ?? true,
+            notificar_supervisor_reclamo_nuevo: publicConfig.notificar_supervisor_reclamo_nuevo ?? true,
+            notificar_supervisor_reclamo_resuelto: publicConfig.notificar_supervisor_reclamo_resuelto ?? true,
+            notificar_supervisor_reclamo_vencido: publicConfig.notificar_supervisor_reclamo_vencido ?? true,
           }));
         }
       }
@@ -656,15 +685,15 @@ export default function WhatsAppConfigPage() {
             </div>
           )}
 
-          {/* Notificaciones */}
+          {/* Notificaciones al Usuario (Vecino) */}
           <div
             className="rounded-xl p-5"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
             <div className="flex items-center gap-2 mb-4">
-              <Bell className="h-5 w-5" style={{ color: theme.primary }} />
+              <Bell className="h-5 w-5" style={{ color: '#3b82f6' }} />
               <h3 className="font-medium" style={{ color: theme.text }}>
-                Notificaciones automaticas
+                Notificaciones al Vecino
               </h3>
             </div>
             <div className="space-y-3">
@@ -674,6 +703,85 @@ export default function WhatsAppConfigPage() {
                 { key: 'notificar_cambio_estado', label: 'Cambio de estado', desc: 'Al cambiar estado del reclamo' },
                 { key: 'notificar_reclamo_resuelto', label: 'Reclamo resuelto', desc: 'Al marcar como resuelto' },
                 { key: 'notificar_comentarios', label: 'Nuevos comentarios', desc: 'Al agregar comentarios' },
+              ].map(item => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between py-2 px-3 rounded-lg"
+                  style={{ backgroundColor: theme.backgroundSecondary }}
+                >
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: theme.text }}>{item.label}</p>
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>{item.desc}</p>
+                  </div>
+                  <button onClick={() => handleToggle(item.key as keyof typeof formData)}>
+                    {formData[item.key as keyof typeof formData] ? (
+                      <ToggleRight className="h-6 w-6" style={{ color: '#25D366' }} />
+                    ) : (
+                      <ToggleLeft className="h-6 w-6" style={{ color: theme.textSecondary }} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Notificaciones al Empleado */}
+          <div
+            className="rounded-xl p-5"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Bell className="h-5 w-5" style={{ color: '#f59e0b' }} />
+              <h3 className="font-medium" style={{ color: theme.text }}>
+                Notificaciones al Empleado
+              </h3>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
+                Requiere teléfono en ficha de empleado
+              </span>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'notificar_empleado_asignacion', label: 'Nueva asignación', desc: 'Cuando le asignan un reclamo' },
+                { key: 'notificar_empleado_nuevo_comentario', label: 'Nuevo comentario', desc: 'Cuando el vecino comenta en el reclamo' },
+                { key: 'notificar_empleado_cambio_prioridad', label: 'Cambio de prioridad', desc: 'Cuando cambia la prioridad del reclamo' },
+              ].map(item => (
+                <div
+                  key={item.key}
+                  className="flex items-center justify-between py-2 px-3 rounded-lg"
+                  style={{ backgroundColor: theme.backgroundSecondary }}
+                >
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: theme.text }}>{item.label}</p>
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>{item.desc}</p>
+                  </div>
+                  <button onClick={() => handleToggle(item.key as keyof typeof formData)}>
+                    {formData[item.key as keyof typeof formData] ? (
+                      <ToggleRight className="h-6 w-6" style={{ color: '#25D366' }} />
+                    ) : (
+                      <ToggleLeft className="h-6 w-6" style={{ color: theme.textSecondary }} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Notificaciones al Supervisor */}
+          <div
+            className="rounded-xl p-5"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Bell className="h-5 w-5" style={{ color: '#8b5cf6' }} />
+              <h3 className="font-medium" style={{ color: theme.text }}>
+                Notificaciones al Supervisor
+              </h3>
+            </div>
+            <div className="space-y-3">
+              {[
+                { key: 'notificar_supervisor_reclamo_nuevo', label: 'Nuevos reclamos', desc: 'Cuando se crea un reclamo en su zona' },
+                { key: 'notificar_supervisor_reclamo_resuelto', label: 'Reclamos resueltos', desc: 'Cuando un empleado resuelve un reclamo' },
+                { key: 'notificar_supervisor_reclamo_vencido', label: 'SLA vencido', desc: 'Cuando un reclamo excede su tiempo de respuesta' },
               ].map(item => (
                 <div
                   key={item.key}

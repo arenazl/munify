@@ -22,7 +22,7 @@ WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID
 WHATSAPP_ACCESS_TOKEN = settings.WHATSAPP_ACCESS_TOKEN
 WHATSAPP_BUSINESS_ACCOUNT_ID = settings.WHATSAPP_BUSINESS_ACCOUNT_ID
 WHATSAPP_WEBHOOK_VERIFY_TOKEN = settings.WHATSAPP_WEBHOOK_VERIFY_TOKEN
-from models import User, Reclamo, Categoria, Zona, Notificacion
+from models import User, Reclamo, Categoria, Zona, Notificacion, Empleado
 from models.enums import EstadoReclamo, RolUsuario
 from models.whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from schemas.whatsapp import (
@@ -34,6 +34,36 @@ router = APIRouter()
 
 # Token de verificación por defecto para webhooks
 DEFAULT_VERIFY_TOKEN = "reclamos_municipales_2024"
+
+
+def formatear_telefono_argentina(telefono: str) -> str:
+    """
+    Formatea un teléfono argentino para WhatsApp Meta API.
+    Meta espera el formato SIN el + (ej: 541160223474)
+    """
+    if not telefono:
+        return telefono
+
+    # Limpiar el teléfono de caracteres no numéricos
+    telefono_limpio = re.sub(r'[^\d]', '', telefono)
+
+    # Si ya tiene código de país 54, devolver como está (sin +)
+    if telefono_limpio.startswith('54') and len(telefono_limpio) >= 11:
+        return telefono_limpio
+
+    # Quitar el 15 si está al inicio (formato viejo argentino)
+    if telefono_limpio.startswith('15'):
+        telefono_limpio = telefono_limpio[2:]
+
+    # Si empieza con 11 (Buenos Aires) u otro código de área
+    if telefono_limpio.startswith('11') or len(telefono_limpio) == 10:
+        return f"54{telefono_limpio}"
+    elif len(telefono_limpio) == 8:
+        # Número sin código de área (8 dígitos), asumir Buenos Aires
+        return f"5411{telefono_limpio}"
+
+    # Si no matchea ningún patrón, agregar 54
+    return f"54{telefono_limpio}"
 
 # Estado de conversación por usuario (en memoria - considerar Redis para producción)
 conversation_states = {}
@@ -661,10 +691,14 @@ async def send_whatsapp_message_with_config(
 ) -> Optional[str]:
     """Envía mensaje usando la configuración del municipio y registra en logs"""
 
+    # Formatear teléfono para Argentina
+    telefono_formateado = formatear_telefono_argentina(to)
+    print(f"📱 WhatsApp: telefono original='{to}' → formateado='{telefono_formateado}'", flush=True)
+
     # Crear log
     log = WhatsAppLog(
         config_id=config.id,
-        telefono=to,
+        telefono=telefono_formateado,
         tipo_mensaje=tipo_mensaje,
         mensaje=message[:500] if message else None,
         usuario_id=usuario_id,
@@ -677,9 +711,9 @@ async def send_whatsapp_message_with_config(
         message_id = None
 
         if config.provider == WhatsAppProvider.META:
-            message_id = await send_via_meta(config, to, message)
+            message_id = await send_via_meta(config, telefono_formateado, message)
         elif config.provider == WhatsAppProvider.TWILIO:
-            message_id = await send_via_twilio(config, to, message)
+            message_id = await send_via_twilio(config, telefono_formateado, message)
 
         log.enviado = True
         log.message_id = message_id
@@ -702,7 +736,7 @@ async def send_via_meta(config: WhatsAppConfig, to: str, message: str) -> Option
     if not phone_number_id or not access_token:
         raise ValueError("Configuración de Meta incompleta. Configure en DB o variables de entorno.")
 
-    url = f"https://graph.facebook.com/v18.0/{phone_number_id}/messages"
+    url = f"https://graph.facebook.com/v22.0/{phone_number_id}/messages"
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -763,7 +797,7 @@ async def send_whatsapp_message(to: str, message: str):
         print(f"[WhatsApp Mock] To: {to}\nMessage: {message}\n")
         return
 
-    url = f"https://graph.facebook.com/v18.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+    url = f"https://graph.facebook.com/v22.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
 
     headers = {
         "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",

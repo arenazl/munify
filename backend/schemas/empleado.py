@@ -14,6 +14,7 @@ class CategoriaSimple(BaseModel):
 class EmpleadoCreate(BaseModel):
     nombre: str
     apellido: Optional[str] = None
+    telefono: Optional[str] = None
     descripcion: Optional[str] = None
     especialidad: Optional[str] = None
     zona_id: Optional[int] = None
@@ -24,6 +25,7 @@ class EmpleadoCreate(BaseModel):
 class EmpleadoUpdate(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
+    telefono: Optional[str] = None
     descripcion: Optional[str] = None
     especialidad: Optional[str] = None
     zona_id: Optional[int] = None
@@ -45,6 +47,7 @@ class EmpleadoResponse(BaseModel):
     id: int
     nombre: str
     apellido: Optional[str] = None
+    telefono: Optional[str] = None
     descripcion: Optional[str] = None
     especialidad: Optional[str] = None
     zona_id: Optional[int] = None

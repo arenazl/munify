@@ -10,6 +10,7 @@ class EstadoReclamo(str, enum.Enum):
     NUEVO = "nuevo"
     ASIGNADO = "asignado"
     EN_PROCESO = "en_proceso"
+    PENDIENTE_CONFIRMACION = "pendiente_confirmacion"  # Empleado terminó, espera confirmación del supervisor
     RESUELTO = "resuelto"
     RECHAZADO = "rechazado"
 

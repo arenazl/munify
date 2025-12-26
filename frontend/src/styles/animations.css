@@ -336,6 +336,23 @@
   background: linear-gradient(90deg, #22c55e, #06b6d4);
 }
 
+.card-gradient-purple {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+  border-left: 4px solid #8b5cf6;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-gradient-purple::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #8b5cf6, #a855f7);
+}
+
 /* Gradient text */
 .gradient-text-primary {
   background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
@@ -430,6 +447,11 @@
   color: white;
 }
 
+.column-header-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+  color: white;
+}
+
 /* Badge gradients */
 .badge-gradient-blue {
   background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
@@ -451,6 +473,15 @@
 
 .badge-gradient-green {
   background: linear-gradient(135deg, #22c55e 0%, #06b6d4 100%);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-gradient-purple {
+  background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
   color: white;
   padding: 2px 8px;
   border-radius: 9999px;

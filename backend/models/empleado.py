@@ -15,6 +15,7 @@ class Empleado(Base):
 
     nombre = Column(String(100), nullable=False)
     apellido = Column(String(100), nullable=True)
+    telefono = Column(String(50), nullable=True)  # Para notificaciones WhatsApp
     descripcion = Column(Text, nullable=True)
 
     # Especialidad del empleado (campo legacy, usar categorias)
@@ -39,4 +40,5 @@ class Empleado(Base):
     # Relaciones
     miembros = relationship("User", back_populates="empleado")
     reclamos_asignados = relationship("Reclamo", back_populates="empleado_asignado")
+    tramites_asignados = relationship("Tramite", back_populates="empleado_asignado")
     categorias = relationship("Categoria", secondary=empleado_categoria, backref="empleados")

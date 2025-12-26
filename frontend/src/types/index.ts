@@ -1,5 +1,5 @@
 export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin';
-export type EstadoReclamo = 'nuevo' | 'asignado' | 'en_proceso' | 'resuelto' | 'rechazado';
+export type EstadoReclamo = 'nuevo' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto' | 'rechazado';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
 export interface User {
@@ -137,4 +137,64 @@ export interface DashboardStats {
   hoy: number;
   semana: number;
   tiempo_promedio_dias: number;
+}
+
+// Tramites
+export type EstadoTramite = 'iniciado' | 'en_revision' | 'requiere_documentacion' | 'en_proceso' | 'aprobado' | 'rechazado' | 'finalizado';
+
+export interface ServicioTramite {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  requisitos?: string;
+  documentos_requeridos?: string;
+  tiempo_estimado_dias: number;
+  costo?: number;
+  url_externa?: string;
+  activo: boolean;
+  orden: number;
+  favorito: boolean;
+  created_at: string;
+}
+
+export interface Tramite {
+  id: number;
+  municipio_id: number;
+  numero_tramite: string;
+  asunto: string;
+  descripcion?: string;
+  estado: EstadoTramite;
+  servicio_id: number;
+  servicio?: {
+    id: number;
+    nombre: string;
+    icono?: string;
+    color?: string;
+  };
+  solicitante_id?: number;
+  nombre_solicitante?: string;
+  apellido_solicitante?: string;
+  dni_solicitante?: string;
+  email_solicitante?: string;
+  telefono_solicitante?: string;
+  direccion_solicitante?: string;
+  respuesta?: string;
+  observaciones?: string;
+  created_at: string;
+  updated_at?: string;
+  fecha_resolucion?: string;
+}
+
+export interface HistorialTramite {
+  id: number;
+  tramite_id: number;
+  usuario_id?: number;
+  estado_anterior?: EstadoTramite;
+  estado_nuevo?: EstadoTramite;
+  accion: string;
+  comentario?: string;
+  created_at: string;
 }

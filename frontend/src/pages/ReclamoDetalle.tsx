@@ -85,6 +85,7 @@ const estadoConfig: Record<EstadoReclamo, { label: string; color: string; bg: st
   nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
   asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
   en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
+  pendiente_confirmacion: { label: 'Pendiente Confirmación', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
   resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
   rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
 };
@@ -94,6 +95,9 @@ const accionIcons: Record<string, typeof CheckCircle> = {
   asignado: Users,
   'cambio de estado': AlertCircle,
   'inicio trabajo': PlayCircle,
+  pendiente_confirmacion: Clock,
+  confirmado: CheckCircle,
+  devuelto: RefreshCw,
   resuelto: CheckCircle,
   rechazado: XCircle,
   comentario: MessageSquare,
@@ -112,6 +116,54 @@ export default function ReclamoDetalle() {
   const [resendingId, setResendingId] = useState<number | null>(null);
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [enviandoComentario, setEnviandoComentario] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [devolviendo, setDevolviendo] = useState(false);
+  const [motivoDevolucion, setMotivoDevolucion] = useState('');
+  const [showDevolverModal, setShowDevolverModal] = useState(false);
+
+  // Función para confirmar reclamo (supervisor)
+  const handleConfirmar = async () => {
+    if (!reclamo) return;
+
+    setConfirmando(true);
+    try {
+      const response = await reclamosApi.confirmar(reclamo.id);
+      setReclamo(response.data);
+      toast.success('Trabajo confirmado. El vecino ha sido notificado.');
+
+      // Recargar historial
+      const historialRes = await reclamosApi.getHistorial(reclamo.id);
+      setHistorial(historialRes.data);
+    } catch (err) {
+      console.error('Error confirmando reclamo:', err);
+      toast.error('Error al confirmar el reclamo');
+    } finally {
+      setConfirmando(false);
+    }
+  };
+
+  // Función para devolver reclamo al empleado
+  const handleDevolver = async () => {
+    if (!reclamo || !motivoDevolucion.trim()) return;
+
+    setDevolviendo(true);
+    try {
+      const response = await reclamosApi.devolver(reclamo.id, motivoDevolucion.trim());
+      setReclamo(response.data);
+      toast.success('Reclamo devuelto al empleado');
+      setShowDevolverModal(false);
+      setMotivoDevolucion('');
+
+      // Recargar historial
+      const historialRes = await reclamosApi.getHistorial(reclamo.id);
+      setHistorial(historialRes.data);
+    } catch (err) {
+      console.error('Error devolviendo reclamo:', err);
+      toast.error('Error al devolver el reclamo');
+    } finally {
+      setDevolviendo(false);
+    }
+  };
 
   // Función para agregar comentario
   const handleAgregarComentario = async () => {
@@ -425,18 +477,117 @@ export default function ReclamoDetalle() {
             {reclamo.resolucion && (
               <div
                 className="p-4 rounded-xl"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid #059669` }}
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${reclamo.estado === 'pendiente_confirmacion' ? '#8b5cf6' : '#059669'}`
+                }}
               >
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="h-5 w-5 mt-0.5" style={{ color: '#059669' }} />
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: '#059669' }}>Resolución</p>
+                  {reclamo.estado === 'pendiente_confirmacion' ? (
+                    <Clock className="h-5 w-5 mt-0.5" style={{ color: '#8b5cf6' }} />
+                  ) : (
+                    <CheckCircle className="h-5 w-5 mt-0.5" style={{ color: '#059669' }} />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium" style={{ color: reclamo.estado === 'pendiente_confirmacion' ? '#8b5cf6' : '#059669' }}>
+                      {reclamo.estado === 'pendiente_confirmacion' ? 'Trabajo Terminado (Pendiente Confirmación)' : 'Resolución'}
+                    </p>
                     <p className="mt-1" style={{ color: theme.text }}>{reclamo.resolucion}</p>
                     {reclamo.fecha_resolucion && (
                       <p className="text-sm mt-2" style={{ color: theme.textSecondary }}>
                         Resuelto el {new Date(reclamo.fecha_resolucion).toLocaleString('es-AR')}
                       </p>
                     )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Botones de Confirmar/Devolver para supervisores cuando está pendiente confirmación */}
+            {reclamo.estado === 'pendiente_confirmacion' && user && ['admin', 'supervisor'].includes(user.rol) && (
+              <div
+                className="p-4 rounded-xl"
+                style={{ backgroundColor: '#8b5cf620', border: `1px solid #8b5cf6` }}
+              >
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 mt-0.5" style={{ color: '#8b5cf6' }} />
+                  <div className="flex-1">
+                    <p className="font-medium" style={{ color: '#8b5cf6' }}>
+                      Acción Requerida
+                    </p>
+                    <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                      El empleado ha marcado este trabajo como terminado. Por favor revisa y confirma o devuelve si requiere más trabajo.
+                    </p>
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={handleConfirmar}
+                        disabled={confirmando}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: '#22c55e', color: '#ffffff' }}
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        {confirmando ? 'Confirmando...' : 'Confirmar Resolución'}
+                      </button>
+                      <button
+                        onClick={() => setShowDevolverModal(true)}
+                        disabled={devolviendo}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Devolver al Empleado
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal para devolver */}
+            {showDevolverModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div
+                  className="w-full max-w-md p-6 rounded-xl mx-4"
+                  style={{ backgroundColor: theme.card }}
+                >
+                  <h3 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
+                    Devolver Reclamo al Empleado
+                  </h3>
+                  <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+                    Indica el motivo por el cual se devuelve el trabajo:
+                  </p>
+                  <textarea
+                    value={motivoDevolucion}
+                    onChange={(e) => setMotivoDevolucion(e.target.value)}
+                    placeholder="Ej: Falta completar la reparación, el problema persiste..."
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-lg resize-none focus:ring-2 focus:outline-none"
+                    style={{
+                      backgroundColor: theme.background,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                  <div className="flex justify-end gap-3 mt-4">
+                    <button
+                      onClick={() => {
+                        setShowDevolverModal(false);
+                        setMotivoDevolucion('');
+                      }}
+                      className="px-4 py-2 rounded-lg transition-colors"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleDevolver}
+                      disabled={devolviendo || !motivoDevolucion.trim()}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${devolviendo ? 'animate-spin' : ''}`} />
+                      {devolviendo ? 'Devolviendo...' : 'Devolver'}
+                    </button>
                   </div>
                 </div>
               </div>

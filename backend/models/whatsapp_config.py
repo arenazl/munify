@@ -38,12 +38,22 @@ class WhatsAppConfig(Base):
     twilio_auth_token = Column(String(100), nullable=True)
     twilio_phone_number = Column(String(20), nullable=True)  # Número WhatsApp de Twilio
 
-    # Configuración de notificaciones
+    # Configuración de notificaciones AL USUARIO (vecino)
     notificar_reclamo_recibido = Column(Boolean, default=True)
     notificar_reclamo_asignado = Column(Boolean, default=True)
     notificar_cambio_estado = Column(Boolean, default=True)
     notificar_reclamo_resuelto = Column(Boolean, default=True)
     notificar_comentarios = Column(Boolean, default=False)
+
+    # Configuración de notificaciones AL EMPLEADO
+    notificar_empleado_asignacion = Column(Boolean, default=True)  # Cuando le asignan un reclamo
+    notificar_empleado_nuevo_comentario = Column(Boolean, default=True)  # Cuando el vecino comenta
+    notificar_empleado_cambio_prioridad = Column(Boolean, default=True)  # Cambio de prioridad
+
+    # Configuración de notificaciones AL SUPERVISOR
+    notificar_supervisor_reclamo_nuevo = Column(Boolean, default=True)  # Nuevos reclamos
+    notificar_supervisor_reclamo_resuelto = Column(Boolean, default=True)  # Reclamos resueltos
+    notificar_supervisor_reclamo_vencido = Column(Boolean, default=True)  # SLA vencido
 
     # Templates de mensajes (IDs de Meta o mensajes personalizados)
     template_reclamo_recibido = Column(String(100), nullable=True)

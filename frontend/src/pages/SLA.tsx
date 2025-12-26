@@ -80,20 +80,25 @@ export default function SLA() {
 
   const fetchData = async () => {
     try {
-      const [configsRes, categoriasRes, resumenRes, alertasRes] = await Promise.all([
-        slaApi.getConfigs(),
-        categoriasApi.getAll(true),
-        slaApi.getResumen(),
-        slaApi.getAlertas(),
+      // Primero cargar datos básicos (configs y categorías)
+      const [configsRes, categoriasRes] = await Promise.all([
+        slaApi.getConfigs().catch(e => { console.error('Error configs:', e); return { data: [] }; }),
+        categoriasApi.getAll(true).catch(e => { console.error('Error categorias:', e); return { data: [] }; }),
       ]);
-      setConfigs(configsRes.data);
-      setCategorias(categoriasRes.data);
+      setConfigs(configsRes.data || []);
+      setCategorias(categoriasRes.data || []);
+      setLoading(false);
+
+      // Después cargar datos de resumen (pueden tardar más)
+      const [resumenRes, alertasRes] = await Promise.all([
+        slaApi.getResumen().catch(e => { console.error('Error resumen:', e); return { data: null }; }),
+        slaApi.getAlertas().catch(e => { console.error('Error alertas:', e); return { data: [] }; }),
+      ]);
       setResumen(resumenRes.data);
-      setAlertas(alertasRes.data);
+      setAlertas(alertasRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Error al cargar datos SLA');
-    } finally {
       setLoading(false);
     }
   };
@@ -216,10 +221,10 @@ export default function SLA() {
           border: `1px solid ${theme.border}`,
         }}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
               style={{ backgroundColor: `${theme.primary}20` }}
             >
               <Clock className="h-5 w-5" style={{ color: theme.primary }} />
@@ -235,7 +240,7 @@ export default function SLA() {
           </div>
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:scale-105"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 w-full sm:w-auto"
             style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)` }}
           >
             <Plus className="h-4 w-4" />

@@ -88,7 +88,7 @@ export const authApi = {
 
 // Reclamos
 export const reclamosApi = {
-  getAll: (params?: Record<string, string>) => api.get('/reclamos', { params }),
+  getAll: (params?: Record<string, string | number>) => api.get('/reclamos', { params }),
   getMisReclamos: () => api.get('/reclamos/mis-reclamos'),
   getOne: (id: number) => api.get(`/reclamos/${id}`),
   getHistorial: (id: number) => api.get(`/reclamos/${id}/historial`),
@@ -103,6 +103,10 @@ export const reclamosApi = {
   }) => api.post(`/reclamos/${id}/asignar`, data),
   iniciar: (id: number) => api.post(`/reclamos/${id}/iniciar`),
   resolver: (id: number, data: { resolucion: string }) => api.post(`/reclamos/${id}/resolver`, data),
+  confirmar: (id: number, comentario?: string) =>
+    api.post(`/reclamos/${id}/confirmar`, null, { params: comentario ? { comentario } : {} }),
+  devolver: (id: number, motivo: string) =>
+    api.post(`/reclamos/${id}/devolver`, null, { params: { motivo } }),
   rechazar: (id: number, data: { motivo: string; descripcion?: string }) =>
     api.post(`/reclamos/${id}/rechazar`, data),
   agregarComentario: (id: number, comentario: string) =>
@@ -133,6 +137,7 @@ export const reclamosApi = {
     limit?: number;
     dias_atras?: number;
     min_similares?: number;
+    municipio_id?: number;
   }) => api.get('/reclamos/recurrentes', { params }),
   getCantidadSimilares: (reclamoId: number) =>
     api.get(`/reclamos/${reclamoId}/cantidad-similares`),
@@ -454,4 +459,93 @@ export const whatsappApi = {
     const endpoint = endpointMap[tipoMensaje] || 'cambio-estado';
     return api.post(`/whatsapp/notificar/${endpoint}/${reclamoId}`);
   },
+};
+
+// Tramites
+export const tramitesApi = {
+  // Servicios (catálogo de trámites disponibles)
+  getServicios: (params?: { municipio_id?: number; solo_activos?: boolean }) => {
+    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
+    return api.get('/tramites/servicios', {
+      params: { municipio_id: municipioId, solo_activos: params?.solo_activos ?? true }
+    });
+  },
+  getServicio: (id: number) => api.get(`/tramites/servicios/${id}`),
+  createServicio: (data: Record<string, unknown>, municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.post('/tramites/servicios', data, { params: { municipio_id: mId } });
+  },
+  updateServicio: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tramites/servicios/${id}`, data),
+  deleteServicio: (id: number) => api.delete(`/tramites/servicios/${id}`),
+
+  // Tramites
+  getAll: (params?: { municipio_id?: number; estado?: string; servicio_id?: number; skip?: number; limit?: number }) => {
+    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
+    return api.get('/tramites', { params: { ...params, municipio_id: municipioId } });
+  },
+  // Para gestión (supervisores/admin)
+  getGestionTodos: (params?: {
+    municipio_id?: number;
+    estado?: string;
+    servicio_id?: number;
+    empleado_id?: number;
+    sin_asignar?: boolean;
+    search?: string;
+    skip?: number;
+    limit?: number;
+  }) => {
+    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
+    return api.get('/tramites/gestion/todos', { params: { ...params, municipio_id: municipioId } });
+  },
+  getOne: (id: number) => api.get(`/tramites/${id}`),
+  consultar: (numeroTramite: string) => api.get(`/tramites/consultar/${numeroTramite}`),
+  create: (data: Record<string, unknown>, municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.post('/tramites', data, { params: { municipio_id: mId } });
+  },
+  update: (id: number, data: { estado?: string; empleado_id?: number; prioridad?: number; respuesta?: string; observaciones?: string }) =>
+    api.put(`/tramites/${id}`, data),
+  asignar: (id: number, data: { empleado_id: number; comentario?: string }) =>
+    api.post(`/tramites/${id}/asignar`, data),
+  sugerirEmpleado: (id: number) => api.get(`/tramites/${id}/sugerir-empleado`),
+  getHistorial: (id: number) => api.get(`/tramites/${id}/historial`),
+  getResumen: (municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.get('/tramites/stats/resumen', { params: { municipio_id: mId } });
+  },
+};
+
+// Calificaciones
+export const calificacionesApi = {
+  // Autenticadas
+  crear: (data: { reclamo_id: number; puntuacion: number; comentario?: string }) =>
+    api.post('/calificaciones', data),
+  getReclamo: (reclamoId: number) => api.get(`/calificaciones/reclamo/${reclamoId}`),
+  getPendientes: () => api.get('/calificaciones/pendientes'),
+  getEstadisticas: (params?: { empleado_id?: number; categoria_id?: number; dias?: number }) =>
+    api.get('/calificaciones/estadisticas', { params }),
+  getRankingEmpleados: (dias?: number) =>
+    api.get('/calificaciones/ranking-empleados', { params: { dias } }),
+
+  // Públicas (para link de WhatsApp)
+  getInfoPublica: (reclamoId: number) =>
+    api.get(`/calificaciones/calificar/${reclamoId}`),
+  calificarPublica: (reclamoId: number, data: { puntuacion: number; comentario?: string }) =>
+    api.post(`/calificaciones/calificar/${reclamoId}`, data),
+};
+
+// Noticias
+export const noticiasApi = {
+  getAll: (params?: { municipio_id?: number; solo_activas?: boolean; skip?: number; limit?: number }) => {
+    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
+    return api.get('/noticias', { params: { ...params, municipio_id: municipioId } });
+  },
+  getOne: (id: number) => api.get(`/noticias/${id}`),
+  create: (data: Record<string, unknown>, municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.post('/noticias', data, { params: { municipio_id: mId } });
+  },
+  update: (id: number, data: Record<string, unknown>) => api.put(`/noticias/${id}`, data),
+  delete: (id: number) => api.delete(`/noticias/${id}`),
 };

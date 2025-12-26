@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import NotificationSettings from '../../components/NotificationSettings';
 
 export default function MobilePerfil() {
   const { theme, themeName, setTheme } = useTheme();
@@ -20,6 +22,7 @@ export default function MobilePerfil() {
   const toggleDarkMode = () => setTheme(isDarkMode ? 'light' : 'dark');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -71,7 +74,7 @@ export default function MobilePerfil() {
       icon: Bell,
       label: 'Notificaciones',
       subtitle: 'Configurar alertas',
-      action: () => {},
+      action: () => setShowNotificationSettings(true),
     },
     {
       icon: isDarkMode ? Sun : Moon,
@@ -215,6 +218,11 @@ export default function MobilePerfil() {
       <p className="text-center text-xs" style={{ color: theme.textSecondary }}>
         Versión 1.0.0
       </p>
+
+      <NotificationSettings
+        isOpen={showNotificationSettings}
+        onClose={() => setShowNotificationSettings(false)}
+      />
     </div>
   );
 }

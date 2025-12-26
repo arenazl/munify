@@ -72,6 +72,15 @@ html, body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Clase para ocultar scrollbar completamente */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
 /* Scrollbar personalizado estilo iOS - Oculto por defecto */
 ::-webkit-scrollbar {
   width: 6px;

@@ -12,6 +12,7 @@ import {
   MessageCircle,
   BarChart3,
   Building2,
+  FileText,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,6 +59,28 @@ export default function MobileHome() {
       setLoading(false);
     }
   };
+
+  // Datos hardcodeados de noticias genéricas para demo (movido arriba para ambas vistas)
+  const noticiasHardcoded = [
+    {
+      id: 1,
+      titulo: "Mejoras en el servicio de recolección de residuos",
+      descripcion: "Se implementó un nuevo sistema de rutas optimizadas para la recolección de residuos, mejorando la frecuencia y cobertura en todos los barrios del municipio.",
+      imagen_url: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=400"
+    },
+    {
+      id: 2,
+      titulo: "Nueva iluminación LED en espacios públicos",
+      descripcion: "El municipio continúa con el plan de modernización del alumbrado público, instalando luminarias LED de bajo consumo en plazas y calles principales.",
+      imagen_url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400"
+    },
+    {
+      id: 3,
+      titulo: "Trabajos de mantenimiento en calles y veredas",
+      descripcion: "Se realizan trabajos de bacheo y reparación de veredas en diversos puntos del distrito para mejorar la transitabilidad y seguridad de los vecinos.",
+      imagen_url: "https://images.unsplash.com/photo-1581094271901-8022df4466f9?w=400"
+    }
+  ];
 
   if (!user) {
     const municipioNombre = localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '') || 'tu Municipio';
@@ -136,6 +159,27 @@ export default function MobileHome() {
           </button>
         </div>
 
+        {/* Iniciar Trámite */}
+        <button
+          onClick={() => navigate('/app/tramites')}
+          className="w-full flex items-center justify-between p-4 rounded-xl transition-all active:scale-[0.98]"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: '#8B5CF620' }}
+            >
+              <FileText className="h-5 w-5" style={{ color: '#8B5CF6' }} />
+            </div>
+            <div className="text-left">
+              <p className="font-medium" style={{ color: theme.text }}>Trámites Municipales</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Habilitaciones, permisos y más</p>
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5" style={{ color: theme.textSecondary }} />
+        </button>
+
         {/* Explorar trabajo del municipio */}
         <button
           onClick={() => navigate('/app/estadisticas')}
@@ -156,6 +200,36 @@ export default function MobileHome() {
           </div>
           <ChevronRight className="h-5 w-5" style={{ color: theme.textSecondary }} />
         </button>
+
+        {/* Noticias del Municipio */}
+        <div>
+          <h3 className="font-semibold mb-3" style={{ color: theme.text }}>
+            Noticias del Municipio
+          </h3>
+          <div className="space-y-3">
+            {noticiasHardcoded.map((noticia) => (
+              <div
+                key={noticia.id}
+                className="rounded-xl p-4 flex gap-3"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+              >
+                <img
+                  src={noticia.imagen_url}
+                  alt={noticia.titulo}
+                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm mb-1" style={{ color: theme.text }}>
+                    {noticia.titulo}
+                  </h4>
+                  <p className="text-xs line-clamp-2" style={{ color: theme.textSecondary }}>
+                    {noticia.descripcion}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Login sutil al final */}
         <div className="text-center pt-2 pb-4">
@@ -182,28 +256,6 @@ export default function MobileHome() {
       </div>
     );
   }
-
-  // Datos hardcodeados de noticias genéricas para demo
-  const noticiasHardcoded = [
-    {
-      id: 1,
-      titulo: "Mejoras en el servicio de recolección de residuos",
-      descripcion: "Se implementó un nuevo sistema de rutas optimizadas para la recolección de residuos, mejorando la frecuencia y cobertura en todos los barrios del municipio.",
-      imagen_url: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=400"
-    },
-    {
-      id: 2,
-      titulo: "Nueva iluminación LED en espacios públicos",
-      descripcion: "El municipio continúa con el plan de modernización del alumbrado público, instalando luminarias LED de bajo consumo en plazas y calles principales.",
-      imagen_url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400"
-    },
-    {
-      id: 3,
-      titulo: "Trabajos de mantenimiento en calles y veredas",
-      descripcion: "Se realizan trabajos de bacheo y reparación de veredas en diversos puntos del distrito para mejorar la transitabilidad y seguridad de los vecinos.",
-      imagen_url: "https://images.unsplash.com/photo-1581094271901-8022df4466f9?w=400"
-    }
-  ];
 
   const municipioNombre = localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '') || 'Municipio';
   const logoUrl = localStorage.getItem('municipio_logo_url');
@@ -332,6 +384,49 @@ export default function MobileHome() {
             </p>
           </div>
         </div>
+
+        {/* Acciones rápidas: Nuevo Reclamo / Iniciar Trámite */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate('/app/nuevo')}
+            className="flex flex-col items-center justify-center p-4 rounded-xl transition-all active:scale-[0.98]"
+            style={{
+              background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
+            }}
+          >
+            <Plus className="h-6 w-6 text-white mb-1" />
+            <span className="text-sm font-medium text-white">Nuevo Reclamo</span>
+          </button>
+          <button
+            onClick={() => navigate('/app/tramites')}
+            className="flex flex-col items-center justify-center p-4 rounded-xl transition-all active:scale-[0.98]"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <FileText className="h-6 w-6 mb-1" style={{ color: theme.primary }} />
+            <span className="text-sm font-medium" style={{ color: theme.text }}>Iniciar Trámite</span>
+          </button>
+        </div>
+
+        {/* Mis Trámites (acceso rápido) */}
+        <button
+          onClick={() => navigate('/app/mis-tramites')}
+          className="w-full flex items-center justify-between p-4 rounded-xl transition-all active:scale-[0.98]"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: '#8b5cf620' }}
+            >
+              <FileText className="h-5 w-5" style={{ color: '#8b5cf6' }} />
+            </div>
+            <div className="text-left">
+              <p className="font-medium" style={{ color: theme.text }}>Mis Trámites</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Consulta y seguimiento</p>
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5" style={{ color: theme.textSecondary }} />
+        </button>
 
         {/* Botón Ver nuestro trabajo */}
         <button

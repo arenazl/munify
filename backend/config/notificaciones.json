@@ -1,0 +1,234 @@
+{
+  "tipos": {
+    "reclamo_recibido": {
+      "nombre": "Reclamo Recibido",
+      "descripcion": "Se envía al vecino cuando su reclamo es registrado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Reclamo Recibido",
+        "cuerpo": "Tu reclamo #{reclamo_id} ha sido registrado exitosamente.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "✅ *Reclamo Recibido*\n\nHola {nombre}! Tu reclamo ha sido registrado correctamente.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\n📍 *Ubicación:* {direccion}\n\nTe notificaremos cuando haya novedades.\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "reclamo_asignado": {
+      "nombre": "Reclamo Asignado",
+      "descripcion": "Se envía al vecino cuando su reclamo es asignado a un empleado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Reclamo Asignado",
+        "cuerpo": "Tu reclamo #{reclamo_id} fue asignado a {empleado_nombre}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "👷 *Reclamo Asignado*\n\nHola {nombre}! Tu reclamo ha sido asignado a un técnico.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\nPronto comenzarán a trabajar en él.\n\n💬 Puedes agregar comentarios o información adicional desde el siguiente enlace:\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "cambio_estado": {
+      "nombre": "Cambio de Estado",
+      "descripcion": "Se envía al vecino cuando cambia el estado de su reclamo",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Estado Actualizado",
+        "cuerpo": "Tu reclamo #{reclamo_id} cambió de {estado_anterior} a {estado_nuevo}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "🔄 *Actualización de Reclamo*\n\nHola {nombre}! Tu reclamo ha cambiado de estado.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\n🚦 *Nuevo estado:* {estado_nuevo}\n\n💬 Puedes agregar comentarios desde:\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "reclamo_resuelto": {
+      "nombre": "Reclamo Resuelto",
+      "descripcion": "Se envía al vecino cuando su reclamo es resuelto",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Reclamo Resuelto",
+        "cuerpo": "Tu reclamo #{reclamo_id} ha sido resuelto. ¡Gracias por tu paciencia!",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "✅ *¡Reclamo Resuelto!*\n\nHola {nombre}! Tu reclamo ha sido resuelto.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\n¡Gracias por tu paciencia!\n\n⭐ *Por favor califica la atención recibida:*\n🔗 {url}"
+      }
+    },
+    "reclamo_resuelto_supervisor": {
+      "nombre": "Reclamo Resuelto (Supervisor)",
+      "descripcion": "Se envía al supervisor cuando un reclamo es resuelto/confirmado",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "Reclamo Cerrado",
+        "cuerpo": "El reclamo #{reclamo_id} ha sido resuelto exitosamente por {empleado_nombre}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "✅ *Reclamo Cerrado*\n\nEl reclamo #{reclamo_id} ha sido resuelto.\n\n📝 *Asunto:* {titulo}\n👷 *Resuelto por:* {empleado_nombre}\n🏷️ *Categoría:* {categoria}\n📍 *Zona:* {zona}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "nuevo_comentario": {
+      "nombre": "Nuevo Comentario",
+      "descripcion": "Se envía al vecino cuando hay un nuevo comentario en su reclamo",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Nuevo Comentario",
+        "cuerpo": "Hay un nuevo comentario en tu reclamo #{reclamo_id}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "💬 *Nuevo Comentario*\n\nHola {nombre}! Hay un nuevo comentario en tu reclamo.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n\n💬 *Comentario:*\n_{comentario}_\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "asignacion_empleado": {
+      "nombre": "Nueva Asignación",
+      "descripcion": "Se envía al empleado cuando le asignan un reclamo",
+      "destinatario": "empleado",
+      "push": {
+        "titulo": "Nueva Asignación",
+        "cuerpo": "Se te asignó el reclamo #{reclamo_id}: {descripcion_corta}",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "📋 *Nueva Asignación*\n\nHola {nombre}! Se te ha asignado un nuevo reclamo.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\n📍 *Ubicación:* {direccion}\n👤 *Vecino:* {vecino_nombre}\n📱 *Teléfono:* {vecino_telefono}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "comentario_vecino": {
+      "nombre": "Comentario del Vecino",
+      "descripcion": "Se envía al empleado cuando el vecino comenta en su reclamo",
+      "destinatario": "empleado",
+      "push": {
+        "titulo": "Comentario del Vecino",
+        "cuerpo": "El vecino comentó en el reclamo #{reclamo_id}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "💬 *Comentario del Vecino*\n\nEl vecino ha agregado un comentario en el reclamo #{reclamo_id}.\n\n📝 *Asunto:* {titulo}\n\n💬 *Comentario:*\n_{comentario}_\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "reclamo_nuevo_supervisor": {
+      "nombre": "Nuevo Reclamo (Supervisor)",
+      "descripcion": "Se envía al supervisor cuando hay un nuevo reclamo",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "Nuevo Reclamo",
+        "cuerpo": "Nuevo reclamo #{reclamo_id} pendiente de revisión.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "📋 *Nuevo Reclamo*\n\nHay un nuevo reclamo pendiente de revisión.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\n📍 *Ubicación:* {direccion}\n🏷️ *Categoría:* {categoria}\n📍 *Zona:* {zona}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "pendiente_confirmacion": {
+      "nombre": "Pendiente Confirmación",
+      "descripcion": "Se envía al supervisor cuando un reclamo está pendiente de confirmación",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "Pendiente Confirmación",
+        "cuerpo": "El reclamo #{reclamo_id} está esperando tu confirmación.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "⏳ *Pendiente Confirmación*\n\nEl reclamo #{reclamo_id} ha sido marcado como resuelto por el empleado y espera tu confirmación.\n\n📝 *Asunto:* {titulo}\n👷 *Resuelto por:* {empleado_nombre}\n\n🔗 *Confirmar:* {url}"
+      }
+    },
+    "sla_vencido": {
+      "nombre": "SLA Vencido",
+      "descripcion": "Se envía a los supervisores cuando un reclamo supera el tiempo de SLA",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "SLA Vencido",
+        "cuerpo": "El reclamo #{reclamo_id} ha superado el tiempo de SLA.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "⚠️ *SLA Vencido*\n\nEl reclamo #{reclamo_id} ha superado el tiempo límite de atención.\n\n📝 *Asunto:* {titulo}\n🏷️ *Categoría:* {categoria}\n⏰ *Tiempo excedido:* {tiempo_excedido}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "cambio_prioridad": {
+      "nombre": "Cambio de Prioridad",
+      "descripcion": "Se envía al empleado cuando cambia la prioridad de un reclamo",
+      "destinatario": "empleado",
+      "push": {
+        "titulo": "Prioridad Actualizada",
+        "cuerpo": "El reclamo #{reclamo_id} cambió a prioridad {prioridad}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "🔔 *Cambio de Prioridad*\n\nEl reclamo #{reclamo_id} ha cambiado de prioridad.\n\n📝 *Asunto:* {titulo}\n🚨 *Nueva prioridad:* {prioridad}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "en_progreso": {
+      "nombre": "Trabajo En Progreso",
+      "descripcion": "Se envía al supervisor cuando el empleado inicia el trabajo en un reclamo",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "Trabajo Iniciado",
+        "cuerpo": "El empleado {empleado_nombre} inició el trabajo en el reclamo #{reclamo_id}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "🔧 *Trabajo En Progreso*\n\nEl empleado *{empleado_nombre}* ha iniciado el trabajo en el reclamo.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n📍 *Ubicación:* {direccion}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "reclamo_rechazado": {
+      "nombre": "Reclamo Rechazado",
+      "descripcion": "Se envía al vecino cuando su reclamo es rechazado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Reclamo Rechazado",
+        "cuerpo": "Tu reclamo #{reclamo_id} ha sido rechazado. Motivo: {motivo_rechazo}",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "❌ *Reclamo Rechazado*\n\nHola {nombre}, lamentamos informarte que tu reclamo no pudo ser procesado.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n\n❌ *Motivo:* {motivo_rechazo}\n\nSi crees que esto es un error, puedes crear un nuevo reclamo con más detalles.\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "reclamo_rechazado_supervisor": {
+      "nombre": "Reclamo Rechazado (Supervisor)",
+      "descripcion": "Se envía al supervisor cuando un reclamo es rechazado",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "Reclamo Rechazado",
+        "cuerpo": "El reclamo #{reclamo_id} fue rechazado por {empleado_nombre}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "❌ *Reclamo Rechazado*\n\nEl reclamo #{reclamo_id} ha sido rechazado.\n\n📝 *Asunto:* {titulo}\n👤 *Rechazado por:* {empleado_nombre}\n❌ *Motivo:* {motivo_rechazo}\n\n📝 *Observación:* {observacion}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "reclamo_reabierto": {
+      "nombre": "Reclamo Reabierto",
+      "descripcion": "Se envía al empleado cuando un reclamo resuelto es reabierto",
+      "destinatario": "empleado",
+      "push": {
+        "titulo": "Reclamo Reabierto",
+        "cuerpo": "El reclamo #{reclamo_id} ha sido reabierto por el supervisor.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "🔄 *Reclamo Reabierto*\n\nEl reclamo #{reclamo_id} ha sido reabierto.\n\n📝 *Asunto:* {titulo}\n💬 *Motivo:* {comentario}\n\nPor favor revisa y continúa trabajando en él.\n\n🔗 *Ver detalle:* {url}"
+      }
+    }
+  },
+  "variables": {
+    "reclamo_id": "ID del reclamo",
+    "titulo": "Título del reclamo",
+    "descripcion": "Descripción completa del reclamo",
+    "descripcion_corta": "Descripción truncada (max 50 chars)",
+    "direccion": "Dirección del reclamo",
+    "estado_anterior": "Estado anterior del reclamo",
+    "estado_nuevo": "Nuevo estado del reclamo",
+    "nombre": "Nombre del destinatario",
+    "empleado_nombre": "Nombre del empleado asignado",
+    "vecino_nombre": "Nombre del vecino que creó el reclamo",
+    "vecino_telefono": "Teléfono del vecino",
+    "categoria": "Categoría del reclamo",
+    "zona": "Zona del reclamo",
+    "prioridad": "Prioridad del reclamo",
+    "comentario": "Contenido del comentario",
+    "tiempo_excedido": "Tiempo que excedió el SLA",
+    "motivo_rechazo": "Motivo por el cual se rechazó el reclamo",
+    "observacion": "Observación adicional del cierre",
+    "resolucion": "Descripción de cómo se resolvió el reclamo",
+    "url": "URL para ver el reclamo"
+  }
+}

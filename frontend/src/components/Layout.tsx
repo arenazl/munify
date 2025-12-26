@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, themes, ThemeName, accentColors } from '../contexts/ThemeContext';
 import { getNavigation } from '../config/navigation';
@@ -10,6 +10,7 @@ import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { MunicipioSelector } from './MunicipioSelector';
 import { Sheet } from './ui/Sheet';
 import { usersApi } from '../lib/api';
+import NotificationSettings from './NotificationSettings';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,6 +21,7 @@ export default function Layout() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+  const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [profileData, setProfileData] = useState({
     nombre: '',
     apellido: '',
@@ -53,6 +55,11 @@ export default function Layout() {
   const handleOpenProfile = () => {
     setUserMenuOpen(false);
     setProfileSheetOpen(true);
+  };
+
+  const handleOpenNotificationSettings = () => {
+    setUserMenuOpen(false);
+    setNotificationSettingsOpen(true);
   };
 
   const handleSaveProfile = async () => {
@@ -306,6 +313,21 @@ export default function Layout() {
                         >
                           <User className="h-4 w-4" style={{ color: theme.primary }} />
                           Mi Perfil
+                        </button>
+
+                        <button
+                          onClick={handleOpenNotificationSettings}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
+                          style={{ color: theme.text }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = theme.backgroundSecondary;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }}
+                        >
+                          <Bell className="h-4 w-4" style={{ color: theme.primary }} />
+                          Notificaciones Push
                         </button>
 
                         <div className="my-1 border-t" style={{ borderColor: theme.border }} />
@@ -708,6 +730,12 @@ export default function Layout() {
 
       {/* Chat Widget con IA */}
       <ChatWidget />
+
+      {/* Modal de configuración de notificaciones push */}
+      <NotificationSettings
+        isOpen={notificationSettingsOpen}
+        onClose={() => setNotificationSettingsOpen(false)}
+      />
 
       {/* Sheet de edición de perfil */}
       <Sheet
