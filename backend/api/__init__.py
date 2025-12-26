@@ -21,7 +21,8 @@ from .portal_publico import router as portal_publico_router
 from .municipios import router as municipios_router
 from .imagenes import router as imagenes_router
 from .gamificacion import router as gamificacion_router
-from .reportes import router as reportes_router
+# Temporalmente deshabilitado por error de reportlab en Heroku
+# from .reportes import router as reportes_router
 from .noticias import router as noticias_router
 
 api_router = APIRouter()
@@ -48,7 +49,7 @@ api_router.include_router(emails_router, prefix="/emails", tags=["Emails"])
 api_router.include_router(portal_publico_router, prefix="/publico", tags=["Portal Público"])
 api_router.include_router(imagenes_router, tags=["Imágenes"])
 api_router.include_router(gamificacion_router, prefix="/gamificacion", tags=["Gamificación"])
-api_router.include_router(reportes_router, prefix="/reportes", tags=["Reportes"])
+# api_router.include_router(reportes_router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(noticias_router, prefix="/noticias", tags=["Noticias"])
 
 # WebSockets
