@@ -38,6 +38,9 @@ export default function MobileLayout() {
           localStorage.setItem('municipio_id', found.id.toString());
           localStorage.setItem('municipio_nombre', found.nombre);
           localStorage.setItem('municipio_color', found.color_primario);
+          if (found.logo_url) {
+            localStorage.setItem('municipio_logo_url', found.logo_url);
+          }
           // Limpiar query param de la URL
           searchParams.delete('municipio');
           setSearchParams(searchParams, { replace: true });
@@ -102,20 +105,12 @@ export default function MobileLayout() {
         }}
       >
         <div className="flex items-center gap-3">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={nombreMunicipio}
-              className="w-9 h-9 rounded-lg object-contain"
-            />
-          ) : (
-            <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: `${colorPrimario}20` }}
-            >
-              <Building2 className="h-5 w-5" style={{ color: colorPrimario }} />
-            </div>
-          )}
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${colorPrimario}20` }}
+          >
+            <Building2 className="h-5 w-5" style={{ color: colorPrimario }} />
+          </div>
           <div>
             <h1 className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
               {nombreMunicipio}

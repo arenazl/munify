@@ -164,6 +164,7 @@ export default function MobileHome() {
   ];
 
   const municipioNombre = localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '') || 'Municipio';
+  const logoUrl = localStorage.getItem('municipio_logo_url');
 
   return (
     <div className="space-y-0">
@@ -174,12 +175,21 @@ export default function MobileHome() {
           background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
         }}
       >
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-        >
-          <Building2 className="h-8 w-8 text-white" />
-        </div>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={municipioNombre}
+            className="w-16 h-16 rounded-2xl object-contain flex-shrink-0"
+            style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}
+          />
+        ) : (
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+          >
+            <Building2 className="h-8 w-8 text-white" />
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <h1 className="text-3xl md:text-4xl text-white mb-2 drop-shadow-lg">
             <span className="font-light">Municipalidad de </span>

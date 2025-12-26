@@ -94,6 +94,9 @@ export default function Landing() {
         localStorage.setItem('municipio_id', found.id.toString());
         localStorage.setItem('municipio_nombre', found.nombre);
         localStorage.setItem('municipio_color', found.color_primario);
+        if (found.logo_url) {
+          localStorage.setItem('municipio_logo_url', found.logo_url);
+        }
         // Redirigir directo a la app del vecino
         navigate('/app');
       }
@@ -177,6 +180,9 @@ export default function Landing() {
     localStorage.setItem('municipio_id', municipio.id.toString());
     localStorage.setItem('municipio_nombre', municipio.nombre);
     localStorage.setItem('municipio_color', municipio.color_primario);
+    if (municipio.logo_url) {
+      localStorage.setItem('municipio_logo_url', municipio.logo_url);
+    }
     // En modo debug, mostrar usuarios de prueba
     setSelectedMunicipio(municipio);
     setDebugError('');
