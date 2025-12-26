@@ -181,6 +181,13 @@ export interface Tramite {
   email_solicitante?: string;
   telefono_solicitante?: string;
   direccion_solicitante?: string;
+  empleado_id?: number;
+  empleado_asignado?: {
+    id: number;
+    nombre: string;
+    apellido?: string;
+    especialidad?: string;
+  };
   respuesta?: string;
   observaciones?: string;
   created_at: string;

@@ -112,8 +112,8 @@ export const reclamosApi = {
   agregarComentario: (id: number, comentario: string) =>
     api.post(`/reclamos/${id}/comentario`, { comentario }),
   // PATCH para cambiar estado via drag & drop en Kanban
-  cambiarEstado: (id: number, estado: string) =>
-    api.patch(`/reclamos/${id}`, null, { params: { nuevo_estado: estado } }),
+  cambiarEstado: (id: number, estado: string, comentario?: string) =>
+    api.patch(`/reclamos/${id}`, null, { params: { nuevo_estado: estado, ...(comentario ? { comentario } : {}) } }),
   upload: (id: number, file: File, etapa: string) => {
     const formData = new FormData();
     formData.append('file', file);

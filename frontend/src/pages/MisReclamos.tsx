@@ -12,6 +12,7 @@ const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
   nuevo: { bg: '#e5e7eb', text: '#374151' },
   asignado: { bg: '#dbeafe', text: '#1e40af' },
   en_proceso: { bg: '#fef3c7', text: '#92400e' },
+  pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
   resuelto: { bg: '#d1fae5', text: '#065f46' },
   rechazado: { bg: '#fee2e2', text: '#991b1b' },
 };
@@ -20,6 +21,7 @@ const estadoLabels: Record<EstadoReclamo, string> = {
   nuevo: 'Nuevo',
   asignado: 'Asignado',
   en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente Confirmación',
   resuelto: 'Resuelto',
   rechazado: 'Rechazado',
 };

@@ -9,8 +9,8 @@ type ViewMode = 'cards' | 'table';
 interface ABMPageProps {
   // Header
   title: string;
-  buttonLabel: string;
-  onAdd: () => void;
+  buttonLabel?: string;
+  onAdd?: () => void;
 
   // Search
   searchPlaceholder?: string;

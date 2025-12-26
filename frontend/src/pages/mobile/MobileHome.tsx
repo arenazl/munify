@@ -23,6 +23,7 @@ const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; l
   nuevo: { icon: Clock, color: '#6b7280', label: 'Nuevo' },
   asignado: { icon: AlertCircle, color: '#3b82f6', label: 'Asignado' },
   en_proceso: { icon: Clock, color: '#f59e0b', label: 'En Proceso' },
+  pendiente_confirmacion: { icon: Clock, color: '#8b5cf6', label: 'Pendiente Confirmación' },
   resuelto: { icon: CheckCircle2, color: '#10b981', label: 'Resuelto' },
   rechazado: { icon: AlertCircle, color: '#ef4444', label: 'Rechazado' },
 };

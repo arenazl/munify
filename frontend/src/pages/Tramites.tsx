@@ -221,8 +221,8 @@ Explícale de forma breve y amigable qué documentación necesita preparar y qu�
   const isStep2Valid = formData.asunto.trim().length >= 10;
   const isStep3Valid = user ? true : (
     isAnonymous
-      ? (formData.email_solicitante || formData.telefono_solicitante)
-      : (registerData.email && registerData.password && (emailExists === false ? registerData.nombre : true))
+      ? !!(formData.email_solicitante || formData.telefono_solicitante)
+      : !!(registerData.email && registerData.password && (emailExists === false ? registerData.nombre : true))
   );
 
   // Manejar envío
@@ -289,9 +289,9 @@ Explícale de forma breve y amigable qué documentación necesita preparar y qu�
         >
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
-            style={{ backgroundColor: `${theme.success || '#10b981'}20` }}
+            style={{ backgroundColor: '#10b98120' }}
           >
-            <CheckCircle2 className="h-10 w-10" style={{ color: theme.success || '#10b981' }} />
+            <CheckCircle2 className="h-10 w-10" style={{ color: '#10b981' }} />
           </div>
           <h2 className="text-2xl font-bold mb-2" style={{ color: theme.text }}>
             Trámite Iniciado
@@ -411,7 +411,7 @@ Explícale de forma breve y amigable qué documentación necesita preparar y qu�
                       border: `2px solid ${formData.servicio_id === String(servicio.id)
                         ? servicio.color || theme.primary
                         : 'transparent'}`,
-                      ringColor: servicio.color || theme.primary,
+                      ['--tw-ring-color' as string]: servicio.color || theme.primary,
                     }}
                   >
                     <div
@@ -679,14 +679,14 @@ Explícale de forma breve y amigable qué documentación necesita preparar y qu�
             // Usuario logueado - mostrar sus datos
             <div
               className="p-4 rounded-xl"
-              style={{ backgroundColor: `${theme.success || '#10b981'}10`, border: `1px solid ${theme.success || '#10b981'}30` }}
+              style={{ backgroundColor: '#10b98110', border: '1px solid #10b98130' }}
             >
               <div className="flex items-center gap-3 mb-3">
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: `${theme.success || '#10b981'}20` }}
+                  style={{ backgroundColor: '#10b98120' }}
                 >
-                  <ShieldCheck className="h-5 w-5" style={{ color: theme.success || '#10b981' }} />
+                  <ShieldCheck className="h-5 w-5" style={{ color: '#10b981' }} />
                 </div>
                 <div>
                   <p className="font-medium" style={{ color: theme.text }}>
@@ -856,7 +856,7 @@ Explícale de forma breve y amigable qué documentación necesita preparar y qu�
                       </p>
                     )}
                     {emailExists === false && (
-                      <p className="text-xs mt-1" style={{ color: theme.success || '#10b981' }}>
+                      <p className="text-xs mt-1" style={{ color: '#10b981' }}>
                         <CheckCircle2 className="h-3 w-3 inline mr-1" />
                         Email disponible. Completá tus datos para crear tu cuenta.
                       </p>
