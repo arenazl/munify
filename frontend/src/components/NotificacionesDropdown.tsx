@@ -62,7 +62,7 @@ export function NotificacionesDropdown() {
   const fetchCount = async () => {
     try {
       const response = await notificacionesApi.getCount();
-      setUnreadCount(response.data.no_leidas || 0);
+      setUnreadCount(response.data.count || 0);
     } catch (error) {
       console.error('Error fetching count:', error);
     }

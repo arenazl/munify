@@ -231,6 +231,26 @@ export const chatApi = {
     const response = await api.post('/chat', { message, history });
     return response.data;
   },
+
+  /**
+   * Chat dinámico genérico - acepta cualquier contexto
+   * @param pregunta - La pregunta del usuario
+   * @param contexto - Objeto con cualquier dato relevante (se convierte en prompt)
+   * @param tipo - Tipo de contexto: 'tramite', 'reclamo', 'consulta', 'empleado'
+   *
+   * Ejemplo de uso:
+   * chatApi.askDynamic("¿Qué documentos necesito?", {
+   *   nombre_tramite: "Habilitación comercial",
+   *   documentos: "DNI, Contrato, etc",
+   *   costo: 15000,
+   *   tiempo_dias: 30
+   * }, "tramite")
+   */
+  askDynamic: async (pregunta: string, contexto: Record<string, unknown> = {}, tipo?: string) => {
+    const response = await api.post('/chat/dinamico', { pregunta, contexto, tipo });
+    return response.data;
+  },
+
   getStatus: () => api.get('/chat/status'),
 };
 

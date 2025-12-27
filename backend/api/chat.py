@@ -1,20 +1,18 @@
 """
-Chat API con IA usando Gemini (Google) como default.
-Funciona en la nube sin necesidad de Ollama local.
-Usa las categorías reales del municipio del usuario.
+Chat API con IA.
+Usa el servicio centralizado de chat con fallback automático.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import httpx
 from typing import Optional
 
 from core.security import get_current_user
-from core.config import settings
 from core.database import get_db
 from models.categoria import Categoria
 from models.user import User
+from services import chat_service
 
 
 router = APIRouter()
@@ -34,9 +32,15 @@ class CategoryQuestionRequest(BaseModel):
     pregunta: str
 
 
+class DynamicChatRequest(BaseModel):
+    """Request genérico para chat con contexto dinámico"""
+    pregunta: str
+    contexto: dict = {}
+    tipo: Optional[str] = None
+
+
 def build_system_prompt(categorias: list[dict]) -> str:
     """Construye el prompt del sistema con las categorías reales del municipio"""
-
     cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']})" for c in categorias])
 
     return f"""Eres un asistente virtual del Sistema de Reclamos Municipales. Tu nombre es "Asistente Municipal".
@@ -63,8 +67,6 @@ EJEMPLOS CORRECTOS:
 - "¡Claro! Un bache corresponde a **Baches y Calles**. [Crear reclamo de Baches y Calles](/reclamos?crear=1)"
 - "Eso es **Alumbrado Público**. [Crear reclamo de Alumbrado](/reclamos?crear=2)"
 
-IMPORTANTE: El link SIEMPRE debe tener corchetes [] seguidos de paréntesis () - NO separar el texto de la URL.
-
 Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
 
 
@@ -88,10 +90,10 @@ async def chat(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Endpoint de chat con IA usando Gemini.
+    Endpoint de chat con IA (autenticado).
     Usa las categorías reales del municipio del usuario.
     """
-    if not settings.GEMINI_API_KEY:
+    if not chat_service.is_available():
         raise HTTPException(
             status_code=503,
             detail="El asistente no está disponible. Contacte al administrador."
@@ -101,7 +103,6 @@ async def chat(
     categorias = await get_categorias_municipio(db, current_user.municipio_id)
 
     if not categorias:
-        # Categorías por defecto si no hay
         categorias = [
             {"id": 1, "nombre": "Baches y Calles"},
             {"id": 2, "nombre": "Alumbrado Público"},
@@ -111,54 +112,27 @@ async def chat(
         ]
 
     system_prompt = build_system_prompt(categorias)
+    context = chat_service.build_chat_context(
+        system_prompt=system_prompt,
+        message=request.message,
+        history=request.history
+    )
 
-    # Construir contexto con historial
-    context = system_prompt + "\n\nCONVERSACIÓN:\n"
+    response = await chat_service.chat(context, max_tokens=500)
 
-    for msg in request.history[-10:]:
-        role = "Usuario" if msg.get("role") == "user" else "Asistente"
-        context += f"{role}: {msg.get('content', '')}\n"
+    if response:
+        return ChatResponse(response=response)
 
-    context += f"Usuario: {request.message}\n\nAsistente:"
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": context}]}],
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 500,
-                    }
-                }
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                return ChatResponse(response=text.strip() if text else "No pude procesar tu mensaje.")
-            else:
-                raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
-
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=503, detail="La consulta tardó demasiado. Intentá de nuevo.")
-    except httpx.ConnectError:
-        raise HTTPException(status_code=503, detail="No se puede conectar al asistente de IA.")
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
 
 
 @router.post("/categoria", response_model=ChatResponse)
 async def chat_categoria(request: CategoryQuestionRequest):
     """
     Endpoint para preguntas sobre una categoría específica.
-    No requiere autenticación para permitir consultas durante el wizard.
+    No requiere autenticación.
     """
-    if not settings.GEMINI_API_KEY:
+    if not chat_service.is_available():
         return ChatResponse(response="El asistente no está disponible en este momento.")
 
     prompt = f"""Sos un asistente virtual de la Municipalidad que ayuda a los ciudadanos a realizar reclamos.
@@ -172,69 +146,70 @@ indicá amablemente que solo podés ayudar con temas relacionados a reclamos de 
 
 Respuesta:"""
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 200,
-                    }
-                }
-            )
+    response = await chat_service.chat(prompt, max_tokens=200)
 
-            if response.status_code == 200:
-                data = response.json()
-                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                return ChatResponse(response=text.strip() if text else "No pude procesar tu pregunta.")
-            else:
-                return ChatResponse(response="El asistente no está disponible en este momento.")
+    if response:
+        return ChatResponse(response=response)
 
-    except Exception:
-        return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
+    return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
+
+
+@router.post("/dinamico", response_model=ChatResponse)
+async def chat_dinamico(request: DynamicChatRequest):
+    """
+    Endpoint genérico de chat con IA.
+    Recibe cualquier contexto y arma el prompt dinámicamente.
+    No requiere autenticación.
+    """
+    if not chat_service.is_available():
+        return ChatResponse(response="El asistente no está disponible en este momento.")
+
+    ctx = request.contexto
+    municipio = ctx.get('municipio', '') or 'Municipalidad'
+    categoria = ctx.get('categoria', '') or ''
+    tramite = ctx.get('tramite', '') or ''
+    pregunta = request.pregunta or ''
+
+    if not tramite and not categoria:
+        return ChatResponse(response="Seleccioná primero un trámite para recibir información.")
+
+    if tramite:
+        prompt = f"Trámite: {tramite}. Categoría: {categoria}. Municipio: {municipio}. Dame requisitos típicos y consejos útiles."
+    else:
+        prompt = f"Categoría: {categoria}. Municipio: {municipio}. ¿Qué trámites hay en esta categoría?"
+
+    if pregunta:
+        prompt = f"{prompt} Pregunta: {pregunta}"
+
+    print(f"[CHAT DINAMICO] Prompt: {prompt}")
+
+    response = await chat_service.chat(prompt, max_tokens=1000)
+
+    if response:
+        return ChatResponse(response=response)
+
+    return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
 
 
 @router.get("/status")
 async def chat_status():
-    """
-    Verificar si el servicio de IA está disponible.
-    """
-    if not settings.GEMINI_API_KEY:
+    """Verificar si el servicio de IA está disponible."""
+    if not chat_service.is_available():
         return {
             "status": "unavailable",
-            "provider": "gemini",
-            "message": "GEMINI_API_KEY no configurada"
+            "message": "No hay proveedores de IA configurados"
         }
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": "Hola"}]}],
-                    "generationConfig": {"maxOutputTokens": 10}
-                }
-            )
+    # Test rápido
+    response = await chat_service.chat("Hola", max_tokens=10)
 
-            if response.status_code == 200:
-                return {
-                    "status": "ok",
-                    "provider": "gemini",
-                    "model": settings.GEMINI_MODEL
-                }
-            else:
-                return {
-                    "status": "error",
-                    "provider": "gemini",
-                    "message": f"Error {response.status_code}"
-                }
-    except Exception as e:
+    if response:
         return {
-            "status": "unavailable",
-            "provider": "gemini",
-            "message": str(e)
+            "status": "ok",
+            "message": "Servicio de IA disponible"
         }
+
+    return {
+        "status": "error",
+        "message": "No se pudo conectar con ningún proveedor"
+    }

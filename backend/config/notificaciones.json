@@ -207,6 +207,84 @@
       "whatsapp": {
         "plantilla": "🔄 *Reclamo Reabierto*\n\nEl reclamo #{reclamo_id} ha sido reabierto.\n\n📝 *Asunto:* {titulo}\n💬 *Motivo:* {comentario}\n\nPor favor revisa y continúa trabajando en él.\n\n🔗 *Ver detalle:* {url}"
       }
+    },
+    "tramite_creado": {
+      "nombre": "Trámite Creado",
+      "descripcion": "Se envía al vecino cuando su trámite es registrado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Trámite Registrado",
+        "cuerpo": "Tu trámite {numero_tramite} ha sido registrado exitosamente.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "✅ *Trámite Registrado*\n\nHola {nombre}! Tu trámite ha sido registrado correctamente.\n\n📋 *Número:* {numero_tramite}\n📝 *Servicio:* {servicio}\n📄 *Asunto:* {asunto}\n\nTe notificaremos cuando haya novedades.\n\n🔗 *Seguimiento:* {url}"
+      }
+    },
+    "tramite_nuevo_supervisor": {
+      "nombre": "Nuevo Trámite (Supervisor)",
+      "descripcion": "Se envía al supervisor cuando hay un nuevo trámite",
+      "destinatario": "supervisor",
+      "push": {
+        "titulo": "Nuevo Trámite",
+        "cuerpo": "Nuevo trámite {numero_tramite} pendiente de revisión.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "📋 *Nuevo Trámite*\n\nHay un nuevo trámite pendiente de revisión.\n\n📋 *Número:* {numero_tramite}\n📝 *Servicio:* {servicio}\n📄 *Asunto:* {asunto}\n👤 *Solicitante:* {solicitante_nombre}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "tramite_asignado": {
+      "nombre": "Trámite Asignado",
+      "descripcion": "Se envía al vecino cuando su trámite es asignado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Trámite en Revisión",
+        "cuerpo": "Tu trámite {numero_tramite} fue asignado y está siendo revisado.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "👷 *Trámite Asignado*\n\nHola {nombre}! Tu trámite ha sido asignado.\n\n📋 *Número:* {numero_tramite}\n📝 *Servicio:* {servicio}\n\nPronto comenzarán a revisarlo.\n\n🔗 *Ver estado:* {url}"
+      }
+    },
+    "tramite_cambio_estado": {
+      "nombre": "Cambio de Estado (Trámite)",
+      "descripcion": "Se envía al vecino cuando cambia el estado de su trámite",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Estado Actualizado",
+        "cuerpo": "Tu trámite {numero_tramite} cambió a {estado_nuevo}.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "🔄 *Actualización de Trámite*\n\nHola {nombre}! Tu trámite ha cambiado de estado.\n\n📋 *Número:* {numero_tramite}\n📝 *Servicio:* {servicio}\n🚦 *Nuevo estado:* {estado_nuevo}\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "tramite_aprobado": {
+      "nombre": "Trámite Aprobado",
+      "descripcion": "Se envía al vecino cuando su trámite es aprobado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Trámite Aprobado",
+        "cuerpo": "¡Tu trámite {numero_tramite} ha sido aprobado!",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "✅ *¡Trámite Aprobado!*\n\nHola {nombre}! Tu trámite ha sido aprobado.\n\n📋 *Número:* {numero_tramite}\n📝 *Servicio:* {servicio}\n\n¡Felicitaciones!\n\n🔗 *Ver detalle:* {url}"
+      }
+    },
+    "tramite_rechazado": {
+      "nombre": "Trámite Rechazado",
+      "descripcion": "Se envía al vecino cuando su trámite es rechazado",
+      "destinatario": "vecino",
+      "push": {
+        "titulo": "Trámite Rechazado",
+        "cuerpo": "Tu trámite {numero_tramite} ha sido rechazado.",
+        "icono": "/favicon.svg"
+      },
+      "whatsapp": {
+        "plantilla": "❌ *Trámite Rechazado*\n\nHola {nombre}, lamentamos informarte que tu trámite no pudo ser aprobado.\n\n📋 *Número:* {numero_tramite}\n📝 *Servicio:* {servicio}\n\n❌ *Motivo:* {motivo_rechazo}\n\n🔗 *Ver detalle:* {url}"
+      }
     }
   },
   "variables": {
@@ -214,6 +292,10 @@
     "titulo": "Título del reclamo",
     "descripcion": "Descripción completa del reclamo",
     "descripcion_corta": "Descripción truncada (max 50 chars)",
+    "numero_tramite": "Número único del trámite (ej: TRM-2025-00001)",
+    "servicio": "Nombre del servicio del trámite",
+    "asunto": "Asunto del trámite",
+    "solicitante_nombre": "Nombre completo del solicitante",
     "direccion": "Dirección del reclamo",
     "estado_anterior": "Estado anterior del reclamo",
     "estado_nuevo": "Nuevo estado del reclamo",

@@ -133,53 +133,57 @@ export default function MobileHome() {
         </div>
 
         <div className="p-4 space-y-4">
-        {/* Acciones principales */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Acciones principales - 3 botones iguales */}
+        <div className="grid grid-cols-3 gap-3">
           <button
             onClick={() => navigate('/app/nuevo')}
-            className="flex flex-col items-center justify-center gap-2 py-5 px-4 rounded-2xl font-semibold text-white shadow-lg transition-all active:scale-[0.98]"
+            className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl font-medium transition-all active:scale-[0.98]"
             style={{
               background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}dd)`,
-              boxShadow: `0 4px 20px ${theme.primary}40`,
+              boxShadow: `0 4px 12px ${theme.primary}40`,
             }}
           >
-            <Plus className="h-7 w-7" />
-            <span>Reportar Problema</span>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+            >
+              <Plus className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center text-white font-semibold">Reclamo</span>
+          </button>
+          <button
+            onClick={() => navigate('/app/tramites/nuevo')}
+            className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl font-medium transition-all active:scale-[0.98]"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: '#8B5CF620' }}
+            >
+              <FileText className="h-6 w-6" style={{ color: '#8B5CF6' }} />
+            </div>
+            <span className="text-xs text-center" style={{ color: theme.text }}>Trámite</span>
           </button>
           <button
             onClick={() => navigate('/app/consulta')}
-            className="flex flex-col items-center justify-center gap-2 py-5 px-4 rounded-2xl font-semibold transition-all active:scale-[0.98]"
+            className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl font-medium transition-all active:scale-[0.98]"
             style={{
               backgroundColor: theme.card,
-              border: `2px solid ${theme.primary}`,
-              color: theme.primary,
+              border: `1px solid ${theme.border}`,
             }}
           >
-            <MessageCircle className="h-7 w-7" />
-            <span>Hacer Consulta</span>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: '#10b98120' }}
+            >
+              <MessageCircle className="h-6 w-6" style={{ color: '#10b981' }} />
+            </div>
+            <span className="text-xs text-center" style={{ color: theme.text }}>Asistente</span>
           </button>
         </div>
-
-        {/* Iniciar Trámite */}
-        <button
-          onClick={() => navigate('/app/tramites')}
-          className="w-full flex items-center justify-between p-4 rounded-xl transition-all active:scale-[0.98]"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: '#8B5CF620' }}
-            >
-              <FileText className="h-5 w-5" style={{ color: '#8B5CF6' }} />
-            </div>
-            <div className="text-left">
-              <p className="font-medium" style={{ color: theme.text }}>Trámites Municipales</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Habilitaciones, permisos y más</p>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5" style={{ color: theme.textSecondary }} />
-        </button>
 
         {/* Explorar trabajo del municipio */}
         <button
@@ -386,69 +390,91 @@ export default function MobileHome() {
           </div>
         </div>
 
-        {/* Acciones rápidas: Nuevo Reclamo / Iniciar Trámite */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Acciones principales - 3 botones iguales */}
+        <div className="grid grid-cols-3 gap-3">
           <button
             onClick={() => navigate('/app/nuevo')}
-            className="flex flex-col items-center justify-center p-4 rounded-xl transition-all active:scale-[0.98]"
+            className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl font-medium transition-all active:scale-[0.98]"
             style={{
-              background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
+              background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}dd)`,
+              boxShadow: `0 4px 12px ${theme.primary}40`,
             }}
           >
-            <Plus className="h-6 w-6 text-white mb-1" />
-            <span className="text-sm font-medium text-white">Nuevo Reclamo</span>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
+            >
+              <Plus className="h-6 w-6 text-white" />
+            </div>
+            <span className="text-xs text-center text-white font-semibold">Reclamo</span>
           </button>
           <button
-            onClick={() => navigate('/app/tramites')}
-            className="flex flex-col items-center justify-center p-4 rounded-xl transition-all active:scale-[0.98]"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+            onClick={() => navigate('/app/tramites/nuevo')}
+            className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl font-medium transition-all active:scale-[0.98]"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
           >
-            <FileText className="h-6 w-6 mb-1" style={{ color: theme.primary }} />
-            <span className="text-sm font-medium" style={{ color: theme.text }}>Iniciar Trámite</span>
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: '#8B5CF620' }}
+            >
+              <FileText className="h-6 w-6" style={{ color: '#8B5CF6' }} />
+            </div>
+            <span className="text-xs text-center" style={{ color: theme.text }}>Trámite</span>
+          </button>
+          <button
+            onClick={() => navigate('/app/consulta')}
+            className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl font-medium transition-all active:scale-[0.98]"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: '#10b98120' }}
+            >
+              <MessageCircle className="h-6 w-6" style={{ color: '#10b981' }} />
+            </div>
+            <span className="text-xs text-center" style={{ color: theme.text }}>Asistente</span>
           </button>
         </div>
 
-        {/* Mis Trámites (acceso rápido) */}
-        <button
-          onClick={() => navigate('/app/mis-tramites')}
-          className="w-full flex items-center justify-between p-4 rounded-xl transition-all active:scale-[0.98]"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: '#8b5cf620' }}
-            >
-              <FileText className="h-5 w-5" style={{ color: '#8b5cf6' }} />
-            </div>
-            <div className="text-left">
-              <p className="font-medium" style={{ color: theme.text }}>Mis Trámites</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>Consulta y seguimiento</p>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5" style={{ color: theme.textSecondary }} />
-        </button>
-
-        {/* Botón Ver nuestro trabajo */}
-        <button
-            onClick={() => navigate('/app/estadisticas')}
-            className="w-full flex items-center justify-between p-4 rounded-xl transition-all active:scale-[0.98]"
+        {/* Accesos rápidos */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate('/app/mis-tramites')}
+            className="flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
-            <div className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: `${theme.primary}15` }}
-              >
-                <BarChart3 className="h-5 w-5" style={{ color: theme.primary }} />
-              </div>
-              <div className="text-left">
-                <p className="font-medium" style={{ color: theme.text }}>Explorá nuestro trabajo</p>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>Estadísticas y reclamos resueltos</p>
-              </div>
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: '#8b5cf620' }}
+            >
+              <FileText className="h-4 w-4" style={{ color: '#8b5cf6' }} />
             </div>
-            <ChevronRight className="h-5 w-5" style={{ color: theme.textSecondary }} />
-        </button>
+            <div className="text-left">
+              <p className="text-sm font-medium" style={{ color: theme.text }}>Mis Trámites</p>
+            </div>
+          </button>
+          <button
+            onClick={() => navigate('/app/estadisticas')}
+            className="flex items-center gap-3 p-3 rounded-xl transition-all active:scale-[0.98]"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}15` }}
+            >
+              <BarChart3 className="h-4 w-4" style={{ color: theme.primary }} />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-medium" style={{ color: theme.text }}>Estadísticas</p>
+            </div>
+          </button>
+        </div>
 
         {/* Noticias del Municipio */}
         <div>

@@ -2898,13 +2898,13 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         onSheetClose={() => {}}
         extraFilters={undefined}
         secondaryFilters={
-          <div className="w-full flex flex-col gap-3">
-            {/* Categorías - chips verticales con scroll horizontal */}
-            <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="w-full flex flex-col gap-2">
+            {/* Categorías - chips que ocupan 100% del contenedor */}
+            <div className="flex gap-1.5 pb-2 w-full">
               {/* Botón Todas las categorías */}
               <button
                 onClick={() => setFiltroCategoria(null)}
-                className="flex flex-col items-center justify-center py-1.5 rounded-lg transition-all flex-shrink-0 w-[48px] h-[52px]"
+                className="flex flex-col items-center justify-center py-2 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
                 style={{
                   background: filtroCategoria === null
                     ? theme.primary
@@ -2912,8 +2912,8 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                   border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
                 }}
               >
-                <Tag className="h-4 w-4" style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
-                <span className="text-[8px] font-semibold leading-tight text-center mt-0.5" style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
+                <Tag className="h-5 w-5" style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
+                <span className="text-[9px] font-semibold leading-tight text-center mt-1" style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
                   Categorías
                 </span>
               </button>
@@ -2928,7 +2928,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                     key={cat.id}
                     onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
                     title={cat.nombre}
-                    className="flex flex-col items-center justify-center py-1 rounded-lg transition-all flex-shrink-0 w-[48px] h-[52px]"
+                    className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
                     style={{
                       background: isSelected ? catColor : theme.backgroundSecondary,
                       border: `1px solid ${isSelected ? catColor : theme.border}`,
@@ -2936,7 +2936,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                   >
                     {/* Número arriba */}
                     <span
-                      className="text-[9px] font-bold leading-none"
+                      className="text-[10px] font-bold leading-none"
                       style={{
                         color: isSelected ? '#ffffff' : catColor,
                       }}
@@ -2944,11 +2944,11 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                       {count}
                     </span>
                     {/* Icono */}
-                    <span className="[&>svg]:h-4 [&>svg]:w-4 my-0.5" style={{ color: isSelected ? '#ffffff' : catColor }}>
+                    <span className="[&>svg]:h-5 [&>svg]:w-5 my-1" style={{ color: isSelected ? '#ffffff' : catColor }}>
                       {getCategoryIcon(cat.nombre)}
                     </span>
                     {/* Texto abajo */}
-                    <span className="text-[8px] font-medium leading-none text-center w-full truncate px-0.5" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                    <span className="text-[9px] font-medium leading-none text-center w-full truncate px-1" style={{ color: isSelected ? '#ffffff' : theme.text }}>
                       {cat.nombre.split(' ')[0]}
                     </span>
                   </button>
@@ -2956,15 +2956,15 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               })}
             </div>
 
-            {/* Estados - ocupan 100% del contenedor */}
-            <div className="flex gap-1.5 pb-2 w-full">
+            {/* Estados - más compactos, ocupan 100% del contenedor */}
+            <div className="flex gap-2 w-full">
               {Object.keys(conteosEstados).length === 0 ? (
                 // Skeleton mientras cargan los conteos
                 <>
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
                       key={`skeleton-estado-${i}`}
-                      className="flex-1 h-[52px] rounded-lg animate-pulse"
+                      className="flex-1 h-[42px] rounded-lg animate-pulse"
                       style={{ background: `${theme.border}40` }}
                     />
                   ))}
@@ -2984,32 +2984,33 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                     <button
                       key={estado.key}
                       onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
-                      className="flex flex-col items-center justify-center py-1 rounded-lg transition-all flex-1 min-w-0 h-[52px]"
+                      className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
                       style={{
                         background: isActive ? estado.color : `${estado.color}15`,
                         border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                       }}
                     >
-                      {/* Número arriba */}
+                      {/* Icono */}
+                      <Icon
+                        className="h-4 w-4 flex-shrink-0"
+                        style={{ color: isActive ? '#ffffff' : estado.color }}
+                      />
+                      {/* Texto */}
                       <span
-                        className="text-[9px] font-bold leading-none"
+                        className="text-[10px] font-medium leading-none truncate"
+                        style={{ color: isActive ? '#ffffff' : estado.color }}
+                      >
+                        {estado.label}
+                      </span>
+                      {/* Badge con count */}
+                      <span
+                        className="text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0"
                         style={{
+                          backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
                           color: isActive ? '#ffffff' : estado.color,
                         }}
                       >
                         {estado.count}
-                      </span>
-                      {/* Icono */}
-                      <Icon
-                        className="h-4 w-4 my-0.5"
-                        style={{ color: isActive ? '#ffffff' : estado.color }}
-                      />
-                      {/* Texto abajo */}
-                      <span
-                        className="text-[8px] font-medium leading-none text-center truncate w-full px-0.5"
-                        style={{ color: isActive ? '#ffffff' : estado.color }}
-                      >
-                        {estado.label}
                       </span>
                     </button>
                   );

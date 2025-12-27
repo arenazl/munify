@@ -47,6 +47,7 @@ import {
   MobileLogin,
   MobileRegister,
   MobileNuevoReclamo,
+  MobileNuevoTramite,
   MobileLogros,
   MobileConsulta,
   MobileEstadisticas,
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
   // Rutas mobile fuera del layout (pantalla completa)
   { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
   { path: '/app/tramites', element: <Tramites /> },
+  { path: '/app/tramites/nuevo', element: <MobileNuevoTramite /> },
   { path: '/app/mis-tramites', element: <MisTramites /> },
   { path: '/app/login', element: <MobileLogin /> },
   { path: '/app/register', element: <MobileRegister /> },

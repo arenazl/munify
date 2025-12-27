@@ -55,6 +55,7 @@ class TramiteCreate(BaseModel):
     servicio_id: int
     asunto: str
     descripcion: Optional[str] = None
+    observaciones: Optional[str] = None
     # Datos del solicitante (para usuarios no logueados)
     nombre_solicitante: Optional[str] = None
     apellido_solicitante: Optional[str] = None

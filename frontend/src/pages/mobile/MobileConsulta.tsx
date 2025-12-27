@@ -247,10 +247,14 @@ export default function MobileConsulta() {
         )}
       </div>
 
-      {/* Input */}
+      {/* Input - fijo abajo */}
       <div
-        className="p-4 border-t"
-        style={{ backgroundColor: theme.card, borderColor: theme.border }}
+        className="sticky bottom-0 p-4 border-t"
+        style={{
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+          paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+        }}
       >
         <div
           className="flex items-center gap-2 rounded-2xl px-4 py-2"

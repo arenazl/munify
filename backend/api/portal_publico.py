@@ -669,7 +669,9 @@ async def chat_publico(
     Chat público con IA para consultas - SIN AUTENTICACIÓN
     Permite a los usuarios hacer consultas sobre el sistema sin necesidad de loguearse.
     """
-    if not settings.GEMINI_API_KEY:
+    from services import chat_service
+
+    if not chat_service.is_available():
         return ChatPublicoResponse(
             response="El asistente no está disponible en este momento. Por favor intentá más tarde."
         )
@@ -721,37 +723,16 @@ EJEMPLO DE RESPUESTA CON LINK:
 
 Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
 
-    # Construir contexto con historial
-    context = system_prompt + "\n\nCONVERSACIÓN:\n"
+    context = chat_service.build_chat_context(
+        system_prompt=system_prompt,
+        message=data.message,
+        history=data.history,
+        max_history=8
+    )
 
-    for msg in data.history[-8:]:
-        role = "Usuario" if msg.get("role") == "user" else "Asistente"
-        context += f"{role}: {msg.get('content', '')}\n"
+    response = await chat_service.chat(context, max_tokens=300)
 
-    context += f"Usuario: {data.message}\n\nAsistente:"
+    if response:
+        return ChatPublicoResponse(response=response)
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": context}]}],
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 300,
-                    }
-                }
-            )
-
-            if response.status_code == 200:
-                response_data = response.json()
-                text = response_data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                return ChatPublicoResponse(response=text.strip() if text else "No pude procesar tu mensaje.")
-            else:
-                return ChatPublicoResponse(response="El asistente no está disponible temporalmente.")
-
-    except httpx.TimeoutException:
-        return ChatPublicoResponse(response="La consulta tardó demasiado. Intentá de nuevo.")
-    except Exception:
-        return ChatPublicoResponse(response="Hubo un error. Por favor intentá de nuevo.")
+    return ChatPublicoResponse(response="No pude procesar tu mensaje. Intentá de nuevo.")

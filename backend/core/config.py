@@ -22,11 +22,11 @@ class Settings(BaseSettings):
 
     # Gemini (Google - gratis con límites) - IA por defecto
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
-    # Grok (xAI) - alternativa
+    # Groq (API rápida) - alternativa/fallback
     GROK_API_KEY: str = ""
-    GROK_MODEL: str = "grok-3-mini"
+    GROK_MODEL: str = "llama-3.1-8b-instant"
 
     # Pexels API (imagenes gratuitas)
     PEXELS_API_KEY: str = ""

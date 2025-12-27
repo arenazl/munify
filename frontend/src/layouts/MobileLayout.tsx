@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { Home, Plus, ClipboardList, User, LogOut, Trophy, Building2, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { NotificacionesDropdown } from '../components/NotificacionesDropdown';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -124,13 +125,16 @@ export default function MobileLayout() {
         </div>
 
         {user && (
-          <button
-            onClick={handleLogout}
-            className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
-            style={{ color: theme.textSecondary }}
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificacionesDropdown />
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
+              style={{ color: theme.textSecondary }}
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
         )}
       </header>
 

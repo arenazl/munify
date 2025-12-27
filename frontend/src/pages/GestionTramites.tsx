@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   Search,
@@ -42,13 +42,13 @@ import {
   LayoutGrid,
   List,
   Filter,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
+import { TramiteWizard } from '../components/TramiteWizard';
 import type { Tramite, EstadoTramite, ServicioTramite, Empleado } from '../types';
 import React from 'react';
 
@@ -187,9 +187,17 @@ export default function GestionTramites() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroServicio, setFiltroServicio] = useState<number | 'todos'>('todos');
-  const [filtroEmpleado, setFiltroEmpleado] = useState<number | 'todos'>('todos');
   const [filtroSinAsignar, setFiltroSinAsignar] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+
+  // Autocompletado de búsqueda
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchResults, setSearchResults] = useState<{
+    tramites: Tramite[];
+    empleados: Empleado[];
+    solicitantes: { nombre: string; apellido: string; dni?: string }[];
+  }>({ tramites: [], empleados: [], solicitantes: [] });
+  const searchRef = React.useRef<HTMLDivElement>(null);
 
   // Sheet para ver/editar trámite
   const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(null);
@@ -215,7 +223,73 @@ export default function GestionTramites() {
   // Resumen
   const [resumen, setResumen] = useState<{ total: number; hoy: number; por_estado: Record<string, number> } | null>(null);
 
+  // Wizard state
+  const [wizardOpen, setWizardOpen] = useState(false);
+
   const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor' || user?.rol === 'empleado';
+
+  // Click fuera para cerrar autocompletado
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Buscar en múltiples fuentes
+  useEffect(() => {
+    if (searchTerm.length < 2) {
+      setSearchResults({ tramites: [], empleados: [], solicitantes: [] });
+      setShowSearchResults(false);
+      return;
+    }
+
+    const term = searchTerm.toLowerCase();
+
+    // Buscar trámites
+    const tramitesMatch = tramites.filter(t =>
+      t.numero_tramite.toLowerCase().includes(term) ||
+      t.asunto.toLowerCase().includes(term)
+    ).slice(0, 5);
+
+    // Buscar empleados
+    const empleadosMatch = empleados.filter(e =>
+      `${e.nombre} ${e.apellido}`.toLowerCase().includes(term) ||
+      e.especialidad?.toLowerCase().includes(term)
+    ).slice(0, 5);
+
+    // Buscar solicitantes (nombres únicos de los trámites)
+    const solicitantesMap: Record<string, { nombre: string; apellido: string; dni?: string }> = {};
+    tramites.forEach(t => {
+      if (t.nombre_solicitante || t.apellido_solicitante) {
+        const fullName = `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.toLowerCase();
+        const dni = t.dni_solicitante || '';
+        if (fullName.includes(term) || dni.includes(term)) {
+          const key = `${t.nombre_solicitante}-${t.apellido_solicitante}-${dni}`;
+          if (!solicitantesMap[key]) {
+            solicitantesMap[key] = {
+              nombre: t.nombre_solicitante || '',
+              apellido: t.apellido_solicitante || '',
+              dni: t.dni_solicitante
+            };
+          }
+        }
+      }
+    });
+    const solicitantesMatch = Object.values(solicitantesMap).slice(0, 5);
+
+    setSearchResults({
+      tramites: tramitesMatch,
+      empleados: empleadosMatch,
+      solicitantes: solicitantesMatch
+    });
+
+    const hasResults = tramitesMatch.length > 0 || empleadosMatch.length > 0 || solicitantesMatch.length > 0;
+    setShowSearchResults(hasResults);
+  }, [searchTerm, tramites, empleados]);
 
   useEffect(() => {
     loadData();
@@ -395,27 +469,34 @@ export default function GestionTramites() {
     return tramites
       .filter(t => t.estado === estado)
       .filter(t => {
+        const term = searchTerm.toLowerCase();
         const matchSearch = searchTerm === '' ||
-          t.numero_tramite.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.asunto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.nombre_solicitante?.toLowerCase().includes(searchTerm.toLowerCase());
+          t.numero_tramite.toLowerCase().includes(term) ||
+          t.asunto.toLowerCase().includes(term) ||
+          t.nombre_solicitante?.toLowerCase().includes(term) ||
+          t.apellido_solicitante?.toLowerCase().includes(term) ||
+          t.dni_solicitante?.toLowerCase().includes(term) ||
+          t.empleado_asignado?.nombre?.toLowerCase().includes(term) ||
+          t.empleado_asignado?.apellido?.toLowerCase().includes(term);
         const matchServicio = filtroServicio === 'todos' || t.servicio_id === filtroServicio;
-        const matchEmpleado = filtroEmpleado === 'todos' || t.empleado_id === filtroEmpleado;
         const matchSinAsignar = !filtroSinAsignar || !t.empleado_id;
-        return matchSearch && matchServicio && matchEmpleado && matchSinAsignar;
+        return matchSearch && matchServicio && matchSinAsignar;
       });
   };
 
   const filteredTramites = tramites.filter(t => {
-    const matchSearch = t.numero_tramite.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.asunto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.nombre_solicitante?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.email_solicitante?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.dni_solicitante?.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchSearch = t.numero_tramite.toLowerCase().includes(term) ||
+      t.asunto.toLowerCase().includes(term) ||
+      t.nombre_solicitante?.toLowerCase().includes(term) ||
+      t.apellido_solicitante?.toLowerCase().includes(term) ||
+      t.email_solicitante?.toLowerCase().includes(term) ||
+      t.dni_solicitante?.toLowerCase().includes(term) ||
+      t.empleado_asignado?.nombre?.toLowerCase().includes(term) ||
+      t.empleado_asignado?.apellido?.toLowerCase().includes(term);
     const matchServicio = filtroServicio === 'todos' || t.servicio_id === filtroServicio;
-    const matchEmpleado = filtroEmpleado === 'todos' || t.empleado_id === filtroEmpleado;
     const matchSinAsignar = !filtroSinAsignar || !t.empleado_id;
-    return matchSearch && matchServicio && matchEmpleado && matchSinAsignar;
+    return matchSearch && matchServicio && matchSinAsignar;
   });
 
   if (loading) {
@@ -475,7 +556,7 @@ export default function GestionTramites() {
 
           {/* Botón Nuevo Trámite */}
           <button
-            onClick={() => navigate('/tramites')}
+            onClick={() => setWizardOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white shadow-lg hover:shadow-xl transition-all"
             style={{
               background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
@@ -547,17 +628,18 @@ export default function GestionTramites() {
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
       >
         <div className="flex flex-wrap gap-4">
-          {/* Búsqueda */}
-          <div className="flex-1 min-w-[200px] relative">
+          {/* Búsqueda con autocompletado */}
+          <div className="flex-1 min-w-[300px] relative" ref={searchRef}>
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10"
               style={{ color: theme.textSecondary }}
             />
             <input
               type="text"
-              placeholder="Buscar por número, asunto o solicitante..."
+              placeholder="Buscar trámites, solicitantes o empleados..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              onFocus={() => searchTerm.length >= 2 && setShowSearchResults(true)}
               className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm"
               style={{
                 backgroundColor: theme.backgroundSecondary,
@@ -565,6 +647,96 @@ export default function GestionTramites() {
                 color: theme.text,
               }}
             />
+
+            {/* Dropdown de resultados */}
+            {showSearchResults && (
+              <div
+                className="absolute top-full left-0 right-0 mt-1 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+              >
+                {/* Trámites */}
+                {searchResults.tramites.length > 0 && (
+                  <div>
+                    <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+                      <FileText className="inline h-3 w-3 mr-1" /> Trámites
+                    </div>
+                    {searchResults.tramites.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          openTramite(t);
+                          setShowSearchResults(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
+                      >
+                        <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
+                          {t.numero_tramite}
+                        </span>
+                        <span className="text-sm truncate" style={{ color: theme.text }}>{t.asunto}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Empleados */}
+                {searchResults.empleados.length > 0 && (
+                  <div>
+                    <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+                      <User className="inline h-3 w-3 mr-1" /> Empleados
+                    </div>
+                    {searchResults.empleados.map(e => (
+                      <button
+                        key={e.id}
+                        onClick={() => {
+                          setSearchTerm(`${e.nombre} ${e.apellido}`);
+                          setShowSearchResults(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
+                      >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
+                          {e.nombre?.[0]}{e.apellido?.[0]}
+                        </div>
+                        <div>
+                          <span className="text-sm" style={{ color: theme.text }}>{e.nombre} {e.apellido}</span>
+                          {e.especialidad && (
+                            <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>({e.especialidad})</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Solicitantes */}
+                {searchResults.solicitantes.length > 0 && (
+                  <div>
+                    <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+                      <Users className="inline h-3 w-3 mr-1" /> Solicitantes
+                    </div>
+                    {searchResults.solicitantes.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setSearchTerm(`${s.nombre} ${s.apellido}`.trim());
+                          setShowSearchResults(false);
+                        }}
+                        className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
+                      >
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style={{ backgroundColor: '#10b98120', color: '#10b981' }}>
+                          {s.nombre?.[0]}{s.apellido?.[0]}
+                        </div>
+                        <div>
+                          <span className="text-sm" style={{ color: theme.text }}>{s.nombre} {s.apellido}</span>
+                          {s.dni && (
+                            <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>DNI: {s.dni}</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Filtro servicio */}
@@ -581,23 +753,6 @@ export default function GestionTramites() {
             <option value="todos">Todos los servicios</option>
             {servicios.map(s => (
               <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
-
-          {/* Filtro empleado */}
-          <select
-            value={filtroEmpleado}
-            onChange={(e) => setFiltroEmpleado(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-            className="px-4 py-2.5 rounded-lg text-sm"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
-          >
-            <option value="todos">Todos los empleados</option>
-            {empleados.map(e => (
-              <option key={e.id} value={e.id}>{e.nombre} {e.apellido}</option>
             ))}
           </select>
 
@@ -1391,6 +1546,14 @@ export default function GestionTramites() {
           </div>
         )}
       </Sheet>
+
+      {/* Wizard para nuevo trámite */}
+      <TramiteWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        servicios={servicios}
+        onSuccess={loadData}
+      />
     </div>
   );
 }

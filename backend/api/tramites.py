@@ -4,18 +4,24 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime
+import logging
 
 from core.database import get_db
 from core.security import get_current_user, get_current_user_optional, require_roles
+from core.config import settings
 from models.tramite import ServicioTramite, Tramite, HistorialTramite, EstadoTramite
 from models.user import User
 from models.enums import RolUsuario
+from models.notificacion import Notificacion
 from schemas.tramite import (
     ServicioTramiteCreate, ServicioTramiteUpdate, ServicioTramiteResponse,
     TramiteCreate, TramiteUpdate, TramiteResponse, TramiteAsignar,
     HistorialTramiteResponse
 )
 from models.empleado import Empleado
+from services.notificacion_service import NotificacionService, get_plantilla, formatear_mensaje
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -308,6 +314,49 @@ async def crear_tramite(
     # Cargar relación servicio para la respuesta
     await db.refresh(tramite, ["servicio"])
 
+    # === NOTIFICACIONES ===
+    try:
+        # Preparar variables para las plantillas
+        variables = {
+            "numero_tramite": tramite.numero_tramite,
+            "servicio": servicio.nombre,
+            "asunto": tramite.asunto or "Sin asunto",
+            "nombre": tramite.nombre_solicitante or "Vecino",
+            "solicitante_nombre": f"{tramite.nombre_solicitante or ''} {tramite.apellido_solicitante or ''}".strip() or "Sin nombre",
+            "url": f"{settings.FRONTEND_URL}/tramites/{tramite.id}"
+        }
+
+        # 1. Notificación in-app al vecino (si está logueado)
+        if current_user:
+            plantilla = get_plantilla("tramite_creado")
+            if plantilla:
+                push_config = plantilla.get("push", {})
+                titulo = formatear_mensaje(push_config.get("titulo", "Trámite Registrado"), variables)
+                cuerpo = formatear_mensaje(push_config.get("cuerpo", ""), variables)
+
+                notif = Notificacion(
+                    usuario_id=current_user.id,
+                    titulo=titulo,
+                    mensaje=cuerpo,
+                    tipo="tramite"
+                )
+                db.add(notif)
+                await db.commit()
+                logger.info(f"Notificación creada para usuario {current_user.id} - Trámite {tramite.numero_tramite}")
+
+        # 2. Notificación a supervisores
+        await NotificacionService.notificar_supervisores(
+            db=db,
+            municipio_id=municipio_id,
+            titulo=f"Nuevo Trámite: {tramite.numero_tramite}",
+            mensaje=f"Nuevo trámite de {servicio.nombre}: {tramite.asunto or 'Sin asunto'}",
+            tipo="tramite",
+            enviar_whatsapp=False  # Por ahora solo in-app
+        )
+    except Exception as e:
+        logger.error(f"Error enviando notificaciones de trámite: {e}")
+        # No fallar el endpoint si las notificaciones fallan
+
     return tramite
 
 
@@ -336,7 +385,8 @@ async def actualizar_tramite(
         setattr(tramite, field, value)
 
     # Si cambió el estado, registrar fecha de resolución si corresponde
-    if tramite_data.estado and tramite_data.estado != estado_anterior:
+    cambio_estado = tramite_data.estado and tramite_data.estado != estado_anterior
+    if cambio_estado:
         if tramite_data.estado in [EstadoTramite.APROBADO, EstadoTramite.RECHAZADO, EstadoTramite.FINALIZADO]:
             tramite.fecha_resolucion = datetime.utcnow()
 
@@ -353,6 +403,44 @@ async def actualizar_tramite(
 
     await db.commit()
     await db.refresh(tramite)
+
+    # === NOTIFICACIONES por cambio de estado ===
+    if cambio_estado and tramite.solicitante_id:
+        try:
+            variables = {
+                "numero_tramite": tramite.numero_tramite,
+                "servicio": tramite.servicio.nombre if tramite.servicio else "Trámite",
+                "estado_nuevo": tramite_data.estado.value.replace("_", " ").title(),
+                "nombre": tramite.nombre_solicitante or "Vecino",
+                "motivo_rechazo": tramite_data.observaciones or "Sin especificar",
+                "url": f"{settings.FRONTEND_URL}/tramites/{tramite.id}"
+            }
+
+            # Determinar tipo de notificación según estado
+            if tramite_data.estado == EstadoTramite.APROBADO:
+                tipo_notif = "tramite_aprobado"
+            elif tramite_data.estado == EstadoTramite.RECHAZADO:
+                tipo_notif = "tramite_rechazado"
+            else:
+                tipo_notif = "tramite_cambio_estado"
+
+            plantilla = get_plantilla(tipo_notif)
+            if plantilla:
+                push_config = plantilla.get("push", {})
+                titulo = formatear_mensaje(push_config.get("titulo", "Estado Actualizado"), variables)
+                cuerpo = formatear_mensaje(push_config.get("cuerpo", ""), variables)
+
+                notif = Notificacion(
+                    usuario_id=tramite.solicitante_id,
+                    titulo=titulo,
+                    mensaje=cuerpo,
+                    tipo="tramite"
+                )
+                db.add(notif)
+                await db.commit()
+                logger.info(f"Notificación de cambio de estado enviada - Trámite {tramite.numero_tramite}")
+        except Exception as e:
+            logger.error(f"Error enviando notificación de cambio de estado: {e}")
 
     return tramite
 
