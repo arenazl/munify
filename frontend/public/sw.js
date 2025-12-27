@@ -2,8 +2,8 @@
 self.addEventListener('push', function(event) {
   const options = {
     body: 'Tienes una nueva notificación',
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: '/icon-notification.png',
+    badge: '/icon-notification.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),

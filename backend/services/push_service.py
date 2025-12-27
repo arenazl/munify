@@ -45,7 +45,7 @@ async def send_push_to_user(
     payload = {
         "title": title,
         "body": body,
-        "icon": icon or "/favicon.svg",
+        "icon": icon or "/icon-notification.png",
         "url": url or "/",
         "data": data or {}
     }
@@ -220,6 +220,5 @@ async def notificar_sla_vencido(db: AsyncSession, supervisor_user_ids: List[int]
         title="SLA Vencido",
         body=f"El reclamo #{reclamo.id} ha superado el tiempo de SLA.",
         url=f"/reclamos/{reclamo.id}",
-        icon="/favicon.svg",
         data={"tipo": "sla_vencido", "reclamo_id": reclamo.id}
     )

@@ -201,8 +201,8 @@ export async function isSubscribed(): Promise<boolean> {
 export function showLocalNotification(title: string, options?: NotificationOptions): void {
   if (Notification.permission === 'granted') {
     new Notification(title, {
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/icon-notification.png',
+      badge: '/icon-notification.png',
       ...options
     });
   }

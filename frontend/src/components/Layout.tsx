@@ -247,6 +247,19 @@ export default function Layout() {
             <div className="flex items-center space-x-3">
               {/* User info con dropdown */}
               <div className="relative">
+                {/* Botón mobile - solo avatar */}
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="sm:hidden p-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <div
+                    className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    {user.nombre[0]}{user.apellido[0]}
+                  </div>
+                </button>
+                {/* Botón desktop - avatar + nombre */}
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="hidden sm:flex items-center gap-3 pr-3 border-r cursor-pointer hover:opacity-80 transition-opacity"

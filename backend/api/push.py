@@ -135,7 +135,7 @@ async def test_push_notification(
         title="Notificación de Prueba",
         body="Si ves esto, las notificaciones push funcionan correctamente!",
         url="/",
-        icon="/favicon.svg"
+        icon="/icon-notification.png"
     )
 
     if sent > 0:
