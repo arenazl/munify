@@ -146,6 +146,27 @@ async def test_push_notification(
     return {"success": False, "message": "No se pudo enviar. Asegurate de tener las notificaciones activadas."}
 
 
+@router.post("/test-public/{user_id}")
+async def test_push_notification_public(
+    user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Envía una notificación push de prueba (endpoint público para testing)"""
+    sent = await send_push_to_user(
+        db=db,
+        user_id=user_id,
+        title="🔔 Prueba de Notificación",
+        body="¡Las notificaciones push funcionan correctamente!",
+        url="/",
+        icon="/icon-notification.png"
+    )
+
+    if sent > 0:
+        return {"success": True, "message": f"Notificación enviada a {sent} dispositivo(s)", "user_id": user_id}
+
+    return {"success": False, "message": "No se pudo enviar. El usuario no tiene suscripciones activas.", "user_id": user_id}
+
+
 # ============================================
 # Preferencias de notificaciones
 # ============================================
