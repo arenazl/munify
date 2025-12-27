@@ -172,6 +172,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -358,11 +359,32 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     });
   }, []);
 
-  // Cargar reclamos cuando cambia el filtro de estado o categoría
+  // Búsqueda: se activa al presionar espacio, Enter, o después de 1.5s de inactividad
+  useEffect(() => {
+    // Si termina en espacio o tiene al menos 3 caracteres, buscar inmediatamente
+    if (search.endsWith(' ') && search.trim().length >= 2) {
+      setDebouncedSearch(search.trim());
+      return;
+    }
+    // Si está vacío, limpiar la búsqueda inmediatamente
+    if (search === '') {
+      setDebouncedSearch('');
+      return;
+    }
+    // Si no, esperar 1.5 segundos de inactividad
+    const timer = setTimeout(() => {
+      if (search.trim().length >= 2) {
+        setDebouncedSearch(search.trim());
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Cargar reclamos cuando cambia el filtro de estado, categoría o búsqueda (con debounce)
   useEffect(() => {
     fetchReclamos(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado, filtroCategoria]);
+  }, [filtroEstado, filtroCategoria, debouncedSearch]);
 
   // Cargar más cuando cambia la página
   useEffect(() => {
@@ -712,6 +734,9 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       }
       if (filtroCategoria) {
         params.categoria_id = filtroCategoria;
+      }
+      if (debouncedSearch && debouncedSearch.trim()) {
+        params.search = debouncedSearch.trim();
       }
 
       const reclamosRes = await reclamosApi.getAll(params);
@@ -1075,14 +1100,24 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     }
   };
 
-  // Solo filtro local por búsqueda de texto - el filtro de categoría y estado se hace en el servidor
+  // Búsqueda del servidor + filtro local para refinamiento en tiempo real
   const filteredReclamos = reclamos.filter(r => {
-    if (search === '') return true;
-    const searchLower = search.toLowerCase();
-    return r.titulo.toLowerCase().includes(searchLower) ||
+    // Si no hay búsqueda o la búsqueda ya fue enviada al servidor, mostrar todos
+    if (!search || search.trim() === debouncedSearch) return true;
+
+    // Filtro local para refinar mientras el usuario sigue escribiendo
+    const searchLower = search.trim().toLowerCase();
+    return (
+      r.titulo.toLowerCase().includes(searchLower) ||
       r.descripcion.toLowerCase().includes(searchLower) ||
       r.direccion.toLowerCase().includes(searchLower) ||
-      r.categoria.nombre.toLowerCase().includes(searchLower);
+      r.categoria.nombre.toLowerCase().includes(searchLower) ||
+      r.creador?.nombre?.toLowerCase().includes(searchLower) ||
+      r.creador?.apellido?.toLowerCase().includes(searchLower) ||
+      `${r.creador?.nombre} ${r.creador?.apellido}`.toLowerCase().includes(searchLower) ||
+      r.empleado_asignado?.nombre?.toLowerCase().includes(searchLower) ||
+      String(r.id).includes(searchLower)
+    );
   });
 
   const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
@@ -2900,7 +2935,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         onSearchChange={setSearch}
         loading={false}
         isEmpty={!loading && filteredReclamos.length === 0}
-        emptyMessage="No se encontraron reclamos"
+        emptyMessage={debouncedSearch ? `No se encontraron reclamos para "${debouncedSearch}"` : "No se encontraron reclamos"}
         sheetOpen={false}
         sheetTitle=""
         sheetDescription=""

@@ -247,12 +247,29 @@ async def get_reclamos(
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
     empleado_id: Optional[int] = None,
+    search: Optional[str] = Query(None, description="Búsqueda en todos los campos"),
     skip: int = Query(0, ge=0, description="Número de registros a saltar"),
     limit: int = Query(20, ge=1, le=100, description="Número de registros a retornar"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    query = get_reclamos_query()
+    from models.categoria import Categoria
+    from models.zona import Zona
+    from models.empleado import Empleado
+    from sqlalchemy import or_, cast, String
+    from sqlalchemy.orm import joinedload
+
+    # Si hay búsqueda, usar JOINs para poder filtrar en tablas relacionadas
+    if search and search.strip():
+        query = select(Reclamo).options(
+            selectinload(Reclamo.categoria),
+            selectinload(Reclamo.zona),
+            selectinload(Reclamo.creador),
+            selectinload(Reclamo.empleado_asignado),
+            selectinload(Reclamo.documentos)
+        ).join(Reclamo.creador).outerjoin(Reclamo.categoria).outerjoin(Reclamo.zona).outerjoin(Reclamo.empleado_asignado)
+    else:
+        query = get_reclamos_query()
 
     # Filtrar por municipio (usa header para admins, o municipio del usuario)
     municipio_id = get_effective_municipio_id(request, current_user)
@@ -274,10 +291,39 @@ async def get_reclamos(
     if empleado_id:
         query = query.where(Reclamo.empleado_id == empleado_id)
 
+    # Búsqueda en todos los campos
+    if search and search.strip():
+        search_term = f"%{search.strip().lower()}%"
+        query = query.where(
+            or_(
+                # Campos del reclamo
+                func.lower(Reclamo.titulo).like(search_term),
+                func.lower(Reclamo.descripcion).like(search_term),
+                func.lower(Reclamo.direccion).like(search_term),
+                func.lower(Reclamo.referencia).like(search_term),
+                func.lower(Reclamo.resolucion).like(search_term),
+                cast(Reclamo.id, String).like(search_term),
+                # Creador
+                func.lower(User.nombre).like(search_term),
+                func.lower(User.apellido).like(search_term),
+                func.lower(User.email).like(search_term),
+                User.telefono.like(search_term),
+                User.dni.like(search_term),
+                # Categoría
+                func.lower(Categoria.nombre).like(search_term),
+                # Zona
+                func.lower(Zona.nombre).like(search_term),
+                func.lower(Zona.codigo).like(search_term),
+                # Empleado asignado
+                func.lower(Empleado.nombre).like(search_term),
+                func.lower(Empleado.apellido).like(search_term),
+            )
+        )
+
     query = query.order_by(Reclamo.created_at.desc())
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.unique().scalars().all()
 
 @router.get("/mis-reclamos", response_model=List[ReclamoResponse])
 async def get_mis_reclamos(
