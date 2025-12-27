@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from typing import List
 
 from core.database import get_db
@@ -10,6 +10,18 @@ from models.enums import RolUsuario
 from schemas.user import UserResponse, UserUpdate, UserCreate, UserProfileUpdate
 
 router = APIRouter()
+
+
+def get_effective_municipio_id(request: Request, current_user: User) -> int:
+    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
+    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        header_municipio_id = request.headers.get('X-Municipio-ID')
+        if header_municipio_id:
+            try:
+                return int(header_municipio_id)
+            except (ValueError, TypeError):
+                pass
+    return current_user.municipio_id
 
 # ============================================
 # ENDPOINTS DE PERFIL PROPIO (cualquier usuario autenticado)
@@ -44,12 +56,14 @@ async def update_my_profile(
 
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
+    municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
         select(User)
-        .where(User.municipio_id == current_user.municipio_id)
+        .where(User.municipio_id == municipio_id)
         .order_by(User.created_at.desc())
     )
     return result.scalars().all()
@@ -57,14 +71,15 @@ async def get_users(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    # Multi-tenant: filtrar por municipio_id del usuario actual
+    municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
         select(User)
         .where(User.id == user_id)
-        .where(User.municipio_id == current_user.municipio_id)
+        .where(User.municipio_id == municipio_id)
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -74,9 +89,14 @@ async def get_user(
 @router.post("/", response_model=UserResponse)
 async def create_user(
     user_data: UserCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
+    municipio_id = get_effective_municipio_id(request, current_user)
+    if not municipio_id:
+        raise HTTPException(status_code=400, detail="Debe seleccionar un municipio")
+
     # Verificar si el email ya existe
     result = await db.execute(select(User).where(User.email == user_data.email))
     if result.scalar_one_or_none():
@@ -90,7 +110,7 @@ async def create_user(
         telefono=user_data.telefono,
         dni=user_data.dni,
         direccion=user_data.direccion,
-        municipio_id=current_user.municipio_id
+        municipio_id=municipio_id
     )
     db.add(user)
     await db.commit()
