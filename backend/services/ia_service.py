@@ -448,9 +448,9 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
         return None
 
 
-async def clasificar_con_grok(texto: str, categorias: List[Dict]) -> Optional[List[Dict]]:
+async def clasificar_con_groq(texto: str, categorias: List[Dict]) -> Optional[List[Dict]]:
     """
-    Clasificación usando Grok (xAI) - alternativa a Gemini.
+    Clasificación usando Groq (API rápida con Llama) - alternativa a Gemini.
     """
     if not settings.GROK_API_KEY:
         return None
@@ -479,7 +479,7 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
-                "https://api.x.ai/v1/chat/completions",
+                "https://api.groq.com/openai/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {settings.GROK_API_KEY}",
                     "Content-Type": "application/json"
@@ -501,14 +501,14 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
                 if json_match:
                     result = json.loads(json_match.group())
                     for item in result:
-                        item['metodo'] = 'grok'
+                        item['metodo'] = 'groq'
                         item['score'] = item.get('confianza', 50)
                     return result
 
             return None
 
     except Exception as e:
-        print(f"Error en Grok: {e}")
+        print(f"Error en Groq: {e}")
         return None
 
 
@@ -539,11 +539,11 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
             if ia_results:
                 ia_metodo = 'gemini'
 
-        # Si Gemini no funcionó, intentar Grok
+        # Si Gemini no funcionó, intentar Groq
         if not ia_results and settings.GROK_API_KEY:
-            ia_results = await clasificar_con_grok(texto, categorias)
+            ia_results = await clasificar_con_groq(texto, categorias)
             if ia_results:
-                ia_metodo = 'grok'
+                ia_metodo = 'groq'
 
     # 4. Combinar resultados
     if ia_results:

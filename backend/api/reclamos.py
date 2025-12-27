@@ -179,7 +179,7 @@ async def enviar_notificacion_whatsapp(
 # HELPER: NOTIFICACIONES PUSH AUTOMÁTICAS
 # ===========================================
 
-def enviar_notificacion_push(
+async def enviar_notificacion_push(
     db: AsyncSession,
     reclamo: Reclamo,
     tipo_notificacion: str,
@@ -199,21 +199,18 @@ def enviar_notificacion_push(
             notificar_reclamo_resuelto
         )
 
-        # Usar db.sync_session para operaciones síncronas
-        sync_db = db.sync_session
-
         if tipo_notificacion == 'reclamo_recibido':
-            notificar_reclamo_recibido(sync_db, reclamo)
+            await notificar_reclamo_recibido(db, reclamo)
         elif tipo_notificacion == 'reclamo_asignado' and empleado_nombre:
-            notificar_reclamo_asignado(sync_db, reclamo, empleado_nombre)
+            await notificar_reclamo_asignado(db, reclamo, empleado_nombre)
         elif tipo_notificacion == 'cambio_estado' and estado_anterior and estado_nuevo:
-            notificar_cambio_estado(sync_db, reclamo, estado_anterior, estado_nuevo)
+            await notificar_cambio_estado(db, reclamo, estado_anterior, estado_nuevo)
         elif tipo_notificacion == 'reclamo_resuelto':
-            notificar_reclamo_resuelto(sync_db, reclamo)
+            await notificar_reclamo_resuelto(db, reclamo)
 
-        print(f"🔔 Push notification enviada: {tipo_notificacion}", flush=True)
+        print(f"[PUSH] Notificacion enviada: {tipo_notificacion}", flush=True)
     except Exception as e:
-        print(f"❌ Error enviando push: {e}", flush=True)
+        print(f"[PUSH] Error enviando: {e}", flush=True)
 
 
 def get_effective_municipio_id(request: Request, current_user: User) -> int:
@@ -356,12 +353,12 @@ async def cambiar_estado_reclamo_drag(
     # Notificación WhatsApp: cambio de estado o resuelto
     if estado_enum == EstadoReclamo.RESUELTO:
         await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
-        enviar_notificacion_push(db, reclamo, 'reclamo_resuelto')
+        await enviar_notificacion_push(db, reclamo, 'reclamo_resuelto')
     else:
         await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
-        enviar_notificacion_push(db, reclamo, 'cambio_estado',
+        await enviar_notificacion_push(db, reclamo, 'cambio_estado',
                                   estado_anterior=estado_anterior.value,
-                                  estado_nuevo=estado_enum.value)
+                                  estado_nuevo=estado_nuevo.value)
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -581,7 +578,7 @@ async def create_reclamo(
     await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
 
     # Notificación Push: reclamo recibido
-    enviar_notificacion_push(db, reclamo, 'reclamo_recibido')
+    await enviar_notificacion_push(db, reclamo, 'reclamo_recibido')
 
     # Recargar con relaciones
     print(f"🔄 Recargando reclamo con relaciones...", flush=True)
@@ -670,7 +667,7 @@ async def asignar_reclamo(
     await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_asignado', current_user.municipio_id)
 
     # Notificación Push: reclamo asignado
-    enviar_notificacion_push(db, reclamo, 'reclamo_asignado', empleado_nombre=f"Empleado #{data.empleado_id}")
+    await enviar_notificacion_push(db, reclamo, 'reclamo_asignado', empleado_nombre=f"Empleado #{data.empleado_id}")
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -712,7 +709,7 @@ async def iniciar_reclamo(
     await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
 
     # Notificación Push: cambio de estado
-    enviar_notificacion_push(db, reclamo, 'cambio_estado',
+    await enviar_notificacion_push(db, reclamo, 'cambio_estado',
                               estado_anterior=estado_anterior.value,
                               estado_nuevo=EstadoReclamo.EN_PROCESO.value)
 
@@ -828,7 +825,7 @@ async def resolver_reclamo(
         await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
 
         # Notificación Push: reclamo resuelto
-        enviar_notificacion_push(db, reclamo, 'reclamo_resuelto')
+        await enviar_notificacion_push(db, reclamo, 'reclamo_resuelto')
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()

@@ -139,12 +139,33 @@ export interface DashboardStats {
   tiempo_promedio_dias: number;
 }
 
-// Tramites
-export type EstadoTramite = 'iniciado' | 'en_revision' | 'requiere_documentacion' | 'en_proceso' | 'aprobado' | 'rechazado' | 'finalizado';
+// Tramites - Estructura de 3 niveles
+// Nivel 1: TipoTramite (categorías: Obras Privadas, Comercio, etc.)
+// Nivel 2: Tramite (procedimientos: Permiso de obra, Habilitación comercial, etc.)
+// Nivel 3: Solicitud (solicitudes diarias de vecinos)
 
-export interface ServicioTramite {
+export type EstadoSolicitud = 'iniciado' | 'en_revision' | 'requiere_documentacion' | 'en_proceso' | 'aprobado' | 'rechazado' | 'finalizado';
+
+// Nivel 1: Categorías de trámites
+export interface TipoTramite {
   id: number;
   municipio_id: number;
+  nombre: string;
+  descripcion?: string;
+  codigo?: string;
+  icono?: string;
+  color?: string;
+  activo: boolean;
+  orden: number;
+  created_at: string;
+  tramites?: TramiteCatalogo[];
+}
+
+// Nivel 2: Catálogo de trámites específicos
+export interface TramiteCatalogo {
+  id: number;
+  tipo_tramite_id: number;
+  tipo_tramite?: TipoTramite;
   nombre: string;
   descripcion?: string;
   icono?: string;
@@ -156,24 +177,39 @@ export interface ServicioTramite {
   url_externa?: string;
   activo: boolean;
   orden: number;
-  favorito: boolean;
   created_at: string;
 }
 
+// Tramite: tipo unificado para compatibilidad (soporta catálogo y solicitudes)
+// Nota: Este tipo combina campos de catálogo y solicitud para mantener compatibilidad
 export interface Tramite {
   id: number;
+  // Campos comunes (requeridos)
+  nombre: string;
+  created_at: string;
+  activo: boolean;
+  orden: number;
+  // Campos de catálogo
+  tipo_tramite_id: number;
+  tipo_tramite?: TipoTramite;
+  icono?: string;
+  color?: string;
+  requisitos?: string;
+  documentos_requeridos?: string;
+  tiempo_estimado_dias: number;
+  costo?: number;
+  url_externa?: string;
+  favorito?: boolean;
+  // Campos de solicitud (requeridos para compatibilidad con código viejo)
   municipio_id: number;
   numero_tramite: string;
   asunto: string;
   descripcion?: string;
-  estado: EstadoTramite;
-  servicio_id: number;
-  servicio?: {
-    id: number;
-    nombre: string;
-    icono?: string;
-    color?: string;
-  };
+  estado: EstadoSolicitud;
+  tramite_id?: number;
+  servicio_id?: number;
+  tramite?: TramiteCatalogo;
+  servicio?: TramiteCatalogo;
   solicitante_id?: number;
   nombre_solicitante?: string;
   apellido_solicitante?: string;
@@ -188,6 +224,40 @@ export interface Tramite {
     apellido?: string;
     especialidad?: string;
   };
+  prioridad?: number;
+  respuesta?: string;
+  observaciones?: string;
+  updated_at?: string;
+  fecha_resolucion?: string;
+}
+
+// Nivel 3: Solicitudes de vecinos
+export interface Solicitud {
+  id: number;
+  municipio_id: number;
+  numero_tramite: string;
+  asunto: string;
+  descripcion?: string;
+  estado: EstadoSolicitud;
+  tramite_id?: number;
+  servicio_id?: number; // Alias deprecado de tramite_id
+  tramite?: Tramite;
+  servicio?: Tramite; // Alias deprecado de tramite
+  solicitante_id?: number;
+  nombre_solicitante?: string;
+  apellido_solicitante?: string;
+  dni_solicitante?: string;
+  email_solicitante?: string;
+  telefono_solicitante?: string;
+  direccion_solicitante?: string;
+  empleado_id?: number;
+  empleado_asignado?: {
+    id: number;
+    nombre: string;
+    apellido?: string;
+    especialidad?: string;
+  };
+  prioridad: number;
   respuesta?: string;
   observaciones?: string;
   created_at: string;
@@ -195,13 +265,42 @@ export interface Tramite {
   fecha_resolucion?: string;
 }
 
-export interface HistorialTramite {
+export interface HistorialSolicitud {
   id: number;
-  tramite_id: number;
+  solicitud_id: number;
   usuario_id?: number;
-  estado_anterior?: EstadoTramite;
-  estado_nuevo?: EstadoTramite;
+  usuario?: { nombre: string; apellido: string };
+  estado_anterior?: EstadoSolicitud;
+  estado_nuevo?: EstadoSolicitud;
   accion: string;
   comentario?: string;
   created_at: string;
+}
+
+// Alias para compatibilidad temporal (deprecado)
+export type EstadoTramite = EstadoSolicitud;
+export type HistorialTramite = HistorialSolicitud;
+
+// ServicioTramite: compatibilidad con código viejo que usaba estructura plana
+// En la nueva estructura, estas propiedades vienen del Tramite (nivel 2)
+export interface ServicioTramite {
+  id: number;
+  municipio_id?: number;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  requisitos?: string;
+  documentos_requeridos?: string;
+  tiempo_estimado_dias: number;
+  costo?: number;
+  url_externa?: string;
+  activo: boolean;
+  orden: number;
+  favorito: boolean;
+  created_at?: string;
+  // Campos de TipoTramite
+  codigo?: string;
+  // Campos de Tramite
+  tipo_tramite_id?: number;
 }

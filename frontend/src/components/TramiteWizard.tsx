@@ -24,13 +24,16 @@ import {
   Users,
   FileCheck,
   Clock,
+  ClipboardList,
+  FileStack,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { WizardModal } from './ui/WizardModal';
-import type { ServicioTramite } from '../types';
+import type { ServicioTramite, TipoTramite } from '../types';
 
 const servicioIcons: Record<string, React.ReactNode> = {
   'Store': <Store className="h-5 w-5" />,
@@ -52,21 +55,117 @@ function getServicioIcon(icono?: string): React.ReactNode {
   return servicioIcons[icono] || servicioIcons.default;
 }
 
+// Función para formatear la respuesta de IA con íconos y secciones
+function formatAIResponse(response: string, theme: { text: string; textSecondary: string; primary: string }) {
+  // Detectar secciones por patrones comunes
+  const lines = response.split('\n');
+  const sections: { title: string; icon: React.ReactNode; items: string[] }[] = [];
+  let currentSection: { title: string; icon: React.ReactNode; items: string[] } | null = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Detectar títulos de sección (con ** o sin)
+    const titleMatch = trimmed.match(/^\*?\*?(Requisitos|Documentos|Tips?|Importante|Nota).*?\*?\*?:?$/i) ||
+                       trimmed.match(/^\*?\*?(Requisitos|Documentos|Tips?|Importante|Nota)[^:]*:?\*?\*?$/i);
+
+    if (titleMatch || trimmed.toLowerCase().includes('requisitos') && trimmed.includes('**')) {
+      // Guardar sección anterior si existe
+      if (currentSection && currentSection.items.length > 0) {
+        sections.push(currentSection);
+      }
+
+      // Determinar ícono según tipo de sección
+      let icon: React.ReactNode;
+      const lowerTitle = trimmed.toLowerCase();
+      if (lowerTitle.includes('requisito')) {
+        icon = <ClipboardList className="h-3.5 w-3.5" />;
+      } else if (lowerTitle.includes('documento')) {
+        icon = <FileStack className="h-3.5 w-3.5" />;
+      } else if (lowerTitle.includes('tip')) {
+        icon = <Lightbulb className="h-3.5 w-3.5" />;
+      } else {
+        icon = <Info className="h-3.5 w-3.5" />;
+      }
+
+      currentSection = {
+        title: trimmed.replace(/\*\*/g, '').replace(/:$/, ''),
+        icon,
+        items: []
+      };
+    } else if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
+      // Es un item de lista
+      const itemText = trimmed.replace(/^[-•]\s*/, '');
+      if (currentSection) {
+        currentSection.items.push(itemText);
+      } else {
+        // Item sin sección, crear una genérica
+        currentSection = {
+          title: 'Información',
+          icon: <Info className="h-3.5 w-3.5" />,
+          items: [itemText]
+        };
+      }
+    } else if (currentSection) {
+      // Texto que no es item, agregarlo como item
+      currentSection.items.push(trimmed);
+    }
+  }
+
+  // Agregar última sección
+  if (currentSection && currentSection.items.length > 0) {
+    sections.push(currentSection);
+  }
+
+  // Si no se detectaron secciones, mostrar como texto simple
+  if (sections.length === 0) {
+    return (
+      <p className="text-xs whitespace-pre-wrap" style={{ color: theme.text }}>
+        {response}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {sections.map((section, idx) => (
+        <div key={idx}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span style={{ color: theme.primary }}>{section.icon}</span>
+            <span className="font-semibold text-xs" style={{ color: theme.text }}>{section.title}</span>
+          </div>
+          <ul className="space-y-0.5 ml-5">
+            {section.items.map((item, itemIdx) => (
+              <li key={itemIdx} className="text-xs flex items-start gap-1.5" style={{ color: theme.textSecondary }}>
+                <span className="mt-1.5 w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: theme.primary }} />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 interface TramiteWizardProps {
   open: boolean;
   onClose: () => void;
   servicios: ServicioTramite[];
+  tipos?: TipoTramite[];
   onSuccess?: () => void;
 }
 
 interface Rubro {
+  id: number;
   nombre: string;
   icono: string;
   color: string;
   servicios: ServicioTramite[];
 }
 
-export function TramiteWizard({ open, onClose, servicios, onSuccess }: TramiteWizardProps) {
+export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess }: TramiteWizardProps) {
   const { theme } = useTheme();
   const { user, register, login } = useAuth();
 
@@ -150,22 +249,21 @@ export function TramiteWizard({ open, onClose, servicios, onSuccess }: TramiteWi
     setAddressSuggestions([]);
   };
 
-  // Agrupar servicios por rubro
+  // Agrupar servicios por tipo (categoría)
+  const rubros: Rubro[] = tipos
+    .sort((a, b) => a.orden - b.orden)
+    .map(tipo => ({
+      id: tipo.id,
+      nombre: tipo.nombre,
+      icono: tipo.icono || 'FileText',
+      color: tipo.color || '#6b7280',
+      servicios: servicios.filter(s => s.tipo_tramite_id === tipo.id)
+    }))
+    .filter(r => r.servicios.length > 0);
+
+  // Mapa para acceso rápido por nombre
   const rubrosMap: Record<string, Rubro> = {};
-  servicios.forEach(s => {
-    const match = s.descripcion?.match(/^\[([^\]]+)\]/);
-    const rubroNombre = match ? match[1] : 'Otros';
-    if (!rubrosMap[rubroNombre]) {
-      rubrosMap[rubroNombre] = {
-        nombre: rubroNombre,
-        icono: s.icono || 'FileText',
-        color: s.color || '#6b7280',
-        servicios: []
-      };
-    }
-    rubrosMap[rubroNombre].servicios.push(s);
-  });
-  const rubros: Rubro[] = Object.values(rubrosMap);
+  rubros.forEach(r => { rubrosMap[r.nombre] = r; });
 
   // Auto-seleccionar el primer rubro cuando se abre el wizard
   useEffect(() => {
@@ -193,6 +291,39 @@ export function TramiteWizard({ open, onClose, servicios, onSuccess }: TramiteWi
     : [];
 
   const selectedServicio = servicios.find(s => s.id === Number(formData.servicio_id));
+
+  // Auto-cargar info de IA cuando se selecciona un trámite en el paso 1
+  useEffect(() => {
+    const fetchAIInfo = async () => {
+      // Solo disparar cuando hay un servicio seleccionado y estamos en paso 0 (selección)
+      if (!selectedServicio || wizardStep !== 0) return;
+
+      setAiLoading(true);
+      setAiResponse('');
+
+      try {
+        const contexto: Record<string, unknown> = {
+          tramite: selectedServicio.nombre,
+          categoria: selectedRubro || '',
+          descripcion: selectedServicio.descripcion?.replace(/^\[[^\]]+\]\s*/, ''),
+          documentos_requeridos: selectedServicio.documentos_requeridos,
+          requisitos: selectedServicio.requisitos,
+          tiempo_estimado: `${selectedServicio.tiempo_estimado_dias} días`,
+          costo: selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratuito',
+          municipio: 'Merlo',
+        };
+
+        const response = await chatApi.askDynamic('', contexto, 'tramite');
+        setAiResponse(response.response || response.message);
+      } catch {
+        setAiResponse('');
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    fetchAIInfo();
+  }, [selectedServicio?.id]); // Se dispara cuando cambia el servicio seleccionado
 
   const checkEmail = async (email: string) => {
     if (!email || email.length < 5) {
@@ -412,51 +543,58 @@ export function TramiteWizard({ open, onClose, servicios, onSuccess }: TramiteWi
         </div>
       </div>
 
-      {selectedRubro && (
-        <div>
-          <p className="text-xs font-medium mb-2" style={{ color: theme.text }}>Trámites de {selectedRubro}:</p>
-          <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
-            {serviciosDelRubro.map((s) => {
-              const isSelected = formData.servicio_id === String(s.id);
-              const color = s.color || theme.primary;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setFormData(prev => ({ ...prev, servicio_id: String(s.id) }))}
-                  className="relative flex-shrink-0 p-2 rounded-lg border-2 text-center"
-                  style={{ backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary, borderColor: isSelected ? color : theme.border, width: '90px' }}
-                >
-                  <div className="w-7 h-7 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
-                    {getServicioIcon(s.icono)}
-                  </div>
-                  <span className="text-[9px] font-medium block line-clamp-2" style={{ color: theme.text }}>{s.nombre}</span>
-                  <div className="text-[8px]" style={{ color: theme.textSecondary }}>{s.tiempo_estimado_dias}d · {s.costo ? `$${(s.costo/1000).toFixed(0)}k` : 'Gratis'}</div>
-                  {isSelected && (
-                    <div className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
-                      <CheckCircle2 className="h-2 w-2 text-white" />
+      <div style={{ minHeight: '90px' }}>
+        {selectedRubro && (
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: theme.text }}>Trámites de {selectedRubro}:</p>
+            <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+              {serviciosDelRubro.map((s) => {
+                const isSelected = formData.servicio_id === String(s.id);
+                const rubroColor = rubrosMap[selectedRubro]?.color || '#6b7280';
+                const color = s.color || rubroColor;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setFormData(prev => ({ ...prev, servicio_id: String(s.id) }))}
+                    className="relative flex-shrink-0 p-2 rounded-lg border-2 text-center"
+                    style={{ backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary, borderColor: isSelected ? color : theme.border, width: '90px' }}
+                  >
+                    <div className="w-7 h-7 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
+                      {getServicioIcon(s.icono)}
                     </div>
-                  )}
-                </button>
-              );
-            })}
+                    <span className="text-[9px] font-medium block line-clamp-2" style={{ color: theme.text }}>{s.nombre}</span>
+                    <div className="text-[8px]" style={{ color: theme.textSecondary }}>{s.tiempo_estimado_dias}d · {s.costo ? `$${(s.costo/1000).toFixed(0)}k` : 'Gratis'}</div>
+                    {isSelected && (
+                      <div className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
+                        <CheckCircle2 className="h-2 w-2 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {selectedServicio && (
-        <div className="p-3 rounded-xl" style={{ backgroundColor: `${selectedServicio.color || theme.primary}15`, border: `2px solid ${selectedServicio.color || theme.primary}` }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: selectedServicio.color || theme.primary }}>
-              <span className="text-white">{getServicioIcon(selectedServicio.icono)}</span>
+      {selectedServicio && (() => {
+        const tipoDelServicio = tipos.find(t => t.id === selectedServicio.tipo_tramite_id);
+        const servicioColor = selectedServicio.color || tipoDelServicio?.color || theme.primary;
+        return (
+          <div className="p-3 rounded-xl" style={{ backgroundColor: `${servicioColor}15`, border: `2px solid ${servicioColor}` }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: servicioColor }}>
+                <span className="text-white">{getServicioIcon(selectedServicio.icono)}</span>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm" style={{ color: theme.text }}>{selectedServicio.nombre}</p>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.tiempo_estimado_dias} días · {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}</p>
+              </div>
+              <CheckCircle2 className="h-5 w-5" style={{ color: servicioColor }} />
             </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm" style={{ color: theme.text }}>{selectedServicio.nombre}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.tiempo_estimado_dias} días · {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}</p>
-            </div>
-            <CheckCircle2 className="h-5 w-5" style={{ color: selectedServicio.color || theme.primary }} />
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 
@@ -801,11 +939,12 @@ export function TramiteWizard({ open, onClose, servicios, onSuccess }: TramiteWi
         )}
 
         {aiResponse && (
-          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <div className="flex items-start gap-2">
-              <Sparkles className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-              <p style={{ color: theme.text }}>{aiResponse}</p>
+          <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <Sparkles className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+              <span className="font-semibold text-xs" style={{ color: theme.primary }}>Asistente IA</span>
             </div>
+            {formatAIResponse(aiResponse, theme)}
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -75,6 +75,15 @@ const categoryIcons: Record<string, React.ReactNode> = {
   'señal': <Signpost className="h-5 w-5" />,
   'plaga': <Bug className="h-5 w-5" />,
   'edificio': <Building2 className="h-5 w-5" />,
+  'semaforo': <TrafficCone className="h-5 w-5" />,
+  'inundacion': <CloudRain className="h-5 w-5" />,
+  'ruido': <Volume2 className="h-5 w-5" />,
+  'animal': <Dog className="h-5 w-5" />,
+  'obra': <Construction className="h-5 w-5" />,
+  'terreno': <Fence className="h-5 w-5" />,
+  'usurpacion': <Home className="h-5 w-5" />,
+  'vandalismo': <PaintBucket className="h-5 w-5" />,
+  'vereda': <Footprints className="h-5 w-5" />,
   'default': <AlertTriangle className="h-5 w-5" />,
 };
 

@@ -49,7 +49,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
 import { TramiteWizard } from '../components/TramiteWizard';
-import type { Tramite, EstadoTramite, ServicioTramite, Empleado } from '../types';
+import type { Tramite, EstadoTramite, ServicioTramite, Empleado, TipoTramite } from '../types';
 import React from 'react';
 
 // Configuración de estados para Kanban
@@ -183,6 +183,7 @@ export default function GestionTramites() {
 
   const [tramites, setTramites] = useState<Tramite[]>([]);
   const [servicios, setServicios] = useState<ServicioTramite[]>([]);
+  const [tipos, setTipos] = useState<TipoTramite[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -308,14 +309,16 @@ export default function GestionTramites() {
 
   const loadData = async () => {
     try {
-      const [tramitesRes, serviciosRes, empleadosRes, resumenRes] = await Promise.all([
+      const [tramitesRes, serviciosRes, tiposRes, empleadosRes, resumenRes] = await Promise.all([
         tramitesApi.getGestionTodos(),
         tramitesApi.getServicios(),
+        tramitesApi.getTipos().catch(() => ({ data: [] })),
         empleadosApi.getAll().catch(() => ({ data: [] })),
         tramitesApi.getResumen().catch(() => ({ data: null })),
       ]);
       setTramites(tramitesRes.data);
       setServicios(serviciosRes.data);
+      setTipos(tiposRes.data);
       setEmpleados(empleadosRes.data);
       setResumen(resumenRes.data);
     } catch (error) {
@@ -508,77 +511,195 @@ export default function GestionTramites() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header con título, botón nuevo y selector de vista */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold gradient-text-rainbow">
-            Gestión de Trámites
+    <div className="space-y-6">
+      {/* Header estilo ABMPage */}
+      <div
+        className="flex items-center gap-4 px-4 py-3 rounded-xl sticky top-0 z-30"
+        style={{
+          backgroundColor: theme.card,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        {/* Título con icono decorativo - igual que ABMPage */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${theme.primary}20` }}
+          >
+            <FileText className="h-4 w-4" style={{ color: theme.primary }} />
+          </div>
+          <h1 className="text-lg font-bold tracking-tight hidden sm:block" style={{ color: theme.text }}>
+            Trámites
           </h1>
-          <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-            Administra las solicitudes de trámites del municipio
-          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Selector de vista */}
-          <div
-            className="flex rounded-lg p-1"
-            style={{ backgroundColor: theme.backgroundSecondary }}
-          >
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'kanban' ? 'shadow-sm' : ''
-              }`}
-              style={{
-                backgroundColor: viewMode === 'kanban' ? theme.card : 'transparent',
-                color: viewMode === 'kanban' ? theme.primary : theme.textSecondary,
-              }}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Kanban
-            </button>
-            <button
-              onClick={() => setViewMode('tabla')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                viewMode === 'tabla' ? 'shadow-sm' : ''
-              }`}
-              style={{
-                backgroundColor: viewMode === 'tabla' ? theme.card : 'transparent',
-                color: viewMode === 'tabla' ? theme.primary : theme.textSecondary,
-              }}
-            >
-              <List className="h-4 w-4" />
-              Tabla
-            </button>
-          </div>
+        {/* Separador */}
+        <div className="h-8 w-px hidden sm:block" style={{ backgroundColor: theme.border }} />
 
-          {/* Botón Nuevo Trámite */}
-          <button
-            onClick={() => setWizardOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white shadow-lg hover:shadow-xl transition-all"
+        {/* Buscador - ocupa espacio disponible */}
+        <div className="relative flex-1" ref={searchRef}>
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4"
+            style={{ color: theme.textSecondary }}
+          />
+          <input
+            type="text"
+            placeholder="Buscar trámites..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => searchTerm.length >= 2 && setShowSearchResults(true)}
+            className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
             style={{
-              background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
             }}
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo Trámite
-          </button>
+          />
 
-          {/* Botón refrescar */}
-          <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+          {/* Dropdown de resultados de búsqueda */}
+          {showSearchResults && (
+            <div
+              className="absolute top-full left-0 right-0 mt-1 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+            >
+              {searchResults.tramites.length > 0 && (
+                <div>
+                  <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+                    <FileText className="inline h-3 w-3 mr-1" /> Trámites
+                  </div>
+                  {searchResults.tramites.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        openTramite(t);
+                        setShowSearchResults(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
+                    >
+                      <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
+                        {t.numero_tramite}
+                      </span>
+                      <span className="text-sm truncate" style={{ color: theme.text }}>{t.asunto}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchResults.empleados.length > 0 && (
+                <div>
+                  <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+                    <User className="inline h-3 w-3 mr-1" /> Empleados
+                  </div>
+                  {searchResults.empleados.map(e => (
+                    <button
+                      key={e.id}
+                      onClick={() => {
+                        setSearchTerm(`${e.nombre} ${e.apellido}`);
+                        setShowSearchResults(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
+                    >
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
+                        {e.nombre?.[0]}{e.apellido?.[0]}
+                      </div>
+                      <span className="text-sm" style={{ color: theme.text }}>{e.nombre} {e.apellido}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchResults.solicitantes.length > 0 && (
+                <div>
+                  <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
+                    <Users className="inline h-3 w-3 mr-1" /> Solicitantes
+                  </div>
+                  {searchResults.solicitantes.map((s, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setSearchTerm(`${s.nombre} ${s.apellido}`);
+                        setShowSearchResults(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-black/5"
+                    >
+                      <span className="text-sm" style={{ color: theme.text }}>{s.nombre} {s.apellido}</span>
+                      {s.dni && <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>DNI: {s.dni}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Filtros inline - servicio y sin asignar */}
+        <div className="hidden md:flex items-center gap-2">
+          <select
+            value={filtroServicio}
+            onChange={(e) => setFiltroServicio(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
+            className="px-3 py-2 rounded-lg text-sm"
             style={{
-              backgroundColor: theme.card,
+              backgroundColor: theme.backgroundSecondary,
               border: `1px solid ${theme.border}`,
               color: theme.text,
             }}
           >
-            <RefreshCw className="h-4 w-4" />
+            <option value="todos">Todos los servicios</option>
+            {servicios.map(s => (
+              <option key={s.id} value={s.id}>{s.nombre}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}
+            className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+            style={{
+              backgroundColor: filtroSinAsignar ? '#ef444420' : theme.backgroundSecondary,
+              border: `1px solid ${filtroSinAsignar ? '#ef4444' : theme.border}`,
+              color: filtroSinAsignar ? '#ef4444' : theme.text,
+            }}
+          >
+            <Filter className="h-4 w-4" />
+            Sin asignar
           </button>
         </div>
+
+        {/* Toggle vista Kanban/Tabla */}
+        <div
+          className="flex rounded-lg p-1 flex-shrink-0"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          <button
+            onClick={() => setViewMode('kanban')}
+            className="p-2 rounded-md transition-all"
+            style={{
+              backgroundColor: viewMode === 'kanban' ? theme.card : 'transparent',
+              color: viewMode === 'kanban' ? theme.primary : theme.textSecondary,
+            }}
+            title="Vista Kanban"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('tabla')}
+            className="p-2 rounded-md transition-all"
+            style={{
+              backgroundColor: viewMode === 'tabla' ? theme.card : 'transparent',
+              color: viewMode === 'tabla' ? theme.primary : theme.textSecondary,
+            }}
+            title="Vista Tabla"
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Botón Nuevo Trámite */}
+        <button
+          onClick={() => setWizardOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all flex-shrink-0"
+          style={{ backgroundColor: theme.primary }}
+        >
+          <Plus className="h-4 w-4" />
+          Nuevo Trámite
+        </button>
       </div>
 
       {/* Stats resumen */}
@@ -622,154 +743,36 @@ export default function GestionTramites() {
         </div>
       )}
 
-      {/* Filtros */}
-      <div
-        className="rounded-xl p-4"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div className="flex flex-wrap gap-4">
-          {/* Búsqueda con autocompletado */}
-          <div className="flex-1 min-w-[300px] relative" ref={searchRef}>
-            <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 z-10"
-              style={{ color: theme.textSecondary }}
-            />
-            <input
-              type="text"
-              placeholder="Buscar trámites, solicitantes o empleados..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onFocus={() => searchTerm.length >= 2 && setShowSearchResults(true)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                border: `1px solid ${theme.border}`,
-                color: theme.text,
-              }}
-            />
+      {/* Filtros secundarios - solo mobile */}
+      <div className="flex md:hidden items-center gap-3">
+        <select
+          value={filtroServicio}
+          onChange={(e) => setFiltroServicio(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
+          className="flex-1 px-3 py-2 rounded-lg text-sm"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            border: `1px solid ${theme.border}`,
+            color: theme.text,
+          }}
+        >
+          <option value="todos">Todos los servicios</option>
+          {servicios.map(s => (
+            <option key={s.id} value={s.id}>{s.nombre}</option>
+          ))}
+        </select>
 
-            {/* Dropdown de resultados */}
-            {showSearchResults && (
-              <div
-                className="absolute top-full left-0 right-0 mt-1 rounded-lg shadow-xl z-50 max-h-80 overflow-y-auto"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-              >
-                {/* Trámites */}
-                {searchResults.tramites.length > 0 && (
-                  <div>
-                    <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
-                      <FileText className="inline h-3 w-3 mr-1" /> Trámites
-                    </div>
-                    {searchResults.tramites.map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          openTramite(t);
-                          setShowSearchResults(false);
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
-                      >
-                        <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
-                          {t.numero_tramite}
-                        </span>
-                        <span className="text-sm truncate" style={{ color: theme.text }}>{t.asunto}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Empleados */}
-                {searchResults.empleados.length > 0 && (
-                  <div>
-                    <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
-                      <User className="inline h-3 w-3 mr-1" /> Empleados
-                    </div>
-                    {searchResults.empleados.map(e => (
-                      <button
-                        key={e.id}
-                        onClick={() => {
-                          setSearchTerm(`${e.nombre} ${e.apellido}`);
-                          setShowSearchResults(false);
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
-                      >
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
-                          {e.nombre?.[0]}{e.apellido?.[0]}
-                        </div>
-                        <div>
-                          <span className="text-sm" style={{ color: theme.text }}>{e.nombre} {e.apellido}</span>
-                          {e.especialidad && (
-                            <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>({e.especialidad})</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Solicitantes */}
-                {searchResults.solicitantes.length > 0 && (
-                  <div>
-                    <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
-                      <Users className="inline h-3 w-3 mr-1" /> Solicitantes
-                    </div>
-                    {searchResults.solicitantes.map((s, i) => (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setSearchTerm(`${s.nombre} ${s.apellido}`.trim());
-                          setShowSearchResults(false);
-                        }}
-                        className="w-full px-3 py-2 text-left hover:bg-black/5 flex items-center gap-2"
-                      >
-                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium" style={{ backgroundColor: '#10b98120', color: '#10b981' }}>
-                          {s.nombre?.[0]}{s.apellido?.[0]}
-                        </div>
-                        <div>
-                          <span className="text-sm" style={{ color: theme.text }}>{s.nombre} {s.apellido}</span>
-                          {s.dni && (
-                            <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>DNI: {s.dni}</span>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Filtro servicio */}
-          <select
-            value={filtroServicio}
-            onChange={(e) => setFiltroServicio(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-            className="px-4 py-2.5 rounded-lg text-sm"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
-          >
-            <option value="todos">Todos los servicios</option>
-            {servicios.map(s => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
-
-          {/* Toggle sin asignar */}
-          <button
-            onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}
-            className="px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
-            style={{
-              backgroundColor: filtroSinAsignar ? '#ef444420' : theme.backgroundSecondary,
-              border: `1px solid ${filtroSinAsignar ? '#ef4444' : theme.border}`,
-              color: filtroSinAsignar ? '#ef4444' : theme.text,
-            }}
-          >
-            <Filter className="h-4 w-4" />
-            Sin asignar
-          </button>
-        </div>
+        <button
+          onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}
+          className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all flex-shrink-0"
+          style={{
+            backgroundColor: filtroSinAsignar ? '#ef444420' : theme.backgroundSecondary,
+            border: `1px solid ${filtroSinAsignar ? '#ef4444' : theme.border}`,
+            color: filtroSinAsignar ? '#ef4444' : theme.text,
+          }}
+        >
+          <Filter className="h-4 w-4" />
+          Sin asignar
+        </button>
       </div>
 
       {/* Vista Kanban */}
@@ -992,7 +995,7 @@ export default function GestionTramites() {
                   </tr>
                 ) : (
                   filteredTramites.map(tramite => {
-                    const config = estadoConfig[tramite.estado];
+                    const config = estadoConfig[tramite.estado] || estadoConfig.iniciado;
                     const IconEstado = config.icon;
                     return (
                       <tr
@@ -1107,16 +1110,18 @@ export default function GestionTramites() {
                   <Copy className="h-4 w-4" style={{ color: theme.textSecondary }} />
                 </button>
               </div>
-              <span
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium"
-                style={{
-                  backgroundColor: estadoConfig[selectedTramite.estado].bg,
-                  color: estadoConfig[selectedTramite.estado].color
-                }}
-              >
-                {React.createElement(estadoConfig[selectedTramite.estado].icon, { className: 'h-4 w-4' })}
-                {estadoConfig[selectedTramite.estado].label}
-              </span>
+              {(() => {
+                const cfg = estadoConfig[selectedTramite.estado] || estadoConfig.iniciado;
+                return (
+                  <span
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium"
+                    style={{ backgroundColor: cfg.bg, color: cfg.color }}
+                  >
+                    {React.createElement(cfg.icon, { className: 'h-4 w-4' })}
+                    {cfg.label}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Servicio */}
@@ -1448,9 +1453,9 @@ export default function GestionTramites() {
                       }}
                     >
                       <option value="">Seleccionar estado...</option>
-                      {estadoTransiciones[selectedTramite.estado].map(estado => (
+                      {(estadoTransiciones[selectedTramite.estado] || []).map(estado => (
                         <option key={estado} value={estado}>
-                          {estadoConfig[estado].label}
+                          {estadoConfig[estado]?.label || estado}
                         </option>
                       ))}
                     </select>
@@ -1552,6 +1557,7 @@ export default function GestionTramites() {
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         servicios={servicios}
+        tipos={tipos}
         onSuccess={loadData}
       />
     </div>

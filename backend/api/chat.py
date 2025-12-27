@@ -173,13 +173,28 @@ async def chat_dinamico(request: DynamicChatRequest):
     if not tramite and not categoria:
         return ChatResponse(response="Seleccioná primero un trámite para recibir información.")
 
+    # Extraer info adicional del contexto
+    descripcion = ctx.get('descripcion', '')
+    documentos = ctx.get('documentos_requeridos', '')
+    requisitos = ctx.get('requisitos', '')
+    tiempo = ctx.get('tiempo_estimado', '')
+    costo = ctx.get('costo', '')
+
     if tramite:
-        prompt = f"Trámite: {tramite}. Categoría: {categoria}. Municipio: {municipio}. Dame requisitos típicos y consejos útiles."
+        prompt = f"""Trámite: "{tramite}" en {municipio}. Categoría: {categoria}.
+Info disponible: {descripcion or ''} {documentos or ''} {requisitos or ''} Tiempo: {tiempo}. Costo: {costo}.
+
+Respondé en español argentino, MUY BREVE (máximo 100 palabras). Formato:
+- 2-3 requisitos clave
+- 2-3 documentos principales
+- 1 tip útil
+
+Sin introducciones ni despedidas. Solo la info práctica."""
     else:
         prompt = f"Categoría: {categoria}. Municipio: {municipio}. ¿Qué trámites hay en esta categoría?"
 
     if pregunta:
-        prompt = f"{prompt} Pregunta: {pregunta}"
+        prompt = f"{prompt}\n\nPREGUNTA ESPECÍFICA DEL USUARIO: {pregunta}\nRespondé específicamente a esta pregunta."
 
     print(f"[CHAT DINAMICO] Prompt: {prompt}")
 

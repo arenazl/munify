@@ -40,12 +40,13 @@ import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi, empleadosApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMTextarea, ABMField, ABMInfoPanel, ABMCollapsible } from '../components/ui/ABMPage';
+import { ABMPage, ABMTextarea, ABMField, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
-import type { ServicioTramite, Tramite, Empleado } from '../types';
+import type { TipoTramite, Tramite, Solicitud, Empleado, ServicioTramite } from '../types';
+import * as LucideIcons from 'lucide-react';
 
 // Iconos por nombre de servicio
 const servicioIcons: Record<string, React.ReactNode> = {
@@ -130,6 +131,7 @@ export default function Tramites() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
+  const [tiposTramite, setTiposTramite] = useState<TipoTramite[]>([]);
 
   // Sheet states
   const [sheetMode, setSheetMode] = useState<SheetMode>('closed');
@@ -181,24 +183,32 @@ export default function Tramites() {
   const [aiResponse, setAiResponse] = useState('');
   const [aiQuestion, setAiQuestion] = useState('');
 
-  // Conteos por estado
+  // Conteos por estado y por tipo
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
+  const [conteosTipos, setConteosTipos] = useState<Record<number, number>>({});
+  const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
 
   // Cargar datos
   useEffect(() => {
     const fetchData = async () => {
+      console.log('🚀 fetchData llamado, dataLoadedRef:', dataLoadedRef.current);
       if (dataLoadedRef.current) return;
       dataLoadedRef.current = true;
 
       try {
-        const [tramitesRes, serviciosRes, empleadosRes] = await Promise.all([
+        console.log('🔄 Cargando datos de tramites...');
+        const [tramitesRes, serviciosRes, empleadosRes, tiposRes] = await Promise.all([
           tramitesApi.getGestionTodos ? tramitesApi.getGestionTodos({}).catch(() => ({ data: [] })) : tramitesApi.getAll().catch(() => ({ data: [] })),
-          tramitesApi.getServicios().catch(() => ({ data: [] })),
+          tramitesApi.getServicios().catch((e) => { console.error('Error getServicios:', e); return { data: [] }; }),
           empleadosApi.getAll(true).catch(() => ({ data: [] })),
+          tramitesApi.getTipos().catch((e) => { console.error('Error getTipos:', e); return { data: [] }; }),
         ]);
+        console.log('📦 Tipos cargados:', tiposRes.data?.length, tiposRes.data);
+        console.log('📦 Servicios cargados:', serviciosRes.data?.length);
         setTramites(tramitesRes.data);
         setServicios(serviciosRes.data);
         setEmpleados(empleadosRes.data);
+        setTiposTramite(tiposRes.data);
 
         // Calcular conteos por estado
         const conteos: Record<string, number> = {};
@@ -206,6 +216,16 @@ export default function Tramites() {
           conteos[t.estado] = (conteos[t.estado] || 0) + 1;
         });
         setConteosEstados(conteos);
+
+        // Calcular conteos por tipo de trámite
+        const conteosTipo: Record<number, number> = {};
+        tramitesRes.data.forEach((t: Tramite) => {
+          const servicio = serviciosRes.data.find((s: ServicioTramite) => s.id === t.servicio_id);
+          if (servicio?.tipo_tramite_id) {
+            conteosTipo[servicio.tipo_tramite_id] = (conteosTipo[servicio.tipo_tramite_id] || 0) + 1;
+          }
+        });
+        setConteosTipos(conteosTipo);
       } catch (error) {
         console.error('Error cargando datos:', error);
         toast.error('Error al cargar datos');
@@ -237,32 +257,29 @@ export default function Tramites() {
     }
   }, [filtroEstado]);
 
-  // Agrupar servicios por rubro
+  // Usar tipos de trámite como rubros (categorías)
   interface Rubro {
+    id: number;
     nombre: string;
     icono: string;
     color: string;
     servicios: ServicioTramite[];
   }
 
-  const rubrosMap: Record<string, Rubro> = {};
-  servicios.forEach(s => {
-    const match = s.descripcion?.match(/^\[([^\]]+)\]/);
-    const rubroNombre = match ? match[1] : 'Otros';
-    if (!rubrosMap[rubroNombre]) {
-      rubrosMap[rubroNombre] = {
-        nombre: rubroNombre,
-        icono: s.icono || 'FileText',
-        color: s.color || '#6b7280',
-        servicios: []
-      };
-    }
-    rubrosMap[rubroNombre].servicios.push(s);
-  });
-  const rubros: Rubro[] = Object.values(rubrosMap);
+  // Construir rubros desde tiposTramite y filtrar servicios por tipo_tramite_id
+  const rubros: Rubro[] = tiposTramite
+    .sort((a, b) => a.orden - b.orden)
+    .map(tipo => ({
+      id: tipo.id,
+      nombre: tipo.nombre,
+      icono: tipo.icono || 'FileText',
+      color: tipo.color || '#6b7280',
+      servicios: servicios.filter(s => s.tipo_tramite_id === tipo.id)
+    }))
+    .filter(r => r.servicios.length > 0); // Solo mostrar tipos que tienen trámites
 
   const serviciosDelRubro: ServicioTramite[] = selectedRubro
-    ? rubrosMap[selectedRubro]?.servicios || []
+    ? rubros.find(r => r.nombre === selectedRubro)?.servicios || []
     : [];
 
   const filteredServicios = searchTerm.trim()
@@ -481,6 +498,12 @@ export default function Tramites() {
 
   // Filtrar trámites
   const filteredTramites = tramites.filter(t => {
+    // Filtro por tipo
+    if (filtroTipo) {
+      const servicio = servicios.find(s => s.id === t.servicio_id);
+      if (servicio?.tipo_tramite_id !== filtroTipo) return false;
+    }
+    // Filtro por búsqueda
     if (!search) return true;
     const s = search.toLowerCase();
     return t.numero_tramite?.toLowerCase().includes(s) ||
@@ -1215,42 +1238,144 @@ export default function Tramites() {
         sheetTitle=""
         sheetDescription=""
         onSheetClose={() => {}}
-        extraFilters={
-          <div className="flex gap-2 pb-2 w-full">
-            {/* Botón Estados (Todos) */}
-            <button
-              onClick={() => setFiltroEstado('')}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-all flex-1"
-              style={{
-                backgroundColor: !filtroEstado ? theme.primary : `${theme.primary}15`,
-                color: !filtroEstado ? '#ffffff' : theme.primary,
-              }}
-            >
-              <span className="text-sm font-bold">{tramites.length}</span>
-              <Eye className="h-4 w-4" />
-              <span className="text-xs font-medium">Estados</span>
-            </button>
-            {estadosDisponibles.map(estado => {
-              const count = conteosEstados[estado.id] || 0;
-              const isActive = filtroEstado === estado.id;
-              const Icon = estado.icon;
-              return (
-                <button
-                  key={estado.id}
-                  onClick={() => setFiltroEstado(isActive ? '' : estado.id)}
-                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl transition-all flex-1"
-                  style={{
-                    backgroundColor: isActive ? estado.color : `${estado.color}15`,
-                    color: isActive ? '#ffffff' : estado.color,
-                  }}
-                >
-                  <span className="text-sm font-bold">{count}</span>
-                  <Icon className="h-4 w-4" />
-                  <span className="text-xs font-medium">{estado.label}</span>
-                </button>
-              );
-            })}
+        extraFilters={undefined}
+        secondaryFilters={
+          <div className="w-full flex flex-col gap-2">
+            {/* Tipos de trámite - chips que ocupan 100% del contenedor */}
+            <div className="flex gap-1.5 pb-2 w-full">
+              {/* Botón Todos los tipos */}
+              <button
+                onClick={() => setFiltroTipo(null)}
+                className="flex flex-col items-center justify-center py-2 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                style={{
+                  background: filtroTipo === null
+                    ? theme.primary
+                    : theme.backgroundSecondary,
+                  border: `1px solid ${filtroTipo === null ? theme.primary : theme.border}`,
+                }}
+              >
+                <Tag className="h-5 w-5" style={{ color: filtroTipo === null ? '#ffffff' : theme.primary }} />
+                <span className="text-[9px] font-semibold leading-tight text-center mt-1" style={{ color: filtroTipo === null ? '#ffffff' : theme.text }}>
+                  Tipos
+                </span>
+              </button>
+
+              {/* Chips por tipo de trámite */}
+              {tiposTramite.map((tipo) => {
+                const isSelected = filtroTipo === tipo.id;
+                const tipoColor = tipo.color || '#6b7280';
+                const count = conteosTipos[tipo.id] || 0;
+                return (
+                  <button
+                    key={tipo.id}
+                    onClick={() => setFiltroTipo(isSelected ? null : tipo.id)}
+                    title={tipo.nombre}
+                    className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                    style={{
+                      background: isSelected ? tipoColor : theme.backgroundSecondary,
+                      border: `1px solid ${isSelected ? tipoColor : theme.border}`,
+                    }}
+                  >
+                    {/* Número arriba */}
+                    <span
+                      className="text-[10px] font-bold leading-none"
+                      style={{
+                        color: isSelected ? '#ffffff' : tipoColor,
+                      }}
+                    >
+                      {count}
+                    </span>
+                    {/* Icono */}
+                    <span className="[&>svg]:h-5 [&>svg]:w-5 my-1" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
+                      {getServicioIcon(tipo.icono)}
+                    </span>
+                    {/* Texto abajo */}
+                    <span className="text-[9px] font-medium leading-none text-center w-full truncate px-1" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                      {tipo.nombre.split(' ')[0]}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Estados - más compactos, ocupan 100% del contenedor */}
+            <div className="flex gap-2 w-full">
+              {[
+                { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
+                ...estadosDisponibles.map(e => ({ key: e.id, label: e.label, icon: e.icon, color: e.color, count: conteosEstados[e.id] || 0 }))
+              ].map((estado) => {
+                const Icon = estado.icon;
+                const isActive = filtroEstado === estado.key;
+                return (
+                  <button
+                    key={estado.key}
+                    onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                    className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
+                    style={{
+                      background: isActive ? estado.color : `${estado.color}15`,
+                      border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
+                    }}
+                  >
+                    {/* Icono */}
+                    <Icon
+                      className="h-4 w-4 flex-shrink-0"
+                      style={{ color: isActive ? '#ffffff' : estado.color }}
+                    />
+                    {/* Texto */}
+                    <span
+                      className="text-[10px] font-medium leading-none truncate"
+                      style={{ color: isActive ? '#ffffff' : estado.color }}
+                    >
+                      {estado.label}
+                    </span>
+                    {/* Badge con count */}
+                    <span
+                      className="text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0"
+                      style={{
+                        backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
+                        color: isActive ? '#ffffff' : estado.color,
+                      }}
+                    >
+                      {estado.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        }
+        tableView={
+          <ABMTable
+            data={filteredTramites}
+            columns={[
+              { key: 'numero_tramite', header: '#', render: (t) => <span className="font-mono text-xs">{t.numero_tramite}</span> },
+              { key: 'asunto', header: 'Asunto', render: (t) => <span className="font-medium">{t.asunto}</span> },
+              { key: 'servicio', header: 'Servicio', render: (t) => {
+                const info = getServicioInfo(t);
+                return (
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: info.color }}></span>
+                    {info.nombre}
+                  </span>
+                );
+              }},
+              { key: 'estado', header: 'Estado', render: (t) => {
+                const estado = estadoColors[t.estado] || { bg: '#6b7280', text: '#ffffff' };
+                return (
+                  <span
+                    className="px-2 py-1 text-xs font-medium rounded-full"
+                    style={{ backgroundColor: `${estado.bg}20`, color: estado.bg }}
+                  >
+                    {estadoLabels[t.estado] || t.estado}
+                  </span>
+                );
+              }},
+              { key: 'solicitante', header: 'Solicitante', render: (t) => t.nombre_solicitante || '-' },
+              { key: 'created_at', header: 'Fecha', render: (t) => new Date(t.created_at).toLocaleDateString() },
+            ]}
+            keyExtractor={(t) => t.id}
+            onRowClick={(t) => openViewSheet(t)}
+          />
         }
       >
         {loading ? (

@@ -800,17 +800,17 @@ export function ABMCollapsible({ title, icon, children, defaultOpen = false, var
     >
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-3 transition-colors duration-200 hover:opacity-90"
-        style={{ backgroundColor: bgColor, color: textColor }}
+        className="w-full flex items-center justify-between px-4 py-2 transition-colors duration-200 hover:opacity-90"
+        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
         type="button"
       >
-        <div className="flex items-center gap-2 font-medium text-sm">
+        <div className="flex items-center gap-2 font-bold text-sm">
           {icon}
           {title}
         </div>
         <ChevronDown
           className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          style={{ color: textColor }}
+          style={{ color: '#ffffff' }}
         />
       </button>
       <div
@@ -856,19 +856,21 @@ export function ABMInfoPanel({ title, icon, children, variant = 'default' }: ABM
 
   return (
     <div
-      className="rounded-lg p-4"
+      className="rounded-lg overflow-hidden"
       style={{
-        backgroundColor: bgColor,
         border: `1px solid ${borderColor}`,
       }}
     >
       {title && (
-        <div className="flex items-center gap-2 font-medium text-sm mb-3" style={{ color: textColor }}>
+        <div
+          className="flex items-center gap-2 font-bold text-sm px-4 py-2"
+          style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        >
           {icon}
           {title}
         </div>
       )}
-      <div style={{ color: theme.text }}>
+      <div className="p-4" style={{ backgroundColor: bgColor, color: theme.text }}>
         {children}
       </div>
     </div>

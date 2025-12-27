@@ -1,22 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 import logging
 
 from core.database import get_db
 from core.security import get_current_user, get_current_user_optional, require_roles
 from core.config import settings
-from models.tramite import ServicioTramite, Tramite, HistorialTramite, EstadoTramite
+from models.tramite import TipoTramite, Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from models.user import User
 from models.enums import RolUsuario
 from models.notificacion import Notificacion
 from schemas.tramite import (
-    ServicioTramiteCreate, ServicioTramiteUpdate, ServicioTramiteResponse,
-    TramiteCreate, TramiteUpdate, TramiteResponse, TramiteAsignar,
-    HistorialTramiteResponse
+    TipoTramiteCreate, TipoTramiteUpdate, TipoTramiteResponse, TipoTramiteConTramites,
+    TramiteCreate, TramiteUpdate, TramiteResponse,
+    SolicitudCreate, SolicitudUpdate, SolicitudResponse, SolicitudAsignar,
+    HistorialSolicitudResponse
 )
 from models.empleado import Empleado
 from services.notificacion_service import NotificacionService, get_plantilla, formatear_mensaje
@@ -26,312 +27,365 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ==================== SERVICIOS DE TRAMITES ====================
+# ==================== TIPOS DE TRAMITE (Categorías) ====================
 
-@router.get("/servicios", response_model=List[ServicioTramiteResponse])
-async def listar_servicios(
+@router.get("/tipos", response_model=List[TipoTramiteResponse])
+async def listar_tipos_tramite(
     municipio_id: int = Query(..., description="ID del municipio"),
-    solo_activos: bool = Query(True, description="Solo servicios activos"),
+    solo_activos: bool = Query(True, description="Solo tipos activos"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista todos los servicios de trámites disponibles para un municipio (público)"""
-    query = select(ServicioTramite).where(ServicioTramite.municipio_id == municipio_id)
+    """Lista todos los tipos de trámites (categorías) de un municipio"""
+    query = select(TipoTramite).where(TipoTramite.municipio_id == municipio_id)
 
     if solo_activos:
-        query = query.where(ServicioTramite.activo == True)
+        query = query.where(TipoTramite.activo == True)
 
-    query = query.order_by(ServicioTramite.orden, ServicioTramite.nombre)
+    query = query.order_by(TipoTramite.orden, TipoTramite.nombre)
 
     result = await db.execute(query)
     return result.scalars().all()
 
 
-@router.get("/servicios/{servicio_id}", response_model=ServicioTramiteResponse)
-async def obtener_servicio(
-    servicio_id: int,
+@router.get("/tipos/{tipo_id}", response_model=TipoTramiteConTramites)
+async def obtener_tipo_tramite(
+    tipo_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtiene un servicio de trámite por ID (público)"""
+    """Obtiene un tipo de trámite con sus trámites específicos"""
     result = await db.execute(
-        select(ServicioTramite).where(ServicioTramite.id == servicio_id)
+        select(TipoTramite)
+        .options(selectinload(TipoTramite.tramites))
+        .where(TipoTramite.id == tipo_id)
     )
-    servicio = result.scalar_one_or_none()
+    tipo = result.scalar_one_or_none()
 
-    if not servicio:
-        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    if not tipo:
+        raise HTTPException(status_code=404, detail="Tipo de trámite no encontrado")
 
-    return servicio
+    return tipo
 
 
-@router.post("/servicios", response_model=ServicioTramiteResponse)
-async def crear_servicio(
-    servicio_data: ServicioTramiteCreate,
+@router.post("/tipos", response_model=TipoTramiteResponse)
+async def crear_tipo_tramite(
+    tipo_data: TipoTramiteCreate,
     municipio_id: int = Query(..., description="ID del municipio"),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Crea un nuevo servicio de trámite (solo admin/gestor)"""
-    servicio = ServicioTramite(
+    """Crea un nuevo tipo de trámite (solo admin/supervisor)"""
+    tipo = TipoTramite(
         municipio_id=municipio_id,
-        **servicio_data.model_dump()
+        **tipo_data.model_dump()
     )
 
-    db.add(servicio)
+    db.add(tipo)
     await db.commit()
-    await db.refresh(servicio)
+    await db.refresh(tipo)
 
-    return servicio
+    return tipo
 
 
-@router.put("/servicios/{servicio_id}", response_model=ServicioTramiteResponse)
-async def actualizar_servicio(
-    servicio_id: int,
-    servicio_data: ServicioTramiteUpdate,
+@router.put("/tipos/{tipo_id}", response_model=TipoTramiteResponse)
+async def actualizar_tipo_tramite(
+    tipo_id: int,
+    tipo_data: TipoTramiteUpdate,
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Actualiza un servicio de trámite (solo admin/gestor)"""
+    """Actualiza un tipo de trámite"""
     result = await db.execute(
-        select(ServicioTramite).where(ServicioTramite.id == servicio_id)
+        select(TipoTramite).where(TipoTramite.id == tipo_id)
     )
-    servicio = result.scalar_one_or_none()
+    tipo = result.scalar_one_or_none()
 
-    if not servicio:
-        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    if not tipo:
+        raise HTTPException(status_code=404, detail="Tipo de trámite no encontrado")
 
-    for field, value in servicio_data.model_dump(exclude_unset=True).items():
-        setattr(servicio, field, value)
+    for field, value in tipo_data.model_dump(exclude_unset=True).items():
+        setattr(tipo, field, value)
 
     await db.commit()
-    await db.refresh(servicio)
+    await db.refresh(tipo)
 
-    return servicio
+    return tipo
 
 
-@router.delete("/servicios/{servicio_id}")
-async def eliminar_servicio(
-    servicio_id: int,
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN])),
+# ==================== TRAMITES (Específicos) ====================
+
+@router.get("/catalogo", response_model=List[TramiteResponse])
+async def listar_tramites_catalogo(
+    tipo_id: Optional[int] = Query(None, description="ID del tipo de trámite (opcional)"),
+    tipo_tramite_id: Optional[int] = Query(None, description="Alias de tipo_id"),
+    solo_activos: bool = Query(True, description="Solo trámites activos"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Elimina (desactiva) un servicio de trámite (solo admin)"""
+    """Lista trámites del catálogo. Si no se especifica tipo_id, devuelve todos."""
+    query = select(Tramite).options(selectinload(Tramite.tipo_tramite))
+
+    # Filtrar por tipo si se especifica
+    tipo = tipo_id or tipo_tramite_id
+    if tipo:
+        query = query.where(Tramite.tipo_tramite_id == tipo)
+
+    if solo_activos:
+        query = query.where(Tramite.activo == True)
+
+    query = query.order_by(Tramite.orden, Tramite.nombre)
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/catalogo/{tramite_id}", response_model=TramiteResponse)
+async def obtener_tramite_catalogo(
+    tramite_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene un trámite del catálogo por ID"""
     result = await db.execute(
-        select(ServicioTramite).where(ServicioTramite.id == servicio_id)
+        select(Tramite).where(Tramite.id == tramite_id)
     )
-    servicio = result.scalar_one_or_none()
+    tramite = result.scalar_one_or_none()
 
-    if not servicio:
-        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+    if not tramite:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
 
-    # Soft delete - solo desactivar
-    servicio.activo = False
+    return tramite
+
+
+@router.post("/catalogo", response_model=TramiteResponse)
+async def crear_tramite_catalogo(
+    tramite_data: TramiteCreate,
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Crea un nuevo trámite en el catálogo (solo admin/supervisor)"""
+    # Verificar que el tipo existe
+    result = await db.execute(
+        select(TipoTramite).where(TipoTramite.id == tramite_data.tipo_tramite_id)
+    )
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Tipo de trámite no encontrado")
+
+    tramite = Tramite(**tramite_data.model_dump())
+
+    db.add(tramite)
     await db.commit()
+    await db.refresh(tramite)
 
-    return {"message": "Servicio desactivado correctamente"}
+    return tramite
 
 
-# ==================== TRAMITES ====================
+@router.put("/catalogo/{tramite_id}", response_model=TramiteResponse)
+async def actualizar_tramite_catalogo(
+    tramite_id: int,
+    tramite_data: TramiteUpdate,
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Actualiza un trámite del catálogo"""
+    result = await db.execute(
+        select(Tramite).where(Tramite.id == tramite_id)
+    )
+    tramite = result.scalar_one_or_none()
 
-@router.get("", response_model=List[TramiteResponse])
-async def listar_tramites(
+    if not tramite:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+
+    for field, value in tramite_data.model_dump(exclude_unset=True).items():
+        setattr(tramite, field, value)
+
+    await db.commit()
+    await db.refresh(tramite)
+
+    return tramite
+
+
+# ==================== SOLICITUDES (Pedidos diarios) ====================
+
+@router.get("/solicitudes", response_model=List[SolicitudResponse])
+async def listar_solicitudes(
     municipio_id: int = Query(..., description="ID del municipio"),
-    estado: Optional[EstadoTramite] = Query(None, description="Filtrar por estado"),
-    servicio_id: Optional[int] = Query(None, description="Filtrar por servicio"),
+    estado: Optional[EstadoSolicitud] = Query(None, description="Filtrar por estado"),
+    tramite_id: Optional[int] = Query(None, description="Filtrar por trámite"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista trámites. Si es vecino, solo ve los suyos. Si es gestor/admin, ve todos del municipio."""
-    query = select(Tramite).where(Tramite.municipio_id == municipio_id)
+    """Lista solicitudes. Vecino ve las suyas, gestor ve todas."""
+    query = select(Solicitud).where(Solicitud.municipio_id == municipio_id)
 
-    # Si es vecino, solo ve sus propios trámites
+    # Vecino solo ve sus propias solicitudes
     if current_user and current_user.rol == RolUsuario.VECINO:
-        query = query.where(Tramite.solicitante_id == current_user.id)
+        query = query.where(Solicitud.solicitante_id == current_user.id)
     elif not current_user:
-        # Usuario anónimo no puede listar trámites
-        raise HTTPException(status_code=401, detail="Debe iniciar sesión para ver sus trámites")
+        raise HTTPException(status_code=401, detail="Debe iniciar sesión para ver sus solicitudes")
 
     if estado:
-        query = query.where(Tramite.estado == estado)
+        query = query.where(Solicitud.estado == estado)
 
-    if servicio_id:
-        query = query.where(Tramite.servicio_id == servicio_id)
+    if tramite_id:
+        query = query.where(Solicitud.tramite_id == tramite_id)
 
     query = query.options(
-        selectinload(Tramite.servicio),
-        selectinload(Tramite.empleado_asignado),
-        selectinload(Tramite.solicitante)
+        selectinload(Solicitud.tramite),
+        selectinload(Solicitud.empleado_asignado),
+        selectinload(Solicitud.solicitante)
     )
-    query = query.order_by(Tramite.created_at.desc())
+    query = query.order_by(Solicitud.created_at.desc())
     query = query.offset(skip).limit(limit)
 
     result = await db.execute(query)
     return result.scalars().all()
 
 
-@router.get("/consultar/{numero_tramite}", response_model=TramiteResponse)
-async def consultar_tramite_por_numero(
+@router.get("/solicitudes/consultar/{numero_tramite}", response_model=SolicitudResponse)
+async def consultar_solicitud_por_numero(
     numero_tramite: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Consulta un trámite por su número (público, para seguimiento)"""
+    """Consulta una solicitud por su número (público, para seguimiento)"""
     result = await db.execute(
-        select(Tramite)
+        select(Solicitud)
         .options(
-            selectinload(Tramite.servicio),
-            selectinload(Tramite.empleado_asignado),
-            selectinload(Tramite.solicitante)
+            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.empleado_asignado),
+            selectinload(Solicitud.solicitante)
         )
-        .where(Tramite.numero_tramite == numero_tramite)
+        .where(Solicitud.numero_tramite == numero_tramite)
     )
-    tramite = result.scalar_one_or_none()
+    solicitud = result.scalar_one_or_none()
 
-    if not tramite:
-        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    return tramite
+    return solicitud
 
 
-@router.get("/{tramite_id}", response_model=TramiteResponse)
-async def obtener_tramite(
-    tramite_id: int,
+@router.get("/solicitudes/{solicitud_id}", response_model=SolicitudResponse)
+async def obtener_solicitud(
+    solicitud_id: int,
     current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtiene un trámite por ID"""
+    """Obtiene una solicitud por ID"""
     result = await db.execute(
-        select(Tramite)
+        select(Solicitud)
         .options(
-            selectinload(Tramite.servicio),
-            selectinload(Tramite.empleado_asignado),
-            selectinload(Tramite.solicitante)
+            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.empleado_asignado),
+            selectinload(Solicitud.solicitante)
         )
-        .where(Tramite.id == tramite_id)
+        .where(Solicitud.id == solicitud_id)
     )
-    tramite = result.scalar_one_or_none()
+    solicitud = result.scalar_one_or_none()
 
-    if not tramite:
-        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    # Verificar permisos: vecino solo puede ver sus propios trámites
+    # Vecino solo puede ver sus propias solicitudes
     if current_user and current_user.rol == RolUsuario.VECINO:
-        if tramite.solicitante_id != current_user.id:
-            raise HTTPException(status_code=403, detail="No tiene permiso para ver este trámite")
+        if solicitud.solicitante_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No tiene permiso para ver esta solicitud")
 
-    return tramite
+    return solicitud
 
 
-@router.post("", response_model=TramiteResponse)
-async def crear_tramite(
-    tramite_data: TramiteCreate,
+@router.post("/solicitudes", response_model=SolicitudResponse)
+async def crear_solicitud(
+    solicitud_data: SolicitudCreate,
     municipio_id: int = Query(..., description="ID del municipio"),
     current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Crea un nuevo trámite.
-    - Si el usuario está logueado, se asocia automáticamente.
-    - Si es anónimo, debe proveer datos de contacto.
-    """
-    # Verificar que el servicio existe y está activo
+    """Crea una nueva solicitud de trámite"""
+    # Verificar que el trámite existe y está activo
     result = await db.execute(
-        select(ServicioTramite).where(
+        select(Tramite)
+        .options(selectinload(Tramite.tipo_tramite))
+        .where(
             and_(
-                ServicioTramite.id == tramite_data.servicio_id,
-                ServicioTramite.municipio_id == municipio_id,
-                ServicioTramite.activo == True
+                Tramite.id == solicitud_data.tramite_id,
+                Tramite.activo == True
             )
         )
     )
-    servicio = result.scalar_one_or_none()
+    tramite = result.scalar_one_or_none()
 
-    if not servicio:
-        raise HTTPException(status_code=404, detail="Servicio no encontrado o no disponible")
+    if not tramite:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado o no disponible")
 
-    # Generar número de trámite único
+    # Generar número de solicitud único
     year = datetime.now().year
     result = await db.execute(
-        select(func.count(Tramite.id)).where(
+        select(func.count(Solicitud.id)).where(
             and_(
-                Tramite.municipio_id == municipio_id,
-                func.extract('year', Tramite.created_at) == year
+                Solicitud.municipio_id == municipio_id,
+                func.extract('year', Solicitud.created_at) == year
             )
         )
     )
     count = result.scalar() or 0
-    numero_tramite = f"TRM-{year}-{str(count + 1).zfill(5)}"
+    numero_tramite = f"SOL-{year}-{str(count + 1).zfill(5)}"
 
-    # Preparar datos del trámite
-    tramite_dict = tramite_data.model_dump()
+    # Preparar datos
+    solicitud_dict = solicitud_data.model_dump()
 
-    tramite = Tramite(
+    solicitud = Solicitud(
         municipio_id=municipio_id,
         numero_tramite=numero_tramite,
-        estado=EstadoTramite.INICIADO,
-        **tramite_dict
+        estado=EstadoSolicitud.INICIADO,
+        **solicitud_dict
     )
 
-    # Si hay usuario logueado, asociar
+    # Si hay usuario logueado, asociar datos usando reflexión
     if current_user:
-        tramite.solicitante_id = current_user.id
-        # Si no se proporcionaron datos de contacto, usar los del usuario
-        if not tramite.nombre_solicitante:
-            tramite.nombre_solicitante = current_user.nombre
-        if not tramite.apellido_solicitante:
-            tramite.apellido_solicitante = current_user.apellido
-        if not tramite.email_solicitante:
-            tramite.email_solicitante = current_user.email
-        if not tramite.telefono_solicitante:
-            tramite.telefono_solicitante = current_user.telefono
-        if not tramite.dni_solicitante:
-            tramite.dni_solicitante = current_user.dni
-        if not tramite.direccion_solicitante:
-            tramite.direccion_solicitante = current_user.direccion
+        solicitud.solicitante_id = current_user.id
+        # Campos que se copian de User a Solicitud (user_field -> solicitud tiene sufijo _solicitante)
+        for campo in ["nombre", "apellido", "email", "telefono", "dni", "direccion"]:
+            campo_solicitud = f"{campo}_solicitante"
+            if not getattr(solicitud, campo_solicitud, None):
+                setattr(solicitud, campo_solicitud, getattr(current_user, campo, None))
     else:
-        # Usuario anónimo: verificar que al menos tenga email o teléfono
-        if not tramite_data.email_solicitante and not tramite_data.telefono_solicitante:
+        # Anónimo: verificar datos de contacto
+        if not solicitud_data.email_solicitante and not solicitud_data.telefono_solicitante:
             raise HTTPException(
                 status_code=400,
-                detail="Debe proporcionar al menos email o teléfono para seguimiento del trámite"
+                detail="Debe proporcionar al menos email o teléfono para seguimiento"
             )
 
-    db.add(tramite)
+    db.add(solicitud)
     await db.commit()
-    await db.refresh(tramite)
+    await db.refresh(solicitud)
 
-    # Registrar en historial
-    historial = HistorialTramite(
-        tramite_id=tramite.id,
+    # Historial
+    historial = HistorialSolicitud(
+        solicitud_id=solicitud.id,
         usuario_id=current_user.id if current_user else None,
-        estado_nuevo=EstadoTramite.INICIADO,
-        accion="Trámite creado",
-        comentario=f"Trámite iniciado para servicio: {servicio.nombre}"
+        estado_nuevo=EstadoSolicitud.INICIADO,
+        accion="Solicitud creada",
+        comentario=f"Trámite: {tramite.nombre}"
     )
     db.add(historial)
     await db.commit()
 
-    # Cargar relación servicio para la respuesta
-    await db.refresh(tramite, ["servicio"])
+    await db.refresh(solicitud, ["tramite"])
 
-    # === NOTIFICACIONES ===
+    # Notificaciones
     try:
-        # Preparar variables para las plantillas
-        variables = {
-            "numero_tramite": tramite.numero_tramite,
-            "servicio": servicio.nombre,
-            "asunto": tramite.asunto or "Sin asunto",
-            "nombre": tramite.nombre_solicitante or "Vecino",
-            "solicitante_nombre": f"{tramite.nombre_solicitante or ''} {tramite.apellido_solicitante or ''}".strip() or "Sin nombre",
-            "url": f"{settings.FRONTEND_URL}/tramites/{tramite.id}"
-        }
-
-        # 1. Notificación in-app al vecino (si está logueado)
         if current_user:
+            variables = {
+                "numero_tramite": solicitud.numero_tramite,
+                "tramite": tramite.nombre,
+                "asunto": solicitud.asunto or "Sin asunto",
+                "nombre": solicitud.nombre_solicitante or "Vecino",
+            }
             plantilla = get_plantilla("tramite_creado")
             if plantilla:
                 push_config = plantilla.get("push", {})
-                titulo = formatear_mensaje(push_config.get("titulo", "Trámite Registrado"), variables)
+                titulo = formatear_mensaje(push_config.get("titulo", "Solicitud Registrada"), variables)
                 cuerpo = formatear_mensaje(push_config.get("cuerpo", ""), variables)
 
                 notif = Notificacion(
@@ -342,84 +396,77 @@ async def crear_tramite(
                 )
                 db.add(notif)
                 await db.commit()
-                logger.info(f"Notificación creada para usuario {current_user.id} - Trámite {tramite.numero_tramite}")
 
-        # 2. Notificación a supervisores
+        # Notificar supervisores
         await NotificacionService.notificar_supervisores(
             db=db,
             municipio_id=municipio_id,
-            titulo=f"Nuevo Trámite: {tramite.numero_tramite}",
-            mensaje=f"Nuevo trámite de {servicio.nombre}: {tramite.asunto or 'Sin asunto'}",
+            titulo=f"Nueva Solicitud: {solicitud.numero_tramite}",
+            mensaje=f"Nueva solicitud de {tramite.nombre}: {solicitud.asunto or 'Sin asunto'}",
             tipo="tramite",
-            enviar_whatsapp=False  # Por ahora solo in-app
+            enviar_whatsapp=False
         )
     except Exception as e:
-        logger.error(f"Error enviando notificaciones de trámite: {e}")
-        # No fallar el endpoint si las notificaciones fallan
+        logger.error(f"Error enviando notificaciones: {e}")
 
-    return tramite
+    return solicitud
 
 
-@router.put("/{tramite_id}", response_model=TramiteResponse)
-async def actualizar_tramite(
-    tramite_id: int,
-    tramite_data: TramiteUpdate,
+@router.put("/solicitudes/{solicitud_id}", response_model=SolicitudResponse)
+async def actualizar_solicitud(
+    solicitud_id: int,
+    solicitud_data: SolicitudUpdate,
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Actualiza un trámite (solo personal municipal)"""
+    """Actualiza una solicitud (solo personal municipal)"""
     result = await db.execute(
-        select(Tramite)
-        .options(selectinload(Tramite.servicio))
-        .where(Tramite.id == tramite_id)
+        select(Solicitud)
+        .options(selectinload(Solicitud.tramite))
+        .where(Solicitud.id == solicitud_id)
     )
-    tramite = result.scalar_one_or_none()
+    solicitud = result.scalar_one_or_none()
 
-    if not tramite:
-        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    estado_anterior = tramite.estado
+    estado_anterior = solicitud.estado
 
-    # Actualizar campos
-    for field, value in tramite_data.model_dump(exclude_unset=True).items():
-        setattr(tramite, field, value)
+    for field, value in solicitud_data.model_dump(exclude_unset=True).items():
+        setattr(solicitud, field, value)
 
-    # Si cambió el estado, registrar fecha de resolución si corresponde
-    cambio_estado = tramite_data.estado and tramite_data.estado != estado_anterior
+    # Si cambió el estado
+    cambio_estado = solicitud_data.estado and solicitud_data.estado != estado_anterior
     if cambio_estado:
-        if tramite_data.estado in [EstadoTramite.APROBADO, EstadoTramite.RECHAZADO, EstadoTramite.FINALIZADO]:
-            tramite.fecha_resolucion = datetime.utcnow()
+        if solicitud_data.estado in [EstadoSolicitud.APROBADO, EstadoSolicitud.RECHAZADO, EstadoSolicitud.FINALIZADO]:
+            solicitud.fecha_resolucion = datetime.utcnow()
 
-        # Registrar en historial
-        historial = HistorialTramite(
-            tramite_id=tramite.id,
+        historial = HistorialSolicitud(
+            solicitud_id=solicitud.id,
             usuario_id=current_user.id,
             estado_anterior=estado_anterior,
-            estado_nuevo=tramite_data.estado,
-            accion=f"Estado cambiado a {tramite_data.estado.value}",
-            comentario=tramite_data.observaciones
+            estado_nuevo=solicitud_data.estado,
+            accion=f"Estado cambiado a {solicitud_data.estado.value}",
+            comentario=solicitud_data.observaciones
         )
         db.add(historial)
 
     await db.commit()
-    await db.refresh(tramite)
+    await db.refresh(solicitud)
 
-    # === NOTIFICACIONES por cambio de estado ===
-    if cambio_estado and tramite.solicitante_id:
+    # Notificaciones por cambio de estado
+    if cambio_estado and solicitud.solicitante_id:
         try:
             variables = {
-                "numero_tramite": tramite.numero_tramite,
-                "servicio": tramite.servicio.nombre if tramite.servicio else "Trámite",
-                "estado_nuevo": tramite_data.estado.value.replace("_", " ").title(),
-                "nombre": tramite.nombre_solicitante or "Vecino",
-                "motivo_rechazo": tramite_data.observaciones or "Sin especificar",
-                "url": f"{settings.FRONTEND_URL}/tramites/{tramite.id}"
+                "numero_tramite": solicitud.numero_tramite,
+                "tramite": solicitud.tramite.nombre if solicitud.tramite else "Trámite",
+                "estado_nuevo": solicitud_data.estado.value.replace("_", " ").title(),
+                "nombre": solicitud.nombre_solicitante or "Vecino",
             }
 
-            # Determinar tipo de notificación según estado
-            if tramite_data.estado == EstadoTramite.APROBADO:
+            if solicitud_data.estado == EstadoSolicitud.APROBADO:
                 tipo_notif = "tramite_aprobado"
-            elif tramite_data.estado == EstadoTramite.RECHAZADO:
+            elif solicitud_data.estado == EstadoSolicitud.RECHAZADO:
                 tipo_notif = "tramite_rechazado"
             else:
                 tipo_notif = "tramite_cambio_estado"
@@ -431,80 +478,140 @@ async def actualizar_tramite(
                 cuerpo = formatear_mensaje(push_config.get("cuerpo", ""), variables)
 
                 notif = Notificacion(
-                    usuario_id=tramite.solicitante_id,
+                    usuario_id=solicitud.solicitante_id,
                     titulo=titulo,
                     mensaje=cuerpo,
                     tipo="tramite"
                 )
                 db.add(notif)
                 await db.commit()
-                logger.info(f"Notificación de cambio de estado enviada - Trámite {tramite.numero_tramite}")
         except Exception as e:
-            logger.error(f"Error enviando notificación de cambio de estado: {e}")
+            logger.error(f"Error notificación cambio estado: {e}")
 
-    return tramite
+    return solicitud
 
 
-@router.get("/{tramite_id}/historial", response_model=List[HistorialTramiteResponse])
-async def obtener_historial_tramite(
-    tramite_id: int,
+@router.get("/solicitudes/{solicitud_id}/historial", response_model=List[HistorialSolicitudResponse])
+async def obtener_historial_solicitud(
+    solicitud_id: int,
     current_user: User = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtiene el historial de cambios de un trámite"""
-    # Verificar que el trámite existe
+    """Obtiene el historial de una solicitud"""
     result = await db.execute(
-        select(Tramite).where(Tramite.id == tramite_id)
+        select(Solicitud).where(Solicitud.id == solicitud_id)
     )
-    tramite = result.scalar_one_or_none()
+    solicitud = result.scalar_one_or_none()
 
-    if not tramite:
-        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    # Verificar permisos
     if current_user and current_user.rol == RolUsuario.VECINO:
-        if tramite.solicitante_id != current_user.id:
-            raise HTTPException(status_code=403, detail="No tiene permiso para ver este trámite")
+        if solicitud.solicitante_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No tiene permiso")
 
     result = await db.execute(
-        select(HistorialTramite)
-        .where(HistorialTramite.tramite_id == tramite_id)
-        .order_by(HistorialTramite.created_at.desc())
+        select(HistorialSolicitud)
+        .where(HistorialSolicitud.solicitud_id == solicitud_id)
+        .order_by(HistorialSolicitud.created_at.desc())
     )
 
     return result.scalars().all()
 
 
+# ==================== ASIGNACIÓN ====================
+
+@router.post("/solicitudes/{solicitud_id}/asignar", response_model=SolicitudResponse)
+async def asignar_solicitud(
+    solicitud_id: int,
+    asignacion: SolicitudAsignar,
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Asigna un empleado a una solicitud"""
+    result = await db.execute(
+        select(Solicitud)
+        .options(
+            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.empleado_asignado),
+            selectinload(Solicitud.solicitante)
+        )
+        .where(Solicitud.id == solicitud_id)
+    )
+    solicitud = result.scalar_one_or_none()
+
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Verificar empleado
+    result = await db.execute(
+        select(Empleado).where(
+            and_(
+                Empleado.id == asignacion.empleado_id,
+                Empleado.municipio_id == solicitud.municipio_id,
+                Empleado.activo == True
+            )
+        )
+    )
+    empleado = result.scalar_one_or_none()
+
+    if not empleado:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+
+    empleado_anterior_id = solicitud.empleado_id
+    estado_anterior = solicitud.estado
+
+    solicitud.empleado_id = asignacion.empleado_id
+
+    if solicitud.estado == EstadoSolicitud.INICIADO:
+        solicitud.estado = EstadoSolicitud.EN_REVISION
+
+    accion = "Empleado asignado" if not empleado_anterior_id else "Empleado reasignado"
+    historial = HistorialSolicitud(
+        solicitud_id=solicitud.id,
+        usuario_id=current_user.id,
+        estado_anterior=estado_anterior,
+        estado_nuevo=solicitud.estado,
+        accion=f"{accion}: {empleado.nombre} {empleado.apellido or ''}",
+        comentario=asignacion.comentario
+    )
+    db.add(historial)
+
+    await db.commit()
+    await db.refresh(solicitud)
+
+    return solicitud
+
+
 # ==================== ESTADÍSTICAS ====================
 
 @router.get("/stats/resumen")
-async def resumen_tramites(
+async def resumen_solicitudes(
     municipio_id: int = Query(..., description="ID del municipio"),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Resumen de trámites para dashboard (solo admin/gestor)"""
+    """Resumen de solicitudes para dashboard"""
     # Contar por estado
     result = await db.execute(
-        select(Tramite.estado, func.count(Tramite.id))
-        .where(Tramite.municipio_id == municipio_id)
-        .group_by(Tramite.estado)
+        select(Solicitud.estado, func.count(Solicitud.id))
+        .where(Solicitud.municipio_id == municipio_id)
+        .group_by(Solicitud.estado)
     )
     por_estado = {row[0].value: row[1] for row in result.all()}
 
-    # Total de trámites
+    # Total
     total_result = await db.execute(
-        select(func.count(Tramite.id)).where(Tramite.municipio_id == municipio_id)
+        select(func.count(Solicitud.id)).where(Solicitud.municipio_id == municipio_id)
     )
     total = total_result.scalar() or 0
 
-    # Trámites de hoy
-    from datetime import date
+    # Hoy
     hoy_result = await db.execute(
-        select(func.count(Tramite.id)).where(
+        select(func.count(Solicitud.id)).where(
             and_(
-                Tramite.municipio_id == municipio_id,
-                func.date(Tramite.created_at) == date.today()
+                Solicitud.municipio_id == municipio_id,
+                func.date(Solicitud.created_at) == date.today()
             )
         )
     )
@@ -517,266 +624,56 @@ async def resumen_tramites(
     }
 
 
-# ==================== ASIGNACIÓN ====================
+# ==================== GESTIÓN ====================
 
-@router.post("/{tramite_id}/asignar", response_model=TramiteResponse)
-async def asignar_tramite(
-    tramite_id: int,
-    asignacion: TramiteAsignar,
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
-    db: AsyncSession = Depends(get_db)
-):
-    """Asigna un empleado a un trámite"""
-    # Obtener trámite
-    result = await db.execute(
-        select(Tramite)
-        .options(
-            selectinload(Tramite.servicio),
-            selectinload(Tramite.empleado_asignado),
-            selectinload(Tramite.solicitante)
-        )
-        .where(Tramite.id == tramite_id)
-    )
-    tramite = result.scalar_one_or_none()
-
-    if not tramite:
-        raise HTTPException(status_code=404, detail="Trámite no encontrado")
-
-    # Verificar que el empleado existe
-    result = await db.execute(
-        select(Empleado).where(
-            and_(
-                Empleado.id == asignacion.empleado_id,
-                Empleado.municipio_id == tramite.municipio_id,
-                Empleado.activo == True
-            )
-        )
-    )
-    empleado = result.scalar_one_or_none()
-
-    if not empleado:
-        raise HTTPException(status_code=404, detail="Empleado no encontrado o no disponible")
-
-    # Guardar empleado anterior para historial
-    empleado_anterior_id = tramite.empleado_id
-    estado_anterior = tramite.estado
-
-    # Asignar empleado
-    tramite.empleado_id = asignacion.empleado_id
-
-    # Si estaba en estado iniciado, pasar a en_revision
-    if tramite.estado == EstadoTramite.INICIADO:
-        tramite.estado = EstadoTramite.EN_REVISION
-
-    # Registrar en historial
-    accion = "Empleado asignado" if not empleado_anterior_id else "Empleado reasignado"
-    historial = HistorialTramite(
-        tramite_id=tramite.id,
-        usuario_id=current_user.id,
-        estado_anterior=estado_anterior,
-        estado_nuevo=tramite.estado,
-        accion=f"{accion}: {empleado.nombre} {empleado.apellido or ''}",
-        comentario=asignacion.comentario
-    )
-    db.add(historial)
-
-    await db.commit()
-    await db.refresh(tramite)
-
-    return tramite
-
-
-@router.get("/{tramite_id}/sugerir-empleado")
-async def sugerir_empleado_ia(
-    tramite_id: int,
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Usa IA para sugerir el mejor empleado para un trámite
-    basándose en el tipo de servicio, carga de trabajo y disponibilidad.
-    """
-    import httpx
-    from core.config import settings
-
-    # Obtener trámite con servicio
-    result = await db.execute(
-        select(Tramite)
-        .options(selectinload(Tramite.servicio))
-        .where(Tramite.id == tramite_id)
-    )
-    tramite = result.scalar_one_or_none()
-
-    if not tramite:
-        raise HTTPException(status_code=404, detail="Trámite no encontrado")
-
-    # Obtener empleados activos del municipio
-    result = await db.execute(
-        select(Empleado).where(
-            and_(
-                Empleado.municipio_id == tramite.municipio_id,
-                Empleado.activo == True
-            )
-        )
-    )
-    empleados = result.scalars().all()
-
-    if not empleados:
-        return {
-            "sugerencia": None,
-            "mensaje": "No hay empleados disponibles",
-            "empleados": []
-        }
-
-    # Obtener carga de trabajo de cada empleado (trámites activos)
-    cargas = {}
-    for emp in empleados:
-        result = await db.execute(
-            select(func.count(Tramite.id)).where(
-                and_(
-                    Tramite.empleado_id == emp.id,
-                    Tramite.estado.notin_([EstadoTramite.FINALIZADO, EstadoTramite.RECHAZADO])
-                )
-            )
-        )
-        cargas[emp.id] = result.scalar() or 0
-
-    # Preparar datos para IA
-    empleados_info = []
-    for emp in empleados:
-        empleados_info.append({
-            "id": emp.id,
-            "nombre": f"{emp.nombre} {emp.apellido or ''}",
-            "especialidad": emp.especialidad or "General",
-            "carga_actual": cargas[emp.id],
-            "capacidad_maxima": emp.capacidad_maxima
-        })
-
-    # Si no hay API de Gemini, usar lógica simple
-    if not settings.GEMINI_API_KEY:
-        # Ordenar por menor carga de trabajo
-        empleados_ordenados = sorted(empleados_info, key=lambda x: x["carga_actual"])
-        mejor = empleados_ordenados[0] if empleados_ordenados else None
-
-        return {
-            "sugerencia": mejor,
-            "mensaje": f"Sugerido por menor carga de trabajo ({mejor['carga_actual']} trámites activos)" if mejor else None,
-            "empleados": empleados_info
-        }
-
-    # Usar IA para sugerencia más inteligente
-    prompt = f"""Eres un asistente de gestión municipal. Sugiere el mejor empleado para este trámite:
-
-TRÁMITE:
-- Servicio: {tramite.servicio.nombre if tramite.servicio else 'General'}
-- Asunto: {tramite.asunto}
-- Descripción: {tramite.descripcion or 'Sin descripción'}
-
-EMPLEADOS DISPONIBLES:
-{chr(10).join([f"- ID {e['id']}: {e['nombre']} | Especialidad: {e['especialidad']} | Carga: {e['carga_actual']}/{e['capacidad_maxima']}" for e in empleados_info])}
-
-Responde SOLO con el ID del empleado más adecuado y una breve razón (máximo 30 palabras).
-Formato: ID|RAZÓN
-Ejemplo: 3|Especialista en el área con menor carga de trabajo"""
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": 0.3,
-                        "maxOutputTokens": 100,
-                    }
-                }
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-
-                if "|" in text:
-                    parts = text.strip().split("|")
-                    try:
-                        emp_id = int(parts[0].strip())
-                        razon = parts[1].strip() if len(parts) > 1 else "Sugerido por IA"
-
-                        sugerido = next((e for e in empleados_info if e["id"] == emp_id), None)
-                        if sugerido:
-                            return {
-                                "sugerencia": sugerido,
-                                "mensaje": razon,
-                                "empleados": empleados_info
-                            }
-                    except ValueError:
-                        pass
-
-    except Exception as e:
-        print(f"Error consultando IA: {e}")
-
-    # Fallback: menor carga
-    empleados_ordenados = sorted(empleados_info, key=lambda x: x["carga_actual"])
-    mejor = empleados_ordenados[0] if empleados_ordenados else None
-
-    return {
-        "sugerencia": mejor,
-        "mensaje": f"Sugerido por menor carga de trabajo ({mejor['carga_actual']} trámites activos)" if mejor else None,
-        "empleados": empleados_info
-    }
-
-
-# ==================== GESTIÓN MASIVA ====================
-
-@router.get("/gestion/todos", response_model=List[TramiteResponse])
-async def listar_todos_tramites(
+@router.get("/gestion/solicitudes", response_model=List[SolicitudResponse])
+async def listar_solicitudes_gestion(
     municipio_id: int = Query(..., description="ID del municipio"),
-    estado: Optional[EstadoTramite] = Query(None, description="Filtrar por estado"),
-    servicio_id: Optional[int] = Query(None, description="Filtrar por servicio"),
-    empleado_id: Optional[int] = Query(None, description="Filtrar por empleado"),
-    sin_asignar: bool = Query(False, description="Solo trámites sin asignar"),
-    search: Optional[str] = Query(None, description="Buscar por número, asunto o solicitante"),
+    estado: Optional[EstadoSolicitud] = Query(None),
+    tramite_id: Optional[int] = Query(None),
+    empleado_id: Optional[int] = Query(None),
+    sin_asignar: bool = Query(False),
+    search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista todos los trámites para gestión (supervisores/admin)"""
-    query = select(Tramite).where(Tramite.municipio_id == municipio_id)
+    """Lista solicitudes para gestión"""
+    query = select(Solicitud).where(Solicitud.municipio_id == municipio_id)
 
     if estado:
-        query = query.where(Tramite.estado == estado)
+        query = query.where(Solicitud.estado == estado)
 
-    if servicio_id:
-        query = query.where(Tramite.servicio_id == servicio_id)
+    if tramite_id:
+        query = query.where(Solicitud.tramite_id == tramite_id)
 
     if empleado_id:
-        query = query.where(Tramite.empleado_id == empleado_id)
+        query = query.where(Solicitud.empleado_id == empleado_id)
 
     if sin_asignar:
-        query = query.where(Tramite.empleado_id == None)
+        query = query.where(Solicitud.empleado_id == None)
 
     if search:
         search_term = f"%{search}%"
         query = query.where(
-            (Tramite.numero_tramite.ilike(search_term)) |
-            (Tramite.asunto.ilike(search_term)) |
-            (Tramite.nombre_solicitante.ilike(search_term)) |
-            (Tramite.apellido_solicitante.ilike(search_term)) |
-            (Tramite.dni_solicitante.ilike(search_term))
+            (Solicitud.numero_tramite.ilike(search_term)) |
+            (Solicitud.asunto.ilike(search_term)) |
+            (Solicitud.nombre_solicitante.ilike(search_term)) |
+            (Solicitud.apellido_solicitante.ilike(search_term)) |
+            (Solicitud.dni_solicitante.ilike(search_term))
         )
 
-    # Si es empleado, solo ver los suyos
+    # Empleado solo ve los suyos
     if current_user.rol == RolUsuario.EMPLEADO:
-        query = query.where(Tramite.empleado_id == current_user.empleado_id)
+        query = query.where(Solicitud.empleado_id == current_user.empleado_id)
 
     query = query.options(
-        selectinload(Tramite.servicio),
-        selectinload(Tramite.empleado_asignado),
-        selectinload(Tramite.solicitante)
+        selectinload(Solicitud.tramite),
+        selectinload(Solicitud.empleado_asignado),
+        selectinload(Solicitud.solicitante)
     )
-    query = query.order_by(Tramite.prioridad, Tramite.created_at.desc())
+    query = query.order_by(Solicitud.prioridad, Solicitud.created_at.desc())
     query = query.offset(skip).limit(limit)
 
     result = await db.execute(query)
