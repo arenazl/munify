@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map, Users,
-  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle, Trophy, MessageCircle, FileCheck
+  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle, Trophy, MessageCircle, FileCheck, Settings
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -133,6 +133,14 @@ export const getNavigation = (userRole: string) => {
       icon: Trophy,
       show: isVecino,
       description: 'Tus logros y puntos'
+    },
+    // === AJUSTES (para todos los usuarios autenticados) ===
+    {
+      name: 'Ajustes',
+      href: '/gestion/ajustes',
+      icon: Settings,
+      show: true,
+      description: 'Preferencias y configuracion'
     },
   ].filter(item => item.show);
 };

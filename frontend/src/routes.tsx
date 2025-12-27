@@ -29,6 +29,7 @@ import Tramites from './pages/Tramites';
 import MisTramites from './pages/MisTramites';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
+import Ajustes from './pages/Ajustes';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -172,6 +173,11 @@ export const router = createBrowserRouter([
       {
         path: 'mis-tramites',
         element: <MisTramites />
+      },
+      // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
+      {
+        path: 'ajustes',
+        element: <Ajustes />
       },
     ],
   },

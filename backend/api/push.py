@@ -4,12 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.sql import func
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Dict
 from core.database import get_db
 from core.security import get_current_user
 from core.config import settings
 from models import User, PushSubscription
+from models.user import DEFAULT_NOTIFICATION_PREFERENCES
 from services.push_service import send_push_to_user
+import json
 
 router = APIRouter(prefix="/push", tags=["Push Notifications"])
 
@@ -142,3 +144,67 @@ async def test_push_notification(
         return {"success": True, "message": f"Notificación enviada a {sent} dispositivo(s)"}
 
     return {"success": False, "message": "No se pudo enviar. Asegurate de tener las notificaciones activadas."}
+
+
+# ============================================
+# Preferencias de notificaciones
+# ============================================
+
+class NotificationPreferencesUpdate(BaseModel):
+    """Modelo para actualizar preferencias de notificaciones"""
+    preferences: Dict[str, bool]
+
+
+@router.get("/preferences")
+async def get_notification_preferences(
+    current_user: User = Depends(get_current_user)
+):
+    """Obtiene las preferencias de notificaciones del usuario"""
+    # Cargar config de notificaciones para obtener metadata
+    try:
+        with open("config/notificaciones.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        config = {"tipos": {}}
+
+    # Obtener preferencias del usuario (o defaults si no tiene)
+    user_prefs = current_user.notificacion_preferencias or DEFAULT_NOTIFICATION_PREFERENCES
+
+    # Combinar con metadata del JSON
+    preferences = []
+    for key, enabled in user_prefs.items():
+        tipo_config = config.get("tipos", {}).get(key, {})
+        preferences.append({
+            "key": key,
+            "enabled": enabled,
+            "nombre": tipo_config.get("nombre", key.replace("_", " ").title()),
+            "descripcion": tipo_config.get("descripcion", ""),
+            "destinatario": tipo_config.get("destinatario", "vecino")
+        })
+
+    return {
+        "preferences": preferences,
+        "defaults": DEFAULT_NOTIFICATION_PREFERENCES
+    }
+
+
+@router.put("/preferences")
+async def update_notification_preferences(
+    data: NotificationPreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Actualiza las preferencias de notificaciones del usuario"""
+    # Obtener preferencias actuales
+    current_prefs = current_user.notificacion_preferencias or DEFAULT_NOTIFICATION_PREFERENCES.copy()
+
+    # Actualizar solo las claves válidas
+    for key, value in data.preferences.items():
+        if key in DEFAULT_NOTIFICATION_PREFERENCES:
+            current_prefs[key] = value
+
+    # Guardar
+    current_user.notificacion_preferencias = current_prefs
+    await db.commit()
+
+    return {"message": "Preferencias actualizadas", "preferences": current_prefs}

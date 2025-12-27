@@ -1,8 +1,39 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
 from .enums import RolUsuario
+
+# Preferencias de notificación por defecto (todas activas)
+# Las claves coinciden con los tipos en config/notificaciones.json
+DEFAULT_NOTIFICATION_PREFERENCES = {
+    # Para vecinos
+    "reclamo_recibido": True,
+    "reclamo_asignado": True,
+    "cambio_estado": True,
+    "reclamo_resuelto": True,
+    "nuevo_comentario": True,
+    "reclamo_rechazado": True,
+    # Para trámites (vecinos)
+    "tramite_creado": True,
+    "tramite_asignado": True,
+    "tramite_cambio_estado": True,
+    "tramite_aprobado": True,
+    "tramite_rechazado": True,
+    # Para empleados
+    "asignacion_empleado": True,
+    "comentario_vecino": True,
+    "cambio_prioridad": True,
+    "reclamo_reabierto": True,
+    # Para supervisores
+    "reclamo_nuevo_supervisor": True,
+    "reclamo_resuelto_supervisor": True,
+    "reclamo_rechazado_supervisor": True,
+    "pendiente_confirmacion": True,
+    "sla_vencido": True,
+    "en_progreso": True,
+    "tramite_nuevo_supervisor": True,
+}
 
 class User(Base):
     __tablename__ = "usuarios"
@@ -23,6 +54,9 @@ class User(Base):
     es_anonimo = Column(Boolean, default=False)  # Usuario anónimo (identidad oculta para el municipio)
     rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
+
+    # Preferencias de notificaciones push (JSON con booleanos para cada tipo)
+    notificacion_preferencias = Column(JSON, default=DEFAULT_NOTIFICATION_PREFERENCES)
 
     # Relacion con empleado (si es usuario empleado)
     empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)

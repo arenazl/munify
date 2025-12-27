@@ -3,12 +3,44 @@ from pywebpush import webpush, WebPushException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models import PushSubscription, User
+from models.user import DEFAULT_NOTIFICATION_PREFERENCES
 from core.config import settings
 from typing import Optional, List
 import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+async def check_user_notification_preference(
+    db: AsyncSession,
+    user_id: int,
+    notification_type: str
+) -> bool:
+    """
+    Verifica si el usuario tiene habilitada una preferencia de notificación específica.
+
+    Args:
+        db: Sesión de base de datos
+        user_id: ID del usuario
+        notification_type: Tipo de notificación (ej: "reclamo_recibido", "cambio_estado")
+
+    Returns:
+        bool: True si la notificación está habilitada, False en caso contrario
+    """
+    result = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return False
+
+    # Obtener preferencias del usuario o usar defaults
+    prefs = user.notificacion_preferencias or DEFAULT_NOTIFICATION_PREFERENCES
+
+    # Si el tipo de notificación no existe en las preferencias, asumir habilitado
+    return prefs.get(notification_type, True)
 
 
 async def send_push_to_user(
@@ -106,6 +138,11 @@ async def send_push_to_users(
 
 async def notificar_reclamo_recibido(db: AsyncSession, reclamo) -> int:
     """Notifica al vecino que su reclamo fue recibido"""
+    # Verificar preferencia del usuario
+    if not await check_user_notification_preference(db, reclamo.creador_id, "reclamo_recibido"):
+        logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación reclamo_recibido")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
@@ -118,6 +155,10 @@ async def notificar_reclamo_recibido(db: AsyncSession, reclamo) -> int:
 
 async def notificar_reclamo_asignado(db: AsyncSession, reclamo, empleado_nombre: str) -> int:
     """Notifica al vecino que su reclamo fue asignado"""
+    if not await check_user_notification_preference(db, reclamo.creador_id, "reclamo_asignado"):
+        logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación reclamo_asignado")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
@@ -130,6 +171,10 @@ async def notificar_reclamo_asignado(db: AsyncSession, reclamo, empleado_nombre:
 
 async def notificar_cambio_estado(db: AsyncSession, reclamo, estado_anterior: str, estado_nuevo: str) -> int:
     """Notifica al vecino el cambio de estado de su reclamo"""
+    if not await check_user_notification_preference(db, reclamo.creador_id, "cambio_estado"):
+        logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación cambio_estado")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
@@ -142,6 +187,10 @@ async def notificar_cambio_estado(db: AsyncSession, reclamo, estado_anterior: st
 
 async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
     """Notifica al vecino que su reclamo fue resuelto"""
+    if not await check_user_notification_preference(db, reclamo.creador_id, "reclamo_resuelto"):
+        logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación reclamo_resuelto")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
@@ -154,6 +203,10 @@ async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
 
 async def notificar_nuevo_comentario_vecino(db: AsyncSession, reclamo, comentario: str) -> int:
     """Notifica al vecino que hay un nuevo comentario en su reclamo"""
+    if not await check_user_notification_preference(db, reclamo.creador_id, "nuevo_comentario"):
+        logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación nuevo_comentario")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
@@ -166,6 +219,10 @@ async def notificar_nuevo_comentario_vecino(db: AsyncSession, reclamo, comentari
 
 async def notificar_asignacion_empleado(db: AsyncSession, empleado_user_id: int, reclamo) -> int:
     """Notifica al empleado que le asignaron un reclamo"""
+    if not await check_user_notification_preference(db, empleado_user_id, "asignacion_empleado"):
+        logger.info(f"Usuario {empleado_user_id} tiene deshabilitada la notificación asignacion_empleado")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=empleado_user_id,
@@ -178,6 +235,10 @@ async def notificar_asignacion_empleado(db: AsyncSession, empleado_user_id: int,
 
 async def notificar_comentario_vecino_a_empleado(db: AsyncSession, empleado_user_id: int, reclamo, comentario: str) -> int:
     """Notifica al empleado que el vecino comentó en su reclamo"""
+    if not await check_user_notification_preference(db, empleado_user_id, "comentario_vecino"):
+        logger.info(f"Usuario {empleado_user_id} tiene deshabilitada la notificación comentario_vecino")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=empleado_user_id,
@@ -190,6 +251,10 @@ async def notificar_comentario_vecino_a_empleado(db: AsyncSession, empleado_user
 
 async def notificar_supervisor_reclamo_nuevo(db: AsyncSession, supervisor_user_id: int, reclamo) -> int:
     """Notifica al supervisor que hay un nuevo reclamo"""
+    if not await check_user_notification_preference(db, supervisor_user_id, "reclamo_nuevo_supervisor"):
+        logger.info(f"Usuario {supervisor_user_id} tiene deshabilitada la notificación reclamo_nuevo_supervisor")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=supervisor_user_id,
@@ -202,6 +267,10 @@ async def notificar_supervisor_reclamo_nuevo(db: AsyncSession, supervisor_user_i
 
 async def notificar_supervisor_pendiente_confirmacion(db: AsyncSession, supervisor_user_id: int, reclamo) -> int:
     """Notifica al supervisor que hay un reclamo pendiente de confirmación"""
+    if not await check_user_notification_preference(db, supervisor_user_id, "pendiente_confirmacion"):
+        logger.info(f"Usuario {supervisor_user_id} tiene deshabilitada la notificación pendiente_confirmacion")
+        return 0
+
     return await send_push_to_user(
         db=db,
         user_id=supervisor_user_id,
@@ -214,9 +283,20 @@ async def notificar_supervisor_pendiente_confirmacion(db: AsyncSession, supervis
 
 async def notificar_sla_vencido(db: AsyncSession, supervisor_user_ids: List[int], reclamo) -> int:
     """Notifica a los supervisores que el SLA de un reclamo venció"""
+    # Filtrar solo los usuarios que tienen habilitada la preferencia
+    enabled_user_ids = []
+    for user_id in supervisor_user_ids:
+        if await check_user_notification_preference(db, user_id, "sla_vencido"):
+            enabled_user_ids.append(user_id)
+        else:
+            logger.info(f"Usuario {user_id} tiene deshabilitada la notificación sla_vencido")
+
+    if not enabled_user_ids:
+        return 0
+
     return await send_push_to_users(
         db=db,
-        user_ids=supervisor_user_ids,
+        user_ids=enabled_user_ids,
         title="SLA Vencido",
         body=f"El reclamo #{reclamo.id} ha superado el tiempo de SLA.",
         url=f"/reclamos/{reclamo.id}",
