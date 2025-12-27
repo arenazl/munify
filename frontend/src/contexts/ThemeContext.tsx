@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type ThemeName = 'dark' | 'light' | 'blue' | 'green';
+export type ThemeName = 'dark' | 'light' | 'blue' | 'brown';
 
 interface Theme {
   name: ThemeName;
@@ -68,21 +68,21 @@ export const themes: Record<ThemeName, Theme> = {
     sidebarTextSecondary: '#64748b',
     contentBackground: '#0c1929',
   },
-  green: {
-    name: 'green',
-    label: 'Verde',
-    background: '#0d1f17',
-    backgroundSecondary: '#122a1e',
-    text: '#e2e8f0',
-    textSecondary: '#94a3b8',
-    border: '#1e4d3a',
-    primary: '#10b981',
-    primaryHover: '#059669',
-    card: '#1a3a2a',
-    sidebar: '#081410',
-    sidebarText: '#e2e8f0',
-    sidebarTextSecondary: '#64748b',
-    contentBackground: '#0d1f17',
+  brown: {
+    name: 'brown',
+    label: 'Marrón',
+    background: '#1a1512',
+    backgroundSecondary: '#231e1a',
+    text: '#e8e4e0',
+    textSecondary: '#a8a098',
+    border: '#3d3530',
+    primary: '#a67c52',
+    primaryHover: '#8b6642',
+    card: '#2a2420',
+    sidebar: '#141210',
+    sidebarText: '#e8e4e0',
+    sidebarTextSecondary: '#8a8078',
+    contentBackground: '#1a1512',
   },
 };
 
@@ -94,6 +94,7 @@ export const accentColors = [
   { name: 'Celeste', value: '#0ea5e9', hover: '#0284c7' },
   { name: 'Verde', value: '#10b981', hover: '#059669' },
   { name: 'Esmeralda', value: '#22c55e', hover: '#16a34a' },
+  { name: 'Marrón', value: '#a67c52', hover: '#8b6642' },
   { name: 'Amarillo', value: '#eab308', hover: '#ca8a04' },
   { name: 'Naranja', value: '#f97316', hover: '#ea580c' },
   { name: 'Rojo', value: '#ef4444', hover: '#dc2626' },
@@ -109,6 +110,10 @@ interface ThemeContextType {
   setCustomPrimary: (color: string | null) => void;
   customSidebar: string | null;
   setCustomSidebar: (color: string | null) => void;
+  sidebarBgImage: string | null;
+  setSidebarBgImage: (url: string | null) => void;
+  sidebarBgOpacity: number;
+  setSidebarBgOpacity: (opacity: number) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -129,6 +134,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const [customSidebar, setCustomSidebarState] = useState<string | null>(() => {
     return localStorage.getItem('customSidebar');
+  });
+
+  const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(() => {
+    return localStorage.getItem('sidebarBgImage');
+  });
+
+  const [sidebarBgOpacity, setSidebarBgOpacityState] = useState<number>(() => {
+    const saved = localStorage.getItem('sidebarBgOpacity');
+    return saved ? parseFloat(saved) : 0.3;
   });
 
   // Fallback to dark theme if themeName is invalid
@@ -187,6 +201,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [customSidebar]);
 
+  useEffect(() => {
+    if (sidebarBgImage) {
+      localStorage.setItem('sidebarBgImage', sidebarBgImage);
+    } else {
+      localStorage.removeItem('sidebarBgImage');
+    }
+  }, [sidebarBgImage]);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarBgOpacity', String(sidebarBgOpacity));
+  }, [sidebarBgOpacity]);
+
   const setTheme = (name: ThemeName) => {
     setThemeName(name);
   };
@@ -199,8 +225,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setCustomSidebarState(color);
   };
 
+  const setSidebarBgImage = (url: string | null) => {
+    setSidebarBgImageState(url);
+  };
+
+  const setSidebarBgOpacity = (opacity: number) => {
+    setSidebarBgOpacityState(opacity);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar }}>
+    <ThemeContext.Provider value={{
+      theme,
+      themeName,
+      setTheme,
+      customPrimary,
+      setCustomPrimary,
+      customSidebar,
+      setCustomSidebar,
+      sidebarBgImage,
+      setSidebarBgImage,
+      sidebarBgOpacity,
+      setSidebarBgOpacity
+    }}>
       {children}
     </ThemeContext.Provider>
   );

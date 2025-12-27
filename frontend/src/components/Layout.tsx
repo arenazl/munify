@@ -31,7 +31,7 @@ export default function Layout() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const { user, logout, municipioActual, refreshUser } = useAuth();
-  const { theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar } = useTheme();
+  const { theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar, sidebarBgImage, setSidebarBgImage, sidebarBgOpacity, setSidebarBgOpacity } = useTheme();
   const location = useLocation();
 
   // Guardar estado del sidebar en localStorage
@@ -107,10 +107,32 @@ export default function Layout() {
           backgroundColor: theme.sidebar,
           width: sidebarWidthPx,
           transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
+        {/* Imagen de fondo del sidebar */}
+        {sidebarBgImage && (
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{
+              backgroundImage: `url(${sidebarBgImage})`,
+              opacity: sidebarBgOpacity,
+              transition: 'opacity 0.3s ease',
+            }}
+          />
+        )}
+        {/* Overlay para mejorar legibilidad */}
+        {sidebarBgImage && (
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(180deg, ${theme.sidebar}dd 0%, ${theme.sidebar}99 50%, ${theme.sidebar}dd 100%)`,
+            }}
+          />
+        )}
         {/* Header del sidebar */}
-        <div className="flex items-center justify-between h-16 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30`, paddingLeft: sidebarCollapsed ? '8px' : '12px', paddingRight: sidebarCollapsed ? '8px' : '12px', transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+        <div className="relative z-10 flex items-center justify-between h-16 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30`, paddingLeft: sidebarCollapsed ? '8px' : '12px', paddingRight: sidebarCollapsed ? '8px' : '12px', transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <div
             className="flex items-center gap-3 flex-1 min-w-0"
             style={{
@@ -158,7 +180,7 @@ export default function Layout() {
         </div>
 
         {/* Navegación */}
-        <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
+        <nav className="relative z-10 flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
@@ -487,10 +509,10 @@ export default function Layout() {
                           {[
                             { name: 'Negro', value: '#000000' },
                             { name: 'Gris oscuro', value: '#1e293b' },
-                            { name: 'Azul oscuro', value: '#071318' },
-                            { name: 'Verde oscuro', value: '#081410' },
+                            { name: 'Azul noche', value: '#0f1a2e' },
+                            { name: 'Azul atardecer', value: '#1a2a4a' },
+                            { name: 'Marrón oscuro', value: '#1a1512' },
                             { name: 'Violeta oscuro', value: '#1e1b4b' },
-                            { name: 'Rojo oscuro', value: '#4c0519' },
                           ].map((color) => {
                             const isSelected = customSidebar === color.value;
                             return (
@@ -524,6 +546,65 @@ export default function Layout() {
                           >
                             Restablecer al tema
                           </button>
+                        )}
+                      </div>
+
+                      {/* Sección: Imagen de fondo del sidebar */}
+                      <div className="px-3 py-2 border-t border-b" style={{ borderColor: theme.border }}>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                          Fondo del sidebar
+                        </span>
+                      </div>
+                      <div className="p-3 space-y-3">
+                        {/* Opciones de imagen */}
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { name: 'Sin imagen', value: null, preview: null },
+                            { name: 'Alumbrado', value: '/light.png', preview: '/light.png' },
+                          ].map((img) => {
+                            const isSelected = sidebarBgImage === img.value;
+                            return (
+                              <button
+                                key={img.name}
+                                onClick={() => setSidebarBgImage(img.value)}
+                                className="w-12 h-12 rounded-lg transition-all duration-200 hover:scale-105 flex items-center justify-center overflow-hidden"
+                                style={{
+                                  backgroundColor: img.preview ? 'transparent' : theme.backgroundSecondary,
+                                  boxShadow: isSelected ? `0 0 0 2px ${theme.primary}` : 'none',
+                                  border: `1px solid ${theme.border}`,
+                                }}
+                                title={img.name}
+                              >
+                                {img.preview ? (
+                                  <img src={img.preview} alt={img.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <X className="w-4 h-4" style={{ color: theme.textSecondary }} />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Slider de opacidad - solo visible si hay imagen */}
+                        {sidebarBgImage && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs" style={{ color: theme.textSecondary }}>Opacidad</span>
+                              <span className="text-xs font-mono" style={{ color: theme.text }}>{Math.round(sidebarBgOpacity * 100)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="0.8"
+                              step="0.05"
+                              value={sidebarBgOpacity}
+                              onChange={(e) => setSidebarBgOpacity(parseFloat(e.target.value))}
+                              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                              style={{
+                                background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${((sidebarBgOpacity - 0.1) / 0.7) * 100}%, ${theme.backgroundSecondary} ${((sidebarBgOpacity - 0.1) / 0.7) * 100}%, ${theme.backgroundSecondary} 100%)`,
+                              }}
+                            />
+                          </div>
                         )}
                       </div>
                     </div>
