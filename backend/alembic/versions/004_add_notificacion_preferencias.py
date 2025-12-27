@@ -1,7 +1,7 @@
 """Agregar campo notificacion_preferencias a usuarios
 
-Revision ID: 004_add_notificacion_preferencias
-Revises: 003_add_pendiente_confirmacion
+Revision ID: 004_notif_prefs
+Revises: 003_pendiente_conf
 Create Date: 2024-12-27
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import mysql
 import json
 
 # revision identifiers, used by Alembic.
-revision: str = '004_add_notificacion_preferencias'
+revision: str = '004_notif_prefs'
 down_revision: Union[str, None] = '003_add_pendiente_confirmacion'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
