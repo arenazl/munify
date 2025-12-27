@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, BellOff, X, Check, AlertCircle } from 'lucide-react';
+import { Bell, BellOff, X, Check, AlertCircle, Send } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   isPushSupported,
@@ -8,6 +8,7 @@ import {
   unsubscribeFromPush,
   isSubscribed
 } from '../lib/pushNotifications';
+import api from '../lib/api';
 
 interface NotificationSettingsProps {
   isOpen: boolean;
@@ -21,6 +22,8 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -65,6 +68,20 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const response = await api.post('/push/test');
+      setTestResult(response.data.success ? 'Notificación enviada!' : response.data.message);
+    } catch (err) {
+      setTestResult('Error al enviar notificación de prueba');
+      console.error(err);
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -195,6 +212,29 @@ export default function NotificationSettings({ isOpen, onClose }: NotificationSe
                 </li>
               </ul>
             </div>
+
+            {subscribed && (
+              <div className="pt-2">
+                <button
+                  onClick={handleTestNotification}
+                  disabled={testLoading}
+                  className="w-full py-2 px-4 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                  style={{
+                    backgroundColor: `${theme.primary}15`,
+                    color: theme.primary,
+                    opacity: testLoading ? 0.5 : 1
+                  }}
+                >
+                  <Send className="h-4 w-4" />
+                  {testLoading ? 'Enviando...' : 'Enviar notificación de prueba'}
+                </button>
+                {testResult && (
+                  <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
+                    {testResult}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
