@@ -1,6 +1,6 @@
 import {
-  Home, ClipboardList, Map, Users,
-  Wrench, FileText, FolderTree, MapPin, FileDown, Clock, PlusCircle, Trophy, MessageCircle, FileCheck, Settings
+  Home, ClipboardList, Map,
+  Wrench, FileDown, Clock, Trophy, FileCheck
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -50,34 +50,6 @@ export const getNavigation = (userRole: string) => {
 
     // === SECCIÓN ADMINISTRACIÓN ===
     {
-      name: 'Empleados',
-      href: '/gestion/empleados',
-      icon: Users,
-      show: isAdminOrSupervisor,
-      description: 'Gestionar empleados'
-    },
-    {
-      name: 'Usuarios',
-      href: '/gestion/usuarios',
-      icon: Users,
-      show: isAdminOrSupervisor,
-      description: 'Gestionar usuarios'
-    },
-    {
-      name: 'Categorías',
-      href: '/gestion/categorias',
-      icon: FolderTree,
-      show: isAdmin,
-      description: 'Gestionar categorías'
-    },
-    {
-      name: 'Zonas',
-      href: '/gestion/zonas',
-      icon: MapPin,
-      show: isAdmin,
-      description: 'Gestionar zonas/barrios'
-    },
-    {
       name: 'SLA',
       href: '/gestion/sla',
       icon: Clock,
@@ -90,13 +62,6 @@ export const getNavigation = (userRole: string) => {
       icon: FileDown,
       show: isAdminOrSupervisor,
       description: 'Exportar informes CSV'
-    },
-    {
-      name: 'WhatsApp',
-      href: '/gestion/whatsapp',
-      icon: MessageCircle,
-      show: isAdminOrSupervisor,
-      description: 'Configurar WhatsApp Business'
     },
     {
       name: 'Trámites',
@@ -133,14 +98,6 @@ export const getNavigation = (userRole: string) => {
       icon: Trophy,
       show: isVecino,
       description: 'Tus logros y puntos'
-    },
-    // === AJUSTES (para todos los usuarios autenticados) ===
-    {
-      name: 'Ajustes',
-      href: '/gestion/ajustes',
-      icon: Settings,
-      show: true,
-      description: 'Preferencias y configuracion'
     },
   ].filter(item => item.show);
 };

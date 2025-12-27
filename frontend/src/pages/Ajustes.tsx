@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bell, MessageCircle, Users, Wrench, ChevronRight } from 'lucide-react';
+import { Settings, Bell, MessageCircle, Users, Wrench, ChevronRight, FolderTree, MapPin } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPreferences from '../components/NotificationPreferences';
 
-type Tab = 'preferencias' | 'whatsapp' | 'usuarios' | 'empleados';
+type Tab = 'preferencias' | 'whatsapp' | 'usuarios' | 'empleados' | 'categorias' | 'zonas';
 
 export default function Ajustes() {
   const { theme } = useTheme();
@@ -16,11 +16,13 @@ export default function Ajustes() {
   const isSupervisor = user?.rol === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
 
-  const tabs: { id: Tab; label: string; icon: typeof Settings; show: boolean; link?: string }[] = [
+  const tabs: { id: Tab; label: string; icon: typeof Settings; show: boolean }[] = [
     { id: 'preferencias', label: 'Notificaciones', icon: Bell, show: true },
-    { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, show: isAdminOrSupervisor, link: '/gestion/whatsapp' },
-    { id: 'usuarios', label: 'Usuarios', icon: Users, show: isAdminOrSupervisor, link: '/gestion/usuarios' },
-    { id: 'empleados', label: 'Empleados', icon: Wrench, show: isAdminOrSupervisor, link: '/gestion/empleados' },
+    { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, show: isAdminOrSupervisor },
+    { id: 'usuarios', label: 'Usuarios', icon: Users, show: isAdminOrSupervisor },
+    { id: 'empleados', label: 'Empleados', icon: Wrench, show: isAdminOrSupervisor },
+    { id: 'categorias', label: 'Categorias', icon: FolderTree, show: isAdmin },
+    { id: 'zonas', label: 'Zonas', icon: MapPin, show: isAdmin },
   ];
 
   const visibleTabs = tabs.filter(t => t.show);
@@ -173,6 +175,72 @@ export default function Ajustes() {
               }}
             >
               Ir a Empleados
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'categorias' && (
+        <div
+          className="rounded-xl p-6"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="text-center py-8">
+            <div
+              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#8b5cf620' }}
+            >
+              <FolderTree className="h-8 w-8" style={{ color: '#8b5cf6' }} />
+            </div>
+            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
+              Gestion de Categorias
+            </h3>
+            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
+              Administra las categorias de reclamos: alumbrado, bacheo, limpieza, etc.
+            </p>
+            <Link
+              to="/gestion/categorias"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
+              style={{
+                backgroundColor: '#8b5cf6',
+                color: '#ffffff',
+              }}
+            >
+              Ir a Categorias
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'zonas' && (
+        <div
+          className="rounded-xl p-6"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="text-center py-8">
+            <div
+              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#06b6d420' }}
+            >
+              <MapPin className="h-8 w-8" style={{ color: '#06b6d4' }} />
+            </div>
+            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
+              Gestion de Zonas
+            </h3>
+            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
+              Administra las zonas y barrios del municipio para asignar empleados.
+            </p>
+            <Link
+              to="/gestion/zonas"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
+              style={{
+                backgroundColor: '#06b6d4',
+                color: '#ffffff',
+              }}
+            >
+              Ir a Zonas
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>

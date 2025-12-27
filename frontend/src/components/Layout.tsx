@@ -533,16 +533,15 @@ export default function Layout() {
 
               <NotificacionesDropdown />
 
-              {/* Configuración - solo para admin */}
-              {user.rol === 'admin' && (
-                <Link
-                  to="/configuracion"
-                  className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-45 active:scale-95"
-                  style={{ color: theme.textSecondary }}
-                >
-                  <Settings className="h-5 w-5" />
-                </Link>
-              )}
+              {/* Ajustes - para todos los usuarios */}
+              <Link
+                to="/gestion/ajustes"
+                className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-45 active:scale-95"
+                style={{ color: theme.textSecondary }}
+                title="Ajustes"
+              >
+                <Settings className="h-5 w-5" />
+              </Link>
             </div>
           </div>
         </header>
