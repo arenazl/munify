@@ -248,6 +248,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     razon_principal: string;
   }[]>([]);
   const [loadingSugerencias, setLoadingSugerencias] = useState(false);
+  const [sugerenciasColapsadas, setSugerenciasColapsadas] = useState(false);
 
   // Búsqueda de usuarios para datos de contacto
   const [userSearchResults, setUserSearchResults] = useState<UserType[]>([]);
@@ -351,11 +352,12 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       zonasApi.getAll(true),
       empleadosApi.getAll(true),
     ]).then(([categoriasRes, zonasRes, empleadosRes]) => {
+      console.log('Empleados cargados:', empleadosRes.data?.length || 0, 'empleados', empleadosRes.data);
       setCategorias(categoriasRes.data);
       setZonas(zonasRes.data);
-      setEmpleados(empleadosRes.data);
+      setEmpleados(empleadosRes.data || []);
     }).catch(error => {
-      console.error('Error cargando datos básicos:', error);
+      console.error('Error cargando datos básicos:', error.response?.status, error.response?.data || error.message);
     });
   }, []);
 
@@ -886,6 +888,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     setMotivoRechazo('');
     setDescripcionRechazo('');
     setSugerencias([]);
+    setSugerenciasColapsadas(false);
     setSheetMode('view');
 
     // Cargar historial
@@ -903,7 +906,9 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     if (reclamo.estado === 'nuevo') {
       setLoadingSugerencias(true);
       try {
+        console.log('[DEBUG] Cargando sugerencias para reclamo:', reclamo.id);
         const res = await reclamosApi.getSugerenciaAsignacion(reclamo.id);
+        console.log('[DEBUG] Sugerencias recibidas:', res.data);
         setSugerencias(res.data.sugerencias || []);
       } catch (error) {
         console.error('Error cargando sugerencias:', error);
@@ -2375,23 +2380,20 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                   <div className="h-5 w-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: theme.primary, borderTopColor: 'transparent' }} />
                   <span className="text-sm" style={{ color: theme.textSecondary }}>Analizando mejor empleado...</span>
                 </div>
-              ) : sugerencias.length > 0 && (
+              ) : sugerencias.length > 0 && !sugerenciasColapsadas && (
                 <div
-                  className="rounded-xl p-4 space-y-3"
+                  className="rounded-xl p-3 space-y-1.5"
                   style={{ backgroundColor: `${theme.primary}08`, border: `1px solid ${theme.primary}20` }}
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Lightbulb className="h-4 w-4" style={{ color: theme.primary }} />
-                    <span className="text-sm font-medium" style={{ color: theme.text }}>
-                      Sugerencias de asignación
-                    </span>
-                  </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {sugerencias.slice(0, 3).map((sug, idx) => (
                       <button
                         key={sug.empleado_id}
-                        onClick={() => handleEmpleadoChange(String(sug.empleado_id))}
-                        className={`w-full p-3 rounded-lg text-left transition-all hover:scale-[1.01] ${empleadoSeleccionado === String(sug.empleado_id) ? 'ring-2' : ''}`}
+                        onClick={() => {
+                          handleEmpleadoChange(String(sug.empleado_id));
+                          setSugerenciasColapsadas(true);
+                        }}
+                        className={`w-full px-2.5 py-2 rounded-lg text-left transition-all hover:scale-[1.01] ${empleadoSeleccionado === String(sug.empleado_id) ? 'ring-1' : ''}`}
                         style={{
                           backgroundColor: empleadoSeleccionado === String(sug.empleado_id) ? `${theme.primary}20` : theme.card,
                           border: `1px solid ${empleadoSeleccionado === String(sug.empleado_id) ? theme.primary : theme.border}`,
@@ -2401,7 +2403,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold"
+                              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
                               style={{
                                 backgroundColor: idx === 0 ? '#10b981' : idx === 1 ? '#3b82f6' : '#6b7280',
                                 color: '#ffffff'
@@ -2410,35 +2412,25 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                               {idx + 1}
                             </div>
                             <div>
-                              <span className="font-medium block" style={{ color: theme.text }}>
+                              <span className="text-sm font-medium" style={{ color: theme.text }}>
                                 {sug.empleado_nombre}
                               </span>
-                              <span className="text-xs" style={{ color: theme.textSecondary }}>
+                              <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>
                                 {sug.razon_principal}
                               </span>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div
-                              className="text-lg font-bold"
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs" style={{ color: theme.textSecondary }}>
+                              {sug.detalles.carga_trabajo} pend.
+                            </span>
+                            <span
+                              className="text-sm font-bold"
                               style={{ color: sug.score_porcentaje >= 70 ? '#10b981' : sug.score_porcentaje >= 50 ? '#f59e0b' : theme.textSecondary }}
                             >
                               {sug.score_porcentaje}%
-                            </div>
-                            <div className="text-xs" style={{ color: theme.textSecondary }}>
-                              {sug.detalles.carga_trabajo} pendientes
-                            </div>
+                            </span>
                           </div>
-                        </div>
-                        {/* Barra de progreso */}
-                        <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${sug.score_porcentaje}%`,
-                              backgroundColor: sug.score_porcentaje >= 70 ? '#10b981' : sug.score_porcentaje >= 50 ? '#f59e0b' : '#6b7280'
-                            }}
-                          />
                         </div>
                       </button>
                     ))}
@@ -2452,25 +2444,37 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               )}
 
               {/* Selector de empleado - muestra todos pero indica especialidad */}
-              <ModernSelect
-                label="Empleado"
-                value={empleadoSeleccionado}
-                onChange={handleEmpleadoChange}
-                placeholder="Seleccionar empleado..."
-                searchable={empleados.length > 5}
-                options={empleados.map(emp => {
-                  const tieneEspecialidad = emp.categorias?.some(cat => cat.id === selectedReclamo.categoria.id);
-                  return {
-                    value: String(emp.id),
-                    label: emp.apellido ? `${emp.nombre} ${emp.apellido}` : emp.nombre,
-                    description: tieneEspecialidad
-                      ? `✓ Especialista en ${selectedReclamo.categoria.nombre}`
-                      : emp.categoria_principal?.nombre || emp.especialidad || 'Sin especialidad asignada',
-                    icon: <User className="h-4 w-4" />,
-                    color: tieneEspecialidad ? '#10b981' : (emp.categoria_principal?.color || '#6b7280'),
-                  };
-                })}
-              />
+              {empleados.length > 0 ? (
+                <ModernSelect
+                  value={empleadoSeleccionado}
+                  onChange={handleEmpleadoChange}
+                  placeholder="Seleccionar empleado..."
+                  searchable={empleados.length > 5}
+                  onOpen={() => setSugerenciasColapsadas(true)}
+                  onClose={(selectedValue) => {
+                    // Si cerró sin seleccionar y no hay empleado seleccionado, mostrar sugerencias
+                    if (selectedValue === null && !empleadoSeleccionado) {
+                      setSugerenciasColapsadas(false);
+                    }
+                  }}
+                  options={empleados.map(emp => {
+                    const tieneEspecialidad = emp.categorias?.some(cat => cat.id === selectedReclamo.categoria.id);
+                    return {
+                      value: String(emp.id),
+                      label: emp.apellido ? `${emp.nombre} ${emp.apellido}` : emp.nombre,
+                      description: tieneEspecialidad
+                        ? `✓ Especialista en ${selectedReclamo.categoria.nombre}`
+                        : emp.categoria_principal?.nombre || emp.especialidad || 'Sin especialidad asignada',
+                      icon: <User className="h-4 w-4" />,
+                      color: tieneEspecialidad ? '#10b981' : (emp.categoria_principal?.color || '#6b7280'),
+                    };
+                  })}
+                />
+              ) : (
+                <div className="text-sm py-2 px-3 rounded-lg" style={{ backgroundColor: theme.card, color: theme.textSecondary }}>
+                  No hay empleados disponibles
+                </div>
+              )}
               {empleadoSeleccionado && !empleados.find(c => c.id === Number(empleadoSeleccionado))?.categorias?.some(cat => cat.id === selectedReclamo.categoria.id) && (
                 <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#f59e0b' }}>
                   <AlertTriangle className="h-3 w-3" />
@@ -2589,7 +2593,6 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               )}
 
               <ABMTextarea
-                label="Comentario"
                 value={comentarioAsignacion}
                 onChange={(e) => setComentarioAsignacion(e.target.value)}
                 placeholder="Comentario (opcional)"
@@ -2750,51 +2753,19 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           </ABMInfoPanel>
         )}
 
-        {/* Historial */}
-        <ABMCollapsible
-          title={`Historial (${historial.length})`}
-          icon={<Clock className="h-4 w-4" />}
-          defaultOpen={false}
-        >
-          {loadingHistorial ? (
-            <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 mx-auto" style={{ borderColor: theme.primary }}></div>
-            </div>
-          ) : historial.length > 0 ? (
-            <div className="space-y-3">
-              {historial.map((h) => (
-                <div key={h.id} className="flex items-start gap-3 text-sm">
-                  <div className="w-2 h-2 mt-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: theme.primary }}></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{h.usuario.nombre} {h.usuario.apellido}</span>
-                      <span style={{ color: theme.textSecondary }}>{h.accion}</span>
-                    </div>
-                    {h.comentario && (
-                      <p className="mt-1 text-sm" style={{ color: theme.textSecondary }}>{h.comentario}</p>
-                    )}
-                    <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                      {new Date(h.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm" style={{ color: theme.textSecondary }}>Sin historial</p>
-          )}
-        </ABMCollapsible>
       </div>
     );
   };
 
-  // Renderizar sticky header para el Sheet (estado + categoría)
+  // Renderizar sticky header para el Sheet (estado + categoría + botón historial)
   const renderSheetStickyHeader = () => {
     if (!selectedReclamo) return null;
 
+    const categoryColor = getCategoryColor(selectedReclamo.categoria.nombre);
+
     return (
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Estado con badge */}
           <span
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-full"
@@ -2806,23 +2777,36 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
             {getEstadoIcon(selectedReclamo.estado)}
             {estadoLabels[selectedReclamo.estado]}
           </span>
-          {/* Categoría */}
+          {/* Categoría con color de la categoría */}
           <span
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
             style={{
-              backgroundColor: `${theme.primary}15`,
-              color: theme.primary,
-              border: `1px solid ${theme.primary}30`
+              backgroundColor: `${categoryColor}20`,
+              color: categoryColor,
+              border: `1px solid ${categoryColor}40`
             }}
           >
-            <Tag className="h-3.5 w-3.5" />
+            {getCategoryIcon(selectedReclamo.categoria.nombre)}
             {selectedReclamo.categoria.nombre}
           </span>
+          {/* Botón Ver Historial */}
+          <button
+            onClick={() => {
+              closeSheet();
+              navigate(`/gestion/reclamos/${selectedReclamo.id}`);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all hover:scale-105"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.primary,
+              border: `1px solid ${theme.primary}`
+            }}
+            title="Ver historial completo"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Historial
+          </button>
         </div>
-        {/* Fecha */}
-        <span className="text-xs font-medium whitespace-nowrap" style={{ color: theme.textSecondary }}>
-          {new Date(selectedReclamo.created_at).toLocaleString()}
-        </span>
       </div>
     );
   };
@@ -2836,21 +2820,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     const canResolver = selectedReclamo.estado === 'en_proceso';
 
     return (
-      <div className="space-y-2">
-        {/* Botón Ver Historial Completo */}
-        <button
-          onClick={() => {
-            closeSheet();
-            navigate(`/gestion/reclamos/${selectedReclamo.id}`);
-          }}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-        >
-          <ExternalLink className="h-4 w-4" />
-          Ver Historial Completo
-        </button>
-
-        <div className="flex gap-2">
+      <div className="flex gap-2">
         {/* Botón Asignar - para estado nuevo */}
         {canAsignar && (
           <>
@@ -2919,7 +2889,6 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
             {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
           </div>
         )}
-        </div>
       </div>
     );
   };
@@ -2948,7 +2917,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               {/* Botón Todas las categorías */}
               <button
                 onClick={() => setFiltroCategoria(null)}
-                className="flex flex-col items-center justify-center py-2 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] ${categorias.length > 0 ? 'flex-1 min-w-0' : 'w-[68px]'}`}
                 style={{
                   background: filtroCategoria === null
                     ? theme.primary
@@ -3178,14 +3147,19 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               </div>
 
               {/* Contenido */}
-              <div>
-                <p className="text-sm flex items-center" style={{ color: theme.textSecondary }}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm flex items-center flex-1 min-w-0" style={{ color: theme.textSecondary }}>
                   <MapPin className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                   <span className="line-clamp-1">{r.direccion}</span>
                 </p>
+                {r.creador && !r.es_anonimo && (
+                  <span className="text-xs ml-2 flex-shrink-0" style={{ color: theme.text }}>
+                    {r.creador.nombre} {r.creador.apellido?.charAt(0)}.
+                  </span>
+                )}
               </div>
 
-              <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
+              <p className="text-sm mt-2 line-clamp-2" style={{ color: theme.textSecondary }}>
                 {r.descripcion}
               </p>
 
@@ -3250,7 +3224,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       <Sheet
         open={sheetMode === 'view'}
         onClose={closeSheet}
-        title={`Reclamo #${selectedReclamo?.id || ''}`}
+        title={`Reclamo #${selectedReclamo?.id || ''} · ${selectedReclamo ? new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''}`}
         description={selectedReclamo?.titulo}
         stickyHeader={renderSheetStickyHeader()}
         stickyFooter={renderSheetFooter()}

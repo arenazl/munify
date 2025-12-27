@@ -185,18 +185,21 @@ async def enviar_notificacion_push(
     tipo_notificacion: str,
     empleado_nombre: str = None,
     estado_anterior: str = None,
-    estado_nuevo: str = None
+    estado_nuevo: str = None,
+    comentario_texto: str = None,
+    autor_nombre: str = None
 ):
     """
     Envía notificación push al creador del reclamo.
-    tipo_notificacion: 'reclamo_recibido', 'reclamo_asignado', 'cambio_estado', 'reclamo_resuelto'
+    tipo_notificacion: 'reclamo_recibido', 'reclamo_asignado', 'cambio_estado', 'reclamo_resuelto', 'nuevo_comentario'
     """
     try:
         from services.push_service import (
             notificar_reclamo_recibido,
             notificar_reclamo_asignado,
             notificar_cambio_estado,
-            notificar_reclamo_resuelto
+            notificar_reclamo_resuelto,
+            notificar_nuevo_comentario
         )
 
         if tipo_notificacion == 'reclamo_recibido':
@@ -207,6 +210,8 @@ async def enviar_notificacion_push(
             await notificar_cambio_estado(db, reclamo, estado_anterior, estado_nuevo)
         elif tipo_notificacion == 'reclamo_resuelto':
             await notificar_reclamo_resuelto(db, reclamo)
+        elif tipo_notificacion == 'nuevo_comentario':
+            await notificar_nuevo_comentario(db, reclamo, comentario_texto, autor_nombre)
 
         print(f"[PUSH] Notificacion enviada: {tipo_notificacion}", flush=True)
     except Exception as e:
@@ -1078,6 +1083,13 @@ async def agregar_comentario(
     await db.commit()
     await db.refresh(historial)
 
+    # Enviar notificación push del comentario
+    await enviar_notificacion_push(
+        db, reclamo, 'nuevo_comentario',
+        comentario_texto=data.comentario[:100],
+        autor_nombre=f"{current_user.nombre} {current_user.apellido or ''}".strip()
+    )
+
     return historial
 
 
@@ -1324,7 +1336,7 @@ async def get_sugerencia_asignacion(
 
         # 1. ESPECIALIDAD/CATEGORÍA (40 puntos máx)
         categoria_score = 0
-        categoria_ids = [cat.id for cat in empleado.categorias]
+        categoria_ids = [cat.id for cat in (empleado.categorias or [])]
 
         # Normalizar nombre de categoría del reclamo para comparación
         cat_reclamo_nombre = reclamo.categoria.nombre.lower().strip() if reclamo.categoria else ""
@@ -1458,18 +1470,17 @@ async def get_sugerencia_asignacion(
 
         score += disponibilidad_score
 
-        # Solo incluir empleados que tengan la especialidad/categoría del reclamo
-        if detalles["categoria_match"]:
-            sugerencias.append({
-                "empleado_id": empleado.id,
-                "empleado_nombre": f"{empleado.nombre} {empleado.apellido or ''}".strip(),
-                "categoria_principal": empleado.categoria_principal.nombre if empleado.categoria_principal else None,
-                "zona": empleado.zona_asignada.nombre if empleado.zona_asignada else None,
-                "score": score,
-                "score_porcentaje": round(score),  # Ya está en escala 0-100
-                "detalles": detalles,
-                "razon_principal": _get_razon_principal(detalles, categoria_score, zona_score, carga_score, disponibilidad_score)
-            })
+        # Incluir todos los empleados activos, priorizando los que tienen la categoría
+        sugerencias.append({
+            "empleado_id": empleado.id,
+            "empleado_nombre": f"{empleado.nombre} {empleado.apellido or ''}".strip(),
+            "categoria_principal": empleado.categoria_principal.nombre if empleado.categoria_principal else None,
+            "zona": empleado.zona_asignada.nombre if empleado.zona_asignada else None,
+            "score": score,
+            "score_porcentaje": round(score),  # Ya está en escala 0-100
+            "detalles": detalles,
+            "razon_principal": _get_razon_principal(detalles, categoria_score, zona_score, carga_score, disponibilidad_score)
+        })
 
     # Ordenar por score descendente
     sugerencias.sort(key=lambda x: x["score"], reverse=True)

@@ -217,6 +217,28 @@ async def notificar_nuevo_comentario_vecino(db: AsyncSession, reclamo, comentari
     )
 
 
+async def notificar_nuevo_comentario(db: AsyncSession, reclamo, comentario_texto: str, autor_nombre: str) -> int:
+    """
+    Notifica sobre un nuevo comentario en el reclamo.
+    Envía al creador del reclamo (vecino) con el texto del comentario.
+    """
+    if not await check_user_notification_preference(db, reclamo.creador_id, "nuevo_comentario"):
+        logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación nuevo_comentario")
+        return 0
+
+    # Truncar comentario si es muy largo
+    comentario_preview = comentario_texto[:80] + "..." if len(comentario_texto) > 80 else comentario_texto
+
+    return await send_push_to_user(
+        db=db,
+        user_id=reclamo.creador_id,
+        title=f"💬 Comentario de {autor_nombre}",
+        body=f"Reclamo #{reclamo.id}: {comentario_preview}",
+        url=f"/reclamos/{reclamo.id}",
+        data={"tipo": "nuevo_comentario", "reclamo_id": reclamo.id}
+    )
+
+
 async def notificar_asignacion_empleado(db: AsyncSession, empleado_user_id: int, reclamo) -> int:
     """Notifica al empleado que le asignaron un reclamo"""
     if not await check_user_notification_preference(db, empleado_user_id, "asignacion_empleado"):

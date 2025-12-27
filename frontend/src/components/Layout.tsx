@@ -100,21 +100,19 @@ export default function Layout() {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 shadow-xl transform lg:translate-x-0 flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-50 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{
           backgroundColor: theme.sidebar,
           width: sidebarWidthPx,
           transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
-          position: 'relative',
-          overflow: 'hidden',
         }}
       >
         {/* Imagen de fondo del sidebar */}
         {sidebarBgImage && (
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
             style={{
               backgroundImage: `url(${sidebarBgImage})`,
               opacity: sidebarBgOpacity,
@@ -125,7 +123,7 @@ export default function Layout() {
         {/* Overlay para mejorar legibilidad */}
         {sidebarBgImage && (
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 pointer-events-none"
             style={{
               background: `linear-gradient(180deg, ${theme.sidebar}dd 0%, ${theme.sidebar}99 50%, ${theme.sidebar}dd 100%)`,
             }}

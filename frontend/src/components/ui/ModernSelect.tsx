@@ -19,6 +19,8 @@ interface ModernSelectProps {
   disabled?: boolean;
   searchable?: boolean;
   className?: string;
+  onOpen?: () => void;
+  onClose?: (selectedValue: string | null) => void;
 }
 
 export function ModernSelect({
@@ -30,6 +32,8 @@ export function ModernSelect({
   disabled = false,
   searchable = false,
   className = '',
+  onOpen,
+  onClose,
 }: ModernSelectProps) {
   const { theme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -43,6 +47,9 @@ export function ModernSelect({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        if (isOpen) {
+          onClose?.(null); // Cerrado sin seleccionar
+        }
         setIsOpen(false);
         setSearchTerm('');
       }
@@ -50,7 +57,7 @@ export function ModernSelect({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isOpen, onClose]);
 
   // Focus en el input de búsqueda cuando se abre
   useEffect(() => {
@@ -68,8 +75,18 @@ export function ModernSelect({
 
   const handleSelect = (optionValue: string) => {
     onChange(optionValue);
+    onClose?.(optionValue); // Cerrado con selección
     setIsOpen(false);
     setSearchTerm('');
+  };
+
+  const handleOpen = () => {
+    if (!disabled) {
+      setIsOpen(!isOpen);
+      if (!isOpen) {
+        onOpen?.();
+      }
+    }
   };
 
   return (
@@ -86,7 +103,7 @@ export function ModernSelect({
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={handleOpen}
         disabled={disabled}
         className={`
           w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl

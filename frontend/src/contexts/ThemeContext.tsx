@@ -137,7 +137,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
 
   const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(() => {
-    return localStorage.getItem('sidebarBgImage');
+    const saved = localStorage.getItem('sidebarBgImage');
+    // Solo usar si explícitamente se guardó un valor
+    return saved && saved !== 'null' ? saved : null;
   });
 
   const [sidebarBgOpacity, setSidebarBgOpacityState] = useState<number>(() => {
