@@ -1,6 +1,8 @@
 """API endpoints para Web Push Notifications"""
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.sql import func
 from pydantic import BaseModel
 from typing import Optional
 from core.database import get_db
@@ -42,14 +44,15 @@ async def get_vapid_public_key():
 @router.post("/subscribe", response_model=PushSubscriptionResponse)
 async def subscribe_to_push(
     subscription: PushSubscriptionCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Registra una nueva suscripción push para el usuario"""
     # Verificar si ya existe esta suscripción
-    existing = db.query(PushSubscription).filter(
-        PushSubscription.endpoint == subscription.endpoint
-    ).first()
+    result = await db.execute(
+        select(PushSubscription).where(PushSubscription.endpoint == subscription.endpoint)
+    )
+    existing = result.scalar_one_or_none()
 
     if existing:
         # Si existe pero está inactiva, reactivarla
@@ -58,8 +61,8 @@ async def subscribe_to_push(
             existing.p256dh_key = subscription.p256dh
             existing.auth_key = subscription.auth
             existing.user_agent = subscription.user_agent
-            db.commit()
-            db.refresh(existing)
+            await db.commit()
+            await db.refresh(existing)
         return existing
 
     # Crear nueva suscripción
@@ -71,8 +74,8 @@ async def subscribe_to_push(
         user_agent=subscription.user_agent
     )
     db.add(new_subscription)
-    db.commit()
-    db.refresh(new_subscription)
+    await db.commit()
+    await db.refresh(new_subscription)
 
     return new_subscription
 
@@ -80,18 +83,21 @@ async def subscribe_to_push(
 @router.post("/unsubscribe")
 async def unsubscribe_from_push(
     subscription: PushSubscriptionCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Desactiva una suscripción push"""
-    existing = db.query(PushSubscription).filter(
-        PushSubscription.endpoint == subscription.endpoint,
-        PushSubscription.user_id == current_user.id
-    ).first()
+    result = await db.execute(
+        select(PushSubscription).where(
+            PushSubscription.endpoint == subscription.endpoint,
+            PushSubscription.user_id == current_user.id
+        )
+    )
+    existing = result.scalar_one_or_none()
 
     if existing:
         existing.activo = False
-        db.commit()
+        await db.commit()
         return {"message": "Suscripción desactivada"}
 
     return {"message": "Suscripción no encontrada"}
@@ -99,14 +105,17 @@ async def unsubscribe_from_push(
 
 @router.get("/status")
 async def get_push_status(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Obtiene el estado de las suscripciones push del usuario"""
-    subscriptions = db.query(PushSubscription).filter(
-        PushSubscription.user_id == current_user.id,
-        PushSubscription.activo == True
-    ).count()
+    result = await db.execute(
+        select(func.count(PushSubscription.id)).where(
+            PushSubscription.user_id == current_user.id,
+            PushSubscription.activo == True
+        )
+    )
+    subscriptions = result.scalar()
 
     return {
         "subscribed": subscriptions > 0,
@@ -116,11 +125,11 @@ async def get_push_status(
 
 @router.post("/test")
 async def test_push_notification(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Envía una notificación push de prueba al usuario actual"""
-    sent = send_push_to_user(
+    sent = await send_push_to_user(
         db=db,
         user_id=current_user.id,
         title="Notificación de Prueba",

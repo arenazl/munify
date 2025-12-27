@@ -1,6 +1,7 @@
 """Servicio para enviar Web Push Notifications"""
 from pywebpush import webpush, WebPushException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from models import PushSubscription, User
 from core.config import settings
 from typing import Optional, List
@@ -10,8 +11,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def send_push_to_user(
-    db: Session,
+async def send_push_to_user(
+    db: AsyncSession,
     user_id: int,
     title: str,
     body: str,
@@ -29,10 +30,13 @@ def send_push_to_user(
         logger.warning("VAPID keys no configuradas, no se pueden enviar push notifications")
         return 0
 
-    subscriptions = db.query(PushSubscription).filter(
-        PushSubscription.user_id == user_id,
-        PushSubscription.activo == True
-    ).all()
+    result = await db.execute(
+        select(PushSubscription).where(
+            PushSubscription.user_id == user_id,
+            PushSubscription.activo == True
+        )
+    )
+    subscriptions = result.scalars().all()
 
     if not subscriptions:
         logger.info(f"Usuario {user_id} no tiene suscripciones push activas")
@@ -68,14 +72,14 @@ def send_push_to_user(
             # Si el endpoint ya no es válido, desactivar la suscripción
             if e.response and e.response.status_code in [404, 410]:
                 sub.activo = False
-                db.commit()
+                await db.commit()
                 logger.info(f"Suscripción {sub.id} desactivada por endpoint inválido")
 
     return sent_count
 
 
-def send_push_to_users(
-    db: Session,
+async def send_push_to_users(
+    db: AsyncSession,
     user_ids: List[int],
     title: str,
     body: str,
@@ -91,7 +95,7 @@ def send_push_to_users(
     """
     total_sent = 0
     for user_id in user_ids:
-        total_sent += send_push_to_user(db, user_id, title, body, url, icon, data)
+        total_sent += await send_push_to_user(db, user_id, title, body, url, icon, data)
     return total_sent
 
 
@@ -100,9 +104,9 @@ def send_push_to_users(
 # (mismos eventos que WhatsApp)
 # ============================================
 
-def notificar_reclamo_recibido(db: Session, reclamo) -> int:
+async def notificar_reclamo_recibido(db: AsyncSession, reclamo) -> int:
     """Notifica al vecino que su reclamo fue recibido"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
         title="Reclamo Recibido",
@@ -112,9 +116,9 @@ def notificar_reclamo_recibido(db: Session, reclamo) -> int:
     )
 
 
-def notificar_reclamo_asignado(db: Session, reclamo, empleado_nombre: str) -> int:
+async def notificar_reclamo_asignado(db: AsyncSession, reclamo, empleado_nombre: str) -> int:
     """Notifica al vecino que su reclamo fue asignado"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
         title="Reclamo Asignado",
@@ -124,9 +128,9 @@ def notificar_reclamo_asignado(db: Session, reclamo, empleado_nombre: str) -> in
     )
 
 
-def notificar_cambio_estado(db: Session, reclamo, estado_anterior: str, estado_nuevo: str) -> int:
+async def notificar_cambio_estado(db: AsyncSession, reclamo, estado_anterior: str, estado_nuevo: str) -> int:
     """Notifica al vecino el cambio de estado de su reclamo"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
         title="Estado Actualizado",
@@ -136,9 +140,9 @@ def notificar_cambio_estado(db: Session, reclamo, estado_anterior: str, estado_n
     )
 
 
-def notificar_reclamo_resuelto(db: Session, reclamo) -> int:
+async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
     """Notifica al vecino que su reclamo fue resuelto"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
         title="Reclamo Resuelto",
@@ -148,9 +152,9 @@ def notificar_reclamo_resuelto(db: Session, reclamo) -> int:
     )
 
 
-def notificar_nuevo_comentario_vecino(db: Session, reclamo, comentario: str) -> int:
+async def notificar_nuevo_comentario_vecino(db: AsyncSession, reclamo, comentario: str) -> int:
     """Notifica al vecino que hay un nuevo comentario en su reclamo"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
         title="Nuevo Comentario",
@@ -160,9 +164,9 @@ def notificar_nuevo_comentario_vecino(db: Session, reclamo, comentario: str) -> 
     )
 
 
-def notificar_asignacion_empleado(db: Session, empleado_user_id: int, reclamo) -> int:
+async def notificar_asignacion_empleado(db: AsyncSession, empleado_user_id: int, reclamo) -> int:
     """Notifica al empleado que le asignaron un reclamo"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=empleado_user_id,
         title="Nueva Asignación",
@@ -172,9 +176,9 @@ def notificar_asignacion_empleado(db: Session, empleado_user_id: int, reclamo) -
     )
 
 
-def notificar_comentario_vecino_a_empleado(db: Session, empleado_user_id: int, reclamo, comentario: str) -> int:
+async def notificar_comentario_vecino_a_empleado(db: AsyncSession, empleado_user_id: int, reclamo, comentario: str) -> int:
     """Notifica al empleado que el vecino comentó en su reclamo"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=empleado_user_id,
         title="Comentario del Vecino",
@@ -184,9 +188,9 @@ def notificar_comentario_vecino_a_empleado(db: Session, empleado_user_id: int, r
     )
 
 
-def notificar_supervisor_reclamo_nuevo(db: Session, supervisor_user_id: int, reclamo) -> int:
+async def notificar_supervisor_reclamo_nuevo(db: AsyncSession, supervisor_user_id: int, reclamo) -> int:
     """Notifica al supervisor que hay un nuevo reclamo"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=supervisor_user_id,
         title="Nuevo Reclamo",
@@ -196,9 +200,9 @@ def notificar_supervisor_reclamo_nuevo(db: Session, supervisor_user_id: int, rec
     )
 
 
-def notificar_supervisor_pendiente_confirmacion(db: Session, supervisor_user_id: int, reclamo) -> int:
+async def notificar_supervisor_pendiente_confirmacion(db: AsyncSession, supervisor_user_id: int, reclamo) -> int:
     """Notifica al supervisor que hay un reclamo pendiente de confirmación"""
-    return send_push_to_user(
+    return await send_push_to_user(
         db=db,
         user_id=supervisor_user_id,
         title="Pendiente Confirmación",
@@ -208,9 +212,9 @@ def notificar_supervisor_pendiente_confirmacion(db: Session, supervisor_user_id:
     )
 
 
-def notificar_sla_vencido(db: Session, supervisor_user_ids: List[int], reclamo) -> int:
+async def notificar_sla_vencido(db: AsyncSession, supervisor_user_ids: List[int], reclamo) -> int:
     """Notifica a los supervisores que el SLA de un reclamo venció"""
-    return send_push_to_users(
+    return await send_push_to_users(
         db=db,
         user_ids=supervisor_user_ids,
         title="SLA Vencido",
