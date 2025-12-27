@@ -7,6 +7,7 @@ from core.database import get_db
 from core.security import get_current_user
 from core.config import settings
 from models import User, PushSubscription
+from services.push_service import send_push_to_user
 
 router = APIRouter(prefix="/push", tags=["Push Notifications"])
 
@@ -111,3 +112,24 @@ async def get_push_status(
         "subscribed": subscriptions > 0,
         "count": subscriptions
     }
+
+
+@router.post("/test")
+async def test_push_notification(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Envía una notificación push de prueba al usuario actual"""
+    sent = send_push_to_user(
+        db=db,
+        user_id=current_user.id,
+        title="Notificación de Prueba",
+        body="Si ves esto, las notificaciones push funcionan correctamente!",
+        url="/",
+        icon="/favicon.svg"
+    )
+
+    if sent > 0:
+        return {"success": True, "message": f"Notificación enviada a {sent} dispositivo(s)"}
+
+    return {"success": False, "message": "No se pudo enviar. Asegurate de tener las notificaciones activadas."}
