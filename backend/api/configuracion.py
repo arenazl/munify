@@ -228,6 +228,143 @@ async def buscar_barrios_municipio(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/dashboard/{rol}")
+async def get_dashboard_config(
+    rol: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtiene la configuración del dashboard para un rol específico.
+    Roles válidos: vecino, empleado
+    Cualquier usuario autenticado puede ver la configuración de su propio rol.
+    """
+    import json
+
+    if rol not in ["vecino", "empleado"]:
+        raise HTTPException(status_code=400, detail="Rol no válido. Use 'vecino' o 'empleado'")
+
+    clave = f"dashboard_config_{rol}"
+
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    # Configuración por defecto si no existe
+    default_config = {
+        "vecino": {
+            "componentes": [
+                {"id": "stats", "nombre": "Estadísticas personales", "visible": True, "orden": 1},
+                {"id": "reclamos_recientes", "nombre": "Reclamos recientes", "visible": True, "orden": 2},
+                {"id": "stats_municipio", "nombre": "Estadísticas del municipio", "visible": True, "orden": 3},
+                {"id": "noticias", "nombre": "Noticias", "visible": True, "orden": 4},
+                {"id": "accesos_rapidos", "nombre": "Accesos rápidos", "visible": True, "orden": 5},
+            ]
+        },
+        "empleado": {
+            "componentes": [
+                {"id": "stats", "nombre": "Mis estadísticas", "visible": True, "orden": 1},
+                {"id": "trabajos_pendientes", "nombre": "Trabajos pendientes", "visible": True, "orden": 2},
+                {"id": "rendimiento", "nombre": "Mi rendimiento", "visible": True, "orden": 3},
+                {"id": "ultimos_resueltos", "nombre": "Últimos resueltos", "visible": True, "orden": 4},
+            ]
+        }
+    }
+
+    if config and config.valor:
+        try:
+            return {"rol": rol, "config": json.loads(config.valor)}
+        except json.JSONDecodeError:
+            pass
+
+    return {"rol": rol, "config": default_config.get(rol, {})}
+
+
+@router.put("/dashboard/{rol}")
+async def update_dashboard_config(
+    rol: str,
+    config_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Actualiza la configuración del dashboard para un rol específico.
+    """
+    import json
+
+    if rol not in ["vecino", "empleado"]:
+        raise HTTPException(status_code=400, detail="Rol no válido. Use 'vecino' o 'empleado'")
+
+    clave = f"dashboard_config_{rol}"
+
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    if config:
+        config.valor = json.dumps(config_data)
+    else:
+        config = Configuracion(
+            clave=clave,
+            valor=json.dumps(config_data),
+            descripcion=f"Configuración del dashboard para {rol}",
+            tipo="json",
+            editable=True,
+            municipio_id=current_user.municipio_id
+        )
+        db.add(config)
+
+    await db.commit()
+    return {"message": f"Configuración del dashboard para {rol} actualizada", "config": config_data}
+
+
+@router.get("/dashboard-publico/{rol}")
+async def get_dashboard_config_publico(
+    rol: str,
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint público para obtener configuración del dashboard (para vecinos sin login).
+    """
+    import json
+
+    if rol not in ["vecino", "empleado"]:
+        raise HTTPException(status_code=400, detail="Rol no válido")
+
+    clave = f"dashboard_config_{rol}"
+
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    # Configuración por defecto
+    default_config = {
+        "componentes": [
+            {"id": "stats", "nombre": "Estadísticas", "visible": True, "orden": 1},
+            {"id": "noticias", "nombre": "Noticias", "visible": True, "orden": 2},
+            {"id": "reclamos_recientes", "nombre": "Reclamos recientes", "visible": True, "orden": 3},
+        ]
+    }
+
+    if config and config.valor:
+        try:
+            return {"rol": rol, "config": json.loads(config.valor)}
+        except json.JSONDecodeError:
+            pass
+
+    return {"rol": rol, "config": default_config}
+
+
 @router.post("/cargar-barrios")
 async def cargar_barrios_como_zonas(
     barrios: List[str],
