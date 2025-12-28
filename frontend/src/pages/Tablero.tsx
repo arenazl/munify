@@ -187,14 +187,15 @@ export default function Tablero() {
 
       {/* Tablero Kanban */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* En móvil: scroll horizontal. En desktop: grid de 4 columnas */}
+        <div className="flex md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 overflow-x-auto md:overflow-x-visible pb-4 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
           {columnas.map((col) => (
             <Droppable droppableId={col.id} key={col.id} isDropDisabled={!canDrag}>
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="rounded-xl overflow-hidden min-h-[400px] transition-all duration-300"
+                  className="rounded-xl overflow-hidden min-h-[350px] md:min-h-[400px] transition-all duration-300 flex-shrink-0 w-[85vw] md:w-auto snap-center"
                   style={{
                     backgroundColor: theme.backgroundSecondary,
                     border: snapshot.isDraggingOver
@@ -324,6 +325,17 @@ export default function Tablero() {
           ))}
         </div>
       </DragDropContext>
+
+      {/* Estilos para ocultar scrollbar en móvil */}
+      <style>{`
+        .overflow-x-auto::-webkit-scrollbar {
+          display: none;
+        }
+        .overflow-x-auto {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }

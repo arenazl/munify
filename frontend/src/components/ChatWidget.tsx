@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Database } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { chatApi } from '../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { parseMarkdown } from './parseMarkdown';
@@ -12,7 +13,12 @@ interface Message {
 
 export function ChatWidget() {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Determinar si puede usar el asistente con datos (gestores)
+  const canUseDataAssistant = user && ['admin', 'supervisor', 'empleado', 'super_admin'].includes(user.rol);
+  const [useDataMode, setUseDataMode] = useState(false);
 
   const handleLinkClick = (url: string) => {
     setIsOpen(false);
@@ -43,7 +49,10 @@ export function ChatWidget() {
     setError(null);
 
     try {
-      const response = await chatApi.sendMessage(input, messages);
+      // Usar endpoint con datos si está en modo datos y tiene permisos
+      const response = canUseDataAssistant && useDataMode
+        ? await chatApi.asistente(input, messages)
+        : await chatApi.sendMessage(input, messages);
       const assistantMessage: Message = { role: 'assistant', content: response.response };
       setMessages(prev => [...prev, assistantMessage]);
     } catch (err: any) {
@@ -109,24 +118,59 @@ export function ChatWidget() {
           }}
         >
           <div className="flex items-center gap-2 text-white">
-            <Bot className="h-5 w-5" />
-            <span className="font-semibold">Asistente Municipal</span>
+            {useDataMode ? <Database className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+            <span className="font-semibold">
+              {useDataMode ? 'Asistente con Datos' : 'Asistente Municipal'}
+            </span>
           </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-1 rounded-lg hover:bg-white/20 transition-colors"
-          >
-            <X className="h-5 w-5 text-white" />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Toggle para modo datos (solo gestores) */}
+            {canUseDataAssistant && (
+              <button
+                onClick={() => {
+                  setUseDataMode(!useDataMode);
+                  setMessages([]); // Limpiar historial al cambiar modo
+                }}
+                className={`p-1.5 rounded-lg transition-colors ${useDataMode ? 'bg-white/30' : 'hover:bg-white/20'}`}
+                title={useDataMode ? 'Modo con datos activo' : 'Activar acceso a datos'}
+              >
+                <Database className="h-4 w-4 text-white" />
+              </button>
+            )}
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 rounded-lg hover:bg-white/20 transition-colors"
+            >
+              <X className="h-5 w-5 text-white" />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-8" style={{ color: theme.textSecondary }}>
-              <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">Hola! Soy tu asistente virtual.</p>
-              <p className="text-sm">En qué puedo ayudarte?</p>
+              {useDataMode ? (
+                <>
+                  <Database className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm font-medium">Asistente con Datos</p>
+                  <p className="text-xs mt-1">Tengo acceso a estadísticas de reclamos, trámites y empleados.</p>
+                  <p className="text-xs mt-2 opacity-70">Probá preguntar:</p>
+                  <p className="text-xs italic">"¿Cuántos reclamos hay pendientes?"</p>
+                  <p className="text-xs italic">"¿Cuál es la categoría con más reclamos?"</p>
+                </>
+              ) : (
+                <>
+                  <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">Hola! Soy tu asistente virtual.</p>
+                  <p className="text-sm">En qué puedo ayudarte?</p>
+                  {canUseDataAssistant && (
+                    <p className="text-xs mt-3 opacity-70">
+                      Tip: Tocá el ícono <Database className="inline h-3 w-3" /> para acceder a datos del sistema.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
           {messages.map((msg, i) => (

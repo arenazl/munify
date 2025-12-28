@@ -10,9 +10,9 @@ import { getDefaultRoute } from '../config/navigation';
  * Funciona con Netlify usando query params: tuapp.netlify.app/?municipio=merlo
  *
  * Lógica:
- * 1. Si hay usuario logueado → redirigir según su rol
- * 2. Si hay ?municipio=xxx en URL → guardar y ir a /app
- * 3. Si hay municipio guardado en localStorage → ir a /app
+ * 1. Si hay usuario logueado → redirigir según su rol a /gestion
+ * 2. Si hay ?municipio=xxx en URL → ir a /bienvenido con el municipio
+ * 3. Si hay municipio guardado en localStorage → ir a /bienvenido
  * 4. Si no hay nada → ir a /bienvenido (landing de selección)
  */
 export default function RootRedirect() {
@@ -21,8 +21,7 @@ export default function RootRedirect() {
   const { user } = useAuth();
 
   useEffect(() => {
-
-    // Si hay usuario logueado, ir a su ruta por defecto
+    // Si hay usuario logueado, ir a su ruta por defecto en /gestion
     if (user) {
       navigate(getDefaultRoute(user.rol), { replace: true });
       return;
@@ -31,15 +30,7 @@ export default function RootRedirect() {
     // Si hay ?municipio=xxx en la URL
     const municipioParam = searchParams.get('municipio');
     if (municipioParam) {
-      // Redirigir a /app con el query param (la app lo procesará)
-      navigate(`/app?municipio=${municipioParam}`, { replace: true });
-      return;
-    }
-
-    // Si hay municipio guardado en localStorage (sesión anterior)
-    const savedMunicipio = localStorage.getItem('municipio_codigo');
-    if (savedMunicipio) {
-      navigate('/app', { replace: true });
+      navigate(`/bienvenido?municipio=${municipioParam}`, { replace: true });
       return;
     }
 

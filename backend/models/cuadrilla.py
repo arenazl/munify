@@ -11,7 +11,7 @@ class Cuadrilla(Base):
 
     # Multi-tenant: FK al municipio
     municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=True, index=True)
-    municipio = relationship("Municipio", back_populates="cuadrillas")
+    municipio = relationship("Municipio")
 
     nombre = Column(String(100), nullable=False)
     apellido = Column(String(100), nullable=True)
@@ -26,7 +26,7 @@ class Cuadrilla(Base):
 
     # Zona asignada por defecto
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True)
-    zona_asignada = relationship("Zona", back_populates="cuadrillas")
+    zona_asignada = relationship("Zona")
 
     # Capacidad y estado
     capacidad_maxima = Column(Integer, default=10)
@@ -37,6 +37,4 @@ class Cuadrilla(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relaciones
-    miembros = relationship("User", back_populates="cuadrilla")
-    reclamos_asignados = relationship("Reclamo", back_populates="cuadrilla_asignada")
     categorias = relationship("Categoria", secondary=cuadrilla_categoria, backref="cuadrillas")

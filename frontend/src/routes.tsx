@@ -26,10 +26,14 @@ import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
 import Tramites from './pages/Tramites';
+import TiposTramite from './pages/TiposTramite';
 import MisTramites from './pages/MisTramites';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
 import Ajustes from './pages/Ajustes';
+import MiRendimiento from './pages/MiRendimiento';
+import MiHistorial from './pages/MiHistorial';
+import ConfigDashboard from './pages/ConfigDashboard';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -113,12 +117,19 @@ export const router = createBrowserRouter([
       // Nuevo Reclamo (dentro del Layout para usuarios logueados)
       { path: 'crear-reclamo', element: <NuevoReclamo /> },
 
+      // Nuevo Trámite (dentro del Layout para usuarios logueados)
+      { path: 'crear-tramite', element: <MobileNuevoTramite /> },
+
       // Reclamos (todo con Side Modal, sin páginas separadas)
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
       { path: 'reclamos/:id', element: <ReclamoDetalle /> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
+      // Mi Rendimiento (estadísticas del empleado)
+      { path: 'mi-rendimiento', element: <ProtectedRoute roles={['empleado']}><MiRendimiento /></ProtectedRoute> },
+      // Mi Historial (auditoría de trabajos del empleado)
+      { path: 'mi-historial', element: <ProtectedRoute roles={['empleado']}><MiHistorial /></ProtectedRoute> },
 
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },
@@ -143,11 +154,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'categorias',
-        element: <ProtectedRoute roles={['admin']}><Categorias /></ProtectedRoute>
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Categorias /></ProtectedRoute>
       },
       {
         path: 'zonas',
-        element: <ProtectedRoute roles={['admin']}><Zonas /></ProtectedRoute>
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Zonas /></ProtectedRoute>
+      },
+      {
+        path: 'tipos-tramite',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><TiposTramite /></ProtectedRoute>
       },
       {
         path: 'configuracion',
@@ -178,6 +193,11 @@ export const router = createBrowserRouter([
       {
         path: 'ajustes',
         element: <Ajustes />
+      },
+      // Configuración del Dashboard (qué ven vecinos y empleados)
+      {
+        path: 'config-dashboard',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><ConfigDashboard /></ProtectedRoute>
       },
     ],
   },

@@ -30,7 +30,10 @@ import {
   Mail,
   Lock,
   ShieldCheck,
-  Phone
+  Phone,
+  MessageCircle,
+  Send,
+  Bot
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, publicoApi, clasificacionApi, authApi } from '../lib/api';
@@ -139,6 +142,16 @@ export default function NuevoReclamo() {
   const [similaresCargados, setSimilaresCargados] = useState(false);
   const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
+  // Estado para el chat inicial (Step 0)
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'assistant' | 'user', content: string}>>([
+    { role: 'assistant', content: '¡Hola! 👋 Soy tu asistente virtual. Contame, ¿qué problema querés reportar?' }
+  ]);
+  const [chatAnalyzing, setChatAnalyzing] = useState(false);
+  const [chatCategoriaSugerida, setChatCategoriaSugerida] = useState<{categoria: Categoria, confianza: number} | null>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
   // Datos de registro (solo se usan si no hay usuario)
   const [registerData, setRegisterData] = useState({
     nombre: '',
@@ -154,10 +167,10 @@ export default function NuevoReclamo() {
   // Esperar a que termine la carga de auth antes de decidir
   const showOnlyRegister = !authLoading && !user;
 
-  // Si el usuario está logueado y está en /nuevo-reclamo (sin Layout), redirigir a /crear-reclamo (con Layout)
+  // Si el usuario está logueado y está en /nuevo-reclamo (sin Layout), redirigir a /gestion/crear-reclamo (con Layout)
   useEffect(() => {
     if (user && !authLoading && window.location.pathname === '/nuevo-reclamo') {
-      navigate('/crear-reclamo', { replace: true });
+      navigate('/gestion/crear-reclamo', { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -166,10 +179,21 @@ export default function NuevoReclamo() {
     display_name: string;
     lat: string;
     lon: string;
+    address?: {
+      house_number?: string;
+      road?: string;
+      neighbourhood?: string;
+      suburb?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      state?: string;
+    };
   }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingAddress, setSearchingAddress] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [userInputNumber, setUserInputNumber] = useState<string>('');
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -314,6 +338,12 @@ export default function NuevoReclamo() {
   const handleAddressChange = (value: string) => {
     setFormData({ ...formData, direccion: value });
 
+    // Extraer número de la dirección que escribe el usuario (ej: "San Martín 230" -> "230")
+    const numberMatch = value.match(/\b(\d+)\b/);
+    if (numberMatch) {
+      setUserInputNumber(numberMatch[1]);
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
@@ -323,11 +353,45 @@ export default function NuevoReclamo() {
     }, 400);
   };
 
-  // Seleccionar una sugerencia
-  const selectAddressSuggestion = (suggestion: { display_name: string; lat: string; lon: string }) => {
+  // Seleccionar una sugerencia - construye dirección limpia preservando el número
+  const selectAddressSuggestion = (suggestion: typeof addressSuggestions[0]) => {
+    // Construir dirección más limpia usando addressdetails
+    let direccion = '';
+    const addr = suggestion.address;
+
+    if (addr) {
+      const parts: string[] = [];
+
+      // Calle con número
+      if (addr.road) {
+        // Usar el número de Nominatim si existe, sino el que escribió el usuario
+        const numero = addr.house_number || userInputNumber;
+        parts.push(numero ? `${addr.road} ${numero}` : addr.road);
+      }
+
+      // Barrio/Localidad
+      const locality = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
+      if (locality) {
+        parts.push(locality);
+      }
+
+      // Provincia (solo si no es Buenos Aires)
+      if (addr.state && !addr.state.toLowerCase().includes('buenos aires')) {
+        parts.push(addr.state);
+      }
+
+      direccion = parts.join(', ');
+    }
+
+    // Si no pudimos construir una dirección mejor, usar display_name pero más corto
+    if (!direccion) {
+      const parts = suggestion.display_name.split(', ').slice(0, 4);
+      direccion = parts.join(', ');
+    }
+
     setFormData({
       ...formData,
-      direccion: suggestion.display_name,
+      direccion,
       latitud: parseFloat(suggestion.lat),
       longitud: parseFloat(suggestion.lon),
     });
@@ -463,6 +527,83 @@ export default function NuevoReclamo() {
     toast.success(`Categoría seleccionada: "${categoria.nombre}"`);
   };
 
+  // Scroll al final del chat cuando hay nuevos mensajes
+  useEffect(() => {
+    chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // Función para enviar mensaje del chat y clasificar con IA
+  const handleChatSubmit = async () => {
+    if (!chatInput.trim() || chatAnalyzing) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setChatAnalyzing(true);
+
+    try {
+      const municipioIdStr = localStorage.getItem('municipio_id');
+      const municipioId = municipioIdStr ? parseInt(municipioIdStr) : 1;
+
+      // Clasificar el texto con IA
+      const resultado = await clasificacionApi.clasificar(userMessage, municipioId);
+
+      if (resultado.sugerencias && resultado.sugerencias.length > 0) {
+        const mejorSugerencia = resultado.sugerencias[0];
+        const cat = categorias.find(c => c.id === mejorSugerencia.categoria_id);
+
+        if (cat) {
+          const confianza = mejorSugerencia.confianza || mejorSugerencia.score || 0;
+          setChatCategoriaSugerida({ categoria: cat, confianza });
+
+          // Guardar la descripción del usuario
+          setFormData(prev => ({
+            ...prev,
+            descripcion: userMessage,
+            titulo: `Problema de ${cat.nombre.toLowerCase()}`,
+          }));
+
+          // Mensaje de respuesta con la sugerencia
+          const confianzaTexto = confianza >= 80 ? '¡Perfecto!' : confianza >= 60 ? 'Entiendo.' : 'Creo que entendí.';
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `${confianzaTexto} Parece que tu problema está relacionado con "${cat.nombre}". ¿Es correcto? Podés confirmar o elegir otra categoría en el siguiente paso.`
+          }]);
+        } else {
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: 'Gracias por tu descripción. En el siguiente paso podés seleccionar la categoría que mejor describa el problema.'
+          }]);
+        }
+      } else {
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Entendido. En el siguiente paso podés seleccionar la categoría que mejor describa el problema.'
+        }]);
+      }
+    } catch {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Gracias por tu descripción. Continuá al siguiente paso para seleccionar la categoría.'
+      }]);
+    } finally {
+      setChatAnalyzing(false);
+    }
+  };
+
+  // Aceptar categoría sugerida por el chat
+  const acceptChatSuggestedCategory = () => {
+    if (chatCategoriaSugerida) {
+      setFormData(prev => ({
+        ...prev,
+        categoria_id: String(chatCategoriaSugerida.categoria.id),
+      }));
+      toast.success(`Categoría "${chatCategoriaSugerida.categoria.nombre}" seleccionada`);
+      // Avanzar al siguiente paso (ubicación, saltando categoría)
+      setCurrentStep(2);
+    }
+  };
+
   const handleSubmit = async () => {
     // Si hay alerta de similares mostrándose, no hacer nada (esperar decisión del usuario)
     if (showSimilaresAlert) {
@@ -574,9 +715,9 @@ export default function NuevoReclamo() {
       }
       // Después del login, el array steps se regenera sin el paso de registro
       // Necesitamos esperar un tick para que React actualice el array
-      // y luego ir al paso de "Confirmar" (que estará en baseSteps[3])
+      // y luego ir al paso de "Confirmar" (que estará en baseSteps[4])
       setTimeout(() => {
-        setCurrentStep(3); // Paso "Confirmar" en baseSteps
+        setCurrentStep(4); // Paso "Confirmar" en baseSteps
       }, 0);
       setRegistering(false);
     } catch (err: unknown) {
@@ -838,6 +979,143 @@ export default function NuevoReclamo() {
             </button>
           </p>
         )}
+      </div>
+    </WizardStepContent>
+  );
+
+  // Validación del paso de chat (tiene al menos una descripción del usuario)
+  const isChatValid = chatMessages.some(m => m.role === 'user') && !chatAnalyzing;
+
+  // Contenido del paso de Chat inicial (Step 0)
+  const ChatStepContent = (
+    <WizardStepContent
+      title="Contanos tu problema"
+      description="Describí lo que querés reportar y te ayudaremos a clasificarlo"
+    >
+      <div className="flex flex-col h-[400px]">
+        {/* Área de mensajes */}
+        <div
+          className="flex-1 overflow-y-auto space-y-3 p-3 rounded-xl mb-3"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          {chatMessages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[85%] p-3 rounded-2xl ${
+                  msg.role === 'user' ? 'rounded-br-md' : 'rounded-bl-md'
+                }`}
+                style={{
+                  backgroundColor: msg.role === 'user' ? theme.primary : theme.card,
+                  color: msg.role === 'user' ? 'white' : theme.text,
+                }}
+              >
+                {msg.role === 'assistant' && (
+                  <div className="flex items-center gap-2 mb-1">
+                    <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+                    <span className="text-xs font-medium" style={{ color: theme.primary }}>Asistente</span>
+                  </div>
+                )}
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              </div>
+            </div>
+          ))}
+
+          {/* Indicador de análisis */}
+          {chatAnalyzing && (
+            <div className="flex justify-start">
+              <div
+                className="p-3 rounded-2xl rounded-bl-md"
+                style={{ backgroundColor: theme.card }}
+              >
+                <div className="flex items-center gap-2">
+                  <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: theme.primary, animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: theme.primary, animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: theme.primary, animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div ref={chatMessagesEndRef} />
+        </div>
+
+        {/* Sugerencia de categoría */}
+        {chatCategoriaSugerida && !chatAnalyzing && (
+          <div
+            className="p-3 rounded-xl mb-3 flex items-center justify-between"
+            style={{
+              backgroundColor: `${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}15`,
+              border: `1px solid ${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}40`,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{
+                  backgroundColor: getCategoryColor(chatCategoriaSugerida.categoria.nombre),
+                  color: 'white',
+                }}
+              >
+                {getCategoryIcon(chatCategoriaSugerida.categoria.nombre)}
+              </div>
+              <div>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>Categoría sugerida</p>
+                <p className="font-medium" style={{ color: theme.text }}>
+                  {chatCategoriaSugerida.categoria.nombre}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={acceptChatSuggestedCategory}
+              className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: theme.primary, color: 'white' }}
+            >
+              Confirmar
+            </button>
+          </div>
+        )}
+
+        {/* Input de chat */}
+        <div className="flex gap-2">
+          <input
+            ref={chatInputRef}
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()}
+            placeholder="Escribí tu problema aquí..."
+            disabled={chatAnalyzing}
+            className="flex-1 px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+            }}
+          />
+          <button
+            onClick={handleChatSubmit}
+            disabled={!chatInput.trim() || chatAnalyzing}
+            className="px-4 py-3 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            style={{ backgroundColor: theme.primary, color: 'white' }}
+          >
+            {chatAnalyzing ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <Send className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+
+        {/* Tip */}
+        <p className="text-xs text-center mt-3" style={{ color: theme.textSecondary }}>
+          Ejemplo: "Hay un bache grande en la esquina de mi casa que es peligroso para los autos"
+        </p>
       </div>
     </WizardStepContent>
   );
@@ -1306,6 +1584,13 @@ export default function NuevoReclamo() {
   // Definir los steps del wizard
   const baseSteps: WizardStep[] = [
     {
+      id: 'chat',
+      label: 'Describir',
+      icon: <MessageCircle className="h-4 w-4" />,
+      content: ChatStepContent,
+      isValid: isChatValid,
+    },
+    {
       id: 'categoria',
       label: 'Categoría',
       icon: <FolderOpen className="h-4 w-4" />,
@@ -1344,13 +1629,13 @@ export default function NuevoReclamo() {
     isValid: isRegisterValid,
   };
 
-  // Flujo: Categoría -> Ubicación -> Detalles -> [Registro si no logueado] -> Confirmar
+  // Flujo: Chat -> Categoría -> Ubicación -> Detalles -> [Registro si no logueado] -> Confirmar
   const steps = showOnlyRegister
-    ? [...baseSteps.slice(0, 3), registerStep, baseSteps[3]] // Insertar registro antes de confirmar
+    ? [...baseSteps.slice(0, 4), registerStep, baseSteps[4]] // Insertar registro antes de confirmar
     : baseSteps;
 
   // Índice del paso de registro (si existe)
-  const registerStepIndex = showOnlyRegister ? 3 : -1;
+  const registerStepIndex = showOnlyRegister ? 4 : -1;
 
   // Manejar el cambio de step y posible registro/login
   const handleStepChange = (newStep: number) => {
@@ -1366,6 +1651,11 @@ export default function NuevoReclamo() {
   const getAISuggestion = () => {
     // Obtener el ID del paso actual
     const currentStepId = steps[currentStep]?.id;
+
+    // Paso de chat - no necesita AI suggestion externa porque el chat es la IA
+    if (currentStepId === 'chat') {
+      return undefined;
+    }
 
     // Paso de registro (solo para usuarios no autenticados)
     if (currentStepId === 'registro') {
@@ -1397,6 +1687,18 @@ export default function NuevoReclamo() {
 
     // Paso de categoría
     if (currentStepId === 'categoria') {
+      // Si ya hay una categoría sugerida por el chat
+      if (chatCategoriaSugerida && !formData.categoria_id) {
+        return {
+          title: 'Categoría sugerida',
+          message: `Basado en tu descripción, sugerimos "${chatCategoriaSugerida.categoria.nombre}". ¿Es correcto o preferís elegir otra?`,
+          actions: [{
+            label: `Usar ${chatCategoriaSugerida.categoria.nombre}`,
+            onClick: () => acceptSuggestedCategory(chatCategoriaSugerida.categoria),
+            variant: 'primary' as const,
+          }],
+        };
+      }
       // Si hay sugerencias de IA basadas en el texto
       if (analyzing) {
         return {
@@ -1419,7 +1721,7 @@ export default function NuevoReclamo() {
       if (!formData.categoria_id) {
         return {
           title: 'Seleccioná una categoría',
-          message: 'Elegí la categoría que mejor describa el problema. Si no estás seguro, podés escribir una descripción en el paso de Detalles y te ayudaré a encontrar la correcta.',
+          message: 'Elegí la categoría que mejor describa el problema.',
         };
       }
       const cat = categorias.find(c => c.id === Number(formData.categoria_id));

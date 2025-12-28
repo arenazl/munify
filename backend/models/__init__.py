@@ -2,6 +2,8 @@ from .municipio import Municipio  # IMPORTANTE: Municipio debe ir primero por la
 from .user import User
 from .categoria import Categoria
 from .zona import Zona
+from .cuadrilla_categoria import cuadrilla_categoria
+from .cuadrilla import Cuadrilla  # Debe ir antes de Reclamo por la relación FK
 from .empleado_categoria import empleado_categoria
 from .empleado import Empleado
 from .reclamo import Reclamo
@@ -28,6 +30,7 @@ __all__ = [
     "User",
     "Categoria",
     "Zona",
+    "Cuadrilla",
     "Empleado",
     "Reclamo",
     "HistorialReclamo",

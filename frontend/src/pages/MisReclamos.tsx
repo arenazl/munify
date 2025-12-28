@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, Clock, Eye, Plus, ExternalLink } from 'lucide-react';
+import { MapPin, Calendar, Tag, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi } from '../lib/api';
+import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
@@ -26,7 +26,13 @@ const estadoLabels: Record<EstadoReclamo, string> = {
   rechazado: 'Rechazado',
 };
 
-type SheetMode = 'closed' | 'view';
+type SheetMode = 'closed' | 'view' | 'calificar';
+
+interface CalificacionExistente {
+  puntuacion: number;
+  comentario?: string;
+  created_at: string;
+}
 
 export default function MisReclamos() {
   const { theme } = useTheme();
@@ -40,6 +46,14 @@ export default function MisReclamos() {
   const [selectedReclamo, setSelectedReclamo] = useState<Reclamo | null>(null);
   const [historial, setHistorial] = useState<HistorialReclamo[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  // Calificación states
+  const [puntuacion, setPuntuacion] = useState(0);
+  const [hoverPuntuacion, setHoverPuntuacion] = useState(0);
+  const [comentario, setComentario] = useState('');
+  const [enviandoCalificacion, setEnviandoCalificacion] = useState(false);
+  const [calificacionExistente, setCalificacionExistente] = useState<CalificacionExistente | null>(null);
+  const [loadingCalificacion, setLoadingCalificacion] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -64,6 +78,7 @@ export default function MisReclamos() {
   const openViewSheet = async (reclamo: Reclamo) => {
     setSelectedReclamo(reclamo);
     setSheetMode('view');
+    setCalificacionExistente(null);
 
     setLoadingHistorial(true);
     try {
@@ -74,12 +89,96 @@ export default function MisReclamos() {
     } finally {
       setLoadingHistorial(false);
     }
+
+    // Si está resuelto, verificar si ya tiene calificación
+    if (reclamo.estado === 'resuelto') {
+      setLoadingCalificacion(true);
+      try {
+        const res = await calificacionesApi.getReclamo(reclamo.id);
+        setCalificacionExistente(res.data);
+      } catch {
+        // No tiene calificación, está ok
+        setCalificacionExistente(null);
+      } finally {
+        setLoadingCalificacion(false);
+      }
+    }
+  };
+
+  const openCalificarSheet = () => {
+    setPuntuacion(0);
+    setHoverPuntuacion(0);
+    setComentario('');
+    setSheetMode('calificar');
+  };
+
+  const handleEnviarCalificacion = async () => {
+    if (!selectedReclamo || puntuacion === 0) {
+      toast.error('Por favor selecciona una calificación');
+      return;
+    }
+
+    setEnviandoCalificacion(true);
+    try {
+      await calificacionesApi.crear({
+        reclamo_id: selectedReclamo.id,
+        puntuacion,
+        comentario: comentario.trim() || undefined
+      });
+
+      toast.success('¡Gracias por tu calificación!');
+      setCalificacionExistente({
+        puntuacion,
+        comentario: comentario.trim() || undefined,
+        created_at: new Date().toISOString()
+      });
+      setSheetMode('view');
+    } catch (error: unknown) {
+      console.error('Error enviando calificación:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { detail?: string } } };
+        toast.error(axiosError.response?.data?.detail || 'Error al enviar la calificación');
+      } else {
+        toast.error('Error al enviar la calificación');
+      }
+    } finally {
+      setEnviandoCalificacion(false);
+    }
   };
 
   const closeSheet = () => {
     setSheetMode('closed');
     setSelectedReclamo(null);
     setHistorial([]);
+    setCalificacionExistente(null);
+    setPuntuacion(0);
+    setComentario('');
+  };
+
+  const renderStars = (rating: number, interactive = false) => {
+    return (
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            disabled={!interactive}
+            onClick={() => interactive && setPuntuacion(star)}
+            onMouseEnter={() => interactive && setHoverPuntuacion(star)}
+            onMouseLeave={() => interactive && setHoverPuntuacion(0)}
+            className={`transition-transform ${interactive ? 'hover:scale-110 active:scale-95 cursor-pointer' : 'cursor-default'}`}
+          >
+            <Star
+              className={`h-8 w-8 transition-colors ${
+                star <= (interactive ? (hoverPuntuacion || puntuacion) : rating)
+                  ? 'text-yellow-400 fill-yellow-400'
+                  : 'text-gray-300'
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   const filteredReclamos = reclamos.filter(r =>
@@ -168,6 +267,56 @@ export default function MisReclamos() {
           )}
         </div>
 
+        {/* Calificación (solo para reclamos resueltos) */}
+        {selectedReclamo.estado === 'resuelto' && (
+          <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
+            <h4 className="font-medium flex items-center mb-3">
+              <Star className="h-4 w-4 mr-2" />
+              Tu Calificación
+            </h4>
+            {loadingCalificacion ? (
+              <div className="text-center py-4">
+                <Loader2 className="h-6 w-6 animate-spin mx-auto" style={{ color: theme.primary }} />
+              </div>
+            ) : calificacionExistente ? (
+              <div
+                className="p-4 rounded-xl"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {renderStars(calificacionExistente.puntuacion)}
+                  <span className="text-sm font-medium" style={{ color: theme.text }}>
+                    {calificacionExistente.puntuacion}/5
+                  </span>
+                </div>
+                {calificacionExistente.comentario && (
+                  <p className="text-sm italic" style={{ color: theme.textSecondary }}>
+                    "{calificacionExistente.comentario}"
+                  </p>
+                )}
+                <div className="flex items-center gap-1 mt-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-xs" style={{ color: theme.textSecondary }}>
+                    Calificado el {new Date(calificacionExistente.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={openCalificarSheet}
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-all hover:opacity-90 active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #eab308 100%)',
+                  color: '#ffffff'
+                }}
+              >
+                <Star className="h-5 w-5" />
+                Calificar este reclamo
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Historial */}
         <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
           <h4 className="font-medium flex items-center mb-3">
@@ -202,6 +351,96 @@ export default function MisReclamos() {
             <p className="text-sm" style={{ color: theme.textSecondary }}>Sin historial</p>
           )}
         </div>
+      </div>
+    );
+  };
+
+  // Renderizar contenido del Sheet de calificación
+  const renderCalificarContent = () => {
+    if (!selectedReclamo) return null;
+
+    return (
+      <div className="space-y-6">
+        {/* Info del reclamo */}
+        <div
+          className="p-4 rounded-xl"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          <p className="font-medium" style={{ color: theme.text }}>{selectedReclamo.titulo}</p>
+          <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+            {selectedReclamo.categoria.nombre}
+          </p>
+          {selectedReclamo.resolucion && (
+            <p className="text-sm mt-2 italic" style={{ color: '#10b981' }}>
+              "{selectedReclamo.resolucion}"
+            </p>
+          )}
+        </div>
+
+        {/* Estrellas */}
+        <div className="text-center">
+          <p className="text-sm font-medium mb-4" style={{ color: theme.text }}>
+            ¿Cómo calificarías la atención recibida?
+          </p>
+          <div className="flex justify-center">
+            {renderStars(puntuacion, true)}
+          </div>
+          {puntuacion > 0 && (
+            <p className="text-sm mt-2" style={{ color: theme.textSecondary }}>
+              {puntuacion === 1 && 'Muy malo'}
+              {puntuacion === 2 && 'Malo'}
+              {puntuacion === 3 && 'Regular'}
+              {puntuacion === 4 && 'Bueno'}
+              {puntuacion === 5 && 'Excelente'}
+            </p>
+          )}
+        </div>
+
+        {/* Comentario */}
+        <div>
+          <label
+            className="flex items-center gap-2 text-sm font-medium mb-2"
+            style={{ color: theme.text }}
+          >
+            <MessageSquare className="h-4 w-4" />
+            Comentario (opcional)
+          </label>
+          <textarea
+            value={comentario}
+            onChange={(e) => setComentario(e.target.value)}
+            placeholder="Cuéntanos más sobre tu experiencia..."
+            rows={3}
+            className="w-full px-4 py-3 rounded-xl resize-none transition-shadow focus:ring-2"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+          />
+        </div>
+
+        {/* Botón enviar */}
+        <button
+          onClick={handleEnviarCalificacion}
+          disabled={enviandoCalificacion || puntuacion === 0}
+          className="w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+            color: 'white',
+          }}
+        >
+          {enviandoCalificacion ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            <>
+              <Send className="h-5 w-5" />
+              Enviar Calificación
+            </>
+          )}
+        </button>
       </div>
     );
   };
@@ -322,6 +561,16 @@ export default function MisReclamos() {
         }
       >
         {renderViewContent()}
+      </Sheet>
+
+      {/* Sheet de calificación */}
+      <Sheet
+        open={sheetMode === 'calificar'}
+        onClose={() => setSheetMode('view')}
+        title="Calificar Reclamo"
+        description={`#${selectedReclamo?.id} - ${selectedReclamo?.titulo}`}
+      >
+        {renderCalificarContent()}
       </Sheet>
     </>
   );

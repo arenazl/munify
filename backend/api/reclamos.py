@@ -333,11 +333,14 @@ async def get_reclamos(
 
 @router.get("/mis-reclamos", response_model=List[ReclamoResponse])
 async def get_mis_reclamos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     query = get_reclamos_query().where(Reclamo.creador_id == current_user.id)
     query = query.order_by(Reclamo.created_at.desc())
+    query = query.offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 

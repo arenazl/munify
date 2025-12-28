@@ -45,9 +45,11 @@ async def call_gemini(prompt: str, max_tokens: int = 500) -> Optional[str]:
 async def call_groq(prompt: str, max_tokens: int = 1000) -> Optional[str]:
     """Llama a Groq API como fallback"""
     if not settings.GROK_API_KEY:
+        print("[GROQ] No API key configured")
         return None
 
     try:
+        print(f"[GROQ] Calling API with model: {settings.GROK_MODEL}")
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
@@ -69,7 +71,7 @@ async def call_groq(prompt: str, max_tokens: int = 1000) -> Optional[str]:
                 print(f"[GROQ] Response OK")
                 return text.strip() if text else None
             else:
-                print(f"[GROQ] Error: {response.status_code}")
+                print(f"[GROQ] Error {response.status_code}: {response.text}")
                 return None
     except Exception as e:
         print(f"[GROQ] Exception: {e}")

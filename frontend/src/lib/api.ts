@@ -89,7 +89,10 @@ export const authApi = {
 // Reclamos
 export const reclamosApi = {
   getAll: (params?: Record<string, string | number>) => api.get('/reclamos', { params }),
-  getMisReclamos: () => api.get('/reclamos/mis-reclamos'),
+  getMisReclamos: (params?: { skip?: number; limit?: number }) => api.get('/reclamos/mis-reclamos', { params }),
+  getMisEstadisticas: () => api.get('/reclamos/mis-estadisticas'),
+  getMiHistorial: (params?: { skip?: number; limit?: number; estado?: string }) =>
+    api.get('/reclamos/mi-historial', { params }),
   getOne: (id: number) => api.get(`/reclamos/${id}`),
   getHistorial: (id: number) => api.get(`/reclamos/${id}/historial`),
   create: (data: Record<string, unknown>) => api.post('/reclamos', data),
@@ -213,6 +216,9 @@ export const configuracionApi = {
   get: (clave: string) => api.get(`/configuracion/${clave}`),
   getPublica: (clave: string) => api.get(`/configuracion/publica/${clave}`),
   update: (clave: string, data: { valor: string; municipio_id?: number | null }) => api.put(`/configuracion/${clave}`, data),
+  // Dashboard config
+  getDashboardConfig: (rol: string) => api.get(`/configuracion/dashboard/${rol}`),
+  updateDashboardConfig: (rol: string, config: object) => api.put(`/configuracion/dashboard/${rol}`, config),
 };
 
 // Municipios
@@ -248,6 +254,16 @@ export const chatApi = {
    */
   askDynamic: async (pregunta: string, contexto: Record<string, unknown> = {}, tipo?: string) => {
     const response = await api.post('/chat/dinamico', { pregunta, contexto, tipo });
+    return response.data;
+  },
+
+  /**
+   * Asistente con acceso a datos del municipio
+   * Solo para admin, supervisor y empleados
+   * Tiene acceso a estadísticas de reclamos, trámites, empleados, etc.
+   */
+  asistente: async (message: string, history: Array<{role: string, content: string}> = []) => {
+    const response = await api.post('/chat/asistente', { message, history });
     return response.data;
   },
 

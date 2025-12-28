@@ -84,8 +84,17 @@ export function ABMPage({
       }
     };
 
+    // Escuchar scroll tanto en window como en document
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    document.addEventListener('scroll', handleScroll, { passive: true });
+
+    // También ejecutar al montar para verificar posición inicial
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   if (loading) {
@@ -107,7 +116,7 @@ export function ABMPage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y', minHeight: '100vh' }}>
       {/* Contenedor sticky para header y secondary filters */}
       <div
         ref={headerRef}
@@ -323,7 +332,7 @@ export function ABMPage({
 
       {/* Grid de contenido con animación de transición */}
       {!isEmpty ? (
-        <div className="relative overflow-hidden mt-4">
+        <div className="relative mt-4">
           {/* Vista Tarjetas - 1 columna en móvil, 2 en tablet, 3 en desktop */}
           <div
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5"

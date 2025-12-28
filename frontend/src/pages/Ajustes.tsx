@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bell, MessageCircle, Users, Wrench, ChevronRight, FolderTree, MapPin } from 'lucide-react';
+import { Settings, Bell, MessageCircle, Users, Wrench, ChevronRight, FolderTree, MapPin, FileText, LayoutDashboard } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPreferences from '../components/NotificationPreferences';
 
-type Tab = 'preferencias' | 'whatsapp' | 'usuarios' | 'empleados' | 'categorias' | 'zonas';
+type Tab = 'preferencias' | 'whatsapp' | 'usuarios' | 'empleados' | 'categorias' | 'zonas' | 'tipos-tramite' | 'dashboard';
 
 export default function Ajustes() {
   const { theme } = useTheme();
@@ -21,8 +21,10 @@ export default function Ajustes() {
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, show: isAdminOrSupervisor },
     { id: 'usuarios', label: 'Usuarios', icon: Users, show: isAdminOrSupervisor },
     { id: 'empleados', label: 'Empleados', icon: Wrench, show: isAdminOrSupervisor },
-    { id: 'categorias', label: 'Categorias', icon: FolderTree, show: isAdmin },
-    { id: 'zonas', label: 'Zonas', icon: MapPin, show: isAdmin },
+    { id: 'categorias', label: 'Categorias', icon: FolderTree, show: isAdminOrSupervisor },
+    { id: 'zonas', label: 'Zonas', icon: MapPin, show: isAdminOrSupervisor },
+    { id: 'tipos-tramite', label: 'Tipos Trámite', icon: FileText, show: isAdminOrSupervisor },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, show: isAdminOrSupervisor },
   ];
 
   const visibleTabs = tabs.filter(t => t.show);
@@ -241,6 +243,72 @@ export default function Ajustes() {
               }}
             >
               Ir a Zonas
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'tipos-tramite' && (
+        <div
+          className="rounded-xl p-6"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="text-center py-8">
+            <div
+              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#10b98120' }}
+            >
+              <FileText className="h-8 w-8" style={{ color: '#10b981' }} />
+            </div>
+            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
+              Gestion de Tipos de Tramite
+            </h3>
+            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
+              Administra los tipos de tramites disponibles: habilitaciones, permisos, licencias, etc.
+            </p>
+            <Link
+              to="/gestion/tipos-tramite"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
+              style={{
+                backgroundColor: '#10b981',
+                color: '#ffffff',
+              }}
+            >
+              Ir a Tipos de Tramite
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'dashboard' && (
+        <div
+          className="rounded-xl p-6"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="text-center py-8">
+            <div
+              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}20` }}
+            >
+              <LayoutDashboard className="h-8 w-8" style={{ color: theme.primary }} />
+            </div>
+            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
+              Configuracion del Dashboard
+            </h3>
+            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
+              Personaliza qué componentes ven los vecinos y empleados en sus dashboards.
+            </p>
+            <Link
+              to="/gestion/config-dashboard"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
+              style={{
+                backgroundColor: theme.primary,
+                color: '#ffffff',
+              }}
+            >
+              Configurar Dashboard
               <ChevronRight className="h-4 w-4" />
             </Link>
           </div>

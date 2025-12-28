@@ -16,8 +16,19 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { reclamosApi } from '../../lib/api';
+import { reclamosApi, configuracionApi } from '../../lib/api';
 import type { Reclamo, EstadoReclamo } from '../../types';
+
+interface DashboardComponente {
+  id: string;
+  nombre: string;
+  visible: boolean;
+  orden: number;
+}
+
+interface DashboardConfig {
+  componentes: DashboardComponente[];
+}
 
 const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; label: string }> = {
   nuevo: { icon: Clock, color: '#6b7280', label: 'Nuevo' },
@@ -35,6 +46,7 @@ export default function MobileHome() {
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pendientes: 0, resueltos: 0 });
+  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -46,19 +58,35 @@ export default function MobileHome() {
 
   const loadReclamos = async () => {
     try {
-      const res = await reclamosApi.getMisReclamos();
-      const data = res.data;
+      const [reclamosRes, configRes] = await Promise.all([
+        reclamosApi.getMisReclamos(),
+        configuracionApi.getDashboardConfig('vecino').catch(() => ({ data: { config: null } })),
+      ]);
+
+      const data = reclamosRes.data;
       setReclamos(data.slice(0, 3));
       setStats({
         total: data.length,
         pendientes: data.filter((r: Reclamo) => ['nuevo', 'asignado', 'en_proceso'].includes(r.estado)).length,
         resueltos: data.filter((r: Reclamo) => r.estado === 'resuelto').length,
       });
+
+      // Cargar configuración del dashboard
+      if (configRes.data?.config) {
+        setDashboardConfig(configRes.data.config);
+      }
     } catch (error) {
       console.error('Error:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper para verificar si un componente es visible
+  const isComponentVisible = (componentId: string): boolean => {
+    if (!dashboardConfig?.componentes) return true; // Por defecto mostrar todo
+    const comp = dashboardConfig.componentes.find(c => c.id === componentId);
+    return comp ? comp.visible : true;
   };
 
   // Datos hardcodeados de noticias genéricas para demo (movido arriba para ambas vistas)
@@ -312,6 +340,7 @@ export default function MobileHome() {
 
       <div className="p-4 space-y-6">
         {/* 4 Cards de estadísticas en una línea */}
+        {isComponentVisible('stats') && (
         <div className="grid grid-cols-4 gap-2">
           {/* Total Reclamos */}
           <div
@@ -389,8 +418,9 @@ export default function MobileHome() {
             </p>
           </div>
         </div>
+        )}
 
-        {/* Acciones principales - 3 botones iguales */}
+        {/* Acciones principales - 3 botones iguales (siempre visible) */}
         <div className="grid grid-cols-3 gap-3">
           <button
             onClick={() => navigate('/app/nuevo')}
@@ -443,6 +473,7 @@ export default function MobileHome() {
         </div>
 
         {/* Accesos rápidos */}
+        {isComponentVisible('accesos_rapidos') && (
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => navigate('/app/mis-tramites')}
@@ -475,8 +506,10 @@ export default function MobileHome() {
             </div>
           </button>
         </div>
+        )}
 
         {/* Noticias del Municipio */}
+        {isComponentVisible('noticias') && (
         <div>
           <h3 className="font-semibold mb-3" style={{ color: theme.text }}>
             Noticias del Municipio
@@ -505,8 +538,10 @@ export default function MobileHome() {
             ))}
           </div>
         </div>
+        )}
 
         {/* Últimos Reclamos */}
+        {isComponentVisible('reclamos_recientes') && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold" style={{ color: theme.text }}>
@@ -586,6 +621,7 @@ export default function MobileHome() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

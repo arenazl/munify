@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileText,
   User,
@@ -66,7 +66,11 @@ export default function MobileNuevoTramite() {
   const { theme } = useTheme();
   const { user, isLoading: authLoading, register, login, municipioActual } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const dataLoadedRef = useRef(false);
+
+  // Detectar si estamos en /gestion para navegar correctamente después del submit
+  const isInGestion = location.pathname.startsWith('/gestion');
 
   const [currentStep, setCurrentStep] = useState(0);
   const [servicios, setServicios] = useState<ServicioTramite[]>([]);
@@ -112,7 +116,19 @@ export default function MobileNuevoTramite() {
     display_name: string;
     lat: string;
     lon: string;
+    address?: {
+      house_number?: string;
+      road?: string;
+      neighbourhood?: string;
+      suburb?: string;
+      city?: string;
+      town?: string;
+      village?: string;
+      state?: string;
+      country?: string;
+    };
   }>>([]);
+  const [userInputNumber, setUserInputNumber] = useState<string>('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingAddress, setSearchingAddress] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -214,14 +230,56 @@ export default function MobileNuevoTramite() {
 
   const handleAddressChange = (value: string) => {
     setFormData(prev => ({ ...prev, direccion: value }));
+
+    // Extraer número de la dirección que escribe el usuario (ej: "San Martín 230" -> "230")
+    const numberMatch = value.match(/\b(\d+)\b/);
+    if (numberMatch) {
+      setUserInputNumber(numberMatch[1]);
+    }
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     searchTimeoutRef.current = setTimeout(() => searchAddress(value), 300);
   };
 
-  const selectAddressSuggestion = (suggestion: { display_name: string }) => {
-    setFormData(prev => ({ ...prev, direccion: suggestion.display_name }));
+  const selectAddressSuggestion = (suggestion: typeof addressSuggestions[0]) => {
+    // Construir dirección más limpia usando addressdetails
+    let direccion = '';
+    const addr = suggestion.address;
+
+    if (addr) {
+      const parts: string[] = [];
+
+      // Calle con número
+      if (addr.road) {
+        // Usar el número de Nominatim si existe, sino el que escribió el usuario
+        const numero = addr.house_number || userInputNumber;
+        parts.push(numero ? `${addr.road} ${numero}` : addr.road);
+      }
+
+      // Barrio/Localidad
+      const locality = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
+      if (locality) {
+        parts.push(locality);
+      }
+
+      // Provincia (solo si no es Buenos Aires que ya se sabe)
+      if (addr.state && !addr.state.toLowerCase().includes('buenos aires')) {
+        parts.push(addr.state);
+      }
+
+      direccion = parts.join(', ');
+    }
+
+    // Si no pudimos construir una dirección mejor, usar display_name pero más corto
+    if (!direccion) {
+      // Tomar solo las primeras 3-4 partes del display_name
+      const parts = suggestion.display_name.split(', ').slice(0, 4);
+      direccion = parts.join(', ');
+    }
+
+    setFormData(prev => ({ ...prev, direccion }));
     setShowSuggestions(false);
     setAddressSuggestions([]);
   };
@@ -312,9 +370,9 @@ export default function MobileNuevoTramite() {
       const res = await tramitesApi.create(tramiteData);
       toast.success(`Trámite ${res.data.numero_tramite} creado exitosamente`);
 
-      // Navegar de vuelta
+      // Navegar de vuelta (a la ruta correcta según dónde estemos)
       await new Promise(resolve => setTimeout(resolve, 500));
-      navigate('/app', { replace: true });
+      navigate(isInGestion ? '/gestion/mis-tramites' : '/app', { replace: true });
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       toast.error(err.response?.data?.detail || 'Error al crear trámite');

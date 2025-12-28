@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -176,6 +176,13 @@ export default function GestionTramites() {
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
 
+  // Infinite scroll state
+  const [skip, setSkip] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const LIMIT = 30;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
   // Click fuera para cerrar autocompletado
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -261,7 +268,7 @@ export default function GestionTramites() {
     }
   }, [searchParams, tramites]);
 
-  const loadData = async () => {
+  const loadData = async (reloadTramites = true) => {
     try {
       const [serviciosRes, tiposRes, empleadosRes, resumenRes] = await Promise.all([
         tramitesApi.getServicios(),
@@ -277,7 +284,9 @@ export default function GestionTramites() {
       // Cargar conteos para filtros visuales
       loadConteos();
       // Cargar trámites con filtros actuales
-      await loadTramites();
+      if (reloadTramites) {
+        await loadTramites(filtroTipo, filtroEstado);
+      }
     } catch (error) {
       console.error('Error cargando datos:', error);
       toast.error('Error al cargar trámites');
@@ -286,10 +295,13 @@ export default function GestionTramites() {
     }
   };
 
-  // Cargar trámites con filtros
+  // Cargar trámites con filtros (resetea la lista)
   const loadTramites = async (tipo?: number | null, estado?: string) => {
     try {
-      const params: Record<string, unknown> = {};
+      const params: Record<string, unknown> = {
+        limit: LIMIT,
+        skip: 0,
+      };
       // Usar parámetros explícitos o valores actuales del state
       const tipoFiltro = tipo !== undefined ? tipo : filtroTipo;
       const estadoFiltro = estado !== undefined ? estado : filtroEstado;
@@ -300,10 +312,69 @@ export default function GestionTramites() {
 
       const res = await tramitesApi.getGestionTodos(params);
       setTramites(res.data);
+      setSkip(LIMIT);
+      setHasMore(res.data.length >= LIMIT);
     } catch (error) {
       console.error('Error cargando trámites:', error);
     }
   };
+
+  // Cargar más trámites (infinite scroll)
+  const loadMoreTramites = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    try {
+      const params: Record<string, unknown> = {
+        limit: LIMIT,
+        skip: skip,
+      };
+
+      if (filtroTipo) params.tipo_tramite_id = filtroTipo;
+      if (filtroEstado) params.estado = filtroEstado.toUpperCase();
+
+      const res = await tramitesApi.getGestionTodos(params);
+
+      if (res.data.length > 0) {
+        setTramites(prev => {
+          const existingIds = new Set(prev.map(t => t.id));
+          const newItems = res.data.filter((t: Tramite) => !existingIds.has(t.id));
+          return [...prev, ...newItems];
+        });
+        setSkip(prev => prev + LIMIT);
+        setHasMore(res.data.length >= LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error cargando más trámites:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, skip, filtroTipo, filtroEstado]);
+
+  // IntersectionObserver para infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          loadMoreTramites();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) {
+      observer.observe(currentRef);
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef);
+      }
+    };
+  }, [hasMore, loadingMore, loading, loadMoreTramites]);
 
   const loadConteos = async () => {
     try {
@@ -371,6 +442,18 @@ export default function GestionTramites() {
     }
   };
 
+  // Función para recargar todo después de una acción
+  const recargarDespuesDeAccion = async () => {
+    // Recargar trámites con los filtros actuales del DOM (no del closure)
+    const tipoActual = filtroTipo;
+    const estadoActual = filtroEstado;
+
+    await Promise.all([
+      loadTramites(tipoActual, estadoActual),
+      loadConteos(),
+    ]);
+  };
+
   const handleAsignarEmpleado = async () => {
     if (!selectedTramite || !empleadoSeleccionado) {
       toast.error('Selecciona un empleado');
@@ -384,7 +467,7 @@ export default function GestionTramites() {
       });
       toast.success('Empleado asignado correctamente');
       closeSheet();
-      loadData();
+      await recargarDespuesDeAccion();
     } catch (error) {
       console.error('Error asignando empleado:', error);
       toast.error('Error al asignar empleado');
@@ -402,13 +485,13 @@ export default function GestionTramites() {
     setSaving(true);
     try {
       await tramitesApi.update(selectedTramite.id, {
-        estado: nuevoEstado,
+        estado: nuevoEstado.toUpperCase(), // Enviar en mayúsculas al backend
         respuesta: respuesta || undefined,
         observaciones: observaciones || undefined,
       });
       toast.success('Trámite actualizado');
       closeSheet();
-      loadData();
+      await recargarDespuesDeAccion();
     } catch (error) {
       console.error('Error actualizando trámite:', error);
       toast.error('Error al actualizar trámite');
@@ -610,12 +693,12 @@ export default function GestionTramites() {
           style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
         >
         <div className="flex flex-col gap-2">
-          {/* Tipos de trámite */}
-          <div className="flex gap-1.5 w-full">
+          {/* Tipos de trámite - Grid 2 filas en mobile, 1 fila en desktop */}
+          <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
             {/* Botón Todos */}
             <button
               onClick={() => setFiltroTipo(null)}
-              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] ${tipos.length > 0 ? 'flex-1 min-w-0' : 'w-[68px]'}`}
+              className="flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
               style={{
                 background: filtroTipo === null ? theme.primary : theme.backgroundSecondary,
                 border: `1px solid ${filtroTipo === null ? theme.primary : theme.border}`,
@@ -637,7 +720,7 @@ export default function GestionTramites() {
                   key={tipo.id}
                   onClick={() => setFiltroTipo(isSelected ? null : tipo.id)}
                   title={tipo.nombre}
-                  className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                  className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
                   style={{
                     background: isSelected ? tipoColor : theme.backgroundSecondary,
                     border: `1px solid ${isSelected ? tipoColor : theme.border}`,
@@ -657,22 +740,22 @@ export default function GestionTramites() {
             })}
           </div>
 
-          {/* Estados */}
-          <div className="flex gap-2 w-full">
+          {/* Estados - Grid 2 filas en mobile (4 columnas), 1 fila en desktop */}
+          <div className="grid grid-cols-4 sm:flex gap-1.5 w-full">
             {Object.keys(conteosEstados).length === 0 ? (
               // Skeleton mientras cargan los conteos
               <>
-                {[1, 2, 3, 4, 5, 6].map((i) => (
+                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
                   <div
                     key={`skeleton-estado-${i}`}
-                    className="flex-1 h-[36px] rounded-lg animate-pulse"
+                    className="h-[36px] rounded-lg animate-pulse sm:flex-1"
                     style={{ background: `${theme.border}40` }}
                   />
                 ))}
               </>
             ) : (
               [
-                { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
+                { key: '', label: 'Todos', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
                 { key: 'iniciado', label: 'Nuevo', icon: Clock, color: '#6366f1', count: conteosEstados['iniciado'] || 0 },
                 { key: 'en_revision', label: 'Revisión', icon: FileCheck, color: '#3b82f6', count: conteosEstados['en_revision'] || 0 },
                 { key: 'en_proceso', label: 'Proceso', icon: RefreshCw, color: '#f59e0b', count: conteosEstados['en_proceso'] || 0 },
@@ -686,7 +769,7 @@ export default function GestionTramites() {
                   <button
                     key={estado.key}
                     onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
-                    className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
+                    className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all h-[36px] sm:flex-1 sm:min-w-0"
                     style={{
                       background: isActive ? estado.color : `${estado.color}15`,
                       border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
@@ -1015,6 +1098,23 @@ export default function GestionTramites() {
           </div>
         </div>
       )}
+
+      {/* Sentinel para infinite scroll + spinner de carga */}
+      <div ref={loadMoreRef} className="py-4">
+        {loadingMore && (
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+            <span className="text-sm" style={{ color: theme.textSecondary }}>
+              Cargando más trámites...
+            </span>
+          </div>
+        )}
+        {!hasMore && tramites.length > 0 && !loadingMore && (
+          <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+            No hay más trámites para mostrar
+          </p>
+        )}
+      </div>
 
       {/* Sheet de detalle */}
       <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite">

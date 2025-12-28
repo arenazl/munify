@@ -19,10 +19,8 @@ import {
   LineChart,
   Line,
   Legend,
-  ScatterChart,
-  Scatter,
-  ZAxis,
 } from 'recharts';
+import HeatmapWidget from '../components/ui/HeatmapWidget';
 
 // Tipos para analytics
 interface HeatmapPoint {
@@ -176,7 +174,8 @@ export default function Dashboard() {
 
         // Paso 4: Cargar analytics avanzados (más pesados) de a uno
         try {
-          const heatmapRes = await analyticsApi.getHeatmap(30).catch(e => ({ data: { puntos: [] } }));
+          // Traer 90 días para el mapa de calor (más representativo)
+          const heatmapRes = await analyticsApi.getHeatmap(90).catch(e => ({ data: { puntos: [] } }));
           setHeatmapData(heatmapRes.data.puntos || []);
         } catch (error) {
           console.error('Error cargando heatmap:', error);
@@ -566,7 +565,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Mapa de Calor - Scatter simulando densidad */}
+        {/* Mapa de Calor - Leaflet con capa de calor real */}
         <div
           className="lg:col-span-2 rounded-2xl p-6 backdrop-blur-sm"
           style={{
@@ -581,44 +580,9 @@ export default function Dashboard() {
               Mapa de Calor - Concentracion de Reclamos
             </h2>
           </div>
-          <div className="h-64">
-            {heatmapData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <ScatterChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                  <XAxis type="number" dataKey="lng" name="Longitud" domain={['auto', 'auto']} hide />
-                  <YAxis type="number" dataKey="lat" name="Latitud" domain={['auto', 'auto']} hide />
-                  <ZAxis type="number" dataKey="intensidad" range={[50, 400]} name="Intensidad" />
-                  <Tooltip
-                    cursor={{ strokeDasharray: '3 3' }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="rounded-lg p-2 shadow-lg text-xs" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-                            <p style={{ color: theme.text }}>{data.categoria}</p>
-                            <p style={{ color: theme.textSecondary }}>Estado: {data.estado}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Scatter
-                    data={heatmapData}
-                    fill="url(#colorGradient)"
-                    fillOpacity={0.8}
-                  />
-                </ScatterChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center" style={{ color: theme.textSecondary }}>
-                <p>Sin datos de ubicacion disponibles</p>
-              </div>
-            )}
-          </div>
+          <HeatmapWidget data={heatmapData} height="256px" />
           <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
-            {heatmapData.length} puntos en los ultimos 30 dias
+            {heatmapData.length} puntos en los ultimos 90 dias
           </p>
         </div>
 
@@ -1072,7 +1036,7 @@ export default function Dashboard() {
                 <Legend />
                 {empleadosNames.map((nombre, index) => (
                   <Line
-                    key={nombre}
+                    key={`empleado-${index}-${nombre}`}
                     type="monotone"
                     dataKey={nombre}
                     name={nombre}

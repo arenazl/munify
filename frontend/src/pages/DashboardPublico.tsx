@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import {
   Building2, MapPin, Clock, CheckCircle2, Plus,
   Search, ChevronRight, User, X, ArrowRight, Loader2,
-  MessageSquare, Calendar, TrendingUp, Navigation, LogOut
+  MessageSquare, Calendar, TrendingUp, Navigation, LogOut, Newspaper, FileText
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -35,6 +35,14 @@ interface Estadisticas {
   por_categoria?: { categoria: string; color: string; cantidad: number }[];
 }
 
+interface Noticia {
+  id: number;
+  titulo: string;
+  contenido: string;
+  imagen_url?: string;
+  created_at: string;
+}
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function DashboardPublico() {
@@ -42,6 +50,7 @@ export default function DashboardPublico() {
   const { user, logout } = useAuth();
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({ total: 0, nuevos: 0, en_proceso: 0, resueltos: 0 });
+  const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showRegistroModal, setShowRegistroModal] = useState(false);
@@ -53,6 +62,7 @@ export default function DashboardPublico() {
   const municipioNombre = localStorage.getItem('municipio_nombre') || 'Mi Municipio';
   const municipioId = localStorage.getItem('municipio_id');
   const municipioColor = localStorage.getItem('municipio_color') || '#3b82f6';
+  const municipioLogo = localStorage.getItem('municipio_logo_url');
 
   useEffect(() => {
     if (!municipioId) {
@@ -61,6 +71,7 @@ export default function DashboardPublico() {
     }
     fetchReclamosPublicos();
     fetchEstadisticas();
+    fetchNoticias();
   }, [municipioId]);
 
   const fetchReclamosPublicos = async () => {
@@ -86,6 +97,35 @@ export default function DashboardPublico() {
       }
     } catch (error) {
       console.error('Error cargando estadísticas:', error);
+    }
+  };
+
+  const fetchNoticias = async () => {
+    try {
+      const response = await fetch(`${API_URL}/noticias/publico?municipio_id=${municipioId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setNoticias(data);
+      }
+    } catch (error) {
+      console.error('Error cargando noticias:', error);
+      // Usar noticias de ejemplo si no hay en la DB
+      setNoticias([
+        {
+          id: 1,
+          titulo: "Mejoras en el servicio de recolección",
+          contenido: "Se implementó un nuevo sistema de rutas optimizadas para la recolección de residuos, mejorando la frecuencia en todos los barrios.",
+          imagen_url: "https://images.unsplash.com/photo-1532996122724-e3c354a0b15b?w=400",
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 2,
+          titulo: "Nueva iluminación LED en espacios públicos",
+          contenido: "El municipio continúa con el plan de modernización del alumbrado público, instalando luminarias LED de bajo consumo.",
+          imagen_url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400",
+          created_at: new Date().toISOString()
+        },
+      ]);
     }
   };
 
@@ -240,14 +280,96 @@ export default function DashboardPublico() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Hero section */}
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-white mb-2">
-            Reclamos en {municipioNombre}
-          </h2>
-          <p className="text-slate-400">
-            Seguí el estado de los reclamos o creá uno nuevo
-          </p>
+        {/* Hero Banner */}
+        <div className="relative rounded-3xl overflow-hidden mb-8" style={{ minHeight: '200px' }}>
+          {/* Background */}
+          <div className="absolute inset-0">
+            {municipioLogo ? (
+              <img
+                src={municipioLogo}
+                alt={municipioNombre}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div
+                className="w-full h-full"
+                style={{
+                  background: `linear-gradient(135deg, ${municipioColor} 0%, ${municipioColor}aa 100%)`,
+                }}
+              />
+            )}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(180deg, rgba(15, 23, 42, 0.3) 0%, rgba(15, 23, 42, 0.8) 100%)`,
+              }}
+            />
+          </div>
+
+          {/* Content */}
+          <div className="relative z-10 p-8 flex flex-col justify-end" style={{ minHeight: '200px' }}>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-2 drop-shadow-lg">
+              {municipioNombre}
+            </h2>
+            <p className="text-white/80 text-lg">
+              Sistema de Reclamos y Trámites Vecinales
+            </p>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <button
+            onClick={() => navigate('/nuevo-reclamo')}
+            className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 rounded-2xl hover:from-blue-500/30 hover:to-indigo-500/30 transition-all group"
+          >
+            <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Plus className="h-6 w-6 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white">Nuevo Reclamo</p>
+              <p className="text-xs text-slate-400">Reportar un problema</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/tramites')}
+            className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+          >
+            <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+              <FileText className="h-6 w-6 text-purple-400" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white">Trámites</p>
+              <p className="text-xs text-slate-400">Iniciar un trámite</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/login')}
+            className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+          >
+            <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+              <User className="h-6 w-6 text-green-400" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white">Mi Cuenta</p>
+              <p className="text-xs text-slate-400">Ingresar / Registrarme</p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate('/bienvenido')}
+            className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group"
+          >
+            <div className="w-12 h-12 bg-amber-500/20 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+              <Navigation className="h-6 w-6 text-amber-400" />
+            </div>
+            <div className="text-left">
+              <p className="font-semibold text-white">Otro Municipio</p>
+              <p className="text-xs text-slate-400">Cambiar ubicación</p>
+            </div>
+          </button>
         </div>
 
         {/* Stats Cards */}
@@ -373,6 +495,43 @@ export default function DashboardPublico() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Noticias del Municipio */}
+        {noticias.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Newspaper className="h-5 w-5 text-blue-400" />
+              <h3 className="text-lg font-semibold text-white">Noticias del Municipio</h3>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {noticias.map((noticia) => (
+                <div
+                  key={noticia.id}
+                  className="bg-white/5 backdrop-blur rounded-2xl overflow-hidden border border-white/5 hover:border-white/10 transition-all"
+                >
+                  {noticia.imagen_url && (
+                    <img
+                      src={noticia.imagen_url}
+                      alt={noticia.titulo}
+                      className="w-full h-40 object-cover"
+                    />
+                  )}
+                  <div className="p-4">
+                    <h4 className="font-medium text-white mb-2">{noticia.titulo}</h4>
+                    <p className="text-sm text-slate-400 line-clamp-2">{noticia.contenido}</p>
+                    <p className="text-xs text-slate-500 mt-3">
+                      {new Date(noticia.created_at).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

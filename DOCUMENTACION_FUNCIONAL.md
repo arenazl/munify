@@ -794,21 +794,128 @@ Play Store: "MuniDesk" → Staff municipal (con login institucional)
 ✅ SLAs y escalado
 ✅ Reportes PDF
 ✅ Multi-tenant
+✅ Layout unificado con sidebar + footer móvil
+✅ Infinite scroll en listados (Reclamos, Trámites)
+✅ Reclamos anónimos (opción)
+✅ Búsqueda de vecinos por nombre/DNI/teléfono
+✅ Calificación de reclamos resueltos (1-5 estrellas)
+✅ Dashboard Vecino con secciones configurables
+✅ Módulo de Trámites completo (wizard, estados, gestión)
+✅ Mi Rendimiento para empleados
 
 ### Lo que Falta (Prioridad Alta)
-⬜ Separar experiencias ciudadano/gestión
-⬜ Simplificar navegación ciudadano
+⬜ Endpoint `/api/reclamos/{id}/cantidad-similares` - mostrar badge "X vecinos" en cards
+⬜ Notificaciones Push - avisar cambios de estado
 ⬜ Testing real con WhatsApp
-⬜ Optimización mobile
-⬜ Documentación de usuario
+⬜ Optimización mobile (pull-to-refresh, gestos swipe)
+
+### Lo que Viene (Media Prioridad)
+⬜ Reportes/Estadísticas avanzadas - tiempos por categoría, reclamos por zona
+⬜ Exportar datos a Excel/PDF
+⬜ Mi Historial para vecinos (timeline de reclamos/trámites)
+⬜ Sistema de adjuntos en Trámites
 
 ### Lo que Viene (Futuro)
-⬜ App nativa móvil
-⬜ API pública
+⬜ App nativa móvil (PWA como paso intermedio)
+⬜ API pública documentada
 ⬜ Predicción con ML
-⬜ Modo offline
+⬜ Modo offline con Service Worker
+⬜ Chat interno vecino-empleado
 
 ---
 
-*Documento actualizado: Diciembre 2024*
-*Versión: 2.0*
+## FIXES RECIENTES (28/12/2024)
+
+### Infinite Scroll en Reclamos
+- **Problema:** El scroll infinito no funcionaba en `/gestion/reclamos`
+- **Causa:** `overflow-hidden` en ABMPage.tsx bloqueaba la detección del sentinel por IntersectionObserver
+- **Solución:** Quitar `overflow-hidden` del contenedor del grid en ABMPage
+- **Archivos:** `frontend/src/components/ui/ABMPage.tsx`
+
+### Errores 404 en cantidad-similares
+- **Problema:** Endpoint `/api/reclamos/{id}/cantidad-similares` no existía en backend
+- **Causa:** Frontend llamaba endpoint no implementado
+- **Solución:** Comentar temporalmente la funcionalidad hasta implementar endpoint
+- **Archivos:** `frontend/src/pages/Reclamos.tsx`
+
+### Indicador de Scroll
+- **Mejora:** Agregado texto "Cargando más reclamos..." y "No hay más reclamos para mostrar"
+- **Patrón:** Igual que GestionTramites para consistencia visual
+
+---
+
+## ARQUITECTURA DE NAVEGACIÓN ACTUAL
+
+```
+/                     → RootRedirect (según rol)
+/bienvenido           → Landing pública con selector de municipio
+
+/gestion              → Layout unificado
+  /gestion            → Dashboard (admin/supervisor)
+  /gestion/tablero    → Kanban (empleado por defecto)
+  /gestion/mi-panel   → Dashboard Vecino (vecino por defecto)
+
+  /gestion/reclamos       → ABM Reclamos (admin/supervisor)
+  /gestion/mis-reclamos   → Mis Reclamos (vecino)
+  /gestion/mis-trabajos   → Mis Trabajos (empleado)
+  /gestion/crear-reclamo  → Wizard nuevo reclamo
+
+  /gestion/tramites       → Gestión Trámites (admin/supervisor)
+  /gestion/mis-tramites   → Mis Trámites (vecino)
+  /gestion/crear-tramite  → Wizard nuevo trámite
+
+  /gestion/mapa           → Mapa de reclamos
+  /gestion/empleados      → ABM Empleados
+  /gestion/categorias     → ABM Categorías
+  /gestion/zonas          → ABM Zonas
+  /gestion/ajustes        → Configuración
+```
+
+---
+
+## COMPONENTES CLAVE
+
+| Componente | Ubicación | Descripción |
+|------------|-----------|-------------|
+| `Layout` | components/Layout.tsx | Layout unificado con sidebar + footer móvil 5 tabs |
+| `ABMPage` | components/ui/ABMPage.tsx | Componente reutilizable para ABMs con grid/tabla |
+| `Sheet` | components/ui/Sheet.tsx | Side Modal para crear/editar/ver |
+| `WizardModal` | components/ui/WizardModal.tsx | Wizard por pasos |
+| `TramiteWizard` | components/TramiteWizard.tsx | Wizard específico para trámites |
+
+---
+
+## PATRÓN INFINITE SCROLL
+
+Patrón usado en todas las páginas con listados:
+```tsx
+// 1. Refs y estados
+const observerTarget = useRef<HTMLDivElement>(null);
+const [loadingMore, setLoadingMore] = useState(false);
+const [hasMore, setHasMore] = useState(true);
+
+// 2. IntersectionObserver
+useEffect(() => {
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+        setPage(prev => prev + 1);
+      }
+    },
+    { threshold: 0.1, rootMargin: '100px' }
+  );
+  if (observerTarget.current) observer.observe(observerTarget.current);
+  return () => observer.disconnect();
+}, [hasMore, loadingMore, loading]);
+
+// 3. Sentinel div (IMPORTANTE: NO debe estar dentro de overflow-hidden)
+<div ref={observerTarget} className="py-4">
+  {loadingMore && <Spinner />}
+  {!hasMore && <p>No hay más para mostrar</p>}
+</div>
+```
+
+---
+
+*Documento actualizado: 28/12/2024*
+*Versión: 2.1*

@@ -16,7 +16,7 @@ from models.notificacion import Notificacion
 from schemas.tramite import (
     TipoTramiteCreate, TipoTramiteUpdate, TipoTramiteResponse, TipoTramiteConTramites,
     TramiteCreate, TramiteUpdate, TramiteResponse,
-    SolicitudCreate, SolicitudUpdate, SolicitudResponse, SolicitudAsignar,
+    SolicitudCreate, SolicitudUpdate, SolicitudResponse, SolicitudGestionResponse, SolicitudAsignar,
     HistorialSolicitudResponse
 )
 from models.empleado import Empleado
@@ -691,7 +691,7 @@ async def conteo_tipos_solicitudes(
 
 # ==================== GESTIÓN ====================
 
-@router.get("/gestion/solicitudes", response_model=List[SolicitudResponse])
+@router.get("/gestion/solicitudes", response_model=List[SolicitudGestionResponse])
 async def listar_solicitudes_gestion(
     municipio_id: int = Query(..., description="ID del municipio"),
     estado: Optional[EstadoSolicitud] = Query(None),
@@ -701,7 +701,7 @@ async def listar_solicitudes_gestion(
     sin_asignar: bool = Query(False),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=1000),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
     db: AsyncSession = Depends(get_db)
 ):
@@ -740,10 +740,11 @@ async def listar_solicitudes_gestion(
     if current_user.rol == RolUsuario.EMPLEADO:
         query = query.where(Solicitud.empleado_id == current_user.empleado_id)
 
+    # Optimización: solo cargar relaciones necesarias para la lista
     query = query.options(
         selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-        selectinload(Solicitud.empleado_asignado),
-        selectinload(Solicitud.solicitante)
+        selectinload(Solicitud.empleado_asignado)
+        # No cargar solicitante completo, ya tenemos nombre_solicitante, apellido_solicitante, etc.
     )
     query = query.order_by(Solicitud.prioridad, Solicitud.created_at.desc())
     query = query.offset(skip).limit(limit)

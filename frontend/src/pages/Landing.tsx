@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, Wrench, User } from 'lucide-react';
+import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, Wrench, User, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
+import { getDefaultRoute, isMobileDevice } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
 
 interface Municipio {
@@ -351,7 +351,7 @@ export default function Landing() {
               <div className="w-full max-w-md mx-auto lg:mx-0 lg:ml-auto">
                 <div className="bg-white/5 backdrop-blur-xl rounded-3xl border border-white/10 p-6 shadow-2xl">
 
-                  {/* MODO DEBUG: Mostrar usuarios de prueba después de seleccionar municipio */}
+                  {/* Después de seleccionar municipio */}
                   {selectedMunicipio ? (
                     <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                       {/* Header con botón volver */}
@@ -372,7 +372,7 @@ export default function Landing() {
                             </div>
                             <div>
                               <h3 className="text-lg font-semibold text-white">{selectedMunicipio.nombre}</h3>
-                              <p className="text-xs text-slate-400">Modo Debug - Acceso Rápido</p>
+                              <p className="text-xs text-slate-400">Selecciona cómo continuar</p>
                             </div>
                           </div>
                         </div>
@@ -385,67 +385,100 @@ export default function Landing() {
                         </div>
                       )}
 
-                      {/* Botón principal: App Ciudadano */}
+                      {/* Opción 1: Continuar sin registrarse */}
+                      <div className="mb-4 p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl">
+                        <div className="flex items-start gap-3 mb-3">
+                          <AlertCircle className="h-5 w-5 text-green-400 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-white">Sin registro</p>
+                            <p className="text-xs text-slate-400">Podés hacer reclamos sin crear una cuenta</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => navigate(isMobileDevice() ? '/app' : '/publico')}
+                          disabled={debugLoading}
+                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg shadow-green-500/25 disabled:opacity-50"
+                        >
+                          <User className="h-5 w-5" />
+                          Continuar sin registrarme
+                        </button>
+                      </div>
+
+                      {/* Opción 2: Iniciar sesión */}
                       <button
-                        onClick={() => navigate('/app')}
+                        onClick={() => navigate('/login')}
                         disabled={debugLoading}
-                        className="w-full mb-3 flex items-center justify-center gap-2 py-4 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                        className="w-full mb-3 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
                       >
-                        <User className="h-5 w-5" />
-                        Entrar como Vecino
+                        <LogIn className="h-5 w-5" />
+                        Iniciar Sesión
                       </button>
 
-                      {/* Botón secundario: Dashboard Público */}
+                      {/* Opción 3: Registrarse */}
                       <button
-                        onClick={irADashboardPublico}
+                        onClick={() => navigate('/register')}
                         disabled={debugLoading}
                         className="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 bg-white/10 border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
                       >
-                        <MapPinned className="h-5 w-5" />
-                        Ver Mapa de Reclamos
+                        <User className="h-5 w-5" />
+                        Crear Cuenta
                       </button>
 
-                      {/* Divider */}
-                      <div className="relative flex items-center gap-3 my-4">
-                        <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-slate-500 text-xs">MODO DEMO</span>
-                        <div className="flex-1 h-px bg-white/10" />
-                      </div>
+                      {/* Botón: Dashboard Público */}
+                      <button
+                        onClick={irADashboardPublico}
+                        disabled={debugLoading}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-slate-400 hover:text-white transition-all disabled:opacity-50"
+                      >
+                        <MapPinned className="h-4 w-4" />
+                        <span className="text-sm">Ver Mapa de Reclamos</span>
+                      </button>
 
-                      {/* Grid de usuarios de prueba */}
-                      <div className="grid grid-cols-2 gap-3">
-                        {demoUsers.map((user, index) => {
-                          const config = rolConfig[user.rol] || rolConfig.vecino;
-                          const Icon = config.icon;
-                          return (
-                            <button
-                              key={`${user.rol}-${index}`}
-                              type="button"
-                              onClick={() => quickLogin(user.email, '123456')}
-                              disabled={debugLoading}
-                              className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
-                            >
-                              {debugLoading ? (
-                                <div className="flex items-center justify-center">
-                                  <Loader2 className="h-5 w-5 animate-spin" />
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <Icon className="h-4 w-4 flex-shrink-0" />
-                                  <div className="text-left min-w-0">
-                                    <div className="font-semibold truncate">{user.nombre_completo}</div>
-                                    <div className="text-[10px] opacity-80">{config.label}</div>
-                                  </div>
-                                </div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      {/* Divider - Usuarios demo */}
+                      {demoUsers.length > 0 && (
+                        <>
+                          <div className="relative flex items-center gap-3 my-4">
+                            <div className="flex-1 h-px bg-white/10" />
+                            <span className="text-slate-500 text-xs">MODO DEMO</span>
+                            <div className="flex-1 h-px bg-white/10" />
+                          </div>
 
-                      <p className="text-xs text-slate-500 text-center mt-4">
-                        Modo debug - Los usuarios son de prueba
-                      </p>
+                          {/* Grid de usuarios de prueba */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {demoUsers.map((user, index) => {
+                              const config = rolConfig[user.rol] || rolConfig.vecino;
+                              const Icon = config.icon;
+                              return (
+                                <button
+                                  key={`${user.rol}-${index}`}
+                                  type="button"
+                                  onClick={() => quickLogin(user.email, '123456')}
+                                  disabled={debugLoading}
+                                  className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                                >
+                                  {debugLoading ? (
+                                    <div className="flex items-center justify-center">
+                                      <Loader2 className="h-5 w-5 animate-spin" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <Icon className="h-4 w-4 flex-shrink-0" />
+                                      <div className="text-left min-w-0">
+                                        <div className="font-semibold truncate">{user.nombre_completo}</div>
+                                        <div className="text-[10px] opacity-80">{config.label}</div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <p className="text-xs text-slate-500 text-center mt-4">
+                            Usuarios de prueba
+                          </p>
+                        </>
+                      )}
                     </div>
                   ) : (
                     /* MODO NORMAL: Selección de municipio */

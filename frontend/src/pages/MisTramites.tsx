@@ -255,6 +255,8 @@ export default function MisTramites() {
           </button>
           {estadosUnicos.map(estado => {
             const config = estadoConfig[estado];
+            // Si no hay config para este estado, usar valores por defecto
+            if (!config) return null;
             return (
               <button
                 key={estado}

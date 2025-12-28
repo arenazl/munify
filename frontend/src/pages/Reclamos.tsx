@@ -177,7 +177,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const ITEMS_PER_PAGE = 20;
+  const ITEMS_PER_PAGE = 50;
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -411,7 +411,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMoreRef.current && !loadingMoreRef.current && !loadingRef.current) {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
           setPage(prev => prev + 1);
         }
       },
@@ -428,7 +428,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         observer.unobserve(currentTarget);
       }
     };
-  }, []); // Solo crear el observer UNA VEZ
+  }, [hasMore, loadingMore, loading]);
 
   // Detectar parámetro ?crear=ID para abrir wizard desde chat
   useEffect(() => {
@@ -574,39 +574,40 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   };
 
   // Cargar conteos de reclamos similares para los reclamos visibles
-  useEffect(() => {
-    const loadSimilaresCounts = async () => {
-      if (reclamos.length === 0) return;
-
-      // Solo cargar para reclamos que no tienen conteo aún
-      const reclamosToFetch = reclamos.filter(r => similaresCounts[r.id] === undefined);
-      if (reclamosToFetch.length === 0) return;
-
-      // Cargar en paralelo (máximo 10 a la vez para no saturar)
-      const batch = reclamosToFetch.slice(0, 10);
-      const results = await Promise.all(
-        batch.map(async (r) => {
-          try {
-            const res = await reclamosApi.getCantidadSimilares(r.id);
-            return { id: r.id, count: res.data.cantidad || 0 };
-          } catch {
-            return { id: r.id, count: 0 };
-          }
-        })
-      );
-
-      // Actualizar estado con los nuevos conteos
-      setSimilaresCounts(prev => {
-        const newCounts = { ...prev };
-        results.forEach(r => {
-          newCounts[r.id] = r.count;
-        });
-        return newCounts;
-      });
-    };
-
-    loadSimilaresCounts();
-  }, [reclamos]);
+  // NOTA: Deshabilitado temporalmente porque el endpoint no existe en el backend
+  // useEffect(() => {
+  //   const loadSimilaresCounts = async () => {
+  //     if (reclamos.length === 0) return;
+  //
+  //     // Solo cargar para reclamos que no tienen conteo aún
+  //     const reclamosToFetch = reclamos.filter(r => similaresCounts[r.id] === undefined);
+  //     if (reclamosToFetch.length === 0) return;
+  //
+  //     // Cargar en paralelo (máximo 10 a la vez para no saturar)
+  //     const batch = reclamosToFetch.slice(0, 10);
+  //     const results = await Promise.all(
+  //       batch.map(async (r) => {
+  //         try {
+  //           const res = await reclamosApi.getCantidadSimilares(r.id);
+  //           return { id: r.id, count: res.data.cantidad || 0 };
+  //         } catch {
+  //           return { id: r.id, count: 0 };
+  //         }
+  //       })
+  //     );
+  //
+  //     // Actualizar estado con los nuevos conteos
+  //     setSimilaresCounts(prev => {
+  //       const newCounts = { ...prev };
+  //       results.forEach(r => {
+  //         newCounts[r.id] = r.count;
+  //       });
+  //       return newCounts;
+  //     });
+  //   };
+  //
+  //   loadSimilaresCounts();
+  // }, [reclamos]);
 
   // Address autocomplete with Nominatim (OpenStreetMap - free)
   const searchAddress = async (query: string) => {
@@ -750,7 +751,11 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           setPage(1);
         }
       } else {
-        setReclamos(prev => [...prev, ...newReclamos]);
+        setReclamos(prev => {
+          const existingIds = new Set(prev.map(r => r.id));
+          const uniqueNew = newReclamos.filter((r: Reclamo) => !existingIds.has(r.id));
+          return [...prev, ...uniqueNew];
+        });
       }
 
       setHasMore(newReclamos.length === ITEMS_PER_PAGE);
@@ -2931,12 +2936,12 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         extraFilters={undefined}
         secondaryFilters={
           <div className="w-full flex flex-col gap-2">
-            {/* Categorías - chips que ocupan 100% del contenedor */}
-            <div className="flex gap-1.5 pb-2 w-full">
+            {/* Categorías - Grid 2 filas en mobile (5 cols), 1 fila en desktop */}
+            <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
               {/* Botón Todas las categorías */}
               <button
                 onClick={() => setFiltroCategoria(null)}
-                className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] ${categorias.length > 0 ? 'flex-1 min-w-0' : 'w-[68px]'}`}
+                className="flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
                 style={{
                   background: filtroCategoria === null
                     ? theme.primary
@@ -2961,7 +2966,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                     key={cat.id}
                     onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
                     title={cat.nombre}
-                    className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                    className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
                     style={{
                       background: isSelected ? catColor : theme.backgroundSecondary,
                       border: `1px solid ${isSelected ? catColor : theme.border}`,
@@ -2989,22 +2994,22 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               })}
             </div>
 
-            {/* Estados - más compactos, ocupan 100% del contenedor */}
-            <div className="flex gap-2 w-full">
+            {/* Estados - Grid 2 filas en mobile (3 cols), 1 fila en desktop */}
+            <div className="grid grid-cols-3 sm:flex gap-1.5 w-full">
               {Object.keys(conteosEstados).length === 0 ? (
                 // Skeleton mientras cargan los conteos
                 <>
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
                       key={`skeleton-estado-${i}`}
-                      className="flex-1 h-[42px] rounded-lg animate-pulse"
+                      className="h-[36px] rounded-lg animate-pulse sm:flex-1"
                       style={{ background: `${theme.border}40` }}
                     />
                   ))}
                 </>
               ) : (
                 [
-                  { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
+                  { key: '', label: 'Todos', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
                   { key: 'asignado', label: 'Asignado', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
                   { key: 'en_proceso', label: 'Proceso', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
@@ -3017,7 +3022,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                     <button
                       key={estado.key}
                       onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
-                      className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
+                      className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all h-[36px] sm:flex-1 sm:min-w-0"
                       style={{
                         background: isActive ? estado.color : `${estado.color}15`,
                         border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
@@ -3028,9 +3033,9 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                         className="h-4 w-4 flex-shrink-0"
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       />
-                      {/* Texto */}
+                      {/* Texto - solo en desktop */}
                       <span
-                        className="text-[10px] font-medium leading-none truncate"
+                        className="text-[10px] font-medium leading-none truncate hidden sm:block"
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       >
                         {estado.label}
@@ -3222,24 +3227,22 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         })
         )}
 
-        {/* Skeleton para "Cargar más" */}
-        {loadingMore && (
-          Array.from({ length: 4 }).map((_, i) => (
-            <ABMCardSkeleton key={`skeleton-more-${i}`} index={i} />
-          ))
-        )}
-
-        {/* Div observado para scroll infinito */}
-        <div ref={observerTarget} className="h-4" />
-
-        {/* Mensaje cuando ya se cargaron todos */}
-        {!loading && !hasMore && reclamos.length > 0 && (
-          <div className="flex justify-center mt-6">
-            <p className="text-sm px-4 py-2 rounded-lg" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}>
-              ✓ Todos los reclamos cargados ({reclamos.length} en total)
+        {/* Sentinel para infinite scroll + spinner de carga */}
+        <div ref={observerTarget} className="py-4 col-span-full">
+          {loadingMore && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+              <span className="text-sm" style={{ color: theme.textSecondary }}>
+                Cargando más reclamos...
+              </span>
+            </div>
+          )}
+          {!hasMore && reclamos.length > 0 && !loadingMore && (
+            <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+              No hay más reclamos para mostrar
             </p>
-          </div>
-        )}
+          )}
+        </div>
       </ABMPage>
 
       {/* Sheet separado para ver detalle */}

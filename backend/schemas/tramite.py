@@ -190,6 +190,37 @@ class SolicitudResponse(BaseModel):
         from_attributes = True
 
 
+class SolicitudGestionResponse(BaseModel):
+    """Response optimizado para lista de gestión - sin cargar relación solicitante"""
+    id: int
+    municipio_id: int
+    numero_tramite: str
+    asunto: str
+    descripcion: Optional[str] = None
+    estado: EstadoSolicitud
+    tramite_id: Optional[int] = None
+    tramite: Optional[TramiteSimple] = None
+    solicitante_id: Optional[int] = None
+    # Datos desnormalizados del solicitante (no la relación)
+    nombre_solicitante: Optional[str] = None
+    apellido_solicitante: Optional[str] = None
+    dni_solicitante: Optional[str] = None
+    email_solicitante: Optional[str] = None
+    telefono_solicitante: Optional[str] = None
+    direccion_solicitante: Optional[str] = None
+    empleado_id: Optional[int] = None
+    empleado_asignado: Optional[EmpleadoSimple] = None
+    prioridad: int = 3
+    respuesta: Optional[str] = None
+    observaciones: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    fecha_resolucion: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Historial ====================
 
 class HistorialSolicitudResponse(BaseModel):

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell } from 'lucide-react';
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
+import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, themes, ThemeName, accentColors } from '../contexts/ThemeContext';
-import { getNavigation } from '../config/navigation';
+import { getNavigation, isMobileDevice } from '../config/navigation';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
@@ -11,6 +11,45 @@ import { MunicipioSelector } from './MunicipioSelector';
 import { Sheet } from './ui/Sheet';
 import { usersApi } from '../lib/api';
 import NotificationSettings from './NotificationSettings';
+
+// Definir tabs del footer móvil según rol (siempre 5, el del medio es el principal)
+const getMobileTabs = (userRole: string) => {
+  const isAdmin = userRole === 'admin';
+  const isSupervisor = userRole === 'supervisor';
+  const isAdminOrSupervisor = isAdmin || isSupervisor;
+  const isEmpleado = userRole === 'empleado';
+
+  if (isAdminOrSupervisor) {
+    // Admin/Supervisor: Reclamos es la acción principal (centro)
+    return [
+      { path: '/gestion', icon: Home, label: 'Inicio', end: true },
+      { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
+      { path: '/gestion/reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
+      { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: false },
+      { path: '/gestion/tramites', icon: FileCheck, label: 'Trámites', end: false },
+    ];
+  }
+
+  if (isEmpleado) {
+    // Empleado: Trabajos es la acción principal (centro)
+    return [
+      { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: true },
+      { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
+      { path: '/gestion/mis-trabajos', icon: ClipboardList, label: 'Trabajos', end: false },
+      { path: '/gestion/mi-rendimiento', icon: BarChart3, label: 'Stats', end: false },
+      { path: '/gestion/mi-historial', icon: History, label: 'Historial', end: false },
+    ];
+  }
+
+  // Vecino: Logros en el centro (elevado), y ambos botones de crear (Reclamo y Trámite)
+  return [
+    { path: '/gestion/crear-reclamo', icon: AlertCircle, label: 'Nuevo', end: false },
+    { path: '/gestion/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
+    { path: '/gestion/logros', icon: Trophy, label: 'Logros', end: false },
+    { path: '/gestion/crear-tramite', icon: FileCheck, label: 'Trámite', end: false },
+    { path: '/gestion/mi-panel', icon: Home, label: 'Inicio', end: true },
+  ];
+};
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,6 +61,7 @@ export default function Layout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
+  // const [newMenuOpen, setNewMenuOpen] = useState(false); // Ya no se usa - vecinos tienen botones directos
   const [profileData, setProfileData] = useState({
     nombre: '',
     apellido: '',
@@ -84,16 +124,22 @@ export default function Layout() {
   if (!user) return null;
 
   const navigation = getNavigation(user.rol);
+  const isMobile = isMobileDevice();
+  const mobileTabs = getMobileTabs(user.rol);
 
   // Anchos dinámicos con valores fijos para transiciones suaves
-  const sidebarWidthPx = sidebarCollapsed ? 80 : 256; // 80px = w-20, 256px = w-64
+  // En móvil un ancho más compacto (200px), en desktop respeta el estado colapsado
+  const sidebarWidthPx = isMobile ? 200 : (sidebarCollapsed ? 80 : 256);
+
+  // En móvil el sidebar siempre se muestra expandido (no colapsado)
+  const isCollapsed = isMobile ? false : sidebarCollapsed;
 
   return (
     <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme.contentBackground }}>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden animate-fade-in"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden animate-fade-in"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -130,11 +176,11 @@ export default function Layout() {
           />
         )}
         {/* Header del sidebar */}
-        <div className="relative z-10 flex items-center justify-between h-16 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30`, paddingLeft: sidebarCollapsed ? '8px' : '12px', paddingRight: sidebarCollapsed ? '8px' : '12px', transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+        <div className="relative z-10 flex items-center justify-between h-16 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30`, paddingLeft: isCollapsed ? '8px' : '12px', paddingRight: isCollapsed ? '8px' : '12px', transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
           <div
             className="flex items-center gap-3 flex-1 min-w-0"
             style={{
-              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
               transition: 'justify-content 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
@@ -142,8 +188,8 @@ export default function Layout() {
             <div
               className="flex flex-col leading-tight min-w-0 flex-1"
               style={{
-                width: sidebarCollapsed ? 0 : '100%',
-                opacity: sidebarCollapsed ? 0 : 1,
+                width: isCollapsed ? 0 : '100%',
+                opacity: isCollapsed ? 0 : 1,
                 overflow: 'hidden',
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
@@ -190,13 +236,13 @@ export default function Layout() {
                 style={{
                   backgroundColor: isActive ? theme.primary : 'transparent',
                   color: isActive ? '#ffffff' : theme.sidebarTextSecondary,
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  paddingLeft: sidebarCollapsed ? '8px' : '12px',
-                  paddingRight: sidebarCollapsed ? '8px' : '12px',
+                  justifyContent: isCollapsed ? 'center' : 'flex-start',
+                  paddingLeft: isCollapsed ? '8px' : '12px',
+                  paddingRight: isCollapsed ? '8px' : '12px',
                   transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
                 onClick={() => setSidebarOpen(false)}
-                title={sidebarCollapsed ? item.name : undefined}
+                title={isCollapsed ? item.name : undefined}
                 onMouseEnter={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.backgroundColor = `${theme.primary}20`;
@@ -218,22 +264,22 @@ export default function Layout() {
                 <Icon
                   className="h-5 w-5 flex-shrink-0"
                   style={{
-                    marginRight: sidebarCollapsed ? 0 : '12px',
+                    marginRight: isCollapsed ? 0 : '12px',
                     transition: 'margin 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 />
                 <span
                   className="whitespace-nowrap"
                   style={{
-                    width: sidebarCollapsed ? 0 : 'auto',
-                    opacity: sidebarCollapsed ? 0 : 1,
+                    width: isCollapsed ? 0 : 'auto',
+                    opacity: isCollapsed ? 0 : 1,
                     overflow: 'hidden',
                     transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
                 >
                   {item.name}
                 </span>
-                {isActive && !sidebarCollapsed && (
+                {isActive && !isCollapsed && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse flex-shrink-0" />
                 )}
               </Link>
@@ -496,22 +542,16 @@ export default function Layout() {
                         )}
                       </div>
 
-                      {/* Sección: Color del sidebar */}
+                      {/* Sección: Color + Fondo del sidebar combinados */}
                       <div className="px-3 py-2 border-t border-b" style={{ borderColor: theme.border }}>
                         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
                           Color del sidebar
                         </span>
                       </div>
-                      <div className="p-3">
-                        <div className="flex flex-wrap gap-2">
-                          {[
-                            { name: 'Negro', value: '#000000' },
-                            { name: 'Gris oscuro', value: '#1e293b' },
-                            { name: 'Azul noche', value: '#0f1a2e' },
-                            { name: 'Azul atardecer', value: '#1a2a4a' },
-                            { name: 'Marrón oscuro', value: '#1a1512' },
-                            { name: 'Violeta oscuro', value: '#1e1b4b' },
-                          ].map((color) => {
+                      <div className="p-3 space-y-3">
+                        {/* Colores del sidebar - mismos que paleta de acento */}
+                        <div className="grid grid-cols-6 gap-2">
+                          {accentColors.map((color) => {
                             const isSelected = customSidebar === color.value;
                             return (
                               <button
@@ -539,23 +579,15 @@ export default function Layout() {
                         {customSidebar && (
                           <button
                             onClick={() => setCustomSidebar(null)}
-                            className="mt-2 w-full text-xs py-1.5 rounded-md transition-colors"
-                            style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}
+                            className="text-xs py-1.5 rounded-md transition-colors"
+                            style={{ color: theme.textSecondary }}
                           >
                             Restablecer al tema
                           </button>
                         )}
-                      </div>
 
-                      {/* Sección: Imagen de fondo del sidebar */}
-                      <div className="px-3 py-2 border-t border-b" style={{ borderColor: theme.border }}>
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                          Fondo del sidebar
-                        </span>
-                      </div>
-                      <div className="p-3 space-y-3">
-                        {/* Opciones de imagen */}
-                        <div className="flex flex-wrap gap-2">
+                        {/* Opciones de imagen de fondo */}
+                        <div className="flex flex-wrap gap-2 pt-2" style={{ borderTop: `1px solid ${theme.border}` }}>
                           {[
                             { name: 'Sin imagen', value: null, preview: null },
                             { name: 'Alumbrado', value: '/light.png', preview: '/light.png' },
@@ -626,12 +658,84 @@ export default function Layout() {
         </header>
 
         {/* Page content with transition - padding reducido en móvil */}
-        <main className="p-3 sm:p-6" style={{ color: theme.text }}>
+        <main
+          className="p-3 sm:p-6"
+          style={{
+            color: theme.text,
+            paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar
+          }}
+        >
           <PageTransition>
             <Outlet />
           </PageTransition>
         </main>
       </div>
+
+      {/* Bottom Tab Bar - Solo en móvil */}
+      {isMobile && (
+        <>
+          <nav
+            className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe"
+            style={{
+              backgroundColor: theme.card,
+              borderTop: `1px solid ${theme.border}`,
+            }}
+          >
+            <div className="flex items-center justify-around py-2">
+              {mobileTabs.map((tab, index) => {
+                const isMainTab = index === 2; // El del medio (índice 2) siempre es el principal
+
+                return (
+                  <NavLink
+                    key={tab.path}
+                    to={tab.path!}
+                    end={'end' in tab ? tab.end : false}
+                    className="flex flex-col items-center min-w-0 flex-1"
+                  >
+                    {({ isActive }) => (
+                      <>
+                        {isMainTab ? (
+                          // Botón central siempre elevado (para otros roles)
+                          <div
+                            className="w-14 h-14 -mt-7 rounded-full flex items-center justify-center shadow-lg"
+                            style={{
+                              backgroundColor: theme.primary,
+                              boxShadow: `0 4px 14px ${theme.primary}50`,
+                            }}
+                          >
+                            <tab.icon className="h-7 w-7 text-white" />
+                          </div>
+                        ) : (
+                          // Botones normales - solo cambian color al seleccionar
+                          <div
+                            className="p-2 rounded-xl transition-colors"
+                            style={{
+                              backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
+                            }}
+                          >
+                            <tab.icon
+                              className="h-5 w-5"
+                              style={{ color: isActive ? theme.primary : theme.textSecondary }}
+                            />
+                          </div>
+                        )}
+                        <span
+                          className={`text-[10px] font-medium ${isMainTab ? 'mt-1' : 'mt-0.5'}`}
+                          style={{
+                            color: isMainTab || isActive ? theme.primary : theme.textSecondary
+                          }}
+                        >
+                          {tab.label}
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </nav>
+        </>
+      )}
 
       {/* Custom CSS for animations and gradients */}
       <style>{`
@@ -817,10 +921,15 @@ export default function Layout() {
           background-size: 200% 100%;
           animation: shimmer 2s infinite;
         }
+
+        /* Safe area padding for iOS */
+        .pb-safe {
+          padding-bottom: env(safe-area-inset-bottom, 8px);
+        }
       `}</style>
 
-      {/* Chat Widget con IA */}
-      <ChatWidget />
+      {/* Chat Widget con IA - Oculto en móvil porque interfiere con el footer */}
+      {!isMobile && <ChatWidget />}
 
       {/* Modal de configuración de notificaciones push */}
       <NotificationSettings

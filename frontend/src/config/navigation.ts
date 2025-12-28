@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, FileDown, Clock, Trophy, FileCheck
+  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -11,7 +11,7 @@ export const getNavigation = (userRole: string) => {
   const isVecino = userRole === 'vecino';
 
   return [
-    // === SECCIÓN PRINCIPAL (Panel de Gestión) ===
+    // === SECCIÓN GESTORES (Admin/Supervisor) ===
     {
       name: 'Dashboard',
       href: '/gestion',
@@ -27,28 +27,26 @@ export const getNavigation = (userRole: string) => {
       description: 'Gestionar todos los reclamos'
     },
     {
+      name: 'Trámites',
+      href: '/gestion/tramites',
+      icon: FileCheck,
+      show: isAdminOrSupervisor,
+      description: 'Gestionar trámites'
+    },
+    {
       name: 'Mapa',
       href: '/gestion/mapa',
       icon: Map,
-      show: isAdminOrSupervisor || isEmpleado,
+      show: isAdminOrSupervisor,
       description: 'Ver reclamos en el mapa'
     },
     {
       name: 'Tablero',
       href: '/gestion/tablero',
       icon: Wrench,
-      show: isEmpleado || isAdminOrSupervisor,
-      description: 'Tablero de trabajo'
+      show: isAdminOrSupervisor,
+      description: 'Tablero Kanban'
     },
-    {
-      name: 'Mis Trabajos',
-      href: '/gestion/mis-trabajos',
-      icon: ClipboardList,
-      show: isEmpleado,
-      description: 'Reclamos asignados a mí'
-    },
-
-    // === SECCIÓN ADMINISTRACIÓN ===
     {
       name: 'SLA',
       href: '/gestion/sla',
@@ -63,13 +61,44 @@ export const getNavigation = (userRole: string) => {
       show: isAdminOrSupervisor,
       description: 'Exportar informes CSV'
     },
+
+    // === SECCIÓN EMPLEADOS ===
     {
-      name: 'Trámites',
-      href: '/gestion/tramites',
-      icon: FileCheck,
-      show: isAdminOrSupervisor,
-      description: 'Gestionar trámites'
+      name: 'Tablero',
+      href: '/gestion/tablero',
+      icon: Wrench,
+      show: isEmpleado,
+      description: 'Tablero de trabajo'
     },
+    {
+      name: 'Mis Trabajos',
+      href: '/gestion/mis-trabajos',
+      icon: ClipboardList,
+      show: isEmpleado,
+      description: 'Reclamos asignados a mí'
+    },
+    {
+      name: 'Mapa',
+      href: '/gestion/mapa',
+      icon: Map,
+      show: isEmpleado,
+      description: 'Ver ubicaciones'
+    },
+    {
+      name: 'Mi Rendimiento',
+      href: '/gestion/mi-rendimiento',
+      icon: BarChart3,
+      show: isEmpleado,
+      description: 'Estadísticas de mi trabajo'
+    },
+    {
+      name: 'Mi Historial',
+      href: '/gestion/mi-historial',
+      icon: History,
+      show: isEmpleado,
+      description: 'Historial de mis trabajos'
+    },
+
     // === SECCIÓN VECINOS ===
     {
       name: 'Mi Panel',
@@ -77,6 +106,13 @@ export const getNavigation = (userRole: string) => {
       icon: Home,
       show: isVecino,
       description: 'Tu panel personal'
+    },
+    {
+      name: 'Nuevo Reclamo',
+      href: '/gestion/crear-reclamo',
+      icon: Plus,
+      show: isVecino,
+      description: 'Reportar un problema'
     },
     {
       name: 'Mis Reclamos',
@@ -93,6 +129,13 @@ export const getNavigation = (userRole: string) => {
       description: 'Ver tus trámites'
     },
     {
+      name: 'Mapa',
+      href: '/gestion/mapa',
+      icon: Map,
+      show: isVecino,
+      description: 'Ver mapa de reclamos'
+    },
+    {
       name: 'Logros',
       href: '/gestion/logros',
       icon: Trophy,
@@ -102,6 +145,27 @@ export const getNavigation = (userRole: string) => {
   ].filter(item => item.show);
 };
 
+/**
+ * Detecta si el usuario está en un dispositivo móvil
+ */
+export const isMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // Detectar por user agent
+  const userAgent = navigator.userAgent || navigator.vendor;
+  const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
+
+  // También detectar por ancho de pantalla (menos de 768px se considera mobile)
+  const isSmallScreen = window.innerWidth < 768;
+
+  return mobileRegex.test(userAgent) || isSmallScreen;
+};
+
+/**
+ * Obtiene la ruta por defecto según el rol del usuario
+ * Ahora todos usan /gestion con el Layout unificado que tiene footer móvil
+ * @param role - Rol del usuario
+ */
 export const getDefaultRoute = (role: string) => {
   switch (role) {
     case 'admin':
@@ -110,9 +174,8 @@ export const getDefaultRoute = (role: string) => {
     case 'empleado':
       return '/gestion/tablero';
     case 'vecino':
-      // Vecinos van a la app mobile-first
-      return '/app';
+      return '/gestion/mi-panel';
     default:
-      return '/app';
+      return '/gestion';
   }
 };
