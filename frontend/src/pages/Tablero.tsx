@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Search, GripVertical } from 'lucide-react';
+import { Search, GripVertical, Columns3 } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { Reclamo, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -130,36 +130,60 @@ export default function Tablero() {
 
   return (
     <div className="space-y-6">
-      {/* Header con título y buscador */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold gradient-text-rainbow">
-          Tablero de Reclamos
-        </h1>
+      {/* Sticky wrapper para header */}
+      <div
+        className="sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-1 pb-3"
+        style={{ backgroundColor: theme.background }}
+      >
+        {/* Header estilo ABMPage */}
+        <div
+          className="flex items-center gap-4 px-4 py-3 rounded-xl"
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          {/* Título con icono */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}20` }}
+            >
+              <Columns3 className="h-4 w-4" style={{ color: theme.primary }} />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight hidden sm:block" style={{ color: theme.text }}>
+              Tablero
+            </h1>
+          </div>
 
-        {/* Buscador */}
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: theme.textSecondary }} />
-          <input
-            type="text"
-            placeholder="Buscar por título, dirección o categoría..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-lg border transition-colors focus:outline-none focus:ring-2"
-            style={{
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-              color: theme.text,
-            }}
-          />
+          {/* Separador */}
+          <div className="h-8 w-px hidden sm:block" style={{ backgroundColor: theme.border }} />
+
+          {/* Buscador - ocupa espacio disponible */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
+            <input
+              type="text"
+              placeholder="Buscar por título, dirección o categoría..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
+              }}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Instrucciones de drag & drop */}
-      {canDrag && (
-        <p className="text-sm" style={{ color: theme.textSecondary }}>
-          Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
-        </p>
-      )}
+        {/* Instrucciones de drag & drop */}
+        {canDrag && (
+          <p className="text-sm mt-2 px-1" style={{ color: theme.textSecondary }}>
+            Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
+          </p>
+        )}
+      </div>
 
       {/* Tablero Kanban */}
       <DragDropContext onDragEnd={handleDragEnd}>
