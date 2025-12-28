@@ -522,6 +522,272 @@ async def get_reclamos_recurrentes(
     return grupos[:limit]
 
 
+# ===========================================
+# RUTAS ESPECÍFICAS (deben ir ANTES de /{reclamo_id})
+# ===========================================
+
+@router.get("/similares")
+async def buscar_reclamos_similares(
+    categoria_id: int = Query(..., description="ID de la categoría"),
+    latitud: Optional[float] = Query(None, description="Latitud del reclamo"),
+    longitud: Optional[float] = Query(None, description="Longitud del reclamo"),
+    radio_metros: int = Query(100, description="Radio de búsqueda en metros"),
+    dias_atras: int = Query(30, description="Buscar reclamos de los últimos N días"),
+    limit: int = Query(10, description="Máximo de resultados"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Busca reclamos similares basándose en:
+    - Misma categoría
+    - Ubicación cercana (radio configurable)
+    - Creados recientemente (últimos N días)
+    - Estados activos (no resueltos ni rechazados)
+    """
+    from datetime import datetime, timedelta
+    from utils.geo import are_locations_close
+
+    fecha_limite = datetime.now(timezone.utc) - timedelta(days=dias_atras)
+
+    query = select(Reclamo).where(
+        Reclamo.categoria_id == categoria_id,
+        Reclamo.created_at >= fecha_limite,
+        Reclamo.estado.in_([
+            EstadoReclamo.NUEVO,
+            EstadoReclamo.ASIGNADO,
+            EstadoReclamo.EN_PROCESO
+        ]),
+        Reclamo.municipio_id == current_user.municipio_id
+    ).options(
+        selectinload(Reclamo.categoria),
+        selectinload(Reclamo.zona),
+        selectinload(Reclamo.creador)
+    ).order_by(Reclamo.created_at.desc())
+
+    result = await db.execute(query)
+    reclamos_candidatos = result.scalars().all()
+
+    reclamos_similares = []
+    if latitud and longitud:
+        for reclamo in reclamos_candidatos:
+            if are_locations_close(
+                latitud, longitud,
+                reclamo.latitud, reclamo.longitud,
+                radius_meters=radio_metros
+            ):
+                reclamos_similares.append(reclamo)
+                if len(reclamos_similares) >= limit:
+                    break
+    else:
+        reclamos_similares = reclamos_candidatos[:limit]
+
+    return [
+        {
+            "id": r.id,
+            "titulo": r.titulo,
+            "descripcion": r.descripcion,
+            "direccion": r.direccion,
+            "estado": r.estado.value,
+            "categoria": r.categoria.nombre if r.categoria else None,
+            "zona": r.zona.nombre if r.zona else None,
+            "created_at": r.created_at.isoformat(),
+            "creador": {
+                "nombre": r.creador.nombre,
+                "apellido": r.creador.apellido
+            } if r.creador else None,
+            "distancia_metros": round(
+                __import__('utils.geo', fromlist=['haversine_distance']).haversine_distance(
+                    latitud, longitud, r.latitud, r.longitud
+                )
+            ) if (latitud and longitud and r.latitud and r.longitud) else None
+        }
+        for r in reclamos_similares
+    ]
+
+
+@router.get("/mis-estadisticas")
+async def get_mis_estadisticas(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["empleado"]))
+):
+    """
+    Obtiene estadísticas de rendimiento del empleado logueado.
+    """
+    from sqlalchemy import case, extract
+    from datetime import date as date_type
+
+    empleado_id = current_user.empleado_id
+    if not empleado_id:
+        raise HTTPException(status_code=400, detail="No tenés un perfil de empleado asociado")
+
+    query = select(
+        func.count(Reclamo.id).label('total'),
+        func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
+        func.sum(case((Reclamo.estado == EstadoReclamo.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        func.sum(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]), 1), else_=0)).label('pendientes'),
+    ).where(Reclamo.empleado_id == empleado_id)
+
+    result = await db.execute(query)
+    stats = result.first()
+
+    primer_dia_mes = date_type.today().replace(day=1)
+    query_mes = select(func.count(Reclamo.id)).where(
+        Reclamo.empleado_id == empleado_id,
+        Reclamo.estado == EstadoReclamo.RESUELTO,
+        Reclamo.fecha_resolucion >= primer_dia_mes
+    )
+    result_mes = await db.execute(query_mes)
+    resueltos_mes = result_mes.scalar() or 0
+
+    query_tiempo = select(
+        func.avg(
+            extract('epoch', Reclamo.fecha_resolucion - Reclamo.created_at) / 86400
+        )
+    ).where(
+        Reclamo.empleado_id == empleado_id,
+        Reclamo.estado == EstadoReclamo.RESUELTO,
+        Reclamo.fecha_resolucion.isnot(None)
+    )
+    result_tiempo = await db.execute(query_tiempo)
+    tiempo_promedio = result_tiempo.scalar() or 0
+
+    query_cats = select(
+        Reclamo.categoria_id,
+        func.count(Reclamo.id).label('cantidad')
+    ).where(
+        Reclamo.empleado_id == empleado_id
+    ).group_by(Reclamo.categoria_id)
+
+    result_cats = await db.execute(query_cats)
+    cats_data = result_cats.all()
+
+    from models.categoria import Categoria
+    por_categoria = []
+    for cat_id, cantidad in cats_data:
+        if cat_id:
+            cat_result = await db.execute(select(Categoria.nombre).where(Categoria.id == cat_id))
+            cat_nombre = cat_result.scalar() or "Sin categoría"
+            por_categoria.append({"categoria": cat_nombre, "cantidad": cantidad})
+
+    por_categoria.sort(key=lambda x: x['cantidad'], reverse=True)
+
+    query_ultimos = select(Reclamo).options(
+        selectinload(Reclamo.categoria)
+    ).where(
+        Reclamo.empleado_id == empleado_id,
+        Reclamo.estado == EstadoReclamo.RESUELTO
+    ).order_by(Reclamo.fecha_resolucion.desc()).limit(10)
+
+    result_ultimos = await db.execute(query_ultimos)
+    ultimos = result_ultimos.scalars().all()
+
+    ultimos_resueltos = [{
+        "id": r.id,
+        "titulo": r.titulo,
+        "categoria": r.categoria.nombre if r.categoria else "Sin categoría",
+        "fecha_resolucion": r.fecha_resolucion.strftime("%d/%m/%Y") if r.fecha_resolucion else ""
+    } for r in ultimos]
+
+    return {
+        "total_asignados": stats.total or 0,
+        "resueltos": stats.resueltos or 0,
+        "en_proceso": stats.en_proceso or 0,
+        "pendientes": stats.pendientes or 0,
+        "resueltos_este_mes": resueltos_mes,
+        "tiempo_promedio_resolucion": round(tiempo_promedio, 1) if tiempo_promedio else 0,
+        "por_categoria": por_categoria,
+        "ultimos_resueltos": ultimos_resueltos
+    }
+
+
+@router.get("/mi-historial")
+async def get_mi_historial(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, le=50),
+    estado: Optional[str] = Query(None, description="Filtrar por estado"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["empleado"]))
+):
+    """
+    Obtiene el historial completo de trabajos del empleado.
+    """
+    empleado_id = current_user.empleado_id
+    if not empleado_id:
+        raise HTTPException(status_code=400, detail="No tenés un perfil de empleado asociado")
+
+    query = select(Reclamo).options(
+        selectinload(Reclamo.categoria),
+        selectinload(Reclamo.zona),
+        selectinload(Reclamo.creador),
+        selectinload(Reclamo.calificacion)
+    ).where(Reclamo.empleado_id == empleado_id)
+
+    if estado:
+        try:
+            estado_enum = EstadoReclamo(estado.lower())
+            query = query.where(Reclamo.estado == estado_enum)
+        except ValueError:
+            pass
+
+    query = query.order_by(Reclamo.created_at.desc()).offset(skip).limit(limit)
+
+    result = await db.execute(query)
+    reclamos = result.scalars().all()
+
+    historial = []
+    for r in reclamos:
+        tiempo_resolucion = None
+        if r.fecha_resolucion and r.created_at:
+            delta = r.fecha_resolucion - r.created_at
+            tiempo_resolucion = round(delta.total_seconds() / 86400, 1)
+
+        calificacion_data = None
+        if r.calificacion:
+            calificacion_data = {
+                "puntuacion": r.calificacion.puntuacion,
+                "comentario": r.calificacion.comentario,
+                "fecha": r.calificacion.created_at.strftime("%d/%m/%Y") if r.calificacion.created_at else None
+            }
+
+        historial.append({
+            "id": r.id,
+            "titulo": r.titulo,
+            "descripcion": r.descripcion[:100] + "..." if len(r.descripcion) > 100 else r.descripcion,
+            "estado": r.estado.value if r.estado else None,
+            "categoria": r.categoria.nombre if r.categoria else None,
+            "zona": r.zona.nombre if r.zona else None,
+            "direccion": r.direccion,
+            "prioridad": r.prioridad,
+            "fecha_creacion": r.created_at.strftime("%d/%m/%Y %H:%M") if r.created_at else None,
+            "fecha_resolucion": r.fecha_resolucion.strftime("%d/%m/%Y %H:%M") if r.fecha_resolucion else None,
+            "tiempo_resolucion_dias": tiempo_resolucion,
+            "creador": f"{r.creador.nombre} {r.creador.apellido}" if r.creador else "Anónimo",
+            "calificacion": calificacion_data
+        })
+
+    count_query = select(func.count(Reclamo.id)).where(Reclamo.empleado_id == empleado_id)
+    if estado:
+        try:
+            estado_enum = EstadoReclamo(estado.lower())
+            count_query = count_query.where(Reclamo.estado == estado_enum)
+        except ValueError:
+            pass
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    return {
+        "data": historial,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
+
+
+# ===========================================
+# RUTAS CON PARÁMETRO {reclamo_id}
+# ===========================================
+
 @router.get("/{reclamo_id}", response_model=ReclamoResponse)
 async def get_reclamo(
     reclamo_id: int,
@@ -1523,155 +1789,3 @@ def _get_razon_principal(detalles: dict, cat_score: int, zona_score: int, carga_
         razones.append("disponible")
 
     return ", ".join(razones).capitalize()
-
-
-# ===========================================
-# RECLAMOS SIMILARES / RECURRENTES
-# ===========================================
-
-@router.get("/similares")
-async def buscar_reclamos_similares(
-    categoria_id: int = Query(..., description="ID de la categoría"),
-    latitud: Optional[float] = Query(None, description="Latitud del reclamo"),
-    longitud: Optional[float] = Query(None, description="Longitud del reclamo"),
-    radio_metros: int = Query(100, description="Radio de búsqueda en metros"),
-    dias_atras: int = Query(30, description="Buscar reclamos de los últimos N días"),
-    limit: int = Query(10, description="Máximo de resultados"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Busca reclamos similares basándose en:
-    - Misma categoría
-    - Ubicación cercana (radio configurable)
-    - Creados recientemente (últimos N días)
-    - Estados activos (no resueltos ni rechazados)
-
-    Útil para:
-    - Mostrar al ciudadano antes de crear un reclamo duplicado
-    - Identificar problemas recurrentes para el municipio
-    """
-    from datetime import datetime, timedelta
-    from utils.geo import are_locations_close
-
-    # Fecha límite (últimos N días)
-    fecha_limite = datetime.now(timezone.utc) - timedelta(days=dias_atras)
-
-    # Query base: misma categoría, fecha reciente, estados activos
-    query = select(Reclamo).where(
-        Reclamo.categoria_id == categoria_id,
-        Reclamo.created_at >= fecha_limite,
-        Reclamo.estado.in_([
-            EstadoReclamo.NUEVO,
-            EstadoReclamo.ASIGNADO,
-            EstadoReclamo.EN_PROCESO
-        ]),
-        Reclamo.municipio_id == current_user.municipio_id
-    ).options(
-        selectinload(Reclamo.categoria),
-        selectinload(Reclamo.zona),
-        selectinload(Reclamo.creador)
-    ).order_by(Reclamo.created_at.desc())
-
-    result = await db.execute(query)
-    reclamos_candidatos = result.scalars().all()
-
-    # Filtrar por ubicación si se proporcionaron coordenadas
-    reclamos_similares = []
-    if latitud and longitud:
-        for reclamo in reclamos_candidatos:
-            if are_locations_close(
-                latitud, longitud,
-                reclamo.latitud, reclamo.longitud,
-                radius_meters=radio_metros
-            ):
-                reclamos_similares.append(reclamo)
-
-                # Limitar resultados
-                if len(reclamos_similares) >= limit:
-                    break
-    else:
-        # Si no hay coordenadas, devolver los primeros N
-        reclamos_similares = reclamos_candidatos[:limit]
-
-    # Formatear respuesta
-    return [
-        {
-            "id": r.id,
-            "titulo": r.titulo,
-            "descripcion": r.descripcion,
-            "direccion": r.direccion,
-            "estado": r.estado.value,
-            "categoria": r.categoria.nombre if r.categoria else None,
-            "zona": r.zona.nombre if r.zona else None,
-            "created_at": r.created_at.isoformat(),
-            "creador": {
-                "nombre": r.creador.nombre,
-                "apellido": r.creador.apellido
-            } if r.creador else None,
-            "distancia_metros": round(
-                __import__('utils.geo', fromlist=['haversine_distance']).haversine_distance(
-                    latitud, longitud, r.latitud, r.longitud
-                )
-            ) if (latitud and longitud and r.latitud and r.longitud) else None
-        }
-        for r in reclamos_similares
-    ]
-
-
-@router.get("/{reclamo_id}/cantidad-similares")
-async def get_cantidad_similares(
-    reclamo_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Devuelve la cantidad de reclamos similares a uno específico.
-    Útil para mostrar badge "X vecinos reportaron esto".
-    """
-    from utils.geo import are_locations_close
-
-    # Obtener el reclamo base
-    result = await db.execute(
-        select(Reclamo).where(Reclamo.id == reclamo_id)
-    )
-    reclamo_base = result.scalar_one_or_none()
-
-    if not reclamo_base:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
-
-    # Buscar similares
-    from datetime import datetime, timedelta
-    fecha_limite = datetime.now(timezone.utc) - timedelta(days=30)
-
-    query = select(Reclamo).where(
-        Reclamo.id != reclamo_id,
-        Reclamo.categoria_id == reclamo_base.categoria_id,
-        Reclamo.created_at >= fecha_limite,
-        Reclamo.estado.in_([
-            EstadoReclamo.NUEVO,
-            EstadoReclamo.ASIGNADO,
-            EstadoReclamo.EN_PROCESO,
-            EstadoReclamo.RESUELTO
-        ]),
-        Reclamo.municipio_id == current_user.municipio_id
-    )
-
-    result = await db.execute(query)
-    candidatos = result.scalars().all()
-
-    # Contar similares por ubicación
-    cantidad = 0
-    for reclamo in candidatos:
-        if are_locations_close(
-            reclamo_base.latitud, reclamo_base.longitud,
-            reclamo.latitud, reclamo.longitud,
-            radius_meters=100
-        ):
-            cantidad += 1
-
-    return {
-        "reclamo_id": reclamo_id,
-        "cantidad_similares": cantidad,
-        "total_reportes": cantidad + 1  # +1 incluye el reclamo base
-    }
