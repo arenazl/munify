@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 import httpx
+import json
 
 from core.database import get_db
 from core.security import get_current_user, require_roles
@@ -13,105 +14,138 @@ from schemas.configuracion import ConfiguracionCreate, ConfiguracionUpdate, Conf
 
 router = APIRouter()
 
-@router.get("/", response_model=List[ConfiguracionResponse])
-async def get_configuraciones(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
-):
-    # Multi-tenant: filtrar por municipio_id del usuario actual
-    result = await db.execute(
-        select(Configuracion)
-        .where(Configuracion.municipio_id == current_user.municipio_id)
-        .order_by(Configuracion.clave)
-    )
-    return result.scalars().all()
 
-@router.get("/{clave}", response_model=ConfiguracionResponse)
-async def get_configuracion(
-    clave: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
-):
-    # Multi-tenant: filtrar por municipio_id
-    result = await db.execute(
-        select(Configuracion)
-        .where(Configuracion.clave == clave)
-        .where(Configuracion.municipio_id == current_user.municipio_id)
-    )
-    config = result.scalar_one_or_none()
-    if not config:
-        raise HTTPException(status_code=404, detail="Configuración no encontrada")
-    return config
+# ==================== RUTAS ESPECÍFICAS (deben ir ANTES de /{clave}) ====================
 
-@router.post("/", response_model=ConfiguracionResponse)
-async def create_configuracion(
-    data: ConfiguracionCreate,
+@router.get("/dashboard/{rol}")
+async def get_dashboard_config(
+    rol: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(get_current_user)
 ):
-    # Multi-tenant: verificar duplicado solo en el mismo municipio
-    result = await db.execute(
-        select(Configuracion)
-        .where(Configuracion.clave == data.clave)
-        .where(Configuracion.municipio_id == current_user.municipio_id)
-    )
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Ya existe una configuración con esa clave")
+    """
+    Obtiene la configuración del dashboard para un rol específico.
+    Roles válidos: vecino, empleado
+    Cualquier usuario autenticado puede ver la configuración de su propio rol.
+    """
+    if rol not in ["vecino", "empleado"]:
+        raise HTTPException(status_code=400, detail="Rol no válido. Use 'vecino' o 'empleado'")
 
-    # Multi-tenant: agregar municipio_id
-    config = Configuracion(**data.model_dump(), municipio_id=current_user.municipio_id)
-    db.add(config)
-    await db.commit()
-    await db.refresh(config)
-    return config
+    clave = f"dashboard_config_{rol}"
 
-@router.put("/{clave}", response_model=ConfiguracionResponse)
-async def update_configuracion(
-    clave: str,
-    data: ConfiguracionUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
-):
-    # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
         select(Configuracion)
         .where(Configuracion.clave == clave)
         .where(Configuracion.municipio_id == current_user.municipio_id)
     )
     config = result.scalar_one_or_none()
-    if not config:
-        raise HTTPException(status_code=404, detail="Configuración no encontrada")
 
-    if not config.editable:
-        raise HTTPException(status_code=400, detail="Esta configuración no es editable")
+    # Configuración por defecto si no existe
+    default_config = {
+        "vecino": {
+            "componentes": [
+                {"id": "stats", "nombre": "Estadísticas personales", "visible": True, "orden": 1},
+                {"id": "reclamos_recientes", "nombre": "Reclamos recientes", "visible": True, "orden": 2},
+                {"id": "stats_municipio", "nombre": "Estadísticas del municipio", "visible": True, "orden": 3},
+                {"id": "noticias", "nombre": "Noticias", "visible": True, "orden": 4},
+                {"id": "accesos_rapidos", "nombre": "Accesos rápidos", "visible": True, "orden": 5},
+            ]
+        },
+        "empleado": {
+            "componentes": [
+                {"id": "stats", "nombre": "Mis estadísticas", "visible": True, "orden": 1},
+                {"id": "trabajos_pendientes", "nombre": "Trabajos pendientes", "visible": True, "orden": 2},
+                {"id": "rendimiento", "nombre": "Mi rendimiento", "visible": True, "orden": 3},
+                {"id": "ultimos_resueltos", "nombre": "Últimos resueltos", "visible": True, "orden": 4},
+            ]
+        }
+    }
 
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(config, key, value)
+    if config and config.valor:
+        try:
+            return {"rol": rol, "config": json.loads(config.valor)}
+        except json.JSONDecodeError:
+            pass
 
-    await db.commit()
-    await db.refresh(config)
-    return config
+    return {"rol": rol, "config": default_config.get(rol, {})}
 
-@router.delete("/{clave}")
-async def delete_configuracion(
-    clave: str,
+
+@router.put("/dashboard/{rol}")
+async def update_dashboard_config(
+    rol: str,
+    config_data: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    # Multi-tenant: filtrar por municipio_id
+    """
+    Actualiza la configuración del dashboard para un rol específico.
+    """
+    if rol not in ["vecino", "empleado"]:
+        raise HTTPException(status_code=400, detail="Rol no válido. Use 'vecino' o 'empleado'")
+
+    clave = f"dashboard_config_{rol}"
+
     result = await db.execute(
         select(Configuracion)
         .where(Configuracion.clave == clave)
         .where(Configuracion.municipio_id == current_user.municipio_id)
     )
     config = result.scalar_one_or_none()
-    if not config:
-        raise HTTPException(status_code=404, detail="Configuración no encontrada")
 
-    await db.delete(config)
+    if config:
+        config.valor = json.dumps(config_data)
+    else:
+        config = Configuracion(
+            clave=clave,
+            valor=json.dumps(config_data),
+            descripcion=f"Configuración del dashboard para {rol}",
+            tipo="json",
+            editable=True,
+            municipio_id=current_user.municipio_id
+        )
+        db.add(config)
+
     await db.commit()
-    return {"message": "Configuración eliminada"}
+    return {"message": f"Configuración del dashboard para {rol} actualizada", "config": config_data}
+
+
+@router.get("/dashboard-publico/{rol}")
+async def get_dashboard_config_publico(
+    rol: str,
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint público para obtener configuración del dashboard (para vecinos sin login).
+    """
+    if rol not in ["vecino", "empleado"]:
+        raise HTTPException(status_code=400, detail="Rol no válido")
+
+    clave = f"dashboard_config_{rol}"
+
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == municipio_id)
+    )
+    config = result.scalar_one_or_none()
+
+    # Configuración por defecto
+    default_config = {
+        "componentes": [
+            {"id": "stats", "nombre": "Estadísticas", "visible": True, "orden": 1},
+            {"id": "noticias", "nombre": "Noticias", "visible": True, "orden": 2},
+            {"id": "reclamos_recientes", "nombre": "Reclamos recientes", "visible": True, "orden": 3},
+        ]
+    }
+
+    if config and config.valor:
+        try:
+            return {"rol": rol, "config": json.loads(config.valor)}
+        except json.JSONDecodeError:
+            pass
+
+    return {"rol": rol, "config": default_config}
 
 
 @router.get("/publica/municipio")
@@ -228,143 +262,6 @@ async def buscar_barrios_municipio(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/dashboard/{rol}")
-async def get_dashboard_config(
-    rol: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Obtiene la configuración del dashboard para un rol específico.
-    Roles válidos: vecino, empleado
-    Cualquier usuario autenticado puede ver la configuración de su propio rol.
-    """
-    import json
-
-    if rol not in ["vecino", "empleado"]:
-        raise HTTPException(status_code=400, detail="Rol no válido. Use 'vecino' o 'empleado'")
-
-    clave = f"dashboard_config_{rol}"
-
-    result = await db.execute(
-        select(Configuracion)
-        .where(Configuracion.clave == clave)
-        .where(Configuracion.municipio_id == current_user.municipio_id)
-    )
-    config = result.scalar_one_or_none()
-
-    # Configuración por defecto si no existe
-    default_config = {
-        "vecino": {
-            "componentes": [
-                {"id": "stats", "nombre": "Estadísticas personales", "visible": True, "orden": 1},
-                {"id": "reclamos_recientes", "nombre": "Reclamos recientes", "visible": True, "orden": 2},
-                {"id": "stats_municipio", "nombre": "Estadísticas del municipio", "visible": True, "orden": 3},
-                {"id": "noticias", "nombre": "Noticias", "visible": True, "orden": 4},
-                {"id": "accesos_rapidos", "nombre": "Accesos rápidos", "visible": True, "orden": 5},
-            ]
-        },
-        "empleado": {
-            "componentes": [
-                {"id": "stats", "nombre": "Mis estadísticas", "visible": True, "orden": 1},
-                {"id": "trabajos_pendientes", "nombre": "Trabajos pendientes", "visible": True, "orden": 2},
-                {"id": "rendimiento", "nombre": "Mi rendimiento", "visible": True, "orden": 3},
-                {"id": "ultimos_resueltos", "nombre": "Últimos resueltos", "visible": True, "orden": 4},
-            ]
-        }
-    }
-
-    if config and config.valor:
-        try:
-            return {"rol": rol, "config": json.loads(config.valor)}
-        except json.JSONDecodeError:
-            pass
-
-    return {"rol": rol, "config": default_config.get(rol, {})}
-
-
-@router.put("/dashboard/{rol}")
-async def update_dashboard_config(
-    rol: str,
-    config_data: dict,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor"]))
-):
-    """
-    Actualiza la configuración del dashboard para un rol específico.
-    """
-    import json
-
-    if rol not in ["vecino", "empleado"]:
-        raise HTTPException(status_code=400, detail="Rol no válido. Use 'vecino' o 'empleado'")
-
-    clave = f"dashboard_config_{rol}"
-
-    result = await db.execute(
-        select(Configuracion)
-        .where(Configuracion.clave == clave)
-        .where(Configuracion.municipio_id == current_user.municipio_id)
-    )
-    config = result.scalar_one_or_none()
-
-    if config:
-        config.valor = json.dumps(config_data)
-    else:
-        config = Configuracion(
-            clave=clave,
-            valor=json.dumps(config_data),
-            descripcion=f"Configuración del dashboard para {rol}",
-            tipo="json",
-            editable=True,
-            municipio_id=current_user.municipio_id
-        )
-        db.add(config)
-
-    await db.commit()
-    return {"message": f"Configuración del dashboard para {rol} actualizada", "config": config_data}
-
-
-@router.get("/dashboard-publico/{rol}")
-async def get_dashboard_config_publico(
-    rol: str,
-    municipio_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Endpoint público para obtener configuración del dashboard (para vecinos sin login).
-    """
-    import json
-
-    if rol not in ["vecino", "empleado"]:
-        raise HTTPException(status_code=400, detail="Rol no válido")
-
-    clave = f"dashboard_config_{rol}"
-
-    result = await db.execute(
-        select(Configuracion)
-        .where(Configuracion.clave == clave)
-        .where(Configuracion.municipio_id == municipio_id)
-    )
-    config = result.scalar_one_or_none()
-
-    # Configuración por defecto
-    default_config = {
-        "componentes": [
-            {"id": "stats", "nombre": "Estadísticas", "visible": True, "orden": 1},
-            {"id": "noticias", "nombre": "Noticias", "visible": True, "orden": 2},
-            {"id": "reclamos_recientes", "nombre": "Reclamos recientes", "visible": True, "orden": 3},
-        ]
-    }
-
-    if config and config.valor:
-        try:
-            return {"rol": rol, "config": json.loads(config.valor)}
-        except json.JSONDecodeError:
-            pass
-
-    return {"rol": rol, "config": default_config}
-
-
 @router.post("/cargar-barrios")
 async def cargar_barrios_como_zonas(
     barrios: List[str],
@@ -409,3 +306,110 @@ async def cargar_barrios_como_zonas(
         "creados": creados,
         "existentes": existentes
     }
+
+
+# ==================== RUTAS GENÉRICAS (deben ir AL FINAL) ====================
+
+@router.get("/", response_model=List[ConfiguracionResponse])
+async def get_configuraciones(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"]))
+):
+    # Multi-tenant: filtrar por municipio_id del usuario actual
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+        .order_by(Configuracion.clave)
+    )
+    return result.scalars().all()
+
+
+@router.post("/", response_model=ConfiguracionResponse)
+async def create_configuracion(
+    data: ConfiguracionCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"]))
+):
+    # Multi-tenant: verificar duplicado solo en el mismo municipio
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == data.clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Ya existe una configuración con esa clave")
+
+    # Multi-tenant: agregar municipio_id
+    config = Configuracion(**data.model_dump(), municipio_id=current_user.municipio_id)
+    db.add(config)
+    await db.commit()
+    await db.refresh(config)
+    return config
+
+
+@router.get("/{clave}", response_model=ConfiguracionResponse)
+async def get_configuracion(
+    clave: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"]))
+):
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+    return config
+
+
+@router.put("/{clave}", response_model=ConfiguracionResponse)
+async def update_configuracion(
+    clave: str,
+    data: ConfiguracionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"]))
+):
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    if not config.editable:
+        raise HTTPException(status_code=400, detail="Esta configuración no es editable")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(config, key, value)
+
+    await db.commit()
+    await db.refresh(config)
+    return config
+
+
+@router.delete("/{clave}")
+async def delete_configuracion(
+    clave: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin"]))
+):
+    # Multi-tenant: filtrar por municipio_id
+    result = await db.execute(
+        select(Configuracion)
+        .where(Configuracion.clave == clave)
+        .where(Configuracion.municipio_id == current_user.municipio_id)
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+
+    await db.delete(config)
+    await db.commit()
+    return {"message": "Configuración eliminada"}
