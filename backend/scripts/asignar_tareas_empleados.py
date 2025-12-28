@@ -1,13 +1,14 @@
 """
 Script para asignar reclamos a los empleados de Merlo.
 Cada empleado recibirá 10 tareas repartidas en diferentes estados.
+Solo modifica la tabla de reclamos, no toca usuarios.
 """
 import asyncio
 import random
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update
+from sqlalchemy import select
 import sys
 import os
 
@@ -16,7 +17,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.config import settings
 from models.municipio import Municipio
-from models.user import User
 from models.empleado import Empleado
 from models.reclamo import Reclamo
 from models.enums import EstadoReclamo
@@ -44,23 +44,7 @@ async def main():
 
         print(f"[OK] Municipio: {municipio.nombre} (ID: {municipio.id})")
 
-        # 2. Obtener empleados (usuarios con rol empleado)
-        result = await session.execute(
-            select(User).where(
-                User.municipio_id == municipio.id,
-                User.rol == "empleado",
-                User.activo == True
-            )
-        )
-        empleados_users = result.scalars().all()
-
-        if not empleados_users:
-            print("[ERROR] No hay empleados en el municipio")
-            return
-
-        print(f"[OK] Encontrados {len(empleados_users)} empleados")
-
-        # 3. Obtener empleados de la tabla empleados
+        # 2. Obtener empleados de la tabla empleados
         result = await session.execute(
             select(Empleado).where(
                 Empleado.municipio_id == municipio.id,
@@ -68,21 +52,13 @@ async def main():
             )
         )
         empleados_db = result.scalars().all()
-        print(f"[OK] Encontrados {len(empleados_db)} registros en tabla empleados")
+        print(f"[OK] Encontrados {len(empleados_db)} empleados")
 
-        # 4. Vincular usuarios con empleados por nombre/apellido
-        for emp_user in empleados_users:
-            # Buscar empleado con mismo nombre y apellido
-            for emp_db in empleados_db:
-                if emp_db.nombre == emp_user.nombre and emp_db.apellido == emp_user.apellido:
-                    if emp_user.empleado_id != emp_db.id:
-                        emp_user.empleado_id = emp_db.id
-                        print(f"   Vinculando {emp_user.email} con empleado_id={emp_db.id}")
-                    break
+        if not empleados_db:
+            print("[ERROR] No hay empleados registrados")
+            return
 
-        await session.commit()
-
-        # 5. Obtener reclamos sin asignar o en estados iniciales
+        # 3. Obtener reclamos disponibles (NUEVO o sin empleado asignado)
         result = await session.execute(
             select(Reclamo).where(
                 Reclamo.municipio_id == municipio.id,
@@ -90,29 +66,14 @@ async def main():
             ).order_by(Reclamo.created_at.desc())
         )
         reclamos_disponibles = result.scalars().all()
-        print(f"[OK] Reclamos disponibles para asignar: {len(reclamos_disponibles)}")
+        print(f"[OK] Reclamos disponibles: {len(reclamos_disponibles)}")
 
-        # 6. Asignar tareas a cada empleado
+        # 4. Asignar tareas a cada empleado
         indice_reclamo = 0
         total_asignados = 0
 
-        for emp_user in empleados_users:
-            if not emp_user.empleado_id:
-                print(f"   [SKIP] {emp_user.email} no tiene empleado_id vinculado")
-                continue
-
-            # Buscar el empleado_db correspondiente
-            emp_db = None
-            for e in empleados_db:
-                if e.id == emp_user.empleado_id:
-                    emp_db = e
-                    break
-
-            if not emp_db:
-                print(f"   [SKIP] {emp_user.email} - empleado_id {emp_user.empleado_id} no encontrado")
-                continue
-
-            print(f"\n>> Asignando tareas a {emp_user.nombre} {emp_user.apellido}...")
+        for emp in empleados_db:
+            print(f"\n>> Asignando tareas a {emp.nombre} {emp.apellido} (ID: {emp.id})...")
 
             tareas_asignadas = 0
             for i in range(TAREAS_POR_EMPLEADO):
@@ -124,10 +85,9 @@ async def main():
                 indice_reclamo += 1
 
                 # Asignar empleado
-                reclamo.empleado_id = emp_db.id
+                reclamo.empleado_id = emp.id
 
                 # Decidir estado aleatorio
-                estados = [EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]
                 peso = random.random()
 
                 if peso < 0.4:  # 40% asignado
@@ -144,15 +104,15 @@ async def main():
                 tareas_asignadas += 1
                 total_asignados += 1
 
-            print(f"   [OK] {tareas_asignadas} tareas asignadas a {emp_user.nombre}")
+            print(f"   [OK] {tareas_asignadas} tareas asignadas")
 
-            # Commit por cada empleado
-            await session.commit()
+        # Commit al final
+        await session.commit()
 
         print(f"\n{'='*60}")
         print(f"RESUMEN")
         print(f"{'='*60}")
-        print(f"Total empleados procesados: {len(empleados_users)}")
+        print(f"Total empleados: {len(empleados_db)}")
         print(f"Total reclamos asignados: {total_asignados}")
         print(f"{'='*60}")
 
