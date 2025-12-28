@@ -192,10 +192,10 @@ export function WizardModal({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
+          {/* Header - Compact single line */}
           <div
             style={{
-              padding: '16px 20px',
+              padding: '12px 20px',
               borderBottom: `1px solid ${theme.border}`,
               background: `linear-gradient(135deg, ${theme.primary}10 0%, ${theme.card} 100%)`,
               flexShrink: 0,
@@ -213,121 +213,92 @@ export function WizardModal({
               }}
             />
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: theme.text, margin: 0 }}>
-                    {title}
-                  </h2>
-                  <p style={{ fontSize: '14px', color: theme.textSecondary, margin: '4px 0 0 0' }}>
-                    Paso {currentStep + 1} de {steps.length}
-                  </p>
-                </div>
-                {headerBadge && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '6px 12px',
-                      borderRadius: '20px',
-                      backgroundColor: `${headerBadge.color}20`,
-                      border: `1px solid ${headerBadge.color}40`,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        backgroundColor: headerBadge.color,
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {headerBadge.icon}
-                    </div>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: headerBadge.color }}>
-                      {headerBadge.label}
-                    </span>
-                  </div>
-                )}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+              {/* Title */}
+              <div style={{ flex: 1 }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0, whiteSpace: 'nowrap' }}>
+                  {title}
+                </h2>
+                <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0 }}>
+                  Paso {currentStep + 1} de {steps.length}
+                </p>
               </div>
 
-              <button
-                onClick={onClose}
-                style={{
-                  padding: '8px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  backgroundColor: theme.backgroundSecondary,
-                  color: theme.textSecondary,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <X style={{ width: '20px', height: '20px' }} />
-              </button>
-            </div>
+              {/* Stepper - centered */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {steps.map((step, index) => {
+                  const isCompleted = index < currentStep;
+                  const isCurrent = index === currentStep;
 
-            {/* Stepper */}
-            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              {steps.map((step, index) => {
-                const isCompleted = index < currentStep;
-                const isCurrent = index === currentStep;
-
-                return (
-                  <div key={step.id} style={{ display: 'flex', alignItems: 'center' }}>
-                    <button
-                      onClick={() => handleStepClick(index)}
-                      disabled={index > currentStep}
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        border: `2px solid ${isCompleted || isCurrent ? theme.primary : theme.border}`,
-                        backgroundColor: isCompleted || isCurrent ? theme.primary : theme.backgroundSecondary,
-                        color: isCompleted || isCurrent ? 'white' : theme.textSecondary,
-                        cursor: index <= currentStep ? 'pointer' : 'default',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s ease',
-                        boxShadow: isCurrent ? `0 0 0 4px ${theme.primary}30` : 'none',
-                      }}
-                    >
-                      {isCompleted ? <Check style={{ width: '18px', height: '18px' }} /> : step.icon}
-                    </button>
-
-                    {index < steps.length - 1 && (
-                      <div
+                  return (
+                    <div key={step.id} style={{ display: 'flex', alignItems: 'center' }}>
+                      <button
+                        onClick={() => handleStepClick(index)}
+                        disabled={index > currentStep}
                         style={{
-                          width: '60px',
-                          height: '4px',
-                          marginLeft: '8px',
-                          marginRight: '8px',
-                          borderRadius: '2px',
-                          backgroundColor: theme.backgroundSecondary,
-                          overflow: 'hidden',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          border: `2px solid ${isCompleted || isCurrent ? theme.primary : theme.border}`,
+                          backgroundColor: isCompleted || isCurrent ? theme.primary : theme.backgroundSecondary,
+                          color: isCompleted || isCurrent ? 'white' : theme.textSecondary,
+                          cursor: index <= currentStep ? 'pointer' : 'default',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s ease',
+                          boxShadow: isCurrent ? `0 0 0 3px ${theme.primary}30` : 'none',
                         }}
                       >
+                        {isCompleted ? <Check style={{ width: '14px', height: '14px' }} /> : step.icon}
+                      </button>
+
+                      {index < steps.length - 1 && (
                         <div
                           style={{
-                            height: '100%',
-                            width: isCompleted ? '100%' : '0%',
-                            backgroundColor: theme.primary,
-                            transition: 'width 0.3s ease',
+                            width: '32px',
+                            height: '3px',
+                            marginLeft: '4px',
+                            marginRight: '4px',
+                            borderRadius: '2px',
+                            backgroundColor: theme.backgroundSecondary,
+                            overflow: 'hidden',
                           }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                        >
+                          <div
+                            style={{
+                              height: '100%',
+                              width: isCompleted ? '100%' : '0%',
+                              backgroundColor: theme.primary,
+                              transition: 'width 0.3s ease',
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Close button */}
+              <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: '6px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.textSecondary,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <X style={{ width: '18px', height: '18px' }} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -351,8 +322,8 @@ export function WizardModal({
                   <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span
                       style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '40px',
+                        height: '40px',
                         borderRadius: '8px',
                         backgroundColor: `${theme.primary}20`,
                         color: theme.primary,

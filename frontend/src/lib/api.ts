@@ -585,6 +585,16 @@ export const tramitesApi = {
   consultar: (numeroTramite: string) => api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),
   sugerirEmpleado: (id: number) => api.get(`/tramites/solicitudes/${id}/sugerir-empleado`),
 
+  // Conteos para filtros (optimizado)
+  getConteoEstados: () => {
+    const municipioId = localStorage.getItem('municipio_id');
+    return api.get('/tramites/stats/conteo-estados', { params: { municipio_id: municipioId } });
+  },
+  getConteoTipos: () => {
+    const municipioId = localStorage.getItem('municipio_id');
+    return api.get('/tramites/stats/conteo-tipos', { params: { municipio_id: municipioId } });
+  },
+
   // Alias de Servicios -> Catálogo (para Servicios.tsx)
   getServicio: (id: number) => api.get(`/tramites/catalogo/${id}`),
   createServicio: (data: Record<string, unknown>) => api.post('/tramites/catalogo', data),

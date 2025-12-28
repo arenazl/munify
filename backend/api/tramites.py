@@ -230,7 +230,7 @@ async def listar_solicitudes(
         query = query.where(Solicitud.tramite_id == tramite_id)
 
     query = query.options(
-        selectinload(Solicitud.tramite),
+        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
         selectinload(Solicitud.empleado_asignado),
         selectinload(Solicitud.solicitante)
     )
@@ -250,7 +250,7 @@ async def consultar_solicitud_por_numero(
     result = await db.execute(
         select(Solicitud)
         .options(
-            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
             selectinload(Solicitud.empleado_asignado),
             selectinload(Solicitud.solicitante)
         )
@@ -274,7 +274,7 @@ async def obtener_solicitud(
     result = await db.execute(
         select(Solicitud)
         .options(
-            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
             selectinload(Solicitud.empleado_asignado),
             selectinload(Solicitud.solicitante)
         )
@@ -422,7 +422,7 @@ async def actualizar_solicitud(
     """Actualiza una solicitud (solo personal municipal)"""
     result = await db.execute(
         select(Solicitud)
-        .options(selectinload(Solicitud.tramite))
+        .options(selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite))
         .where(Solicitud.id == solicitud_id)
     )
     solicitud = result.scalar_one_or_none()
@@ -532,7 +532,7 @@ async def asignar_solicitud(
     result = await db.execute(
         select(Solicitud)
         .options(
-            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
             selectinload(Solicitud.empleado_asignado),
             selectinload(Solicitud.solicitante)
         )
@@ -598,7 +598,7 @@ async def resumen_solicitudes(
         .where(Solicitud.municipio_id == municipio_id)
         .group_by(Solicitud.estado)
     )
-    por_estado = {row[0].value: row[1] for row in result.all()}
+    por_estado = {row[0].value.lower(): row[1] for row in result.all()}
 
     # Total
     total_result = await db.execute(
@@ -624,6 +624,71 @@ async def resumen_solicitudes(
     }
 
 
+# ==================== CONTEOS PARA FILTROS ====================
+
+@router.get("/stats/conteo-estados")
+async def conteo_estados_solicitudes(
+    municipio_id: int = Query(..., description="ID del municipio"),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Conteo de solicitudes por estado (optimizado para filtros)"""
+    query = select(Solicitud.estado, func.count(Solicitud.id)).where(
+        Solicitud.municipio_id == municipio_id
+    )
+
+    # Empleado solo ve los suyos
+    if current_user.rol == RolUsuario.EMPLEADO:
+        query = query.where(Solicitud.empleado_id == current_user.empleado_id)
+
+    query = query.group_by(Solicitud.estado)
+    result = await db.execute(query)
+
+    return {row[0].value.lower(): row[1] for row in result.all()}
+
+
+@router.get("/stats/conteo-tipos")
+async def conteo_tipos_solicitudes(
+    municipio_id: int = Query(..., description="ID del municipio"),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
+    db: AsyncSession = Depends(get_db)
+):
+    """Conteo de solicitudes por tipo de trámite (optimizado para filtros)"""
+    query = select(
+        TipoTramite.id,
+        TipoTramite.nombre,
+        TipoTramite.icono,
+        TipoTramite.color,
+        func.count(Solicitud.id).label('cantidad')
+    ).select_from(Solicitud).join(
+        Tramite, Solicitud.tramite_id == Tramite.id
+    ).join(
+        TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id
+    ).where(
+        Solicitud.municipio_id == municipio_id
+    )
+
+    # Empleado solo ve los suyos
+    if current_user.rol == RolUsuario.EMPLEADO:
+        query = query.where(Solicitud.empleado_id == current_user.empleado_id)
+
+    query = query.group_by(TipoTramite.id, TipoTramite.nombre, TipoTramite.icono, TipoTramite.color)
+    query = query.order_by(func.count(Solicitud.id).desc())
+
+    result = await db.execute(query)
+
+    return [
+        {
+            "id": row[0],
+            "nombre": row[1],
+            "icono": row[2],
+            "color": row[3],
+            "cantidad": row[4]
+        }
+        for row in result.all()
+    ]
+
+
 # ==================== GESTIÓN ====================
 
 @router.get("/gestion/solicitudes", response_model=List[SolicitudResponse])
@@ -631,15 +696,16 @@ async def listar_solicitudes_gestion(
     municipio_id: int = Query(..., description="ID del municipio"),
     estado: Optional[EstadoSolicitud] = Query(None),
     tramite_id: Optional[int] = Query(None),
+    tipo_tramite_id: Optional[int] = Query(None, description="Filtrar por tipo/categoría de trámite"),
     empleado_id: Optional[int] = Query(None),
     sin_asignar: bool = Query(False),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista solicitudes para gestión"""
+    """Lista solicitudes para gestión con paginación"""
     query = select(Solicitud).where(Solicitud.municipio_id == municipio_id)
 
     if estado:
@@ -647,6 +713,12 @@ async def listar_solicitudes_gestion(
 
     if tramite_id:
         query = query.where(Solicitud.tramite_id == tramite_id)
+
+    # Filtro por tipo de trámite (categoría)
+    if tipo_tramite_id:
+        query = query.join(Tramite, Solicitud.tramite_id == Tramite.id).where(
+            Tramite.tipo_tramite_id == tipo_tramite_id
+        )
 
     if empleado_id:
         query = query.where(Solicitud.empleado_id == empleado_id)
@@ -669,7 +741,7 @@ async def listar_solicitudes_gestion(
         query = query.where(Solicitud.empleado_id == current_user.empleado_id)
 
     query = query.options(
-        selectinload(Solicitud.tramite),
+        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
         selectinload(Solicitud.empleado_asignado),
         selectinload(Solicitud.solicitante)
     )

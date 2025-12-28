@@ -202,6 +202,11 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   const [aiResponse, setAiResponse] = useState('');
   const [aiQuestion, setAiQuestion] = useState('');
 
+  // IA contextual basada en lo que escribe el usuario
+  const [contextualAiResponse, setContextualAiResponse] = useState('');
+  const [contextualAiLoading, setContextualAiLoading] = useState(false);
+  const contextualAiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Autocompletado de direcciones
   const [addressSuggestions, setAddressSuggestions] = useState<Array<{
     display_name: string;
@@ -211,6 +216,10 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingAddress, setSearchingAddress] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ref para scroll de trámites
+  const tramitesScrollRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Buscar direcciones con Nominatim (OpenStreetMap)
   const searchAddress = useCallback(async (query: string) => {
@@ -283,6 +292,40 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
     ? rubrosMap[selectedRubro]?.servicios || []
     : [];
 
+  // Seleccionar trámite al hacer scroll (cuando para de scrollear)
+  const handleTramitesScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = tramitesScrollRef.current;
+      if (!container || serviciosDelRubro.length === 0) return;
+
+      // Usar el borde izquierdo del contenedor + un offset para detectar el primer item visible
+      const containerLeft = container.getBoundingClientRect().left;
+
+      let closestId: string | null = null;
+      let closestDistance = Infinity;
+
+      const buttons = container.querySelectorAll('button[data-tramite-id]');
+      buttons.forEach((button) => {
+        const rect = button.getBoundingClientRect();
+        // Distancia desde el borde izquierdo del contenedor al inicio del botón
+        const distance = Math.abs(rect.left - containerLeft - 8); // 8px de padding
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestId = button.getAttribute('data-tramite-id');
+        }
+      });
+
+      if (closestId && closestId !== formData.servicio_id) {
+        setFormData(prev => ({ ...prev, servicio_id: closestId! }));
+      }
+    }, 100);
+  }, [serviciosDelRubro.length, formData.servicio_id]);
+
   const filteredServicios = searchTerm.trim()
     ? servicios.filter(s =>
         s.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -324,6 +367,67 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
 
     fetchAIInfo();
   }, [selectedServicio?.id]); // Se dispara cuando cambia el servicio seleccionado
+
+  // IA contextual: analiza lo que escribe el usuario en observaciones (3+ palabras)
+  useEffect(() => {
+    // Limpiar timeout anterior
+    if (contextualAiTimeoutRef.current) {
+      clearTimeout(contextualAiTimeoutRef.current);
+    }
+
+    const texto = formData.observaciones.trim();
+    const palabras = texto.split(/\s+/).filter(p => p.length > 0);
+
+    // Solo activar con 3+ palabras y servicio seleccionado
+    if (palabras.length < 3 || !selectedServicio) {
+      setContextualAiResponse('');
+      return;
+    }
+
+    // Debounce de 3 segundos - solo cuando el usuario realmente frena
+    contextualAiTimeoutRef.current = setTimeout(async () => {
+      setContextualAiLoading(true);
+
+      try {
+        const contexto: Record<string, unknown> = {
+          tramite: selectedServicio.nombre,
+          categoria: selectedRubro || '',
+          descripcion_tramite: selectedServicio.descripcion?.replace(/^\[[^\]]+\]\s*/, ''),
+          texto_usuario: texto,
+          documentos_requeridos: selectedServicio.documentos_requeridos,
+        };
+
+        const direccion = formData.direccion || '';
+        const response = await chatApi.askDynamic(
+          `Vecino quiere hacer: "${selectedServicio.nombre}" (categoría: ${selectedRubro || 'general'}).
+Escribió: "${texto}"
+${direccion ? `Dirección del trámite: ${direccion}` : ''}
+
+Respondé como empleada municipal de Merlo dando info útil y específica:
+- Dónde tiene que ir a hacer el trámite (oficina, dirección si sabés)
+- Qué documentos llevar
+- Cuánto tarda aproximadamente
+- Si la dirección está en zona céntrica o alejada, mencionalo
+
+Tono amigable, 3-4 oraciones máximo.`,
+          contexto,
+          'tramite_contextual'
+        );
+        console.log('[IA Contextual] Respuesta:', response);
+        setContextualAiResponse(response.response || response.message || '');
+      } catch {
+        setContextualAiResponse('');
+      } finally {
+        setContextualAiLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      if (contextualAiTimeoutRef.current) {
+        clearTimeout(contextualAiTimeoutRef.current);
+      }
+    };
+  }, [formData.observaciones, selectedServicio?.id, selectedRubro]);
 
   const checkEmail = async (email: string) => {
     if (!email || email.length < 5) {
@@ -526,15 +630,18 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
                 key={rubro.nombre}
                 onClick={() => setSelectedRubro(isSelected ? null : rubro.nombre)}
                 className={`relative p-2 rounded-xl border-2 transition-all hover:scale-105 ${isSelected ? 'border-current' : 'border-transparent'}`}
-                style={{ backgroundColor: isSelected ? `${rubro.color}20` : theme.backgroundSecondary, borderColor: isSelected ? rubro.color : theme.border }}
+                style={{
+                  backgroundColor: isSelected ? `${rubro.color}20` : theme.backgroundSecondary,
+                  borderColor: isSelected ? rubro.color : theme.border,
+                }}
               >
-                <div className="w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? rubro.color : `${rubro.color}30`, color: isSelected ? 'white' : rubro.color }}>
+                <div className="w-10 h-10 rounded-full mx-auto mb-1.5 flex items-center justify-center" style={{ backgroundColor: isSelected ? rubro.color : `${rubro.color}30`, color: isSelected ? 'white' : rubro.color }}>
                   {getServicioIcon(rubro.icono)}
                 </div>
-                <span className="text-[10px] font-medium block text-center line-clamp-2" style={{ color: theme.text }}>{rubro.nombre}</span>
+                <span className="text-xs font-medium block text-center line-clamp-2 leading-tight" style={{ color: theme.text }}>{rubro.nombre}</span>
                 {isSelected && (
-                  <div className="absolute top-1 right-1 w-3 h-3 rounded-full flex items-center justify-center" style={{ backgroundColor: rubro.color }}>
-                    <CheckCircle2 className="h-2 w-2 text-white" />
+                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: rubro.color }}>
+                    <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                   </div>
                 )}
               </button>
@@ -543,11 +650,16 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
         </div>
       </div>
 
-      <div style={{ minHeight: '90px' }}>
-        {selectedRubro && (
+      <div style={{ height: '120px' }}>
+        {selectedRubro ? (
           <div>
             <p className="text-xs font-medium mb-2" style={{ color: theme.text }}>Trámites de {selectedRubro}:</p>
-            <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
+            <div
+              ref={tramitesScrollRef}
+              onScroll={handleTramitesScroll}
+              className="flex gap-2 overflow-x-auto pb-2"
+              style={{ scrollbarWidth: 'thin' }}
+            >
               {serviciosDelRubro.map((s) => {
                 const isSelected = formData.servicio_id === String(s.id);
                 const rubroColor = rubrosMap[selectedRubro]?.color || '#6b7280';
@@ -555,18 +667,24 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
                 return (
                   <button
                     key={s.id}
+                    data-tramite-id={String(s.id)}
                     onClick={() => setFormData(prev => ({ ...prev, servicio_id: String(s.id) }))}
-                    className="relative flex-shrink-0 p-2 rounded-lg border-2 text-center"
-                    style={{ backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary, borderColor: isSelected ? color : theme.border, width: '90px' }}
+                    className="relative flex-shrink-0 p-2 rounded-xl border-2 text-center transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary,
+                      borderColor: isSelected ? color : theme.border,
+                      width: '100px',
+                      minHeight: '95px'
+                    }}
                   >
-                    <div className="w-7 h-7 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
+                    <div className="w-9 h-9 rounded-full mx-auto mb-1.5 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
                       {getServicioIcon(s.icono)}
                     </div>
-                    <span className="text-[9px] font-medium block line-clamp-2" style={{ color: theme.text }}>{s.nombre}</span>
-                    <div className="text-[8px]" style={{ color: theme.textSecondary }}>{s.tiempo_estimado_dias}d · {s.costo ? `$${(s.costo/1000).toFixed(0)}k` : 'Gratis'}</div>
+                    <span className="text-[10px] font-medium block line-clamp-2 leading-tight" style={{ color: theme.text }}>{s.nombre}</span>
+                    <div className="text-[9px] mt-1" style={{ color: theme.textSecondary }}>{s.tiempo_estimado_dias}d · {s.costo ? `$${(s.costo/1000).toFixed(0)}k` : 'Gratis'}</div>
                     {isSelected && (
-                      <div className="absolute top-0.5 right-0.5 w-3 h-3 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
-                        <CheckCircle2 className="h-2 w-2 text-white" />
+                      <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
+                        <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                       </div>
                     )}
                   </button>
@@ -574,50 +692,37 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
               })}
             </div>
           </div>
+        ) : (
+          <p className="text-xs text-center pt-8" style={{ color: theme.textSecondary }}>Selecciona una categoría para ver los trámites disponibles</p>
         )}
       </div>
 
-      {selectedServicio && (() => {
-        const tipoDelServicio = tipos.find(t => t.id === selectedServicio.tipo_tramite_id);
-        const servicioColor = selectedServicio.color || tipoDelServicio?.color || theme.primary;
-        return (
-          <div className="p-3 rounded-xl" style={{ backgroundColor: `${servicioColor}15`, border: `2px solid ${servicioColor}` }}>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: servicioColor }}>
-                <span className="text-white">{getServicioIcon(selectedServicio.icono)}</span>
+      <div style={{ height: '70px' }}>
+        {selectedServicio && (() => {
+          const tipoDelServicio = tipos.find(t => t.id === selectedServicio.tipo_tramite_id);
+          const servicioColor = selectedServicio.color || tipoDelServicio?.color || theme.primary;
+          return (
+            <div className="p-3 rounded-xl" style={{ backgroundColor: `${servicioColor}15`, border: `2px solid ${servicioColor}` }}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: servicioColor }}>
+                  <span className="text-white">{getServicioIcon(selectedServicio.icono)}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm" style={{ color: theme.text }}>{selectedServicio.nombre}</p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.tiempo_estimado_dias} días · {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}</p>
+                </div>
+                <CheckCircle2 className="h-5 w-5" style={{ color: servicioColor }} />
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-sm" style={{ color: theme.text }}>{selectedServicio.nombre}</p>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.tiempo_estimado_dias} días · {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}</p>
-              </div>
-              <CheckCircle2 className="h-5 w-5" style={{ color: servicioColor }} />
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
+      </div>
     </div>
   );
 
   // Step 2: Detalle
   const wizardStep2 = (
     <div className="space-y-4">
-      {selectedServicio && (
-        <div className="p-4 rounded-xl" style={{ backgroundColor: `${selectedServicio.color || theme.primary}10`, border: `1px solid ${selectedServicio.color || theme.primary}30` }}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${selectedServicio.color || theme.primary}20` }}>
-              <span style={{ color: selectedServicio.color || theme.primary }}>{getServicioIcon(selectedServicio.icono)}</span>
-            </div>
-            <div>
-              <p className="font-medium" style={{ color: theme.text }}>{selectedServicio.nombre}</p>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.tiempo_estimado_dias} días · {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratuito'}</p>
-            </div>
-          </div>
-          {selectedServicio.documentos_requeridos && (
-            <p className="text-xs mt-2" style={{ color: theme.textSecondary }}><strong>Documentos:</strong> {selectedServicio.documentos_requeridos}</p>
-          )}
-        </div>
-      )}
-
       <div className="space-y-2">
         <label className="text-sm font-medium" style={{ color: theme.text }}>Asunto <span className="text-red-500">*</span></label>
         <input
@@ -672,15 +777,47 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium" style={{ color: theme.text }}>Observaciones para el trámite</label>
+        <label className="text-sm font-medium" style={{ color: theme.text }}>Contanos más sobre tu trámite</label>
         <textarea
-          placeholder="Información adicional que consideres relevante..."
+          placeholder="Ej: Quiero abrir un local de comidas en Av. San Martín, ya tengo el contrato de alquiler firmado..."
           value={formData.observaciones}
           onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
-          rows={2}
-          className="w-full px-4 py-3 rounded-xl text-sm resize-none"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+          rows={3}
+          className="w-full px-4 py-3 rounded-xl resize-none"
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text, fontSize: '15px' }}
         />
+
+        {/* IA contextual basada en lo que escribe el usuario */}
+        {contextualAiLoading && (
+          <div className="p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Analizando...</span>
+          </div>
+        )}
+
+        {contextualAiResponse && !contextualAiLoading && (
+          <div className="p-4 rounded-xl" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98130' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-4 w-4" style={{ color: '#10b981' }} />
+              <span className="text-xs font-medium" style={{ color: '#10b981' }}>Asistente Municipal</span>
+            </div>
+            <div className="space-y-2 text-sm leading-relaxed" style={{ color: theme.text }}>
+              {contextualAiResponse.split(/(?<=[.!?])\s+/).reduce((acc: string[][], sentence, idx) => {
+                const groupIdx = Math.floor(idx / 2);
+                if (!acc[groupIdx]) acc[groupIdx] = [];
+                acc[groupIdx].push(sentence);
+                return acc;
+              }, []).map((group, idx) => (
+                <p key={idx} className="flex items-start gap-2">
+                  <span className="mt-0.5" style={{ color: '#10b981' }}>
+                    {idx === 0 ? <Map className="h-4 w-4" /> : idx === 1 ? <FileText className="h-4 w-4" /> : <Lightbulb className="h-4 w-4" />}
+                  </span>
+                  <span>{group.join(' ')}</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -816,8 +953,8 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   );
 
   const wizardSteps = [
-    { id: 'servicio', title: 'Servicio', description: 'Selecciona el trámite', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
-    { id: 'detalle', title: 'Detalle', description: 'Describe tu solicitud', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
+    { id: 'servicio', title: selectedRubro || 'Categoría', description: selectedServicio ? selectedServicio.nombre : 'Selecciona el trámite', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
+    { id: 'detalle', title: selectedRubro || 'Detalle', description: selectedServicio?.nombre || 'Describe tu solicitud', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
     { id: 'contacto', title: 'Contacto', description: 'Datos de contacto', icon: <User className="h-5 w-5" />, content: wizardStep3, isValid: isStep3Valid },
   ];
 
@@ -834,21 +971,6 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
         {/* Info dinámica del servicio seleccionado */}
         {selectedServicio && (
           <div className="space-y-3">
-            {/* Header del servicio */}
-            <div className="p-3 rounded-lg" style={{ backgroundColor: `${selectedServicio.color || theme.primary}15`, border: `1px solid ${selectedServicio.color || theme.primary}30` }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: selectedServicio.color || theme.primary, color: 'white' }}>
-                  {getServicioIcon(selectedServicio.icono)}
-                </div>
-                <div className="flex-1">
-                  <span className="font-medium text-sm block" style={{ color: theme.text }}>{selectedServicio.nombre}</span>
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>
-                    {selectedServicio.descripcion?.replace(/^\[[^\]]+\]\s*/, '')}
-                  </span>
-                </div>
-              </div>
-            </div>
-
             {/* Tiempo y costo */}
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2 rounded-lg text-center" style={{ backgroundColor: theme.card }}>
@@ -984,11 +1106,6 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
       loading={saving}
       completeLabel="Enviar Trámite"
       aiPanel={wizardAIPanel}
-      headerBadge={selectedServicio ? {
-        icon: getServicioIcon(selectedServicio.icono),
-        label: selectedServicio.nombre,
-        color: selectedServicio.color || theme.primary,
-      } : undefined}
     />
   );
 }

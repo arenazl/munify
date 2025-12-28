@@ -170,6 +170,14 @@ async def chat_dinamico(request: DynamicChatRequest):
     tramite = ctx.get('tramite', '') or ''
     pregunta = request.pregunta or ''
 
+    # Si es un chat contextual del tramite wizard, usar el prompt tal cual viene
+    if request.tipo == 'tramite_contextual' and pregunta:
+        print(f"[CHAT CONTEXTUAL] Prompt directo: {pregunta[:100]}...")
+        response = await chat_service.chat(pregunta, max_tokens=300)
+        if response:
+            return ChatResponse(response=response)
+        return ChatResponse(response="No pude procesar tu consulta. Intentá de nuevo.")
+
     if not tramite and not categoria:
         return ChatResponse(response="Seleccioná primero un trámite para recibir información.")
 

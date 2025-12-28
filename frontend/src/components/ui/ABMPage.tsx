@@ -41,6 +41,9 @@ interface ABMPageProps {
 
   // Vista tabla (opcional)
   tableView?: ReactNode;
+
+  // Vista por defecto
+  defaultViewMode?: ViewMode;
 }
 
 export function ABMPage({
@@ -63,9 +66,10 @@ export function ABMPage({
   sheetFooter,
   onSheetClose,
   tableView,
+  defaultViewMode = 'table',
 }: ABMPageProps) {
   const { theme } = useTheme();
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
   const [isSticky, setIsSticky] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -801,7 +805,7 @@ export function ABMCollapsible({ title, icon, children, defaultOpen = false, var
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-4 py-2 transition-colors duration-200 hover:opacity-90"
-        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        style={{ backgroundColor: `${theme.background}ee`, color: theme.primary }}
         type="button"
       >
         <div className="flex items-center gap-2 font-bold text-sm">
@@ -810,7 +814,7 @@ export function ABMCollapsible({ title, icon, children, defaultOpen = false, var
         </div>
         <ChevronDown
           className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-          style={{ color: '#ffffff' }}
+          style={{ color: theme.primary }}
         />
       </button>
       <div
@@ -864,7 +868,7 @@ export function ABMInfoPanel({ title, icon, children, variant = 'default' }: ABM
       {title && (
         <div
           className="flex items-center gap-2 font-bold text-sm px-4 py-2"
-          style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+          style={{ backgroundColor: `${theme.background}ee`, color: theme.primary }}
         >
           {icon}
           {title}

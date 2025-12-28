@@ -2762,51 +2762,50 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     if (!selectedReclamo) return null;
 
     const categoryColor = getCategoryColor(selectedReclamo.categoria.nombre);
+    const estadoColor = estadoColors[selectedReclamo.estado].bg;
 
     return (
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          {/* Estado con badge */}
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-full"
-            style={{
-              backgroundColor: estadoColors[selectedReclamo.estado].bg,
-              color: estadoColors[selectedReclamo.estado].text
-            }}
-          >
-            {getEstadoIcon(selectedReclamo.estado)}
-            {estadoLabels[selectedReclamo.estado]}
-          </span>
-          {/* Categoría con color de la categoría */}
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
-            style={{
-              backgroundColor: `${categoryColor}20`,
-              color: categoryColor,
-              border: `1px solid ${categoryColor}40`
-            }}
-          >
-            {getCategoryIcon(selectedReclamo.categoria.nombre)}
-            {selectedReclamo.categoria.nombre}
-          </span>
-          {/* Botón Ver Historial */}
-          <button
-            onClick={() => {
-              closeSheet();
-              navigate(`/gestion/reclamos/${selectedReclamo.id}`);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all hover:scale-105"
-            style={{
-              backgroundColor: 'transparent',
-              color: theme.primary,
-              border: `1px solid ${theme.primary}`
-            }}
-            title="Ver historial completo"
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Historial
-          </button>
-        </div>
+      <div className="flex items-center gap-2">
+        {/* Estado */}
+        <span
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full"
+          style={{
+            backgroundColor: estadoColor,
+            color: '#ffffff'
+          }}
+        >
+          {getEstadoIcon(selectedReclamo.estado)}
+          {estadoLabels[selectedReclamo.estado]}
+        </span>
+        {/* Categoría */}
+        <span
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+          style={{
+            backgroundColor: `${categoryColor}15`,
+            color: categoryColor,
+            border: `1px solid ${categoryColor}40`
+          }}
+        >
+          {getCategoryIcon(selectedReclamo.categoria.nombre)}
+          {selectedReclamo.categoria.nombre}
+        </span>
+        {/* Historial */}
+        <button
+          onClick={() => {
+            closeSheet();
+            navigate(`/gestion/reclamos/${selectedReclamo.id}`);
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.primary,
+            border: `1px solid ${theme.border}`
+          }}
+          title="Ver historial completo"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          Historial
+        </button>
       </div>
     );
   };
@@ -2827,15 +2826,23 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
             <button
               onClick={handleAsignar}
               disabled={saving || !empleadoSeleccionado || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
+              style={{
+                backgroundColor: theme.primary,
+                color: '#ffffff',
+                boxShadow: `0 4px 14px ${theme.primary}40`
+              }}
             >
               {saving ? 'Asignando...' : 'Asignar'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
               className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{ border: '1px solid #ef4444', color: '#ef4444' }}
+              style={{
+                backgroundColor: '#ef444415',
+                border: '1px solid #ef444450',
+                color: '#ef4444'
+              }}
             >
               Rechazar
             </button>
@@ -2847,8 +2854,12 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           <button
             onClick={handleIniciar}
             disabled={saving}
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-            style={{ backgroundColor: '#eab308', color: '#ffffff' }}
+            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
+            style={{
+              backgroundColor: theme.primary,
+              color: '#ffffff',
+              boxShadow: `0 4px 14px ${theme.primary}40`
+            }}
           >
             {saving ? 'Iniciando...' : 'Iniciar Trabajo'}
           </button>
@@ -2859,8 +2870,12 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           <button
             onClick={handleResolver}
             disabled={saving || !resolucion}
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-            style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
+            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
+            style={{
+              backgroundColor: '#16a34a',
+              color: '#ffffff',
+              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
+            }}
           >
             {saving ? 'Resolviendo...' : 'Marcar Resuelto'}
           </button>
@@ -2870,7 +2885,11 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
             onClick={handleNoFinalizado}
             disabled={saving || !motivoNoFinalizado}
             className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-            style={{ backgroundColor: '#f59e0b', color: '#ffffff' }}
+            style={{
+              backgroundColor: `${theme.primary}20`,
+              color: theme.primary,
+              border: `1px solid ${theme.primary}50`
+            }}
           >
             {saving ? 'Procesando...' : 'Volver a Asignado'}
           </button>
@@ -2881,9 +2900,9 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           <div
             className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
             style={{
-              backgroundColor: theme.card,
-              color: theme.textSecondary,
-              border: `1px solid ${theme.border}`
+              backgroundColor: selectedReclamo.estado === 'resuelto' ? '#16a34a20' : '#ef444420',
+              color: selectedReclamo.estado === 'resuelto' ? '#16a34a' : '#ef4444',
+              border: `1px solid ${selectedReclamo.estado === 'resuelto' ? '#16a34a50' : '#ef444450'}`
             }}
           >
             {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
@@ -2932,7 +2951,8 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               </button>
 
               {/* Chips por categoría - número arriba, icono medio, texto abajo */}
-              {categorias.map((cat) => {
+              {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
+              {categorias.filter((cat) => (conteosCategorias[cat.id] || 0) > 0 || reclamos.some(r => r.categoria.id === cat.id)).map((cat) => {
                 const isSelected = filtroCategoria === cat.id;
                 const catColor = getCategoryColor(cat.nombre);
                 const count = conteosCategorias[cat.id] || 0;
@@ -3143,20 +3163,22 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                     {r.categoria.nombre}
                   </span>
                 </div>
-                <span className="text-xs" style={{ color: theme.textSecondary }}>#{r.id}</span>
+                <div className="flex items-center gap-2">
+                  {r.creador && !r.es_anonimo && (
+                    <span className="text-sm font-medium" style={{ color: theme.text }}>
+                      {r.creador.nombre} {r.creador.apellido?.charAt(0)}.
+                    </span>
+                  )}
+                  <span className="text-xs" style={{ color: theme.textSecondary }}>#{r.id}</span>
+                </div>
               </div>
 
               {/* Contenido */}
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <p className="text-sm flex items-center flex-1 min-w-0" style={{ color: theme.textSecondary }}>
                   <MapPin className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                   <span className="line-clamp-1">{r.direccion}</span>
                 </p>
-                {r.creador && !r.es_anonimo && (
-                  <span className="text-xs ml-2 flex-shrink-0" style={{ color: theme.text }}>
-                    {r.creador.nombre} {r.creador.apellido?.charAt(0)}.
-                  </span>
-                )}
               </div>
 
               <p className="text-sm mt-2 line-clamp-2" style={{ color: theme.textSecondary }}>

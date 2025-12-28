@@ -71,22 +71,24 @@ class TramiteUpdate(BaseModel):
     orden: Optional[int] = None
 
 
+class TipoTramiteSimple(BaseModel):
+    id: int
+    nombre: str
+    icono: Optional[str] = None
+    color: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class TramiteSimple(BaseModel):
     id: int
     nombre: str
     icono: Optional[str] = None
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
-
-    class Config:
-        from_attributes = True
-
-
-class TipoTramiteSimple(BaseModel):
-    id: int
-    nombre: str
-    icono: Optional[str] = None
-    color: Optional[str] = None
+    tipo_tramite_id: Optional[int] = None
+    tipo_tramite: Optional[TipoTramiteSimple] = None
 
     class Config:
         from_attributes = True

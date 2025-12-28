@@ -81,6 +81,7 @@ export interface Reclamo {
   latitud?: number;
   longitud?: number;
   referencia?: string;
+  es_anonimo?: boolean;
   motivo_rechazo?: MotivoRechazo;
   descripcion_rechazo?: string;
   resolucion?: string;

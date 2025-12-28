@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
+from datetime import datetime, timezone, timedelta
 import cloudinary
 import cloudinary.uploader
 
@@ -387,7 +388,7 @@ async def cambiar_estado_reclamo_drag(
     reclamo.estado = estado_enum
 
     if estado_enum == EstadoReclamo.RESUELTO:
-        reclamo.fecha_resolucion = datetime.utcnow()
+        reclamo.fecha_resolucion = datetime.now(timezone.utc)
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
@@ -447,7 +448,7 @@ async def get_reclamos_recurrentes(
         raise HTTPException(status_code=400, detail="Se requiere municipio_id")
 
     # Fecha límite
-    fecha_limite = datetime.utcnow() - timedelta(days=dias_atras)
+    fecha_limite = datetime.now(timezone.utc) - timedelta(days=dias_atras)
 
     # Obtener todos los reclamos activos recientes
     query = select(Reclamo).where(
@@ -852,7 +853,7 @@ async def resolver_reclamo(
     else:
         # Admin/Supervisor resuelve directamente
         reclamo.estado = EstadoReclamo.RESUELTO
-        reclamo.fecha_resolucion = datetime.utcnow()
+        reclamo.fecha_resolucion = datetime.now(timezone.utc)
 
         historial = HistorialReclamo(
             reclamo_id=reclamo.id,
@@ -914,7 +915,7 @@ async def confirmar_reclamo(
 
     estado_anterior = reclamo.estado
     reclamo.estado = EstadoReclamo.RESUELTO
-    reclamo.fecha_resolucion = datetime.utcnow()
+    reclamo.fecha_resolucion = datetime.now(timezone.utc)
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
@@ -1035,6 +1036,7 @@ async def rechazar_reclamo(
     reclamo.estado = EstadoReclamo.RECHAZADO
     reclamo.motivo_rechazo = data.motivo
     reclamo.descripcion_rechazo = data.descripcion
+    reclamo.fecha_resolucion = datetime.now(timezone.utc)
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
@@ -1553,7 +1555,7 @@ async def buscar_reclamos_similares(
     from utils.geo import are_locations_close
 
     # Fecha límite (últimos N días)
-    fecha_limite = datetime.utcnow() - timedelta(days=dias_atras)
+    fecha_limite = datetime.now(timezone.utc) - timedelta(days=dias_atras)
 
     # Query base: misma categoría, fecha reciente, estados activos
     query = select(Reclamo).where(
@@ -1640,7 +1642,7 @@ async def get_cantidad_similares(
 
     # Buscar similares
     from datetime import datetime, timedelta
-    fecha_limite = datetime.utcnow() - timedelta(days=30)
+    fecha_limite = datetime.now(timezone.utc) - timedelta(days=30)
 
     query = select(Reclamo).where(
         Reclamo.id != reclamo_id,

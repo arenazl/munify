@@ -105,6 +105,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           className="flex items-center justify-between px-6 py-4"
           style={{
             borderBottom: `1px solid ${theme.border}`,
+            backgroundColor: `${theme.background}cc`,
             transform: isVisible ? 'translateX(0)' : 'translateX(20px)',
             opacity: isVisible ? 1 : 0,
             transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -173,7 +174,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
             className="px-6 py-4"
             style={{
               borderTop: `1px solid ${theme.border}`,
-              backgroundColor: theme.backgroundSecondary,
+              backgroundColor: `${theme.background}cc`,
               transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
               opacity: isVisible ? 1 : 0,
               transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',

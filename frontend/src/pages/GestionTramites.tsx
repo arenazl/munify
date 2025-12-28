@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   Search,
-  GripVertical,
   Plus,
   FileText,
   Clock,
@@ -41,7 +39,6 @@ import {
   Copy,
   LayoutGrid,
   List,
-  Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi } from '../lib/api';
@@ -52,59 +49,7 @@ import { TramiteWizard } from '../components/TramiteWizard';
 import type { Tramite, EstadoTramite, ServicioTramite, Empleado, TipoTramite } from '../types';
 import React from 'react';
 
-// Configuración de estados para Kanban
-interface ColumnaKanban {
-  id: EstadoTramite;
-  titulo: string;
-  color: string;
-  headerClass: string;
-  cardClass: string;
-  badgeClass: string;
-}
-
-const columnasKanban: ColumnaKanban[] = [
-  {
-    id: 'iniciado',
-    titulo: 'Nuevos',
-    color: '#6366f1',
-    headerClass: 'bg-gradient-to-r from-indigo-500 to-indigo-600',
-    cardClass: 'bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/30 dark:to-gray-900',
-    badgeClass: 'bg-indigo-100 text-indigo-700',
-  },
-  {
-    id: 'en_revision',
-    titulo: 'En Revisión',
-    color: '#3b82f6',
-    headerClass: 'bg-gradient-to-r from-blue-500 to-blue-600',
-    cardClass: 'bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/30 dark:to-gray-900',
-    badgeClass: 'bg-blue-100 text-blue-700',
-  },
-  {
-    id: 'en_proceso',
-    titulo: 'En Proceso',
-    color: '#f59e0b',
-    headerClass: 'bg-gradient-to-r from-amber-500 to-amber-600',
-    cardClass: 'bg-gradient-to-br from-amber-50 to-white dark:from-amber-950/30 dark:to-gray-900',
-    badgeClass: 'bg-amber-100 text-amber-700',
-  },
-  {
-    id: 'aprobado',
-    titulo: 'Aprobados',
-    color: '#10b981',
-    headerClass: 'bg-gradient-to-r from-emerald-500 to-emerald-600',
-    cardClass: 'bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/30 dark:to-gray-900',
-    badgeClass: 'bg-emerald-100 text-emerald-700',
-  },
-  {
-    id: 'finalizado',
-    titulo: 'Finalizados',
-    color: '#059669',
-    headerClass: 'bg-gradient-to-r from-green-600 to-green-700',
-    cardClass: 'bg-gradient-to-br from-green-50 to-white dark:from-green-950/30 dark:to-gray-900',
-    badgeClass: 'bg-green-100 text-green-700',
-  },
-];
-
+// Configuración de estados
 const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; color: string; label: string; bg: string }> = {
   iniciado: { icon: Clock, color: '#6366f1', label: 'Iniciado', bg: '#6366f115' },
   en_revision: { icon: FileCheck, color: '#3b82f6', label: 'En Revisión', bg: '#3b82f615' },
@@ -173,7 +118,7 @@ interface SugerenciaEmpleado {
   }>;
 }
 
-type ViewMode = 'kanban' | 'tabla';
+type ViewMode = 'cards' | 'tabla';
 
 export default function GestionTramites() {
   const { theme } = useTheme();
@@ -187,9 +132,13 @@ export default function GestionTramites() {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtroServicio, setFiltroServicio] = useState<number | 'todos'>('todos');
-  const [filtroSinAsignar, setFiltroSinAsignar] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [viewMode, setViewMode] = useState<ViewMode>('tabla');
+
+  // Filtros visuales estilo Reclamos
+  const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<string>('');
+  const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
+  const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
 
   // Autocompletado de búsqueda
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -226,8 +175,6 @@ export default function GestionTramites() {
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
-
-  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor' || user?.rol === 'empleado';
 
   // Click fuera para cerrar autocompletado
   useEffect(() => {
@@ -296,6 +243,13 @@ export default function GestionTramites() {
     loadData();
   }, []);
 
+  // Recargar trámites cuando cambien los filtros
+  useEffect(() => {
+    if (!loading) {
+      loadTramites(filtroTipo, filtroEstado);
+    }
+  }, [filtroTipo, filtroEstado]);
+
   // Abrir trámite desde URL
   useEffect(() => {
     const tramiteId = searchParams.get('id');
@@ -309,23 +263,58 @@ export default function GestionTramites() {
 
   const loadData = async () => {
     try {
-      const [tramitesRes, serviciosRes, tiposRes, empleadosRes, resumenRes] = await Promise.all([
-        tramitesApi.getGestionTodos(),
+      const [serviciosRes, tiposRes, empleadosRes, resumenRes] = await Promise.all([
         tramitesApi.getServicios(),
         tramitesApi.getTipos().catch(() => ({ data: [] })),
         empleadosApi.getAll().catch(() => ({ data: [] })),
         tramitesApi.getResumen().catch(() => ({ data: null })),
       ]);
-      setTramites(tramitesRes.data);
       setServicios(serviciosRes.data);
       setTipos(tiposRes.data);
       setEmpleados(empleadosRes.data);
       setResumen(resumenRes.data);
+
+      // Cargar conteos para filtros visuales
+      loadConteos();
+      // Cargar trámites con filtros actuales
+      await loadTramites();
     } catch (error) {
       console.error('Error cargando datos:', error);
       toast.error('Error al cargar trámites');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Cargar trámites con filtros
+  const loadTramites = async (tipo?: number | null, estado?: string) => {
+    try {
+      const params: Record<string, unknown> = {};
+      // Usar parámetros explícitos o valores actuales del state
+      const tipoFiltro = tipo !== undefined ? tipo : filtroTipo;
+      const estadoFiltro = estado !== undefined ? estado : filtroEstado;
+
+      if (tipoFiltro) params.tipo_tramite_id = tipoFiltro;
+      // El backend espera el estado en mayúsculas (enum EstadoSolicitud)
+      if (estadoFiltro) params.estado = estadoFiltro.toUpperCase();
+
+      const res = await tramitesApi.getGestionTodos(params);
+      setTramites(res.data);
+    } catch (error) {
+      console.error('Error cargando trámites:', error);
+    }
+  };
+
+  const loadConteos = async () => {
+    try {
+      const [tiposRes, estadosRes] = await Promise.all([
+        tramitesApi.getConteoTipos().catch(() => ({ data: [] })),
+        tramitesApi.getConteoEstados().catch(() => ({ data: {} })),
+      ]);
+      setConteosTipos(tiposRes.data);
+      setConteosEstados(estadosRes.data);
+    } catch (error) {
+      console.error('Error cargando conteos:', error);
     }
   };
 
@@ -428,68 +417,11 @@ export default function GestionTramites() {
     }
   };
 
-  // Drag & Drop handler
-  const handleDragEnd = async (result: DropResult) => {
-    const { source, destination, draggableId } = result;
-
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId) return;
-
-    const tramiteId = parseInt(draggableId);
-    const nuevoEstado = destination.droppableId as EstadoTramite;
-    const estadoAnterior = source.droppableId as EstadoTramite;
-
-    // Verificar si la transición es válida
-    if (!estadoTransiciones[estadoAnterior]?.includes(nuevoEstado) &&
-        !['iniciado', 'en_revision', 'en_proceso', 'aprobado', 'finalizado'].includes(nuevoEstado)) {
-      toast.error('Transición de estado no permitida');
-      return;
-    }
-
-    // Actualizar estado local optimistamente
-    setTramites(prev =>
-      prev.map(t =>
-        t.id === tramiteId ? { ...t, estado: nuevoEstado } : t
-      )
-    );
-
-    try {
-      await tramitesApi.update(tramiteId, { estado: nuevoEstado });
-      toast.success(`Trámite movido a "${columnasKanban.find(c => c.id === nuevoEstado)?.titulo}"`);
-    } catch (error) {
-      // Revertir en caso de error
-      setTramites(prev =>
-        prev.map(t =>
-          t.id === tramiteId ? { ...t, estado: estadoAnterior } : t
-        )
-      );
-      console.error('Error al cambiar estado:', error);
-      toast.error('Error al cambiar el estado del trámite');
-    }
-  };
-
-  const getTramitesPorEstado = (estado: EstadoTramite) => {
-    return tramites
-      .filter(t => t.estado === estado)
-      .filter(t => {
-        const term = searchTerm.toLowerCase();
-        const matchSearch = searchTerm === '' ||
-          t.numero_tramite.toLowerCase().includes(term) ||
-          t.asunto.toLowerCase().includes(term) ||
-          t.nombre_solicitante?.toLowerCase().includes(term) ||
-          t.apellido_solicitante?.toLowerCase().includes(term) ||
-          t.dni_solicitante?.toLowerCase().includes(term) ||
-          t.empleado_asignado?.nombre?.toLowerCase().includes(term) ||
-          t.empleado_asignado?.apellido?.toLowerCase().includes(term);
-        const matchServicio = filtroServicio === 'todos' || t.servicio_id === filtroServicio;
-        const matchSinAsignar = !filtroSinAsignar || !t.empleado_id;
-        return matchSearch && matchServicio && matchSinAsignar;
-      });
-  };
-
+  // Filtro local solo para búsqueda de texto (tipo y estado se filtran en backend)
   const filteredTramites = tramites.filter(t => {
+    if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
-    const matchSearch = t.numero_tramite.toLowerCase().includes(term) ||
+    return t.numero_tramite.toLowerCase().includes(term) ||
       t.asunto.toLowerCase().includes(term) ||
       t.nombre_solicitante?.toLowerCase().includes(term) ||
       t.apellido_solicitante?.toLowerCase().includes(term) ||
@@ -497,9 +429,6 @@ export default function GestionTramites() {
       t.dni_solicitante?.toLowerCase().includes(term) ||
       t.empleado_asignado?.nombre?.toLowerCase().includes(term) ||
       t.empleado_asignado?.apellido?.toLowerCase().includes(term);
-    const matchServicio = filtroServicio === 'todos' || t.servicio_id === filtroServicio;
-    const matchSinAsignar = !filtroSinAsignar || !t.empleado_id;
-    return matchSearch && matchServicio && matchSinAsignar;
   });
 
   if (loading) {
@@ -512,14 +441,19 @@ export default function GestionTramites() {
 
   return (
     <div className="space-y-6">
-      {/* Header estilo ABMPage */}
+      {/* Sticky wrapper */}
       <div
-        className="flex items-center gap-4 px-4 py-3 rounded-xl sticky top-0 z-30"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
+        className="sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-1"
+        style={{ backgroundColor: theme.background }}
       >
+        {/* Header estilo ABMPage */}
+        <div
+          className="flex items-center gap-4 px-4 py-3 rounded-xl"
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
         {/* Título con icono decorativo - igual que ABMPage */}
         <div className="flex items-center gap-2 flex-shrink-0">
           <div
@@ -630,51 +564,19 @@ export default function GestionTramites() {
           )}
         </div>
 
-        {/* Filtros inline - servicio y sin asignar */}
-        <div className="hidden md:flex items-center gap-2">
-          <select
-            value={filtroServicio}
-            onChange={(e) => setFiltroServicio(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-            className="px-3 py-2 rounded-lg text-sm"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
-          >
-            <option value="todos">Todos los servicios</option>
-            {servicios.map(s => (
-              <option key={s.id} value={s.id}>{s.nombre}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}
-            className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
-            style={{
-              backgroundColor: filtroSinAsignar ? '#ef444420' : theme.backgroundSecondary,
-              border: `1px solid ${filtroSinAsignar ? '#ef4444' : theme.border}`,
-              color: filtroSinAsignar ? '#ef4444' : theme.text,
-            }}
-          >
-            <Filter className="h-4 w-4" />
-            Sin asignar
-          </button>
-        </div>
-
-        {/* Toggle vista Kanban/Tabla */}
+        {/* Toggle vista Cards/Tabla */}
         <div
           className="flex rounded-lg p-1 flex-shrink-0"
           style={{ backgroundColor: theme.backgroundSecondary }}
         >
           <button
-            onClick={() => setViewMode('kanban')}
+            onClick={() => setViewMode('cards')}
             className="p-2 rounded-md transition-all"
             style={{
-              backgroundColor: viewMode === 'kanban' ? theme.card : 'transparent',
-              color: viewMode === 'kanban' ? theme.primary : theme.textSecondary,
+              backgroundColor: viewMode === 'cards' ? theme.card : 'transparent',
+              color: viewMode === 'cards' ? theme.primary : theme.textSecondary,
             }}
-            title="Vista Kanban"
+            title="Vista Cards"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
@@ -700,259 +602,276 @@ export default function GestionTramites() {
           <Plus className="h-4 w-4" />
           Nuevo Trámite
         </button>
-      </div>
-
-      {/* Stats resumen */}
-      {resumen && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <StatCard
-            theme={theme}
-            icon={<FileText className="h-5 w-5" />}
-            label="Total"
-            value={resumen.total}
-            color={theme.primary}
-          />
-          <StatCard
-            theme={theme}
-            icon={<Clock className="h-5 w-5" />}
-            label="Hoy"
-            value={resumen.hoy}
-            color="#f59e0b"
-          />
-          <StatCard
-            theme={theme}
-            icon={<AlertCircle className="h-5 w-5" />}
-            label="Sin Asignar"
-            value={tramites.filter(t => !t.empleado_id).length}
-            color="#ef4444"
-          />
-          <StatCard
-            theme={theme}
-            icon={<RefreshCw className="h-5 w-5" />}
-            label="En Proceso"
-            value={(resumen.por_estado?.en_proceso || 0) + (resumen.por_estado?.en_revision || 0)}
-            color="#8b5cf6"
-          />
-          <StatCard
-            theme={theme}
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            label="Finalizados"
-            value={(resumen.por_estado?.aprobado || 0) + (resumen.por_estado?.finalizado || 0)}
-            color="#10b981"
-          />
         </div>
-      )}
 
-      {/* Filtros secundarios - solo mobile */}
-      <div className="flex md:hidden items-center gap-3">
-        <select
-          value={filtroServicio}
-          onChange={(e) => setFiltroServicio(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-          className="flex-1 px-3 py-2 rounded-lg text-sm"
-          style={{
-            backgroundColor: theme.backgroundSecondary,
-            border: `1px solid ${theme.border}`,
-            color: theme.text,
-          }}
+        {/* Filtros visuales estilo Reclamos */}
+        <div
+          className="rounded-xl p-3 mt-2"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
         >
-          <option value="todos">Todos los servicios</option>
-          {servicios.map(s => (
-            <option key={s.id} value={s.id}>{s.nombre}</option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-2">
+          {/* Tipos de trámite */}
+          <div className="flex gap-1.5 w-full">
+            {/* Botón Todos */}
+            <button
+              onClick={() => setFiltroTipo(null)}
+              className={`flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] ${tipos.length > 0 ? 'flex-1 min-w-0' : 'w-[68px]'}`}
+              style={{
+                background: filtroTipo === null ? theme.primary : theme.backgroundSecondary,
+                border: `1px solid ${filtroTipo === null ? theme.primary : theme.border}`,
+              }}
+            >
+              <FileText className="h-5 w-5" style={{ color: filtroTipo === null ? '#ffffff' : theme.primary }} />
+              <span className="text-[9px] font-semibold leading-tight text-center mt-1" style={{ color: filtroTipo === null ? '#ffffff' : theme.text }}>
+                Tipos
+              </span>
+            </button>
 
-        <button
-          onClick={() => setFiltroSinAsignar(!filtroSinAsignar)}
-          className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all flex-shrink-0"
-          style={{
-            backgroundColor: filtroSinAsignar ? '#ef444420' : theme.backgroundSecondary,
-            border: `1px solid ${filtroSinAsignar ? '#ef4444' : theme.border}`,
-            color: filtroSinAsignar ? '#ef4444' : theme.text,
-          }}
-        >
-          <Filter className="h-4 w-4" />
-          Sin asignar
-        </button>
-      </div>
+            {/* Chips por tipo de trámite */}
+            {tipos.filter(t => t.activo).map((tipo) => {
+              const isSelected = filtroTipo === tipo.id;
+              const tipoColor = tipo.color || theme.primary;
+              const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
+              return (
+                <button
+                  key={tipo.id}
+                  onClick={() => setFiltroTipo(isSelected ? null : tipo.id)}
+                  title={tipo.nombre}
+                  className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                  style={{
+                    background: isSelected ? tipoColor : theme.backgroundSecondary,
+                    border: `1px solid ${isSelected ? tipoColor : theme.border}`,
+                  }}
+                >
+                  <span className="text-[10px] font-bold leading-none" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
+                    {conteo}
+                  </span>
+                  <span className="[&>svg]:h-5 [&>svg]:w-5 my-1" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
+                    {servicioIcons[tipo.icono || ''] || servicioIcons.default}
+                  </span>
+                  <span className="text-[9px] font-medium leading-none text-center w-full truncate px-1" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                    {tipo.nombre.split(' ')[0]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Vista Kanban */}
-      {viewMode === 'kanban' && (
-        <>
-          {canDrag && (
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Arrastra las tarjetas entre columnas para cambiar el estado de los trámites.
-            </p>
-          )}
-
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4">
-              {columnasKanban.map((col) => (
-                <Droppable droppableId={col.id} key={col.id} isDropDisabled={!canDrag}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="rounded-xl overflow-hidden min-h-[400px] min-w-[280px] transition-all duration-300"
+          {/* Estados */}
+          <div className="flex gap-2 w-full">
+            {Object.keys(conteosEstados).length === 0 ? (
+              // Skeleton mientras cargan los conteos
+              <>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={`skeleton-estado-${i}`}
+                    className="flex-1 h-[36px] rounded-lg animate-pulse"
+                    style={{ background: `${theme.border}40` }}
+                  />
+                ))}
+              </>
+            ) : (
+              [
+                { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
+                { key: 'iniciado', label: 'Nuevo', icon: Clock, color: '#6366f1', count: conteosEstados['iniciado'] || 0 },
+                { key: 'en_revision', label: 'Revisión', icon: FileCheck, color: '#3b82f6', count: conteosEstados['en_revision'] || 0 },
+                { key: 'en_proceso', label: 'Proceso', icon: RefreshCw, color: '#f59e0b', count: conteosEstados['en_proceso'] || 0 },
+                { key: 'aprobado', label: 'Aprobado', icon: CheckCircle2, color: '#10b981', count: conteosEstados['aprobado'] || 0 },
+                { key: 'finalizado', label: 'Finalizado', icon: CheckCircle2, color: '#059669', count: conteosEstados['finalizado'] || 0 },
+                { key: 'rechazado', label: 'Rechazado', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
+              ].map((estado) => {
+                const Icon = estado.icon;
+                const isActive = filtroEstado === estado.key;
+                return (
+                  <button
+                    key={estado.key}
+                    onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                    className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
+                    style={{
+                      background: isActive ? estado.color : `${estado.color}15`,
+                      border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
+                    }}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? '#ffffff' : estado.color }} />
+                    <span className="text-[10px] font-medium leading-none truncate hidden sm:block" style={{ color: isActive ? '#ffffff' : estado.color }}>
+                      {estado.label}
+                    </span>
+                    <span
+                      className="text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0"
                       style={{
-                        backgroundColor: theme.backgroundSecondary,
-                        border: snapshot.isDraggingOver
-                          ? `2px dashed ${col.color}`
-                          : `1px solid ${theme.border}`,
-                        boxShadow: snapshot.isDraggingOver
-                          ? `0 0 20px ${col.color}30`
-                          : '0 4px 12px rgba(0,0,0,0.1)',
+                        backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
+                        color: isActive ? '#ffffff' : estado.color,
                       }}
                     >
-                      {/* Header de columna */}
-                      <div className={`${col.headerClass} px-4 py-3 flex items-center justify-between`}>
-                        <h2 className="font-semibold text-white flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-white/50"></span>
-                          {col.titulo}
-                        </h2>
-                        <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-white">
-                          {getTramitesPorEstado(col.id).length}
+                      {estado.count}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+        </div>
+      </div>
+
+      {/* Vista Cards */}
+      {viewMode === 'cards' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-left-4 duration-300">
+          {filteredTramites.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: theme.textSecondary }} />
+              <p style={{ color: theme.textSecondary }}>No hay trámites</p>
+            </div>
+          ) : (
+            filteredTramites.map((t) => {
+              const config = estadoConfig[t.estado] || estadoConfig.iniciado;
+              const IconEstado = config.icon;
+              // tipo_tramite ahora viene en t.tramite.tipo_tramite
+              const tipoTramite = t.tramite?.tipo_tramite;
+              const tipoColor = tipoTramite?.color || theme.primary;
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => openTramite(t)}
+                  className="group relative rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
+                  style={{
+                    backgroundColor: theme.card,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <div className="relative z-10 p-5">
+                    {/* Header con gradiente */}
+                    <div
+                      className="flex items-center justify-between -mx-5 -mt-5 mb-4 px-4 py-3 rounded-t-xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${config.color} 0%, ${config.color}80 100%)`,
+                        borderBottom: `1px solid ${config.color}`
+                      }}
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+                        >
+                          <FileText className="h-4 w-4" style={{ color: '#ffffff' }} />
+                        </div>
+                        <span className="font-mono text-sm font-bold" style={{ color: '#ffffff' }}>
+                          {t.numero_tramite}
                         </span>
                       </div>
+                      <span
+                        className="px-3 py-1 text-xs font-semibold rounded-full shadow-sm flex-shrink-0 ml-2 flex items-center gap-1.5"
+                        style={{
+                          backgroundColor: theme.card,
+                          color: config.color,
+                        }}
+                      >
+                        <IconEstado className="h-3 w-3" />
+                        {config.label}
+                      </span>
+                    </div>
 
-                      {/* Lista de trámites */}
-                      <div className="p-3 space-y-3">
-                        {getTramitesPorEstado(col.id).map((tramite, index) => (
-                          <Draggable
-                            key={tramite.id}
-                            draggableId={String(tramite.id)}
-                            index={index}
-                            isDragDisabled={!canDrag}
-                          >
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                onClick={() => !snapshot.isDragging && openTramite(tramite)}
-                                className={`${col.cardClass} rounded-lg p-4 cursor-pointer transition-all ${
-                                  !snapshot.isDragging ? 'hover:shadow-lg hover:-translate-y-0.5' : ''
-                                } ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                                style={{
-                                  ...provided.draggableProps.style,
-                                  boxShadow: snapshot.isDragging
-                                    ? `0 20px 40px rgba(0,0,0,0.3), 0 0 30px ${col.color}50`
-                                    : '0 2px 8px rgba(0,0,0,0.1)',
-                                  opacity: snapshot.isDragging ? 0.95 : 1,
-                                  border: `1px solid ${theme.border}`,
-                                }}
-                              >
-                                <div className="flex items-start gap-3">
-                                  {/* Handle de drag */}
-                                  {canDrag && (
-                                    <div
-                                      className="mt-1 p-1 rounded"
-                                      style={{
-                                        background: `linear-gradient(135deg, ${col.color}30, ${col.color}10)`,
-                                        color: col.color
-                                      }}
-                                    >
-                                      <GripVertical className="w-4 h-4" />
-                                    </div>
-                                  )}
-
-                                  <div className="flex-1 min-w-0">
-                                    {/* Número de trámite */}
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span
-                                        className="text-xs font-mono font-bold px-2 py-0.5 rounded"
-                                        style={{ backgroundColor: `${col.color}20`, color: col.color }}
-                                      >
-                                        {tramite.numero_tramite}
-                                      </span>
-                                      {!tramite.empleado_id && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600">
-                                          Sin asignar
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* Asunto */}
-                                    <p
-                                      className="font-medium line-clamp-2 text-sm mb-2"
-                                      style={{ color: theme.text }}
-                                    >
-                                      {tramite.asunto}
-                                    </p>
-
-                                    {/* Servicio */}
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <div
-                                        className="w-6 h-6 rounded flex items-center justify-center"
-                                        style={{ backgroundColor: `${tramite.servicio?.color || '#6b7280'}20` }}
-                                      >
-                                        <span style={{ color: tramite.servicio?.color || '#6b7280' }} className="scale-75">
-                                          {servicioIcons[tramite.servicio?.icono || ''] || servicioIcons.default}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs truncate" style={{ color: theme.textSecondary }}>
-                                        {tramite.servicio?.nombre || 'Sin servicio'}
-                                      </span>
-                                    </div>
-
-                                    {/* Footer: Solicitante y fecha */}
-                                    <div
-                                      className="flex items-center justify-between pt-2 border-t text-xs"
-                                      style={{ borderColor: `${col.color}20`, color: theme.textSecondary }}
-                                    >
-                                      <span className="truncate max-w-[100px]">
-                                        {tramite.nombre_solicitante || 'Anónimo'}
-                                      </span>
-                                      <span>
-                                        {new Date(tramite.created_at).toLocaleDateString('es-AR', {
-                                          day: '2-digit',
-                                          month: 'short'
-                                        })}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-
-                        {provided.placeholder}
-
-                        {getTramitesPorEstado(col.id).length === 0 && (
+                    {/* Badges de tipo y trámite */}
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {/* Tipo (nivel 1) */}
+                      <div
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                        style={{
+                          backgroundColor: `${tipoColor}15`,
+                          border: `1px solid ${tipoColor}40`,
+                        }}
+                      >
+                        <div
+                          className="w-5 h-5 rounded-full flex items-center justify-center"
+                          style={{ backgroundColor: tipoColor }}
+                        >
+                          <span style={{ color: '#ffffff' }} className="scale-75">
+                            {servicioIcons[tipoTramite?.icono || ''] || servicioIcons.default}
+                          </span>
+                        </div>
+                        <span className="text-xs font-semibold" style={{ color: tipoColor }}>
+                          {tipoTramite?.nombre || 'Sin tipo'}
+                        </span>
+                      </div>
+                      {/* Trámite (nivel 2) */}
+                      {t.tramite?.nombre && (
+                        <>
+                          <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>&gt;</span>
                           <div
-                            className="text-center py-12 rounded-lg border-2 border-dashed transition-all"
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
                             style={{
-                              borderColor: `${col.color}40`,
-                              color: theme.textSecondary,
-                              background: `linear-gradient(135deg, ${col.color}05, ${col.color}10)`,
+                              backgroundColor: `${theme.primary}15`,
+                              border: `1px solid ${theme.primary}40`,
                             }}
                           >
                             <div
-                              className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                              style={{ background: `linear-gradient(135deg, ${col.color}20, ${col.color}10)` }}
+                              className="w-5 h-5 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: theme.primary }}
                             >
-                              <FileText className="w-6 h-6" style={{ color: col.color }} />
+                              <FileText className="h-3 w-3" style={{ color: '#ffffff' }} />
                             </div>
-                            <p className="text-sm font-medium">Sin trámites</p>
-                            {canDrag && (
-                              <p className="text-xs mt-1 opacity-70">Arrastra aquí para mover</p>
-                            )}
+                            <span className="text-xs font-semibold" style={{ color: theme.primary }}>
+                              {t.tramite.nombre}
+                            </span>
                           </div>
+                        </>
+                      )}
+                      <span className="text-xs" style={{ color: theme.textSecondary }}>#{t.id}</span>
+                    </div>
+
+                    {/* Asunto */}
+                    <p className="font-medium line-clamp-2 text-sm mb-2" style={{ color: theme.text }}>
+                      {t.asunto}
+                    </p>
+
+                    {/* Solicitante */}
+                    <div className="flex items-center text-sm" style={{ color: theme.textSecondary }}>
+                      <User className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                      <span className="line-clamp-1">
+                        {t.nombre_solicitante} {t.apellido_solicitante}
+                      </span>
+                    </div>
+
+                    {/* Footer */}
+                    <div
+                      className="flex items-center justify-between mt-4 pt-4 text-xs"
+                      style={{ borderTop: `1px solid ${theme.border}`, color: theme.textSecondary }}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="flex items-center">
+                          <CalendarDays className="h-3 w-3 mr-1" />
+                          {new Date(t.created_at).toLocaleDateString()}
+                        </span>
+                        {!t.empleado_id && (
+                          <span
+                            className="px-2 py-0.5 rounded-full text-xs"
+                            style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
+                          >
+                            Sin asignar
+                          </span>
                         )}
                       </div>
+                      <div className="flex items-center gap-2">
+                        {t.empleado_asignado && (
+                          <span style={{ color: theme.primary }} className="font-medium">
+                            {t.empleado_asignado.nombre}
+                          </span>
+                        )}
+                        <Eye className="h-4 w-4" style={{ color: theme.primary }} />
+                      </div>
                     </div>
-                  )}
-                </Droppable>
-              ))}
-            </div>
-          </DragDropContext>
-        </>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       )}
 
       {/* Vista Tabla */}
       {viewMode === 'tabla' && (
         <div
-          className="rounded-xl overflow-hidden"
+          className="rounded-xl overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300"
           style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
         >
           <div className="overflow-x-auto">
@@ -963,7 +882,10 @@ export default function GestionTramites() {
                     NÚMERO
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
-                    SERVICIO
+                    TIPO
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
+                    TRÁMITE
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
                     SOLICITANTE
@@ -988,7 +910,7 @@ export default function GestionTramites() {
               <tbody>
                 {filteredTramites.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-12">
+                    <td colSpan={9} className="text-center py-12">
                       <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: theme.textSecondary }} />
                       <p style={{ color: theme.textSecondary }}>No hay trámites</p>
                     </td>
@@ -997,6 +919,8 @@ export default function GestionTramites() {
                   filteredTramites.map(tramite => {
                     const config = estadoConfig[tramite.estado] || estadoConfig.iniciado;
                     const IconEstado = config.icon;
+                    const tipoTramiteTabla = tramite.tramite?.tipo_tramite;
+                    const tipoColorTabla = tipoTramiteTabla?.color || theme.primary;
                     return (
                       <tr
                         key={tramite.id}
@@ -1013,16 +937,21 @@ export default function GestionTramites() {
                           <div className="flex items-center gap-2">
                             <div
                               className="w-7 h-7 rounded flex items-center justify-center"
-                              style={{ backgroundColor: `${tramite.servicio?.color || theme.primary}20` }}
+                              style={{ backgroundColor: `${tipoColorTabla}20` }}
                             >
-                              <span style={{ color: tramite.servicio?.color || theme.primary }}>
-                                {servicioIcons[tramite.servicio?.icono || ''] || servicioIcons.default}
+                              <span style={{ color: tipoColorTabla }}>
+                                {servicioIcons[tipoTramiteTabla?.icono || ''] || servicioIcons.default}
                               </span>
                             </div>
                             <span className="text-sm" style={{ color: theme.text }}>
-                              {tramite.servicio?.nombre || 'Sin servicio'}
+                              {tipoTramiteTabla?.nombre || 'Sin tipo'}
                             </span>
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm" style={{ color: theme.text }}>
+                            {tramite.tramite?.nombre || '-'}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <div>
@@ -1124,33 +1053,39 @@ export default function GestionTramites() {
               })()}
             </div>
 
-            {/* Servicio */}
-            <div
-              className="p-4 rounded-xl"
-              style={{
-                backgroundColor: `${selectedTramite.servicio?.color || theme.primary}10`,
-                border: `1px solid ${selectedTramite.servicio?.color || theme.primary}30`
-              }}
-            >
-              <div className="flex items-center gap-3">
+            {/* Tipo de trámite */}
+            {(() => {
+              const tipoDetalle = selectedTramite.tramite?.tipo_tramite;
+              const colorDetalle = tipoDetalle?.color || theme.primary;
+              return (
                 <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${selectedTramite.servicio?.color || theme.primary}20` }}
+                  className="p-4 rounded-xl"
+                  style={{
+                    backgroundColor: `${colorDetalle}10`,
+                    border: `1px solid ${colorDetalle}30`
+                  }}
                 >
-                  <span style={{ color: selectedTramite.servicio?.color || theme.primary }}>
-                    {servicioIcons[selectedTramite.servicio?.icono || ''] || servicioIcons.default}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${colorDetalle}20` }}
+                    >
+                      <span style={{ color: colorDetalle }}>
+                        {servicioIcons[tipoDetalle?.icono || ''] || servicioIcons.default}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium" style={{ color: theme.text }}>
+                        {tipoDetalle?.nombre || selectedTramite.tramite?.nombre || 'Sin tipo'}
+                      </p>
+                      <p className="text-xs" style={{ color: theme.textSecondary }}>
+                        Tipo de trámite
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium" style={{ color: theme.text }}>
-                    {selectedTramite.servicio?.nombre || 'Servicio no especificado'}
-                  </p>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>
-                    Tipo de trámite
-                  </p>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Asunto y descripción */}
             <div>
@@ -1227,104 +1162,139 @@ export default function GestionTramites() {
               </div>
             </div>
 
-            {/* Asignación de empleado */}
-            <div
-              className="p-4 rounded-xl"
-              style={{ backgroundColor: theme.backgroundSecondary }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium" style={{ color: theme.text }}>
-                  Empleado Asignado
-                </h3>
-                <button
-                  onClick={handleSugerirEmpleado}
-                  disabled={loadingSugerencia}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{
-                    background: `linear-gradient(135deg, #8b5cf6, #7c3aed)`,
-                    color: '#ffffff',
-                  }}
-                >
-                  {loadingSugerencia ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-3 w-3" />
-                  )}
-                  Sugerir con IA
-                </button>
-              </div>
+            {/* Asignación de empleado - Solo si no está en proceso/finalizado/rechazado */}
+            {(() => {
+              const estadosBloqueados: EstadoTramite[] = ['en_proceso', 'aprobado', 'finalizado', 'rechazado'];
+              const tramiteCerrado = estadosBloqueados.includes(selectedTramite.estado);
 
-              {/* Sugerencia de IA */}
-              {sugerenciaIA && sugerenciaIA.sugerencia && (
+              return (
                 <div
-                  className="mb-3 p-3 rounded-lg"
-                  style={{ backgroundColor: '#8b5cf620', border: '1px solid #8b5cf640' }}
+                  className="p-4 rounded-xl"
+                  style={{ backgroundColor: theme.backgroundSecondary }}
                 >
-                  <div className="flex items-start gap-2">
-                    <Sparkles className="h-4 w-4 mt-0.5" style={{ color: '#8b5cf6' }} />
-                    <div>
-                      <p className="text-sm font-medium" style={{ color: theme.text }}>
-                        {sugerenciaIA.sugerencia.nombre}
-                      </p>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium" style={{ color: theme.text }}>
+                      Empleado Asignado
+                    </h3>
+                    {!tramiteCerrado && (
+                      <button
+                        onClick={handleSugerirEmpleado}
+                        disabled={loadingSugerencia}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                        style={{
+                          background: `linear-gradient(135deg, #8b5cf6, #7c3aed)`,
+                          color: '#ffffff',
+                        }}
+                      >
+                        {loadingSugerencia ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3 w-3" />
+                        )}
+                        Sugerir con IA
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Empleado actual */}
+                  {selectedTramite.empleado_asignado && (
+                    <div className="flex items-center gap-2 mb-3">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
+                        style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                      >
+                        {selectedTramite.empleado_asignado.nombre?.[0]}{selectedTramite.empleado_asignado.apellido?.[0]}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: theme.text }}>
+                          {selectedTramite.empleado_asignado.nombre} {selectedTramite.empleado_asignado.apellido}
+                        </p>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>
+                          {tramiteCerrado ? 'Responsable del trámite' : 'Actualmente asignado'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Controles de asignación - Solo si el trámite no está cerrado */}
+                  {tramiteCerrado ? (
+                    <div
+                      className="p-3 rounded-lg text-center"
+                      style={{ backgroundColor: `${theme.border}30` }}
+                    >
                       <p className="text-xs" style={{ color: theme.textSecondary }}>
-                        {sugerenciaIA.mensaje}
-                      </p>
-                      <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                        Carga: {sugerenciaIA.sugerencia.carga_actual}/{sugerenciaIA.sugerencia.capacidad_maxima} trámites
+                        No se puede modificar la asignación de un trámite {
+                          selectedTramite.estado === 'en_proceso' ? 'en proceso' :
+                          selectedTramite.estado === 'aprobado' ? 'aprobado' :
+                          selectedTramite.estado === 'finalizado' ? 'finalizado' : 'rechazado'
+                        }
                       </p>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <select
-                  value={empleadoSeleccionado}
-                  onChange={(e) => setEmpleadoSeleccionado(e.target.value ? Number(e.target.value) : '')}
-                  className="flex-1 px-3 py-2 rounded-lg text-sm"
-                  style={{
-                    backgroundColor: theme.card,
-                    border: `1px solid ${theme.border}`,
-                    color: theme.text,
-                  }}
-                >
-                  <option value="">Seleccionar empleado...</option>
-                  {empleados.map(e => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre} {e.apellido} {e.especialidad ? `(${e.especialidad})` : ''}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={handleAsignarEmpleado}
-                  disabled={!empleadoSeleccionado || asignando}
-                  className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
-                  style={{
-                    background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                    color: '#ffffff',
-                  }}
-                >
-                  {asignando ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <UserPlus className="h-4 w-4" />
-                  )}
-                  Asignar
-                </button>
-              </div>
+                    <>
+                      {/* Sugerencia de IA */}
+                      {sugerenciaIA && sugerenciaIA.sugerencia && (
+                        <div
+                          className="mb-3 p-3 rounded-lg"
+                          style={{ backgroundColor: '#8b5cf620', border: '1px solid #8b5cf640' }}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Sparkles className="h-4 w-4 mt-0.5" style={{ color: '#8b5cf6' }} />
+                            <div>
+                              <p className="text-sm font-medium" style={{ color: theme.text }}>
+                                {sugerenciaIA.sugerencia.nombre}
+                              </p>
+                              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                                {sugerenciaIA.mensaje}
+                              </p>
+                              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                                Carga: {sugerenciaIA.sugerencia.carga_actual}/{sugerenciaIA.sugerencia.capacidad_maxima} trámites
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
-              {/* Empleado actual */}
-              {selectedTramite.empleado_asignado && (
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>
-                    Actualmente asignado a:
-                  </span>
-                  <span className="text-sm font-medium" style={{ color: theme.text }}>
-                    {selectedTramite.empleado_asignado.nombre} {selectedTramite.empleado_asignado.apellido}
-                  </span>
+                      <div className="flex gap-2">
+                        <select
+                          value={empleadoSeleccionado}
+                          onChange={(e) => setEmpleadoSeleccionado(e.target.value ? Number(e.target.value) : '')}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm"
+                          style={{
+                            backgroundColor: theme.card,
+                            border: `1px solid ${theme.border}`,
+                            color: theme.text,
+                          }}
+                        >
+                          <option value="">Seleccionar empleado...</option>
+                          {empleados.map(e => (
+                            <option key={e.id} value={e.id}>
+                              {e.nombre} {e.apellido} {e.especialidad ? `(${e.especialidad})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={handleAsignarEmpleado}
+                          disabled={!empleadoSeleccionado || asignando}
+                          className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                          style={{
+                            background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
+                            color: '#ffffff',
+                          }}
+                        >
+                          {asignando ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserPlus className="h-4 w-4" />
+                          )}
+                          Asignar
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* Fechas */}
             <div className="flex gap-4">
@@ -1427,7 +1397,7 @@ export default function GestionTramites() {
             </div>
 
             {/* Actualizar estado */}
-            {estadoTransiciones[selectedTramite.estado].length > 0 && (
+            {(estadoTransiciones[selectedTramite.estado]?.length || 0) > 0 && (
               <div
                 className="p-4 rounded-xl"
                 style={{ backgroundColor: theme.backgroundSecondary }}
@@ -1560,45 +1530,6 @@ export default function GestionTramites() {
         tipos={tipos}
         onSuccess={loadData}
       />
-    </div>
-  );
-}
-
-// Componente StatCard
-function StatCard({
-  theme,
-  icon,
-  label,
-  value,
-  color
-}: {
-  theme: ReturnType<typeof useTheme>['theme'];
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  color: string;
-}) {
-  return (
-    <div
-      className="rounded-xl p-4"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: `${color}15` }}
-        >
-          <span style={{ color }}>{icon}</span>
-        </div>
-        <div>
-          <p className="text-2xl font-bold" style={{ color: theme.text }}>
-            {value}
-          </p>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>
-            {label}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
