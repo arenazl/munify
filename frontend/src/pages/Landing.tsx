@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, Wrench, User, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute, isMobileDevice } from '../config/navigation';
+import { getDefaultRoute } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
 
 interface Municipio {
@@ -84,7 +84,7 @@ export default function Landing() {
     fetchMunicipios();
   }, []);
 
-  // Auto-redirigir a /app si viene desde subdominio o query param de municipio
+  // Auto-redirigir a /home si viene desde subdominio o query param de municipio
   useEffect(() => {
     if (municipioFromUrl && municipios.length > 0) {
       const found = municipios.find(m => m.codigo.toLowerCase() === municipioFromUrl.toLowerCase());
@@ -97,8 +97,8 @@ export default function Landing() {
         if (found.logo_url) {
           localStorage.setItem('municipio_logo_url', found.logo_url);
         }
-        // Redirigir directo a la app del vecino
-        navigate('/app');
+        // Redirigir a la landing publica responsiva
+        navigate('/home');
       }
     }
   }, [municipioFromUrl, municipios, navigate]);
@@ -217,7 +217,7 @@ export default function Landing() {
 
   // Ir al dashboard público sin login
   const irADashboardPublico = () => {
-    navigate('/publico');
+    navigate('/home');
   };
 
   // Volver a la selección de municipio
@@ -395,7 +395,7 @@ export default function Landing() {
                           </div>
                         </div>
                         <button
-                          onClick={() => navigate(isMobileDevice() ? '/app' : '/publico')}
+                          onClick={() => navigate('/home')}
                           disabled={debugLoading}
                           className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg shadow-green-500/25 disabled:opacity-50"
                         >

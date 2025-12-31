@@ -20,6 +20,11 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
 /* Clases utilitarias para usar el tema */
 .bg-theme-primary {
   background-color: var(--bg-primary);

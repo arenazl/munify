@@ -5,7 +5,7 @@ import RootRedirect from './components/RootRedirect';
 
 // Pages
 import Landing from './pages/Landing';
-import DashboardPublico from './pages/DashboardPublico';
+import HomePublic from './pages/HomePublic';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -34,6 +34,7 @@ import Ajustes from './pages/Ajustes';
 import MiRendimiento from './pages/MiRendimiento';
 import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
+import Onboarding from './pages/Onboarding';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -43,14 +44,11 @@ import DemoMinimal from './pages/demos/DemoMinimal';
 import DemoBento from './pages/demos/DemoBento';
 import DemoCyberpunk from './pages/demos/DemoCyberpunk';
 
-// Mobile App para ciudadanos
+// Mobile App para ciudadanos (rutas legacy, redirigen a /home o usan componentes específicos)
 import MobileLayout from './layouts/MobileLayout';
 import {
-  MobileHome,
   MobileMisReclamos,
   MobilePerfil,
-  MobileLogin,
-  MobileRegister,
   MobileNuevoReclamo,
   MobileNuevoTramite,
   MobileLogros,
@@ -68,11 +66,13 @@ export const router = createBrowserRouter([
   { path: '/demos/cyberpunk', element: <DemoCyberpunk /> },
 
   // === APP MOBILE PARA CIUDADANOS ===
+  // /app ahora redirige a /home (página responsiva unificada)
+  { path: '/app', element: <Navigate to="/home" replace /> },
+  // Sub-rutas de /app que aún se usan
   {
     path: '/app',
     element: <MobileLayout />,
     children: [
-      { index: true, element: <MobileHome /> },
       { path: 'mis-reclamos', element: <MobileMisReclamos /> },
       { path: 'logros', element: <MobileLogros /> },
       { path: 'perfil', element: <MobilePerfil /> },
@@ -85,17 +85,19 @@ export const router = createBrowserRouter([
   { path: '/app/tramites', element: <Tramites /> },
   { path: '/app/tramites/nuevo', element: <MobileNuevoTramite /> },
   { path: '/app/mis-tramites', element: <MisTramites /> },
-  { path: '/app/login', element: <MobileLogin /> },
-  { path: '/app/register', element: <MobileRegister /> },
+  { path: '/app/login', element: <Navigate to="/login" replace /> },
+  { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
   { path: '/bienvenido', element: <Landing /> },
-  { path: '/publico', element: <DashboardPublico /> },
+  { path: '/home', element: <HomePublic /> },
+  { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
   { path: '/nuevo-reclamo', element: <NuevoReclamo /> },
   { path: '/tramites', element: <Tramites /> },
   { path: '/calificar/:id', element: <CalificarReclamo /> },  // Link directo desde WhatsApp
+  { path: '/onboarding', element: <Onboarding /> },  // Wizard post-registro
 
   // === RUTA RAÍZ - Redirección inteligente ===
   { path: '/', element: <RootRedirect /> },

@@ -55,7 +55,13 @@ export default function Register() {
         localStorage.removeItem('pending_reclamo');
         navigate('/nuevo-reclamo');
       } else {
-        navigate(getDefaultRoute('vecino'));
+        // Ir al onboarding para configurar PWA y notificaciones
+        const onboardingCompleted = localStorage.getItem('onboarding_completed');
+        if (onboardingCompleted === 'true') {
+          navigate(getDefaultRoute('vecino'));
+        } else {
+          navigate('/onboarding');
+        }
       }
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
