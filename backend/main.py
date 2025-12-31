@@ -1,13 +1,14 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from contextlib import asynccontextmanager
 import time
 import os
 from pathlib import Path
 import sentry_sdk
 from slowapi.errors import RateLimitExceeded
+import traceback
 
 from core.database import init_db
 from core.config import settings
@@ -52,6 +53,16 @@ app = FastAPI(
 # Rate Limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+# Capturar excepciones no manejadas
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_detail = traceback.format_exc()
+    print(f"ERROR in {request.url.path}:\n{error_detail}", flush=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": error_detail}
+    )
 
 # CORS
 cors_origins = settings.cors_origins_list
