@@ -1004,23 +1004,46 @@ async def asignar_reclamo(
 
     await db.commit()
 
-    # Notificaciones en background (no bloquean respuesta)
-    # Notificación WhatsApp: comentado por lentitud
-    # asyncio.create_task(enviar_notificacion_whatsapp(db, reclamo, 'reclamo_asignado', current_user.municipio_id))
-
-    # Notificación Push al VECINO: reclamo asignado
-    asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_asignado', empleado_nombre=f"Empleado #{data.empleado_id}"))
+    # Guardar IDs antes de cerrar la sesión para usar en background tasks
+    reclamo_id_for_push = reclamo.id
+    empleado_id_for_push = data.empleado_id
+    creador_id_for_push = reclamo.creador_id
 
     # Notificación Push al EMPLEADO: nueva asignación
-    # Buscar el user_id del empleado asignado
-    from models.empleado import Empleado
+    # Buscar el user_id del empleado asignado (antes de cerrar la sesión)
     empleado_result = await db.execute(
         select(User).where(User.empleado_id == data.empleado_id)
     )
     empleado_user = empleado_result.scalar_one_or_none()
-    if empleado_user:
-        from services.push_service import notificar_asignacion_empleado
-        asyncio.create_task(notificar_asignacion_empleado(db, empleado_user.id, reclamo))
+    empleado_user_id = empleado_user.id if empleado_user else None
+
+    # Enviar notificaciones en background con nueva sesión
+    async def enviar_push_asignacion():
+        from core.database import AsyncSessionLocal
+        from services.push_service import notificar_asignacion_empleado, send_push_to_user
+        try:
+            async with AsyncSessionLocal() as new_db:
+                # Notificar al vecino
+                await send_push_to_user(
+                    new_db,
+                    creador_id_for_push,
+                    "Reclamo Asignado",
+                    f"Tu reclamo #{reclamo_id_for_push} fue asignado a un empleado.",
+                    f"/reclamos/{reclamo_id_for_push}",
+                    data={"tipo": "reclamo_asignado", "reclamo_id": reclamo_id_for_push}
+                )
+                # Notificar al empleado
+                if empleado_user_id:
+                    # Recargar el reclamo en la nueva sesión
+                    result = await new_db.execute(select(Reclamo).where(Reclamo.id == reclamo_id_for_push))
+                    reclamo_fresh = result.scalar_one_or_none()
+                    if reclamo_fresh:
+                        await notificar_asignacion_empleado(new_db, empleado_user_id, reclamo_fresh)
+                print(f"[PUSH] Notificaciones de asignación enviadas para reclamo #{reclamo_id_for_push}", flush=True)
+        except Exception as e:
+            print(f"[PUSH] Error en background task: {e}", flush=True)
+
+    asyncio.create_task(enviar_push_asignacion())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
