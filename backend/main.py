@@ -59,9 +59,32 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 async def global_exception_handler(request: Request, exc: Exception):
     error_detail = traceback.format_exc()
     print(f"ERROR in {request.url.path}:\n{error_detail}", flush=True)
+    # Agregar headers CORS a respuestas de error
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
     return JSONResponse(
         status_code=500,
-        content={"detail": str(exc), "traceback": error_detail}
+        content={"detail": str(exc), "traceback": error_detail},
+        headers=headers
+    )
+
+# Handler para HTTPException (401, 403, etc) con CORS
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers
     )
 
 # CORS

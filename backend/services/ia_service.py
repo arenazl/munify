@@ -452,7 +452,7 @@ async def clasificar_con_groq(texto: str, categorias: List[Dict]) -> Optional[Li
     """
     Clasificación usando Groq (API rápida con Llama) - alternativa a Gemini.
     """
-    if not settings.GROK_API_KEY:
+    if not settings.GROQ_API_KEY:
         return None
 
     # Construir lista de categorías
@@ -481,11 +481,11 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {settings.GROK_API_KEY}",
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": settings.GROK_MODEL,
+                    "model": settings.GROQ_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.1,
                     "max_tokens": 300,
@@ -534,7 +534,7 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
 
     if usar_ia:
         # Intentar Groq primero (más rápido)
-        if settings.GROK_API_KEY:
+        if settings.GROQ_API_KEY:
             ia_results = await clasificar_con_groq(texto, categorias)
             if ia_results:
                 ia_metodo = 'groq'
@@ -556,7 +556,7 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
         return {
             'sugerencias': local_results,
             'metodo_principal': 'local',
-            'ia_disponible': bool(settings.GROK_API_KEY or settings.GEMINI_API_KEY)
+            'ia_disponible': bool(settings.GROQ_API_KEY or settings.GEMINI_API_KEY)
         }
 
 

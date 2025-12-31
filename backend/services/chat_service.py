@@ -44,21 +44,21 @@ async def call_gemini(prompt: str, max_tokens: int = 500) -> Optional[str]:
 
 async def call_groq(prompt: str, max_tokens: int = 1000) -> Optional[str]:
     """Llama a Groq API como fallback"""
-    if not settings.GROK_API_KEY:
+    if not settings.GROQ_API_KEY:
         print("[GROQ] No API key configured")
         return None
 
     try:
-        print(f"[GROQ] Calling API with model: {settings.GROK_MODEL}")
+        print(f"[GROQ] Calling API with model: {settings.GROQ_MODEL}")
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": f"Bearer {settings.GROK_API_KEY}"
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}"
                 },
                 json={
-                    "model": settings.GROK_MODEL,
+                    "model": settings.GROQ_MODEL,
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": max_tokens,
                     "temperature": 0.7
@@ -136,4 +136,4 @@ def build_chat_context(
 
 def is_available() -> bool:
     """Verifica si al menos un proveedor de IA está disponible"""
-    return bool(settings.GEMINI_API_KEY or settings.GROK_API_KEY)
+    return bool(settings.GEMINI_API_KEY or settings.GROQ_API_KEY)

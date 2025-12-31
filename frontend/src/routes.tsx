@@ -36,6 +36,9 @@ import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
 import Onboarding from './pages/Onboarding';
 import MunicipioHome from './pages/MunicipioHome';
+import GestionCuadrillas from './pages/GestionCuadrillas';
+import GestionAusencias from './pages/GestionAusencias';
+import GestionHorarios from './pages/GestionHorarios';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -202,6 +205,19 @@ export const router = createBrowserRouter([
       {
         path: 'config-dashboard',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><ConfigDashboard /></ProtectedRoute>
+      },
+      // Gestion de Empleados (nuevos ABMs)
+      {
+        path: 'cuadrillas',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionCuadrillas /></ProtectedRoute>
+      },
+      {
+        path: 'ausencias',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionAusencias /></ProtectedRoute>
+      },
+      {
+        path: 'horarios',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionHorarios /></ProtectedRoute>
       },
     ],
   },

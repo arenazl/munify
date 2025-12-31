@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Time, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
@@ -33,6 +33,10 @@ class Empleado(Base):
     capacidad_maxima = Column(Integer, default=10)
     activo = Column(Boolean, default=True)
 
+    # Horario default (legacy, usar empleado_horarios para horarios por dia)
+    hora_entrada = Column(Time, nullable=True)
+    hora_salida = Column(Time, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -42,3 +46,10 @@ class Empleado(Base):
     reclamos_asignados = relationship("Reclamo", back_populates="empleado_asignado")
     solicitudes_asignadas = relationship("Solicitud", back_populates="empleado_asignado")
     categorias = relationship("Categoria", secondary=empleado_categoria, backref="empleados")
+
+    # Nuevas relaciones
+    cuadrillas_asignadas = relationship("EmpleadoCuadrilla", back_populates="empleado", cascade="all, delete-orphan")
+    ausencias = relationship("EmpleadoAusencia", back_populates="empleado", cascade="all, delete-orphan")
+    horarios = relationship("EmpleadoHorario", back_populates="empleado", cascade="all, delete-orphan")
+    metricas = relationship("EmpleadoMetrica", back_populates="empleado", cascade="all, delete-orphan")
+    capacitaciones = relationship("EmpleadoCapacitacion", back_populates="empleado", cascade="all, delete-orphan")

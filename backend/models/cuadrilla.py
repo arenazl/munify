@@ -38,3 +38,4 @@ class Cuadrilla(Base):
 
     # Relaciones
     categorias = relationship("Categoria", secondary=cuadrilla_categoria, backref="cuadrillas")
+    empleados_asignados = relationship("EmpleadoCuadrilla", back_populates="cuadrilla", cascade="all, delete-orphan")

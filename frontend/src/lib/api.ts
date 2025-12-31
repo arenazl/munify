@@ -649,3 +649,66 @@ export const noticiasApi = {
   update: (id: number, data: Record<string, unknown>) => api.put(`/noticias/${id}`, data),
   delete: (id: number) => api.delete(`/noticias/${id}`),
 };
+
+// Gestion de Empleados (cuadrillas, ausencias, horarios, metricas, capacitaciones)
+export const empleadosGestionApi = {
+  // Empleado-Cuadrilla
+  getCuadrillas: (params?: { empleado_id?: number; cuadrilla_id?: number; activo?: boolean }) =>
+    api.get('/empleados-gestion/cuadrillas', { params }),
+  asignarCuadrilla: (data: { empleado_id: number; cuadrilla_id: number; es_lider?: boolean }) =>
+    api.post('/empleados-gestion/cuadrillas', data),
+  updateAsignacionCuadrilla: (id: number, data: { es_lider?: boolean; activo?: boolean }) =>
+    api.put(`/empleados-gestion/cuadrillas/${id}`, data),
+  desasignarCuadrilla: (id: number) =>
+    api.delete(`/empleados-gestion/cuadrillas/${id}`),
+
+  // Ausencias
+  getAusencias: (params?: { empleado_id?: number; tipo?: string; aprobado?: boolean; fecha_desde?: string; fecha_hasta?: string }) =>
+    api.get('/empleados-gestion/ausencias', { params }),
+  createAusencia: (data: { empleado_id: number; tipo: string; fecha_inicio: string; fecha_fin: string; motivo?: string }) =>
+    api.post('/empleados-gestion/ausencias', data),
+  updateAusencia: (id: number, data: { tipo?: string; fecha_inicio?: string; fecha_fin?: string; motivo?: string; aprobado?: boolean }) =>
+    api.put(`/empleados-gestion/ausencias/${id}`, data),
+  deleteAusencia: (id: number) =>
+    api.delete(`/empleados-gestion/ausencias/${id}`),
+
+  // Horarios
+  getHorarios: (params?: { empleado_id?: number; activo?: boolean }) =>
+    api.get('/empleados-gestion/horarios', { params }),
+  createHorario: (data: { empleado_id: number; dia_semana: number; hora_entrada: string; hora_salida: string; activo?: boolean }) =>
+    api.post('/empleados-gestion/horarios', data),
+  updateHorario: (id: number, data: { hora_entrada?: string; hora_salida?: string; activo?: boolean }) =>
+    api.put(`/empleados-gestion/horarios/${id}`, data),
+  deleteHorario: (id: number) =>
+    api.delete(`/empleados-gestion/horarios/${id}`),
+  setHorariosSemana: (empleadoId: number, horarios: Array<{ empleado_id: number; dia_semana: number; hora_entrada: string; hora_salida: string; activo?: boolean }>) =>
+    api.post(`/empleados-gestion/horarios/bulk/${empleadoId}`, horarios),
+
+  // Metricas
+  getMetricas: (params?: { empleado_id?: number; periodo_desde?: string; periodo_hasta?: string }) =>
+    api.get('/empleados-gestion/metricas', { params }),
+  createMetrica: (data: Record<string, unknown>) =>
+    api.post('/empleados-gestion/metricas', data),
+
+  // Capacitaciones
+  getCapacitaciones: (params?: { empleado_id?: number; vigentes?: boolean }) =>
+    api.get('/empleados-gestion/capacitaciones', { params }),
+  createCapacitacion: (data: { empleado_id: number; nombre: string; descripcion?: string; institucion?: string; fecha_inicio?: string; fecha_fin?: string; fecha_vencimiento?: string; certificado_url?: string }) =>
+    api.post('/empleados-gestion/capacitaciones', data),
+  updateCapacitacion: (id: number, data: Record<string, unknown>) =>
+    api.put(`/empleados-gestion/capacitaciones/${id}`, data),
+  deleteCapacitacion: (id: number) =>
+    api.delete(`/empleados-gestion/capacitaciones/${id}`),
+
+  // Helper: companeros de cuadrilla
+  getCompaneros: (empleadoId: number) =>
+    api.get(`/empleados-gestion/companeros/${empleadoId}`),
+
+  // Cuadrillas (ABM basico - ya existe en /cuadrillas pero agregamos alias)
+  getCuadrillasAll: (params?: { activo?: boolean }) =>
+    api.get('/cuadrillas', { params }),
+  getCuadrilla: (id: number) => api.get(`/cuadrillas/${id}`),
+  createCuadrillaEntity: (data: Record<string, unknown>) => api.post('/cuadrillas', data),
+  updateCuadrillaEntity: (id: number, data: Record<string, unknown>) => api.put(`/cuadrillas/${id}`, data),
+  deleteCuadrillaEntity: (id: number) => api.delete(`/cuadrillas/${id}`),
+};

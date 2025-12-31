@@ -26,6 +26,8 @@ from .gamificacion import router as gamificacion_router
 from .noticias import router as noticias_router
 from .tramites import router as tramites_router
 from .push import router as push_router
+from .empleados_gestion import router as empleados_gestion_router
+from .cuadrillas import router as cuadrillas_router
 
 api_router = APIRouter()
 
@@ -35,6 +37,7 @@ api_router.include_router(users_router, prefix="/users", tags=["Usuarios"])
 api_router.include_router(categorias_router, prefix="/categorias", tags=["Categorías"])
 api_router.include_router(zonas_router, prefix="/zonas", tags=["Zonas"])
 api_router.include_router(empleados_router, prefix="/empleados", tags=["Empleados"])
+api_router.include_router(empleados_gestion_router, prefix="/empleados-gestion", tags=["Gestion Empleados"])
 api_router.include_router(reclamos_router, prefix="/reclamos", tags=["Reclamos"])
 api_router.include_router(configuracion_router, prefix="/configuracion", tags=["Configuración"])
 api_router.include_router(notificaciones_router, prefix="/notificaciones", tags=["Notificaciones"])
@@ -55,6 +58,7 @@ api_router.include_router(gamificacion_router, prefix="/gamificacion", tags=["Ga
 api_router.include_router(noticias_router, prefix="/noticias", tags=["Noticias"])
 api_router.include_router(tramites_router, prefix="/tramites", tags=["Trámites"])
 api_router.include_router(push_router, tags=["Push Notifications"])
+api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
 
 # WebSockets
 from .ws import router as ws_router

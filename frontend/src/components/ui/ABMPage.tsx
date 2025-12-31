@@ -10,6 +10,7 @@ interface ABMPageProps {
   // Header
   title: string;
   buttonLabel?: string;
+  buttonIcon?: ReactNode;
   onAdd?: () => void;
 
   // Search
@@ -19,6 +20,7 @@ interface ABMPageProps {
 
   // Extra filters (opcional)
   extraFilters?: ReactNode;
+  filters?: ReactNode; // Alias para compatibilidad
 
   // Secondary filters bar (opcional - barra completa debajo del header)
   secondaryFilters?: ReactNode;
@@ -49,11 +51,13 @@ interface ABMPageProps {
 export function ABMPage({
   title,
   buttonLabel,
+  buttonIcon,
   onAdd,
   searchPlaceholder = 'Buscar...',
   searchValue,
   onSearchChange,
   extraFilters,
+  filters,
   secondaryFilters,
   children,
   emptyMessage = 'No se encontraron resultados',
@@ -68,6 +72,8 @@ export function ABMPage({
   tableView,
   defaultViewMode = 'table',
 }: ABMPageProps) {
+  // Combinar filters con extraFilters para compatibilidad
+  const allFilters = filters || extraFilters;
   const { theme } = useTheme();
   const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
   const [isSticky, setIsSticky] = useState(false);
@@ -248,12 +254,12 @@ export function ABMPage({
             }}
           >
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-            <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />
+            {buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
             {buttonLabel}
           </button>
 
           {/* Filtros extra - en mobile van debajo */}
-          {extraFilters && (
+          {allFilters && (
             <div className={`flex-shrink-0 abm-filter-wrapper overflow-x-auto transition-all duration-300 hidden sm:block`} style={{ scrollbarWidth: 'none' }}>
               <style>{`
                 .abm-filter-wrapper select {
@@ -277,7 +283,7 @@ export function ABMPage({
                   box-shadow: 0 0 0 3px ${theme.primary}30;
                 }
               `}</style>
-              {extraFilters}
+              {allFilters}
             </div>
           )}
 
@@ -303,14 +309,14 @@ export function ABMPage({
               }}
             >
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-              <Plus className="h-4 w-4 mr-1.5" />
+              {buttonIcon || <Plus className="h-4 w-4 mr-1.5" />}
               {buttonLabel}
             </button>
 
             {/* Filtros extra - scroll horizontal en mobile */}
-            {extraFilters && (
+            {allFilters && (
               <div className="overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {extraFilters}
+                {allFilters}
               </div>
             )}
           </div>
@@ -638,9 +644,12 @@ export function ABMSheetFooter({ onCancel, onSave, saving = false, saveLabel = '
 interface ABMBadgeProps {
   active?: boolean;
   label?: string;
+  activeLabel?: string;
+  inactiveLabel?: string;
 }
 
-export function ABMBadge({ active = true, label }: ABMBadgeProps) {
+export function ABMBadge({ active = true, label, activeLabel, inactiveLabel }: ABMBadgeProps) {
+  const displayLabel = label || (active ? (activeLabel || 'Activo') : (inactiveLabel || 'Inactivo'));
   return (
     <span className={`
       px-3 py-1 text-xs font-semibold rounded-full
@@ -652,7 +661,7 @@ export function ABMBadge({ active = true, label }: ABMBadgeProps) {
       shadow-sm
     `}>
       <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${active ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-      {label || (active ? 'Activo' : 'Inactivo')}
+      {displayLabel}
     </span>
   );
 }

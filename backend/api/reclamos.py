@@ -286,7 +286,28 @@ async def get_reclamos(
     if current_user.rol == RolUsuario.VECINO:
         query = query.where(Reclamo.creador_id == current_user.id)
     elif current_user.rol == RolUsuario.EMPLEADO:
-        query = query.where(Reclamo.empleado_id == current_user.empleado_id)
+        # Empleado ve sus reclamos + los de su cuadrilla
+        from models.empleado_cuadrilla import EmpleadoCuadrilla
+
+        # Obtener IDs de cuadrillas del empleado
+        cuadrillas_subq = select(EmpleadoCuadrilla.cuadrilla_id).where(
+            EmpleadoCuadrilla.empleado_id == current_user.empleado_id,
+            EmpleadoCuadrilla.activo == True
+        )
+
+        # Obtener IDs de compañeros de cuadrilla
+        companeros_subq = select(EmpleadoCuadrilla.empleado_id).where(
+            EmpleadoCuadrilla.cuadrilla_id.in_(cuadrillas_subq),
+            EmpleadoCuadrilla.activo == True
+        )
+
+        # Filtrar: reclamos asignados al empleado O a compañeros de cuadrilla
+        query = query.where(
+            or_(
+                Reclamo.empleado_id == current_user.empleado_id,
+                Reclamo.empleado_id.in_(companeros_subq)
+            )
+        )
 
     # Filtros opcionales
     if estado:
@@ -414,7 +435,7 @@ async def cambiar_estado_reclamo_drag(
         # await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
         asyncio.create_task(enviar_notificacion_push(db, reclamo, 'cambio_estado',
                                   estado_anterior=estado_anterior.value,
-                                  estado_nuevo=estado_nuevo.value))
+                                  estado_nuevo=estado_enum.value))
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -987,8 +1008,19 @@ async def asignar_reclamo(
     # Notificación WhatsApp: comentado por lentitud
     # asyncio.create_task(enviar_notificacion_whatsapp(db, reclamo, 'reclamo_asignado', current_user.municipio_id))
 
-    # Notificación Push: reclamo asignado (en background)
+    # Notificación Push al VECINO: reclamo asignado
     asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_asignado', empleado_nombre=f"Empleado #{data.empleado_id}"))
+
+    # Notificación Push al EMPLEADO: nueva asignación
+    # Buscar el user_id del empleado asignado
+    from models.empleado import Empleado
+    empleado_result = await db.execute(
+        select(User).where(User.empleado_id == data.empleado_id)
+    )
+    empleado_user = empleado_result.scalar_one_or_none()
+    if empleado_user:
+        from services.push_service import notificar_asignacion_empleado
+        asyncio.create_task(notificar_asignacion_empleado(db, empleado_user.id, reclamo))
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()

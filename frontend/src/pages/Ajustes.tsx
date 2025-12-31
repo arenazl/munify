@@ -1,33 +1,190 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bell, MessageCircle, Users, Wrench, ChevronRight, FolderTree, MapPin, FileText, LayoutDashboard } from 'lucide-react';
+import {
+  Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
+  FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
+  CalendarOff, Clock, Building2, Check
+} from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPreferences from '../components/NotificationPreferences';
 
-type Tab = 'preferencias' | 'whatsapp' | 'usuarios' | 'empleados' | 'categorias' | 'zonas' | 'tipos-tramite' | 'dashboard';
+interface SettingCard {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+  link: string;
+  show: boolean;
+}
+
+interface SettingSection {
+  id: string;
+  title: string;
+  items: SettingCard[];
+}
 
 export default function Ajustes() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<Tab>('preferencias');
+  const [activeSection, setActiveSection] = useState<string>('general');
+  const [selectedItem, setSelectedItem] = useState<string | null>(null);
 
   const isAdmin = user?.rol === 'admin';
   const isSupervisor = user?.rol === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
 
-  const tabs: { id: Tab; label: string; icon: typeof Settings; show: boolean }[] = [
-    { id: 'preferencias', label: 'Notificaciones', icon: Bell, show: true },
-    { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle, show: isAdminOrSupervisor },
-    { id: 'usuarios', label: 'Usuarios', icon: Users, show: isAdminOrSupervisor },
-    { id: 'empleados', label: 'Empleados', icon: Wrench, show: isAdminOrSupervisor },
-    { id: 'categorias', label: 'Categorias', icon: FolderTree, show: isAdminOrSupervisor },
-    { id: 'zonas', label: 'Zonas', icon: MapPin, show: isAdminOrSupervisor },
-    { id: 'tipos-tramite', label: 'Tipos Trámite', icon: FileText, show: isAdminOrSupervisor },
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, show: isAdminOrSupervisor },
+  // Recuperar item seleccionado del localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('settings_selected_item');
+    if (saved) {
+      setSelectedItem(saved);
+      // También activar la sección correcta
+      const savedSection = localStorage.getItem('settings_selected_section');
+      if (savedSection) {
+        setActiveSection(savedSection);
+      }
+    }
+  }, []);
+
+  const sections: SettingSection[] = [
+    {
+      id: 'general',
+      title: 'General',
+      items: [
+        {
+          id: 'notificaciones',
+          label: 'Notificaciones',
+          description: 'Configura como recibir alertas y avisos',
+          icon: Bell,
+          color: '#3b82f6',
+          link: '',
+          show: true
+        },
+        {
+          id: 'whatsapp',
+          label: 'WhatsApp',
+          description: 'Integracion con WhatsApp Business',
+          icon: MessageCircle,
+          color: '#25D366',
+          link: '/gestion/whatsapp',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          description: 'Personaliza los dashboards por rol',
+          icon: LayoutDashboard,
+          color: '#8b5cf6',
+          link: '/gestion/config-dashboard',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'branding',
+          label: 'Branding',
+          description: 'Logo, colores y personalizacion',
+          icon: Building2,
+          color: '#ec4899',
+          link: '/gestion/branding',
+          show: isAdmin
+        }
+      ]
+    },
+    {
+      id: 'usuarios',
+      title: 'Usuarios y Empleados',
+      items: [
+        {
+          id: 'usuarios',
+          label: 'Usuarios',
+          description: 'Vecinos, supervisores y administradores',
+          icon: Users,
+          color: '#3b82f6',
+          link: '/gestion/usuarios',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'empleados',
+          label: 'Empleados',
+          description: 'Equipos de trabajo y especialidades',
+          icon: Wrench,
+          color: '#f59e0b',
+          link: '/gestion/empleados',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'cuadrillas',
+          label: 'Cuadrillas',
+          description: 'Grupos de trabajo y asignaciones',
+          icon: UsersRound,
+          color: '#10b981',
+          link: '/gestion/cuadrillas',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'ausencias',
+          label: 'Ausencias',
+          description: 'Vacaciones, licencias y permisos',
+          icon: CalendarOff,
+          color: '#ef4444',
+          link: '/gestion/ausencias',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'horarios',
+          label: 'Horarios',
+          description: 'Turnos y horarios de trabajo',
+          icon: Clock,
+          color: '#06b6d4',
+          link: '/gestion/horarios',
+          show: isAdminOrSupervisor
+        }
+      ]
+    },
+    {
+      id: 'catalogo',
+      title: 'Catalogos',
+      items: [
+        {
+          id: 'categorias',
+          label: 'Categorias',
+          description: 'Tipos de reclamos: alumbrado, bacheo, etc',
+          icon: FolderTree,
+          color: '#8b5cf6',
+          link: '/gestion/categorias',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'zonas',
+          label: 'Zonas',
+          description: 'Barrios y areas del municipio',
+          icon: MapPin,
+          color: '#06b6d4',
+          link: '/gestion/zonas',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'tipos-tramite',
+          label: 'Tipos de Tramite',
+          description: 'Habilitaciones, permisos, licencias',
+          icon: FileText,
+          color: '#10b981',
+          link: '/gestion/tipos-tramite',
+          show: isAdminOrSupervisor
+        }
+      ]
+    }
   ];
 
-  const visibleTabs = tabs.filter(t => t.show);
+  const visibleSections = sections.map(section => ({
+    ...section,
+    items: section.items.filter(item => item.show)
+  })).filter(section => section.items.length > 0);
+
+  const sectionTabs = visibleSections.map(s => ({ id: s.id, title: s.title }));
+
+  const currentSection = visibleSections.find(s => s.id === activeSection) || visibleSections[0];
 
   return (
     <div className="space-y-6">
@@ -51,269 +208,110 @@ export default function Ajustes() {
               Ajustes
             </h1>
             <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Preferencias y configuracion del sistema
+              Configuracion del sistema y preferencias
             </p>
           </div>
         </div>
       </div>
 
-      {/* Tabs Navigation */}
+      {/* Section Tabs */}
       <div
         className="flex gap-2 p-1.5 rounded-xl overflow-x-auto"
         style={{ backgroundColor: theme.backgroundSecondary }}
       >
-        {visibleTabs.map(tab => (
+        {sectionTabs.map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setActiveSection(tab.id)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all"
             style={{
-              backgroundColor: activeTab === tab.id ? theme.card : 'transparent',
-              color: activeTab === tab.id ? theme.primary : theme.textSecondary,
-              boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              backgroundColor: activeSection === tab.id ? theme.card : 'transparent',
+              color: activeSection === tab.id ? theme.primary : theme.textSecondary,
+              boxShadow: activeSection === tab.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
             }}
           >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
+            {tab.title}
           </button>
         ))}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'preferencias' && (
-        <NotificationPreferences />
-      )}
+      {/* Section Content */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {currentSection?.items.map(item => {
+          // Notificaciones es especial, se muestra inline
+          if (item.id === 'notificaciones') {
+            return (
+              <div
+                key={item.id}
+                className="md:col-span-2 lg:col-span-3"
+              >
+                <NotificationPreferences />
+              </div>
+            );
+          }
 
-      {activeTab === 'whatsapp' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#25D36620' }}
-            >
-              <MessageCircle className="h-8 w-8" style={{ color: '#25D366' }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Configuracion de WhatsApp Business
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Configura la integracion con WhatsApp para enviar notificaciones automaticas a vecinos, empleados y supervisores.
-            </p>
+          const isSelected = selectedItem === item.id;
+
+          return (
             <Link
-              to="/gestion/whatsapp"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
+              key={item.id}
+              to={item.link}
+              onClick={() => {
+                setSelectedItem(item.id);
+                localStorage.setItem('settings_selected_item', item.id);
+                localStorage.setItem('settings_selected_section', activeSection);
+              }}
+              className="group relative rounded-xl p-5 transition-all hover:shadow-lg overflow-hidden"
               style={{
-                backgroundColor: '#25D366',
-                color: '#ffffff',
+                backgroundColor: theme.card,
+                border: isSelected ? `2px solid ${item.color}` : `1px solid ${theme.border}`,
+                boxShadow: isSelected ? `0 0 0 3px ${item.color}20` : 'none',
               }}
             >
-              Ir a Configuracion
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
+              {/* Linea indicadora lateral cuando esta seleccionado */}
+              {isSelected && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-1"
+                  style={{ backgroundColor: item.color }}
+                />
+              )}
 
-      {activeTab === 'usuarios' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <Users className="h-8 w-8" style={{ color: theme.primary }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Gestion de Usuarios
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Administra los usuarios del sistema: vecinos, supervisores y administradores.
-            </p>
-            <Link
-              to="/gestion/usuarios"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
-              style={{
-                backgroundColor: theme.primary,
-                color: '#ffffff',
-              }}
-            >
-              Ir a Usuarios
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
+              {/* Badge de seleccionado */}
+              {isSelected && (
+                <div
+                  className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: item.color }}
+                >
+                  <Check className="h-3 w-3 text-white" />
+                </div>
+              )}
 
-      {activeTab === 'empleados' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#f59e0b20' }}
-            >
-              <Wrench className="h-8 w-8" style={{ color: '#f59e0b' }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Gestion de Empleados
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Administra los equipos de trabajo, asigna zonas y especialidades a cada empleado.
-            </p>
-            <Link
-              to="/gestion/empleados"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
-              style={{
-                backgroundColor: '#f59e0b',
-                color: '#ffffff',
-              }}
-            >
-              Ir a Empleados
-              <ChevronRight className="h-4 w-4" />
+              <div className="flex items-start gap-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+                  style={{ backgroundColor: `${item.color}20` }}
+                >
+                  <item.icon className="h-6 w-6" style={{ color: item.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold" style={{ color: isSelected ? item.color : theme.text }}>
+                      {item.label}
+                    </h3>
+                    <ChevronRight
+                      className="h-5 w-5 transition-transform group-hover:translate-x-1"
+                      style={{ color: isSelected ? item.color : theme.textSecondary }}
+                    />
+                  </div>
+                  <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                    {item.description}
+                  </p>
+                </div>
+              </div>
             </Link>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'categorias' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#8b5cf620' }}
-            >
-              <FolderTree className="h-8 w-8" style={{ color: '#8b5cf6' }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Gestion de Categorias
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Administra las categorias de reclamos: alumbrado, bacheo, limpieza, etc.
-            </p>
-            <Link
-              to="/gestion/categorias"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
-              style={{
-                backgroundColor: '#8b5cf6',
-                color: '#ffffff',
-              }}
-            >
-              Ir a Categorias
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'zonas' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#06b6d420' }}
-            >
-              <MapPin className="h-8 w-8" style={{ color: '#06b6d4' }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Gestion de Zonas
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Administra las zonas y barrios del municipio para asignar empleados.
-            </p>
-            <Link
-              to="/gestion/zonas"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
-              style={{
-                backgroundColor: '#06b6d4',
-                color: '#ffffff',
-              }}
-            >
-              Ir a Zonas
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'tipos-tramite' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: '#10b98120' }}
-            >
-              <FileText className="h-8 w-8" style={{ color: '#10b981' }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Gestion de Tipos de Tramite
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Administra los tipos de tramites disponibles: habilitaciones, permisos, licencias, etc.
-            </p>
-            <Link
-              to="/gestion/tipos-tramite"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
-              style={{
-                backgroundColor: '#10b981',
-                color: '#ffffff',
-              }}
-            >
-              Ir a Tipos de Tramite
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'dashboard' && (
-        <div
-          className="rounded-xl p-6"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="text-center py-8">
-            <div
-              className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <LayoutDashboard className="h-8 w-8" style={{ color: theme.primary }} />
-            </div>
-            <h3 className="font-medium mb-2" style={{ color: theme.text }}>
-              Configuracion del Dashboard
-            </h3>
-            <p className="text-sm mb-6 max-w-md mx-auto" style={{ color: theme.textSecondary }}>
-              Personaliza qué componentes ven los vecinos y empleados en sus dashboards.
-            </p>
-            <Link
-              to="/gestion/config-dashboard"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all hover:gap-3"
-              style={{
-                backgroundColor: theme.primary,
-                color: '#ffffff',
-              }}
-            >
-              Configurar Dashboard
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

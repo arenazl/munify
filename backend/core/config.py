@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-1.5-flash"
 
     # Groq (API rápida) - alternativa/fallback
-    GROK_API_KEY: str = ""
-    GROK_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
 
     # Pexels API (imagenes gratuitas)
     PEXELS_API_KEY: str = ""

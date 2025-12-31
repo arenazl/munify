@@ -32,11 +32,20 @@ class CuadrillaUpdate(BaseModel):
     categoria_principal_id: Optional[int] = None
     categoria_ids: Optional[List[int]] = None
 
-class MiembroSimple(BaseModel):
+class EmpleadoSimple(BaseModel):
     id: int
     nombre: str
     apellido: str
-    email: str
+
+    class Config:
+        from_attributes = True
+
+class EmpleadoCuadrillaSimple(BaseModel):
+    id: int
+    empleado_id: int
+    es_lider: bool = False
+    activo: bool = True
+    empleado: Optional[EmpleadoSimple] = None
 
     class Config:
         from_attributes = True
@@ -54,7 +63,7 @@ class CuadrillaResponse(BaseModel):
     categoria_principal_id: Optional[int] = None
     categoria_principal: Optional[CategoriaSimple] = None
     categorias: List[CategoriaSimple] = []
-    miembros: List[MiembroSimple] = []
+    empleados_asignados: List[EmpleadoCuadrillaSimple] = []
 
     class Config:
         from_attributes = True

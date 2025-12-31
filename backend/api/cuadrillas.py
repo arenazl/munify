@@ -7,6 +7,7 @@ from typing import List, Optional
 from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.cuadrilla import Cuadrilla
+from models.empleado_cuadrilla import EmpleadoCuadrilla
 from models.categoria import Categoria
 from models.user import User
 from schemas.cuadrilla import CuadrillaCreate, CuadrillaUpdate, CuadrillaResponse
@@ -92,7 +93,7 @@ async def get_cuadrillas(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     query = select(Cuadrilla).options(
-        selectinload(Cuadrilla.miembros),
+        selectinload(Cuadrilla.empleados_asignados).selectinload(EmpleadoCuadrilla.empleado),
         selectinload(Cuadrilla.categorias),
         selectinload(Cuadrilla.categoria_principal)
     ).where(Cuadrilla.municipio_id == current_user.municipio_id)
@@ -111,7 +112,7 @@ async def get_cuadrilla(
     result = await db.execute(
         select(Cuadrilla)
         .options(
-            selectinload(Cuadrilla.miembros),
+            selectinload(Cuadrilla.empleados_asignados).selectinload(EmpleadoCuadrilla.empleado),
             selectinload(Cuadrilla.categorias),
             selectinload(Cuadrilla.categoria_principal)
         )
@@ -149,7 +150,7 @@ async def create_cuadrilla(
     result = await db.execute(
         select(Cuadrilla)
         .options(
-            selectinload(Cuadrilla.miembros),
+            selectinload(Cuadrilla.empleados_asignados).selectinload(EmpleadoCuadrilla.empleado),
             selectinload(Cuadrilla.categorias),
             selectinload(Cuadrilla.categoria_principal)
         )
@@ -167,7 +168,7 @@ async def update_cuadrilla(
     result = await db.execute(
         select(Cuadrilla)
         .options(
-            selectinload(Cuadrilla.miembros),
+            selectinload(Cuadrilla.empleados_asignados).selectinload(EmpleadoCuadrilla.empleado),
             selectinload(Cuadrilla.categorias),
             selectinload(Cuadrilla.categoria_principal)
         )
@@ -199,7 +200,7 @@ async def update_cuadrilla(
     result = await db.execute(
         select(Cuadrilla)
         .options(
-            selectinload(Cuadrilla.miembros),
+            selectinload(Cuadrilla.empleados_asignados).selectinload(EmpleadoCuadrilla.empleado),
             selectinload(Cuadrilla.categorias),
             selectinload(Cuadrilla.categoria_principal)
         )
