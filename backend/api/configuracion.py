@@ -310,7 +310,7 @@ async def cargar_barrios_como_zonas(
 
 # ==================== RUTAS GENÉRICAS (deben ir AL FINAL) ====================
 
-@router.get("/", response_model=List[ConfiguracionResponse])
+@router.get("", response_model=List[ConfiguracionResponse])
 async def get_configuraciones(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
@@ -324,7 +324,7 @@ async def get_configuraciones(
     return result.scalars().all()
 
 
-@router.post("/", response_model=ConfiguracionResponse)
+@router.post("", response_model=ConfiguracionResponse)
 async def create_configuracion(
     data: ConfiguracionCreate,
     db: AsyncSession = Depends(get_db),

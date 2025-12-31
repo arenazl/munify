@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, Wrench, User } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
+import { API_URL } from '../lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -100,7 +101,7 @@ export default function Login() {
     rol: string;
   }>>([]);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  // API_URL importado desde lib/api.ts
 
   // Cargar usuarios demo desde la API
   useEffect(() => {

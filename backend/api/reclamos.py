@@ -246,7 +246,7 @@ def get_reclamos_query():
         selectinload(Reclamo.documentos)
     )
 
-@router.get("/", response_model=List[ReclamoResponse])
+@router.get("", response_model=List[ReclamoResponse])
 async def get_reclamos(
     request: Request,
     estado: Optional[EstadoReclamo] = None,
@@ -822,7 +822,7 @@ async def get_reclamo_historial(
     )
     return result.scalars().all()
 
-@router.post("/", response_model=ReclamoResponse)
+@router.post("", response_model=ReclamoResponse)
 async def create_reclamo(
     data: ReclamoCreate,
     db: AsyncSession = Depends(get_db),

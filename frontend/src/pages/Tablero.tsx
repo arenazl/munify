@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Search, GripVertical, Columns3 } from 'lucide-react';
+import { Search, GripVertical, Columns3, Calendar, X } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { Reclamo, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -52,10 +52,18 @@ const columnas: Columna[] = [
   },
 ];
 
+// Función helper para obtener fecha de hoy en formato YYYY-MM-DD
+const getTodayDate = () => {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+};
+
 export default function Tablero() {
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [fechaDesde, setFechaDesde] = useState(getTodayDate());
+  const [fechaHasta, setFechaHasta] = useState(getTodayDate());
   const { user } = useAuth();
   const { theme } = useTheme();
 
@@ -110,12 +118,24 @@ export default function Tablero() {
   const getReclamosPorEstado = (estado: EstadoReclamo) => {
     return reclamos
       .filter(r => r.estado === estado)
+      .filter(r => {
+        // Filtro por fecha
+        const fechaReclamo = new Date(r.created_at).toISOString().split('T')[0];
+        if (fechaDesde && fechaReclamo < fechaDesde) return false;
+        if (fechaHasta && fechaReclamo > fechaHasta) return false;
+        return true;
+      })
       .filter(r =>
         searchTerm === '' ||
         r.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.direccion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
       );
+  };
+
+  const limpiarFiltrosFecha = () => {
+    setFechaDesde('');
+    setFechaHasta('');
   };
 
   const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
@@ -159,12 +179,55 @@ export default function Tablero() {
           {/* Separador */}
           <div className="h-8 w-px hidden sm:block" style={{ backgroundColor: theme.border }} />
 
+          {/* Filtros de fecha */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Calendar className="w-4 h-4 hidden sm:block" style={{ color: theme.textSecondary }} />
+            <input
+              type="date"
+              value={fechaDesde}
+              onChange={(e) => setFechaDesde(e.target.value)}
+              className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
+              }}
+              title="Desde"
+            />
+            <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
+            <input
+              type="date"
+              value={fechaHasta}
+              onChange={(e) => setFechaHasta(e.target.value)}
+              className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: theme.text,
+              }}
+              title="Hasta"
+            />
+            {(fechaDesde || fechaHasta) && (
+              <button
+                onClick={limpiarFiltrosFecha}
+                className="p-1.5 rounded-lg hover:opacity-80 transition-opacity"
+                style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                title="Limpiar filtros de fecha"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Separador */}
+          <div className="h-8 w-px hidden lg:block" style={{ backgroundColor: theme.border }} />
+
           {/* Buscador - ocupa espacio disponible */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[150px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
             <input
               type="text"
-              placeholder="Buscar por título, dirección o categoría..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"

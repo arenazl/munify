@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export type ThemeName = 'dark' | 'light' | 'blue' | 'brown';
+export type ThemeName = 'dark' | 'light' | 'blue' | 'brown' | 'amber';
 
 interface Theme {
   name: ThemeName;
@@ -83,6 +83,22 @@ export const themes: Record<ThemeName, Theme> = {
     sidebarText: '#e8e4e0',
     sidebarTextSecondary: '#8a8078',
     contentBackground: '#1a1512',
+  },
+  amber: {
+    name: 'amber',
+    label: 'Ámbar',
+    background: '#fefdfb',
+    backgroundSecondary: '#fffbf5',
+    text: '#44403c',
+    textSecondary: '#78716c',
+    border: '#e7e0d8',
+    primary: '#d97706',
+    primaryHover: '#b45309',
+    card: '#fffaf3',
+    sidebar: '#44403c',
+    sidebarText: '#fef3e2',
+    sidebarTextSecondary: '#d6d3d1',
+    contentBackground: '#fefcf8',
   },
 };
 

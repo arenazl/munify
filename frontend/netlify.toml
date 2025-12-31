@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  VITE_API_URL = "https://reclamos-mun-api-aedc8e147cbe.herokuapp.com/api"
 
 # Redirects para SPA (React Router)
 [[redirects]]

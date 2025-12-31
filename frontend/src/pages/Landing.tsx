@@ -5,6 +5,7 @@ import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinn
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
+import { API_URL } from '../lib/api';
 
 interface Municipio {
   id: number;
@@ -19,18 +20,7 @@ interface Municipio {
   distancia_km?: number;
 }
 
-const getApiUrl = () => {
-  const envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  if (import.meta.env.DEV) {
-    const host = window.location.hostname;
-    return `http://${host}:8001/api`;
-  }
-  return 'http://localhost:8001/api';
-};
-const API_URL = getApiUrl();
+// API_URL importado desde lib/api.ts
 
 // Calcular distancia entre dos puntos (Haversine)
 const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -86,8 +76,10 @@ export default function Landing() {
 
   // Auto-redirigir a /home si viene desde subdominio o query param de municipio
   useEffect(() => {
+    console.log('Landing: municipioFromUrl=', municipioFromUrl, 'municipios.length=', municipios.length);
     if (municipioFromUrl && municipios.length > 0) {
       const found = municipios.find(m => m.codigo.toLowerCase() === municipioFromUrl.toLowerCase());
+      console.log('Landing: found=', found);
       if (found) {
         // Guardar datos del municipio en localStorage
         localStorage.setItem('municipio_codigo', found.codigo);
@@ -97,8 +89,9 @@ export default function Landing() {
         if (found.logo_url) {
           localStorage.setItem('municipio_logo_url', found.logo_url);
         }
+        console.log('Landing: redirecting to /home');
         // Redirigir a la landing publica responsiva
-        navigate('/home');
+        navigate('/home', { replace: true });
       }
     }
   }, [municipioFromUrl, municipios, navigate]);

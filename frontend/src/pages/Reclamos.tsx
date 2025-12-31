@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
@@ -39,9 +39,7 @@ const getCategoryImageUrl = (nombre: string): string | null => {
     .replace(/[-\s]+/g, '_')
     .trim();
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
-  const baseUrl = apiUrl.replace('/api', '');
-  return `${baseUrl}/static/images/categorias/${safeName}.jpeg`;
+  return `${API_BASE_URL}/static/images/categorias/${safeName}.jpeg`;
 };
 
 // Función para obtener el icono del estado
@@ -175,6 +173,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
+  const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
@@ -301,6 +300,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   // AI Panel debounce state - mostrar sugerencias 3 segundos después de escribir descripción
   const [showAISuggestions, setShowAISuggestions] = useState(false);
   const [aiSuggestionsLoading, setAISuggestionsLoading] = useState(false);
+  const [contextualAiResponse, setContextualAiResponse] = useState('');
   const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Address autocomplete states
@@ -321,6 +321,10 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
 
   // Estado para conteos de reclamos similares (por reclamo_id)
   const [similaresCounts, setSimilaresCounts] = useState<Record<number, number>>({});
+
+  // Derivados de estado (deben estar antes de los useEffect que los usan)
+  const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
+  const selectedZona = zonas.find(z => z.id === Number(formData.zona_id));
 
   // Cargar datos del municipio y conteos UNA SOLA VEZ al montar
   useEffect(() => {
@@ -475,11 +479,10 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   // Cargar datos de la Municipalidad (multi-tenant)
   const fetchMunicipioData = async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL;
       const municipioId = localStorage.getItem('municipio_id');
       const url = municipioId
-        ? `${apiUrl}/configuracion/publica/municipio?municipio_id=${municipioId}`
-        : `${apiUrl}/configuracion/publica/municipio`;
+        ? `${API_URL}/configuracion/publica/municipio?municipio_id=${municipioId}`
+        : `${API_URL}/configuracion/publica/municipio`;
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
@@ -502,16 +505,29 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     if (wizardStep !== 2) {
       setShowAISuggestions(false);
       setAISuggestionsLoading(false);
+      setContextualAiResponse('');
       return;
     }
 
-    // Si no hay descripción, ocultar sugerencias
-    if (!formData.descripcion.trim()) {
+    // Si no hay descripción o categoría, ocultar sugerencias
+    if (!formData.descripcion.trim() || !selectedCategoria) {
       setShowAISuggestions(false);
       setAISuggestionsLoading(false);
+      setContextualAiResponse('');
       if (aiDebounceRef.current) {
         clearTimeout(aiDebounceRef.current);
       }
+      return;
+    }
+
+    const texto = formData.descripcion.trim();
+    const palabras = texto.split(/\s+/).filter(p => p.length > 0);
+
+    // Solo activar con 3+ palabras
+    if (palabras.length < 3) {
+      setShowAISuggestions(false);
+      setAISuggestionsLoading(false);
+      setContextualAiResponse('');
       return;
     }
 
@@ -524,10 +540,41 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     setShowAISuggestions(false);
     setAISuggestionsLoading(true);
 
-    // Esperar 3 segundos antes de mostrar las sugerencias
-    aiDebounceRef.current = setTimeout(() => {
-      setAISuggestionsLoading(false);
-      setShowAISuggestions(true);
+    // Esperar 3 segundos antes de llamar a la IA
+    aiDebounceRef.current = setTimeout(async () => {
+      try {
+        const contexto: Record<string, unknown> = {
+          categoria: selectedCategoria.nombre,
+          descripcion_usuario: texto,
+          titulo: formData.titulo || '',
+          direccion: formData.direccion || '',
+        };
+
+        const response = await chatApi.askDynamic(
+          `Vecino reporta problema en categoría "${selectedCategoria.nombre}".
+Descripción: "${texto}"
+${formData.direccion ? `Ubicación: ${formData.direccion}` : ''}
+
+Respondé como empleado municipal dando info útil:
+- Qué área se encarga de este tipo de reclamos
+- Tiempo estimado de resolución típico
+- Si necesita algún dato adicional para procesar mejor el reclamo
+- Un tip útil relacionado
+
+Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
+          contexto,
+          'reclamo_contextual'
+        );
+
+        setContextualAiResponse(response.response || response.message || '');
+        setShowAISuggestions(true);
+      } catch (error) {
+        console.error('Error llamando a IA:', error);
+        setContextualAiResponse('');
+        setShowAISuggestions(true); // Mostrar fallback estático si falla
+      } finally {
+        setAISuggestionsLoading(false);
+      }
     }, 3000);
 
     return () => {
@@ -535,15 +582,14 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         clearTimeout(aiDebounceRef.current);
       }
     };
-  }, [formData.descripcion, wizardStep]);
+  }, [formData.descripcion, formData.titulo, formData.direccion, wizardStep, selectedCategoria]);
 
   const askAI = async () => {
     if (!aiQuestion.trim() || !selectedCategoria) return;
 
     setAiLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-      const response = await fetch(`${apiUrl}/chat/categoria`, {
+      const response = await fetch(`${API_URL}/chat/categoria`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -765,6 +811,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setFilterLoading(null); // Clear filter loading state
     }
   };
 
@@ -1118,20 +1165,34 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     // Filtro local para refinar mientras el usuario sigue escribiendo
     const searchLower = search.trim().toLowerCase();
     return (
-      r.titulo.toLowerCase().includes(searchLower) ||
-      r.descripcion.toLowerCase().includes(searchLower) ||
-      r.direccion.toLowerCase().includes(searchLower) ||
-      r.categoria.nombre.toLowerCase().includes(searchLower) ||
+      // ID
+      String(r.id).includes(searchLower) ||
+      // Título y descripción
+      r.titulo?.toLowerCase().includes(searchLower) ||
+      r.descripcion?.toLowerCase().includes(searchLower) ||
+      // Ubicación
+      r.direccion?.toLowerCase().includes(searchLower) ||
+      r.referencia?.toLowerCase().includes(searchLower) ||
+      // Categoría y zona
+      r.categoria?.nombre?.toLowerCase().includes(searchLower) ||
+      r.zona?.nombre?.toLowerCase().includes(searchLower) ||
+      r.zona?.codigo?.toLowerCase().includes(searchLower) ||
+      // Creador (nombre, apellido, email, teléfono)
       r.creador?.nombre?.toLowerCase().includes(searchLower) ||
       r.creador?.apellido?.toLowerCase().includes(searchLower) ||
-      `${r.creador?.nombre} ${r.creador?.apellido}`.toLowerCase().includes(searchLower) ||
+      `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`.toLowerCase().includes(searchLower) ||
+      r.creador?.email?.toLowerCase().includes(searchLower) ||
+      r.creador?.telefono?.includes(searchLower) ||
+      // Empleado asignado (nombre, apellido, especialidad)
       r.empleado_asignado?.nombre?.toLowerCase().includes(searchLower) ||
-      String(r.id).includes(searchLower)
+      r.empleado_asignado?.apellido?.toLowerCase().includes(searchLower) ||
+      `${r.empleado_asignado?.nombre || ''} ${r.empleado_asignado?.apellido || ''}`.toLowerCase().includes(searchLower) ||
+      r.empleado_asignado?.especialidad?.toLowerCase().includes(searchLower) ||
+      // Resolución y rechazo
+      r.resolucion?.toLowerCase().includes(searchLower) ||
+      r.descripcion_rechazo?.toLowerCase().includes(searchLower)
     );
   });
-
-  const selectedCategoria = categorias.find(c => c.id === Number(formData.categoria_id));
-  const selectedZona = zonas.find(z => z.id === Number(formData.zona_id));
 
   // Wizard Step 1: Categoría
   const wizardStep1 = (
@@ -1950,108 +2011,29 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
               </div>
             )}
 
-            {/* Sugerencias mostradas después del debounce */}
+            {/* Sugerencias de IA mostradas después del debounce */}
             {showAISuggestions && formData.descripcion.trim() && (
               <>
-                <div className="p-3 rounded-lg" style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}10`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Wrench className="h-4 w-4" style={{ color: getCategoryColor(selectedCategoria.nombre) }} />
-                    <span className="font-medium text-sm" style={{ color: theme.text }}>Posibles soluciones</span>
+                {/* Respuesta de IA contextual */}
+                {contextualAiResponse ? (
+                  <div className="p-4 rounded-lg" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98130' }}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="h-4 w-4" style={{ color: '#10b981' }} />
+                      <span className="text-xs font-medium" style={{ color: '#10b981' }}>Asistente Municipal</span>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: theme.text }}>
+                      {contextualAiResponse}
+                    </p>
                   </div>
-                  <ul className="space-y-1 text-xs">
-                    {selectedCategoria.nombre.toLowerCase().includes('alumbrado') && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Revisión de conexiones eléctricas</li>
-                        <li style={{ color: theme.textSecondary }}>• Cambio de lámpara o luminaria</li>
-                        <li style={{ color: theme.textSecondary }}>• Reparación de poste o brazo</li>
-                      </>
-                    )}
-                    {(selectedCategoria.nombre.toLowerCase().includes('bache') || selectedCategoria.nombre.toLowerCase().includes('calle')) && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Bacheo con mezcla asfáltica</li>
-                        <li style={{ color: theme.textSecondary }}>• Reparación de calzada</li>
-                        <li style={{ color: theme.textSecondary }}>• Nivelación de terreno</li>
-                      </>
-                    )}
-                    {(selectedCategoria.nombre.toLowerCase().includes('agua') || selectedCategoria.nombre.toLowerCase().includes('cloaca')) && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Reparación de cañerías</li>
-                        <li style={{ color: theme.textSecondary }}>• Destape de conductos</li>
-                        <li style={{ color: theme.textSecondary }}>• Cambio de válvulas</li>
-                      </>
-                    )}
-                    {selectedCategoria.nombre.toLowerCase().includes('arbol') && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Poda de ramas</li>
-                        <li style={{ color: theme.textSecondary }}>• Extracción de árbol seco</li>
-                        <li style={{ color: theme.textSecondary }}>• Tratamiento fitosanitario</li>
-                      </>
-                    )}
-                    {selectedCategoria.nombre.toLowerCase().includes('basura') && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Recolección extraordinaria</li>
-                        <li style={{ color: theme.textSecondary }}>• Limpieza de microbasural</li>
-                        <li style={{ color: theme.textSecondary }}>• Instalación de contenedor</li>
-                      </>
-                    )}
-                    {(selectedCategoria.nombre.toLowerCase().includes('espacio') || selectedCategoria.nombre.toLowerCase().includes('verde') || selectedCategoria.nombre.toLowerCase().includes('plaza')) && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Mantenimiento de césped</li>
-                        <li style={{ color: theme.textSecondary }}>• Reparación de juegos infantiles</li>
-                        <li style={{ color: theme.textSecondary }}>• Instalación de mobiliario urbano</li>
-                        <li style={{ color: theme.textSecondary }}>• Limpieza general del espacio</li>
-                      </>
-                    )}
-                    {(selectedCategoria.nombre.toLowerCase().includes('vereda') || selectedCategoria.nombre.toLowerCase().includes('acera')) && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Reparación de baldosas</li>
-                        <li style={{ color: theme.textSecondary }}>• Nivelación de vereda</li>
-                        <li style={{ color: theme.textSecondary }}>• Reconstrucción de tramo</li>
-                      </>
-                    )}
-                    {(selectedCategoria.nombre.toLowerCase().includes('semaforo') || selectedCategoria.nombre.toLowerCase().includes('transito') || selectedCategoria.nombre.toLowerCase().includes('tránsito')) && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Reparación de semáforo</li>
-                        <li style={{ color: theme.textSecondary }}>• Sincronización de tiempos</li>
-                        <li style={{ color: theme.textSecondary }}>• Instalación de señalización</li>
-                      </>
-                    )}
-                    {selectedCategoria.nombre.toLowerCase().includes('limpieza') && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Barrido de calles</li>
-                        <li style={{ color: theme.textSecondary }}>• Limpieza de sumideros</li>
-                        <li style={{ color: theme.textSecondary }}>• Desmalezado de terrenos</li>
-                      </>
-                    )}
-                    {/* Fallback para categorías no específicas */}
-                    {!['alumbrado', 'bache', 'calle', 'agua', 'cloaca', 'arbol', 'basura', 'espacio', 'verde', 'plaza', 'vereda', 'acera', 'semaforo', 'transito', 'tránsito', 'limpieza'].some(k => selectedCategoria.nombre.toLowerCase().includes(k)) && (
-                      <>
-                        <li style={{ color: theme.textSecondary }}>• Evaluación técnica del problema</li>
-                        <li style={{ color: theme.textSecondary }}>• Asignación de equipo especializado</li>
-                        <li style={{ color: theme.textSecondary }}>• Resolución según prioridad</li>
-                      </>
-                    )}
-                  </ul>
-                </div>
-
-                <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Timer className="h-4 w-4" style={{ color: '#f59e0b' }} />
-                    <span className="font-medium text-sm" style={{ color: theme.text }}>Tiempo estimado</span>
+                ) : (
+                  /* Mensaje si la IA no está disponible */
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                      <span className="text-sm" style={{ color: theme.textSecondary }}>Recomendaciones no disponibles</span>
+                    </div>
                   </div>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>
-                    {selectedCategoria.nombre.toLowerCase().includes('alumbrado') && '24-72 horas para reparación'}
-                    {(selectedCategoria.nombre.toLowerCase().includes('bache') || selectedCategoria.nombre.toLowerCase().includes('calle')) && '3-7 días según complejidad'}
-                    {(selectedCategoria.nombre.toLowerCase().includes('agua') || selectedCategoria.nombre.toLowerCase().includes('cloaca')) && '24-48 horas (urgente)'}
-                    {selectedCategoria.nombre.toLowerCase().includes('arbol') && '5-15 días según riesgo'}
-                    {selectedCategoria.nombre.toLowerCase().includes('basura') && '24-72 horas'}
-                    {(selectedCategoria.nombre.toLowerCase().includes('espacio') || selectedCategoria.nombre.toLowerCase().includes('verde') || selectedCategoria.nombre.toLowerCase().includes('plaza')) && '5-10 días según tipo de trabajo'}
-                    {(selectedCategoria.nombre.toLowerCase().includes('vereda') || selectedCategoria.nombre.toLowerCase().includes('acera')) && '7-15 días según extensión'}
-                    {(selectedCategoria.nombre.toLowerCase().includes('semaforo') || selectedCategoria.nombre.toLowerCase().includes('transito') || selectedCategoria.nombre.toLowerCase().includes('tránsito')) && '24-72 horas (urgente)'}
-                    {selectedCategoria.nombre.toLowerCase().includes('limpieza') && '24-72 horas'}
-                    {!['alumbrado', 'bache', 'calle', 'agua', 'cloaca', 'arbol', 'basura', 'espacio', 'verde', 'plaza', 'vereda', 'acera', 'semaforo', 'transito', 'tránsito', 'limpieza'].some(k => selectedCategoria.nombre.toLowerCase().includes(k)) && '3-10 días según disponibilidad'}
-                  </p>
-                </div>
+                )}
 
                 {formData.titulo && formData.descripcion && (
                   <div className="p-3 rounded-lg" style={{ backgroundColor: '#22c55e15', border: '1px solid #22c55e30' }}>
@@ -2217,7 +2199,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       header: 'Ubicación',
       sortValue: (r: Reclamo) => r.direccion,
       render: (r: Reclamo) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-w-[200px]" title={r.direccion}>
           <MapPin className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
           <span className="truncate" style={{ color: theme.textSecondary }}>{r.direccion}</span>
         </div>
@@ -2227,16 +2209,42 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       key: 'estado',
       header: 'Estado',
       sortValue: (r: Reclamo) => r.estado,
+      render: (r: Reclamo) => {
+        const color = estadoColors[r.estado].bg;
+        return (
+          <span
+            className="px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm"
+            style={{
+              backgroundColor: `${color}18`,
+              color: color,
+              border: `1px solid ${color}40`,
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+            {estadoLabels[r.estado]}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'vecino',
+      header: 'Vecino',
+      sortValue: (r: Reclamo) => `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`,
       render: (r: Reclamo) => (
-        <span
-          className="px-3 py-1 text-xs font-semibold rounded-full"
-          style={{
-            backgroundColor: estadoColors[r.estado].bg,
-            color: estadoColors[r.estado].text
-          }}
-        >
-          {estadoLabels[r.estado]}
-        </span>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${theme.primary}15` }}
+          >
+            <User className="h-3 w-3" style={{ color: theme.primary }} />
+          </div>
+          <span className="truncate" style={{ color: theme.text }}>
+            {r.creador ? `${r.creador.nombre} ${r.creador.apellido}` : r.es_anonimo ? 'Anónimo' : '-'}
+          </span>
+        </div>
       ),
     },
     {
@@ -2938,9 +2946,25 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           <div className="w-full flex flex-col gap-2">
             {/* Categorías - Grid 2 filas en mobile (5 cols), 1 fila en desktop */}
             <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
+              {/* Skeleton completo mientras cargan las categorías Y los conteos */}
+              {categorias.length === 0 || Object.keys(conteosCategorias).length === 0 ? (
+                <>
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                    <div
+                      key={`skeleton-cat-${i}`}
+                      className="h-[68px] rounded-xl animate-pulse sm:flex-1 sm:min-w-0"
+                      style={{ background: `${theme.border}40` }}
+                    />
+                  ))}
+                </>
+              ) : (
+              <>
               {/* Botón Todas las categorías */}
               <button
-                onClick={() => setFiltroCategoria(null)}
+                onClick={() => {
+                  setFilterLoading('cat-all');
+                  setFiltroCategoria(null);
+                }}
                 className="flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
                 style={{
                   background: filtroCategoria === null
@@ -2949,22 +2973,25 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                   border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
                 }}
               >
-                <Tag className="h-5 w-5" style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
-                <span className="text-[9px] font-semibold leading-tight text-center mt-1" style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
+                <Tag className={`h-5 w-5 ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
+                <span className={`text-[9px] font-semibold leading-tight text-center mt-1 ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
                   Categorías
                 </span>
               </button>
 
-              {/* Chips por categoría - número arriba, icono medio, texto abajo */}
               {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
               {categorias.filter((cat) => (conteosCategorias[cat.id] || 0) > 0 || reclamos.some(r => r.categoria.id === cat.id)).map((cat) => {
                 const isSelected = filtroCategoria === cat.id;
                 const catColor = getCategoryColor(cat.nombre);
                 const count = conteosCategorias[cat.id] || 0;
+                const isLoadingThis = filterLoading === `cat-${cat.id}`;
                 return (
                   <button
                     key={cat.id}
-                    onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
+                    onClick={() => {
+                      setFilterLoading(`cat-${cat.id}`);
+                      setFiltroCategoria(isSelected ? null : cat.id);
+                    }}
                     title={cat.nombre}
                     className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
                     style={{
@@ -2974,7 +3001,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                   >
                     {/* Número arriba */}
                     <span
-                      className="text-[10px] font-bold leading-none"
+                      className={`text-[10px] font-bold leading-none ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{
                         color: isSelected ? '#ffffff' : catColor,
                       }}
@@ -2982,16 +3009,18 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                       {count}
                     </span>
                     {/* Icono */}
-                    <span className="[&>svg]:h-5 [&>svg]:w-5 my-1" style={{ color: isSelected ? '#ffffff' : catColor }}>
+                    <span className={`[&>svg]:h-5 [&>svg]:w-5 my-1 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : catColor }}>
                       {getCategoryIcon(cat.nombre)}
                     </span>
                     {/* Texto abajo */}
-                    <span className="text-[9px] font-medium leading-none text-center w-full truncate px-1" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                    <span className={`text-[9px] font-medium leading-none text-center w-full truncate px-1 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
                       {cat.nombre.split(' ')[0]}
                     </span>
                   </button>
                 );
               })}
+              </>
+              )}
             </div>
 
             {/* Estados - Grid 2 filas en mobile (3 cols), 1 fila en desktop */}
@@ -3018,10 +3047,14 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                 ].map((estado) => {
                   const Icon = estado.icon;
                   const isActive = filtroEstado === estado.key;
+                  const isLoadingThis = filterLoading === `estado-${estado.key}`;
                   return (
                     <button
                       key={estado.key}
-                      onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                      onClick={() => {
+                        setFilterLoading(`estado-${estado.key}`);
+                        setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
+                      }}
                       className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all h-[36px] sm:flex-1 sm:min-w-0"
                       style={{
                         background: isActive ? estado.color : `${estado.color}15`,
@@ -3030,19 +3063,19 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
                     >
                       {/* Icono */}
                       <Icon
-                        className="h-4 w-4 flex-shrink-0"
+                        className={`h-4 w-4 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       />
                       {/* Texto - solo en desktop */}
                       <span
-                        className="text-[10px] font-medium leading-none truncate hidden sm:block"
+                        className={`text-[10px] font-medium leading-none truncate hidden sm:block ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       >
                         {estado.label}
                       </span>
                       {/* Badge con count */}
                       <span
-                        className="text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0"
+                        className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                         style={{
                           backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
                           color: isActive ? '#ffffff' : estado.color,
@@ -3226,24 +3259,24 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
           );
         })
         )}
-
-        {/* Sentinel para infinite scroll + spinner de carga */}
-        <div ref={observerTarget} className="py-4 col-span-full">
-          {loadingMore && (
-            <div className="flex items-center justify-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
-              <span className="text-sm" style={{ color: theme.textSecondary }}>
-                Cargando más reclamos...
-              </span>
-            </div>
-          )}
-          {!hasMore && reclamos.length > 0 && !loadingMore && (
-            <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
-              No hay más reclamos para mostrar
-            </p>
-          )}
-        </div>
       </ABMPage>
+
+      {/* Sentinel para infinite scroll + spinner de carga */}
+      <div ref={observerTarget} className="py-4">
+        {loadingMore && (
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+            <span className="text-sm" style={{ color: theme.textSecondary }}>
+              Cargando más reclamos...
+            </span>
+          </div>
+        )}
+        {!hasMore && reclamos.length > 0 && !loadingMore && (
+          <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+            No hay más reclamos para mostrar
+          </p>
+        )}
+      </div>
 
       {/* Sheet separado para ver detalle */}
       <Sheet

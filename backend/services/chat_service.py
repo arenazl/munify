@@ -1,6 +1,6 @@
 """
 Servicio centralizado de Chat con IA.
-Maneja Gemini como primario y Groq como fallback.
+Maneja Groq como primario y Gemini como fallback.
 """
 import httpx
 from typing import Optional, List

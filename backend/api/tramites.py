@@ -628,13 +628,14 @@ async def resumen_solicitudes(
 
 @router.get("/stats/conteo-estados")
 async def conteo_estados_solicitudes(
-    municipio_id: int = Query(..., description="ID del municipio"),
+    municipio_id: int = Query(None, description="ID del municipio (opcional, usa el del usuario)"),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
     db: AsyncSession = Depends(get_db)
 ):
     """Conteo de solicitudes por estado (optimizado para filtros)"""
+    muni_id = municipio_id or current_user.municipio_id
     query = select(Solicitud.estado, func.count(Solicitud.id)).where(
-        Solicitud.municipio_id == municipio_id
+        Solicitud.municipio_id == muni_id
     )
 
     # Empleado solo ve los suyos
@@ -649,11 +650,12 @@ async def conteo_estados_solicitudes(
 
 @router.get("/stats/conteo-tipos")
 async def conteo_tipos_solicitudes(
-    municipio_id: int = Query(..., description="ID del municipio"),
+    municipio_id: int = Query(None, description="ID del municipio (opcional, usa el del usuario)"),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.EMPLEADO])),
     db: AsyncSession = Depends(get_db)
 ):
     """Conteo de solicitudes por tipo de trámite (optimizado para filtros)"""
+    muni_id = municipio_id or current_user.municipio_id
     query = select(
         TipoTramite.id,
         TipoTramite.nombre,
@@ -665,7 +667,7 @@ async def conteo_tipos_solicitudes(
     ).join(
         TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id
     ).where(
-        Solicitud.municipio_id == municipio_id
+        Solicitud.municipio_id == muni_id
     )
 
     # Empleado solo ve los suyos

@@ -4,8 +4,7 @@ import { Home, Plus, ClipboardList, User, LogOut, Trophy, Building2, Loader2 } f
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificacionesDropdown } from '../components/NotificacionesDropdown';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+import { API_URL } from '../lib/api';
 
 export default function MobileLayout() {
   const { theme } = useTheme();

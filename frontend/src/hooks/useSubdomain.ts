@@ -33,6 +33,12 @@ export function getSubdomainMunicipio(): string | null {
     return null;
   }
 
+  // Ignorar dominios de hosting (Netlify, Heroku, Vercel, etc.)
+  const hostingDomains = ['netlify.app', 'herokuapp.com', 'vercel.app', 'render.com', 'railway.app'];
+  if (hostingDomains.some(domain => hostname.endsWith(domain))) {
+    return null;
+  }
+
   // Separar por puntos
   const parts = hostname.split('.');
 
@@ -100,7 +106,7 @@ export function isDevelopment(): boolean {
 
 /**
  * Hook para usar el subdominio del municipio.
- * En desarrollo, también revisa el query param ?municipio=
+ * Revisa el query param ?municipio= en cualquier entorno (desarrollo y producción)
  */
 export function useMunicipioFromUrl(): string | null {
   // Primero intentar desde subdominio
@@ -109,13 +115,11 @@ export function useMunicipioFromUrl(): string | null {
     return subdomain;
   }
 
-  // En desarrollo, también aceptar query param
-  if (isDevelopment()) {
-    const params = new URLSearchParams(window.location.search);
-    const municipioParam = params.get('municipio');
-    if (municipioParam) {
-      return municipioParam.toLowerCase();
-    }
+  // Aceptar query param ?municipio= en cualquier entorno
+  const params = new URLSearchParams(window.location.search);
+  const municipioParam = params.get('municipio');
+  if (municipioParam) {
+    return municipioParam.toLowerCase();
   }
 
   return null;

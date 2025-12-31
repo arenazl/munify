@@ -131,6 +131,7 @@ export default function Tramites() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
+  const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [tiposTramite, setTiposTramite] = useState<TipoTramite[]>([]);
 
   // Sheet states
@@ -187,45 +188,59 @@ export default function Tramites() {
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
   const [conteosTipos, setConteosTipos] = useState<Record<number, number>>({});
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
+  const [loadingFilters, setLoadingFilters] = useState(true);
 
-  // Cargar datos
+  // Cargar conteos de filtros (tipos + estados) con endpoints optimizados (COUNT en DB)
+  useEffect(() => {
+    const fetchConteos = async () => {
+      try {
+        const [conteosTiposRes, conteosEstadosRes] = await Promise.all([
+          tramitesApi.getConteoTipos().catch(() => ({ data: [] })),
+          tramitesApi.getConteoEstados().catch(() => ({ data: {} })),
+        ]);
+
+        // Procesar tipos
+        const tiposData = conteosTiposRes.data || [];
+        const tipos: TipoTramite[] = tiposData.map((item: { id: number; nombre: string; icono: string; color: string; cantidad: number }) => ({
+          id: item.id,
+          nombre: item.nombre,
+          icono: item.icono,
+          color: item.color,
+        }));
+        setTiposTramite(tipos);
+
+        const conteosTipoMap: Record<number, number> = {};
+        tiposData.forEach((item: { id: number; cantidad: number }) => {
+          conteosTipoMap[item.id] = item.cantidad;
+        });
+        setConteosTipos(conteosTipoMap);
+
+        // Procesar estados
+        setConteosEstados(conteosEstadosRes.data || {});
+      } catch (error) {
+        console.error('Error cargando conteos:', error);
+      } finally {
+        setLoadingFilters(false);
+      }
+    };
+    fetchConteos();
+  }, []);
+
+  // Cargar datos principales
   useEffect(() => {
     const fetchData = async () => {
-      console.log('🚀 fetchData llamado, dataLoadedRef:', dataLoadedRef.current);
       if (dataLoadedRef.current) return;
       dataLoadedRef.current = true;
 
       try {
-        console.log('🔄 Cargando datos de tramites...');
-        const [tramitesRes, serviciosRes, empleadosRes, tiposRes] = await Promise.all([
-          tramitesApi.getGestionTodos ? tramitesApi.getGestionTodos({}).catch(() => ({ data: [] })) : tramitesApi.getAll().catch(() => ({ data: [] })),
+        const [tramitesRes, serviciosRes, empleadosRes] = await Promise.all([
+          tramitesApi.getGestionTodos().catch(() => ({ data: [] })),
           tramitesApi.getServicios().catch((e) => { console.error('Error getServicios:', e); return { data: [] }; }),
           empleadosApi.getAll(true).catch(() => ({ data: [] })),
-          tramitesApi.getTipos().catch((e) => { console.error('Error getTipos:', e); return { data: [] }; }),
         ]);
-        console.log('📦 Tipos cargados:', tiposRes.data?.length, tiposRes.data);
-        console.log('📦 Servicios cargados:', serviciosRes.data?.length);
         setTramites(tramitesRes.data);
         setServicios(serviciosRes.data);
         setEmpleados(empleadosRes.data);
-        setTiposTramite(tiposRes.data);
-
-        // Calcular conteos por estado
-        const conteos: Record<string, number> = {};
-        tramitesRes.data.forEach((t: Tramite) => {
-          conteos[t.estado] = (conteos[t.estado] || 0) + 1;
-        });
-        setConteosEstados(conteos);
-
-        // Calcular conteos por tipo de trámite
-        const conteosTipo: Record<number, number> = {};
-        tramitesRes.data.forEach((t: Tramite) => {
-          const servicio = serviciosRes.data.find((s: ServicioTramite) => s.id === t.servicio_id);
-          if (servicio?.tipo_tramite_id) {
-            conteosTipo[servicio.tipo_tramite_id] = (conteosTipo[servicio.tipo_tramite_id] || 0) + 1;
-          }
-        });
-        setConteosTipos(conteosTipo);
       } catch (error) {
         console.error('Error cargando datos:', error);
         toast.error('Error al cargar datos');
@@ -248,6 +263,8 @@ export default function Tramites() {
       setTramites(res.data);
     } catch (error) {
       console.error('Error refetching tramites:', error);
+    } finally {
+      setFilterLoading(null); // Clear filter loading state
     }
   };
 
@@ -503,13 +520,36 @@ export default function Tramites() {
       const servicio = servicios.find(s => s.id === t.servicio_id);
       if (servicio?.tipo_tramite_id !== filtroTipo) return false;
     }
-    // Filtro por búsqueda
+    // Filtro por búsqueda - buscar en todos los campos relevantes
     if (!search) return true;
     const s = search.toLowerCase();
-    return t.numero_tramite?.toLowerCase().includes(s) ||
-           t.asunto.toLowerCase().includes(s) ||
-           t.nombre_solicitante?.toLowerCase().includes(s) ||
-           t.apellido_solicitante?.toLowerCase().includes(s);
+    const servicio = servicios.find(sv => sv.id === t.servicio_id);
+    return (
+      // Número de trámite e ID
+      t.numero_tramite?.toLowerCase().includes(s) ||
+      String(t.id).includes(s) ||
+      // Asunto y descripción
+      t.asunto?.toLowerCase().includes(s) ||
+      t.descripcion?.toLowerCase().includes(s) ||
+      // Datos del solicitante
+      t.nombre_solicitante?.toLowerCase().includes(s) ||
+      t.apellido_solicitante?.toLowerCase().includes(s) ||
+      `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.toLowerCase().includes(s) ||
+      t.dni_solicitante?.toLowerCase().includes(s) ||
+      t.email_solicitante?.toLowerCase().includes(s) ||
+      t.telefono_solicitante?.includes(s) ||
+      t.direccion_solicitante?.toLowerCase().includes(s) ||
+      // Empleado asignado (nombre, apellido, especialidad)
+      t.empleado_asignado?.nombre?.toLowerCase().includes(s) ||
+      t.empleado_asignado?.apellido?.toLowerCase().includes(s) ||
+      `${t.empleado_asignado?.nombre || ''} ${t.empleado_asignado?.apellido || ''}`.toLowerCase().includes(s) ||
+      t.empleado_asignado?.especialidad?.toLowerCase().includes(s) ||
+      // Servicio
+      servicio?.nombre?.toLowerCase().includes(s) ||
+      // Respuesta y observaciones
+      t.respuesta?.toLowerCase().includes(s) ||
+      t.observaciones?.toLowerCase().includes(s)
+    );
   });
 
   // Obtener info del servicio para un trámite
@@ -1231,9 +1271,10 @@ export default function Tramites() {
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por número, asunto o solicitante..."
-        loading={loading}
+        loading={false}
         isEmpty={!loading && filteredTramites.length === 0}
         emptyMessage="No hay trámites. Iniciá el primer trámite municipal."
+        defaultViewMode="cards"
         sheetOpen={false}
         sheetTitle=""
         sheetDescription=""
@@ -1243,6 +1284,19 @@ export default function Tramites() {
           <div className="w-full flex flex-col gap-2">
             {/* Tipos de trámite - chips que ocupan 100% del contenedor */}
             <div className="flex gap-1.5 pb-2 w-full">
+              {/* Skeleton completo mientras cargan los tipos */}
+              {loadingFilters ? (
+                <>
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div
+                      key={`skeleton-tipo-${i}`}
+                      className="h-[68px] rounded-xl animate-pulse flex-1 min-w-0"
+                      style={{ background: `${theme.border}40` }}
+                    />
+                  ))}
+                </>
+              ) : (
+              <>
               {/* Botón Todos los tipos */}
               <button
                 onClick={() => setFiltroTipo(null)}
@@ -1260,8 +1314,8 @@ export default function Tramites() {
                 </span>
               </button>
 
-              {/* Chips por tipo de trámite */}
-              {tiposTramite.map((tipo) => {
+              {/* Chips por tipo de trámite (solo los que tienen al menos 1) */}
+              {tiposTramite.filter((tipo) => (conteosTipos[tipo.id] || 0) > 0).map((tipo) => {
                 const isSelected = filtroTipo === tipo.id;
                 const tipoColor = tipo.color || '#6b7280';
                 const count = conteosTipos[tipo.id] || 0;
@@ -1278,7 +1332,7 @@ export default function Tramites() {
                   >
                     {/* Número arriba */}
                     <span
-                      className="text-[10px] font-bold leading-none"
+                      className="text-[10px] font-bold leading-none h-3 flex items-center justify-center"
                       style={{
                         color: isSelected ? '#ffffff' : tipoColor,
                       }}
@@ -1296,20 +1350,37 @@ export default function Tramites() {
                   </button>
                 );
               })}
+              </>
+              )}
             </div>
 
             {/* Estados - más compactos, ocupan 100% del contenedor */}
             <div className="flex gap-2 w-full">
-              {[
+              {loadingFilters ? (
+                <>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div
+                      key={`skeleton-estado-${i}`}
+                      className="h-[36px] rounded-lg animate-pulse flex-1"
+                      style={{ background: `${theme.border}40` }}
+                    />
+                  ))}
+                </>
+              ) : (
+              [
                 { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
                 ...estadosDisponibles.map(e => ({ key: e.id, label: e.label, icon: e.icon, color: e.color, count: conteosEstados[e.id] || 0 }))
               ].map((estado) => {
                 const Icon = estado.icon;
                 const isActive = filtroEstado === estado.key;
+                const isLoadingThis = filterLoading === `estado-${estado.key}`;
                 return (
                   <button
                     key={estado.key}
-                    onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                    onClick={() => {
+                      setFilterLoading(`estado-${estado.key}`);
+                      setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
+                    }}
                     className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
                     style={{
                       background: isActive ? estado.color : `${estado.color}15`,
@@ -1318,19 +1389,19 @@ export default function Tramites() {
                   >
                     {/* Icono */}
                     <Icon
-                      className="h-4 w-4 flex-shrink-0"
+                      className={`h-4 w-4 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{ color: isActive ? '#ffffff' : estado.color }}
                     />
                     {/* Texto */}
                     <span
-                      className="text-[10px] font-medium leading-none truncate"
+                      className={`text-[10px] font-medium leading-none truncate ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{ color: isActive ? '#ffffff' : estado.color }}
                     >
                       {estado.label}
                     </span>
                     {/* Badge con count */}
                     <span
-                      className="text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0"
+                      className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{
                         backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
                         color: isActive ? '#ffffff' : estado.color,
@@ -1340,7 +1411,7 @@ export default function Tramites() {
                     </span>
                   </button>
                 );
-              })}
+              }))}
             </div>
           </div>
         }
@@ -1370,7 +1441,19 @@ export default function Tramites() {
                   </span>
                 );
               }},
-              { key: 'solicitante', header: 'Solicitante', render: (t) => t.nombre_solicitante || '-' },
+              { key: 'solicitante', header: 'Solicitante', render: (t) => (
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${theme.primary}15` }}
+                  >
+                    <User className="h-3 w-3" style={{ color: theme.primary }} />
+                  </div>
+                  <span className="truncate" style={{ color: theme.text }}>
+                    {t.nombre_solicitante || '-'}
+                  </span>
+                </div>
+              )},
               { key: 'created_at', header: 'Fecha', render: (t) => new Date(t.created_at).toLocaleDateString() },
             ]}
             keyExtractor={(t) => t.id}

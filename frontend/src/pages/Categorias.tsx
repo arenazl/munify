@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Edit, Trash2, ImageIcon, RefreshCw, X, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import api, { categoriasApi, imagenesApi } from '../lib/api';
+import api, { categoriasApi, imagenesApi, API_BASE_URL } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import type { Categoria } from '../types';
@@ -23,11 +23,8 @@ const getLocalImageUrl = (nombre: string): string | null => {
     .replace(/[-\s]+/g, '_')
     .trim();
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8002/api';
-  const baseUrl = apiUrl.replace('/api', '');
-
   // El backend guarda como .jpeg
-  const url = `${baseUrl}/static/images/categorias/${safeName}.jpeg`;
+  const url = `${API_BASE_URL}/static/images/categorias/${safeName}.jpeg`;
 
   // Guardar en cache y retornar
   imageExistsCache[nombre] = url;

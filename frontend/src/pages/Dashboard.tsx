@@ -103,6 +103,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingCharts, setLoadingCharts] = useState(true);
   const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+  const [loadingHeatmap, setLoadingHeatmap] = useState(true);
 
   // Analytics avanzados
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
@@ -179,6 +180,8 @@ export default function Dashboard() {
           setHeatmapData(heatmapRes.data.puntos || []);
         } catch (error) {
           console.error('Error cargando heatmap:', error);
+        } finally {
+          setLoadingHeatmap(false);
         }
 
         try {
@@ -580,7 +583,7 @@ export default function Dashboard() {
               Mapa de Calor - Concentracion de Reclamos
             </h2>
           </div>
-          <HeatmapWidget data={heatmapData} height="256px" />
+          <HeatmapWidget data={heatmapData} height="256px" title="Mapa de Calor - Concentracion de Reclamos" loading={loadingHeatmap} />
           <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
             {heatmapData.length} puntos en los ultimos 90 dias
           </p>

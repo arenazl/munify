@@ -214,14 +214,44 @@ export function WizardModal({
             />
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-              {/* Title */}
-              <div style={{ flex: 1 }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0, whiteSpace: 'nowrap' }}>
-                  {title}
-                </h2>
-                <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0 }}>
-                  Paso {currentStep + 1} de {steps.length}
-                </p>
+              {/* Title - muestra categoría si está seleccionada, sino título normal */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {headerBadge ? (
+                  <>
+                    <div
+                      style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '10px',
+                        backgroundColor: `${headerBadge.color}20`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: headerBadge.color,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {headerBadge.icon}
+                    </div>
+                    <div>
+                      <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0 }}>
+                        {headerBadge.label}
+                      </h2>
+                      <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0 }}>
+                        {currentStepData?.description || currentStepData?.title}
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <h2 style={{ fontSize: '16px', fontWeight: 700, color: theme.text, margin: 0, whiteSpace: 'nowrap' }}>
+                      {title}
+                    </h2>
+                    <p style={{ fontSize: '12px', color: theme.textSecondary, margin: 0 }}>
+                      Paso {currentStep + 1} de {steps.length}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Stepper - centered */}

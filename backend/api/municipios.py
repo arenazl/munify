@@ -275,7 +275,7 @@ async def obtener_usuarios_demo(
 
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
-@router.get("/", response_model=List[MunicipioDetalle])
+@router.get("", response_model=List[MunicipioDetalle])
 async def listar_municipios(
     skip: int = 0,
     limit: int = 100,
@@ -321,7 +321,7 @@ async def obtener_municipio(
     return municipio
 
 
-@router.post("/", response_model=MunicipioDetalle)
+@router.post("", response_model=MunicipioDetalle)
 async def crear_municipio(
     data: MunicipioCreate,
     db: AsyncSession = Depends(get_db),

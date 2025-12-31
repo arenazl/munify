@@ -29,11 +29,15 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { useMunicipioFromUrl } from '../hooks/useSubdomain';
+import PWAOnboarding from '../components/PWAOnboarding';
+import NotificationPrompt from '../components/NotificationPrompt';
 import {
   isPushSupported,
   getNotificationPermission,
   subscribeToPush,
 } from '../lib/pushNotifications';
+import { saveMunicipio, loadMunicipio, loadMunicipioSync } from '../utils/municipioStorage';
 
 interface Reclamo {
   id: number;
@@ -88,6 +92,7 @@ export default function HomePublic() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const municipioFromUrl = useMunicipioFromUrl();
 
   const [estadisticas, setEstadisticas] = useState<Estadisticas>({ total: 0, nuevos: 0, en_proceso: 0, resueltos: 0 });
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
@@ -97,19 +102,110 @@ export default function HomePublic() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [configLoading, setConfigLoading] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [municipioLoaded, setMunicipioLoaded] = useState(false);
+  const [showPWAOnboarding, setShowPWAOnboarding] = useState(false);
+  // Inicializar con datos sincronos de localStorage, luego actualizar con IndexedDB
+  const syncData = loadMunicipioSync();
+  const [municipioData, setMunicipioData] = useState({
+    nombre: syncData?.nombre || 'Mi Municipio',
+    id: syncData?.id || null,
+    color: syncData?.color || '#3b82f6',
+    logo: syncData?.logo_url || null,
+  });
 
   const { isInstallable, isInstalled, promptInstall, showIOSInstructions, isIOS } = usePWAInstall();
   const pushSupported = isPushSupported();
+
+  // Mostrar onboarding PWA en mobile si no esta instalado y no lo vio antes
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const hasSeenOnboarding = localStorage.getItem('pwa_onboarding_seen');
+
+    if (isMobile && !isInstalled && !hasSeenOnboarding) {
+      // Mostrar despues de 1.5 segundos para que cargue la pagina
+      const timer = setTimeout(() => {
+        setShowPWAOnboarding(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isInstalled]);
+
+  const handleCloseOnboarding = () => {
+    setShowPWAOnboarding(false);
+    localStorage.setItem('pwa_onboarding_seen', 'true');
+  };
 
   // Actualizar estado de permisos de notificacion
   useEffect(() => {
     setNotificationPermission(getNotificationPermission());
   }, [showConfigModal]);
 
-  const municipioNombre = localStorage.getItem('municipio_nombre') || 'Mi Municipio';
-  const municipioId = localStorage.getItem('municipio_id');
-  const municipioColor = localStorage.getItem('municipio_color') || '#3b82f6';
-  const municipioLogo = localStorage.getItem('municipio_logo_url');
+  // Cargar municipio desde IndexedDB/localStorage o URL
+  useEffect(() => {
+    const initMunicipio = async () => {
+      // Primero intentar cargar de IndexedDB (mas persistente en iOS)
+      const savedData = await loadMunicipio();
+
+      // Si viene municipio en la URL y es diferente al guardado, usar el de la URL
+      if (municipioFromUrl) {
+        if (savedData?.codigo?.toLowerCase() !== municipioFromUrl.toLowerCase()) {
+          // Cargar el nuevo municipio desde la API
+          try {
+            const res = await fetch(`${API_URL}/municipios/public`);
+            if (res.ok) {
+              const municipios = await res.json();
+              const found = municipios.find((m: { codigo: string }) =>
+                m.codigo.toLowerCase() === municipioFromUrl.toLowerCase()
+              );
+              if (found) {
+                // Guardar en IndexedDB + localStorage
+                await saveMunicipio({
+                  id: found.id.toString(),
+                  codigo: found.codigo,
+                  nombre: found.nombre,
+                  color: found.color_primario,
+                  logo_url: found.logo_url,
+                });
+                setMunicipioData({
+                  nombre: found.nombre,
+                  id: found.id.toString(),
+                  color: found.color_primario,
+                  logo: found.logo_url || null,
+                });
+                setMunicipioLoaded(true);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Error cargando municipio desde URL:', error);
+          }
+        }
+      }
+
+      // Si hay datos guardados, usarlos
+      if (savedData && savedData.id) {
+        setMunicipioData({
+          nombre: savedData.nombre,
+          id: savedData.id,
+          color: savedData.color,
+          logo: savedData.logo_url || null,
+        });
+        setMunicipioLoaded(true);
+        return;
+      }
+
+      // Si no hay municipio guardado ni en URL, marcar como cargado
+      // para que el siguiente useEffect redirija a /bienvenido
+      setMunicipioLoaded(true);
+    };
+    initMunicipio();
+  }, [municipioFromUrl]);
+
+  // Usar estado en vez de localStorage directo para reactivos
+  const municipioNombre = municipioData.nombre;
+  const municipioId = municipioData.id;
+  const municipioColor = municipioData.color;
+  const municipioLogo = municipioData.logo;
 
   // Scroll to top al montar el componente
   useEffect(() => {
@@ -117,12 +213,13 @@ export default function HomePublic() {
   }, []);
 
   useEffect(() => {
+    if (!municipioLoaded) return;
     if (!municipioId) {
       navigate('/bienvenido');
       return;
     }
     fetchData();
-  }, [municipioId]);
+  }, [municipioId, municipioLoaded]);
 
   const fetchData = async () => {
     try {
@@ -197,18 +294,31 @@ export default function HomePublic() {
   };
 
   // Si el usuario está logueado, redirigir al panel correspondiente
+  // PERO solo después de que se haya procesado el municipio de la URL
   useEffect(() => {
-    if (user) {
+    if (user && municipioLoaded) {
       if (user.rol === 'vecino') {
         navigate('/gestion/mi-panel');
       } else {
         navigate('/gestion');
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, municipioLoaded]);
 
   return (
     <div className="min-h-screen pb-20 md:pb-0 overflow-x-hidden" style={{ backgroundColor: theme.background }}>
+      {/* PWA Onboarding Modal */}
+      {showPWAOnboarding && (
+        <PWAOnboarding
+          onClose={handleCloseOnboarding}
+          municipioNombre={municipioNombre}
+          municipioColor={municipioColor}
+        />
+      )}
+
+      {/* Prompt para activar notificaciones */}
+      <NotificationPrompt delay={3000} />
+
       {/* Header - Desktop */}
       <header
         className="hidden md:block sticky top-0 z-40 border-b"

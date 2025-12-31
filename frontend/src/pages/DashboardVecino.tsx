@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { reclamosApi, publicoApi, configuracionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationPrompt from '../components/NotificationPrompt';
 import type { Reclamo, EstadoReclamo } from '../types';
 
 interface EstadisticasPublicas {
@@ -398,6 +399,9 @@ export default function DashboardVecino() {
 
   return (
     <div className="space-y-6">
+      {/* Prompt para activar notificaciones */}
+      <NotificationPrompt delay={2000} />
+
       {/* Header de bienvenida - siempre visible */}
       <div>
         <h1 className="text-xl sm:text-2xl font-bold" style={{ color: theme.text }}>

@@ -1,23 +1,21 @@
 import axios from 'axios';
 
 const getApiUrl = () => {
+  // Si hay URL completa configurada, usarla
   const envUrl = import.meta.env.VITE_API_URL;
-
-  // Si hay URL configurada, usarla
   if (envUrl) {
     return envUrl;
   }
 
-  // Fallback: en desarrollo usar el host actual
-  if (import.meta.env.DEV) {
-    const host = window.location.hostname;
-    return `http://${host}:8001/api`;
-  }
+  // Usar puerto configurable (default 8000)
+  const port = import.meta.env.VITE_API_PORT || '8000';
+  const host = window.location.hostname || 'localhost';
 
-  return 'http://localhost:8001/api';
+  return `http://${host}:${port}/api`;
 };
 
-const API_URL = getApiUrl();
+export const API_URL = getApiUrl();
+export const API_BASE_URL = API_URL.replace('/api', '');
 console.log('🔗 API URL:', API_URL);
 
 if (!API_URL) {

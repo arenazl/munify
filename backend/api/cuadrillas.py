@@ -85,7 +85,7 @@ async def sugerir_cuadrilla(
 # RUTAS CRUD ESTÁNDAR
 # ===========================================
 
-@router.get("/", response_model=List[CuadrillaResponse])
+@router.get("", response_model=List[CuadrillaResponse])
 async def get_cuadrillas(
     activo: bool = None,
     db: AsyncSession = Depends(get_db),
@@ -122,7 +122,7 @@ async def get_cuadrilla(
         raise HTTPException(status_code=404, detail="Cuadrilla no encontrada")
     return cuadrilla
 
-@router.post("/", response_model=CuadrillaResponse)
+@router.post("", response_model=CuadrillaResponse)
 async def create_cuadrilla(
     data: CuadrillaCreate,
     db: AsyncSession = Depends(get_db),

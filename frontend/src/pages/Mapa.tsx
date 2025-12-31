@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import { X, MapPin, Calendar, User, Tag, Clock, Navigation, ExternalLink } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { reclamosApi } from '../lib/api';
@@ -38,42 +38,131 @@ const createPinIcon = (color: string) => {
   });
 };
 
+// Colores consistentes con Reclamos.tsx
 const STATUS_COLORS: Record<string, string> = {
-  pendiente: '#f59e0b',
+  nuevo: '#6366f1',
   asignado: '#3b82f6',
-  en_progreso: '#8b5cf6',
+  en_proceso: '#f59e0b',
+  pendiente_confirmacion: '#8b5cf6',
   resuelto: '#10b981',
   rechazado: '#ef4444',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  pendiente: 'Pendiente',
+  nuevo: 'Nuevo',
   asignado: 'Asignado',
-  en_progreso: 'En Progreso',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pend. Confirm.',
   resuelto: 'Resuelto',
   rechazado: 'Rechazado',
 };
+
+// Componente para ajustar el mapa a los bounds de los markers
+function FitBoundsToMarkers({ reclamos }: { reclamos: Reclamo[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (reclamos.length === 0) return;
+
+    // Pequeño delay para asegurar que el mapa esté listo
+    const timer = setTimeout(() => {
+      const validReclamos = reclamos.filter(r => r.latitud && r.longitud);
+
+      if (validReclamos.length === 0) return;
+
+      map.invalidateSize();
+
+      if (validReclamos.length === 1) {
+        // Si hay solo un marker, centrar en él
+        map.setView([validReclamos[0].latitud!, validReclamos[0].longitud!], 15);
+      } else {
+        // Si hay múltiples markers, ajustar bounds para verlos todos
+        const latlngs = validReclamos.map(r => L.latLng(r.latitud!, r.longitud!));
+        const bounds = L.latLngBounds(latlngs);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [reclamos, map]);
+
+  return null;
+}
 
 export default function Mapa() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<Reclamo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Filtros de estado - null = todos, string = solo ese estado
+  const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchReclamos = async () => {
+    const fetchReclamosEnLotes = async () => {
       try {
-        const response = await reclamosApi.getAll();
-        setReclamos(response.data.filter((r: Reclamo) => r.latitud && r.longitud));
+        const BATCH_SIZE = 100;
+        let allReclamos: Reclamo[] = [];
+        let skip = 0;
+        let hasMore = true;
+        let isFirstBatch = true;
+
+        // Cargar en lotes hasta que no haya más
+        while (hasMore) {
+          if (!isFirstBatch) {
+            setLoadingMore(true);
+          }
+
+          const response = await reclamosApi.getAll({ skip, limit: BATCH_SIZE });
+          const batch = response.data || [];
+
+          // Filtrar solo los que tienen ubicación
+          const conUbicacion = batch.filter((r: Reclamo) => r.latitud && r.longitud);
+          allReclamos = [...allReclamos, ...conUbicacion];
+
+          // Eliminar duplicados por ID (puede haber en la base de datos)
+          const idsVistos = new Set<number>();
+          const sinDuplicados = allReclamos.filter(r => {
+            if (idsVistos.has(r.id)) return false;
+            idsVistos.add(r.id);
+            return true;
+          });
+
+          // Actualizar estado parcialmente para mostrar progreso
+          setReclamos(sinDuplicados);
+
+          // Después del primer lote, quitar loading principal para mostrar el mapa
+          if (isFirstBatch) {
+            setLoading(false);
+            isFirstBatch = false;
+          }
+
+          // Si trajo menos del límite, ya no hay más
+          if (batch.length < BATCH_SIZE) {
+            hasMore = false;
+          } else {
+            skip += BATCH_SIZE;
+          }
+        }
+
+        // Obtener cantidad final sin duplicados
+        const idsFinales = new Set<number>();
+        const totalSinDuplicados = allReclamos.filter(r => {
+          if (idsFinales.has(r.id)) return false;
+          idsFinales.add(r.id);
+          return true;
+        }).length;
+        console.log(`[Mapa] Cargados ${totalSinDuplicados} reclamos con ubicación (sin duplicados)`);
       } catch (error) {
         console.error('Error cargando reclamos:', error);
-      } finally {
         setLoading(false);
+      } finally {
+        setLoadingMore(false);
       }
     };
-    fetchReclamos();
+    fetchReclamosEnLotes();
   }, []);
 
   // Calcular centro del mapa basado en reclamos
@@ -112,23 +201,73 @@ export default function Mapa() {
     );
   }
 
+  // Contar reclamos por estado
+  const conteosPorEstado = reclamos.reduce((acc, r) => {
+    acc[r.estado] = (acc[r.estado] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Filtrar reclamos según el estado seleccionado
+  const reclamosFiltrados = filtroEstado
+    ? reclamos.filter(r => r.estado === filtroEstado)
+    : reclamos;
+
+  // Toggle filtro: si ya está seleccionado, deseleccionar (mostrar todos)
+  const toggleFiltro = (estado: string) => {
+    setFiltroEstado(prev => prev === estado ? null : estado);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: theme.text }}>Mapa de Reclamos</h1>
-        <div className="flex items-center gap-4 text-sm" style={{ color: theme.textSecondary }}>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.pendiente }}></div>
-            <span>Pendiente</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.en_progreso }}></div>
-            <span>En progreso</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLORS.resuelto }}></div>
-            <span>Resuelto</span>
-          </div>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold" style={{ color: theme.text }}>Mapa de Reclamos</h1>
+          {loadingMore && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              <span>Cargando más...</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap text-sm">
+          {/* Botón "Todos" */}
+          <button
+            onClick={() => setFiltroEstado(null)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+            style={{
+              backgroundColor: filtroEstado === null ? theme.primary : `${theme.textSecondary}15`,
+              color: filtroEstado === null ? '#ffffff' : theme.textSecondary,
+              border: `1px solid ${filtroEstado === null ? theme.primary : theme.border}`,
+            }}
+          >
+            <span>Todos</span>
+            <span className="font-medium">({reclamos.length})</span>
+          </button>
+          {/* Botones por estado */}
+          {Object.entries(STATUS_COLORS).map(([estado, color]) => {
+            const count = conteosPorEstado[estado] || 0;
+            if (count === 0) return null;
+            const isActive = filtroEstado === estado;
+            return (
+              <button
+                key={estado}
+                onClick={() => toggleFiltro(estado)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+                style={{
+                  backgroundColor: isActive ? color : `${color}15`,
+                  color: isActive ? '#ffffff' : color,
+                  border: `1px solid ${isActive ? color : `${color}40`}`,
+                }}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: isActive ? '#ffffff' : color }}
+                />
+                <span>{STATUS_LABELS[estado]}</span>
+                <span className="font-medium">({count})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -144,7 +283,8 @@ export default function Mapa() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {reclamos.map((reclamo) => (
+            <FitBoundsToMarkers reclamos={reclamosFiltrados} />
+            {reclamosFiltrados.map((reclamo) => (
               <Marker
                 key={reclamo.id}
                 position={[reclamo.latitud!, reclamo.longitud!]}
@@ -359,10 +499,10 @@ export default function Mapa() {
       {/* Lista de reclamos con ubicación */}
       <div className="rounded-lg shadow p-6" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
         <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-          Reclamos con ubicación ({reclamos.length})
+          {filtroEstado ? `${STATUS_LABELS[filtroEstado]} (${reclamosFiltrados.length})` : `Reclamos con ubicación (${reclamos.length})`}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {reclamos.slice(0, 9).map((reclamo) => (
+          {reclamosFiltrados.slice(0, 9).map((reclamo) => (
             <div
               key={reclamo.id}
               className="p-4 rounded-lg cursor-pointer transition-all hover:scale-[1.02]"

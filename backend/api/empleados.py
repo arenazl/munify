@@ -13,7 +13,7 @@ from schemas.empleado import EmpleadoCreate, EmpleadoUpdate, EmpleadoResponse
 
 router = APIRouter()
 
-@router.get("/", response_model=List[EmpleadoResponse])
+@router.get("", response_model=List[EmpleadoResponse])
 async def get_empleados(
     activo: bool = None,
     db: AsyncSession = Depends(get_db),
@@ -52,7 +52,7 @@ async def get_empleado(
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
     return empleado
 
-@router.post("/", response_model=EmpleadoResponse)
+@router.post("", response_model=EmpleadoResponse)
 async def create_empleado(
     data: EmpleadoCreate,
     db: AsyncSession = Depends(get_db),

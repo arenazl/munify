@@ -515,7 +515,7 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
 async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool = True) -> Dict:
     """
     Clasificación: usa IA si está habilitada, sino local.
-    Prioridad de IA: Gemini > Grok > local
+    Prioridad de IA: Groq > Gemini > local
 
     Args:
         texto: Título y/o descripción del reclamo
@@ -533,17 +533,17 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
     ia_metodo = None
 
     if usar_ia:
-        # Intentar Gemini primero (default)
-        if settings.GEMINI_API_KEY:
-            ia_results = await clasificar_con_gemini(texto, categorias)
-            if ia_results:
-                ia_metodo = 'gemini'
-
-        # Si Gemini no funcionó, intentar Groq
-        if not ia_results and settings.GROK_API_KEY:
+        # Intentar Groq primero (más rápido)
+        if settings.GROK_API_KEY:
             ia_results = await clasificar_con_groq(texto, categorias)
             if ia_results:
                 ia_metodo = 'groq'
+
+        # Si Groq no funcionó, intentar Gemini como fallback
+        if not ia_results and settings.GEMINI_API_KEY:
+            ia_results = await clasificar_con_gemini(texto, categorias)
+            if ia_results:
+                ia_metodo = 'gemini'
 
     # 4. Combinar resultados
     if ia_results:
@@ -556,7 +556,7 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
         return {
             'sugerencias': local_results,
             'metodo_principal': 'local',
-            'ia_disponible': bool(settings.GEMINI_API_KEY or settings.GROK_API_KEY)
+            'ia_disponible': bool(settings.GROK_API_KEY or settings.GEMINI_API_KEY)
         }
 
 

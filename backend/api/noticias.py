@@ -26,7 +26,7 @@ async def get_noticias_publico(
     noticias = result.scalars().all()
     return noticias
 
-@router.get("/", response_model=List[NoticiaResponse])
+@router.get("", response_model=List[NoticiaResponse])
 async def get_noticias(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
@@ -40,7 +40,7 @@ async def get_noticias(
     noticias = result.scalars().all()
     return noticias
 
-@router.post("/", response_model=NoticiaResponse)
+@router.post("", response_model=NoticiaResponse)
 async def create_noticia(
     data: NoticiaCreate,
     db: AsyncSession = Depends(get_db),

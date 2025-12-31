@@ -54,7 +54,7 @@ async def update_my_profile(
 # ENDPOINTS DE ADMINISTRACIÓN (admin/supervisor)
 # ============================================
 
-@router.get("/", response_model=List[UserResponse])
+@router.get("", response_model=List[UserResponse])
 async def get_users(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -86,7 +86,7 @@ async def get_user(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
 
-@router.post("/", response_model=UserResponse)
+@router.post("", response_model=UserResponse)
 async def create_user(
     user_data: UserCreate,
     request: Request,

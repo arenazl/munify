@@ -25,7 +25,9 @@
       "Bash(git push:*)",
       "Bash(netlify status:*)",
       "Bash(netlify sites:list:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

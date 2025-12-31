@@ -35,6 +35,7 @@ import MiRendimiento from './pages/MiRendimiento';
 import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
 import Onboarding from './pages/Onboarding';
+import MunicipioHome from './pages/MunicipioHome';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -91,6 +92,7 @@ export const router = createBrowserRouter([
   // === RUTAS PÚBLICAS ===
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
+  { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/merlo
   { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },

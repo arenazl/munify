@@ -25,7 +25,7 @@ def get_effective_municipio_id(request: Request, current_user: User) -> int:
     return current_user.municipio_id
 
 
-@router.get("/", response_model=List[CategoriaResponse])
+@router.get("", response_model=List[CategoriaResponse])
 async def get_categorias(
     request: Request,
     activo: bool = None,
@@ -58,7 +58,7 @@ async def get_categoria(
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     return categoria
 
-@router.post("/", response_model=CategoriaResponse)
+@router.post("", response_model=CategoriaResponse)
 async def create_categoria(
     request: Request,
     data: CategoriaCreate,

@@ -25,7 +25,7 @@ def get_effective_municipio_id(request: Request, current_user: User) -> int:
     return current_user.municipio_id
 
 
-@router.get("/", response_model=List[ZonaResponse])
+@router.get("", response_model=List[ZonaResponse])
 async def get_zonas(
     request: Request,
     activo: bool = None,
@@ -58,7 +58,7 @@ async def get_zona(
         raise HTTPException(status_code=404, detail="Zona no encontrada")
     return zona
 
-@router.post("/", response_model=ZonaResponse)
+@router.post("", response_model=ZonaResponse)
 async def create_zona(
     request: Request,
     data: ZonaCreate,

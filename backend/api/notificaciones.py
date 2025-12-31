@@ -11,7 +11,7 @@ from schemas.notificacion import NotificacionResponse
 
 router = APIRouter()
 
-@router.get("/", response_model=List[NotificacionResponse])
+@router.get("", response_model=List[NotificacionResponse])
 async def get_notificaciones(
     leidas: bool = None,
     db: AsyncSession = Depends(get_db),

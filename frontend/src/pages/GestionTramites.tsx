@@ -46,6 +46,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
 import { TramiteWizard } from '../components/TramiteWizard';
+import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import type { Tramite, EstadoTramite, ServicioTramite, Empleado, TipoTramite } from '../types';
 import React from 'react';
 
@@ -514,13 +515,8 @@ export default function GestionTramites() {
       t.empleado_asignado?.apellido?.toLowerCase().includes(term);
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
-      </div>
-    );
-  }
+  // Ya no bloqueamos el render con un spinner - mostramos el header inmediatamente
+  // y usamos skeletons en los filtros/cards mientras cargan los datos
 
   return (
     <div className="space-y-6">
@@ -695,6 +691,19 @@ export default function GestionTramites() {
         <div className="flex flex-col gap-2">
           {/* Tipos de trámite - Grid 2 filas en mobile, 1 fila en desktop */}
           <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
+            {/* Skeleton mientras cargan los tipos */}
+            {loading || tipos.length === 0 ? (
+              <>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={`skeleton-tipo-${i}`}
+                    className="h-[68px] rounded-xl animate-pulse sm:flex-1 sm:min-w-0"
+                    style={{ background: `${theme.border}40` }}
+                  />
+                ))}
+              </>
+            ) : (
+              <>
             {/* Botón Todos */}
             <button
               onClick={() => setFiltroTipo(null)}
@@ -738,6 +747,8 @@ export default function GestionTramites() {
                 </button>
               );
             })}
+              </>
+            )}
           </div>
 
           {/* Estados - Grid 2 filas en mobile (4 columnas), 1 fila en desktop */}
@@ -800,7 +811,12 @@ export default function GestionTramites() {
       {/* Vista Cards */}
       {viewMode === 'cards' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in slide-in-from-left-4 duration-300">
-          {filteredTramites.length === 0 ? (
+          {loading ? (
+            // Skeletons mientras carga
+            Array.from({ length: 6 }).map((_, i) => (
+              <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
+            ))
+          ) : filteredTramites.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: theme.textSecondary }} />
               <p style={{ color: theme.textSecondary }}>No hay trámites</p>
@@ -991,7 +1007,21 @@ export default function GestionTramites() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTramites.length === 0 ? (
+                {loading ? (
+                  // Skeleton rows mientras carga
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={`skeleton-row-${i}`}>
+                      {Array.from({ length: 9 }).map((_, j) => (
+                        <td key={`skeleton-cell-${i}-${j}`} className="px-4 py-3">
+                          <div
+                            className="h-4 rounded animate-pulse"
+                            style={{ background: `${theme.border}40`, width: j === 0 ? '80px' : j === 4 ? '200px' : '100px' }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                ) : filteredTramites.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="text-center py-12">
                       <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: theme.textSecondary }} />

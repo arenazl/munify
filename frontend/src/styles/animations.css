@@ -57,6 +57,20 @@
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Pulse fade - for loading states on filter buttons */
+@keyframes pulse-fade {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-pulse-fade {
+  animation: pulse-fade 0.8s ease-in-out infinite;
+}
+
 /* Slide in animations */
 @keyframes slideInLeft {
   from {

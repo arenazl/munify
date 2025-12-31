@@ -205,6 +205,7 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   // IA contextual basada en lo que escribe el usuario
   const [contextualAiResponse, setContextualAiResponse] = useState('');
   const [contextualAiLoading, setContextualAiLoading] = useState(false);
+  const [contextualAiFailed, setContextualAiFailed] = useState(false);
   const contextualAiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Autocompletado de direcciones
@@ -381,12 +382,14 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
     // Solo activar con 3+ palabras y servicio seleccionado
     if (palabras.length < 3 || !selectedServicio) {
       setContextualAiResponse('');
+      setContextualAiFailed(false);
       return;
     }
 
     // Debounce de 3 segundos - solo cuando el usuario realmente frena
     contextualAiTimeoutRef.current = setTimeout(async () => {
       setContextualAiLoading(true);
+      setContextualAiFailed(false);
 
       try {
         const contexto: Record<string, unknown> = {
@@ -414,9 +417,14 @@ Tono amigable, 3-4 oraciones máximo.`,
           'tramite_contextual'
         );
         console.log('[IA Contextual] Respuesta:', response);
-        setContextualAiResponse(response.response || response.message || '');
+        const aiText = response.response || response.message || '';
+        setContextualAiResponse(aiText);
+        if (!aiText) {
+          setContextualAiFailed(true);
+        }
       } catch {
         setContextualAiResponse('');
+        setContextualAiFailed(true);
       } finally {
         setContextualAiLoading(false);
       }
@@ -815,6 +823,15 @@ Tono amigable, 3-4 oraciones máximo.`,
                   <span>{group.join(' ')}</span>
                 </p>
               ))}
+            </div>
+          </div>
+        )}
+
+        {contextualAiFailed && !contextualAiResponse && !contextualAiLoading && (
+          <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              <span className="text-sm" style={{ color: theme.textSecondary }}>Recomendaciones no disponibles</span>
             </div>
           </div>
         )}
