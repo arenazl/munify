@@ -2979,6 +2979,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 </span>
               </button>
 
+              
+
               {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
               {categorias.filter((cat) => (conteosCategorias[cat.id] || 0) > 0 || reclamos.some(r => r.categoria.id === cat.id)).map((cat) => {
                 const isSelected = filtroCategoria === cat.id;
