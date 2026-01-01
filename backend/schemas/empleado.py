@@ -14,7 +14,10 @@ class CategoriaSimple(BaseModel):
 class EmpleadoCreate(BaseModel):
     nombre: str
     apellido: Optional[str] = None
+    email: str  # Email para login
+    password: str  # Password para login
     telefono: Optional[str] = None
+    dni: Optional[str] = None
     descripcion: Optional[str] = None
     especialidad: Optional[str] = None
     zona_id: Optional[int] = None

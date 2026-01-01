@@ -14,12 +14,14 @@ import {
   BarChart3,
   Trophy,
   Sparkles,
+  Bell,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, publicoApi, configuracionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPrompt from '../components/NotificationPrompt';
+import { subscribeToPush, isSubscribed } from '../lib/pushNotifications';
 import type { Reclamo, EstadoReclamo } from '../types';
 
 interface EstadisticasPublicas {

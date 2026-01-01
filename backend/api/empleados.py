@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from typing import List
 
 from core.database import get_db
-from core.security import get_current_user, require_roles
+from core.security import get_current_user, require_roles, get_password_hash
 from models.empleado import Empleado
 from models.categoria import Categoria
 from models.user import User
@@ -58,11 +58,43 @@ async def create_empleado(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin"]))
 ):
-    # Extraer categoria_ids antes de crear el modelo
-    categoria_ids = data.categoria_ids or []
-    create_data = data.model_dump(exclude={'categoria_ids'})
+    # Verificar que el email no exista
+    existing_user = await db.execute(
+        select(User).where(User.email == data.email)
+    )
+    if existing_user.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Ya existe un usuario con ese email")
 
-    empleado = Empleado(**create_data, municipio_id=current_user.municipio_id)
+    # 1. Crear el usuario con rol empleado
+    nuevo_usuario = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        nombre=data.nombre,
+        apellido=data.apellido or "",
+        telefono=data.telefono,
+        dni=data.dni,
+        rol="empleado",
+        municipio_id=current_user.municipio_id,
+        activo=True
+    )
+    db.add(nuevo_usuario)
+    await db.flush()  # Para obtener el ID del usuario
+
+    # 2. Crear el empleado vinculado al usuario
+    categoria_ids = data.categoria_ids or []
+    empleado_data = {
+        'nombre': data.nombre,
+        'apellido': data.apellido,
+        'telefono': data.telefono,
+        'descripcion': data.descripcion,
+        'especialidad': data.especialidad,
+        'zona_id': data.zona_id,
+        'capacidad_maxima': data.capacidad_maxima,
+        'categoria_principal_id': data.categoria_principal_id,
+        'municipio_id': current_user.municipio_id
+    }
+
+    empleado = Empleado(**empleado_data)
 
     # Agregar categorias si se proporcionan (solo del mismo municipio)
     if categoria_ids:
@@ -76,6 +108,11 @@ async def create_empleado(
         empleado.categorias = list(categorias)
 
     db.add(empleado)
+    await db.flush()
+
+    # 3. Vincular usuario al empleado como miembro
+    nuevo_usuario.empleado_id = empleado.id
+
     await db.commit()
     await db.refresh(empleado)
 

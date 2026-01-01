@@ -352,30 +352,21 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center space-x-3">
-              {/* Toggle de Push Notifications - visible para todos si no está suscrito */}
-              {pushSubscribed === false && (
+              {/* Toggle de Push Notifications - SIEMPRE visible si no está suscrito */}
+              {!pushSubscribed && (
                 <button
                   onClick={handleTopBarPushSubscribe}
                   disabled={pushSubscribing}
-                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0 animate-pulse"
                   style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1px solid ${theme.border}`,
+                    backgroundColor: theme.primary,
+                    color: '#ffffff',
                     opacity: pushSubscribing ? 0.7 : 1,
                   }}
                   title="Activar notificaciones push"
                 >
-                  <BellRing className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                  {/* Toggle OFF - oculto en mobile para ahorrar espacio */}
-                  <div
-                    className="hidden sm:block w-8 h-5 rounded-full p-0.5 transition-all"
-                    style={{ backgroundColor: theme.border }}
-                  >
-                    <div
-                      className="w-4 h-4 rounded-full bg-white transition-transform"
-                      style={{ transform: 'translateX(0)' }}
-                    />
-                  </div>
+                  <BellRing className="h-4 w-4" />
+                  <span className="text-xs font-medium hidden sm:inline">Activar</span>
                 </button>
               )}
 
@@ -818,6 +809,46 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
+          {/* Banner de activar notificaciones - visible para vecino, empleado, supervisor */}
+          {!pushSubscribed && user.rol !== 'admin' && (
+            <div
+              className="mb-4 p-4 rounded-xl flex items-center justify-between gap-4"
+              style={{
+                backgroundColor: `${theme.primary}15`,
+                border: `1px solid ${theme.primary}30`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded-full"
+                  style={{ backgroundColor: theme.primary }}
+                >
+                  <BellRing className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm" style={{ color: theme.text }}>
+                    Activá las notificaciones
+                  </p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>
+                    Recibí alertas cuando haya novedades en tus reclamos
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleTopBarPushSubscribe}
+                disabled={pushSubscribing}
+                className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:opacity-90 active:scale-95 whitespace-nowrap"
+                style={{
+                  backgroundColor: theme.primary,
+                  color: '#ffffff',
+                  opacity: pushSubscribing ? 0.7 : 1,
+                }}
+              >
+                {pushSubscribing ? 'Activando...' : 'Activar'}
+              </button>
+            </div>
+          )}
+
           <PageTransition>
             <Outlet />
           </PageTransition>

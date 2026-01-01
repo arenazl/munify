@@ -19,6 +19,10 @@ export default function Empleados() {
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',
+    email: '',
+    password: '',
+    telefono: '',
+    dni: '',
     descripcion: '',
     especialidad: '',
     capacidad_maxima: 10,
@@ -54,6 +58,10 @@ export default function Empleados() {
       setFormData({
         nombre: empleado.nombre,
         apellido: empleado.apellido || '',
+        email: '', // No mostramos email en edición
+        password: '', // No mostramos password en edición
+        telefono: empleado.telefono || '',
+        dni: '',
         descripcion: empleado.descripcion || '',
         especialidad: empleado.especialidad || '',
         capacidad_maxima: empleado.capacidad_maxima,
@@ -66,6 +74,10 @@ export default function Empleados() {
       setFormData({
         nombre: '',
         apellido: '',
+        email: '',
+        password: '',
+        telefono: '',
+        dni: '',
         descripcion: '',
         especialidad: '',
         capacidad_maxima: 10,
@@ -84,10 +96,19 @@ export default function Empleados() {
   };
 
   const handleSubmit = async () => {
+    // Validar email y password solo para nuevo empleado
+    if (!selectedEmpleado) {
+      if (!formData.email || !formData.password) {
+        toast.error('Email y contraseña son requeridos');
+        return;
+      }
+    }
+
     setSaving(true);
-    const payload = {
+    const payload: Record<string, unknown> = {
       nombre: formData.nombre,
       apellido: formData.apellido || null,
+      telefono: formData.telefono || null,
       descripcion: formData.descripcion || null,
       especialidad: formData.especialidad || null,
       capacidad_maxima: formData.capacidad_maxima,
@@ -95,6 +116,13 @@ export default function Empleados() {
       categoria_principal_id: formData.categoria_principal_id ? parseInt(formData.categoria_principal_id) : null,
       categoria_ids: formData.categoria_ids
     };
+
+    // Solo agregar email/password/dni para nuevo empleado
+    if (!selectedEmpleado) {
+      payload.email = formData.email;
+      payload.password = formData.password;
+      payload.dni = formData.dni || null;
+    }
 
     try {
       if (selectedEmpleado) {
@@ -300,6 +328,44 @@ export default function Empleados() {
               placeholder="Apellido"
             />
           </div>
+
+          {/* Campos de acceso - solo para nuevo empleado */}
+          {!selectedEmpleado && (
+            <>
+              <ABMInput
+                label="Email"
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="email@ejemplo.com"
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <ABMInput
+                  label="Contraseña"
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Contraseña"
+                />
+                <ABMInput
+                  label="DNI"
+                  value={formData.dni}
+                  onChange={(e) => setFormData({ ...formData, dni: e.target.value })}
+                  placeholder="DNI"
+                />
+              </div>
+            </>
+          )}
+
+          <ABMInput
+            label="Teléfono"
+            type="tel"
+            value={formData.telefono}
+            onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+            placeholder="Teléfono"
+          />
 
           <ABMTextarea
             label="Descripcion"
