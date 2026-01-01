@@ -167,10 +167,19 @@ export default function Ajustes() {
         {
           id: 'tipos-tramite',
           label: 'Tipos de Tramite',
-          description: 'Habilitaciones, permisos, licencias',
-          icon: FileText,
+          description: 'Categorías: Obras, Comercio, etc',
+          icon: FolderTree,
           color: '#10b981',
           link: '/gestion/tipos-tramite',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'tramites-catalogo',
+          label: 'Catálogo Trámites',
+          description: 'Trámites específicos: permisos, habilitaciones',
+          icon: FileText,
+          color: '#6366f1',
+          link: '/gestion/tramites-catalogo',
           show: isAdminOrSupervisor
         }
       ]

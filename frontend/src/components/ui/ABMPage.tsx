@@ -70,12 +70,14 @@ export function ABMPage({
   sheetFooter,
   onSheetClose,
   tableView,
-  defaultViewMode = 'table',
+  defaultViewMode,
 }: ABMPageProps) {
   // Combinar filters con extraFilters para compatibilidad
   const allFilters = filters || extraFilters;
   const { theme } = useTheme();
-  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  // Si no hay tableView, defaultear a 'cards' para evitar pantalla vacía
+  const resolvedDefaultViewMode = defaultViewMode || (tableView ? 'table' : 'cards');
+  const [viewMode, setViewMode] = useState<ViewMode>(resolvedDefaultViewMode);
   const [isSticky, setIsSticky] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);

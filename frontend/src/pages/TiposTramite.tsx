@@ -7,11 +7,36 @@ import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import type { TipoTramite, TramiteCatalogo } from '../types';
 
-// Iconos disponibles para tipos de trámite
+// Iconos disponibles para tipos de trámite (organizados por categoría)
 const ICONOS_DISPONIBLES = [
-  'HardHat', 'Store', 'Car', 'Landmark', 'Map', 'TreeDeciduous', 'Heart',
-  'Wrench', 'CalendarDays', 'FileText', 'Users', 'AlertTriangle', 'Building2',
-  'Home', 'Briefcase', 'GraduationCap', 'Stethoscope', 'ShoppingCart'
+  // Documentos y Trámites
+  'FileText', 'FileCheck', 'FilePlus', 'FileSearch', 'Files', 'FolderOpen', 'ClipboardList', 'ClipboardCheck',
+  // Construcción y Obras
+  'HardHat', 'Building', 'Building2', 'Home', 'Hammer', 'Wrench', 'Construction',
+  // Comercio y Negocios
+  'Store', 'ShoppingBag', 'ShoppingCart', 'Briefcase', 'CreditCard', 'Receipt', 'BadgePercent',
+  // Vehículos y Transporte
+  'Car', 'Truck', 'Bus', 'Bike', 'ParkingCircle', 'TrafficCone',
+  // Naturaleza y Ambiente
+  'TreeDeciduous', 'TreePine', 'Leaf', 'Flower2', 'Sun', 'Droplets',
+  // Personas y Social
+  'Users', 'UserPlus', 'UserCheck', 'Baby', 'Heart', 'HandHeart', 'Accessibility',
+  // Salud
+  'Stethoscope', 'Pill', 'Syringe', 'Activity', 'HeartPulse',
+  // Educación
+  'GraduationCap', 'BookOpen', 'School', 'Library',
+  // Comunicación
+  'Mail', 'Phone', 'MessageSquare', 'Megaphone', 'Bell',
+  // Ubicación
+  'MapPin', 'Map', 'Compass', 'Navigation', 'Landmark',
+  // Alertas y Estado
+  'AlertTriangle', 'AlertCircle', 'CheckCircle', 'XCircle', 'Info', 'HelpCircle',
+  // Tiempo
+  'Clock', 'Calendar', 'CalendarDays', 'Timer', 'History',
+  // Otros
+  'Key', 'Lock', 'Shield', 'Award', 'Star', 'Flag', 'Zap', 'Lightbulb', 'Settings', 'Tool',
+  // Animales
+  'Dog', 'Cat', 'Bird', 'Fish', 'Bug',
 ];
 
 function getIcon(iconName?: string) {
@@ -315,18 +340,20 @@ export default function TiposTramite() {
             <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
               Icono
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5 max-h-[180px] overflow-y-auto p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
               {ICONOS_DISPONIBLES.map(iconName => (
                 <button
                   key={iconName}
                   type="button"
                   onClick={() => setFormData({ ...formData, icono: iconName })}
-                  className="w-10 h-10 rounded-lg flex items-center justify-center transition-all"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:scale-110"
                   style={{
-                    backgroundColor: formData.icono === iconName ? formData.color : theme.backgroundSecondary,
+                    backgroundColor: formData.icono === iconName ? formData.color : theme.card,
                     color: formData.icono === iconName ? '#fff' : theme.textSecondary,
                     border: formData.icono === iconName ? 'none' : `1px solid ${theme.border}`,
+                    boxShadow: formData.icono === iconName ? `0 2px 8px ${formData.color}40` : 'none',
                   }}
+                  title={iconName}
                 >
                   {getIcon(iconName)}
                 </button>

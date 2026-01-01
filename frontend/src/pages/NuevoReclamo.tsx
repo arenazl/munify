@@ -33,17 +33,21 @@ import {
   Phone,
   MessageCircle,
   Send,
-  Bot
+  Bot,
+  Sparkles,
+  Clock,
+  Search
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, publicoApi, clasificacionApi, authApi } from '../lib/api';
+import { reclamosApi, publicoApi, clasificacionApi, authApi, chatApi } from '../lib/api';
 import { validationSchemas } from '../lib/validations';
 import { Categoria, Zona } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getDefaultRoute } from '../config/navigation';
 import { MapPicker } from '../components/ui/MapPicker';
-import { WizardForm, WizardStep, WizardStepContent } from '../components/ui/WizardForm';
+import { WizardModal, WizardStep } from '../components/ui/WizardModal';
+import { WizardStepContent } from '../components/ui/WizardForm';
 import { ReclamosSimilares } from '../components/ReclamosSimilares';
 
 // Iconos por categoría
@@ -137,6 +141,7 @@ export default function NuevoReclamo() {
   const [registerError, setRegisterError] = useState('');
   const [suggestedCategorias, setSuggestedCategorias] = useState<Array<{categoria: Categoria, confianza: number}>>([]);
   const [showSuggestion, setShowSuggestion] = useState(false);
+  const [searchCategoria, setSearchCategoria] = useState('');
   const [showSimilaresAlert, setShowSimilaresAlert] = useState(false);
   const [ignorarSimilares, setIgnorarSimilares] = useState(false);
   const [similaresCargados, setSimilaresCargados] = useState(false);
@@ -151,6 +156,12 @@ export default function NuevoReclamo() {
   const [chatCategoriaSugerida, setChatCategoriaSugerida] = useState<{categoria: Categoria, confianza: number} | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
+  // IA contextual basada en lo que escribe el usuario (igual que TramiteWizard)
+  const [contextualAiResponse, setContextualAiResponse] = useState('');
+  const [contextualAiLoading, setContextualAiLoading] = useState(false);
+  const [contextualAiFailed, setContextualAiFailed] = useState(false);
+  const contextualAiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Datos de registro (solo se usan si no hay usuario)
   const [registerData, setRegisterData] = useState({
@@ -532,6 +543,75 @@ export default function NuevoReclamo() {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // IA contextual: analiza lo que escribe el usuario en descripción (3+ palabras)
+  // Se dispara 3 segundos después de que el usuario deja de escribir
+  useEffect(() => {
+    // Limpiar timeout anterior
+    if (contextualAiTimeoutRef.current) {
+      clearTimeout(contextualAiTimeoutRef.current);
+    }
+
+    const texto = formData.descripcion.trim();
+    const palabras = texto.split(/\s+/).filter(p => p.length > 0);
+
+    // Obtener categoría seleccionada dentro del efecto
+    const catSeleccionada = categorias.find(c => c.id === Number(formData.categoria_id));
+
+    // Solo activar con 3+ palabras y categoría seleccionada
+    if (palabras.length < 3 || !catSeleccionada) {
+      setContextualAiResponse('');
+      setContextualAiFailed(false);
+      return;
+    }
+
+    // Debounce de 3 segundos - solo cuando el usuario realmente frena
+    contextualAiTimeoutRef.current = setTimeout(async () => {
+      setContextualAiLoading(true);
+      setContextualAiFailed(false);
+
+      try {
+        const contexto: Record<string, unknown> = {
+          categoria: catSeleccionada.nombre,
+          descripcion_problema: texto,
+          direccion: formData.direccion || '',
+        };
+
+        const response = await chatApi.askDynamic(
+          `Vecino quiere reportar: "${catSeleccionada.nombre}".
+Escribió: "${texto}"
+${formData.direccion ? `Dirección: ${formData.direccion}` : ''}
+
+Respondé como empleada municipal dando info útil y específica:
+- Qué área se encarga de esto
+- Tiempo estimado de resolución
+- Si hay algo que el vecino deba saber
+- Si la dirección está en zona céntrica o alejada, mencionalo
+
+Tono amigable, 3-4 oraciones máximo.`,
+          contexto,
+          'reclamo_contextual'
+        );
+        console.log('[IA Contextual Reclamo] Respuesta:', response);
+        const aiText = response.response || response.message || '';
+        setContextualAiResponse(aiText);
+        if (!aiText) {
+          setContextualAiFailed(true);
+        }
+      } catch {
+        setContextualAiResponse('');
+        setContextualAiFailed(true);
+      } finally {
+        setContextualAiLoading(false);
+      }
+    }, 3000);
+
+    return () => {
+      if (contextualAiTimeoutRef.current) {
+        clearTimeout(contextualAiTimeoutRef.current);
+      }
+    };
+  }, [formData.descripcion, formData.categoria_id, formData.direccion, categorias]);
+
   // Función para enviar mensaje del chat y clasificar con IA
   const handleChatSubmit = async () => {
     if (!chatInput.trim() || chatAnalyzing) return;
@@ -599,8 +679,8 @@ export default function NuevoReclamo() {
         categoria_id: String(chatCategoriaSugerida.categoria.id),
       }));
       toast.success(`Categoría "${chatCategoriaSugerida.categoria.nombre}" seleccionada`);
-      // Avanzar al siguiente paso (ubicación, saltando categoría)
-      setCurrentStep(2);
+      // Avanzar al paso de categoría para confirmar/ver opciones (no saltarlo)
+      setCurrentStep(1);
     }
   };
 
@@ -1120,6 +1200,14 @@ export default function NuevoReclamo() {
     </WizardStepContent>
   );
 
+  // Filtrar categorías
+  const categoriasFiltradas = searchCategoria.trim()
+    ? categorias.filter(c =>
+        c.nombre.toLowerCase().includes(searchCategoria.toLowerCase()) ||
+        (c.descripcion && c.descripcion.toLowerCase().includes(searchCategoria.toLowerCase()))
+      )
+    : categorias;
+
   // Contenido del paso de Categoría
   const CategoriaStepContent = (
     <WizardStepContent title="¿Qué problema querés reportar?" description="Seleccioná la categoría que mejor describe el problema">
@@ -1132,57 +1220,158 @@ export default function NuevoReclamo() {
           No hay categorías disponibles
         </div>
       ) : (
-        <div
-          className="grid gap-2 sm:gap-3"
-          style={{
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-          }}
-        >
-          {categorias.map((cat) => {
-            const isSelected = formData.categoria_id === String(cat.id);
-            const catColor = cat.color || getCategoryColor(cat.nombre);
+        <div className="space-y-4">
+          {/* Buscador de categorías */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar categoría..."
+              value={searchCategoria}
+              onChange={(e) => setSearchCategoria(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 rounded-xl text-sm"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            />
+            <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: theme.textSecondary }} />
+          </div>
 
-            return (
+          {/* Sugerencia de IA destacada si existe */}
+          {chatCategoriaSugerida && !formData.categoria_id && (
+            <div
+              className="p-3 rounded-xl flex items-center justify-between"
+              style={{
+                backgroundColor: `${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}15`,
+                border: `2px solid ${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{
+                    backgroundColor: getCategoryColor(chatCategoriaSugerida.categoria.nombre),
+                    color: 'white',
+                  }}
+                >
+                  {getCategoryIcon(chatCategoriaSugerida.categoria.nombre)}
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <Lightbulb className="h-3.5 w-3.5" style={{ color: getCategoryColor(chatCategoriaSugerida.categoria.nombre) }} />
+                    <span className="text-xs font-medium" style={{ color: getCategoryColor(chatCategoriaSugerida.categoria.nombre) }}>
+                      Sugerida por IA ({Math.round(chatCategoriaSugerida.confianza)}%)
+                    </span>
+                  </div>
+                  <p className="font-semibold" style={{ color: theme.text }}>
+                    {chatCategoriaSugerida.categoria.nombre}
+                  </p>
+                </div>
+              </div>
               <button
-                key={cat.id}
                 type="button"
                 onClick={() => {
                   setFormData({
                     ...formData,
-                    categoria_id: String(cat.id),
-                    titulo: formData.titulo || `Problema de ${cat.nombre.toLowerCase()}`,
+                    categoria_id: String(chatCategoriaSugerida.categoria.id),
+                    titulo: formData.titulo || `Problema de ${chatCategoriaSugerida.categoria.nombre.toLowerCase()}`,
                   });
                 }}
-                className="relative p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 active:scale-95 touch-manipulation"
-                style={{
-                  backgroundColor: isSelected ? `${catColor}20` : theme.backgroundSecondary,
-                  borderColor: isSelected ? catColor : theme.border,
-                  color: theme.text,
-                  minHeight: '100px',
-                }}
+                className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105"
+                style={{ backgroundColor: getCategoryColor(chatCategoriaSugerida.categoria.nombre), color: 'white' }}
               >
-                <div
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full mx-auto mb-2 sm:mb-3 flex items-center justify-center transition-all duration-300"
+                Usar esta
+              </button>
+            </div>
+          )}
+
+          {/* Grid de categorías */}
+          <div
+            className="grid gap-2 sm:gap-3"
+            style={{
+              gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+            }}
+          >
+            {categoriasFiltradas.map((cat) => {
+              const isSelected = formData.categoria_id === String(cat.id);
+              const isSuggested = chatCategoriaSugerida?.categoria.id === cat.id && !formData.categoria_id;
+              const catColor = cat.color || getCategoryColor(cat.nombre);
+
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      categoria_id: String(cat.id),
+                      titulo: formData.titulo || `Problema de ${cat.nombre.toLowerCase()}`,
+                    });
+                  }}
+                  className="relative p-2 sm:p-3 rounded-xl border-2 transition-all duration-300 active:scale-95 touch-manipulation"
                   style={{
-                    backgroundColor: isSelected ? catColor : `${catColor}30`,
-                    color: isSelected ? 'white' : catColor,
+                    backgroundColor: isSelected ? `${catColor}20` : isSuggested ? `${catColor}10` : theme.backgroundSecondary,
+                    borderColor: isSelected ? catColor : isSuggested ? `${catColor}60` : theme.border,
+                    color: theme.text,
+                    minHeight: '90px',
                   }}
                 >
-                  {getCategoryIcon(cat.nombre)}
-                </div>
-                <span className="text-xs sm:text-sm font-medium block leading-tight">{cat.nombre}</span>
-
-                {isSelected && (
                   <div
-                    className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: catColor }}
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full mx-auto mb-1.5 sm:mb-2 flex items-center justify-center transition-all duration-300"
+                    style={{
+                      backgroundColor: isSelected ? catColor : `${catColor}30`,
+                      color: isSelected ? 'white' : catColor,
+                    }}
                   >
-                    <CheckCircle2 className="h-3 w-3 text-white" />
+                    {getCategoryIcon(cat.nombre)}
                   </div>
-                )}
-              </button>
-            );
-          })}
+                  <span className="text-[10px] sm:text-xs font-medium block leading-tight text-center line-clamp-2">{cat.nombre}</span>
+
+                  {isSelected && (
+                    <div
+                      className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: catColor }}
+                    >
+                      <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                    </div>
+                  )}
+
+                  {isSuggested && !isSelected && (
+                    <div
+                      className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: catColor }}
+                    >
+                      <Lightbulb className="h-2.5 w-2.5 text-white" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Categoría seleccionada */}
+          {selectedCategoria && (
+            <div
+              className="p-3 rounded-xl"
+              style={{
+                backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`,
+                border: `2px solid ${getCategoryColor(selectedCategoria.nombre)}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: getCategoryColor(selectedCategoria.nombre) }}
+                >
+                  <span className="text-white">{getCategoryIcon(selectedCategoria.nombre)}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm" style={{ color: theme.text }}>{selectedCategoria.nombre}</p>
+                  {selectedCategoria.descripcion && (
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedCategoria.descripcion}</p>
+                  )}
+                </div>
+                <CheckCircle2 className="h-5 w-5" style={{ color: getCategoryColor(selectedCategoria.nombre) }} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </WizardStepContent>
@@ -1585,36 +1774,41 @@ export default function NuevoReclamo() {
   const baseSteps: WizardStep[] = [
     {
       id: 'chat',
-      label: 'Describir',
-      icon: <MessageCircle className="h-4 w-4" />,
+      title: 'Describir',
+      description: 'Contanos tu problema',
+      icon: <MessageCircle className="h-5 w-5" />,
       content: ChatStepContent,
       isValid: isChatValid,
     },
     {
       id: 'categoria',
-      label: 'Categoría',
-      icon: <FolderOpen className="h-4 w-4" />,
+      title: 'Categoría',
+      description: 'Seleccioná el tipo de reclamo',
+      icon: <FolderOpen className="h-5 w-5" />,
       content: CategoriaStepContent,
       isValid: isCategoriaValid,
     },
     {
       id: 'ubicacion',
-      label: 'Ubicación',
-      icon: <MapPin className="h-4 w-4" />,
+      title: 'Ubicación',
+      description: 'Indicá dónde está el problema',
+      icon: <MapPin className="h-5 w-5" />,
       content: UbicacionStepContent,
       isValid: isUbicacionValid,
     },
     {
       id: 'detalles',
-      label: 'Detalles',
-      icon: <FileText className="h-4 w-4" />,
+      title: 'Detalles',
+      description: 'Agregá fotos y más información',
+      icon: <FileText className="h-5 w-5" />,
       content: DetallesStepContent,
       isValid: isDetallesValid,
     },
     {
       id: 'confirmar',
-      label: 'Confirmar',
-      icon: <CheckCircle2 className="h-4 w-4" />,
+      title: 'Confirmar',
+      description: 'Revisá y enviá tu reclamo',
+      icon: <CheckCircle2 className="h-5 w-5" />,
       content: ConfirmarStepContent,
       isValid: true,
     },
@@ -1623,8 +1817,9 @@ export default function NuevoReclamo() {
   // Si no hay usuario, agregar paso de registro ANTES de confirmar (al final del flujo)
   const registerStep: WizardStep = {
     id: 'registro',
-    label: 'Cuenta',
-    icon: <User className="h-4 w-4" />,
+    title: 'Cuenta',
+    description: 'Identificate para continuar',
+    icon: <User className="h-5 w-5" />,
     content: RegistroStepContent,
     isValid: isRegisterValid,
   };
@@ -1830,6 +2025,174 @@ export default function NuevoReclamo() {
 
   const aiSuggestion = getAISuggestion();
 
+  // Obtener la categoría seleccionada
+  const selectedCategoriaObj = categorias.find(c => String(c.id) === formData.categoria_id);
+
+  // Panel de IA para el wizard
+  const wizardAIPanel = (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
+          <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
+        </div>
+        <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente IA</span>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto">
+        {/* Sugerencia de IA del chat */}
+        {chatCategoriaSugerida && (
+          <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Lightbulb className="h-4 w-4" style={{ color: theme.primary }} />
+              <span className="font-medium text-xs" style={{ color: theme.text }}>Categoría sugerida</span>
+            </div>
+            <p className="text-sm font-medium" style={{ color: theme.text }}>{chatCategoriaSugerida.categoria.nombre}</p>
+            {chatCategoriaSugerida.confianza && (
+              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                Confianza: {Math.round(chatCategoriaSugerida.confianza * 100)}%
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Info de categoría seleccionada */}
+        {selectedCategoriaObj && (
+          <div className="space-y-3">
+            <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
+              <div className="flex items-center gap-2 mb-2">
+                <div style={{ color: getCategoryColor(selectedCategoriaObj.nombre) }}>
+                  {getCategoryIcon(selectedCategoriaObj.nombre)}
+                </div>
+                <span className="font-medium text-sm" style={{ color: theme.text }}>{selectedCategoriaObj.nombre}</span>
+              </div>
+              {selectedCategoriaObj.descripcion && (
+                <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedCategoriaObj.descripcion}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* IA contextual basada en lo que escribe el usuario */}
+        {contextualAiLoading && (
+          <div className="p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Analizando...</span>
+          </div>
+        )}
+
+        {contextualAiResponse && !contextualAiLoading && (
+          <div className="p-4 rounded-xl" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98130' }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-4 w-4" style={{ color: '#10b981' }} />
+              <span className="text-xs font-medium" style={{ color: '#10b981' }}>Asistente Municipal</span>
+            </div>
+            <div className="space-y-2 text-sm leading-relaxed" style={{ color: theme.text }}>
+              {contextualAiResponse.split(/(?<=[.!?])\s+/).reduce((acc: string[][], sentence, idx) => {
+                const groupIdx = Math.floor(idx / 2);
+                if (!acc[groupIdx]) acc[groupIdx] = [];
+                acc[groupIdx].push(sentence);
+                return acc;
+              }, []).map((group, idx) => (
+                <p key={idx} className="flex items-start gap-2">
+                  <span className="mt-0.5" style={{ color: '#10b981' }}>
+                    {idx === 0 ? <MapPin className="h-4 w-4" /> : idx === 1 ? <FileText className="h-4 w-4" /> : <Lightbulb className="h-4 w-4" />}
+                  </span>
+                  <span>{group.join(' ')}</span>
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {contextualAiFailed && !contextualAiResponse && !contextualAiLoading && (
+          <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              <span className="text-sm" style={{ color: theme.textSecondary }}>Recomendaciones no disponibles</span>
+            </div>
+          </div>
+        )}
+
+        {/* Tips según el paso actual */}
+        <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
+          <div className="flex items-center gap-2 mb-2">
+            <Lightbulb className="h-4 w-4" style={{ color: '#f59e0b' }} />
+            <span className="font-medium text-xs" style={{ color: theme.text }}>Tips</span>
+          </div>
+          <ul className="space-y-1.5">
+            {currentStep === 0 && (
+              <>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Describí el problema con detalle
+                </li>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  La IA sugerirá una categoría
+                </li>
+              </>
+            )}
+            {currentStep === 1 && (
+              <>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Elegí la categoría más adecuada
+                </li>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Usá el buscador si hay muchas opciones
+                </li>
+              </>
+            )}
+            {currentStep === 2 && (
+              <>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Indicá la dirección exacta
+                </li>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Usá el mapa para ajustar la ubicación
+                </li>
+              </>
+            )}
+            {currentStep === 3 && (
+              <>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Las fotos ayudan a resolver más rápido
+                </li>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Agregá referencias o números de poste
+                </li>
+              </>
+            )}
+            {currentStep >= 4 && (
+              <>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Revisá que todo esté correcto
+                </li>
+                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                  Recibirás un número de seguimiento
+                </li>
+              </>
+            )}
+          </ul>
+        </div>
+
+        {/* Tiempo estimado */}
+        <div className="p-2 rounded-lg text-center" style={{ backgroundColor: theme.card }}>
+          <Clock className="h-4 w-4 mx-auto mb-1" style={{ color: theme.primary }} />
+          <p className="text-xs font-medium" style={{ color: theme.text }}>2-3 min</p>
+          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Tiempo estimado</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.background }}>
       {/* Top Bar - solo en /nuevo-reclamo (fuera del Layout) */}
@@ -1862,18 +2225,19 @@ export default function NuevoReclamo() {
         </div>
       )}
 
-      <div className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 py-4 w-full">
-        <WizardForm
+      <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 pt-2 pb-4 w-full mt-2">
+        <WizardModal
+          open={true}
+          onClose={() => navigate(-1)}
+          title="Nuevo Reclamo"
           steps={steps}
           currentStep={currentStep}
           onStepChange={handleStepChange}
           onComplete={handleSubmit}
-          onCancel={() => navigate(-1)}
-          saving={submitting || registering}
-          title="Nuevo Reclamo"
-          subtitle="Reportá un problema en tu barrio"
+          loading={submitting || registering}
           completeLabel="Enviar Reclamo"
-          aiSuggestion={aiSuggestion}
+          aiPanel={wizardAIPanel}
+          embedded={true}
         />
       </div>
 

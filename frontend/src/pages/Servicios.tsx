@@ -1,10 +1,50 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, Clock, DollarSign, ExternalLink, Star, Link2 } from 'lucide-react';
+import { Edit, Trash2, Clock, DollarSign, Star, Link2, FileText } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import type { ServicioTramite } from '../types';
+
+// Iconos disponibles para servicios (organizados por categoría)
+const ICONOS_DISPONIBLES = [
+  // Documentos y Trámites
+  'FileText', 'FileCheck', 'FilePlus', 'FileSearch', 'Files', 'FolderOpen', 'ClipboardList', 'ClipboardCheck',
+  // Construcción y Obras
+  'HardHat', 'Building', 'Building2', 'Home', 'Hammer', 'Wrench', 'Construction',
+  // Comercio y Negocios
+  'Store', 'ShoppingBag', 'ShoppingCart', 'Briefcase', 'CreditCard', 'Receipt', 'BadgePercent',
+  // Vehículos y Transporte
+  'Car', 'Truck', 'Bus', 'Bike', 'ParkingCircle', 'TrafficCone',
+  // Naturaleza y Ambiente
+  'TreeDeciduous', 'TreePine', 'Leaf', 'Flower2', 'Sun', 'Droplets',
+  // Personas y Social
+  'Users', 'UserPlus', 'UserCheck', 'Baby', 'Heart', 'HandHeart', 'Accessibility',
+  // Salud
+  'Stethoscope', 'Pill', 'Syringe', 'Activity', 'HeartPulse',
+  // Educación
+  'GraduationCap', 'BookOpen', 'School', 'Library',
+  // Comunicación
+  'Mail', 'Phone', 'MessageSquare', 'Megaphone', 'Bell',
+  // Ubicación
+  'MapPin', 'Map', 'Compass', 'Navigation',
+  // Alertas y Estado
+  'AlertTriangle', 'AlertCircle', 'CheckCircle', 'XCircle', 'Info', 'HelpCircle',
+  // Tiempo
+  'Clock', 'Calendar', 'CalendarDays', 'Timer', 'History',
+  // Otros
+  'Key', 'Lock', 'Shield', 'Award', 'Star', 'Flag', 'Zap', 'Lightbulb', 'Settings', 'Tool',
+  // Animales
+  'Dog', 'Cat', 'Bird', 'Fish', 'Bug',
+];
+
+function getIcon(iconName?: string, size: string = "h-5 w-5") {
+  if (!iconName) return <FileText className={size} />;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Icon = (LucideIcons as any)[iconName];
+  return Icon ? <Icon className={size} /> : <FileText className={size} />;
+}
 
 export default function Servicios() {
   const { theme } = useTheme();
@@ -17,7 +57,7 @@ export default function Servicios() {
   const [formData, setFormData] = useState({
     nombre: '',
     descripcion: '',
-    icono: '',
+    icono: 'FileText',
     color: '#3B82F6',
     requisitos: '',
     documentos_requeridos: '',
@@ -50,7 +90,7 @@ export default function Servicios() {
       setFormData({
         nombre: servicio.nombre,
         descripcion: servicio.descripcion || '',
-        icono: servicio.icono || '',
+        icono: servicio.icono || 'FileText',
         color: servicio.color || '#3B82F6',
         requisitos: servicio.requisitos || '',
         documentos_requeridos: servicio.documentos_requeridos || '',
@@ -66,7 +106,7 @@ export default function Servicios() {
       setFormData({
         nombre: '',
         descripcion: '',
-        icono: '',
+        icono: 'FileText',
         color: '#3B82F6',
         requisitos: '',
         documentos_requeridos: '',
@@ -142,11 +182,9 @@ export default function Servicios() {
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: s.color || '#e5e7eb' }}
+            style={{ backgroundColor: s.color || '#3B82F6' }}
           >
-            <span className="text-white text-sm font-medium opacity-70">
-              {s.nombre[0].toUpperCase()}
-            </span>
+            <span className="text-white scale-75">{getIcon(s.icono)}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="font-medium">{s.nombre}</span>
@@ -248,36 +286,50 @@ export default function Servicios() {
             rows={3}
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <ABMInput
-              label="Icono (Lucide)"
-              value={formData.icono}
-              onChange={(e) => setFormData({ ...formData, icono: e.target.value })}
-              placeholder="Ej: FileText"
-            />
-            <div>
-              <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
-                Color
-              </label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="color"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  className="w-12 h-10 rounded cursor-pointer"
-                  style={{ border: `1px solid ${theme.border}` }}
-                />
-                <input
-                  type="text"
-                  value={formData.color}
-                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  className="flex-1 rounded-lg px-3 py-2"
+          {/* Selector de icono */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              Icono
+            </label>
+            <div className="flex flex-wrap gap-1.5 max-h-[180px] overflow-y-auto p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+              {ICONOS_DISPONIBLES.map(iconName => (
+                <button
+                  key={iconName}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, icono: iconName })}
+                  className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover:scale-110"
                   style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    color: theme.text,
-                    border: `1px solid ${theme.border}`,
+                    backgroundColor: formData.icono === iconName ? formData.color : theme.card,
+                    color: formData.icono === iconName ? '#fff' : theme.textSecondary,
+                    border: formData.icono === iconName ? 'none' : `1px solid ${theme.border}`,
+                    boxShadow: formData.icono === iconName ? `0 2px 8px ${formData.color}40` : 'none',
                   }}
-                />
+                  title={iconName}
+                >
+                  {getIcon(iconName, "h-4 w-4")}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Selector de color */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={formData.color}
+                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                className="w-12 h-12 rounded-lg cursor-pointer border-0"
+              />
+              <div
+                className="flex-1 h-12 rounded-lg flex items-center justify-center gap-2"
+                style={{ backgroundColor: formData.color }}
+              >
+                <span className="text-white">{getIcon(formData.icono)}</span>
+                <span className="text-white font-medium text-sm">Vista previa</span>
               </div>
             </div>
           </div>
@@ -397,9 +449,7 @@ export default function Servicios() {
                       boxShadow: `0 4px 14px ${servicioColor}40`,
                     }}
                   >
-                    <span className="text-white text-xl font-bold opacity-70">
-                      {s.nombre[0].toUpperCase()}
-                    </span>
+                    <span className="text-white">{getIcon(s.icono)}</span>
                   </div>
                   <div className="ml-4">
                     <div className="flex items-center gap-2">

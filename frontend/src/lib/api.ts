@@ -212,7 +212,11 @@ export const notificacionesApi = {
 export const configuracionApi = {
   getAll: () => api.get('/configuracion'),
   get: (clave: string) => api.get(`/configuracion/${clave}`),
-  getPublica: (clave: string) => api.get(`/configuracion/publica/${clave}`),
+  getPublica: (clave: string) => {
+    const municipioId = localStorage.getItem('municipio_id');
+    const params = municipioId ? { municipio_id: municipioId } : {};
+    return api.get(`/configuracion/publica/${clave}`, { params });
+  },
   update: (clave: string, data: { valor: string; municipio_id?: number | null }) => api.put(`/configuracion/${clave}`, data),
   // Dashboard config
   getDashboardConfig: (rol: string) => api.get(`/configuracion/dashboard/${rol}`),

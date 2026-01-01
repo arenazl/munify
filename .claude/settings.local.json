@@ -27,7 +27,8 @@
       "Bash(netlify sites:list:*)",
       "Bash(git commit:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(ping:*)"
     ],
     "deny": [],
     "ask": []

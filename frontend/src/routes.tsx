@@ -27,6 +27,7 @@ import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
 import Tramites from './pages/Tramites';
 import TiposTramite from './pages/TiposTramite';
+import TramitesCatalogo from './pages/TramitesCatalogo';
 import MisTramites from './pages/MisTramites';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -87,7 +88,7 @@ export const router = createBrowserRouter([
   // Rutas mobile fuera del layout (pantalla completa)
   { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
   { path: '/app/tramites', element: <Tramites /> },
-  { path: '/app/tramites/nuevo', element: <MobileNuevoTramite /> },
+  { path: '/app/tramites/nuevo', element: <Tramites /> },
   { path: '/app/mis-tramites', element: <MisTramites /> },
   { path: '/app/login', element: <Navigate to="/login" replace /> },
   { path: '/app/register', element: <Navigate to="/register" replace /> },
@@ -125,7 +126,7 @@ export const router = createBrowserRouter([
       { path: 'crear-reclamo', element: <NuevoReclamo /> },
 
       // Nuevo Trámite (dentro del Layout para usuarios logueados)
-      { path: 'crear-tramite', element: <MobileNuevoTramite /> },
+      { path: 'crear-tramite', element: <Tramites /> },
 
       // Reclamos (todo con Side Modal, sin páginas separadas)
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
@@ -170,6 +171,10 @@ export const router = createBrowserRouter([
       {
         path: 'tipos-tramite',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><TiposTramite /></ProtectedRoute>
+      },
+      {
+        path: 'tramites-catalogo',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><TramitesCatalogo /></ProtectedRoute>
       },
       {
         path: 'configuracion',

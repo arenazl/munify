@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle } from 'lucide-react';
+import { MapPin, Calendar, Tag, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, Filter } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,6 +41,10 @@ export default function MisReclamos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
+  // Ordenamiento y filtros
+  const [ordenarPor, setOrdenarPor] = useState<'fecha' | 'estado'>('fecha');
+  const [filtroEstado, setFiltroEstado] = useState<EstadoReclamo | 'todos'>('todos');
+
   // Sheet states
   const [sheetMode, setSheetMode] = useState<SheetMode>('closed');
   const [selectedReclamo, setSelectedReclamo] = useState<Reclamo | null>(null);
@@ -72,7 +76,7 @@ export default function MisReclamos() {
   };
 
   const goToNuevoReclamo = () => {
-    navigate('/nuevo-reclamo');
+    navigate('/gestion/crear-reclamo');
   };
 
   const openViewSheet = async (reclamo: Reclamo) => {
@@ -181,11 +185,35 @@ export default function MisReclamos() {
     );
   };
 
-  const filteredReclamos = reclamos.filter(r =>
-    r.titulo.toLowerCase().includes(search.toLowerCase()) ||
-    r.descripcion.toLowerCase().includes(search.toLowerCase()) ||
-    r.direccion.toLowerCase().includes(search.toLowerCase())
-  );
+  // Orden de estados para ordenamiento
+  const estadoOrden: Record<string, number> = {
+    'nuevo': 1,
+    'asignado': 2,
+    'en_proceso': 3,
+    'pendiente_confirmacion': 4,
+    'resuelto': 5,
+    'rechazado': 6,
+  };
+
+  const filteredReclamos = reclamos
+    .filter(r => {
+      const matchSearch = r.titulo.toLowerCase().includes(search.toLowerCase()) ||
+        r.descripcion.toLowerCase().includes(search.toLowerCase()) ||
+        r.direccion.toLowerCase().includes(search.toLowerCase());
+      const matchEstado = filtroEstado === 'todos' || r.estado === filtroEstado;
+      return matchSearch && matchEstado;
+    })
+    .sort((a, b) => {
+      if (ordenarPor === 'fecha') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      } else {
+        // Ordenar por estado (pendientes primero)
+        return (estadoOrden[a.estado] || 99) - (estadoOrden[b.estado] || 99);
+      }
+    });
+
+  // Estados únicos para el filtro
+  const estadosUnicos = [...new Set(reclamos.map(r => r.estado))];
 
   // Renderizar contenido del Sheet de ver
   const renderViewContent = () => {
@@ -469,6 +497,70 @@ export default function MisReclamos() {
     </div>
   );
 
+  // Estado para mostrar/ocultar dropdown de filtros
+  const [showFiltroDropdown, setShowFiltroDropdown] = useState(false);
+  const filtroButtonRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+
+  // Actualizar posición del dropdown cuando se abre
+  useEffect(() => {
+    if (showFiltroDropdown && filtroButtonRef.current) {
+      const rect = filtroButtonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [showFiltroDropdown]);
+
+  // Componente de filtros extra
+  const renderExtraFilters = () => (
+    <div className="flex gap-2">
+      {/* Botón ordenar por fecha/estado */}
+      <button
+        onClick={() => setOrdenarPor(ordenarPor === 'fecha' ? 'estado' : 'fecha')}
+        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95"
+        style={{
+          backgroundColor: theme.card,
+          border: `1px solid ${theme.border}`,
+          color: theme.text,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+        }}
+        title={ordenarPor === 'fecha' ? 'Ordenado por fecha' : 'Ordenado por estado'}
+      >
+        <ArrowUpDown className="h-4 w-4" />
+        <span className="hidden sm:inline">{ordenarPor === 'fecha' ? 'Fecha' : 'Estado'}</span>
+      </button>
+
+      {/* Botón filtrar por estado - moderno con dropdown */}
+      <div className="relative" ref={filtroButtonRef}>
+        <button
+          onClick={() => setShowFiltroDropdown(!showFiltroDropdown)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95"
+          style={{
+            backgroundColor: filtroEstado !== 'todos' ? `${theme.primary}` : theme.card,
+            border: `1px solid ${filtroEstado !== 'todos' ? theme.primary : theme.border}`,
+            color: filtroEstado !== 'todos' ? '#ffffff' : theme.text,
+            boxShadow: filtroEstado !== 'todos' ? `0 4px 12px ${theme.primary}40` : '0 1px 2px rgba(0,0,0,0.05)',
+          }}
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden sm:inline">
+            {filtroEstado === 'todos' ? 'Filtrar' : estadoLabels[filtroEstado]}
+          </span>
+          {filtroEstado !== 'todos' && (
+            <span
+              className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold sm:hidden"
+              style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
+            >
+              1
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <ABMPage
@@ -479,58 +571,98 @@ export default function MisReclamos() {
         searchValue={search}
         onSearchChange={setSearch}
         loading={loading}
-        isEmpty={filteredReclamos.length === 0 && !search}
+        isEmpty={filteredReclamos.length === 0 && !search && filtroEstado === 'todos'}
         emptyMessage=""
+        defaultViewMode="cards"
+        extraFilters={renderExtraFilters()}
       >
-        {filteredReclamos.length === 0 && !search ? (
+        {filteredReclamos.length === 0 && !search && filtroEstado === 'todos' ? (
           renderEmptyState()
-        ) : filteredReclamos.length === 0 && search ? (
+        ) : filteredReclamos.length === 0 ? (
           <div className="col-span-full text-center py-12" style={{ color: theme.textSecondary }}>
             No se encontraron reclamos
+            {(search || filtroEstado !== 'todos') && (
+              <button
+                onClick={() => { setSearch(''); setFiltroEstado('todos'); }}
+                className="block mx-auto mt-2 text-sm"
+                style={{ color: theme.primary }}
+              >
+                Limpiar filtros
+              </button>
+            )}
           </div>
         ) : (
           filteredReclamos.map((r) => {
             const estado = estadoColors[r.estado];
+            const tieneImagen = r.imagenes && r.imagenes.length > 0;
             return (
               <ABMCard key={r.id} onClick={() => openViewSheet(r)}>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs" style={{ color: theme.textSecondary }}>#{r.id}</span>
+                <div className="flex gap-4">
+                  {/* Imagen miniatura o placeholder */}
+                  <div
+                    className="w-20 h-20 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
+                    style={{ backgroundColor: tieneImagen ? 'transparent' : `${r.categoria?.color || theme.primary}15` }}
+                  >
+                    {tieneImagen ? (
+                      <img
+                        src={r.imagenes[0].url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <MapPin
+                        className="h-8 w-8"
+                        style={{ color: r.categoria?.color || theme.primary }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Contenido */}
+                  <div className="flex-1 min-w-0">
+                    {/* Línea 1: Título + Estado */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold line-clamp-1" style={{ color: theme.text }}>
+                        {r.titulo}
+                      </p>
                       <span
-                        className="px-2 py-0.5 text-xs font-medium rounded-full"
+                        className="px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0"
                         style={{ backgroundColor: estado.bg, color: estado.text }}
                       >
                         {estadoLabels[r.estado]}
                       </span>
                     </div>
-                    <p className="font-medium mt-1 line-clamp-1">{r.titulo}</p>
-                    <p className="text-sm flex items-center mt-1" style={{ color: theme.textSecondary }}>
-                      <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                      <span className="line-clamp-1">{r.direccion}</span>
+
+                    {/* Línea 2: Categoría + Fecha */}
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <span
+                        className="text-xs font-medium px-2 py-0.5 rounded-md"
+                        style={{ backgroundColor: `${r.categoria?.color || theme.primary}15`, color: r.categoria?.color || theme.primary }}
+                      >
+                        {r.categoria.nombre}
+                      </span>
+                      <span className="text-xs flex items-center" style={{ color: theme.textSecondary }}>
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+
+                    {/* Línea 3: Descripción */}
+                    <p className="text-sm mt-2 line-clamp-2" style={{ color: theme.textSecondary }}>
+                      {r.descripcion}
                     </p>
                   </div>
                 </div>
 
-                <p className="text-sm mt-3 line-clamp-2" style={{ color: theme.textSecondary }}>
-                  {r.descripcion}
-                </p>
-
+                {/* Footer con dirección */}
                 <div
-                  className="flex items-center justify-between mt-4 pt-4 text-xs"
-                  style={{ borderTop: `1px solid ${theme.border}`, color: theme.textSecondary }}
+                  className="flex items-center justify-between mt-3 pt-3 text-xs"
+                  style={{ borderTop: `1px solid ${theme.border}` }}
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="flex items-center">
-                      <Tag className="h-3 w-3 mr-1" />
-                      {r.categoria.nombre}
-                    </span>
-                    <span className="flex items-center">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      {new Date(r.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <Eye className="h-4 w-4" style={{ color: theme.primary }} />
+                  <span className="flex items-center truncate" style={{ color: theme.textSecondary }}>
+                    <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                    <span className="truncate">{r.direccion}</span>
+                  </span>
+                  <Eye className="h-4 w-4 flex-shrink-0 ml-2" style={{ color: theme.primary }} />
                 </div>
               </ABMCard>
             );
@@ -549,7 +681,7 @@ export default function MisReclamos() {
             <button
               onClick={() => {
                 closeSheet();
-                navigate(`/reclamos/${selectedReclamo.id}`);
+                navigate(`/gestion/reclamos/${selectedReclamo.id}`);
               }}
               className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
               style={{ backgroundColor: theme.primary, color: '#ffffff' }}
@@ -572,6 +704,101 @@ export default function MisReclamos() {
       >
         {renderCalificarContent()}
       </Sheet>
+
+      {/* Dropdown de filtros (fixed position para evitar overflow:hidden) */}
+      {showFiltroDropdown && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[9998]"
+            onClick={() => setShowFiltroDropdown(false)}
+          />
+          {/* Menu */}
+          <div
+            className="fixed z-[9999] min-w-[200px] rounded-xl overflow-hidden shadow-xl"
+            style={{
+              top: dropdownPosition.top,
+              right: dropdownPosition.right,
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+              animation: 'fadeInDown 0.2s ease-out',
+            }}
+          >
+            <div className="p-2">
+              <p className="text-xs font-medium px-2 py-1.5 mb-1" style={{ color: theme.textSecondary }}>
+                Filtrar por estado
+              </p>
+
+              {/* Opción Todos */}
+              <button
+                onClick={() => { setFiltroEstado('todos'); setShowFiltroDropdown(false); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:scale-[1.02]"
+                style={{
+                  backgroundColor: filtroEstado === 'todos' ? `${theme.primary}15` : 'transparent',
+                }}
+              >
+                <div
+                  className="w-3 h-3 rounded-full border-2"
+                  style={{
+                    borderColor: filtroEstado === 'todos' ? theme.primary : theme.border,
+                    backgroundColor: filtroEstado === 'todos' ? theme.primary : 'transparent',
+                  }}
+                />
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: filtroEstado === 'todos' ? theme.primary : theme.text }}
+                >
+                  Todos los estados
+                </span>
+              </button>
+
+              <div className="h-px my-1" style={{ backgroundColor: theme.border }} />
+
+              {/* Estados disponibles */}
+              {estadosUnicos.map(estado => {
+                const estadoColor = estadoColors[estado];
+                const isSelected = filtroEstado === estado;
+                return (
+                  <button
+                    key={estado}
+                    onClick={() => { setFiltroEstado(estado); setShowFiltroDropdown(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:scale-[1.02]"
+                    style={{
+                      backgroundColor: isSelected ? `${estadoColor.text}10` : 'transparent',
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: estadoColor.text }}
+                    />
+                    <span
+                      className="text-sm font-medium flex-1"
+                      style={{ color: isSelected ? estadoColor.text : theme.text }}
+                    >
+                      {estadoLabels[estado]}
+                    </span>
+                    {isSelected && (
+                      <CheckCircle className="h-4 w-4" style={{ color: estadoColor.text }} />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <style>{`
+            @keyframes fadeInDown {
+              from {
+                opacity: 0;
+                transform: translateY(-8px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+          `}</style>
+        </>
+      )}
     </>
   );
 }

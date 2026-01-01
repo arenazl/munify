@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
@@ -159,6 +160,7 @@ interface ReclamosProps {
 
 export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const { theme } = useTheme();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -291,6 +293,10 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [motivoNoFinalizado, setMotivoNoFinalizado] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [descripcionRechazo, setDescripcionRechazo] = useState('');
+
+  // Modal de advertencia para supervisores
+  const [showSupervisorWarning, setShowSupervisorWarning] = useState(false);
+  const [pendingSupervisorAction, setPendingSupervisorAction] = useState<'iniciar' | 'resolver' | null>(null);
 
   // AI Chat states
   const [aiQuestion, setAiQuestion] = useState('');
@@ -1084,8 +1090,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleIniciar = async () => {
+  const handleIniciar = async (bypassWarning = false) => {
     if (!selectedReclamo) return;
+
+    // Mostrar advertencia si es supervisor o admin y no ha confirmado
+    if (!bypassWarning && (user?.rol === 'supervisor' || user?.rol === 'admin')) {
+      setPendingSupervisorAction('iniciar');
+      setShowSupervisorWarning(true);
+      return;
+    }
+
     setSaving(true);
     try {
       await reclamosApi.iniciar(selectedReclamo.id);
@@ -1100,8 +1114,18 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleResolver = async () => {
+  const handleResolver = async (bypassWarning = false) => {
     if (!selectedReclamo || !resolucion) return;
+
+    console.log('[DEBUG] handleResolver - user.rol:', user?.rol, 'bypassWarning:', bypassWarning);
+
+    // Mostrar advertencia si es supervisor o admin y no ha confirmado
+    if (!bypassWarning && (user?.rol === 'supervisor' || user?.rol === 'admin')) {
+      setPendingSupervisorAction('resolver');
+      setShowSupervisorWarning(true);
+      return;
+    }
+
     setSaving(true);
     try {
       await reclamosApi.resolver(selectedReclamo.id, { resolucion });
@@ -2865,7 +2889,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Botón Iniciar - para estado asignado */}
         {canIniciar && (
           <button
-            onClick={handleIniciar}
+            onClick={() => handleIniciar()}
             disabled={saving}
             className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
             style={{
@@ -2881,7 +2905,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Botón Resolver/No Finalizar - para estado en_proceso */}
         {canResolver && tipoFinalizacion === 'resuelto' && (
           <button
-            onClick={handleResolver}
+            onClick={() => handleResolver()}
             disabled={saving || !resolucion}
             className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
             style={{
@@ -3310,6 +3334,107 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: getCategoryColor(selectedCategoria.nombre),
         } : undefined}
       />
+
+      {/* Modal de advertencia para supervisores */}
+      {showSupervisorWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              setShowSupervisorWarning(false);
+              setPendingSupervisorAction(null);
+            }}
+          />
+
+          {/* Modal */}
+          <div
+            className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            {/* Icono de advertencia */}
+            <div className="flex justify-center mb-4">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: '#fef3c7' }}
+              >
+                <Info className="w-8 h-8 text-amber-500" />
+              </div>
+            </div>
+
+            {/* Título */}
+            <h3
+              className="text-xl font-bold text-center mb-3"
+              style={{ color: theme.text }}
+            >
+              Acción de Empleado
+            </h3>
+
+            {/* Mensaje */}
+            <p
+              className="text-center mb-6 leading-relaxed"
+              style={{ color: theme.textSecondary }}
+            >
+              Esta acción normalmente debe ser ejecutada por el{' '}
+              <span className="font-semibold" style={{ color: theme.primary }}>
+                empleado asignado
+              </span>{' '}
+              al reclamo.
+              <br />
+              <br />
+              {pendingSupervisorAction === 'iniciar'
+                ? '¿Desea iniciar el trabajo en nombre del empleado?'
+                : '¿Desea marcar como resuelto en nombre del empleado?'}
+            </p>
+
+            {/* Botones */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowSupervisorWarning(false);
+                  setPendingSupervisorAction(null);
+                }}
+                className="flex-1 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-80"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  setShowSupervisorWarning(false);
+                  if (pendingSupervisorAction === 'iniciar') {
+                    handleIniciar(true);
+                  } else if (pendingSupervisorAction === 'resolver') {
+                    handleResolver(true);
+                  }
+                  setPendingSupervisorAction(null);
+                }}
+                className="flex-1 px-4 py-3 rounded-xl font-medium text-white transition-all hover:opacity-90"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}dd)`,
+                }}
+              >
+                Continuar
+              </button>
+            </div>
+
+            {/* Nota al pie */}
+            <p
+              className="text-xs text-center mt-4"
+              style={{ color: theme.textSecondary }}
+            >
+              El empleado recibirá una notificación de esta acción.
+            </p>
+          </div>
+        </div>
+      )}
     </>
   );
 }

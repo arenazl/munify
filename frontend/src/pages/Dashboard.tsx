@@ -363,9 +363,11 @@ export default function Dashboard() {
     return null;
   };
 
-  // Obtener el color del municipio
-  const municipioColor = localStorage.getItem('municipio_color') || theme.primary;
-  const municipioNombre = localStorage.getItem('municipio_nombre') || 'Tu Municipio';
+  // Obtener datos del municipio (preferir contexto sobre localStorage)
+  const municipioColor = municipioActual?.color_primario || localStorage.getItem('municipio_color') || theme.primary;
+  // Limpiar el nombre si ya incluye "Municipalidad de"
+  const rawNombre = municipioActual?.nombre || localStorage.getItem('municipio_nombre') || 'Tu Municipio';
+  const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
 
   return (
     <div className="space-y-6">
@@ -424,7 +426,7 @@ export default function Dashboard() {
           <div className="mt-auto">
             <h1 className="text-3xl md:text-4xl text-white mb-2 drop-shadow-lg">
               <span className="font-light">Municipalidad de </span>
-              <span className="font-bold">{localStorage.getItem('municipio_nombre') || 'Municipalidad'}</span>
+              <span className="font-bold">{municipioNombre}</span>
             </h1>
             <p className="text-slate-200 text-sm md:text-base mb-4">
               Monitoreo en tiempo real de gestión municipal
