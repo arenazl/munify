@@ -319,7 +319,7 @@ export default function Tablero() {
 
                               <div className="flex-1 min-w-0">
                                 <Link
-                                  to={`/reclamos/${reclamo.id}`}
+                                  to={`/gestion/reclamos/${reclamo.id}`}
                                   className="font-semibold hover:underline line-clamp-2 transition-colors"
                                   style={{ color: theme.text }}
                                   onClick={(e) => snapshot.isDragging && e.preventDefault()}
