@@ -187,6 +187,10 @@ Antes de comenzar a codear:
 | `04_UI.md` | Layout, componentes, temas, animaciones |
 | `05_CREDENCIALES.md` | Servicios externos, variables de entorno |
 | `06_DEPLOY.md` | Heroku, Netlify, producción |
+| `07_INFRAESTRUCTURA.md` | Arquitectura, servicios cloud |
+| `08_API_CLIENT.md` | Cliente API del frontend |
+| `09_ESTADO_ACTUAL.md` | Estado del proyecto, fixes recientes |
+| `10_PWA_INSTALACION.md` | Guía para instalar y compartir la app como PWA |
 
 ---
 

@@ -1081,11 +1081,30 @@ async def iniciar_reclamo(
 
     await db.commit()
 
-    # Notificaciones en background (no bloquean respuesta)
-    # await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
-    asyncio.create_task(enviar_notificacion_push(db, reclamo, 'cambio_estado',
-                              estado_anterior=estado_anterior.value,
-                              estado_nuevo=EstadoReclamo.EN_PROCESO.value))
+    # Guardar datos para notificación en background
+    reclamo_id_for_push = reclamo.id
+    creador_id_for_push = reclamo.creador_id
+    estado_anterior_str = estado_anterior.value
+
+    # Notificación al vecino en background con nueva sesión
+    async def enviar_push_inicio():
+        from core.database import AsyncSessionLocal
+        from services.push_service import send_push_to_user
+        try:
+            async with AsyncSessionLocal() as new_db:
+                await send_push_to_user(
+                    new_db,
+                    creador_id_for_push,
+                    "Trabajo Iniciado",
+                    f"El empleado comenzó a trabajar en tu reclamo #{reclamo_id_for_push}.",
+                    f"/gestion/reclamos/{reclamo_id_for_push}",
+                    data={"tipo": "cambio_estado", "reclamo_id": reclamo_id_for_push}
+                )
+                print(f"[PUSH] Notificación de inicio enviada para reclamo #{reclamo_id_for_push}", flush=True)
+        except Exception as e:
+            print(f"[PUSH] Error en background task inicio: {e}", flush=True)
+
+    asyncio.create_task(enviar_push_inicio())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -1195,9 +1214,29 @@ async def resolver_reclamo(
         except Exception as e:
             pass
 
-        # Notificaciones en background (no bloquean respuesta)
-        # await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
-        asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_resuelto'))
+        # Guardar datos para notificación
+        reclamo_id_for_push = reclamo.id
+        creador_id_for_push = reclamo.creador_id
+
+        # Notificación al vecino en background con nueva sesión
+        async def enviar_push_resuelto():
+            from core.database import AsyncSessionLocal
+            from services.push_service import send_push_to_user
+            try:
+                async with AsyncSessionLocal() as new_db:
+                    await send_push_to_user(
+                        new_db,
+                        creador_id_for_push,
+                        "Reclamo Resuelto",
+                        f"Tu reclamo #{reclamo_id_for_push} ha sido resuelto. ¡Gracias por tu paciencia!",
+                        f"/gestion/reclamos/{reclamo_id_for_push}",
+                        data={"tipo": "reclamo_resuelto", "reclamo_id": reclamo_id_for_push}
+                    )
+                    print(f"[PUSH] Notificación de resuelto enviada para reclamo #{reclamo_id_for_push}", flush=True)
+            except Exception as e:
+                print(f"[PUSH] Error en background task resuelto: {e}", flush=True)
+
+        asyncio.create_task(enviar_push_resuelto())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
