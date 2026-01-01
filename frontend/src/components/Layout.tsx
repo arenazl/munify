@@ -89,12 +89,16 @@ export default function Layout() {
   // Solo se oculta cuando el usuario lo activa exitosamente
   useEffect(() => {
     const checkPushStatus = async () => {
-      if (isPushSupported()) {
+      const supported = isPushSupported();
+      console.log('[PUSH] isPushSupported:', supported);
+      if (supported) {
         // Siempre mostrar el toggle, sin importar si ya está suscrito
         // Solo se oculta cuando el usuario presiona el botón y se activa
         setPushSubscribed(false);
+        console.log('[PUSH] setPushSubscribed(false) - toggle debería verse');
       } else {
         setPushSubscribed(true); // No mostrar toggle si no hay soporte
+        console.log('[PUSH] setPushSubscribed(true) - navegador no soporta push');
       }
     };
     checkPushStatus();
