@@ -368,7 +368,7 @@ export default function Layout() {
                 <button
                   onClick={handleTopBarPushSubscribe}
                   disabled={pushSubscribing}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0"
                   style={{
                     backgroundColor: theme.backgroundSecondary,
                     border: `1px solid ${theme.border}`,
@@ -377,9 +377,9 @@ export default function Layout() {
                   title="Activar notificaciones push"
                 >
                   <BellRing className="h-4 w-4" style={{ color: theme.textSecondary }} />
-                  {/* Toggle OFF */}
+                  {/* Toggle OFF - oculto en mobile para ahorrar espacio */}
                   <div
-                    className="w-8 h-5 rounded-full p-0.5 transition-all"
+                    className="hidden sm:block w-8 h-5 rounded-full p-0.5 transition-all"
                     style={{ backgroundColor: theme.border }}
                   >
                     <div
