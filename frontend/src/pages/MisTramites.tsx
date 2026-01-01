@@ -563,7 +563,7 @@ export default function MisTramites() {
                   </div>
                 </div>
 
-                {/* Footer con número de trámite */}
+                {/* Footer con número de trámite y fechas */}
                 <div
                   className="flex items-center justify-between mt-3 pt-3 text-xs"
                   style={{ borderTop: `1px solid ${theme.border}` }}
@@ -574,7 +574,66 @@ export default function MisTramites() {
                   >
                     {t.numero_tramite}
                   </span>
-                  <Eye className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    {/* Última actualización */}
+                    {t.updated_at && (
+                      <span className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                        <Clock className="h-3 w-3" />
+                        {new Date(t.updated_at).toLocaleDateString()}
+                      </span>
+                    )}
+                    {/* Por vencer - basado en tiempo_estimado_dias desde created_at */}
+                    {!['finalizado', 'rechazado', 'aprobado'].includes(t.estado) && (() => {
+                      const tiempoEstimado = t.servicio?.tiempo_estimado_dias || t.tramite?.tiempo_estimado_dias || 0;
+                      if (!tiempoEstimado) return null;
+
+                      const fechaCreacion = new Date(t.created_at);
+                      const fechaVencimiento = new Date(fechaCreacion);
+                      fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
+
+                      const hoy = new Date();
+                      hoy.setHours(0, 0, 0, 0);
+                      fechaVencimiento.setHours(0, 0, 0, 0);
+
+                      const diffMs = fechaVencimiento.getTime() - hoy.getTime();
+                      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                      const diffHoras = Math.ceil(diffMs / (1000 * 60 * 60));
+
+                      let texto = '';
+                      let color = theme.textSecondary;
+
+                      if (diffDias < 0) {
+                        const diasVencidos = Math.abs(diffDias);
+                        if (diasVencidos >= 7) {
+                          texto = `Vencido (${Math.floor(diasVencidos / 7)}sem)`;
+                        } else {
+                          texto = `Vencido (${diasVencidos}d)`;
+                        }
+                        color = '#ef4444';
+                      } else if (diffDias === 0) {
+                        texto = 'Hoy';
+                        color = '#f59e0b';
+                      } else if (diffHoras <= 24) {
+                        texto = `${diffHoras}h`;
+                        color = '#f59e0b';
+                      } else if (diffDias === 1) {
+                        texto = 'Mañana';
+                        color = '#eab308';
+                      } else if (diffDias <= 7) {
+                        texto = `${diffDias}d`;
+                        color = diffDias <= 2 ? '#eab308' : theme.textSecondary;
+                      } else {
+                        texto = `${Math.floor(diffDias / 7)}sem`;
+                      }
+
+                      return (
+                        <span className="font-medium" style={{ color }}>
+                          {texto}
+                        </span>
+                      );
+                    })()}
+                    <Eye className="h-4 w-4" style={{ color: theme.primary }} />
+                  </div>
                 </div>
               </ABMCard>
             );

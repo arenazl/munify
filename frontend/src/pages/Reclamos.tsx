@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -176,6 +176,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
+  const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
@@ -299,9 +300,6 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [descripcionRechazo, setDescripcionRechazo] = useState('');
 
-  // Modal de advertencia para supervisores
-  const [showSupervisorWarning, setShowSupervisorWarning] = useState(false);
-  const [pendingSupervisorAction, setPendingSupervisorAction] = useState<'iniciar' | 'resolver' | null>(null);
 
   // AI Chat states
   const [aiQuestion, setAiQuestion] = useState('');
@@ -1082,6 +1080,27 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const handleAsignar = async () => {
     if (!selectedReclamo || !empleadoSeleccionado) return;
+
+    // Encontrar nombre del empleado para la actualización optimista
+    const empleadoData = empleados.find(e => e.id === Number(empleadoSeleccionado));
+
+    // Actualización optimista
+    const reclamoActualizado = {
+      ...selectedReclamo,
+      estado: 'asignado' as const,
+      empleado_id: Number(empleadoSeleccionado),
+      empleado_asignado: empleadoData ? {
+        id: empleadoData.id,
+        nombre: empleadoData.nombre,
+        apellido: empleadoData.apellido,
+        especialidad: empleadoData.especialidad
+      } : selectedReclamo.empleado_asignado,
+      fecha_programada: fechaProgramada || selectedReclamo.fecha_programada
+    };
+    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
+    closeSheet();
+    toast.success('Reclamo asignado correctamente');
+
     setSaving(true);
     try {
       await reclamosApi.asignar(selectedReclamo.id, {
@@ -1091,10 +1110,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         hora_fin: horaFin || undefined,
         comentario: comentarioAsignacion || undefined
       });
-      toast.success('Reclamo asignado correctamente');
       fetchReclamos();
-      closeSheet();
     } catch (error) {
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al asignar reclamo');
       console.error('Error:', error);
     } finally {
@@ -1142,23 +1160,30 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleIniciar = async (bypassWarning = false) => {
+  const handleIniciar = async () => {
     if (!selectedReclamo) return;
 
-    // Mostrar advertencia si es supervisor o admin y no ha confirmado
-    if (!bypassWarning && (user?.rol === 'supervisor' || user?.rol === 'admin')) {
-      setPendingSupervisorAction('iniciar');
-      setShowSupervisorWarning(true);
-      return;
+    // Toast de advertencia para supervisores/admins
+    if (user?.rol === 'supervisor' || user?.rol === 'admin') {
+      toast.warning('Atención: Estás iniciando el trabajo como supervisor.', {
+        duration: 4000,
+      });
     }
+
+    // Actualización optimista: actualizar UI inmediatamente
+    const reclamoActualizado = { ...selectedReclamo, estado: 'en_proceso' as const };
+    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
+    closeSheet();
+    toast.success('Trabajo iniciado');
 
     setSaving(true);
     try {
       await reclamosApi.iniciar(selectedReclamo.id);
-      toast.success('Trabajo iniciado');
+      // Refrescar en background para sincronizar datos completos
       fetchReclamos();
-      closeSheet();
     } catch (error) {
+      // Revertir cambio optimista si falla
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al iniciar trabajo');
       console.error('Error:', error);
     } finally {
@@ -1166,25 +1191,28 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleResolver = async (bypassWarning = false) => {
+  const handleResolver = async () => {
     if (!selectedReclamo || !resolucion) return;
 
-    console.log('[DEBUG] handleResolver - user.rol:', user?.rol, 'bypassWarning:', bypassWarning);
-
-    // Mostrar advertencia si es supervisor o admin y no ha confirmado
-    if (!bypassWarning && (user?.rol === 'supervisor' || user?.rol === 'admin')) {
-      setPendingSupervisorAction('resolver');
-      setShowSupervisorWarning(true);
-      return;
+    // Toast de advertencia para supervisores/admins
+    if (user?.rol === 'supervisor' || user?.rol === 'admin') {
+      toast.warning('Atención: Estás resolviendo este reclamo directamente como supervisor.', {
+        duration: 4000,
+      });
     }
+
+    // Actualización optimista
+    const reclamoActualizado = { ...selectedReclamo, estado: 'resuelto' as const, resolucion };
+    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
+    closeSheet();
+    toast.success('Reclamo resuelto');
 
     setSaving(true);
     try {
       await reclamosApi.resolver(selectedReclamo.id, { resolucion });
-      toast.success('Reclamo resuelto');
       fetchReclamos();
-      closeSheet();
     } catch (error) {
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al resolver reclamo');
       console.error('Error:', error);
     } finally {
@@ -1194,16 +1222,22 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const handleRechazar = async () => {
     if (!selectedReclamo || !motivoRechazo) return;
+
+    // Actualización optimista
+    const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
+    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
+    closeSheet();
+    toast.success('Reclamo rechazado');
+
     setSaving(true);
     try {
       await reclamosApi.rechazar(selectedReclamo.id, {
         motivo: motivoRechazo,
         descripcion: descripcionRechazo || undefined
       });
-      toast.success('Reclamo rechazado');
       fetchReclamos();
-      closeSheet();
     } catch (error) {
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al rechazar reclamo');
       console.error('Error:', error);
     } finally {
@@ -1268,6 +1302,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       r.resolucion?.toLowerCase().includes(searchLower) ||
       r.descripcion_rechazo?.toLowerCase().includes(searchLower)
     );
+  }).sort((a, b) => {
+    if (ordenamiento === 'programado') {
+      // Ordenar por fecha programada (más próxima primero), los sin fecha al final
+      const fechaA = a.fecha_programada ? new Date(a.fecha_programada).getTime() : Infinity;
+      const fechaB = b.fecha_programada ? new Date(b.fecha_programada).getTime() : Infinity;
+      return fechaA - fechaB;
+    } else {
+      // Ordenar por fecha de creación (más reciente primero)
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
   });
 
   // Wizard Step 0: Describir problema
@@ -2341,6 +2385,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     {
       key: 'titulo',
       header: 'Título',
+      width: '280px',
       sortValue: (r: Reclamo) => r.titulo,
       render: (r: Reclamo) => (
         <div className="flex items-center gap-3">
@@ -2351,9 +2396,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             {getCategoryIcon(r.categoria.nombre)}
           </div>
           <div className="min-w-0">
-            <span className="font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
+            <span className="text-xs font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
             <span
-              className="text-xs font-bold"
+              className="text-[10px]"
               style={{ color: getCategoryColor(r.categoria.nombre) }}
             >
               {r.categoria.nombre}
@@ -2427,13 +2472,71 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     },
     {
       key: 'fecha',
-      header: 'Fecha',
+      header: 'Creación',
       sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
       render: (r: Reclamo) => (
         <span className="text-xs" style={{ color: theme.textSecondary }}>
           {new Date(r.created_at).toLocaleDateString()}
         </span>
       ),
+    },
+    {
+      key: 'actualizacion',
+      header: 'Actualización',
+      sortValue: (r: Reclamo) => r.updated_at ? new Date(r.updated_at).getTime() : 0,
+      render: (r: Reclamo) => (
+        <span className="text-xs" style={{ color: theme.textSecondary }}>
+          {r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'vencimiento',
+      header: 'Por vencer',
+      sortValue: (r: Reclamo) => r.fecha_programada ? new Date(r.fecha_programada).getTime() : Infinity,
+      render: (r: Reclamo) => {
+        if (!r.fecha_programada) {
+          return <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>;
+        }
+        const fechaProg = new Date(r.fecha_programada);
+        const ahora = new Date();
+        const diffMs = fechaProg.getTime() - ahora.getTime();
+        const diffHoras = Math.ceil(diffMs / (1000 * 60 * 60));
+        const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        const diffSemanas = Math.ceil(diffDias / 7);
+
+        let color = theme.textSecondary;
+        let bgColor = 'transparent';
+        let texto = '';
+
+        if (diffHoras < 0) {
+          color = '#ef4444';
+          bgColor = '#ef444415';
+          const diasVencido = Math.abs(diffDias);
+          texto = diasVencido >= 7 ? `Vencido (${Math.floor(diasVencido/7)}sem)` : `Vencido (${diasVencido}d)`;
+        } else if (diffHoras <= 24) {
+          color = '#f59e0b';
+          bgColor = '#f59e0b15';
+          texto = diffHoras <= 1 ? '1 hora' : `${diffHoras} horas`;
+        } else if (diffDias <= 2) {
+          color = '#eab308';
+          bgColor = '#eab30815';
+          texto = diffDias === 1 ? 'Mañana' : `${diffDias} días`;
+        } else if (diffDias <= 7) {
+          texto = `${diffDias} días`;
+        } else {
+          texto = `${diffSemanas} sem`;
+        }
+
+        return (
+          <span
+            className="text-xs px-2 py-0.5 rounded font-medium"
+            style={{ color, backgroundColor: bgColor }}
+          >
+            {texto}
+          </span>
+        );
+      },
     },
   ];
 
@@ -3033,7 +3136,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Botón Iniciar - para estado asignado */}
         {canIniciar && (
           <button
-            onClick={() => handleIniciar()}
+            onClick={handleIniciar}
             disabled={saving}
             className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
             style={{
@@ -3049,7 +3152,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Botón Resolver/No Finalizar - para estado en_proceso */}
         {canResolver && tipoFinalizacion === 'resuelto' && (
           <button
-            onClick={() => handleResolver()}
+            onClick={handleResolver}
             disabled={saving || !resolucion}
             className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
             style={{
@@ -3097,8 +3200,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     <>
       <ABMPage
         title={soloMisTrabajos ? "Mis Trabajos" : "Reclamos"}
-        buttonLabel={soloMisTrabajos ? undefined : "Nuevo Reclamo"}
-        onAdd={soloMisTrabajos ? undefined : openWizard}
+        buttonLabel={soloMisTrabajos || user?.rol === 'empleado' ? undefined : "Nuevo Reclamo"}
+        onAdd={soloMisTrabajos || user?.rol === 'empleado' ? undefined : openWizard}
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -3110,6 +3213,35 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         sheetDescription=""
         onSheetClose={() => {}}
         extraFilters={undefined}
+        headerActions={
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setOrdenamiento('reciente')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
+                border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
+                color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
+              }}
+            >
+              <ArrowUpDown className="h-3 w-3" />
+              Más recientes
+            </button>
+            <button
+              onClick={() => setOrdenamiento('programado')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: ordenamiento === 'programado' ? theme.primary : theme.backgroundSecondary,
+                border: `1px solid ${ordenamiento === 'programado' ? theme.primary : theme.border}`,
+                color: ordenamiento === 'programado' ? '#ffffff' : theme.textSecondary,
+              }}
+            >
+              <Calendar className="h-3 w-3" />
+              Por vencer
+            </button>
+          </div>
+        }
+        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin'}
         secondaryFilters={
           <div className="w-full flex flex-col gap-2">
             {/* Categorías - Grid 2 filas en mobile (5 cols), 1 fila en desktop */}
@@ -3258,6 +3390,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 })
               )}
             </div>
+
           </div>
         }
         tableView={
@@ -3479,106 +3612,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         } : undefined}
       />
 
-      {/* Modal de advertencia para supervisores */}
-      {showSupervisorWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => {
-              setShowSupervisorWarning(false);
-              setPendingSupervisorAction(null);
-            }}
-          />
-
-          {/* Modal */}
-          <div
-            className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200"
-            style={{
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            {/* Icono de advertencia */}
-            <div className="flex justify-center mb-4">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: '#fef3c7' }}
-              >
-                <Info className="w-8 h-8 text-amber-500" />
-              </div>
-            </div>
-
-            {/* Título */}
-            <h3
-              className="text-xl font-bold text-center mb-3"
-              style={{ color: theme.text }}
-            >
-              Acción de Empleado
-            </h3>
-
-            {/* Mensaje */}
-            <p
-              className="text-center mb-6 leading-relaxed"
-              style={{ color: theme.textSecondary }}
-            >
-              Esta acción normalmente debe ser ejecutada por el{' '}
-              <span className="font-semibold" style={{ color: theme.primary }}>
-                empleado asignado
-              </span>{' '}
-              al reclamo.
-              <br />
-              <br />
-              {pendingSupervisorAction === 'iniciar'
-                ? '¿Desea iniciar el trabajo en nombre del empleado?'
-                : '¿Desea marcar como resuelto en nombre del empleado?'}
-            </p>
-
-            {/* Botones */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowSupervisorWarning(false);
-                  setPendingSupervisorAction(null);
-                }}
-                className="flex-1 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-80"
-                style={{
-                  backgroundColor: theme.backgroundSecondary,
-                  color: theme.text,
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  setShowSupervisorWarning(false);
-                  if (pendingSupervisorAction === 'iniciar') {
-                    handleIniciar(true);
-                  } else if (pendingSupervisorAction === 'resolver') {
-                    handleResolver(true);
-                  }
-                  setPendingSupervisorAction(null);
-                }}
-                className="flex-1 px-4 py-3 rounded-xl font-medium text-white transition-all hover:opacity-90"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}dd)`,
-                }}
-              >
-                Continuar
-              </button>
-            </div>
-
-            {/* Nota al pie */}
-            <p
-              className="text-xs text-center mt-4"
-              style={{ color: theme.textSecondary }}
-            >
-              El empleado recibirá una notificación de esta acción.
-            </p>
-          </div>
-        </div>
-      )}
     </>
   );
 }

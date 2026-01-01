@@ -22,6 +22,9 @@ interface ABMPageProps {
   extraFilters?: ReactNode;
   filters?: ReactNode; // Alias para compatibilidad
 
+  // Header actions - botones extra junto al toggle de vista (ej: ordenamiento)
+  headerActions?: ReactNode;
+
   // Secondary filters bar (opcional - barra completa debajo del header)
   secondaryFilters?: ReactNode;
 
@@ -46,6 +49,9 @@ interface ABMPageProps {
 
   // Vista por defecto
   defaultViewMode?: ViewMode;
+
+  // Header sticky (fijo al hacer scroll)
+  stickyHeader?: boolean;
 }
 
 export function ABMPage({
@@ -58,6 +64,7 @@ export function ABMPage({
   onSearchChange,
   extraFilters,
   filters,
+  headerActions,
   secondaryFilters,
   children,
   emptyMessage = 'No se encontraron resultados',
@@ -71,6 +78,7 @@ export function ABMPage({
   onSheetClose,
   tableView,
   defaultViewMode,
+  stickyHeader = false,
 }: ABMPageProps) {
   // Combinar filters con extraFilters para compatibilidad
   const allFilters = filters || extraFilters;
@@ -128,36 +136,28 @@ export function ABMPage({
       {/* Contenedor sticky para header y secondary filters */}
       <div
         ref={headerRef}
-        className={`${isSticky ? 'sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8' : ''}`}
+        className={`${stickyHeader && isSticky ? 'sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8' : ''}`}
         style={{
-          backgroundColor: isSticky ? theme.background : 'transparent',
-          paddingTop: isSticky ? '0.5rem' : 0,
-          paddingBottom: isSticky ? '0.5rem' : 0,
+          backgroundColor: stickyHeader && isSticky ? theme.background : 'transparent',
+          paddingTop: stickyHeader && isSticky ? '0.5rem' : 0,
+          paddingBottom: stickyHeader && isSticky ? '0.5rem' : 0,
         }}
       >
         {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
         <div
-          className={`px-5 py-3 relative overflow-hidden ${isSticky ? 'rounded-t-xl' : 'rounded-xl'}`}
+          className={`px-5 py-3 relative overflow-hidden ${stickyHeader && isSticky ? 'rounded-t-xl' : 'rounded-xl'}`}
           style={{
             backgroundColor: theme.card,
-            border: isSticky ? 'none' : `1px solid ${theme.border}`,
-            borderBottom: isSticky && secondaryFilters ? 'none' : (isSticky ? 'none' : `1px solid ${theme.border}`),
-            boxShadow: isSticky ? `0 4px 20px rgba(0,0,0,0.15)` : 'none',
+            border: stickyHeader && isSticky ? 'none' : `1px solid ${theme.border}`,
+            borderBottom: stickyHeader && isSticky && secondaryFilters ? 'none' : (stickyHeader && isSticky ? 'none' : `1px solid ${theme.border}`),
+            boxShadow: stickyHeader && isSticky ? `0 4px 20px rgba(0,0,0,0.15)` : 'none',
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
-          {/* Título con icono decorativo - se oculta cuando el search está enfocado en mobile */}
-          <div className={`flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : 'flex'}`}>
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
-            </div>
-            <h1 className="text-lg font-bold tracking-tight hidden sm:block" style={{ color: theme.text }}>
-              {title}
-            </h1>
-          </div>
+          {/* Título - se oculta cuando el search está enfocado en mobile */}
+          <h1 className={`text-lg font-bold tracking-tight hidden sm:block flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:block' : ''}`} style={{ color: theme.text }}>
+            {title}
+          </h1>
 
           {/* Separador vertical - se oculta en mobile cuando search enfocado */}
           <div className={`h-8 w-px hidden sm:block ${searchFocused ? 'sm:hidden md:block' : ''}`} style={{ backgroundColor: theme.border }} />
@@ -183,6 +183,13 @@ export function ABMPage({
               }}
             />
           </div>
+
+          {/* Header Actions (ordenamiento, etc) - junto al toggle de vista */}
+          {headerActions && (
+            <div className="hidden sm:flex items-center flex-shrink-0">
+              {headerActions}
+            </div>
+          )}
 
           {/* Toggle Vista - solo desktop */}
           {tableView && (
@@ -327,10 +334,10 @@ export function ABMPage({
         {/* Secondary Filters Bar (full width) - dentro del sticky container */}
         {secondaryFilters && (
           <div
-            className={`px-5 py-3 relative overflow-hidden ${isSticky ? 'rounded-b-xl' : 'rounded-xl mt-3'}`}
+            className={`px-5 py-3 relative overflow-hidden ${stickyHeader && isSticky ? 'rounded-b-xl' : 'rounded-xl mt-3'}`}
             style={{
               backgroundColor: theme.card,
-              border: isSticky ? 'none' : `1px solid ${theme.border}`,
+              border: stickyHeader && isSticky ? 'none' : `1px solid ${theme.border}`,
             }}
           >
             {secondaryFilters}

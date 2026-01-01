@@ -172,7 +172,7 @@ export const getDefaultRoute = (role: string) => {
     case 'supervisor':
       return '/gestion';
     case 'empleado':
-      return '/gestion/tablero';
+      return '/gestion/mis-trabajos';
     case 'vecino':
       return '/gestion/mi-panel';
     default:

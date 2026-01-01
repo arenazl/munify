@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, themes, ThemeName, accentColors } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -11,6 +11,7 @@ import { MunicipioSelector } from './MunicipioSelector';
 import { Sheet } from './ui/Sheet';
 import { usersApi } from '../lib/api';
 import NotificationSettings from './NotificationSettings';
+import { isPushSupported, isSubscribed, subscribeToPush } from '../lib/pushNotifications';
 
 // Definir tabs del footer móvil según rol (siempre 5, el del medio es el principal)
 const getMobileTabs = (userRole: string) => {
@@ -70,6 +71,10 @@ export default function Layout() {
     direccion: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  // Estado para el toggle de push notifications en la top bar
+  const [pushSubscribed, setPushSubscribed] = useState<boolean | null>(null); // null = cargando
+  const [pushSubscribing, setPushSubscribing] = useState(false);
+  const [showPushActivatedPopup, setShowPushActivatedPopup] = useState(false);
   const { user, logout, municipioActual, refreshUser } = useAuth();
   const { theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar, customSidebarText, setCustomSidebarText, sidebarBgImage, setSidebarBgImage, sidebarBgOpacity, setSidebarBgOpacity, contentBgImage, setContentBgImage, contentBgOpacity, setContentBgOpacity } = useTheme();
   const location = useLocation();
@@ -78,6 +83,37 @@ export default function Layout() {
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Verificar estado de suscripción push al montar
+  useEffect(() => {
+    const checkPushStatus = async () => {
+      if (isPushSupported()) {
+        const subscribed = await isSubscribed();
+        setPushSubscribed(subscribed);
+      } else {
+        setPushSubscribed(true); // No mostrar toggle si no hay soporte
+      }
+    };
+    checkPushStatus();
+  }, []);
+
+  // Handler para activar push desde la top bar
+  const handleTopBarPushSubscribe = async () => {
+    setPushSubscribing(true);
+    try {
+      const subscription = await subscribeToPush();
+      if (subscription) {
+        setPushSubscribed(true);
+        setShowPushActivatedPopup(true);
+        // Ocultar popup después de 3 segundos
+        setTimeout(() => setShowPushActivatedPopup(false), 3000);
+      }
+    } catch (error) {
+      console.error('Error activando push:', error);
+    } finally {
+      setPushSubscribing(false);
+    }
+  };
 
   // Cargar datos del usuario cuando se abre el sheet de perfil
   useEffect(() => {
@@ -97,10 +133,6 @@ export default function Layout() {
     setProfileSheetOpen(true);
   };
 
-  const handleOpenNotificationSettings = () => {
-    setUserMenuOpen(false);
-    setNotificationSettingsOpen(true);
-  };
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -333,6 +365,33 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center space-x-3">
+              {/* Toggle de Push Notifications - visible para todos si no está suscrito */}
+              {pushSubscribed === false && (
+                <button
+                  onClick={handleTopBarPushSubscribe}
+                  disabled={pushSubscribing}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1px solid ${theme.border}`,
+                    opacity: pushSubscribing ? 0.7 : 1,
+                  }}
+                  title="Activar notificaciones push"
+                >
+                  <BellRing className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                  {/* Toggle OFF */}
+                  <div
+                    className="w-8 h-5 rounded-full p-0.5 transition-all"
+                    style={{ backgroundColor: theme.border }}
+                  >
+                    <div
+                      className="w-4 h-4 rounded-full bg-white transition-transform"
+                      style={{ transform: 'translateX(0)' }}
+                    />
+                  </div>
+                </button>
+              )}
+
               {/* User info con dropdown */}
               <div className="relative">
                 {/* Botón mobile - solo avatar */}
@@ -414,21 +473,6 @@ export default function Layout() {
                         >
                           <User className="h-4 w-4" style={{ color: theme.primary }} />
                           Mi Perfil
-                        </button>
-
-                        <button
-                          onClick={handleOpenNotificationSettings}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
-                          style={{ color: theme.text }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = theme.backgroundSecondary;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <Bell className="h-4 w-4" style={{ color: theme.primary }} />
-                          Notificaciones Push
                         </button>
 
                         <div className="my-1 border-t" style={{ borderColor: theme.border }} />
@@ -1058,6 +1102,27 @@ export default function Layout() {
         isOpen={notificationSettingsOpen}
         onClose={() => setNotificationSettingsOpen(false)}
       />
+
+      {/* Popup de notificaciones activadas */}
+      {showPushActivatedPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+          <div
+            className="px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 pointer-events-auto animate-scale-in"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}20` }}
+            >
+              <Bell className="h-5 w-5" style={{ color: theme.primary }} />
+            </div>
+            <div>
+              <p className="font-semibold" style={{ color: theme.text }}>Notificaciones activadas</p>
+              <p className="text-sm" style={{ color: theme.textSecondary }}>Recibirás alertas de tus reclamos</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sheet de edición de perfil */}
       <Sheet

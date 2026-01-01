@@ -1437,6 +1437,7 @@ export default function Tramites() {
         sheetDescription=""
         onSheetClose={() => {}}
         extraFilters={undefined}
+        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin'}
         secondaryFilters={
           <div className="w-full flex flex-col gap-2">
             {/* Tipos de trámite - chips que ocupan 100% del contenedor */}
@@ -1611,7 +1612,56 @@ export default function Tramites() {
                   </span>
                 </div>
               )},
-              { key: 'created_at', header: 'Fecha', render: (t) => new Date(t.created_at).toLocaleDateString() },
+              { key: 'created_at', header: 'Creación', render: (t) => new Date(t.created_at).toLocaleDateString() },
+              { key: 'updated_at', header: 'Actualización', render: (t) => t.updated_at ? new Date(t.updated_at).toLocaleDateString() : '-' },
+              { key: 'vencimiento', header: 'Por vencer', render: (t) => {
+                // Calcular vencimiento basado en tiempo_estimado_dias desde created_at
+                const tiempoEstimado = t.servicio?.tiempo_estimado_dias || t.tramite?.tiempo_estimado_dias || 0;
+                if (!tiempoEstimado) {
+                  return <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>;
+                }
+                const fechaCreacion = new Date(t.created_at);
+                const fechaVencimiento = new Date(fechaCreacion);
+                fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
+
+                const ahora = new Date();
+                const diffMs = fechaVencimiento.getTime() - ahora.getTime();
+                const diffHoras = Math.ceil(diffMs / (1000 * 60 * 60));
+                const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                const diffSemanas = Math.ceil(diffDias / 7);
+
+                let color = theme.textSecondary;
+                let bgColor = 'transparent';
+                let texto = '';
+
+                if (diffHoras < 0) {
+                  color = '#ef4444';
+                  bgColor = '#ef444415';
+                  const diasVencido = Math.abs(diffDias);
+                  texto = diasVencido >= 7 ? `Vencido (${Math.floor(diasVencido/7)}sem)` : `Vencido (${diasVencido}d)`;
+                } else if (diffHoras <= 24) {
+                  color = '#f59e0b';
+                  bgColor = '#f59e0b15';
+                  texto = diffHoras <= 1 ? '1 hora' : `${diffHoras} horas`;
+                } else if (diffDias <= 2) {
+                  color = '#eab308';
+                  bgColor = '#eab30815';
+                  texto = diffDias === 1 ? 'Mañana' : `${diffDias} días`;
+                } else if (diffDias <= 7) {
+                  texto = `${diffDias} días`;
+                } else {
+                  texto = `${diffSemanas} sem`;
+                }
+
+                return (
+                  <span
+                    className="text-xs px-2 py-0.5 rounded font-medium"
+                    style={{ color, backgroundColor: bgColor }}
+                  >
+                    {texto}
+                  </span>
+                );
+              }},
             ]}
             keyExtractor={(t) => t.id}
             onRowClick={(t) => openViewSheet(t)}

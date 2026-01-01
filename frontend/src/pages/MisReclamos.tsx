@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, Filter } from 'lucide-react';
+import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -42,7 +42,7 @@ export default function MisReclamos() {
   const [search, setSearch] = useState('');
 
   // Ordenamiento y filtros
-  const [ordenarPor, setOrdenarPor] = useState<'fecha' | 'estado'>('fecha');
+  const [ordenarPor, setOrdenarPor] = useState<'fecha' | 'vencimiento'>('fecha');
   const [filtroEstado, setFiltroEstado] = useState<EstadoReclamo | 'todos'>('todos');
 
   // Sheet states
@@ -185,16 +185,6 @@ export default function MisReclamos() {
     );
   };
 
-  // Orden de estados para ordenamiento
-  const estadoOrden: Record<string, number> = {
-    'nuevo': 1,
-    'asignado': 2,
-    'en_proceso': 3,
-    'pendiente_confirmacion': 4,
-    'resuelto': 5,
-    'rechazado': 6,
-  };
-
   const filteredReclamos = reclamos
     .filter(r => {
       const matchSearch = r.titulo.toLowerCase().includes(search.toLowerCase()) ||
@@ -205,10 +195,14 @@ export default function MisReclamos() {
     })
     .sort((a, b) => {
       if (ordenarPor === 'fecha') {
+        // Más recientes primero
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       } else {
-        // Ordenar por estado (pendientes primero)
-        return (estadoOrden[a.estado] || 99) - (estadoOrden[b.estado] || 99);
+        // Por vencer: ordenar por fecha_programada (los que vencen primero arriba)
+        // Los que no tienen fecha van al final
+        const fechaA = a.fecha_programada ? new Date(a.fecha_programada).getTime() : Infinity;
+        const fechaB = b.fecha_programada ? new Date(b.fecha_programada).getTime() : Infinity;
+        return fechaA - fechaB;
       }
     });
 
@@ -497,67 +491,75 @@ export default function MisReclamos() {
     </div>
   );
 
-  // Estado para mostrar/ocultar dropdown de filtros
-  const [showFiltroDropdown, setShowFiltroDropdown] = useState(false);
-  const filtroButtonRef = useRef<HTMLDivElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
 
-  // Actualizar posición del dropdown cuando se abre
-  useEffect(() => {
-    if (showFiltroDropdown && filtroButtonRef.current) {
-      const rect = filtroButtonRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right,
-      });
-    }
-  }, [showFiltroDropdown]);
-
-  // Componente de filtros extra
+  // Componente de filtros extra (solo chips de estados)
   const renderExtraFilters = () => (
-    <div className="flex gap-2">
-      {/* Botón ordenar por fecha/estado */}
+    <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {/* Chip "Todos" */}
       <button
-        onClick={() => setOrdenarPor(ordenarPor === 'fecha' ? 'estado' : 'fecha')}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95"
+        onClick={() => setFiltroEstado('todos')}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
         style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-          color: theme.text,
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          backgroundColor: filtroEstado === 'todos' ? theme.primary : theme.backgroundSecondary,
+          color: filtroEstado === 'todos' ? '#ffffff' : theme.textSecondary,
+          border: `1px solid ${filtroEstado === 'todos' ? theme.primary : theme.border}`,
         }}
-        title={ordenarPor === 'fecha' ? 'Ordenado por fecha' : 'Ordenado por estado'}
       >
-        <ArrowUpDown className="h-4 w-4" />
-        <span className="hidden sm:inline">{ordenarPor === 'fecha' ? 'Fecha' : 'Estado'}</span>
+        Todos
       </button>
+      {/* Chips de estados disponibles */}
+      {estadosUnicos.map(estado => {
+        const estadoColor = estadoColors[estado];
+        const isSelected = filtroEstado === estado;
+        return (
+          <button
+            key={estado}
+            onClick={() => setFiltroEstado(estado)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            style={{
+              backgroundColor: isSelected ? estadoColor.bg : theme.backgroundSecondary,
+              color: isSelected ? estadoColor.text : theme.textSecondary,
+              border: `1px solid ${isSelected ? estadoColor.text : theme.border}`,
+            }}
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: estadoColor.text }}
+            />
+            {estadoLabels[estado]}
+          </button>
+        );
+      })}
+    </div>
+  );
 
-      {/* Botón filtrar por estado - moderno con dropdown */}
-      <div className="relative" ref={filtroButtonRef}>
-        <button
-          onClick={() => setShowFiltroDropdown(!showFiltroDropdown)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95"
-          style={{
-            backgroundColor: filtroEstado !== 'todos' ? `${theme.primary}` : theme.card,
-            border: `1px solid ${filtroEstado !== 'todos' ? theme.primary : theme.border}`,
-            color: filtroEstado !== 'todos' ? '#ffffff' : theme.text,
-            boxShadow: filtroEstado !== 'todos' ? `0 4px 12px ${theme.primary}40` : '0 1px 2px rgba(0,0,0,0.05)',
-          }}
-        >
-          <Filter className="h-4 w-4" />
-          <span className="hidden sm:inline">
-            {filtroEstado === 'todos' ? 'Filtrar' : estadoLabels[filtroEstado]}
-          </span>
-          {filtroEstado !== 'todos' && (
-            <span
-              className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold sm:hidden"
-              style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-            >
-              1
-            </span>
-          )}
-        </button>
-      </div>
+  // Botones de ordenamiento (van junto al cambio de vista)
+  const renderHeaderActions = () => (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => setOrdenarPor('fecha')}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+        style={{
+          backgroundColor: ordenarPor === 'fecha' ? theme.card : theme.backgroundSecondary,
+          border: `1px solid ${ordenarPor === 'fecha' ? theme.primary : theme.border}`,
+          color: ordenarPor === 'fecha' ? theme.primary : theme.textSecondary,
+        }}
+      >
+        <ArrowUpDown className="h-3 w-3" />
+        Más recientes
+      </button>
+      <button
+        onClick={() => setOrdenarPor('vencimiento')}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+        style={{
+          backgroundColor: ordenarPor === 'vencimiento' ? theme.primary : theme.backgroundSecondary,
+          border: `1px solid ${ordenarPor === 'vencimiento' ? theme.primary : theme.border}`,
+          color: ordenarPor === 'vencimiento' ? '#ffffff' : theme.textSecondary,
+        }}
+      >
+        <Calendar className="h-3 w-3" />
+        Por vencer
+      </button>
     </div>
   );
 
@@ -575,6 +577,7 @@ export default function MisReclamos() {
         emptyMessage=""
         defaultViewMode="cards"
         extraFilters={renderExtraFilters()}
+        headerActions={renderHeaderActions()}
       >
         {filteredReclamos.length === 0 && !search && filtroEstado === 'todos' ? (
           renderEmptyState()
@@ -594,7 +597,7 @@ export default function MisReclamos() {
         ) : (
           filteredReclamos.map((r) => {
             const estado = estadoColors[r.estado];
-            const tieneImagen = r.imagenes && r.imagenes.length > 0;
+            const tieneImagen = r.documentos && r.documentos.length > 0;
             return (
               <ABMCard key={r.id} onClick={() => openViewSheet(r)}>
                 <div className="flex gap-4">
@@ -605,7 +608,7 @@ export default function MisReclamos() {
                   >
                     {tieneImagen ? (
                       <img
-                        src={r.imagenes[0].url}
+                        src={r.documentos[0].url}
                         alt=""
                         className="w-full h-full object-cover"
                       />
@@ -653,7 +656,7 @@ export default function MisReclamos() {
                   </div>
                 </div>
 
-                {/* Footer con dirección */}
+                {/* Footer con dirección y fechas */}
                 <div
                   className="flex items-center justify-between mt-3 pt-3 text-xs"
                   style={{ borderTop: `1px solid ${theme.border}` }}
@@ -662,7 +665,59 @@ export default function MisReclamos() {
                     <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
                     <span className="truncate">{r.direccion}</span>
                   </span>
-                  <Eye className="h-4 w-4 flex-shrink-0 ml-2" style={{ color: theme.primary }} />
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                    {/* Última actualización */}
+                    {r.updated_at && (
+                      <span className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                        <Clock className="h-3 w-3" />
+                        {new Date(r.updated_at).toLocaleDateString()}
+                      </span>
+                    )}
+                    {/* Por vencer - basado en fecha_programada */}
+                    {r.fecha_programada && !['resuelto', 'rechazado'].includes(r.estado) && (() => {
+                      const hoy = new Date();
+                      hoy.setHours(0, 0, 0, 0);
+                      const fechaVenc = new Date(r.fecha_programada);
+                      fechaVenc.setHours(0, 0, 0, 0);
+                      const diffMs = fechaVenc.getTime() - hoy.getTime();
+                      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                      const diffHoras = Math.ceil(diffMs / (1000 * 60 * 60));
+
+                      let texto = '';
+                      let color = theme.textSecondary;
+
+                      if (diffDias < 0) {
+                        const diasVencidos = Math.abs(diffDias);
+                        if (diasVencidos >= 7) {
+                          texto = `Vencido (${Math.floor(diasVencidos / 7)}sem)`;
+                        } else {
+                          texto = `Vencido (${diasVencidos}d)`;
+                        }
+                        color = '#ef4444';
+                      } else if (diffDias === 0) {
+                        texto = 'Hoy';
+                        color = '#f59e0b';
+                      } else if (diffHoras <= 24) {
+                        texto = `${diffHoras}h`;
+                        color = '#f59e0b';
+                      } else if (diffDias === 1) {
+                        texto = 'Mañana';
+                        color = '#eab308';
+                      } else if (diffDias <= 7) {
+                        texto = `${diffDias}d`;
+                        color = diffDias <= 2 ? '#eab308' : theme.textSecondary;
+                      } else {
+                        texto = `${Math.floor(diffDias / 7)}sem`;
+                      }
+
+                      return (
+                        <span className="font-medium" style={{ color }}>
+                          {texto}
+                        </span>
+                      );
+                    })()}
+                    <Eye className="h-4 w-4" style={{ color: theme.primary }} />
+                  </div>
                 </div>
               </ABMCard>
             );
@@ -705,100 +760,6 @@ export default function MisReclamos() {
         {renderCalificarContent()}
       </Sheet>
 
-      {/* Dropdown de filtros (fixed position para evitar overflow:hidden) */}
-      {showFiltroDropdown && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-[9998]"
-            onClick={() => setShowFiltroDropdown(false)}
-          />
-          {/* Menu */}
-          <div
-            className="fixed z-[9999] min-w-[200px] rounded-xl overflow-hidden shadow-xl"
-            style={{
-              top: dropdownPosition.top,
-              right: dropdownPosition.right,
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-              animation: 'fadeInDown 0.2s ease-out',
-            }}
-          >
-            <div className="p-2">
-              <p className="text-xs font-medium px-2 py-1.5 mb-1" style={{ color: theme.textSecondary }}>
-                Filtrar por estado
-              </p>
-
-              {/* Opción Todos */}
-              <button
-                onClick={() => { setFiltroEstado('todos'); setShowFiltroDropdown(false); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:scale-[1.02]"
-                style={{
-                  backgroundColor: filtroEstado === 'todos' ? `${theme.primary}15` : 'transparent',
-                }}
-              >
-                <div
-                  className="w-3 h-3 rounded-full border-2"
-                  style={{
-                    borderColor: filtroEstado === 'todos' ? theme.primary : theme.border,
-                    backgroundColor: filtroEstado === 'todos' ? theme.primary : 'transparent',
-                  }}
-                />
-                <span
-                  className="text-sm font-medium"
-                  style={{ color: filtroEstado === 'todos' ? theme.primary : theme.text }}
-                >
-                  Todos los estados
-                </span>
-              </button>
-
-              <div className="h-px my-1" style={{ backgroundColor: theme.border }} />
-
-              {/* Estados disponibles */}
-              {estadosUnicos.map(estado => {
-                const estadoColor = estadoColors[estado];
-                const isSelected = filtroEstado === estado;
-                return (
-                  <button
-                    key={estado}
-                    onClick={() => { setFiltroEstado(estado); setShowFiltroDropdown(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:scale-[1.02]"
-                    style={{
-                      backgroundColor: isSelected ? `${estadoColor.text}10` : 'transparent',
-                    }}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: estadoColor.text }}
-                    />
-                    <span
-                      className="text-sm font-medium flex-1"
-                      style={{ color: isSelected ? estadoColor.text : theme.text }}
-                    >
-                      {estadoLabels[estado]}
-                    </span>
-                    {isSelected && (
-                      <CheckCircle className="h-4 w-4" style={{ color: estadoColor.text }} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <style>{`
-            @keyframes fadeInDown {
-              from {
-                opacity: 0;
-                transform: translateY(-8px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-          `}</style>
-        </>
-      )}
     </>
   );
 }
