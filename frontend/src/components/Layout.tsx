@@ -11,7 +11,7 @@ import { MunicipioSelector } from './MunicipioSelector';
 import { Sheet } from './ui/Sheet';
 import { usersApi } from '../lib/api';
 import NotificationSettings from './NotificationSettings';
-import { isPushSupported, isSubscribed, subscribeToPush } from '../lib/pushNotifications';
+import { isPushSupported, subscribeToPush } from '../lib/pushNotifications';
 
 // Definir tabs del footer móvil según rol (siempre 5, el del medio es el principal)
 const getMobileTabs = (userRole: string) => {
@@ -85,11 +85,14 @@ export default function Layout() {
   }, [sidebarCollapsed]);
 
   // Verificar estado de suscripción push al montar
+  // SIEMPRE mostrar el toggle (false) excepto si no hay soporte del navegador
+  // Solo se oculta cuando el usuario lo activa exitosamente
   useEffect(() => {
     const checkPushStatus = async () => {
       if (isPushSupported()) {
-        const subscribed = await isSubscribed();
-        setPushSubscribed(subscribed);
+        // Siempre mostrar el toggle, sin importar si ya está suscrito
+        // Solo se oculta cuando el usuario presiona el botón y se activa
+        setPushSubscribed(false);
       } else {
         setPushSubscribed(true); // No mostrar toggle si no hay soporte
       }
