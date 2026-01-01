@@ -72,7 +72,7 @@ export default function Layout() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   // Estado para el toggle de push notifications en la top bar
-  const [pushSubscribed, setPushSubscribed] = useState<boolean | null>(null); // null = cargando
+  const [pushSubscribed, setPushSubscribed] = useState(false); // Siempre visible hasta que se active
   const [pushSubscribing, setPushSubscribing] = useState(false);
   const [showPushActivatedPopup, setShowPushActivatedPopup] = useState(false);
   const { user, logout, municipioActual, refreshUser } = useAuth();
@@ -83,12 +83,6 @@ export default function Layout() {
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-
-  // SIEMPRE mostrar el toggle de push (sin validar soporte)
-  // Solo se oculta cuando el usuario lo activa exitosamente
-  useEffect(() => {
-    setPushSubscribed(false);
-  }, []);
 
   // Handler para activar push desde la top bar
   const handleTopBarPushSubscribe = async () => {
