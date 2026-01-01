@@ -70,6 +70,27 @@ export function WizardModal({
     }
   }, [open]);
 
+  // Prevenir cierre accidental con Escape solo cuando NO estamos en un input/textarea
+  useEffect(() => {
+    if (!open || embedded) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Solo permitir Escape si no estamos en un input o textarea
+      if (e.key === 'Escape') {
+        const activeElement = document.activeElement;
+        const isInInput = activeElement?.tagName === 'INPUT' ||
+                         activeElement?.tagName === 'TEXTAREA' ||
+                         activeElement?.getAttribute('contenteditable') === 'true';
+        if (!isInInput) {
+          onClose();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open, embedded, onClose]);
+
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       setDirection('next');
@@ -323,6 +344,8 @@ export function WizardModal({
             <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={onClose}
+                tabIndex={-1}
+                type="button"
                 style={{
                   padding: '6px',
                   borderRadius: '8px',
@@ -502,10 +525,10 @@ export function WizardModal({
   const modalContent = (
     <>
       <style>{cssStyles}</style>
-      {/* Backdrop */}
-      <div className="wizard-modal-backdrop" onClick={onClose} />
-      {/* Modal Container */}
-      <div className="wizard-modal-container" onClick={onClose}>
+      {/* Backdrop - sin onClick para evitar cierres accidentales */}
+      <div className="wizard-modal-backdrop" />
+      {/* Modal Container - sin onClick para evitar cierres accidentales */}
+      <div className="wizard-modal-container">
         {wizardInnerContent}
       </div>
     </>

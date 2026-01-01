@@ -35,6 +35,7 @@ import {
   FileCheck,
   Calendar,
   ChevronRight,
+  MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi, empleadosApi } from '../lib/api';
@@ -155,6 +156,11 @@ export default function Tramites() {
   const [wizardStep, setWizardStep] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRubro, setSelectedRubro] = useState<string | null>(null);
+
+  // Estado para paso de descripción inicial
+  const [descripcionInput, setDescripcionInput] = useState('');
+  const [clasificando, setClasificando] = useState(false);
+  const [servicioSugerido, setServicioSugerido] = useState<ServicioTramite | null>(null);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -347,11 +353,73 @@ export default function Tramites() {
     setSelectedRubro(null);
     setWizardStep(0);
     setAiResponse('');
+    setDescripcionInput('');
+    setServicioSugerido(null);
+    setClasificando(false);
     setWizardOpen(true);
   };
 
   const closeWizard = () => {
     setWizardOpen(false);
+    setDescripcionInput('');
+    setServicioSugerido(null);
+  };
+
+  // Buscar servicio sugerido basado en palabras clave
+  const handleDescripcionSubmit = () => {
+    if (!descripcionInput.trim() || clasificando) return;
+
+    setClasificando(true);
+
+    // Buscar servicio por coincidencia de palabras clave
+    const texto = descripcionInput.toLowerCase();
+    let mejorServicio: ServicioTramite | null = null;
+    let mejorScore = 0;
+
+    for (const servicio of servicios) {
+      let score = 0;
+      const nombreLower = servicio.nombre.toLowerCase();
+      const descripcionLower = (servicio.descripcion || '').toLowerCase();
+
+      // Buscar coincidencias de palabras
+      const palabras = texto.split(/\s+/);
+      for (const palabra of palabras) {
+        if (palabra.length > 2) {
+          if (nombreLower.includes(palabra)) score += 3;
+          if (descripcionLower.includes(palabra)) score += 1;
+        }
+      }
+
+      if (score > mejorScore) {
+        mejorScore = score;
+        mejorServicio = servicio;
+      }
+    }
+
+    if (mejorServicio && mejorScore >= 3) {
+      setServicioSugerido(mejorServicio);
+      setFormData(prev => ({
+        ...prev,
+        descripcion: descripcionInput.trim(),
+        asunto: `Consulta sobre ${mejorServicio!.nombre}`,
+      }));
+    } else {
+      // Guardar la descripción aunque no encontremos servicio
+      setFormData(prev => ({
+        ...prev,
+        descripcion: descripcionInput.trim(),
+      }));
+    }
+
+    setClasificando(false);
+  };
+
+  // Aceptar servicio sugerido
+  const aceptarServicioSugerido = () => {
+    if (servicioSugerido) {
+      setFormData(prev => ({ ...prev, servicio_id: String(servicioSugerido.id) }));
+      setWizardStep(2); // Ir directamente a detalle (saltando servicio)
+    }
   };
 
   // Sheet functions
@@ -562,6 +630,82 @@ export default function Tramites() {
     };
   };
 
+  // Wizard Step 0: Describir consulta
+  const wizardStep0 = (
+    <div className="space-y-4">
+      <p className="text-sm" style={{ color: theme.textSecondary }}>
+        Describí qué trámite necesitás y te sugeriremos la opción más adecuada:
+      </p>
+
+      {/* Input de descripción */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={descripcionInput}
+          onChange={(e) => setDescripcionInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleDescripcionSubmit()}
+          placeholder="Ej: Necesito sacar una habilitación comercial..."
+          disabled={clasificando}
+          className="flex-1 px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.text,
+            border: `1px solid ${theme.border}`,
+          }}
+        />
+        <button
+          onClick={handleDescripcionSubmit}
+          disabled={!descripcionInput.trim() || clasificando}
+          className="px-4 py-3 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: theme.primary, color: 'white' }}
+        >
+          {clasificando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+        </button>
+      </div>
+
+      {/* Sugerencia de servicio */}
+      {servicioSugerido && !clasificando && (
+        <div
+          className="p-4 rounded-xl flex items-center justify-between"
+          style={{
+            backgroundColor: `${servicioSugerido.color || theme.primary}15`,
+            border: `2px solid ${servicioSugerido.color || theme.primary}`,
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: servicioSugerido.color || theme.primary,
+                color: 'white',
+              }}
+            >
+              {getServicioIcon(servicioSugerido.icono)}
+            </div>
+            <div>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Servicio sugerido</p>
+              <p className="font-semibold" style={{ color: theme.text }}>
+                {servicioSugerido.nombre}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={aceptarServicioSugerido}
+            className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 active:scale-95"
+            style={{ backgroundColor: theme.primary, color: 'white' }}
+          >
+            Confirmar
+          </button>
+        </div>
+      )}
+
+      {/* Tip */}
+      <p className="text-xs text-center" style={{ color: theme.textSecondary }}>
+        Tip: Describí tu necesidad con detalle para obtener una mejor sugerencia
+      </p>
+    </div>
+  );
+
   // Wizard Step 1: Seleccionar servicio
   const wizardStep1 = (
     <div className="space-y-4">
@@ -581,7 +725,7 @@ export default function Tramites() {
             {filteredServicios.length > 0 ? filteredServicios.map((s) => (
               <button
                 key={s.id}
-                onClick={() => { setFormData(prev => ({ ...prev, servicio_id: String(s.id) })); setSearchTerm(''); setTimeout(() => setWizardStep(1), 300); }}
+                onClick={() => { setFormData(prev => ({ ...prev, servicio_id: String(s.id) })); setSearchTerm(''); setTimeout(() => setWizardStep(2), 300); }}
                 className="w-full p-3 flex items-center gap-3 text-left hover:bg-black/5"
               >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${s.color || theme.primary}20`, color: s.color || theme.primary }}>
@@ -652,7 +796,7 @@ export default function Tramites() {
               return (
                 <button
                   key={s.id}
-                  onClick={() => { setFormData(prev => ({ ...prev, servicio_id: String(s.id) })); setTimeout(() => setWizardStep(1), 300); }}
+                  onClick={() => { setFormData(prev => ({ ...prev, servicio_id: String(s.id) })); setTimeout(() => setWizardStep(2), 300); }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all hover:shadow-md ${isSelected ? 'shadow-lg' : ''}`}
                   style={{
                     backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary,
@@ -842,6 +986,7 @@ export default function Tramites() {
 
   // Wizard steps array
   const wizardSteps = [
+    { id: 'describir', title: 'Describir', description: 'Contanos qué necesitás', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: true },
     { id: 'servicio', title: 'Servicio', description: 'Selecciona el trámite', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
     { id: 'detalle', title: 'Detalle', description: 'Describe tu solicitud', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
     { id: 'contacto', title: 'Contacto', description: 'Datos de contacto', icon: <User className="h-5 w-5" />, content: wizardStep3, isValid: isStep3Valid },
@@ -858,8 +1003,20 @@ export default function Tramites() {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto">
-        {/* Paso 0: Info del servicio */}
-        {wizardStep === 0 && selectedServicio && (
+        {/* Paso 0: Describir */}
+        {wizardStep === 0 && (
+          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+            <div className="flex items-start gap-2">
+              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+              <p style={{ color: theme.textSecondary }}>
+                Contanos qué necesitás hacer y te sugeriremos el trámite más adecuado.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 1: Info del servicio */}
+        {wizardStep === 1 && selectedServicio && (
           <div className="space-y-3">
             <div className="p-3 rounded-lg" style={{ backgroundColor: `${selectedServicio.color || theme.primary}15`, border: `1px solid ${selectedServicio.color || theme.primary}30` }}>
               <div className="flex items-center gap-2 mb-2">
@@ -887,7 +1044,7 @@ export default function Tramites() {
           </div>
         )}
 
-        {wizardStep === 0 && !selectedServicio && (
+        {wizardStep === 1 && !selectedServicio && (
           <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
             <div className="flex items-start gap-2">
               <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
@@ -896,7 +1053,7 @@ export default function Tramites() {
           </div>
         )}
 
-        {wizardStep === 1 && (
+        {wizardStep === 2 && (
           <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
             <div className="flex items-start gap-2">
               <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
@@ -905,7 +1062,7 @@ export default function Tramites() {
           </div>
         )}
 
-        {wizardStep === 2 && (
+        {wizardStep === 3 && (
           <div className="space-y-3">
             <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
               <div className="flex items-center gap-2 mb-2">

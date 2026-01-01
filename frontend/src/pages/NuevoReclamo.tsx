@@ -693,7 +693,7 @@ Tono amigable, 3-4 oraciones máximo.`,
     setSubmitting(true);
     try {
       console.log('Creando reclamo...', formData);
-      const data = {
+      const data: Record<string, unknown> = {
         ...formData,
         categoria_id: Number(formData.categoria_id),
         zona_id: formData.zona_id ? Number(formData.zona_id) : undefined,
@@ -1824,10 +1824,13 @@ Tono amigable, 3-4 oraciones máximo.`,
     isValid: isRegisterValid,
   };
 
-  // Flujo: Chat -> Categoría -> Ubicación -> Detalles -> [Registro si no logueado] -> Confirmar
-  const steps = showOnlyRegister
-    ? [...baseSteps.slice(0, 4), registerStep, baseSteps[4]] // Insertar registro antes de confirmar
-    : baseSteps;
+  // Flujo para público: Chat -> Categoría -> Ubicación -> Detalles -> [Registro si no logueado] -> Confirmar
+  let steps: WizardStep[];
+  if (showOnlyRegister) {
+    steps = [...baseSteps.slice(0, 4), registerStep, baseSteps[4]];
+  } else {
+    steps = baseSteps;
+  }
 
   // Índice del paso de registro (si existe)
   const registerStepIndex = showOnlyRegister ? 4 : -1;

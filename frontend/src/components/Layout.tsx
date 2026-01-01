@@ -71,7 +71,7 @@ export default function Layout() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const { user, logout, municipioActual, refreshUser } = useAuth();
-  const { theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar, sidebarBgImage, setSidebarBgImage, sidebarBgOpacity, setSidebarBgOpacity } = useTheme();
+  const { theme, themeName, setTheme, customPrimary, setCustomPrimary, customSidebar, setCustomSidebar, customSidebarText, setCustomSidebarText, sidebarBgImage, setSidebarBgImage, sidebarBgOpacity, setSidebarBgOpacity, contentBgImage, setContentBgImage, contentBgOpacity, setContentBgOpacity } = useTheme();
   const location = useLocation();
 
   // Guardar estado del sidebar en localStorage
@@ -290,7 +290,29 @@ export default function Layout() {
       </div>
 
       {/* Main content */}
-      <div className="lg:transition-[padding] lg:duration-300 main-content-area">
+      <div className="lg:transition-[padding] lg:duration-300 main-content-area relative">
+        {/* Imagen de fondo del contenido */}
+        {contentBgImage && (
+          <>
+            <div
+              className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+              style={{
+                backgroundImage: `url(${contentBgImage})`,
+                opacity: contentBgOpacity,
+                transition: 'opacity 0.3s ease',
+                zIndex: 0,
+              }}
+            />
+            {/* Overlay para mejorar legibilidad */}
+            <div
+              className="fixed inset-0 pointer-events-none"
+              style={{
+                background: `linear-gradient(180deg, ${theme.contentBackground}ee 0%, ${theme.contentBackground}cc 50%, ${theme.contentBackground}ee 100%)`,
+                zIndex: 0,
+              }}
+            />
+          </>
+        )}
         {/* Top bar */}
         <header
           className="sticky top-0 z-40 shadow-sm backdrop-blur-md transition-colors duration-300 overflow-visible"
@@ -549,26 +571,35 @@ export default function Layout() {
                         </span>
                       </div>
                       <div className="p-3 space-y-3">
-                        {/* Colores del sidebar - mismos que paleta de acento */}
-                        <div className="grid grid-cols-6 gap-2">
-                          {accentColors.map((color) => {
-                            const isSelected = customSidebar === color.value;
+                        {/* Colores del sidebar - complementarios al tema + negro/blanco */}
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            // Negro y blanco siempre disponibles
+                            { name: 'Negro', value: '#000000', textColor: '#ffffff' },
+                            { name: 'Blanco', value: '#f8fafc', textColor: '#1e293b' },
+                            // Colores complementarios del tema actual
+                            { name: 'Tema base', value: themes[themeName].sidebar, textColor: themes[themeName].sidebarText },
+                            { name: 'Fondo', value: themes[themeName].background, textColor: themes[themeName].text },
+                            { name: 'Acento', value: theme.primary, textColor: '#ffffff' },
+                            { name: 'Card', value: themes[themeName].card, textColor: themes[themeName].text },
+                          ].map((color) => {
+                            const isSelected = customSidebar === color.value || (!customSidebar && themes[themeName].sidebar === color.value);
                             return (
                               <button
-                                key={color.value}
+                                key={color.name}
                                 onClick={() => {
-                                  setCustomSidebar(color.value);
+                                  setCustomSidebar(color.value === themes[themeName].sidebar ? null : color.value);
                                 }}
-                                className="w-7 h-7 rounded-full transition-all duration-200 hover:scale-110 flex items-center justify-center"
+                                className="w-8 h-8 rounded-lg transition-all duration-200 hover:scale-110 flex items-center justify-center"
                                 style={{
                                   backgroundColor: color.value,
-                                  boxShadow: isSelected ? `0 0 0 2px ${theme.card}, 0 0 0 4px ${color.value}` : 'none',
-                                  border: `1px solid ${theme.border}`,
+                                  boxShadow: isSelected ? `0 0 0 2px ${theme.card}, 0 0 0 3px ${theme.primary}` : 'none',
+                                  border: color.value === '#f8fafc' || color.value === '#ffffff' ? `1px solid ${theme.border}` : 'none',
                                 }}
                                 title={color.name}
                               >
                                 {isSelected && (
-                                  <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <svg className="w-3.5 h-3.5" fill={color.textColor} viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                   </svg>
                                 )}
@@ -585,6 +616,37 @@ export default function Layout() {
                             Restablecer al tema
                           </button>
                         )}
+
+                        {/* Color de fuente del sidebar */}
+                        <div className="pt-2" style={{ borderTop: `1px solid ${theme.border}` }}>
+                          <span className="text-xs mb-2 block" style={{ color: theme.textSecondary }}>Color de texto</span>
+                          <div className="flex flex-wrap gap-2">
+                            {[
+                              { name: 'Auto', value: null, color: themes[themeName].sidebarText, label: 'A' },
+                              { name: 'Blanco', value: '#ffffff', color: '#ffffff', label: '' },
+                              { name: 'Negro', value: '#1e293b', color: '#1e293b', label: '' },
+                              { name: 'Gris', value: '#6b7280', color: '#6b7280', label: '' },
+                            ].map((opt) => {
+                              const isSelected = customSidebarText === opt.value;
+                              return (
+                                <button
+                                  key={opt.name}
+                                  onClick={() => setCustomSidebarText(opt.value)}
+                                  className="w-8 h-8 rounded-lg transition-all duration-200 hover:scale-110 flex items-center justify-center text-xs font-bold"
+                                  style={{
+                                    backgroundColor: opt.color,
+                                    boxShadow: isSelected ? `0 0 0 2px ${theme.card}, 0 0 0 3px ${theme.primary}` : 'none',
+                                    border: opt.value === '#ffffff' || opt.value === null ? `1px solid ${theme.border}` : 'none',
+                                    color: opt.value === '#ffffff' || opt.value === null ? '#1e293b' : '#ffffff',
+                                  }}
+                                  title={opt.name}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
 
                         {/* Opciones de imagen de fondo */}
                         <div className="flex flex-wrap gap-2 pt-2" style={{ borderTop: `1px solid ${theme.border}` }}>
@@ -637,6 +699,65 @@ export default function Layout() {
                           </div>
                         )}
                       </div>
+
+                      {/* Sección: Fondo del contenido */}
+                      <div className="px-3 py-2 border-t border-b" style={{ borderColor: theme.border }}>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                          Fondo de página
+                        </span>
+                      </div>
+                      <div className="p-3 space-y-3">
+                        {/* Opciones de imagen de fondo */}
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { name: 'Sin imagen', value: null, preview: null },
+                            { name: 'Banner', value: municipioActual?.logo_url || 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=800', preview: municipioActual?.logo_url || 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=200' },
+                          ].map((img) => {
+                            const isSelected = contentBgImage === img.value;
+                            return (
+                              <button
+                                key={img.name}
+                                onClick={() => setContentBgImage(img.value)}
+                                className="w-12 h-12 rounded-lg transition-all duration-200 hover:scale-105 flex items-center justify-center overflow-hidden"
+                                style={{
+                                  backgroundColor: img.preview ? 'transparent' : theme.backgroundSecondary,
+                                  boxShadow: isSelected ? `0 0 0 2px ${theme.primary}` : 'none',
+                                  border: `1px solid ${theme.border}`,
+                                }}
+                                title={img.name}
+                              >
+                                {img.preview ? (
+                                  <img src={img.preview} alt={img.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <X className="w-4 h-4" style={{ color: theme.textSecondary }} />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Slider de opacidad - solo visible si hay imagen */}
+                        {contentBgImage && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs" style={{ color: theme.textSecondary }}>Opacidad</span>
+                              <span className="text-xs font-mono" style={{ color: theme.text }}>{Math.round(contentBgOpacity * 100)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0.03"
+                              max="0.3"
+                              step="0.01"
+                              value={contentBgOpacity}
+                              onChange={(e) => setContentBgOpacity(parseFloat(e.target.value))}
+                              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                              style={{
+                                background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${((contentBgOpacity - 0.03) / 0.27) * 100}%, ${theme.backgroundSecondary} ${((contentBgOpacity - 0.03) / 0.27) * 100}%, ${theme.backgroundSecondary} 100%)`,
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -659,10 +780,11 @@ export default function Layout() {
 
         {/* Page content with transition - padding reducido en móvil */}
         <main
-          className="p-3 sm:p-6"
+          className="p-3 sm:p-6 relative"
           style={{
             color: theme.text,
             paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar
+            zIndex: 1,
           }}
         >
           <PageTransition>

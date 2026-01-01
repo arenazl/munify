@@ -126,10 +126,16 @@ interface ThemeContextType {
   setCustomPrimary: (color: string | null) => void;
   customSidebar: string | null;
   setCustomSidebar: (color: string | null) => void;
+  customSidebarText: string | null;
+  setCustomSidebarText: (color: string | null) => void;
   sidebarBgImage: string | null;
   setSidebarBgImage: (url: string | null) => void;
   sidebarBgOpacity: number;
   setSidebarBgOpacity: (opacity: number) => void;
+  contentBgImage: string | null;
+  setContentBgImage: (url: string | null) => void;
+  contentBgOpacity: number;
+  setContentBgOpacity: (opacity: number) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -152,6 +158,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem('customSidebar');
   });
 
+  const [customSidebarText, setCustomSidebarTextState] = useState<string | null>(() => {
+    return localStorage.getItem('customSidebarText');
+  });
+
   const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(() => {
     const saved = localStorage.getItem('sidebarBgImage');
     // Solo usar si explícitamente se guardó un valor
@@ -163,8 +173,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return saved ? parseFloat(saved) : 0.3;
   });
 
+  const [contentBgImage, setContentBgImageState] = useState<string | null>(() => {
+    const saved = localStorage.getItem('contentBgImage');
+    return saved && saved !== 'null' ? saved : null;
+  });
+
+  const [contentBgOpacity, setContentBgOpacityState] = useState<number>(() => {
+    const saved = localStorage.getItem('contentBgOpacity');
+    return saved ? parseFloat(saved) : 0.1;
+  });
+
   // Fallback to dark theme if themeName is invalid
   const baseTheme = themes[themeName] || themes.dark;
+
+  // Función para detectar si un color es claro u oscuro
+  const isLightColor = (color: string): boolean => {
+    // Convertir hex a RGB
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    // Calcular luminancia (fórmula estándar)
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    // Umbral más bajo (0.35) para detectar colores medianos como claros
+    return luminance > 0.35;
+  };
 
   // Aplicar color de acento personalizado si existe
   let theme: Theme = customPrimary
@@ -178,9 +211,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Aplicar color de sidebar personalizado si existe, sino usar el del tema base
   const sidebarColor = customSidebar || theme.sidebar;
 
+  // Determinar colores de texto del sidebar (personalizado o del tema base)
+  const sidebarTextColor = customSidebarText || baseTheme.sidebarText;
+  // Para el secundario, derivar del principal
+  const sidebarTextSecondaryColor = customSidebarText === '#ffffff' ? '#94a3b8' :
+                                     customSidebarText === '#1e293b' ? '#64748b' :
+                                     customSidebarText === '#6b7280' ? '#9ca3af' :
+                                     baseTheme.sidebarTextSecondary;
+
   theme = {
     ...theme,
     sidebar: sidebarColor,
+    sidebarText: sidebarTextColor,
+    sidebarTextSecondary: sidebarTextSecondaryColor,
   };
 
   useEffect(() => {
@@ -220,6 +263,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [customSidebar]);
 
   useEffect(() => {
+    if (customSidebarText) {
+      localStorage.setItem('customSidebarText', customSidebarText);
+    } else {
+      localStorage.removeItem('customSidebarText');
+    }
+  }, [customSidebarText]);
+
+  useEffect(() => {
     if (sidebarBgImage) {
       localStorage.setItem('sidebarBgImage', sidebarBgImage);
     } else {
@@ -230,6 +281,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     localStorage.setItem('sidebarBgOpacity', String(sidebarBgOpacity));
   }, [sidebarBgOpacity]);
+
+  useEffect(() => {
+    if (contentBgImage) {
+      localStorage.setItem('contentBgImage', contentBgImage);
+    } else {
+      localStorage.removeItem('contentBgImage');
+    }
+  }, [contentBgImage]);
+
+  useEffect(() => {
+    localStorage.setItem('contentBgOpacity', String(contentBgOpacity));
+  }, [contentBgOpacity]);
 
   const setTheme = (name: ThemeName) => {
     setThemeName(name);
@@ -243,12 +306,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setCustomSidebarState(color);
   };
 
+  const setCustomSidebarText = (color: string | null) => {
+    setCustomSidebarTextState(color);
+  };
+
   const setSidebarBgImage = (url: string | null) => {
     setSidebarBgImageState(url);
   };
 
   const setSidebarBgOpacity = (opacity: number) => {
     setSidebarBgOpacityState(opacity);
+  };
+
+  const setContentBgImage = (url: string | null) => {
+    setContentBgImageState(url);
+  };
+
+  const setContentBgOpacity = (opacity: number) => {
+    setContentBgOpacityState(opacity);
   };
 
   return (
@@ -260,10 +335,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setCustomPrimary,
       customSidebar,
       setCustomSidebar,
+      customSidebarText,
+      setCustomSidebarText,
       sidebarBgImage,
       setSidebarBgImage,
       sidebarBgOpacity,
-      setSidebarBgOpacity
+      setSidebarBgOpacity,
+      contentBgImage,
+      setContentBgImage,
+      contentBgOpacity,
+      setContentBgOpacity
     }}>
       {children}
     </ThemeContext.Provider>

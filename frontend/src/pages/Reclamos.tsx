@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
@@ -191,6 +191,11 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const [wizardStep, setWizardStep] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
+  // Estado para paso de descripción inicial
+  const [descripcionInput, setDescripcionInput] = useState('');
+  const [clasificando, setClasificando] = useState(false);
+  const [categoriaSugerida, setCategoriaSugerida] = useState<{categoria: Categoria; confianza: number} | null>(null);
 
   // Sheet states (solo para ver detalle)
   const [sheetMode, setSheetMode] = useState<SheetMode>('closed');
@@ -447,7 +452,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       const categoriaExiste = categorias.find(c => c.id === parseInt(crearCategoriaId));
       if (categoriaExiste) {
         setFormData(prev => ({ ...prev, categoria_id: crearCategoriaId }));
-        setWizardStep(1); // Saltar al paso de detalles
+        setWizardStep(2); // Saltar al paso de ubicación (después de describir y categoría)
         setWizardOpen(true);
         setSearchParams({}); // Limpiar URL
       }
@@ -507,8 +512,8 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
 
   // Debounce para mostrar sugerencias de IA - 3 segundos después de escribir
   useEffect(() => {
-    // Solo aplicar debounce si estamos en el paso de detalles (paso 2)
-    if (wizardStep !== 2) {
+    // Solo aplicar debounce si estamos en el paso de detalles (paso 3)
+    if (wizardStep !== 3) {
       setShowAISuggestions(false);
       setAISuggestionsLoading(false);
       setContextualAiResponse('');
@@ -826,11 +831,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setLoadingUsers(true);
     try {
       const response = await usersApi.getAll();
+      console.log('[fetchUsers] Response:', response.data?.length, 'usuarios');
       // Filtrar solo vecinos activos
       const vecinos = response.data.filter((u: UserType) => u.rol === 'vecino' && u.activo);
+      console.log('[fetchUsers] Vecinos activos:', vecinos.length);
       setAllUsers(vecinos);
     } catch (error) {
-      console.error('Error cargando usuarios:', error);
+      console.error('[fetchUsers] Error cargando usuarios:', error);
     } finally {
       setLoadingUsers(false);
     }
@@ -838,6 +845,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   // Buscar usuarios por nombre, apellido, DNI o teléfono
   const handleUserSearch = (query: string) => {
+    console.log('[handleUserSearch] Query:', query, 'allUsers:', allUsers.length);
     if (query.length < 2) {
       setUserSearchResults([]);
       setShowUserResults(false);
@@ -855,6 +863,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         (u.dni && u.dni.toLowerCase().includes(queryLower)) ||
         (u.telefono && u.telefono.includes(query))
       ).slice(0, 10);
+      console.log('[handleUserSearch] Results:', results.length);
       setUserSearchResults(results);
       setShowUserResults(results.length > 0);
       setSearchingUsers(false);
@@ -905,6 +914,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setWizardStep(0);
     setSelectedUser(null);
     setUserSearchResults([]);
+    setDescripcionInput('');
+    setCategoriaSugerida(null);
+    setClasificando(false);
     setWizardOpen(true);
     // Cargar usuarios si no están cargados
     if (allUsers.length === 0) {
@@ -916,6 +928,46 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setWizardOpen(false);
     setWizardStep(0);
     setEsAnonimo(false);
+    setDescripcionInput('');
+    setCategoriaSugerida(null);
+  };
+
+  // Clasificar descripción con IA
+  const handleDescripcionSubmit = async () => {
+    if (!descripcionInput.trim() || clasificando) return;
+
+    setClasificando(true);
+    try {
+      const municipioId = user?.municipio_id || 1;
+      const resultado = await clasificacionApi.clasificar(descripcionInput.trim(), municipioId);
+
+      if (resultado.sugerencias && resultado.sugerencias.length > 0) {
+        const mejorSugerencia = resultado.sugerencias[0];
+        const cat = categorias.find(c => c.id === mejorSugerencia.categoria_id);
+
+        if (cat) {
+          const confianza = mejorSugerencia.confianza || mejorSugerencia.score || 0;
+          setCategoriaSugerida({ categoria: cat, confianza });
+          setFormData(prev => ({
+            ...prev,
+            descripcion: descripcionInput.trim(),
+            titulo: `Problema de ${cat.nombre.toLowerCase()}`,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error clasificando:', error);
+    } finally {
+      setClasificando(false);
+    }
+  };
+
+  // Aceptar categoría sugerida
+  const aceptarCategoriaSugerida = () => {
+    if (categoriaSugerida) {
+      setFormData(prev => ({ ...prev, categoria_id: String(categoriaSugerida.categoria.id) }));
+      setWizardStep(2); // Ir directamente a ubicación (saltando categoría ya que está seleccionada)
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1218,6 +1270,85 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     );
   });
 
+  // Wizard Step 0: Describir problema
+  const wizardStep0 = (
+    <div className="space-y-4">
+      <p className="text-sm" style={{ color: theme.textSecondary }}>
+        Describí el problema y te sugeriremos la categoría más adecuada:
+      </p>
+
+      {/* Input de descripción */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={descripcionInput}
+          onChange={(e) => setDescripcionInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleDescripcionSubmit()}
+          placeholder="Ej: Hay un bache grande en la esquina..."
+          disabled={clasificando}
+          className="flex-1 px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.text,
+            border: `1px solid ${theme.border}`,
+          }}
+        />
+        <button
+          onClick={handleDescripcionSubmit}
+          disabled={!descripcionInput.trim() || clasificando}
+          className="px-4 py-3 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: theme.primary, color: 'white' }}
+        >
+          {clasificando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+        </button>
+      </div>
+
+      {/* Sugerencia de categoría */}
+      {categoriaSugerida && !clasificando && (
+        <div
+          className="p-4 rounded-xl flex items-center justify-between"
+          style={{
+            backgroundColor: `${getCategoryColor(categoriaSugerida.categoria.nombre)}15`,
+            border: `2px solid ${getCategoryColor(categoriaSugerida.categoria.nombre)}`,
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: getCategoryColor(categoriaSugerida.categoria.nombre),
+                color: 'white',
+              }}
+            >
+              {getCategoryIcon(categoriaSugerida.categoria.nombre)}
+            </div>
+            <div>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Categoría sugerida</p>
+              <p className="font-semibold" style={{ color: theme.text }}>
+                {categoriaSugerida.categoria.nombre}
+              </p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                {categoriaSugerida.confianza >= 80 ? 'Alta confianza' : categoriaSugerida.confianza >= 60 ? 'Confianza media' : 'Baja confianza'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={aceptarCategoriaSugerida}
+            className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 active:scale-95"
+            style={{ backgroundColor: theme.primary, color: 'white' }}
+          >
+            Confirmar
+          </button>
+        </div>
+      )}
+
+      {/* Tip */}
+      <p className="text-xs text-center" style={{ color: theme.textSecondary }}>
+        Tip: Describí el problema con detalle para obtener una mejor sugerencia
+      </p>
+    </div>
+  );
+
   // Wizard Step 1: Categoría
   const wizardStep1 = (
     <div className="space-y-3">
@@ -1232,7 +1363,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               key={cat.id}
               type="button"
-              onClick={() => { setFormData({ ...formData, categoria_id: String(cat.id) }); setTimeout(() => setWizardStep(1), 300); }}
+              onClick={() => { setFormData({ ...formData, categoria_id: String(cat.id) }); setTimeout(() => setWizardStep(2), 300); }}
               className={`relative p-3 rounded-xl border-2 transition-all duration-300 hover:scale-105 active:scale-95 ${isSelected ? 'border-current' : 'border-transparent'}`}
               style={{
                 backgroundColor: isSelected ? `${catColor}20` : theme.backgroundSecondary,
@@ -1935,8 +2066,20 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       <div className="flex-1 space-y-3 overflow-y-auto">
         {/* Contenido dinámico según el paso */}
 
-        {/* Paso 0: Categoría */}
-        {wizardStep === 0 && selectedCategoria ? (
+        {/* Paso 0: Describir - info general */}
+        {wizardStep === 0 && (
+          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
+            <div className="flex items-start gap-2">
+              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+              <p style={{ color: theme.textSecondary }}>
+                Describí el problema con detalle y te sugeriremos la categoría más adecuada automáticamente.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Paso 1: Categoría */}
+        {wizardStep === 1 && selectedCategoria ? (
           <div className="space-y-3">
             <div className="p-3 rounded-lg" style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}>
               <div className="flex items-center gap-2 mb-2">
@@ -1971,7 +2114,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               </div>
             </div>
           </div>
-        ) : wizardStep === 0 ? (
+        ) : wizardStep === 1 ? (
           <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
             <div className="flex items-start gap-2">
               <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
@@ -1982,8 +2125,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </div>
         ) : null}
 
-        {/* Paso 1: Ubicación */}
-        {wizardStep === 1 && (
+        {/* Paso 2: Ubicación */}
+        {wizardStep === 2 && (
           <div className="space-y-3">
             <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
               <div className="flex items-start gap-2">
@@ -2005,8 +2148,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </div>
         )}
 
-        {/* Paso 2: Detalles - Panel con sugerencias basadas en categoría */}
-        {wizardStep === 2 && selectedCategoria && (
+        {/* Paso 3: Detalles - Panel con sugerencias basadas en categoría */}
+        {wizardStep === 3 && selectedCategoria && (
           <div className="space-y-3">
             {/* Estado inicial: esperando que escriba descripción */}
             {!formData.descripcion.trim() && !aiSuggestionsLoading && (
@@ -2075,8 +2218,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </div>
         )}
 
-        {/* Paso 3: Contacto */}
-        {wizardStep === 3 && (
+        {/* Paso 4: Contacto */}
+        {wizardStep === 4 && (
           <div className="space-y-3">
             <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: '#25D36610', border: '1px solid #25D36630' }}>
               <div className="flex items-center gap-2 mb-2">
@@ -2104,8 +2247,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </div>
         )}
 
-        {/* Paso 4: Resumen */}
-        {wizardStep === 4 && (
+        {/* Paso 5: Resumen */}
+        {wizardStep === 5 && (
           <div className="space-y-3">
             <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
               <div className="flex items-center gap-2 mb-2">
@@ -2177,9 +2320,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   );
 
   const wizardSteps = [
+    { id: 'describir', title: 'Describir', description: 'Contanos el problema', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: !!descripcionInput.trim() },
     { id: 'categoria', title: 'Categoría', description: 'Selecciona el tipo de problema', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: !!formData.categoria_id },
     { id: 'ubicacion', title: 'Ubicación', description: 'Indica dónde está el problema', icon: <MapPin className="h-5 w-5" />, content: wizardStep2, isValid: !!formData.direccion },
-    { id: 'detalles', title: 'Detalles', description: 'Describe el problema', icon: <FileText className="h-5 w-5" />, content: wizardStep3, isValid: !!formData.titulo && !!formData.descripcion },
+    { id: 'detalles', title: 'Detalles', description: 'Agregá más información', icon: <FileText className="h-5 w-5" />, content: wizardStep3, isValid: !!formData.titulo && !!formData.descripcion },
     { id: 'contacto', title: 'Contacto', description: 'Tus datos para seguimiento', icon: <Phone className="h-5 w-5" />, content: wizardStepContacto, isValid: esAnonimo || (!!formData.nombre_contacto && !!formData.telefono_contacto) },
     { id: 'resumen', title: 'Confirmar', description: 'Revisa y envía', icon: <CheckCircle2 className="h-5 w-5" />, content: wizardStep4, isValid: true },
   ];

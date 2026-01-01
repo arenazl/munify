@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Search, GripVertical, Columns3, Calendar, X } from 'lucide-react';
+import { Search, GripVertical, Columns3, Calendar, X, Filter } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { Reclamo, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +18,14 @@ interface Columna {
 }
 
 const columnas: Columna[] = [
+  {
+    id: 'nuevo',
+    titulo: 'Nuevos',
+    color: '#ef4444',
+    headerClass: 'column-header-red',
+    cardClass: 'card-gradient-red',
+    badgeClass: 'badge-gradient-red',
+  },
   {
     id: 'asignado',
     titulo: 'Asignados',
@@ -36,7 +44,7 @@ const columnas: Columna[] = [
   },
   {
     id: 'pendiente_confirmacion',
-    titulo: 'Pendiente Confirmación',
+    titulo: 'Pend. Confirmación',
     color: '#8b5cf6',
     headerClass: 'column-header-purple',
     cardClass: 'card-gradient-purple',
@@ -52,18 +60,26 @@ const columnas: Columna[] = [
   },
 ];
 
-// Función helper para obtener fecha de hoy en formato YYYY-MM-DD
-const getTodayDate = () => {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
+// Función helper para obtener fecha en formato YYYY-MM-DD
+const getDateString = (date: Date) => {
+  return date.toISOString().split('T')[0];
+};
+
+// Función para obtener fecha de hace N días
+const getDaysAgoDate = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return getDateString(date);
 };
 
 export default function Tablero() {
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [fechaDesde, setFechaDesde] = useState(getTodayDate());
-  const [fechaHasta, setFechaHasta] = useState(getTodayDate());
+  const [fechaDesde, setFechaDesde] = useState(() => getDaysAgoDate(2));
+  const [fechaHasta, setFechaHasta] = useState(() => getDateString(new Date()));
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [activeColumnIndex, setActiveColumnIndex] = useState(0);
   const { user } = useAuth();
   const { theme } = useTheme();
 
@@ -125,12 +141,19 @@ export default function Tablero() {
         if (fechaHasta && fechaReclamo > fechaHasta) return false;
         return true;
       })
-      .filter(r =>
-        searchTerm === '' ||
-        r.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.direccion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.categoria?.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      .filter(r => {
+        if (searchTerm === '') return true;
+        const term = searchTerm.toLowerCase();
+        const empleadoNombre = r.empleado_asignado
+          ? `${r.empleado_asignado.nombre} ${r.empleado_asignado.apellido || ''}`.toLowerCase()
+          : '';
+        return (
+          r.titulo.toLowerCase().includes(term) ||
+          r.direccion?.toLowerCase().includes(term) ||
+          r.categoria?.nombre?.toLowerCase().includes(term) ||
+          empleadoNombre.includes(term)
+        );
+      });
   };
 
   const limpiarFiltrosFecha = () => {
@@ -149,15 +172,15 @@ export default function Tablero() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Sticky wrapper para header */}
       <div
         className="sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-1 pb-3"
         style={{ backgroundColor: theme.background }}
       >
-        {/* Header estilo ABMPage */}
+        {/* Header - Desktop */}
         <div
-          className="flex items-center gap-4 px-4 py-3 rounded-xl"
+          className="hidden md:flex items-center gap-4 px-4 py-3 rounded-xl"
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
@@ -171,17 +194,17 @@ export default function Tablero() {
             >
               <Columns3 className="h-4 w-4" style={{ color: theme.primary }} />
             </div>
-            <h1 className="text-lg font-bold tracking-tight hidden sm:block" style={{ color: theme.text }}>
+            <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
               Tablero
             </h1>
           </div>
 
           {/* Separador */}
-          <div className="h-8 w-px hidden sm:block" style={{ backgroundColor: theme.border }} />
+          <div className="h-8 w-px" style={{ backgroundColor: theme.border }} />
 
           {/* Filtros de fecha */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <Calendar className="w-4 h-4 hidden sm:block" style={{ color: theme.textSecondary }} />
+            <Calendar className="w-4 h-4" style={{ color: theme.textSecondary }} />
             <input
               type="date"
               value={fechaDesde}
@@ -220,7 +243,7 @@ export default function Tablero() {
           </div>
 
           {/* Separador */}
-          <div className="h-8 w-px hidden lg:block" style={{ backgroundColor: theme.border }} />
+          <div className="h-8 w-px" style={{ backgroundColor: theme.border }} />
 
           {/* Buscador - ocupa espacio disponible */}
           <div className="relative flex-1 min-w-[150px]">
@@ -240,9 +263,132 @@ export default function Tablero() {
           </div>
         </div>
 
-        {/* Instrucciones de drag & drop */}
+        {/* Header - Mobile */}
+        <div className="md:hidden space-y-3">
+          {/* Fila 1: Título + Filtros + Buscar */}
+          <div
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${theme.primary}20` }}
+            >
+              <Columns3 className="h-4 w-4" style={{ color: theme.primary }} />
+            </div>
+
+            {/* Buscador compacto */}
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.text,
+                }}
+              />
+            </div>
+
+            {/* Botón de filtros */}
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className="p-2 rounded-lg flex-shrink-0 transition-all"
+              style={{
+                backgroundColor: (fechaDesde || fechaHasta) ? theme.primary : theme.backgroundSecondary,
+                color: (fechaDesde || fechaHasta) ? '#fff' : theme.textSecondary,
+                border: `1px solid ${(fechaDesde || fechaHasta) ? theme.primary : theme.border}`,
+              }}
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Filtros expandibles en mobile */}
+          {showMobileFilters && (
+            <div
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl animate-in slide-in-from-top-2"
+              style={{
+                backgroundColor: theme.card,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+                className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.text,
+                }}
+              />
+              <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+                className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.text,
+                }}
+              />
+              {(fechaDesde || fechaHasta) && (
+                <button
+                  onClick={limpiarFiltrosFecha}
+                  className="p-1.5 rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Tabs/Pills para navegar entre columnas - Mobile (5 botones que entran en pantalla) */}
+          <div className="grid grid-cols-5 gap-1">
+            {columnas.map((col, index) => {
+              const count = getReclamosPorEstado(col.id).length;
+              const isActive = activeColumnIndex === index;
+              // Títulos cortos para mobile
+              const tituloCorto = col.id === 'nuevo' ? 'Nuevos' :
+                                  col.id === 'asignado' ? 'Asig.' :
+                                  col.id === 'en_proceso' ? 'Proceso' :
+                                  col.id === 'pendiente_confirmacion' ? 'Conf.' : 'Resuel.';
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => setActiveColumnIndex(index)}
+                  className="flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    backgroundColor: isActive ? col.color : theme.card,
+                    color: isActive ? '#fff' : theme.textSecondary,
+                    border: `1px solid ${isActive ? col.color : theme.border}`,
+                    boxShadow: isActive ? `0 2px 8px ${col.color}40` : 'none',
+                  }}
+                >
+                  <span className="font-bold text-sm">{count}</span>
+                  <span className="text-[10px] opacity-80">{tituloCorto}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Instrucciones de drag & drop - solo desktop */}
         {canDrag && (
-          <p className="text-sm mt-2 px-1" style={{ color: theme.textSecondary }}>
+          <p className="text-sm mt-2 px-1 hidden md:block" style={{ color: theme.textSecondary }}>
             Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
           </p>
         )}
@@ -250,15 +396,15 @@ export default function Tablero() {
 
       {/* Tablero Kanban */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        {/* En móvil: scroll horizontal. En desktop: grid de 4 columnas */}
-        <div className="flex md:grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 overflow-x-auto md:overflow-x-visible pb-4 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0 snap-x snap-mandatory md:snap-none">
-          {columnas.map((col) => (
+        {/* En móvil: solo columna activa. En desktop: grid de 5 columnas */}
+        <div className="md:grid md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3 lg:gap-4">
+          {columnas.map((col, colIndex) => (
             <Droppable droppableId={col.id} key={col.id} isDropDisabled={!canDrag}>
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}
                   {...provided.droppableProps}
-                  className="rounded-xl overflow-hidden min-h-[350px] md:min-h-[400px] transition-all duration-300 flex-shrink-0 w-[85vw] md:w-auto snap-center"
+                  className={`rounded-xl overflow-hidden min-h-[300px] md:min-h-[400px] transition-all duration-300 ${colIndex !== activeColumnIndex ? 'hidden md:block' : ''}`}
                   style={{
                     backgroundColor: theme.backgroundSecondary,
                     border: snapshot.isDraggingOver
@@ -271,9 +417,9 @@ export default function Tablero() {
                 >
                   {/* Header de columna con gradiente */}
                   <div className={`${col.headerClass} px-4 py-3 flex items-center justify-between`}>
-                    <h2 className="font-semibold text-white flex items-center gap-2">
+                    <h2 className="font-semibold text-white flex items-center gap-2 text-base">
                       <span className="w-2 h-2 rounded-full bg-white/50"></span>
-                      {col.titulo}
+                      <span className="truncate">{col.titulo}</span>
                     </h2>
                     <span className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-white">
                       {getReclamosPorEstado(col.id).length}
@@ -281,7 +427,7 @@ export default function Tablero() {
                   </div>
 
                   {/* Lista de reclamos */}
-                  <div className="p-4 space-y-3">
+                  <div className="p-3 md:p-4 space-y-3 overflow-y-auto">
                     {getReclamosPorEstado(col.id).map((reclamo, index) => (
                       <Draggable
                         key={reclamo.id}
@@ -304,10 +450,10 @@ export default function Tablero() {
                             }}
                           >
                             <div className="flex items-start gap-3">
-                              {/* Handle de drag con icono colorido */}
+                              {/* Handle de drag con icono colorido - solo en desktop */}
                               {canDrag && (
                                 <div
-                                  className="mt-1 p-1 rounded"
+                                  className="mt-1 p-1 rounded hidden md:block"
                                   style={{
                                     background: `linear-gradient(135deg, ${col.color}30, ${col.color}10)`,
                                     color: col.color
@@ -320,14 +466,14 @@ export default function Tablero() {
                               <div className="flex-1 min-w-0">
                                 <Link
                                   to={`/gestion/reclamos/${reclamo.id}`}
-                                  className="font-semibold hover:underline line-clamp-2 transition-colors"
+                                  className="font-semibold hover:underline line-clamp-2 transition-colors text-sm md:text-base"
                                   style={{ color: theme.text }}
                                   onClick={(e) => snapshot.isDragging && e.preventDefault()}
                                 >
                                   {reclamo.titulo}
                                 </Link>
                                 <p
-                                  className="text-sm mt-1 truncate flex items-center gap-1"
+                                  className="text-xs md:text-sm mt-1 truncate flex items-center gap-1"
                                   style={{ color: theme.textSecondary }}
                                 >
                                   <span className="inline-block w-1 h-1 rounded-full" style={{ backgroundColor: col.color }}></span>
@@ -341,15 +487,28 @@ export default function Tablero() {
                                       month: 'short'
                                     })}
                                   </span>
-                                  <span
-                                    className="text-xs px-2 py-1 rounded-full text-white truncate max-w-[120px] font-medium"
-                                    style={{
-                                      background: `linear-gradient(135deg, ${reclamo.categoria?.color || '#6b7280'}, ${reclamo.categoria?.color || '#6b7280'}dd)`
-                                    }}
-                                    title={reclamo.categoria?.nombre}
-                                  >
-                                    {reclamo.categoria?.nombre}
-                                  </span>
+                                  {/* Si tiene empleado asignado mostrar su nombre, sino la categoría */}
+                                  {reclamo.empleado_asignado ? (
+                                    <span
+                                      className="text-xs px-2 py-1 rounded-full text-white truncate max-w-[120px] font-medium"
+                                      style={{
+                                        background: `linear-gradient(135deg, ${col.color}, ${col.color}dd)`
+                                      }}
+                                      title={`${reclamo.empleado_asignado.nombre} ${reclamo.empleado_asignado.apellido || ''}`}
+                                    >
+                                      {reclamo.empleado_asignado.nombre}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className="text-xs px-2 py-1 rounded-full text-white truncate max-w-[120px] font-medium"
+                                      style={{
+                                        background: `linear-gradient(135deg, ${reclamo.categoria?.color || '#6b7280'}, ${reclamo.categoria?.color || '#6b7280'}dd)`
+                                      }}
+                                      title={reclamo.categoria?.nombre}
+                                    >
+                                      {reclamo.categoria?.nombre}
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -377,7 +536,7 @@ export default function Tablero() {
                         </div>
                         <p className="text-sm font-medium">Sin reclamos</p>
                         {canDrag && (
-                          <p className="text-xs mt-1 opacity-70">Arrastra aquí para mover</p>
+                          <p className="text-xs mt-1 opacity-70 hidden md:block">Arrastra aquí para mover</p>
                         )}
                       </div>
                     )}
@@ -389,16 +548,6 @@ export default function Tablero() {
         </div>
       </DragDropContext>
 
-      {/* Estilos para ocultar scrollbar en móvil */}
-      <style>{`
-        .overflow-x-auto::-webkit-scrollbar {
-          display: none;
-        }
-        .overflow-x-auto {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 }

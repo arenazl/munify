@@ -347,7 +347,8 @@ async def get_reclamos_recientes(db: AsyncSession, municipio_id: int, limit: int
     """Obtiene los reclamos más recientes"""
     query = select(Reclamo).options(
         selectinload(Reclamo.categoria),
-        selectinload(Reclamo.creador)
+        selectinload(Reclamo.creador),
+        selectinload(Reclamo.empleado_asignado)
     ).where(
         Reclamo.municipio_id == municipio_id
     ).order_by(Reclamo.created_at.desc()).limit(limit)
@@ -364,6 +365,7 @@ async def get_reclamos_recientes(db: AsyncSession, municipio_id: int, limit: int
         'fecha': r.created_at.strftime('%d/%m/%Y') if r.created_at else '',
         'prioridad': r.prioridad,
         'creador': f"{r.creador.nombre} {r.creador.apellido}" if r.creador else 'Anónimo',
+        'empleado_asignado': f"{r.empleado_asignado.nombre} {r.empleado_asignado.apellido or ''}".strip() if r.empleado_asignado else None,
     } for r in reclamos]
 
 
@@ -470,31 +472,47 @@ async def get_reclamos_por_categoria(db: AsyncSession, municipio_id: int) -> lis
 
 
 async def get_empleados_activos(db: AsyncSession, municipio_id: int) -> list:
-    """Obtiene empleados con reclamos asignados"""
-    query = select(
-        Empleado.nombre,
-        Empleado.apellido,
-        Empleado.cargo,
-        sql_func.count(Reclamo.id).label('reclamos_asignados')
-    ).outerjoin(
-        Reclamo,
-        (Reclamo.empleado_id == Empleado.id) &
-        (Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]))
-    ).where(
+    """Obtiene todos los empleados activos con estadísticas de reclamos"""
+    # Obtener empleados activos
+    query = select(Empleado).where(
         Empleado.municipio_id == municipio_id,
         Empleado.activo == True
-    ).group_by(
-        Empleado.id, Empleado.nombre, Empleado.apellido, Empleado.cargo
-    ).order_by(sql_func.count(Reclamo.id).desc()).limit(10)
+    ).order_by(Empleado.nombre)
 
     result = await db.execute(query)
-    rows = result.all()
+    empleados = result.scalars().all()
 
-    return [{
-        'nombre': f"{r.nombre} {r.apellido}",
-        'cargo': r.cargo,
-        'reclamos_asignados': r.reclamos_asignados
-    } for r in rows]
+    empleados_data = []
+    for emp in empleados:
+        # Contar reclamos por estado para cada empleado
+        stats_query = select(
+            Reclamo.estado,
+            sql_func.count(Reclamo.id).label('cantidad')
+        ).where(
+            Reclamo.empleado_id == emp.id
+        ).group_by(Reclamo.estado)
+
+        stats_result = await db.execute(stats_query)
+        stats = {row.estado: row.cantidad for row in stats_result.all()}
+
+        asignados = stats.get(EstadoReclamo.ASIGNADO, 0)
+        en_proceso = stats.get(EstadoReclamo.EN_PROCESO, 0)
+        pend_conf = stats.get(EstadoReclamo.PENDIENTE_CONFIRMACION, 0)
+        resueltos = stats.get(EstadoReclamo.RESUELTO, 0)
+
+        empleados_data.append({
+            'id': emp.id,
+            'nombre': f"{emp.nombre} {emp.apellido or ''}".strip(),
+            'especialidad': emp.especialidad,
+            'asignados': asignados,
+            'en_proceso': en_proceso,
+            'pendiente_confirmacion': pend_conf,
+            'resueltos': resueltos,
+            'activos': asignados + en_proceso + pend_conf,
+            'total': sum(stats.values())
+        })
+
+    return empleados_data
 
 
 def build_asistente_prompt(
@@ -512,7 +530,7 @@ def build_asistente_prompt(
     cats_list = ", ".join([c['nombre'] for c in categorias])
 
     reclamos_list = "\n".join([
-        f"  - #{r['id']}: {r['titulo']} ({r['estado']}) - {r['categoria']} - {r['direccion']} - Creado por: {r.get('creador', 'N/A')}"
+        f"  - #{r['id']}: {r['titulo']} ({r['estado']}) - {r['categoria']} - {r['direccion']} - Creado por: {r.get('creador', 'N/A')}" + (f" - Asignado a: {r['empleado_asignado']}" if r.get('empleado_asignado') else "")
         for r in reclamos_recientes[:10]
     ]) or "  Sin reclamos recientes"
 
@@ -527,8 +545,8 @@ def build_asistente_prompt(
     ]) or "  Sin datos"
 
     empleados_list = "\n".join([
-        f"  - {e['nombre']} ({e['cargo']}): {e['reclamos_asignados']} reclamos activos"
-        for e in empleados[:5]
+        f"  - {e['nombre']} (ID:{e['id']}): {e['activos']} activos ({e['asignados']} asignados, {e['en_proceso']} en proceso, {e['pendiente_confirmacion']} pend.conf.), {e['resueltos']} resueltos, {e['total']} total histórico"
+        for e in empleados
     ]) or "  Sin empleados"
 
     usuarios_list = "\n".join([
@@ -568,7 +586,7 @@ DATOS ACTUALES DEL MUNICIPIO:
 📈 RECLAMOS POR CATEGORÍA:
 {cats_stats}
 
-👥 EMPLEADOS ACTIVOS:
+👥 EMPLEADOS ACTIVOS (con estadísticas de reclamos asignados):
 {empleados_list}
 
 👤 VECINOS CON RECLAMOS (usuarios que crearon reclamos):
@@ -578,16 +596,18 @@ CATEGORÍAS DISPONIBLES: {cats_list}
 
 TU ROL:
 - Responder preguntas sobre el estado del sistema
-- Dar información sobre reclamos, trámites, estadísticas
+- Dar información sobre reclamos, trámites, estadísticas de empleados y vecinos
 - Ayudar a interpretar los datos
 - Sugerir acciones basadas en los datos
+- Responder consultas sobre cuántos reclamos tiene asignado cada empleado
 
 REGLAS:
 1. Usá español argentino (vos, podés, tenés)
 2. Sé conciso pero informativo
-3. Si te preguntan por datos específicos que no tenés, indicá que podés dar información general
+3. Cuando te pregunten por un empleado (ej: "cuántos reclamos tiene Juan"), buscá en la lista de EMPLEADOS ACTIVOS por nombre similar
 4. Podés hacer cálculos simples con los datos (porcentajes, comparaciones)
 5. SIEMPRE incluí links relevantes usando formato markdown: [texto](url)
+6. Si te preguntan por un empleado específico, incluí el link al tablero para ver sus reclamos
 
 LINKS DISPONIBLES (usá el formato markdown exacto):
 
