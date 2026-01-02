@@ -373,8 +373,8 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     });
 
     // Cargar empleados por separado (solo admin/supervisor tienen acceso)
-    // No intentar si es modo empleado (soloMisTrabajos) para evitar error 403
-    if (!soloMisTrabajos && user && ['admin', 'supervisor'].includes(user.rol)) {
+    // No intentar si es modo empleado (soloMisTrabajos) para evitar error 403 en consola
+    if (!soloMisTrabajos) {
       empleadosApi.getAll(true).then((empleadosRes) => {
         setEmpleados(empleadosRes.data || []);
       }).catch(() => {
@@ -382,7 +382,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
         setEmpleados([]);
       });
     }
-  }, [soloMisTrabajos, user]);
+  }, [soloMisTrabajos]);
 
   // Para empleados: calcular conteos desde los reclamos cargados
   useEffect(() => {
