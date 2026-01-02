@@ -163,13 +163,13 @@ export default function MobileLayout() {
                   {tab.isMain ? (
                     // Botón central destacado para "Nuevo"
                     <div
-                      className="w-12 h-12 -mt-5 rounded-full flex items-center justify-center shadow-lg"
+                      className="w-10 h-10 -mt-3 rounded-full flex items-center justify-center shadow-lg"
                       style={{
                         backgroundColor: theme.primary,
                         boxShadow: `0 4px 12px ${theme.primary}50`,
                       }}
                     >
-                      <tab.icon className="h-6 w-6 text-white" />
+                      <tab.icon className="h-5 w-5 text-white" />
                     </div>
                   ) : (
                     <div

@@ -1193,7 +1193,7 @@ export default function GestionTramites() {
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-sm" style={{ color: theme.textSecondary }}>
-                            {new Date(tramite.updated_at).toLocaleDateString('es-AR')}
+                            {tramite.updated_at ? new Date(tramite.updated_at).toLocaleDateString('es-AR') : '-'}
                           </span>
                         </td>
                         <td className="px-4 py-3">

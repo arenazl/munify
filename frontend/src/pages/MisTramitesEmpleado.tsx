@@ -4,7 +4,6 @@ import {
   User,
   CheckCircle,
   Clock,
-  Eye,
   Play,
   XCircle,
   Search,
@@ -17,7 +16,7 @@ import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { Sheet } from '../components/ui/Sheet';
-import { ABMTextarea, ABMField, ABMInfoPanel } from '../components/ui/ABMPage';
+import { ABMInfoPanel } from '../components/ui/ABMPage';
 import type { Solicitud } from '../types';
 
 // Estado de trámites
@@ -88,8 +87,8 @@ export default function MisTramitesEmpleado() {
       return (
         s.numero_tramite?.toLowerCase().includes(searchLower) ||
         s.tramite?.nombre?.toLowerCase().includes(searchLower) ||
-        s.solicitante?.nombre?.toLowerCase().includes(searchLower) ||
-        s.solicitante?.apellido?.toLowerCase().includes(searchLower)
+        s.nombre_solicitante?.toLowerCase().includes(searchLower) ||
+        s.apellido_solicitante?.toLowerCase().includes(searchLower)
       );
     })
     .sort((a, b) => {
@@ -235,7 +234,7 @@ export default function MisTramitesEmpleado() {
                 {/* Solicitante */}
                 <div className="flex items-center gap-2 text-xs" style={{ color: theme.textSecondary }}>
                   <User className="h-3 w-3" />
-                  {s.solicitante?.nombre} {s.solicitante?.apellido}
+                  {s.nombre_solicitante} {s.apellido_solicitante}
                 </div>
 
                 {/* Fecha */}
@@ -259,47 +258,52 @@ export default function MisTramitesEmpleado() {
         {selectedSolicitud && (
           <div className="space-y-4">
             {/* Info del trámite */}
-            <ABMInfoPanel
-              title="Información del Trámite"
-              items={[
-                { label: 'Número', value: selectedSolicitud.numero_tramite },
-                { label: 'Tipo', value: selectedSolicitud.tramite?.tipo_tramite?.nombre || '-' },
-                { label: 'Trámite', value: selectedSolicitud.tramite?.nombre || '-' },
-                { label: 'Estado', value: estadoLabels[selectedSolicitud.estado] },
-                { label: 'Prioridad', value: selectedSolicitud.prioridad?.toString() || '0' },
-                { label: 'Fecha', value: new Date(selectedSolicitud.created_at).toLocaleDateString('es-AR') },
-              ]}
-            />
-
-            {/* Solicitante */}
-            <ABMInfoPanel
-              title="Solicitante"
-              items={[
-                { label: 'Nombre', value: `${selectedSolicitud.solicitante?.nombre || ''} ${selectedSolicitud.solicitante?.apellido || ''}` },
-                { label: 'Email', value: selectedSolicitud.solicitante?.email || '-' },
-                { label: 'Teléfono', value: selectedSolicitud.solicitante?.telefono || '-' },
-              ]}
-            />
-
-            {/* Datos del formulario */}
-            {selectedSolicitud.datos_formulario && Object.keys(selectedSolicitud.datos_formulario).length > 0 && (
-              <div
-                className="p-4 rounded-xl"
-                style={{ backgroundColor: theme.backgroundSecondary }}
-              >
-                <h3 className="font-medium text-sm mb-3" style={{ color: theme.text }}>
-                  Datos del Formulario
-                </h3>
-                <div className="space-y-2">
-                  {Object.entries(selectedSolicitud.datos_formulario).map(([key, value]) => (
-                    <div key={key} className="flex justify-between text-sm">
-                      <span style={{ color: theme.textSecondary }}>{key}:</span>
-                      <span style={{ color: theme.text }}>{String(value)}</span>
-                    </div>
-                  ))}
+            <ABMInfoPanel title="Información del Trámite">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Número:</span>
+                  <span style={{ color: theme.text }}>{selectedSolicitud.numero_tramite}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Tipo:</span>
+                  <span style={{ color: theme.text }}>{selectedSolicitud.tramite?.tipo_tramite?.nombre || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Trámite:</span>
+                  <span style={{ color: theme.text }}>{selectedSolicitud.tramite?.nombre || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Estado:</span>
+                  <span style={{ color: theme.text }}>{estadoLabels[selectedSolicitud.estado]}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Prioridad:</span>
+                  <span style={{ color: theme.text }}>{selectedSolicitud.prioridad?.toString() || '0'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Fecha:</span>
+                  <span style={{ color: theme.text }}>{new Date(selectedSolicitud.created_at).toLocaleDateString('es-AR')}</span>
                 </div>
               </div>
-            )}
+            </ABMInfoPanel>
+
+            {/* Solicitante */}
+            <ABMInfoPanel title="Solicitante">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Nombre:</span>
+                  <span style={{ color: theme.text }}>{`${selectedSolicitud.nombre_solicitante || ''} ${selectedSolicitud.apellido_solicitante || ''}`.trim() || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Email:</span>
+                  <span style={{ color: theme.text }}>{selectedSolicitud.email_solicitante || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span style={{ color: theme.textSecondary }}>Teléfono:</span>
+                  <span style={{ color: theme.text }}>{selectedSolicitud.telefono_solicitante || '-'}</span>
+                </div>
+              </div>
+            </ABMInfoPanel>
 
             {/* Acciones de estado */}
             <div className="space-y-2">

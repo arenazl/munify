@@ -932,13 +932,13 @@ export default function Layout() {
                         {isMainTab ? (
                           // Botón central siempre elevado (para otros roles)
                           <div
-                            className="w-14 h-14 -mt-7 rounded-full flex items-center justify-center shadow-lg"
+                            className="w-10 h-10 -mt-3 rounded-full flex items-center justify-center shadow-lg"
                             style={{
                               backgroundColor: theme.primary,
                               boxShadow: `0 4px 14px ${theme.primary}50`,
                             }}
                           >
-                            <tab.icon className="h-7 w-7 text-white" />
+                            <tab.icon className="h-5 w-5 text-white" />
                           </div>
                         ) : (
                           // Botones normales - solo cambian color al seleccionar
