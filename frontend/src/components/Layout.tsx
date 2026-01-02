@@ -72,7 +72,7 @@ export default function Layout() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   // Estado para el toggle de push notifications en la top bar
-  const [pushSubscribed, setPushSubscribed] = useState(false); // Siempre visible hasta que se active
+  const [pushSubscribed, setPushSubscribed] = useState(() => localStorage.getItem('pushActivated') === 'true');
   const [pushSubscribing, setPushSubscribing] = useState(false);
   const [showPushActivatedPopup, setShowPushActivatedPopup] = useState(false);
   const { user, logout, municipioActual, refreshUser } = useAuth();
@@ -91,12 +91,20 @@ export default function Layout() {
       const subscription = await subscribeToPush();
       if (subscription) {
         setPushSubscribed(true);
+        localStorage.setItem('pushActivated', 'true');
         setShowPushActivatedPopup(true);
         // Ocultar popup después de 3 segundos
         setTimeout(() => setShowPushActivatedPopup(false), 3000);
+      } else {
+        // Aunque falle la suscripción, ocultar el banner después del click
+        setPushSubscribed(true);
+        localStorage.setItem('pushActivated', 'true');
       }
     } catch (error) {
       console.error('Error activando push:', error);
+      // Ocultar banner aunque falle
+      setPushSubscribed(true);
+      localStorage.setItem('pushActivated', 'true');
     } finally {
       setPushSubscribing(false);
     }
@@ -256,8 +264,8 @@ export default function Layout() {
                   backgroundColor: isActive ? theme.primary : 'transparent',
                   color: isActive ? '#ffffff' : theme.sidebarTextSecondary,
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  paddingLeft: isCollapsed ? '8px' : '12px',
-                  paddingRight: isCollapsed ? '8px' : '12px',
+                  paddingLeft: isCollapsed ? '0' : '12px',
+                  paddingRight: isCollapsed ? '0' : '12px',
                   transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
                 onClick={() => setSidebarOpen(false)}
@@ -852,6 +860,46 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
+          {/* Banner de activar notificaciones - visible para todos si no están activas */}
+          {!pushSubscribed && (
+            <div
+              className="mb-4 p-4 rounded-xl flex items-center justify-between gap-4"
+              style={{
+                backgroundColor: `${theme.primary}15`,
+                border: `1px solid ${theme.primary}30`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded-full"
+                  style={{ backgroundColor: theme.primary }}
+                >
+                  <BellRing className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm" style={{ color: theme.text }}>
+                    Activá las notificaciones
+                  </p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>
+                    Recibí alertas de novedades en tus reclamos
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleTopBarPushSubscribe}
+                disabled={pushSubscribing}
+                className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:opacity-90 active:scale-95 whitespace-nowrap"
+                style={{
+                  backgroundColor: theme.primary,
+                  color: '#ffffff',
+                  opacity: pushSubscribing ? 0.7 : 1,
+                }}
+              >
+                {pushSubscribing ? 'Activando...' : 'Activar'}
+              </button>
+            </div>
+          )}
+
           <PageTransition>
             <Outlet />
           </PageTransition>

@@ -27,9 +27,17 @@ import {
   ClipboardList,
   FileStack,
   Info,
+  Paperclip,
+  X,
+  Upload,
+  File,
+  Image,
+  Bot,
+  MessageCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi, authApi, chatApi } from '../lib/api';
+import { tramitesApi, authApi, chatApi, clasificacionApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { WizardModal } from './ui/WizardModal';
@@ -167,7 +175,7 @@ interface Rubro {
 
 export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess }: TramiteWizardProps) {
   const { theme } = useTheme();
-  const { user, register, login } = useAuth();
+  const { user, register, login, municipioActual } = useAuth();
 
   const [wizardStep, setWizardStep] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -202,6 +210,16 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   const [aiResponse, setAiResponse] = useState('');
   const [aiQuestion, setAiQuestion] = useState('');
 
+  // Chat del paso 0 (asistente IA para clasificar trámite)
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{role: 'assistant' | 'user', content: string}>>([
+    { role: 'assistant', content: '¡Hola! 👋 Soy tu asistente virtual. Contame, ¿qué trámite necesitás hacer?' }
+  ]);
+  const [chatAnalyzing, setChatAnalyzing] = useState(false);
+  const [chatSugerencias, setChatSugerencias] = useState<Array<{tramite_id: number, tramite_nombre: string, confianza: number, tipo_tramite_id?: number, tipo_tramite_nombre?: string}>>([]);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+
   // IA contextual basada en lo que escribe el usuario
   const [contextualAiResponse, setContextualAiResponse] = useState('');
   const [contextualAiLoading, setContextualAiLoading] = useState(false);
@@ -222,6 +240,11 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   const tramitesScrollRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Documentos adjuntos
+  const [documentos, setDocumentos] = useState<File[]>([]);
+  const [uploadingDocs, setUploadingDocs] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Buscar direcciones con Nominatim (OpenStreetMap)
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
@@ -232,8 +255,13 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
 
     setSearchingAddress(true);
     try {
+      // Usar el nombre del municipio para filtrar la búsqueda
+      const locationFilter = municipioActual?.nombre
+        ? `${municipioActual.nombre}, Buenos Aires, Argentina`
+        : 'Buenos Aires, Argentina';
+
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Argentina&limit=5&addressdetails=1`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, ${encodeURIComponent(locationFilter)}&limit=5&addressdetails=1`
       );
       const data = await response.json();
       setAddressSuggestions(data);
@@ -243,7 +271,7 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
     } finally {
       setSearchingAddress(false);
     }
-  }, []);
+  }, [municipioActual]);
 
   const handleAddressChange = (value: string) => {
     setFormData(prev => ({ ...prev, direccion: value }));
@@ -257,6 +285,48 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
     setFormData(prev => ({ ...prev, direccion: suggestion.display_name }));
     setShowSuggestions(false);
     setAddressSuggestions([]);
+  };
+
+  // Manejar selección de archivos
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/gif', 'application/pdf'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    const validFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error(`${file.name}: Tipo de archivo no permitido`);
+        continue;
+      }
+      if (file.size > maxSize) {
+        toast.error(`${file.name}: El archivo excede 10MB`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setDocumentos(prev => [...prev, ...validFiles]);
+    }
+
+    // Limpiar input para permitir seleccionar el mismo archivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeDocumento = (index: number) => {
+    setDocumentos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
   // Agrupar servicios por tipo (categoría)
@@ -339,8 +409,8 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   // Auto-cargar info de IA cuando se selecciona un trámite en el paso 1
   useEffect(() => {
     const fetchAIInfo = async () => {
-      // Solo disparar cuando hay un servicio seleccionado y estamos en paso 0 (selección)
-      if (!selectedServicio || wizardStep !== 0) return;
+      // Solo disparar cuando hay un servicio seleccionado y estamos en paso 1 (selección de servicio)
+      if (!selectedServicio || wizardStep !== 1) return;
 
       setAiLoading(true);
       setAiResponse('');
@@ -354,7 +424,9 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
           requisitos: selectedServicio.requisitos,
           tiempo_estimado: `${selectedServicio.tiempo_estimado_dias} días`,
           costo: selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratuito',
-          municipio: 'Merlo',
+          municipio: municipioActual?.nombre || 'Municipalidad',
+          municipio_direccion: municipioActual?.direccion || '',
+          municipio_telefono: municipioActual?.telefono || '',
         };
 
         const response = await chatApi.askDynamic('', contexto, 'tramite');
@@ -367,7 +439,7 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
     };
 
     fetchAIInfo();
-  }, [selectedServicio?.id]); // Se dispara cuando cambia el servicio seleccionado
+  }, [selectedServicio?.id, selectedRubro, wizardStep, municipioActual?.nombre]); // Se dispara cuando cambia el servicio seleccionado
 
   // IA contextual: analiza lo que escribe el usuario en observaciones (3+ palabras)
   useEffect(() => {
@@ -400,19 +472,25 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
           documentos_requeridos: selectedServicio.documentos_requeridos,
         };
 
-        const direccion = formData.direccion || '';
+        // Construir info del municipio para la IA
+        const municipioNombre = municipioActual?.nombre || 'la Municipalidad';
+        const municipioDireccion = municipioActual?.direccion ? `Sede: ${municipioActual.direccion}` : '';
+        const municipioTelefono = municipioActual?.telefono ? `Tel: ${municipioActual.telefono}` : '';
+        const municipioInfo = [municipioDireccion, municipioTelefono].filter(Boolean).join(' | ');
+
         const response = await chatApi.askDynamic(
-          `Vecino quiere hacer: "${selectedServicio.nombre}" (categoría: ${selectedRubro || 'general'}).
+          `Sos empleada de ${municipioNombre}.${municipioInfo ? ` ${municipioInfo}.` : ''}
+
+Vecino quiere hacer: "${selectedServicio.nombre}" (categoría: ${selectedRubro || 'general'}).
 Escribió: "${texto}"
-${direccion ? `Dirección del trámite: ${direccion}` : ''}
 
-Respondé como empleada municipal de Merlo dando info útil y específica:
-- Dónde tiene que ir a hacer el trámite (oficina, dirección si sabés)
-- Qué documentos llevar
-- Cuánto tarda aproximadamente
-- Si la dirección está en zona céntrica o alejada, mencionalo
+Respondé dando info útil basada SOLO en lo que sabés del trámite:
+- Qué documentos suelen pedirse para este tipo de trámite
+- Cuánto suele tardar aproximadamente
+- Algún tip útil general
 
-Tono amigable, 3-4 oraciones máximo.`,
+Si tenés datos de contacto del municipio, podés mencionarlos. NO inventes direcciones ni datos que no tengas.
+Tono amigable, 2-3 oraciones máximo.`,
           contexto,
           'tramite_contextual'
         );
@@ -476,6 +554,97 @@ Tono amigable, 3-4 oraciones máximo.`,
     setSearchTerm('');
     setWizardStep(0);
     setAiResponse('');
+    setDocumentos([]);
+    // Reset del chat
+    setChatInput('');
+    setChatMessages([
+      { role: 'assistant', content: '¡Hola! 👋 Soy tu asistente virtual. Contame, ¿qué trámite necesitás hacer?' }
+    ]);
+    setChatSugerencias([]);
+  };
+
+  // Scroll al final del chat cuando hay nuevos mensajes
+  useEffect(() => {
+    chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // Función para enviar mensaje del chat y clasificar con IA
+  const handleChatSubmit = async () => {
+    if (!chatInput.trim() || chatAnalyzing) return;
+
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setChatAnalyzing(true);
+    setChatSugerencias([]);
+
+    try {
+      const municipioIdStr = localStorage.getItem('municipio_id');
+      const municipioId = municipioIdStr ? parseInt(municipioIdStr) : 1;
+
+      // Clasificar el texto con IA
+      const resultado = await clasificacionApi.clasificarTramite(userMessage, municipioId);
+
+      if (resultado.sugerencias && resultado.sugerencias.length > 0) {
+        setChatSugerencias(resultado.sugerencias);
+
+        const mejorSugerencia = resultado.sugerencias[0];
+        const confianza = mejorSugerencia.confianza || 0;
+
+        // Mensaje de respuesta con las sugerencias
+        const confianzaTexto = confianza >= 80 ? '¡Perfecto!' : confianza >= 60 ? 'Entiendo.' : 'Creo que entendí.';
+
+        if (resultado.sugerencias.length === 1) {
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `${confianzaTexto} Parece que necesitás "${mejorSugerencia.tramite_nombre}". ¿Es correcto? Podés seleccionarlo abajo o elegir otro trámite.`
+          }]);
+        } else {
+          const tramitesTexto = resultado.sugerencias.slice(0, 3).map((s: {tramite_nombre: string}) => s.tramite_nombre).join(', ');
+          setChatMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `${confianzaTexto} Encontré estos trámites que podrían ser lo que buscás: ${tramitesTexto}. Seleccioná el que corresponda.`
+          }]);
+        }
+
+        // Pre-guardar la descripción del usuario
+        setFormData(prev => ({
+          ...prev,
+          observaciones: userMessage,
+        }));
+      } else {
+        setChatMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'No encontré un trámite específico para tu consulta. Podés describirme con más detalle qué necesitás o ir al siguiente paso para buscar manualmente.'
+        }]);
+      }
+    } catch {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Hubo un problema al analizar tu consulta. Podés intentar de nuevo o ir al siguiente paso para buscar el trámite manualmente.'
+      }]);
+    } finally {
+      setChatAnalyzing(false);
+    }
+  };
+
+  // Seleccionar un trámite sugerido desde el chat
+  const selectSuggestedTramite = (sugerencia: {tramite_id: number, tramite_nombre: string, tipo_tramite_id?: number, tipo_tramite_nombre?: string}) => {
+    setFormData(prev => ({
+      ...prev,
+      servicio_id: String(sugerencia.tramite_id),
+      asunto: `Solicitud: ${sugerencia.tramite_nombre}`,
+    }));
+
+    // Seleccionar el rubro correspondiente
+    if (sugerencia.tipo_tramite_nombre) {
+      setSelectedRubro(sugerencia.tipo_tramite_nombre);
+    }
+
+    toast.success(`Trámite "${sugerencia.tramite_nombre}" seleccionado`);
+
+    // Avanzar al siguiente paso (detalle)
+    setWizardStep(2);
   };
 
   const handleClose = () => {
@@ -522,6 +691,23 @@ Tono amigable, 3-4 oraciones máximo.`,
       }
 
       const res = await tramitesApi.create(tramiteData);
+      const solicitudId = res.data.id;
+
+      // Subir documentos si hay
+      if (documentos.length > 0) {
+        setUploadingDocs(true);
+        for (const doc of documentos) {
+          try {
+            const formData = new FormData();
+            formData.append('file', doc);
+            await tramitesApi.uploadDocumento(solicitudId, formData);
+          } catch (err) {
+            console.error('Error subiendo documento:', err);
+          }
+        }
+        setUploadingDocs(false);
+      }
+
       toast.success(`Trámite ${res.data.numero_tramite} creado exitosamente`);
       handleClose();
       onSuccess?.();
@@ -556,14 +742,16 @@ Tono amigable, 3-4 oraciones máximo.`,
       }
 
       if (wizardStep === 0) {
-        contexto.paso = 'Selección de trámite';
+        contexto.paso = 'Asistente IA';
       } else if (wizardStep === 1) {
+        contexto.paso = 'Selección de trámite';
+      } else if (wizardStep === 2) {
         contexto.paso = 'Completando detalles';
         if (formData.asunto) contexto.asunto_ingresado = formData.asunto;
         if (formData.barrio) contexto.barrio = formData.barrio;
         if (formData.direccion) contexto.direccion = formData.direccion;
         if (formData.observaciones) contexto.observaciones = formData.observaciones;
-      } else if (wizardStep === 2) {
+      } else if (wizardStep === 3) {
         contexto.paso = 'Datos de contacto';
       }
 
@@ -590,6 +778,154 @@ Tono amigable, 3-4 oraciones máximo.`,
     isAnonymous
       ? !!(formData.email_solicitante || formData.telefono_solicitante)
       : !!(registerData.email && registerData.password && (emailExists === false ? registerData.nombre : true))
+  );
+
+  // Step 0: Chat con IA para identificar trámite
+  const wizardStep0 = (
+    <div className="space-y-4 h-full flex flex-col">
+      {/* Chat messages */}
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-[200px] max-h-[300px] pr-2">
+        {chatMessages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`flex items-start gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+          >
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{
+                backgroundColor: msg.role === 'assistant' ? `${theme.primary}20` : theme.backgroundSecondary,
+              }}
+            >
+              {msg.role === 'assistant' ? (
+                <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+              ) : (
+                <User className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              )}
+            </div>
+            <div
+              className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${
+                msg.role === 'user'
+                  ? 'rounded-tr-sm'
+                  : 'rounded-tl-sm'
+              }`}
+              style={{
+                backgroundColor: msg.role === 'assistant' ? theme.card : theme.primary,
+                color: msg.role === 'assistant' ? theme.text : 'white',
+              }}
+            >
+              <p className="text-sm leading-relaxed">{msg.content}</p>
+            </div>
+          </div>
+        ))}
+
+        {/* Indicador de carga */}
+        {chatAnalyzing && (
+          <div className="flex items-start gap-2">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: `${theme.primary}20` }}
+            >
+              <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+            </div>
+            <div
+              className="px-4 py-3 rounded-2xl rounded-tl-sm"
+              style={{ backgroundColor: theme.card }}
+            >
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
+                <span className="text-sm" style={{ color: theme.textSecondary }}>Analizando...</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={chatMessagesEndRef} />
+      </div>
+
+      {/* Sugerencias de trámites */}
+      {chatSugerencias.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium" style={{ color: theme.textSecondary }}>
+            Trámites sugeridos:
+          </p>
+          <div className="grid gap-2">
+            {chatSugerencias.slice(0, 3).map((sug, idx) => {
+              const tipo = tipos.find(t => t.id === sug.tipo_tramite_id);
+              const color = tipo?.color || theme.primary;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => selectSuggestedTramite(sug)}
+                  className="flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02]"
+                  style={{
+                    backgroundColor: `${color}10`,
+                    border: `2px solid ${color}30`,
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: color, color: 'white' }}
+                  >
+                    {getServicioIcon(tipo?.icono)}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-sm" style={{ color: theme.text }}>
+                      {sug.tramite_nombre}
+                    </p>
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>
+                      {sug.tipo_tramite_nombre || 'General'} · {sug.confianza}% coincidencia
+                    </p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 flex-shrink-0" style={{ color }} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Input del chat */}
+      <div
+        className="flex items-center gap-2 p-3 rounded-xl"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+      >
+        <input
+          ref={chatInputRef}
+          type="text"
+          value={chatInput}
+          onChange={(e) => setChatInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleChatSubmit()}
+          placeholder="Ej: Quiero abrir un local de comidas..."
+          disabled={chatAnalyzing}
+          className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
+          style={{ color: theme.text }}
+        />
+        <button
+          onClick={handleChatSubmit}
+          disabled={!chatInput.trim() || chatAnalyzing}
+          className="p-2 rounded-lg transition-colors disabled:opacity-50"
+          style={{ backgroundColor: theme.primary, color: 'white' }}
+        >
+          {chatAnalyzing ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </button>
+      </div>
+
+      {/* Botón para saltar */}
+      <button
+        onClick={() => setWizardStep(1)}
+        className="text-xs py-2 px-4 rounded-lg transition-colors hover:opacity-80"
+        style={{ color: theme.textSecondary }}
+      >
+        <span className="flex items-center justify-center gap-1">
+          Prefiero buscar el trámite manualmente
+          <ArrowRight className="h-3 w-3" />
+        </span>
+      </button>
+    </div>
   );
 
   // Step 1: Seleccionar servicio
@@ -836,6 +1172,77 @@ Tono amigable, 3-4 oraciones máximo.`,
           </div>
         )}
       </div>
+
+      {/* Sección de documentos adjuntos */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium flex items-center gap-2" style={{ color: theme.text }}>
+          <Paperclip className="h-4 w-4" />
+          Adjuntar documentos
+        </label>
+        <p className="text-xs" style={{ color: theme.textSecondary }}>
+          Podés adjuntar imágenes o PDFs (máximo 10MB cada uno)
+        </p>
+
+        {/* Input oculto */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/jpg,image/webp,image/gif,application/pdf"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+
+        {/* Botón de upload */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full p-4 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-colors hover:border-current"
+          style={{ borderColor: theme.border, color: theme.textSecondary }}
+        >
+          <Upload className="h-6 w-6" />
+          <span className="text-sm">Click para seleccionar archivos</span>
+        </button>
+
+        {/* Lista de documentos adjuntos */}
+        {documentos.length > 0 && (
+          <div className="space-y-2 mt-3">
+            {documentos.map((doc, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ backgroundColor: theme.backgroundSecondary }}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: doc.type.startsWith('image/') ? '#3b82f620' : '#ef444420' }}
+                >
+                  {doc.type.startsWith('image/') ? (
+                    <Image className="h-5 w-5" style={{ color: '#3b82f6' }} />
+                  ) : (
+                    <File className="h-5 w-5" style={{ color: '#ef4444' }} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: theme.text }}>
+                    {doc.name}
+                  </p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>
+                    {formatFileSize(doc.size)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeDocumento(index)}
+                  className="p-1.5 rounded-lg hover:bg-red-500/10 transition-colors"
+                >
+                  <X className="h-4 w-4" style={{ color: '#ef4444' }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -870,6 +1277,27 @@ Tono amigable, 3-4 oraciones máximo.`,
               <div>
                 <p className="text-xs" style={{ color: theme.textSecondary }}>Observaciones:</p>
                 <p className="text-sm" style={{ color: theme.text }}>{formData.observaciones}</p>
+              </div>
+            )}
+            {documentos.length > 0 && (
+              <div>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>Documentos adjuntos:</p>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {documentos.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs"
+                      style={{ backgroundColor: theme.backgroundSecondary }}
+                    >
+                      {doc.type.startsWith('image/') ? (
+                        <Image className="h-3 w-3" style={{ color: '#3b82f6' }} />
+                      ) : (
+                        <File className="h-3 w-3" style={{ color: '#ef4444' }} />
+                      )}
+                      <span className="truncate max-w-[100px]" style={{ color: theme.text }}>{doc.name}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -969,7 +1397,11 @@ Tono amigable, 3-4 oraciones máximo.`,
     </div>
   );
 
+  // Validación del paso 0: siempre válido (puede saltar)
+  const isStep0Valid = true;
+
   const wizardSteps = [
+    { id: 'asistente', title: 'Asistente', description: '¿Qué trámite necesitás?', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: isStep0Valid },
     { id: 'servicio', title: selectedRubro || 'Categoría', description: selectedServicio ? selectedServicio.nombre : 'Selecciona el trámite', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
     { id: 'detalle', title: selectedRubro || 'Detalle', description: selectedServicio?.nombre || 'Describe tu solicitud', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
     { id: 'contacto', title: 'Contacto', description: 'Datos de contacto', icon: <User className="h-5 w-5" />, content: wizardStep3, isValid: isStep3Valid },
@@ -1035,8 +1467,23 @@ Tono amigable, 3-4 oraciones máximo.`,
           </div>
         )}
 
-        {/* Mensaje cuando no hay servicio seleccionado */}
-        {!selectedServicio && wizardStep === 0 && (
+        {/* Mensaje para el paso 0 (Asistente IA) */}
+        {wizardStep === 0 && (
+          <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+            <div className="flex items-start gap-2">
+              <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+              <div>
+                <p className="font-medium text-xs mb-1" style={{ color: theme.text }}>Asistente inteligente</p>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>
+                  Contale al asistente qué trámite necesitás y te sugerirá las opciones más relevantes.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mensaje cuando no hay servicio seleccionado (paso 1) */}
+        {!selectedServicio && wizardStep === 1 && (
           <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
             <div className="flex items-start gap-2">
               <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
@@ -1051,7 +1498,7 @@ Tono amigable, 3-4 oraciones máximo.`,
         )}
 
         {/* Tips según el paso */}
-        {wizardStep === 1 && selectedServicio && (
+        {wizardStep === 2 && selectedServicio && (
           <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
             <div className="flex items-start gap-2">
               <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
@@ -1065,7 +1512,7 @@ Tono amigable, 3-4 oraciones máximo.`,
           </div>
         )}
 
-        {wizardStep === 2 && (
+        {wizardStep === 3 && (
           <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2 className="h-4 w-4" style={{ color: theme.primary }} />

@@ -15,6 +15,11 @@ export interface Municipio {
   logo_url?: string;
   latitud?: number;
   longitud?: number;
+  // Datos de contacto
+  direccion?: string;
+  telefono?: string;
+  email?: string;
+  sitio_web?: string;
 }
 
 interface AuthContextType {

@@ -36,6 +36,7 @@ import {
   Calendar,
   ChevronRight,
   MessageCircle,
+  ArrowUpDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi, empleadosApi } from '../lib/api';
@@ -134,6 +135,7 @@ export default function Tramites() {
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [tiposTramite, setTiposTramite] = useState<TipoTramite[]>([]);
+  const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'vencimiento'>('reciente');
 
   // Sheet states
   const [sheetMode, setSheetMode] = useState<SheetMode>('closed');
@@ -582,6 +584,16 @@ export default function Tramites() {
   );
 
   // Filtrar trámites
+  // Función para calcular fecha de vencimiento
+  const calcularVencimiento = (t: Tramite) => {
+    const tiempoEstimado = t.servicio?.tiempo_estimado_dias || 0;
+    if (!tiempoEstimado) return null;
+    const fechaCreacion = new Date(t.created_at);
+    const fechaVencimiento = new Date(fechaCreacion);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
+    return fechaVencimiento;
+  };
+
   const filteredTramites = tramites.filter(t => {
     // Filtro por tipo
     if (filtroTipo) {
@@ -618,6 +630,18 @@ export default function Tramites() {
       t.respuesta?.toLowerCase().includes(s) ||
       t.observaciones?.toLowerCase().includes(s)
     );
+  }).sort((a, b) => {
+    if (ordenamiento === 'reciente') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    } else {
+      // Por vencimiento - los que vencen más pronto primero
+      const vencA = calcularVencimiento(a);
+      const vencB = calcularVencimiento(b);
+      if (!vencA && !vencB) return 0;
+      if (!vencA) return 1;
+      if (!vencB) return -1;
+      return vencA.getTime() - vencB.getTime();
+    }
   });
 
   // Obtener info del servicio para un trámite
@@ -1437,41 +1461,69 @@ export default function Tramites() {
         sheetDescription=""
         onSheetClose={() => {}}
         extraFilters={undefined}
+        headerActions={
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setOrdenamiento('reciente')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
+                border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
+                color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
+              }}
+            >
+              <ArrowUpDown className="h-3 w-3" />
+              Más recientes
+            </button>
+            <button
+              onClick={() => setOrdenamiento('vencimiento')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: ordenamiento === 'vencimiento' ? theme.primary : theme.backgroundSecondary,
+                border: `1px solid ${ordenamiento === 'vencimiento' ? theme.primary : theme.border}`,
+                color: ordenamiento === 'vencimiento' ? '#ffffff' : theme.textSecondary,
+              }}
+            >
+              <Calendar className="h-3 w-3" />
+              Por vencer
+            </button>
+          </div>
+        }
         stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin'}
         secondaryFilters={
-          <div className="w-full flex flex-col gap-2">
-            {/* Tipos de trámite - chips que ocupan 100% del contenedor */}
-            <div className="flex gap-1.5 pb-2 w-full">
+          <div className="w-full flex flex-col gap-1">
+            {/* Tipos de trámite - botón Todos fijo + scroll horizontal */}
+            <div className="flex gap-1">
+              {/* Botón Todos fijo - outlined */}
+              <button
+                onClick={() => setFiltroTipo(null)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px solid ${filtroTipo === null ? theme.primary : theme.border}`,
+                }}
+              >
+                <Tag className="h-3 w-3" style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
+                <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
+                  Todos
+                </span>
+              </button>
+
+              {/* Scroll de tipos */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
               {/* Skeleton completo mientras cargan los tipos */}
               {loadingFilters ? (
                 <>
                   {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
                       key={`skeleton-tipo-${i}`}
-                      className="h-[68px] rounded-xl animate-pulse flex-1 min-w-0"
+                      className="h-[28px] w-[50px] rounded-md animate-pulse flex-shrink-0"
                       style={{ background: `${theme.border}40` }}
                     />
                   ))}
                 </>
               ) : (
               <>
-              {/* Botón Todos los tipos */}
-              <button
-                onClick={() => setFiltroTipo(null)}
-                className="flex flex-col items-center justify-center py-2 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
-                style={{
-                  background: filtroTipo === null
-                    ? theme.primary
-                    : theme.backgroundSecondary,
-                  border: `1px solid ${filtroTipo === null ? theme.primary : theme.border}`,
-                }}
-              >
-                <Tag className="h-5 w-5" style={{ color: filtroTipo === null ? '#ffffff' : theme.primary }} />
-                <span className="text-[9px] font-semibold leading-tight text-center mt-1" style={{ color: filtroTipo === null ? '#ffffff' : theme.text }}>
-                  Tipos
-                </span>
-              </button>
-
               {/* Chips por tipo de trámite (solo los que tienen al menos 1) */}
               {tiposTramite.filter((tipo) => (conteosTipos[tipo.id] || 0) > 0).map((tipo) => {
                 const isSelected = filtroTipo === tipo.id;
@@ -1482,94 +1534,109 @@ export default function Tramites() {
                     key={tipo.id}
                     onClick={() => setFiltroTipo(isSelected ? null : tipo.id)}
                     title={tipo.nombre}
-                    className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all flex-1 min-w-0 h-[68px]"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
                     style={{
                       background: isSelected ? tipoColor : theme.backgroundSecondary,
                       border: `1px solid ${isSelected ? tipoColor : theme.border}`,
                     }}
                   >
-                    {/* Número arriba */}
+                    <span className="[&>svg]:h-3 [&>svg]:w-3" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
+                      {getServicioIcon(tipo.icono)}
+                    </span>
+                    <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                      {tipo.nombre.split(' ')[0]}
+                    </span>
                     <span
-                      className="text-[10px] font-bold leading-none h-3 flex items-center justify-center"
+                      className="text-[9px] font-bold px-1 rounded-full"
                       style={{
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${tipoColor}30`,
                         color: isSelected ? '#ffffff' : tipoColor,
                       }}
                     >
                       {count}
-                    </span>
-                    {/* Icono */}
-                    <span className="[&>svg]:h-5 [&>svg]:w-5 my-1" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
-                      {getServicioIcon(tipo.icono)}
-                    </span>
-                    {/* Texto abajo */}
-                    <span className="text-[9px] font-medium leading-none text-center w-full truncate px-1" style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                      {tipo.nombre.split(' ')[0]}
                     </span>
                   </button>
                 );
               })}
               </>
               )}
+              </div>
             </div>
 
-            {/* Estados - más compactos, ocupan 100% del contenedor */}
-            <div className="flex gap-2 w-full">
+            {/* Estados - botón Todos fijo + scroll horizontal */}
+            <div className="flex gap-1">
+              {/* Botón Todos fijo - outlined */}
+              <button
+                onClick={() => {
+                  setFilterLoading('estado-');
+                  setFiltroEstado('');
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
+                }}
+              >
+                <Eye className={`h-3 w-3 ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
+                <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+                  Todos
+                </span>
+                <span className={`text-[9px] font-bold ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+                  {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
+                </span>
+              </button>
+
+              {/* Scroll de estados */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
               {loadingFilters ? (
                 <>
                   {[1, 2, 3, 4, 5].map((i) => (
                     <div
                       key={`skeleton-estado-${i}`}
-                      className="h-[36px] rounded-lg animate-pulse flex-1"
+                      className="h-[26px] w-[45px] rounded-md animate-pulse flex-shrink-0"
                       style={{ background: `${theme.border}40` }}
                     />
                   ))}
                 </>
               ) : (
-              [
-                { key: '', label: 'Estados', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
-                ...estadosDisponibles.map(e => ({ key: e.id, label: e.label, icon: e.icon, color: e.color, count: conteosEstados[e.id] || 0 }))
-              ].map((estado) => {
+              estadosDisponibles.map((estado) => {
                 const Icon = estado.icon;
-                const isActive = filtroEstado === estado.key;
-                const isLoadingThis = filterLoading === `estado-${estado.key}`;
+                const isActive = filtroEstado === estado.id;
+                const isLoadingThis = filterLoading === `estado-${estado.id}`;
+                const count = conteosEstados[estado.id] || 0;
                 return (
                   <button
-                    key={estado.key}
+                    key={estado.id}
                     onClick={() => {
-                      setFilterLoading(`estado-${estado.key}`);
-                      setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
+                      setFilterLoading(`estado-${estado.id}`);
+                      setFiltroEstado(filtroEstado === estado.id ? '' : estado.id);
                     }}
-                    className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg transition-all flex-1 min-w-0 h-[36px]"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
                     style={{
                       background: isActive ? estado.color : `${estado.color}15`,
                       border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                     }}
                   >
-                    {/* Icono */}
                     <Icon
-                      className={`h-4 w-4 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                      className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{ color: isActive ? '#ffffff' : estado.color }}
                     />
-                    {/* Texto */}
                     <span
-                      className={`text-[10px] font-medium leading-none truncate ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                      className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{ color: isActive ? '#ffffff' : estado.color }}
                     >
                       {estado.label}
                     </span>
-                    {/* Badge con count */}
                     <span
-                      className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                      style={{
-                        backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
-                        color: isActive ? '#ffffff' : estado.color,
-                      }}
+                      className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                      style={{ color: isActive ? '#ffffff' : estado.color }}
                     >
-                      {estado.count}
+                      {count}
                     </span>
                   </button>
                 );
               }))}
+              </div>
             </div>
           </div>
         }
@@ -1578,7 +1645,7 @@ export default function Tramites() {
             data={filteredTramites}
             columns={[
               { key: 'numero_tramite', header: '#', render: (t) => <span className="font-mono text-xs">{t.numero_tramite}</span> },
-              { key: 'asunto', header: 'Asunto', render: (t) => <span className="font-medium">{t.asunto}</span> },
+              { key: 'asunto', header: 'Asunto', render: (t) => <span className="text-sm font-medium">{t.asunto}</span> },
               { key: 'servicio', header: 'Servicio', render: (t) => {
                 const info = getServicioInfo(t);
                 return (

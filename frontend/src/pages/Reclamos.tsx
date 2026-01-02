@@ -339,40 +339,68 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   useEffect(() => {
     fetchMunicipioData();
 
-    // Cargar conteos UNA SOLA VEZ (GROUP BY optimizado)
-    Promise.all([
-      dashboardApi.getConteoEstados(),
-      dashboardApi.getConteoCategorias(),
-    ]).then(([estadosRes, categoriasRes]) => {
-      const estadosMap: Record<string, number> = {};
-      estadosRes.data.forEach((item: any) => {
-        estadosMap[item.estado] = item.cantidad;
-      });
-      setConteosEstados(estadosMap);
+    // Cargar conteos UNA SOLA VEZ (GROUP BY optimizado) - solo para admin/supervisor
+    if (!soloMisTrabajos) {
+      Promise.all([
+        dashboardApi.getConteoEstados(),
+        dashboardApi.getConteoCategorias(),
+      ]).then(([estadosRes, categoriasRes]) => {
+        const estadosMap: Record<string, number> = {};
+        estadosRes.data.forEach((item: any) => {
+          estadosMap[item.estado] = item.cantidad;
+        });
+        setConteosEstados(estadosMap);
 
-      const categoriasMap: Record<number, number> = {};
-      categoriasRes.data.forEach((item: any) => {
-        categoriasMap[item.categoria_id] = item.cantidad;
+        const categoriasMap: Record<number, number> = {};
+        categoriasRes.data.forEach((item: any) => {
+          categoriasMap[item.categoria_id] = item.cantidad;
+        });
+        setConteosCategorias(categoriasMap);
+      }).catch(error => {
+        console.error('Error cargando conteos:', error);
       });
-      setConteosCategorias(categoriasMap);
-    }).catch(error => {
-      console.error('Error cargando conteos:', error);
-    });
+    }
 
-    // Cargar datos básicos (categorías, zonas, empleados) UNA SOLA VEZ
+    // Cargar datos básicos (categorías, zonas) UNA SOLA VEZ
     Promise.all([
       categoriasApi.getAll(true),
       zonasApi.getAll(true),
-      empleadosApi.getAll(true),
-    ]).then(([categoriasRes, zonasRes, empleadosRes]) => {
-      console.log('Empleados cargados:', empleadosRes.data?.length || 0, 'empleados', empleadosRes.data);
+    ]).then(([categoriasRes, zonasRes]) => {
       setCategorias(categoriasRes.data);
       setZonas(zonasRes.data);
-      setEmpleados(empleadosRes.data || []);
     }).catch(error => {
-      console.error('Error cargando datos básicos:', error.response?.status, error.response?.data || error.message);
+      console.error('Error cargando categorías/zonas:', error.response?.status, error.response?.data || error.message);
     });
-  }, []);
+
+    // Cargar empleados por separado (solo admin/supervisor tienen acceso)
+    empleadosApi.getAll(true).then((empleadosRes) => {
+      setEmpleados(empleadosRes.data || []);
+    }).catch(() => {
+      // Silenciar error - usuarios sin permisos no necesitan ver empleados
+      setEmpleados([]);
+    });
+  }, [soloMisTrabajos]);
+
+  // Para empleados: calcular conteos desde los reclamos cargados
+  useEffect(() => {
+    if (soloMisTrabajos && reclamos.length > 0) {
+      // Calcular conteos de estados
+      const estadosMap: Record<string, number> = {};
+      reclamos.forEach(r => {
+        estadosMap[r.estado] = (estadosMap[r.estado] || 0) + 1;
+      });
+      setConteosEstados(estadosMap);
+
+      // Calcular conteos de categorías
+      const categoriasMap: Record<number, number> = {};
+      reclamos.forEach(r => {
+        if (r.categoria?.id) {
+          categoriasMap[r.categoria.id] = (categoriasMap[r.categoria.id] || 0) + 1;
+        }
+      });
+      setConteosCategorias(categoriasMap);
+    }
+  }, [soloMisTrabajos, reclamos]);
 
   // Búsqueda: se activa al presionar espacio, Enter, o después de 1.5s de inactividad
   useEffect(() => {
@@ -674,8 +702,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
     setSearchingAddress(true);
     try {
+      // Usar el nombre del municipio para filtrar la búsqueda, o Buenos Aires por defecto
+      const locationFilter = municipioData?.nombre_municipio
+        ? `${municipioData.nombre_municipio}, Buenos Aires, Argentina`
+        : 'Buenos Aires, Argentina';
+
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, Buenos Aires, Argentina&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}, ${encodeURIComponent(locationFilter)}&limit=5&addressdetails=1`,
         {
           headers: {
             'Accept-Language': 'es',
@@ -2396,9 +2429,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             {getCategoryIcon(r.categoria.nombre)}
           </div>
           <div className="min-w-0">
-            <span className="text-xs font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
+            <span className="text-sm font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
             <span
-              className="text-[10px]"
+              className="text-[11px]"
               style={{ color: getCategoryColor(r.categoria.nombre) }}
             >
               {r.categoria.nombre}
@@ -3243,44 +3276,42 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         }
         stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin'}
         secondaryFilters={
-          <div className="w-full flex flex-col gap-2">
-            {/* Categorías - Grid 2 filas en mobile (5 cols), 1 fila en desktop */}
-            <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
+          <div className="w-full flex flex-col gap-1">
+            {/* Categorías - botón Todas fijo + scroll horizontal */}
+            <div className="flex gap-1">
+              {/* Botón Todas fijo - outlined */}
+              <button
+                onClick={() => {
+                  setFilterLoading('cat-all');
+                  setFiltroCategoria(null);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
+                }}
+              >
+                <Tag className={`h-3 w-3 ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? theme.primary : theme.textSecondary }} />
+                <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? theme.primary : theme.textSecondary }}>
+                  Todas
+                </span>
+              </button>
+
+              {/* Scroll de categorías */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
               {/* Skeleton completo mientras cargan las categorías Y los conteos */}
               {categorias.length === 0 || Object.keys(conteosCategorias).length === 0 ? (
                 <>
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
                     <div
                       key={`skeleton-cat-${i}`}
-                      className="h-[68px] rounded-xl animate-pulse sm:flex-1 sm:min-w-0"
+                      className="h-[28px] w-[50px] rounded-md animate-pulse flex-shrink-0"
                       style={{ background: `${theme.border}40` }}
                     />
                   ))}
                 </>
               ) : (
               <>
-              {/* Botón Todas las categorías */}
-              <button
-                onClick={() => {
-                  setFilterLoading('cat-all');
-                  setFiltroCategoria(null);
-                }}
-                className="flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
-                style={{
-                  background: filtroCategoria === null
-                    ? theme.primary
-                    : theme.backgroundSecondary,
-                  border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
-                }}
-              >
-                <Tag className={`h-5 w-5 ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? '#ffffff' : theme.primary }} />
-                <span className={`text-[9px] font-semibold leading-tight text-center mt-1 ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? '#ffffff' : theme.text }}>
-                  Categorías
-                </span>
-              </button>
-
-              
-
               {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
               {categorias.filter((cat) => (conteosCategorias[cat.id] || 0) > 0 || reclamos.some(r => r.categoria.id === cat.id)).map((cat) => {
                 const isSelected = filtroCategoria === cat.id;
@@ -3295,57 +3326,78 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                       setFiltroCategoria(isSelected ? null : cat.id);
                     }}
                     title={cat.nombre}
-                    className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
                     style={{
                       background: isSelected ? catColor : theme.backgroundSecondary,
                       border: `1px solid ${isSelected ? catColor : theme.border}`,
                     }}
                   >
-                    {/* Número arriba */}
+                    <span className={`[&>svg]:h-3 [&>svg]:w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : catColor }}>
+                      {getCategoryIcon(cat.nombre)}
+                    </span>
+                    <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                      {cat.nombre.split(' ')[0]}
+                    </span>
                     <span
-                      className={`text-[10px] font-bold leading-none ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                      className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                       style={{
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${catColor}30`,
                         color: isSelected ? '#ffffff' : catColor,
                       }}
                     >
                       {count}
-                    </span>
-                    {/* Icono */}
-                    <span className={`[&>svg]:h-5 [&>svg]:w-5 my-1 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : catColor }}>
-                      {getCategoryIcon(cat.nombre)}
-                    </span>
-                    {/* Texto abajo */}
-                    <span className={`text-[9px] font-medium leading-none text-center w-full truncate px-1 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                      {cat.nombre.split(' ')[0]}
                     </span>
                   </button>
                 );
               })}
               </>
               )}
+              </div>
             </div>
 
-            {/* Estados - Grid 2 filas en mobile (3 cols), 1 fila en desktop */}
-            <div className="grid grid-cols-3 sm:flex gap-1.5 w-full">
+            {/* Estados - botón Todos fijo + scroll horizontal */}
+            <div className="flex gap-1">
+              {/* Botón Todos fijo - outlined */}
+              <button
+                onClick={() => {
+                  setFilterLoading('estado-');
+                  setFiltroEstado('');
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
+                }}
+              >
+                <Eye className={`h-3 w-3 ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
+                <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+                  Todos
+                </span>
+                <span className={`text-[9px] font-bold ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+                  {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
+                </span>
+              </button>
+
+              {/* Scroll de estados */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
               {Object.keys(conteosEstados).length === 0 ? (
                 // Skeleton mientras cargan los conteos
                 <>
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                  {[1, 2, 3, 4, 5].map((i) => (
                     <div
                       key={`skeleton-estado-${i}`}
-                      className="h-[36px] rounded-lg animate-pulse sm:flex-1"
+                      className="h-[26px] w-[45px] rounded-md animate-pulse flex-shrink-0"
                       style={{ background: `${theme.border}40` }}
                     />
                   ))}
                 </>
               ) : (
                 [
-                  { key: '', label: 'Todos', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
-                  { key: 'asignado', label: 'Asignado', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
-                  { key: 'en_proceso', label: 'Proceso', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
-                  { key: 'resuelto', label: 'Resuelto', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
-                  { key: 'rechazado', label: 'Rechazado', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
+                  { key: 'asignado', label: 'Asig.', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
+                  { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
+                  { key: 'resuelto', label: 'Resu.', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
+                  { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
                 ].map((estado) => {
                   const Icon = estado.icon;
                   const isActive = filtroEstado === estado.key;
@@ -3357,31 +3409,25 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                         setFilterLoading(`estado-${estado.key}`);
                         setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
                       }}
-                      className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all h-[36px] sm:flex-1 sm:min-w-0"
+                      className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
                       style={{
                         background: isActive ? estado.color : `${estado.color}15`,
                         border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                       }}
                     >
-                      {/* Icono */}
                       <Icon
-                        className={`h-4 w-4 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                        className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       />
-                      {/* Texto - solo en desktop */}
                       <span
-                        className={`text-[10px] font-medium leading-none truncate hidden sm:block ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                        className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                         style={{ color: isActive ? '#ffffff' : estado.color }}
                       >
                         {estado.label}
                       </span>
-                      {/* Badge con count */}
                       <span
-                        className={`text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                        style={{
-                          backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
-                          color: isActive ? '#ffffff' : estado.color,
-                        }}
+                        className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                        style={{ color: isActive ? '#ffffff' : estado.color }}
                       >
                         {estado.count}
                       </span>
@@ -3389,6 +3435,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   );
                 })
               )}
+              </div>
             </div>
 
           </div>

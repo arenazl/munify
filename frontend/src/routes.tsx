@@ -40,6 +40,7 @@ import MunicipioHome from './pages/MunicipioHome';
 import GestionCuadrillas from './pages/GestionCuadrillas';
 import GestionAusencias from './pages/GestionAusencias';
 import GestionHorarios from './pages/GestionHorarios';
+import Planificacion from './pages/Planificacion';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -223,6 +224,11 @@ export const router = createBrowserRouter([
       {
         path: 'horarios',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionHorarios /></ProtectedRoute>
+      },
+      // Planificación Semanal (calendario visual)
+      {
+        path: 'planificacion',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Planificacion /></ProtectedRoute>
       },
     ],
   },

@@ -39,6 +39,8 @@ import {
   Copy,
   LayoutGrid,
   List,
+  ArrowUpDown,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi } from '../lib/api';
@@ -140,6 +142,7 @@ export default function GestionTramites() {
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
+  const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'vencimiento'>('reciente');
 
   // Autocompletado de búsqueda
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -501,6 +504,16 @@ export default function GestionTramites() {
     }
   };
 
+  // Función para calcular fecha de vencimiento
+  const calcularVencimiento = (t: Tramite) => {
+    const tiempoEstimado = t.tramite?.tiempo_estimado_dias || 0;
+    if (!tiempoEstimado) return null;
+    const fechaCreacion = new Date(t.created_at);
+    const fechaVencimiento = new Date(fechaCreacion);
+    fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
+    return fechaVencimiento;
+  };
+
   // Filtro local solo para búsqueda de texto (tipo y estado se filtran en backend)
   const filteredTramites = tramites.filter(t => {
     if (!searchTerm) return true;
@@ -513,6 +526,18 @@ export default function GestionTramites() {
       t.dni_solicitante?.toLowerCase().includes(term) ||
       t.empleado_asignado?.nombre?.toLowerCase().includes(term) ||
       t.empleado_asignado?.apellido?.toLowerCase().includes(term);
+  }).sort((a, b) => {
+    if (ordenamiento === 'reciente') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    } else {
+      // Por vencimiento - los que vencen más pronto primero
+      const vencA = calcularVencimiento(a);
+      const vencB = calcularVencimiento(b);
+      if (!vencA && !vencB) return 0;
+      if (!vencA) return 1;
+      if (!vencB) return -1;
+      return vencA.getTime() - vencB.getTime();
+    }
   });
 
   // Ya no bloqueamos el render con un spinner - mostramos el header inmediatamente
@@ -643,6 +668,34 @@ export default function GestionTramites() {
           )}
         </div>
 
+        {/* Botones de ordenamiento */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={() => setOrdenamiento('reciente')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            style={{
+              backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
+              border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
+              color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
+            }}
+          >
+            <ArrowUpDown className="h-3 w-3" />
+            Más recientes
+          </button>
+          <button
+            onClick={() => setOrdenamiento('vencimiento')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            style={{
+              backgroundColor: ordenamiento === 'vencimiento' ? theme.primary : theme.backgroundSecondary,
+              border: `1px solid ${ordenamiento === 'vencimiento' ? theme.primary : theme.border}`,
+              color: ordenamiento === 'vencimiento' ? '#ffffff' : theme.textSecondary,
+            }}
+          >
+            <Calendar className="h-3 w-3" />
+            Por vencer
+          </button>
+        </div>
+
         {/* Toggle vista Cards/Tabla */}
         <div
           className="flex rounded-lg p-1 flex-shrink-0"
@@ -672,15 +725,16 @@ export default function GestionTramites() {
           </button>
         </div>
 
-        {/* Botón Nuevo Trámite */}
+        {/* Botón Nuevo Trámite - en el header */}
         <button
           onClick={() => setWizardOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all flex-shrink-0"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 active:scale-95 flex-shrink-0"
           style={{ backgroundColor: theme.primary }}
         >
           <Plus className="h-4 w-4" />
           Nuevo Trámite
         </button>
+
         </div>
 
         {/* Filtros visuales estilo Reclamos */}
@@ -688,37 +742,39 @@ export default function GestionTramites() {
           className="rounded-xl p-3 mt-2"
           style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
         >
-        <div className="flex flex-col gap-2">
-          {/* Tipos de trámite - Grid 2 filas en mobile, 1 fila en desktop */}
-          <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
+        <div className="flex flex-col gap-1.5">
+          {/* Tipos de trámite - botón Todos fijo + scroll horizontal */}
+          <div className="flex gap-1.5">
+            {/* Botón Todos fijo - outlined */}
+            <button
+              onClick={() => setFiltroTipo(null)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[34px] flex-shrink-0"
+              style={{
+                background: 'transparent',
+                border: `1.5px solid ${filtroTipo === null ? theme.primary : theme.border}`,
+              }}
+            >
+              <FileText className="h-4 w-4" style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
+              <span className="text-xs font-medium whitespace-nowrap" style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
+                Todos
+              </span>
+            </button>
+
+            {/* Scroll de tipos */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
             {/* Skeleton mientras cargan los tipos */}
             {loading || tipos.length === 0 ? (
               <>
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div
                     key={`skeleton-tipo-${i}`}
-                    className="h-[68px] rounded-xl animate-pulse sm:flex-1 sm:min-w-0"
+                    className="h-[34px] w-[60px] rounded-lg animate-pulse flex-shrink-0"
                     style={{ background: `${theme.border}40` }}
                   />
                 ))}
               </>
             ) : (
               <>
-            {/* Botón Todos */}
-            <button
-              onClick={() => setFiltroTipo(null)}
-              className="flex flex-col items-center justify-center py-2 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
-              style={{
-                background: filtroTipo === null ? theme.primary : theme.backgroundSecondary,
-                border: `1px solid ${filtroTipo === null ? theme.primary : theme.border}`,
-              }}
-            >
-              <FileText className="h-5 w-5" style={{ color: filtroTipo === null ? '#ffffff' : theme.primary }} />
-              <span className="text-[9px] font-semibold leading-tight text-center mt-1" style={{ color: filtroTipo === null ? '#ffffff' : theme.text }}>
-                Tipos
-              </span>
-            </button>
-
             {/* Chips por tipo de trámite */}
             {tipos.filter(t => t.activo).map((tipo) => {
               const isSelected = filtroTipo === tipo.id;
@@ -729,50 +785,76 @@ export default function GestionTramites() {
                   key={tipo.id}
                   onClick={() => setFiltroTipo(isSelected ? null : tipo.id)}
                   title={tipo.nombre}
-                  className="flex flex-col items-center justify-center py-1.5 rounded-xl transition-all h-[68px] sm:flex-1 sm:min-w-0"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[34px] flex-shrink-0"
                   style={{
                     background: isSelected ? tipoColor : theme.backgroundSecondary,
                     border: `1px solid ${isSelected ? tipoColor : theme.border}`,
                   }}
                 >
-                  <span className="text-[10px] font-bold leading-none" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
-                    {conteo}
-                  </span>
-                  <span className="[&>svg]:h-5 [&>svg]:w-5 my-1" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
+                  <span className="[&>svg]:h-4 [&>svg]:w-4" style={{ color: isSelected ? '#ffffff' : tipoColor }}>
                     {servicioIcons[tipo.icono || ''] || servicioIcons.default}
                   </span>
-                  <span className="text-[9px] font-medium leading-none text-center w-full truncate px-1" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                  <span className="text-xs font-medium whitespace-nowrap" style={{ color: isSelected ? '#ffffff' : theme.text }}>
                     {tipo.nombre.split(' ')[0]}
+                  </span>
+                  <span
+                    className="text-[10px] font-bold px-1.5 rounded-full"
+                    style={{
+                      backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${tipoColor}30`,
+                      color: isSelected ? '#ffffff' : tipoColor,
+                    }}
+                  >
+                    {conteo}
                   </span>
                 </button>
               );
             })}
               </>
             )}
+            </div>
           </div>
 
-          {/* Estados - Grid 2 filas en mobile (4 columnas), 1 fila en desktop */}
-          <div className="grid grid-cols-4 sm:flex gap-1.5 w-full">
+          {/* Estados - botón Todos fijo + scroll horizontal */}
+          <div className="flex gap-1.5">
+            {/* Botón Todos fijo - outlined */}
+            <button
+              onClick={() => setFiltroEstado('')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
+              style={{
+                background: 'transparent',
+                border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
+              }}
+            >
+              <Eye className="h-4 w-4" style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
+              <span className="text-xs font-medium whitespace-nowrap" style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+                Todos
+              </span>
+              <span className="text-[10px] font-bold" style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+                {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
+              </span>
+            </button>
+
+            {/* Scroll de estados */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
             {Object.keys(conteosEstados).length === 0 ? (
               // Skeleton mientras cargan los conteos
               <>
-                {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+                {[1, 2, 3, 4, 5, 6].map((i) => (
                   <div
                     key={`skeleton-estado-${i}`}
-                    className="h-[36px] rounded-lg animate-pulse sm:flex-1"
+                    className="h-[32px] w-[55px] rounded-lg animate-pulse flex-shrink-0"
                     style={{ background: `${theme.border}40` }}
                   />
                 ))}
               </>
             ) : (
               [
-                { key: '', label: 'Todos', icon: Eye, color: theme.primary, count: Object.values(conteosEstados).reduce((a, b) => a + b, 0) },
                 { key: 'iniciado', label: 'Nuevo', icon: Clock, color: '#6366f1', count: conteosEstados['iniciado'] || 0 },
                 { key: 'en_revision', label: 'Revisión', icon: FileCheck, color: '#3b82f6', count: conteosEstados['en_revision'] || 0 },
                 { key: 'en_proceso', label: 'Proceso', icon: RefreshCw, color: '#f59e0b', count: conteosEstados['en_proceso'] || 0 },
                 { key: 'aprobado', label: 'Aprobado', icon: CheckCircle2, color: '#10b981', count: conteosEstados['aprobado'] || 0 },
-                { key: 'finalizado', label: 'Finalizado', icon: CheckCircle2, color: '#059669', count: conteosEstados['finalizado'] || 0 },
-                { key: 'rechazado', label: 'Rechazado', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
+                { key: 'finalizado', label: 'Final.', icon: CheckCircle2, color: '#059669', count: conteosEstados['finalizado'] || 0 },
+                { key: 'rechazado', label: 'Rech.', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
               ].map((estado) => {
                 const Icon = estado.icon;
                 const isActive = filtroEstado === estado.key;
@@ -780,22 +862,19 @@ export default function GestionTramites() {
                   <button
                     key={estado.key}
                     onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
-                    className="flex items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all h-[36px] sm:flex-1 sm:min-w-0"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
                     style={{
                       background: isActive ? estado.color : `${estado.color}15`,
                       border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                     }}
                   >
                     <Icon className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? '#ffffff' : estado.color }} />
-                    <span className="text-[10px] font-medium leading-none truncate hidden sm:block" style={{ color: isActive ? '#ffffff' : estado.color }}>
+                    <span className="text-xs font-medium whitespace-nowrap" style={{ color: isActive ? '#ffffff' : estado.color }}>
                       {estado.label}
                     </span>
                     <span
-                      className="text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full flex-shrink-0"
-                      style={{
-                        backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${estado.color}30`,
-                        color: isActive ? '#ffffff' : estado.color,
-                      }}
+                      className="text-[10px] font-bold"
+                      style={{ color: isActive ? '#ffffff' : estado.color }}
                     >
                       {estado.count}
                     </span>
@@ -803,6 +882,7 @@ export default function GestionTramites() {
                 );
               })
             )}
+            </div>
           </div>
         </div>
         </div>
@@ -999,10 +1079,13 @@ export default function GestionTramites() {
                     ESTADO
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
-                    FECHA
+                    CREACIÓN
                   </th>
-                  <th className="text-center px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
-                    ACCIONES
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
+                    ACTUALIZACIÓN
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium" style={{ color: theme.textSecondary }}>
+                    POR VENCER
                   </th>
                 </tr>
               </thead>
@@ -1011,7 +1094,7 @@ export default function GestionTramites() {
                   // Skeleton rows mientras carga
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={`skeleton-row-${i}`}>
-                      {Array.from({ length: 9 }).map((_, j) => (
+                      {Array.from({ length: 10 }).map((_, j) => (
                         <td key={`skeleton-cell-${i}-${j}`} className="px-4 py-3">
                           <div
                             className="h-4 rounded animate-pulse"
@@ -1023,7 +1106,7 @@ export default function GestionTramites() {
                   ))
                 ) : filteredTramites.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-12">
+                    <td colSpan={10} className="text-center py-12">
                       <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" style={{ color: theme.textSecondary }} />
                       <p style={{ color: theme.textSecondary }}>No hay trámites</p>
                     </td>
@@ -1108,16 +1191,32 @@ export default function GestionTramites() {
                             {new Date(tramite.created_at).toLocaleDateString('es-AR')}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            className="p-2 rounded-lg hover:bg-black/5 transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openTramite(tramite);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" style={{ color: theme.primary }} />
-                          </button>
+                        <td className="px-4 py-3">
+                          <span className="text-sm" style={{ color: theme.textSecondary }}>
+                            {new Date(tramite.updated_at).toLocaleDateString('es-AR')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const venc = calcularVencimiento(tramite);
+                            if (!venc) return <span className="text-sm" style={{ color: theme.textSecondary }}>-</span>;
+                            const hoy = new Date();
+                            const diffDias = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+                            const vencido = diffDias <= 0;
+                            const porVencer = diffDias > 0 && diffDias <= 3;
+                            return (
+                              <span
+                                className="text-sm px-2 py-0.5 rounded-full"
+                                style={{
+                                  backgroundColor: vencido ? '#ef444420' : porVencer ? '#f59e0b20' : 'transparent',
+                                  color: vencido ? '#ef4444' : porVencer ? '#f59e0b' : theme.textSecondary,
+                                  fontWeight: vencido || porVencer ? 500 : 400,
+                                }}
+                              >
+                                {vencido ? `Vencido (${Math.abs(diffDias)}d)` : `${diffDias}d`}
+                              </span>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );

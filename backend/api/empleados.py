@@ -13,6 +13,29 @@ from schemas.empleado import EmpleadoCreate, EmpleadoUpdate, EmpleadoResponse
 
 router = APIRouter()
 
+@router.get("/me", response_model=EmpleadoResponse)
+async def get_mi_empleado(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Obtener datos del empleado vinculado al usuario actual"""
+    if not current_user.empleado_id:
+        raise HTTPException(status_code=404, detail="No tienes un empleado vinculado")
+
+    result = await db.execute(
+        select(Empleado)
+        .options(
+            selectinload(Empleado.miembros),
+            selectinload(Empleado.categorias),
+            selectinload(Empleado.categoria_principal)
+        )
+        .where(Empleado.id == current_user.empleado_id)
+    )
+    empleado = result.scalar_one_or_none()
+    if not empleado:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    return empleado
+
 @router.get("", response_model=List[EmpleadoResponse])
 async def get_empleados(
     activo: bool = None,
@@ -88,6 +111,7 @@ async def create_empleado(
         'telefono': data.telefono,
         'descripcion': data.descripcion,
         'especialidad': data.especialidad,
+        'tipo': data.tipo or 'operario',
         'zona_id': data.zona_id,
         'capacidad_maxima': data.capacidad_maxima,
         'categoria_principal_id': data.categoria_principal_id,

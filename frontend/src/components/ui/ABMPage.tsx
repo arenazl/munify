@@ -184,6 +184,20 @@ export function ABMPage({
             />
           </div>
 
+          {/* Botón + mobile - al lado del search */}
+          {onAdd && buttonLabel && (
+            <button
+              onClick={onAdd}
+              className="sm:hidden p-2 rounded-lg transition-all active:scale-95 flex-shrink-0"
+              style={{
+                backgroundColor: theme.primary,
+                color: '#ffffff',
+              }}
+            >
+              <Plus className="h-5 w-5" />
+            </button>
+          )}
+
           {/* Header Actions (ordenamiento, etc) - junto al toggle de vista */}
           {headerActions && (
             <div className="hidden sm:flex items-center flex-shrink-0">
@@ -244,28 +258,30 @@ export function ABMPage({
             </div>
           )}
 
-          {/* Botón agregar - solo desktop en esta línea */}
-          <button
-            onClick={onAdd}
-            className={`
-              hidden sm:inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
-              transition-all duration-300 ease-out
-              hover:scale-105 hover:-translate-y-0.5
-              active:scale-95
-              group
-              relative overflow-hidden
-              flex-shrink-0
-            `}
-            style={{
-              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-              color: '#ffffff',
-              boxShadow: `0 4px 14px ${theme.primary}40`,
-            }}
-          >
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-            {buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
-            {buttonLabel}
-          </button>
+          {/* Botón agregar - solo desktop en esta línea - solo si hay onAdd */}
+          {onAdd && buttonLabel && (
+            <button
+              onClick={onAdd}
+              className={`
+                hidden sm:inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
+                transition-all duration-300 ease-out
+                hover:scale-105 hover:-translate-y-0.5
+                active:scale-95
+                group
+                relative overflow-hidden
+                flex-shrink-0
+              `}
+              style={{
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                color: '#ffffff',
+                boxShadow: `0 4px 14px ${theme.primary}40`,
+              }}
+            >
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+              {buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
+              {buttonLabel}
+            </button>
+          )}
 
           {/* Filtros extra - en mobile van debajo */}
           {allFilters && (
@@ -298,37 +314,12 @@ export function ABMPage({
 
         </div>
 
-          {/* Mobile: Botón 100% + Filtros de estado */}
-          <div className="flex sm:hidden flex-col gap-2 mt-3">
-            {/* Botón agregar - 100% en mobile */}
-            <button
-              onClick={onAdd}
-              className="
-                w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg font-semibold text-sm
-                transition-all duration-300 ease-out
-                active:scale-95
-                group
-                relative overflow-hidden 
-              "
-              style={{
-                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                color: '#ffffff',
-                boxShadow: `0 4px 14px ${theme.primary}40`,
-                marginBottom: '0.5rem',
-              }}
-            >
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-              {buttonIcon || <Plus className="h-4 w-4 mr-1.5" />}
-              {buttonLabel}
-            </button>
-
-            {/* Filtros extra - scroll horizontal en mobile */}
-            {allFilters && (
-              <div className="overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {allFilters}
-              </div>
-            )}
-          </div>
+          {/* Mobile: Filtros extra */}
+          {allFilters && (
+            <div className="flex sm:hidden mt-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              {allFilters}
+            </div>
+          )}
         </div>
 
         {/* Secondary Filters Bar (full width) - dentro del sticky container */}

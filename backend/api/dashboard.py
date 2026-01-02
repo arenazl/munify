@@ -462,21 +462,46 @@ async def get_conteo_categorias(
     request: Request,
     estado: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
     """
     Endpoint optimizado que devuelve el conteo de reclamos por categoría
     sin traer todos los datos. Mucho más eficiente que traer todos los reclamos.
+    Para empleados: solo cuenta reclamos asignados a él o su cuadrilla.
     """
     from models.categoria import Categoria
-    from sqlalchemy import and_
+    from sqlalchemy import and_, or_
 
     municipio_id = get_effective_municipio_id(request, current_user)
 
-    # Construir condiciones
+    # Construir condiciones base
     conditions = [Reclamo.municipio_id == municipio_id]
     if estado:
         conditions.append(Reclamo.estado == estado)
+
+    # Si es empleado, filtrar solo sus reclamos y los de su cuadrilla
+    if current_user.rol == RolUsuario.EMPLEADO:
+        from models.empleado_cuadrilla import EmpleadoCuadrilla
+
+        # Subconsulta: IDs de cuadrillas del empleado
+        cuadrillas_subq = select(EmpleadoCuadrilla.cuadrilla_id).where(
+            EmpleadoCuadrilla.empleado_id == current_user.empleado_id,
+            EmpleadoCuadrilla.activo == True
+        )
+
+        # Subconsulta: IDs de compañeros de cuadrilla
+        companeros_subq = select(EmpleadoCuadrilla.empleado_id).where(
+            EmpleadoCuadrilla.cuadrilla_id.in_(cuadrillas_subq),
+            EmpleadoCuadrilla.activo == True
+        )
+
+        # Filtrar: reclamos asignados al empleado O a compañeros de cuadrilla
+        conditions.append(
+            or_(
+                Reclamo.empleado_id == current_user.empleado_id,
+                Reclamo.empleado_id.in_(companeros_subq)
+            )
+        )
 
     query = await db.execute(
         select(
@@ -505,20 +530,49 @@ async def get_conteo_categorias(
 async def get_conteo_estados(
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
     """
     Endpoint optimizado que devuelve el conteo de reclamos por estado.
-    Mucho más eficiente que traer todos los reclamos.
+    Para empleados: solo cuenta reclamos asignados a él o su cuadrilla.
     """
+    from sqlalchemy import or_
+
     municipio_id = get_effective_municipio_id(request, current_user)
+
+    # Construir condiciones base
+    conditions = [Reclamo.municipio_id == municipio_id]
+
+    # Si es empleado, filtrar solo sus reclamos y los de su cuadrilla
+    if current_user.rol == RolUsuario.EMPLEADO:
+        from models.empleado_cuadrilla import EmpleadoCuadrilla
+
+        # Subconsulta: IDs de cuadrillas del empleado
+        cuadrillas_subq = select(EmpleadoCuadrilla.cuadrilla_id).where(
+            EmpleadoCuadrilla.empleado_id == current_user.empleado_id,
+            EmpleadoCuadrilla.activo == True
+        )
+
+        # Subconsulta: IDs de compañeros de cuadrilla
+        companeros_subq = select(EmpleadoCuadrilla.empleado_id).where(
+            EmpleadoCuadrilla.cuadrilla_id.in_(cuadrillas_subq),
+            EmpleadoCuadrilla.activo == True
+        )
+
+        # Filtrar: reclamos asignados al empleado O a compañeros de cuadrilla
+        conditions.append(
+            or_(
+                Reclamo.empleado_id == current_user.empleado_id,
+                Reclamo.empleado_id.in_(companeros_subq)
+            )
+        )
 
     query = await db.execute(
         select(
             Reclamo.estado,
             func.count(Reclamo.id).label('cantidad')
         )
-        .where(Reclamo.municipio_id == municipio_id)
+        .where(*conditions)
         .group_by(Reclamo.estado)
     )
 

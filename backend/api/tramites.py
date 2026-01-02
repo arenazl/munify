@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, date
 import logging
+import cloudinary
+import cloudinary.uploader
 
 from core.database import get_db
 from core.security import get_current_user, get_current_user_optional, require_roles
@@ -20,7 +22,15 @@ from schemas.tramite import (
     HistorialSolicitudResponse
 )
 from models.empleado import Empleado
+from models.documento_solicitud import DocumentoSolicitud
 from services.notificacion_service import NotificacionService, get_plantilla, formatear_mensaje
+
+# Configurar Cloudinary
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+    api_key=settings.CLOUDINARY_API_KEY,
+    api_secret=settings.CLOUDINARY_API_SECRET
+)
 
 logger = logging.getLogger(__name__)
 
@@ -753,3 +763,441 @@ async def listar_solicitudes_gestion(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+# ==================== DOCUMENTOS ====================
+
+# Tipos de archivo permitidos y tamaño máximo
+ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/jpg", "image/webp", "image/gif", "application/pdf"]
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+@router.post("/solicitudes/{solicitud_id}/documentos")
+async def upload_documento_solicitud(
+    solicitud_id: int,
+    file: UploadFile = File(...),
+    tipo_documento: str = Query(None, description="Tipo de documento: dni, comprobante, formulario, etc."),
+    descripcion: str = Query(None, description="Descripción del documento"),
+    etapa: str = Query("creacion", description="Etapa: creacion, proceso, resolucion"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Sube un documento/imagen a una solicitud de trámite"""
+    # Verificar tipo de archivo
+    if file.content_type not in ALLOWED_FILE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tipo de archivo no permitido. Permitidos: {', '.join(ALLOWED_FILE_TYPES)}"
+        )
+
+    # Verificar tamaño
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="El archivo excede el tamaño máximo de 10MB")
+    await file.seek(0)
+
+    # Verificar que la solicitud existe
+    result = await db.execute(
+        select(Solicitud).where(Solicitud.id == solicitud_id)
+    )
+    solicitud = result.scalar_one_or_none()
+
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Verificar permisos: el solicitante o personal municipal
+    if current_user.rol == RolUsuario.VECINO:
+        if solicitud.solicitante_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No tiene permiso para subir documentos a esta solicitud")
+
+    # Subir a Cloudinary
+    try:
+        # Determinar resource_type basado en el content_type
+        resource_type = "image" if file.content_type.startswith("image/") else "raw"
+
+        upload_result = cloudinary.uploader.upload(
+            file.file,
+            folder=f"solicitudes/{solicitud_id}",
+            resource_type=resource_type
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al subir archivo: {str(e)}")
+
+    # Determinar tipo
+    tipo = "imagen" if file.content_type.startswith("image/") else "documento"
+
+    documento = DocumentoSolicitud(
+        solicitud_id=solicitud_id,
+        usuario_id=current_user.id,
+        nombre_original=file.filename,
+        url=upload_result["secure_url"],
+        public_id=upload_result["public_id"],
+        tipo=tipo,
+        mime_type=file.content_type,
+        tamanio=upload_result.get("bytes"),
+        tipo_documento=tipo_documento,
+        descripcion=descripcion,
+        etapa=etapa
+    )
+    db.add(documento)
+    await db.commit()
+    await db.refresh(documento)
+
+    return {
+        "message": "Archivo subido correctamente",
+        "id": documento.id,
+        "url": documento.url,
+        "nombre": documento.nombre_original,
+        "tipo": documento.tipo
+    }
+
+
+@router.get("/solicitudes/{solicitud_id}/documentos")
+async def listar_documentos_solicitud(
+    solicitud_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Lista todos los documentos de una solicitud"""
+    # Verificar que la solicitud existe
+    result = await db.execute(
+        select(Solicitud).where(Solicitud.id == solicitud_id)
+    )
+    solicitud = result.scalar_one_or_none()
+
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Verificar permisos
+    if current_user.rol == RolUsuario.VECINO:
+        if solicitud.solicitante_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No tiene permiso para ver los documentos de esta solicitud")
+
+    # Obtener documentos
+    result = await db.execute(
+        select(DocumentoSolicitud)
+        .where(DocumentoSolicitud.solicitud_id == solicitud_id)
+        .order_by(DocumentoSolicitud.created_at.desc())
+    )
+    documentos = result.scalars().all()
+
+    return [
+        {
+            "id": doc.id,
+            "nombre_original": doc.nombre_original,
+            "url": doc.url,
+            "tipo": doc.tipo,
+            "tipo_documento": doc.tipo_documento,
+            "descripcion": doc.descripcion,
+            "etapa": doc.etapa,
+            "mime_type": doc.mime_type,
+            "tamanio": doc.tamanio,
+            "created_at": doc.created_at
+        }
+        for doc in documentos
+    ]
+
+
+@router.delete("/solicitudes/{solicitud_id}/documentos/{documento_id}")
+async def eliminar_documento_solicitud(
+    solicitud_id: int,
+    documento_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Elimina un documento de una solicitud"""
+    # Verificar que el documento existe y pertenece a la solicitud
+    result = await db.execute(
+        select(DocumentoSolicitud)
+        .where(
+            DocumentoSolicitud.id == documento_id,
+            DocumentoSolicitud.solicitud_id == solicitud_id
+        )
+    )
+    documento = result.scalar_one_or_none()
+
+    if not documento:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+
+    # Verificar permisos: solo el que subió el documento o admin/supervisor
+    if current_user.rol == RolUsuario.VECINO:
+        if documento.usuario_id != current_user.id:
+            raise HTTPException(status_code=403, detail="No tiene permiso para eliminar este documento")
+
+    # Eliminar de Cloudinary
+    if documento.public_id:
+        try:
+            cloudinary.uploader.destroy(documento.public_id)
+        except Exception as e:
+            logger.error(f"Error eliminando de Cloudinary: {e}")
+
+    # Eliminar de la base de datos
+    await db.delete(documento)
+    await db.commit()
+
+    return {"message": "Documento eliminado correctamente"}
+
+
+# ==================== CLASIFICACIÓN DE TRÁMITES CON IA ====================
+
+from pydantic import BaseModel
+from services import chat_service
+
+
+class ClasificarTramiteRequest(BaseModel):
+    texto: str
+    municipio_id: int
+    usar_ia: bool = True
+
+
+# Palabras clave para clasificación local de trámites
+TRAMITE_KEYWORDS = {
+    'comercio': [
+        'habilitacion', 'habilitación', 'comercial', 'comercio', 'local', 'negocio',
+        'kiosco', 'almacen', 'almacén', 'restaurante', 'bar', 'panaderia', 'panadería',
+        'carniceria', 'carnicería', 'verduleria', 'verdulería', 'farmacia', 'libreria',
+        'librería', 'ferreteria', 'ferretería', 'peluqueria', 'peluquería', 'barberia',
+        'barbería', 'gimnasio', 'supermercado', 'minimercado', 'despensa', 'rotiseria',
+        'rotisería', 'heladeria', 'heladería', 'pizzeria', 'pizzería', 'cafeteria',
+        'cafetería', 'pub', 'boliche', 'discoteca', 'salon', 'salón', 'eventos',
+        'fiesta', 'emprendimiento', 'monotributo', 'autónomo', 'autonomo', 'vender',
+        'venta', 'abrir', 'apertura', 'habilitar'
+    ],
+    'obras': [
+        'obra', 'construccion', 'construcción', 'edificar', 'edificacion', 'edificación',
+        'plano', 'planos', 'permiso', 'demoler', 'demolicion', 'demolición', 'refaccion',
+        'refacción', 'ampliacion', 'ampliación', 'remodelar', 'remodelacion', 'remodelación',
+        'albañil', 'albanil', 'arquitecto', 'ingeniero', 'pileta', 'piscina', 'techo',
+        'medianera', 'cerco', 'vereda', 'garage', 'cochera', 'terraza', 'balcon',
+        'balcón', 'losa', 'columna', 'viga', 'cimiento', 'final de obra', 'inicio de obra',
+        'aprobacion', 'aprobación', 'visado', 'mensura', 'catastro'
+    ],
+    'vehiculos': [
+        'vehiculo', 'vehículo', 'auto', 'automovil', 'automóvil', 'moto', 'motocicleta',
+        'camion', 'camión', 'camioneta', 'utilitario', 'patente', 'licencia', 'conducir',
+        'registro', 'carnet', 'libre deuda', 'multa', 'multas', 'infraccion', 'infracción',
+        'estacionamiento', 'remis', 'taxi', 'uber', 'transfer', 'transporte', 'escolar',
+        'traslado', 'grua', 'grúa', 'acarreo', 'secuestro', 'radar', 'fotomulta'
+    ],
+    'social': [
+        'social', 'subsidio', 'ayuda', 'beneficio', 'pension', 'pensión', 'jubilacion',
+        'jubilación', 'discapacidad', 'certificado', 'cud', 'vivienda', 'terreno',
+        'lote', 'plan', 'procrear', 'anses', 'asignacion', 'asignación', 'tarjeta',
+        'alimentar', 'bolson', 'bolsón', 'comedor', 'merendero', 'emergencia',
+        'indigencia', 'pobreza', 'vulnerable', 'familia', 'niño', 'niña', 'anciano',
+        'mayor', 'tercera edad', 'inclusion', 'inclusión'
+    ],
+    'salud': [
+        'salud', 'hospital', 'clinica', 'clínica', 'medico', 'médico', 'turno',
+        'vacuna', 'vacunacion', 'vacunación', 'sanitario', 'bromatologia', 'bromatología',
+        'habilitacion sanitaria', 'libreta', 'manipulador', 'alimentos', 'carnet sanitario',
+        'analisis', 'análisis', 'laboratorio', 'certificado medico', 'certificado médico',
+        'defuncion', 'defunción', 'nacimiento', 'partida'
+    ],
+    'ambiente': [
+        'ambiente', 'ambiental', 'arbol', 'árbol', 'poda', 'plantacion', 'plantación',
+        'fumigacion', 'fumigación', 'plaga', 'dengue', 'descacharrado', 'residuo',
+        'basura', 'reciclaje', 'reciclar', 'verde', 'espacio verde', 'plaza', 'parque',
+        'contaminacion', 'contaminación', 'ruido', 'molestia', 'humo', 'quema'
+    ],
+    'tramites_generales': [
+        'certificado', 'constancia', 'libre deuda', 'deuda', 'impuesto', 'tasa',
+        'tributo', 'pago', 'factura', 'boleta', 'mora', 'plan de pago', 'moratoria',
+        'exencion', 'exención', 'reduccion', 'reducción', 'bonificacion', 'bonificación',
+        'domicilio', 'residencia', 'domiciliario', 'avaluo', 'avalúo', 'valuacion',
+        'valuación', 'escribano', 'escribania', 'escribanía', 'notarial'
+    ],
+    'eventos': [
+        'evento', 'eventos', 'espectaculo', 'espectáculo', 'recital', 'show', 'concierto',
+        'feria', 'exposicion', 'exposición', 'muestra', 'festival', 'fiesta', 'cumpleaños',
+        'casamiento', 'boda', 'quince', '15', 'salon', 'salón', 'club', 'cancha',
+        'predio', 'permiso evento', 'autorizacion', 'autorización', 'via publica',
+        'vía pública', 'corte', 'calle', 'marcha', 'manifestacion', 'manifestación'
+    ],
+    'empleo': [
+        'empleo', 'trabajo', 'trabajar', 'cv', 'curriculum', 'currículum', 'bolsa',
+        'postulacion', 'postulación', 'vacante', 'puesto', 'oferta', 'laboral',
+        'capacitacion', 'capacitación', 'curso', 'taller', 'formacion', 'formación',
+        'oficio', 'pasantia', 'pasantía', 'practica', 'práctica'
+    ]
+}
+
+
+def normalize_text_tramite(text: str) -> str:
+    """Normaliza texto para comparación"""
+    import unicodedata
+    text = text.lower()
+    text = unicodedata.normalize('NFD', text)
+    text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+    return text
+
+
+def clasificar_tramite_local(texto: str, tramites: list) -> list:
+    """Clasificación local de trámites usando palabras clave"""
+    if not texto or len(texto) < 3:
+        return []
+
+    normalized_text = normalize_text_tramite(texto)
+    scores = []
+
+    for tramite in tramites:
+        tramite_name = normalize_text_tramite(tramite['nombre'])
+        tramite_desc = normalize_text_tramite(tramite.get('descripcion', '') or '')
+        score = 0
+
+        # Buscar coincidencias con palabras clave
+        for category, keywords in TRAMITE_KEYWORDS.items():
+            # Verificar si esta categoría aplica al trámite
+            category_match = False
+            for keyword in keywords[:10]:  # Top keywords de la categoría
+                if keyword in tramite_name or keyword in tramite_desc:
+                    category_match = True
+                    break
+
+            if category_match:
+                for keyword in keywords:
+                    normalized_keyword = normalize_text_tramite(keyword)
+                    if normalized_keyword in normalized_text:
+                        score += 1 + (len(keyword) // 4)
+
+        # Bonus si palabras del nombre del trámite están en el texto
+        tramite_words = tramite_name.split()
+        for word in tramite_words:
+            if len(word) > 3 and word in normalized_text:
+                score += 5
+
+        # Bonus si palabras de la descripción están en el texto
+        desc_words = tramite_desc.split()
+        for word in desc_words:
+            if len(word) > 4 and word in normalized_text:
+                score += 2
+
+        if score > 0:
+            scores.append({
+                'tramite_id': tramite['id'],
+                'tramite_nombre': tramite['nombre'],
+                'tipo_tramite_id': tramite.get('tipo_tramite_id'),
+                'tipo_tramite_nombre': tramite.get('tipo_tramite_nombre', ''),
+                'score': score,
+                'confianza': min(score * 5, 100),
+                'metodo': 'local'
+            })
+
+    # Ordenar por score y retornar top 5
+    scores.sort(key=lambda x: x['score'], reverse=True)
+    return scores[:5]
+
+
+async def clasificar_tramite_con_ia(texto: str, tramites: list) -> Optional[list]:
+    """Clasificación de trámites usando IA"""
+    if not chat_service.is_available():
+        return None
+
+    # Construir lista de trámites para el prompt
+    tramites_list = "\n".join([
+        f"- ID {t['id']}: {t['nombre']} (Categoría: {t.get('tipo_tramite_nombre', 'General')})"
+        for t in tramites[:50]  # Limitar para no exceder tokens
+    ])
+
+    prompt = f"""Eres un asistente municipal que clasifica solicitudes de trámites.
+
+TEXTO DEL USUARIO:
+"{texto}"
+
+TRÁMITES DISPONIBLES:
+{tramites_list}
+
+Analiza qué trámite necesita el usuario y devuelve los 3 más probables en formato JSON.
+Responde SOLO con un JSON válido:
+[
+  {{"tramite_id": <id>, "tramite_nombre": "<nombre>", "confianza": <0-100>}},
+  {{"tramite_id": <id>, "tramite_nombre": "<nombre>", "confianza": <0-100>}},
+  {{"tramite_id": <id>, "tramite_nombre": "<nombre>", "confianza": <0-100>}}
+]
+
+Si no hay trámites relevantes, devuelve: []"""
+
+    try:
+        response = await chat_service.chat(prompt, max_tokens=500)
+        if response:
+            import re
+            import json
+            json_match = re.search(r'\[[\s\S]*\]', response)
+            if json_match:
+                result = json.loads(json_match.group())
+                for item in result:
+                    item['metodo'] = 'ia'
+                    item['score'] = item.get('confianza', 50)
+                return result
+    except Exception as e:
+        logger.error(f"Error en clasificación IA de trámites: {e}")
+
+    return None
+
+
+@router.post("/clasificar")
+async def clasificar_tramite_endpoint(
+    data: ClasificarTramiteRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Clasifica un texto para sugerir trámites relevantes.
+    Usa IA si está disponible, sino clasificación local por palabras clave.
+    """
+    # Obtener trámites del municipio
+    query = (
+        select(Tramite, TipoTramite.nombre.label('tipo_nombre'))
+        .join(TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id)
+        .where(
+            TipoTramite.municipio_id == data.municipio_id,
+            Tramite.activo == True
+        )
+    )
+    result = await db.execute(query)
+    rows = result.all()
+
+    tramites = [
+        {
+            'id': row.Tramite.id,
+            'nombre': row.Tramite.nombre,
+            'descripcion': row.Tramite.descripcion,
+            'tipo_tramite_id': row.Tramite.tipo_tramite_id,
+            'tipo_tramite_nombre': row.tipo_nombre
+        }
+        for row in rows
+    ]
+
+    if not tramites:
+        return {
+            'sugerencias': [],
+            'metodo_principal': 'none',
+            'mensaje': 'No hay trámites configurados para este municipio'
+        }
+
+    # Clasificación local como backup
+    local_results = clasificar_tramite_local(data.texto, tramites)
+
+    # Intentar IA si está habilitado
+    ia_results = None
+    if data.usar_ia:
+        ia_results = await clasificar_tramite_con_ia(data.texto, tramites)
+
+    if ia_results:
+        # Enriquecer resultados de IA con info del tipo
+        for item in ia_results:
+            tramite = next((t for t in tramites if t['id'] == item.get('tramite_id')), None)
+            if tramite:
+                item['tipo_tramite_id'] = tramite['tipo_tramite_id']
+                item['tipo_tramite_nombre'] = tramite['tipo_tramite_nombre']
+
+        return {
+            'sugerencias': ia_results,
+            'metodo_principal': 'ia',
+            'local_backup': local_results
+        }
+
+    return {
+        'sugerencias': local_results,
+        'metodo_principal': 'local',
+        'ia_disponible': chat_service.is_available()
+    }

@@ -133,6 +133,7 @@ class Solicitud(Base):
 
     # Relaciones
     historial = relationship("HistorialSolicitud", back_populates="solicitud", order_by="HistorialSolicitud.created_at.desc()")
+    documentos = relationship("DocumentoSolicitud", back_populates="solicitud", cascade="all, delete-orphan")
 
 
 class HistorialSolicitud(Base):

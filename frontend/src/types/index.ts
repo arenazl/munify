@@ -47,6 +47,8 @@ export interface CategoriaSimple {
   icono?: string;
 }
 
+export type TipoEmpleado = 'operario' | 'administrativo';
+
 export interface Empleado {
   id: number;
   nombre: string;
@@ -54,6 +56,7 @@ export interface Empleado {
   telefono?: string;
   descripcion?: string;
   especialidad?: string;
+  tipo: TipoEmpleado;
   zona_id?: number;
   capacidad_maxima: number;
   activo: boolean;

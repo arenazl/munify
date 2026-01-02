@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '007_emp_tables'
-down_revision: Union[str, None] = '006_add_tipos_tramites'
+down_revision: Union[str, None] = '006_tipos_tramites'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -25,7 +25,7 @@ def upgrade() -> None:
         sa.Column('empleado_id', sa.Integer(), sa.ForeignKey('empleados.id', ondelete='CASCADE'), nullable=False, index=True),
         sa.Column('cuadrilla_id', sa.Integer(), sa.ForeignKey('cuadrillas.id', ondelete='CASCADE'), nullable=False, index=True),
         sa.Column('es_lider', sa.Boolean(), default=False),
-        sa.Column('fecha_ingreso', sa.Date(), server_default=sa.func.current_date()),
+        sa.Column('fecha_ingreso', sa.Date(), nullable=True),
         sa.Column('activo', sa.Boolean(), default=True),
     )
 
@@ -41,7 +41,7 @@ def upgrade() -> None:
         sa.Column('aprobado', sa.Boolean(), default=False),
         sa.Column('aprobado_por_id', sa.Integer(), sa.ForeignKey('usuarios.id'), nullable=True),
         sa.Column('fecha_aprobacion', sa.Date(), nullable=True),
-        sa.Column('created_at', sa.Date(), server_default=sa.func.current_date()),
+        sa.Column('created_at', sa.Date(), nullable=True),
     )
 
     # Tabla empleado_horarios (horario por dia de semana)
@@ -68,7 +68,7 @@ def upgrade() -> None:
         sa.Column('tiempo_promedio_resolucion', sa.Integer(), default=0),  # minutos
         sa.Column('calificacion_promedio', sa.Float(), default=0.0),  # 1-5
         sa.Column('sla_cumplido_porcentaje', sa.Float(), default=0.0),  # 0-100
-        sa.Column('created_at', sa.Date(), server_default=sa.func.current_date()),
+        sa.Column('created_at', sa.Date(), nullable=True),
     )
 
     # Tabla empleado_capacitaciones (cursos y certificaciones)
@@ -83,7 +83,7 @@ def upgrade() -> None:
         sa.Column('fecha_fin', sa.Date(), nullable=True),
         sa.Column('fecha_vencimiento', sa.Date(), nullable=True),
         sa.Column('certificado_url', sa.String(500), nullable=True),
-        sa.Column('created_at', sa.Date(), server_default=sa.func.current_date()),
+        sa.Column('created_at', sa.Date(), nullable=True),
     )
 
 

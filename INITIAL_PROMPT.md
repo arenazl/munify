@@ -1,4 +1,4 @@
-# Sistema de Gestión de Reclamos Municipales
+![alt text](image.png)# Sistema de Gestión de Reclamos Municipales
 
 Plataforma integral para la gestión de reclamos ciudadanos con geolocalización, seguimiento en tiempo real y asignación de cuadrillas de trabajo.
 

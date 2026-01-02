@@ -25,6 +25,7 @@ export default function Empleados() {
     dni: '',
     descripcion: '',
     especialidad: '',
+    tipo: 'operario' as 'operario' | 'administrativo',
     capacidad_maxima: 10,
     zona_id: '',
     categoria_principal_id: '',
@@ -64,6 +65,7 @@ export default function Empleados() {
         dni: '',
         descripcion: empleado.descripcion || '',
         especialidad: empleado.especialidad || '',
+        tipo: (empleado as any).tipo || 'operario',
         capacidad_maxima: empleado.capacidad_maxima,
         zona_id: empleado.zona_id?.toString() || '',
         categoria_principal_id: empleado.categoria_principal_id?.toString() || '',
@@ -80,6 +82,7 @@ export default function Empleados() {
         dni: '',
         descripcion: '',
         especialidad: '',
+        tipo: 'operario',
         capacidad_maxima: 10,
         zona_id: '',
         categoria_principal_id: '',
@@ -111,6 +114,7 @@ export default function Empleados() {
       telefono: formData.telefono || null,
       descripcion: formData.descripcion || null,
       especialidad: formData.especialidad || null,
+      tipo: formData.tipo,
       capacidad_maxima: formData.capacidad_maxima,
       zona_id: formData.zona_id ? parseInt(formData.zona_id) : null,
       categoria_principal_id: formData.categoria_principal_id ? parseInt(formData.categoria_principal_id) : null,
@@ -359,13 +363,24 @@ export default function Empleados() {
             </>
           )}
 
-          <ABMInput
-            label="Teléfono"
-            type="tel"
-            value={formData.telefono}
-            onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-            placeholder="Teléfono"
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <ABMInput
+              label="Teléfono"
+              type="tel"
+              value={formData.telefono}
+              onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+              placeholder="Teléfono"
+            />
+            <ABMSelect
+              label="Tipo de Empleado"
+              value={formData.tipo}
+              onChange={(e) => setFormData({ ...formData, tipo: e.target.value as 'operario' | 'administrativo' })}
+              options={[
+                { value: 'operario', label: 'Operario (Reclamos)' },
+                { value: 'administrativo', label: 'Administrativo (Trámites)' }
+              ]}
+            />
+          </div>
 
           <ABMTextarea
             label="Descripcion"

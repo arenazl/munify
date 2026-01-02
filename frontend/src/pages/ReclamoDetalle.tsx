@@ -4,7 +4,7 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send
+  RefreshCw, Send, ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, whatsappApi } from '../lib/api';
@@ -120,6 +120,11 @@ export default function ReclamoDetalle() {
   const [devolviendo, setDevolviendo] = useState(false);
   const [motivoDevolucion, setMotivoDevolucion] = useState('');
   const [showDevolverModal, setShowDevolverModal] = useState(false);
+  const [showEstadoDropdown, setShowEstadoDropdown] = useState(false);
+  const [cambiandoEstado, setCambiandoEstado] = useState(false);
+  const [showComentarioModal, setShowComentarioModal] = useState(false);
+  const [nuevoEstado, setNuevoEstado] = useState<EstadoReclamo | null>(null);
+  const [comentarioCambioEstado, setComentarioCambioEstado] = useState('');
 
   // Función para confirmar reclamo (supervisor)
   const handleConfirmar = async () => {
@@ -203,6 +208,42 @@ export default function ReclamoDetalle() {
       toast.error('Error al reenviar el mensaje');
     } finally {
       setResendingId(null);
+    }
+  };
+
+  // Función para iniciar cambio de estado
+  const handleIniciarCambioEstado = (estado: EstadoReclamo) => {
+    setNuevoEstado(estado);
+    setComentarioCambioEstado('');
+    setShowEstadoDropdown(false);
+    setShowComentarioModal(true);
+  };
+
+  // Función para confirmar cambio de estado
+  const handleConfirmarCambioEstado = async () => {
+    if (!reclamo || !nuevoEstado) return;
+
+    setCambiandoEstado(true);
+    try {
+      const response = await reclamosApi.cambiarEstado(
+        reclamo.id,
+        nuevoEstado,
+        comentarioCambioEstado.trim() || undefined
+      );
+      setReclamo(response.data);
+      toast.success(`Estado cambiado a "${estadoConfig[nuevoEstado].label}"`);
+      setShowComentarioModal(false);
+      setNuevoEstado(null);
+      setComentarioCambioEstado('');
+
+      // Recargar historial
+      const historialRes = await reclamosApi.getHistorial(reclamo.id);
+      setHistorial(historialRes.data);
+    } catch (err) {
+      console.error('Error cambiando estado:', err);
+      toast.error('Error al cambiar el estado');
+    } finally {
+      setCambiandoEstado(false);
     }
   };
 
@@ -352,13 +393,69 @@ export default function ReclamoDetalle() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-full"
-                  style={{ backgroundColor: estadoActual.bg, color: estadoActual.color }}
-                >
-                  <EstadoIcon className="h-4 w-4" />
-                  {estadoActual.label}
-                </span>
+                {/* Badge de estado - con dropdown para admin/supervisor */}
+                {user && ['admin', 'supervisor'].includes(user.rol) ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowEstadoDropdown(!showEstadoDropdown)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-full transition-all hover:opacity-80 cursor-pointer"
+                      style={{ backgroundColor: estadoActual.bg, color: estadoActual.color }}
+                    >
+                      <EstadoIcon className="h-4 w-4" />
+                      {estadoActual.label}
+                      <ChevronDown className={`h-3 w-3 transition-transform ${showEstadoDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Dropdown de estados */}
+                    {showEstadoDropdown && (
+                      <>
+                        {/* Overlay para cerrar */}
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowEstadoDropdown(false)}
+                        />
+                        <div
+                          className="absolute top-full left-0 mt-2 w-56 rounded-lg shadow-lg z-50 py-1 overflow-hidden"
+                          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+                        >
+                          <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary }}>
+                            Cambiar estado a:
+                          </div>
+                          {(Object.entries(estadoConfig) as [EstadoReclamo, typeof estadoActual][]).map(([estado, config]) => {
+                            const Icon = config.icon;
+                            const isCurrentState = estado === reclamo.estado;
+                            return (
+                              <button
+                                key={estado}
+                                onClick={() => !isCurrentState && handleIniciarCambioEstado(estado)}
+                                disabled={isCurrentState}
+                                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                                  isCurrentState ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'
+                                }`}
+                                style={{
+                                  backgroundColor: isCurrentState ? config.bg : 'transparent',
+                                  color: config.color
+                                }}
+                              >
+                                <Icon className="h-4 w-4" />
+                                {config.label}
+                                {isCurrentState && <span className="ml-auto text-xs">(actual)</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium rounded-full"
+                    style={{ backgroundColor: estadoActual.bg, color: estadoActual.color }}
+                  >
+                    <EstadoIcon className="h-4 w-4" />
+                    {estadoActual.label}
+                  </span>
+                )}
                 {reclamo.categoria && (
                   <span
                     className="px-3 py-1 text-sm rounded-full"
@@ -587,6 +684,87 @@ export default function ReclamoDetalle() {
                     >
                       <RefreshCw className={`h-4 w-4 ${devolviendo ? 'animate-spin' : ''}`} />
                       {devolviendo ? 'Devolviendo...' : 'Devolver'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal para cambiar estado */}
+            {showComentarioModal && nuevoEstado && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div
+                  className="w-full max-w-md p-6 rounded-xl mx-4"
+                  style={{ backgroundColor: theme.card }}
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    {(() => {
+                      const config = estadoConfig[nuevoEstado];
+                      const Icon = config.icon;
+                      return (
+                        <>
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                            style={{ backgroundColor: config.bg }}
+                          >
+                            <Icon className="h-5 w-5" style={{ color: config.color }} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
+                              Cambiar Estado
+                            </h3>
+                            <p className="text-sm" style={{ color: config.color }}>
+                              → {config.label}
+                            </p>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+                    Opcionalmente, agrega un comentario sobre este cambio:
+                  </p>
+                  <textarea
+                    value={comentarioCambioEstado}
+                    onChange={(e) => setComentarioCambioEstado(e.target.value)}
+                    placeholder="Comentario opcional..."
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-lg resize-none focus:ring-2 focus:outline-none"
+                    style={{
+                      backgroundColor: theme.background,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                  <div className="flex justify-end gap-3 mt-4">
+                    <button
+                      onClick={() => {
+                        setShowComentarioModal(false);
+                        setNuevoEstado(null);
+                        setComentarioCambioEstado('');
+                      }}
+                      className="px-4 py-2 rounded-lg transition-colors"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleConfirmarCambioEstado}
+                      disabled={cambiandoEstado}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      style={{ backgroundColor: estadoConfig[nuevoEstado].color, color: '#ffffff' }}
+                    >
+                      {cambiandoEstado ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Cambiando...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          Confirmar Cambio
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

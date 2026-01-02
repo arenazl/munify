@@ -18,6 +18,9 @@ class Empleado(Base):
     telefono = Column(String(50), nullable=True)  # Para notificaciones WhatsApp
     descripcion = Column(Text, nullable=True)
 
+    # Tipo de empleado: operario (reclamos) o administrativo (trámites)
+    tipo = Column(String(20), default="operario", nullable=False)  # operario | administrativo
+
     # Especialidad del empleado (campo legacy, usar categorias)
     especialidad = Column(String(100), nullable=True)
 

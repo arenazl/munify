@@ -282,6 +282,14 @@ export const clasificacionApi = {
     });
     return response.data;
   },
+  clasificarTramite: async (texto: string, municipioId: number, usarIa: boolean = true) => {
+    const response = await api.post('/tramites/clasificar', {
+      texto,
+      municipio_id: municipioId,
+      usar_ia: usarIa,
+    });
+    return response.data;
+  },
 };
 
 // SLA
@@ -618,6 +626,16 @@ export const tramitesApi = {
   createServicio: (data: Record<string, unknown>) => api.post('/tramites/catalogo', data),
   updateServicio: (id: number, data: Record<string, unknown>) => api.put(`/tramites/catalogo/${id}`, data),
   deleteServicio: (id: number) => api.delete(`/tramites/catalogo/${id}`),
+
+  // Documentos de solicitudes
+  uploadDocumento: (solicitudId: number, formData: FormData, params?: { tipo_documento?: string; descripcion?: string; etapa?: string }) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/documentos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      params,
+    }),
+  getDocumentos: (solicitudId: number) => api.get(`/tramites/solicitudes/${solicitudId}/documentos`),
+  deleteDocumento: (solicitudId: number, documentoId: number) =>
+    api.delete(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}`),
 };
 
 // Calificaciones
@@ -715,4 +733,26 @@ export const empleadosGestionApi = {
   createCuadrillaEntity: (data: Record<string, unknown>) => api.post('/cuadrillas', data),
   updateCuadrillaEntity: (id: number, data: Record<string, unknown>) => api.put(`/cuadrillas/${id}`, data),
   deleteCuadrillaEntity: (id: number) => api.delete(`/cuadrillas/${id}`),
+};
+
+// Planificación Semanal
+export const planificacionApi = {
+  getSemanal: (fechaInicio: string, fechaFin: string, empleadoId?: number) =>
+    api.get('/planificacion/semanal', {
+      params: {
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
+        empleado_id: empleadoId,
+      },
+    }),
+  asignarFecha: (reclamoId: number, empleadoId: number, fechaProgramada: string, horaInicio?: string, horaFin?: string) =>
+    api.post('/planificacion/asignar-fecha', null, {
+      params: {
+        reclamo_id: reclamoId,
+        empleado_id: empleadoId,
+        fecha_programada: fechaProgramada,
+        hora_inicio: horaInicio,
+        hora_fin: horaFin,
+      },
+    }),
 };

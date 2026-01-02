@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History
+  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -46,6 +46,13 @@ export const getNavigation = (userRole: string) => {
       icon: Wrench,
       show: isAdminOrSupervisor,
       description: 'Tablero Kanban'
+    },
+    {
+      name: 'Planificación',
+      href: '/gestion/planificacion',
+      icon: CalendarDays,
+      show: isAdminOrSupervisor,
+      description: 'Calendario semanal del personal'
     },
     {
       name: 'SLA',
