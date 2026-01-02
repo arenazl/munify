@@ -51,6 +51,7 @@ export interface Empleado {
   id: number;
   nombre: string;
   apellido?: string;
+  telefono?: string;
   descripcion?: string;
   especialidad?: string;
   zona_id?: number;

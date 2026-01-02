@@ -352,24 +352,6 @@ export default function Layout() {
             </div>
 
             <div className="flex items-center space-x-3">
-              {/* Toggle de Push Notifications - SIEMPRE visible si no está suscrito */}
-              {!pushSubscribed && (
-                <button
-                  onClick={handleTopBarPushSubscribe}
-                  disabled={pushSubscribing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 hover:scale-105 flex-shrink-0 animate-pulse"
-                  style={{
-                    backgroundColor: theme.primary,
-                    color: '#ffffff',
-                    opacity: pushSubscribing ? 0.7 : 1,
-                  }}
-                  title="Activar notificaciones push"
-                >
-                  <BellRing className="h-4 w-4" />
-                  <span className="text-xs font-medium hidden sm:inline">Activar</span>
-                </button>
-              )}
-
               {/* User info con dropdown */}
               <div className="relative">
                 {/* Botón mobile - solo avatar */}
@@ -452,6 +434,67 @@ export default function Layout() {
                           <User className="h-4 w-4" style={{ color: theme.primary }} />
                           Mi Perfil
                         </button>
+
+                        {/* Opción de Notificaciones */}
+                        <div className="px-4 py-2.5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <BellRing className="h-4 w-4" style={{ color: pushSubscribed ? '#22c55e' : theme.primary }} />
+                            <span className="text-sm" style={{ color: theme.text }}>Notificaciones</span>
+                            {pushSubscribed && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                                Activas
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setUserMenuOpen(false);
+                                handleTopBarPushSubscribe();
+                              }}
+                              disabled={pushSubscribed || pushSubscribing}
+                              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                              style={{
+                                backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.primary,
+                                color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                                opacity: pushSubscribed ? 0.5 : 1
+                              }}
+                            >
+                              {pushSubscribing ? 'Activando...' : pushSubscribed ? 'Activado' : 'Activar'}
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setUserMenuOpen(false);
+                                // Enviar notificación de prueba
+                                try {
+                                  const token = localStorage.getItem('token');
+                                  const res = await fetch('/api/push/test', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json'
+                                    }
+                                  });
+                                  if (res.ok) {
+                                    // Toast se mostrará con la notificación
+                                  }
+                                } catch {
+                                  console.error('Error enviando notificación de prueba');
+                                }
+                              }}
+                              disabled={!pushSubscribed}
+                              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                              style={{
+                                backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.border,
+                                color: pushSubscribed ? theme.text : theme.textSecondary,
+                                border: `1px solid ${theme.border}`,
+                                opacity: pushSubscribed ? 1 : 0.5
+                              }}
+                            >
+                              Probar
+                            </button>
+                          </div>
+                        </div>
 
                         <div className="my-1 border-t" style={{ borderColor: theme.border }} />
 
@@ -809,46 +852,6 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
-          {/* Banner de activar notificaciones - visible para vecino, empleado, supervisor */}
-          {!pushSubscribed && user.rol !== 'admin' && (
-            <div
-              className="mb-4 p-4 rounded-xl flex items-center justify-between gap-4"
-              style={{
-                backgroundColor: `${theme.primary}15`,
-                border: `1px solid ${theme.primary}30`,
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="p-2 rounded-full"
-                  style={{ backgroundColor: theme.primary }}
-                >
-                  <BellRing className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm" style={{ color: theme.text }}>
-                    Activá las notificaciones
-                  </p>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>
-                    Recibí alertas cuando haya novedades en tus reclamos
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleTopBarPushSubscribe}
-                disabled={pushSubscribing}
-                className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:opacity-90 active:scale-95 whitespace-nowrap"
-                style={{
-                  backgroundColor: theme.primary,
-                  color: '#ffffff',
-                  opacity: pushSubscribing ? 0.7 : 1,
-                }}
-              >
-                {pushSubscribing ? 'Activando...' : 'Activar'}
-              </button>
-            </div>
-          )}
-
           <PageTransition>
             <Outlet />
           </PageTransition>

@@ -1,4 +1,8 @@
 // Service Worker para Push Notifications
+// VERSION: 2.0.0 - Forzar actualización
+const SW_VERSION = '2.0.0';
+const CACHE_NAME = `app-cache-v${SW_VERSION}`;
+
 self.addEventListener('push', function(event) {
   const options = {
     body: 'Tienes una nueva notificación',
@@ -59,14 +63,41 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-// Instalación del Service Worker
+// Instalación del Service Worker - skipWaiting para activar inmediatamente
 self.addEventListener('install', function(event) {
-  console.log('Service Worker instalado');
+  console.log(`Service Worker v${SW_VERSION} instalando...`);
+  // Forzar activación inmediata sin esperar
   self.skipWaiting();
 });
 
-// Activación
+// Activación - limpiar caches antiguos y tomar control
 self.addEventListener('activate', function(event) {
-  console.log('Service Worker activado');
-  event.waitUntil(clients.claim());
+  console.log(`Service Worker v${SW_VERSION} activado`);
+  event.waitUntil(
+    Promise.all([
+      // Limpiar todos los caches antiguos
+      caches.keys().then(function(cacheNames) {
+        return Promise.all(
+          cacheNames.map(function(cacheName) {
+            if (cacheName !== CACHE_NAME) {
+              console.log('Eliminando cache antiguo:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      }),
+      // Tomar control de todos los clientes inmediatamente
+      clients.claim()
+    ])
+  );
+});
+
+// Fetch - No cachear nada, siempre ir al network
+self.addEventListener('fetch', function(event) {
+  // Para la app, siempre usar network-first
+  event.respondWith(
+    fetch(event.request).catch(function() {
+      return caches.match(event.request);
+    })
+  );
 });
