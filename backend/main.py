@@ -167,4 +167,13 @@ if frontend_path.exists():
             return FileResponse(file_path)
 
         # Para cualquier otra ruta, servir index.html (SPA routing)
-        return FileResponse(frontend_path / "index.html", media_type="text/html")
+        # No cachear el HTML para que siempre cargue los assets actualizados
+        return FileResponse(
+            frontend_path / "index.html",
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
