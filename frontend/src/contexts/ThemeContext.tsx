@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useAuth } from './AuthContext';
 
 export type ThemeName = 'dark' | 'light' | 'blue' | 'brown' | 'amber';
 
@@ -141,6 +142,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
+  // Get municipio from AuthContext to load its theme config
+  const { municipioActual } = useAuth();
+
   const [themeName, setThemeName] = useState<ThemeName>(() => {
     const saved = localStorage.getItem('theme');
     // Validate that saved theme exists in themes object
@@ -182,6 +186,29 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('contentBgOpacity');
     return saved ? parseFloat(saved) : 0.1;
   });
+
+  // Cargar configuración del tema desde el municipio al montar o cuando cambie
+  useEffect(() => {
+    if (municipioActual?.tema_config) {
+      const config = municipioActual.tema_config;
+
+      // Aplicar tema base si está definido
+      if (config.theme && config.theme in themes) {
+        setThemeName(config.theme as ThemeName);
+      }
+
+      // Aplicar colores personalizados
+      if (config.customPrimary) setCustomPrimaryState(config.customPrimary);
+      if (config.customSidebar) setCustomSidebarState(config.customSidebar);
+      if (config.customSidebarText) setCustomSidebarTextState(config.customSidebarText);
+
+      // Aplicar imágenes de fondo
+      if (config.sidebarBgImage !== undefined) setSidebarBgImageState(config.sidebarBgImage);
+      if (config.sidebarBgOpacity !== undefined) setSidebarBgOpacityState(config.sidebarBgOpacity);
+      if (config.contentBgImage !== undefined) setContentBgImageState(config.contentBgImage);
+      if (config.contentBgOpacity !== undefined) setContentBgOpacityState(config.contentBgOpacity);
+    }
+  }, [municipioActual]);
 
   // Fallback to dark theme if themeName is invalid
   const baseTheme = themes[themeName] || themes.dark;

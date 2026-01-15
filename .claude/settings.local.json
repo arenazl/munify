@@ -28,7 +28,9 @@
       "Bash(git commit:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(taskkill //F //PID 154876)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

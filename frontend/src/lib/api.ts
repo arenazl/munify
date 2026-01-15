@@ -231,6 +231,7 @@ export const municipiosApi = {
     api.post(`/municipios/${id}/branding`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  updateTema: (id: number, tema: any) => api.put(`/municipios/${id}/tema`, tema),
 };
 
 // Chat IA

@@ -1,6 +1,6 @@
 // Service Worker para Push Notifications
-// VERSION: 2.0.1 - Forzar actualización de caché
-const SW_VERSION = '2.0.1';
+// VERSION: 2.0.0 - Forzar actualización
+const SW_VERSION = '2.0.0';
 const CACHE_NAME = `app-cache-v${SW_VERSION}`;
 
 self.addEventListener('push', function(event) {

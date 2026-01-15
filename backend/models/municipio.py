@@ -31,6 +31,10 @@ class Municipio(Base):
     color_primario = Column(String(7), default="#3B82F6")  # Hex color
     color_secundario = Column(String(7), default="#1E40AF")
 
+    # Configuracion de tema completo (JSON)
+    # Estructura: { "theme": "dark", "customPrimary": "#fff", "customSidebar": "#000", ... }
+    tema_config = Column(JSON, nullable=True)
+
     # Contacto
     direccion = Column(String(300), nullable=True)
     telefono = Column(String(50), nullable=True)

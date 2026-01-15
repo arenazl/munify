@@ -9,9 +9,10 @@ import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { MunicipioSelector } from './MunicipioSelector';
 import { Sheet } from './ui/Sheet';
-import { usersApi } from '../lib/api';
+import { usersApi, municipiosApi } from '../lib/api';
 import NotificationSettings from './NotificationSettings';
 import { subscribeToPush } from '../lib/pushNotifications';
+import { toast } from 'sonner';
 
 // Definir tabs del footer móvil según rol (siempre 5, el del medio es el principal)
 const getMobileTabs = (userRole: string) => {
@@ -71,6 +72,7 @@ export default function Layout() {
     direccion: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingTheme, setSavingTheme] = useState(false);
   // Estado para el toggle de push notifications en la top bar
   const [pushSubscribed, setPushSubscribed] = useState(() => localStorage.getItem('pushActivated') === 'true');
   const [pushSubscribing, setPushSubscribing] = useState(false);
@@ -128,6 +130,36 @@ export default function Layout() {
     setProfileSheetOpen(true);
   };
 
+  // Handler para guardar el tema actual en el municipio
+  const handleSaveTheme = async () => {
+    if (!municipioActual || user?.rol !== 'admin') return;
+
+    setSavingTheme(true);
+    try {
+      const temaConfig = {
+        theme: themeName,
+        customPrimary,
+        customSidebar,
+        customSidebarText,
+        sidebarBgImage,
+        sidebarBgOpacity,
+        contentBgImage,
+        contentBgOpacity,
+      };
+
+      await municipiosApi.updateTema(municipioActual.id, temaConfig);
+      toast.success('Tema guardado exitosamente');
+      setThemeMenuOpen(false);
+
+      // Refrescar el usuario para que tenga el municipio actualizado
+      await refreshUser();
+    } catch (error) {
+      console.error('Error guardando tema:', error);
+      toast.error('Error al guardar el tema');
+    } finally {
+      setSavingTheme(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -831,6 +863,37 @@ export default function Layout() {
                           </div>
                         )}
                       </div>
+
+                      {/* Botón para guardar tema - solo visible para admin */}
+                      {user?.rol === 'admin' && (
+                        <div className="p-3 border-t" style={{ borderColor: theme.border }}>
+                          <button
+                            onClick={handleSaveTheme}
+                            disabled={savingTheme}
+                            className="w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            style={{
+                              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                              color: '#ffffff',
+                              boxShadow: `0 4px 12px ${theme.primary}40`,
+                            }}
+                          >
+                            {savingTheme ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                Guardando...
+                              </>
+                            ) : (
+                              <>
+                                <Palette className="h-4 w-4" />
+                                Guardar tema del municipio
+                              </>
+                            )}
+                          </button>
+                          <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
+                            Este tema se aplicará para todos los usuarios del municipio
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

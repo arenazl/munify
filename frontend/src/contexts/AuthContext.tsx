@@ -20,6 +20,17 @@ export interface Municipio {
   telefono?: string;
   email?: string;
   sitio_web?: string;
+  // Configuración de tema
+  tema_config?: {
+    theme?: string;
+    customPrimary?: string;
+    customSidebar?: string;
+    customSidebarText?: string;
+    sidebarBgImage?: string;
+    sidebarBgOpacity?: number;
+    contentBgImage?: string;
+    contentBgOpacity?: number;
+  };
 }
 
 interface AuthContextType {

@@ -55,6 +55,7 @@ class MunicipioDetalle(MunicipioPublic):
     sitio_web: Optional[str] = None
     zoom_mapa_default: int = 13
     color_secundario: str = "#1E40AF"
+    tema_config: Optional[dict] = None
 
 
 class MunicipioCreate(BaseModel):
@@ -471,6 +472,50 @@ async def actualizar_branding(
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
+
+    await db.commit()
+    await db.refresh(municipio)
+
+    return municipio
+
+
+class TemaConfigUpdate(BaseModel):
+    """Configuración completa del tema del municipio"""
+    theme: Optional[str] = None  # dark, light, blue, brown, amber
+    customPrimary: Optional[str] = None
+    customSidebar: Optional[str] = None
+    customSidebarText: Optional[str] = None
+    sidebarBgImage: Optional[str] = None
+    sidebarBgOpacity: Optional[float] = None
+    contentBgImage: Optional[str] = None
+    contentBgOpacity: Optional[float] = None
+
+
+@router.put("/{municipio_id}/tema", response_model=MunicipioDetalle)
+async def actualizar_tema(
+    municipio_id: int,
+    tema: TemaConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Actualiza la configuración completa del tema de un municipio.
+    Solo admin puede modificar.
+    """
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Verificar que el usuario es admin del municipio o super admin
+    if current_user.municipio_id and current_user.municipio_id != municipio_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este municipio")
+
+    # Guardar configuración del tema como JSON
+    municipio.tema_config = tema.model_dump(exclude_none=True)
 
     await db.commit()
     await db.refresh(municipio)
