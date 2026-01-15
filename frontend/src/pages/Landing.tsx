@@ -36,7 +36,7 @@ const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export default function Landing() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,16 +72,13 @@ export default function Landing() {
       localStorage.removeItem('municipio_color');
     }
     fetchMunicipios();
-  }, []);
+  }, [municipioFromUrl]);
 
-  // Auto-redirigir a /home si viene desde subdominio o query param de municipio
+  // Guardar municipio en localStorage si viene en la URL (incluso si está logueado)
   useEffect(() => {
-    console.log('Landing: municipioFromUrl=', municipioFromUrl, 'municipios.length=', municipios.length);
     if (municipioFromUrl && municipios.length > 0) {
       const found = municipios.find(m => m.codigo.toLowerCase() === municipioFromUrl.toLowerCase());
-      console.log('Landing: found=', found);
       if (found) {
-        // Guardar datos del municipio en localStorage
         localStorage.setItem('municipio_codigo', found.codigo);
         localStorage.setItem('municipio_id', found.id.toString());
         localStorage.setItem('municipio_nombre', found.nombre);
@@ -89,12 +86,24 @@ export default function Landing() {
         if (found.logo_url) {
           localStorage.setItem('municipio_logo_url', found.logo_url);
         }
-        console.log('Landing: redirecting to /home');
+      }
+    }
+  }, [municipioFromUrl, municipios]);
+
+  // Auto-redirigir a /home si viene desde subdominio o query param de municipio (SOLO si NO está logueado)
+  useEffect(() => {
+    console.log('Landing: municipioFromUrl=', municipioFromUrl, 'municipios.length=', municipios.length, 'user=', user);
+    // Solo auto-redirigir si NO hay usuario logueado
+    if (municipioFromUrl && municipios.length > 0 && !user) {
+      const found = municipios.find(m => m.codigo.toLowerCase() === municipioFromUrl.toLowerCase());
+      console.log('Landing: found=', found);
+      if (found) {
+        console.log('Landing: redirecting to /home (no user logged in)');
         // Redirigir a la landing publica responsiva
         navigate('/home', { replace: true });
       }
     }
-  }, [municipioFromUrl, municipios, navigate]);
+  }, [municipioFromUrl, municipios, navigate, user]);
 
   // Detectar ubicación cuando tengamos municipios (solo si no hay municipio desde URL)
   useEffect(() => {
