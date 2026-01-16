@@ -1,5 +1,5 @@
-import { ReactNode, useState, useEffect, useRef } from 'react';
-import { Plus, Search, Sparkles, ChevronDown, LayoutGrid, List } from 'lucide-react';
+import { ReactNode, useState } from 'react';
+import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
@@ -86,32 +86,7 @@ export function ABMPage({
   // Si no hay tableView, defaultear a 'cards' para evitar pantalla vacía
   const resolvedDefaultViewMode = defaultViewMode || (tableView ? 'table' : 'cards');
   const [viewMode, setViewMode] = useState<ViewMode>(resolvedDefaultViewMode);
-  const [isSticky, setIsSticky] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
-  const headerRef = useRef<HTMLDivElement>(null);
-
-  // Detectar scroll para activar sticky
-  useEffect(() => {
-    const handleScroll = () => {
-      if (headerRef.current) {
-        const rect = headerRef.current.getBoundingClientRect();
-        // Activar sticky cuando el header llega al top (considerando el navbar ~64px)
-        setIsSticky(rect.top <= 64);
-      }
-    };
-
-    // Escuchar scroll tanto en window como en document
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    document.addEventListener('scroll', handleScroll, { passive: true });
-
-    // También ejecutar al montar para verificar posición inicial
-    handleScroll();
-
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      document.removeEventListener('scroll', handleScroll);
-    };
-  }, []);
 
   if (loading) {
     return (
@@ -133,24 +108,20 @@ export function ABMPage({
 
   return (
     <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y', minHeight: '100vh' }}>
-      {/* Contenedor sticky para header y secondary filters */}
+      {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
       <div
-        ref={headerRef}
-        className={`${stickyHeader && isSticky ? 'sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8' : ''}`}
+        className={stickyHeader ? 'sticky top-[64px] z-30 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-1 pb-1' : ''}
         style={{
-          backgroundColor: stickyHeader && isSticky ? theme.background : 'transparent',
-          paddingTop: stickyHeader && isSticky ? '0.5rem' : 0,
-          paddingBottom: stickyHeader && isSticky ? '0.5rem' : 0,
+          backgroundColor: stickyHeader ? theme.background : 'transparent',
         }}
       >
         {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
         <div
-          className={`px-5 py-3 relative overflow-hidden ${stickyHeader && isSticky ? 'rounded-t-xl' : 'rounded-xl'}`}
+          className={`px-5 py-3 relative overflow-hidden ${secondaryFilters ? 'rounded-t-xl' : 'rounded-xl'}`}
           style={{
             backgroundColor: theme.card,
-            border: stickyHeader && isSticky ? 'none' : `1px solid ${theme.border}`,
-            borderBottom: stickyHeader && isSticky && secondaryFilters ? 'none' : (stickyHeader && isSticky ? 'none' : `1px solid ${theme.border}`),
-            boxShadow: stickyHeader && isSticky ? `0 4px 20px rgba(0,0,0,0.15)` : 'none',
+            border: `1px solid ${theme.border}`,
+            borderBottom: secondaryFilters ? 'none' : `1px solid ${theme.border}`,
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
@@ -196,13 +167,6 @@ export function ABMPage({
             >
               <Plus className="h-5 w-5" />
             </button>
-          )}
-
-          {/* Header Actions (ordenamiento, etc) - junto al toggle de vista */}
-          {headerActions && (
-            <div className="hidden sm:flex items-center flex-shrink-0">
-              {headerActions}
-            </div>
           )}
 
           {/* Toggle Vista - solo desktop */}
@@ -258,30 +222,36 @@ export function ABMPage({
             </div>
           )}
 
-          {/* Botón agregar - solo desktop en esta línea - solo si hay onAdd */}
-          {onAdd && buttonLabel && (
-            <button
-              onClick={onAdd}
-              className={`
-                hidden sm:inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
-                transition-all duration-300 ease-out
-                hover:scale-105 hover:-translate-y-0.5
-                active:scale-95
-                group
-                relative overflow-hidden
-                flex-shrink-0
-              `}
-              style={{
-                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                color: '#ffffff',
-                boxShadow: `0 4px 14px ${theme.primary}40`,
-              }}
-            >
-              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-              {buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
-              {buttonLabel}
-            </button>
-          )}
+          {/* Contenedor para headerActions + Botón Nuevo - siempre juntos */}
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+            {/* Header Actions (ordenamiento, etc) */}
+            {headerActions}
+
+            {/* Botón agregar */}
+            {onAdd && buttonLabel && (
+              <button
+                onClick={onAdd}
+                className={`
+                  inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
+                  transition-all duration-300 ease-out
+                  hover:scale-105 hover:-translate-y-0.5
+                  active:scale-95
+                  group
+                  relative overflow-hidden
+                  flex-shrink-0
+                `}
+                style={{
+                  background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                  color: '#ffffff',
+                  boxShadow: `0 4px 14px ${theme.primary}40`,
+                }}
+              >
+                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+                {buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
+                {buttonLabel}
+              </button>
+            )}
+          </div>
 
           {/* Filtros extra - en mobile van debajo */}
           {allFilters && (
@@ -325,10 +295,11 @@ export function ABMPage({
         {/* Secondary Filters Bar (full width) - dentro del sticky container */}
         {secondaryFilters && (
           <div
-            className={`px-5 py-3 relative overflow-hidden ${stickyHeader && isSticky ? 'rounded-b-xl' : 'rounded-xl mt-3'}`}
+            className="rounded-b-xl p-3"
             style={{
               backgroundColor: theme.card,
-              border: stickyHeader && isSticky ? 'none' : `1px solid ${theme.border}`,
+              border: `1px solid ${theme.border}`,
+              borderTop: 'none',
             }}
           >
             {secondaryFilters}

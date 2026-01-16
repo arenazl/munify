@@ -186,15 +186,15 @@ export default function Layout() {
   const isMobile = isMobileDevice();
   const mobileTabs = getMobileTabs(user.rol);
 
-  // Anchos dinámicos con valores fijos para transiciones suaves
-  // En móvil un ancho más compacto (200px), en desktop respeta el estado colapsado
-  const sidebarWidthPx = isMobile ? 200 : (sidebarCollapsed ? 80 : 256);
+  // Anchos dinámicos con medidas relativas para mejor responsividad
+  // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
+  const sidebarWidth = isMobile ? '12.5rem' : (sidebarCollapsed ? '5rem' : '11rem');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;
 
   return (
-    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme.contentBackground }}>
+    <div className="min-h-screen transition-colors duration-300" style={{ backgroundColor: theme.contentBackground, overflowX: 'clip' }}>
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -205,12 +205,12 @@ export default function Layout() {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden ${
+        className={`fixed inset-y-0 left-0 z-50 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden sidebar-container ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${isCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
           backgroundColor: theme.sidebar,
-          width: sidebarWidthPx,
+          width: sidebarWidth,
           transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
         }}
       >
@@ -236,84 +236,63 @@ export default function Layout() {
         )}
         {/* Header del sidebar con gradiente moderno */}
         <div
-          className="relative z-10 flex items-center justify-between border-b overflow-hidden"
+          className="relative z-10 border-b h-16"
           style={{
             borderColor: `${theme.sidebarTextSecondary}20`,
-            paddingLeft: isCollapsed ? '8px' : '16px',
-            paddingRight: isCollapsed ? '8px' : '16px',
-            paddingTop: '20px',
-            paddingBottom: '20px',
-            transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            background: `linear-gradient(135deg, ${theme.primary}15 0%, ${theme.primary}08 50%, transparent 100%)`,
+            background: `linear-gradient(to right, ${theme.primary}, #ffffff)`,
+            opacity: 0.6,
           }}
         >
-          <div
-            className="flex items-center gap-4 flex-1 min-w-0"
-            style={{
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
-              transition: 'justify-content 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            }}
-          >
-            {/* Logo con efecto de elevación */}
-            <div
-              className="flex-shrink-0 rounded-xl p-2"
+          {/* Logo centrado absolutamente */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <img
+              src={new URL('../assets/munify_logo_no_text (1).png', import.meta.url).href}
+              alt="Munify"
+              className="object-contain"
               style={{
-                background: `linear-gradient(135deg, ${theme.primary}20 0%, ${theme.primary}10 100%)`,
-                boxShadow: `0 4px 12px ${theme.primary}15`,
+                height: '40px',
+                width: '40px',
+                opacity: isCollapsed ? 1 : 0,
+                position: 'absolute',
+                transition: 'opacity 0.2s ease-in-out',
               }}
-            >
-              <img src="/logo-removebg-preview.png" alt="Logo" className="h-14 w-14 object-contain" />
-            </div>
-
-            {/* Información del municipio */}
-            <div
-              className="flex flex-col justify-center min-w-0 flex-1 gap-0.5"
+            />
+            <img
+              src={new URL('../assets/munify_logo_2.png', import.meta.url).href}
+              alt="Munify"
+              className="object-contain"
               style={{
-                width: isCollapsed ? 0 : '100%',
+                height: '48px',
+                maxWidth: '100%',
                 opacity: isCollapsed ? 0 : 1,
-                overflow: 'hidden',
-                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transition: 'opacity 0.2s ease-in-out',
               }}
-            >
-              <span className="text-[9px] font-medium tracking-widest uppercase whitespace-nowrap opacity-70" style={{ color: theme.sidebarTextSecondary }}>
-                Municipalidad de
-              </span>
-              <span className="text-lg font-bold truncate" style={{ color: theme.sidebarText, letterSpacing: '-0.01em' }}>
-                {nombreMunicipio}
-              </span>
-              {municipioActual?.direccion && (
-                <span className="text-[10px] font-light whitespace-nowrap opacity-60 flex items-center gap-1" style={{ color: theme.sidebarTextSecondary }}>
-                  <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                  </svg>
-                  {municipioActual.direccion}
-                </span>
-              )}
-            </div>
+            />
           </div>
-          <div className="flex items-center gap-1">
-            {/* Botón colapsar - solo en desktop */}
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="hidden lg:flex p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
-              style={{ color: theme.sidebarTextSecondary }}
-              title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
-            >
-              {sidebarCollapsed ? (
-                <ChevronRight className="h-5 w-5" />
-              ) : (
-                <ChevronLeft className="h-5 w-5" />
-              )}
-            </button>
-            {/* Botón cerrar - solo en mobile */}
-            <button
-              className="lg:hidden p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
-              onClick={() => setSidebarOpen(false)}
-              style={{ color: theme.sidebarText }}
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          {/* Botón colapsar/expandir - posición absoluta derecha, solo en desktop */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden lg:flex absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-md hover:scale-110 active:scale-95 sidebar-toggle-btn"
+            style={{
+              color: theme.sidebarText,
+              backgroundColor: `${theme.primary}30`,
+            }}
+            title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-5 w-5" />
+            ) : (
+              <ChevronLeft className="h-5 w-5" />
+            )}
+          </button>
+          {/* Botón cerrar - posición absoluta derecha, solo en mobile */}
+          <button
+            className="lg:hidden absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
+            onClick={() => setSidebarOpen(false)}
+            style={{ color: theme.sidebarText }}
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navegación */}
@@ -406,10 +385,12 @@ export default function Layout() {
             />
           </>
         )}
-        {/* Top bar */}
+        {/* Top bar - sticky para que quede fija al hacer scroll */}
         <header
           className="sticky top-0 z-40 shadow-sm backdrop-blur-md transition-colors duration-300 overflow-visible"
-          style={{ backgroundColor: `${theme.card}ee` }}
+          style={{
+            backgroundColor: `${theme.card}ee`,
+          }}
         >
           <div className="flex items-center justify-between h-16 px-4 overflow-visible">
             <button
@@ -1077,6 +1058,17 @@ export default function Layout() {
 
       {/* Custom CSS for animations and gradients */}
       <style>{`
+        /* CSS variable para el ancho del sidebar (usado por StickyPageHeader) */
+        :root {
+          --sidebar-width: 0px;
+        }
+
+        @media (min-width: 1024px) {
+          :root {
+            --sidebar-width: ${sidebarWidth};
+          }
+        }
+
         /* Main content responsive padding for sidebar */
         .main-content-area {
           padding-left: 0;
@@ -1085,8 +1077,22 @@ export default function Layout() {
 
         @media (min-width: 1024px) {
           .main-content-area {
-            padding-left: ${sidebarWidthPx}px;
+            padding-left: ${sidebarWidth};
           }
+        }
+
+        /* Sidebar toggle button - aparece on hover cuando está colapsado */
+        .sidebar-toggle-btn {
+          transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, background-color 0.2s ease-in-out !important;
+        }
+
+        /* Cuando el sidebar está colapsado, el botón aparece on hover */
+        .sidebar-collapsed .sidebar-toggle-btn {
+          opacity: 0 !important;
+        }
+
+        .sidebar-collapsed:hover .sidebar-toggle-btn {
+          opacity: 1 !important;
         }
 
         @keyframes fade-in {
