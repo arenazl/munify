@@ -516,7 +516,7 @@ export default function Landing() {
                       <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                         {municipiosOrdenados.length === 0 ? (
                           <div className="text-center py-8">
-                            <Building2 className="h-10 w-10 text-slate-600 mx-auto mb-2" />
+                            <img src="/logo-removebg-preview.png" alt="Logo" className="h-10 w-10 mx-auto mb-2 object-contain opacity-40" />
                             <p className="text-slate-500 text-sm">No se encontraron municipios</p>
                           </div>
                         ) : (

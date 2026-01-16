@@ -26,6 +26,20 @@ const estadoLabels: Record<EstadoReclamo, string> = {
   rechazado: 'Rechazado',
 };
 
+// Formatea el nombre del empleado en formato "L. Lopez"
+const formatEmpleadoNombre = (nombreCompleto: string): string => {
+  const partes = nombreCompleto.trim().split(' ');
+  if (partes.length === 0) return nombreCompleto;
+
+  // Tomar la primera letra del primer nombre
+  const inicial = partes[0][0].toUpperCase();
+
+  // Tomar el/los apellido(s) - todo excepto el primer nombre
+  const apellidos = partes.slice(1).join(' ');
+
+  return apellidos ? `${inicial}. ${apellidos}` : nombreCompleto;
+};
+
 type SheetMode = 'closed' | 'view' | 'calificar';
 
 interface CalificacionExistente {
@@ -259,7 +273,7 @@ export default function MisReclamos() {
           {selectedReclamo.empleado_asignado && (
             <div className="p-3 rounded-lg" style={{ backgroundColor: '#dbeafe' }}>
               <label className="block text-sm font-medium" style={{ color: '#1e40af' }}>Empleado Asignado</label>
-              <p className="mt-1" style={{ color: '#1e3a8a' }}>{selectedReclamo.empleado_asignado.nombre}</p>
+              <p className="mt-1" style={{ color: '#1e3a8a' }}>{formatEmpleadoNombre(selectedReclamo.empleado_asignado.nombre)}</p>
               {selectedReclamo.empleado_asignado.especialidad && (
                 <p className="text-sm" style={{ color: '#3b82f6' }}>{selectedReclamo.empleado_asignado.especialidad}</p>
               )}
@@ -635,8 +649,8 @@ export default function MisReclamos() {
                       </span>
                     </div>
 
-                    {/* Línea 2: Categoría + Fecha */}
-                    <div className="flex items-center gap-3 mt-1.5">
+                    {/* Línea 2: Categoría + Fecha + Empleado */}
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-md"
                         style={{ backgroundColor: `${r.categoria?.color || theme.primary}15`, color: r.categoria?.color || theme.primary }}
@@ -647,6 +661,17 @@ export default function MisReclamos() {
                         <Calendar className="h-3 w-3 mr-1" />
                         {new Date(r.created_at).toLocaleDateString()}
                       </span>
+                      {r.empleado_asignado && (
+                        <span
+                          className="text-xs font-medium px-2 py-0.5 rounded-md flex items-center gap-1"
+                          style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}
+                        >
+                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          {formatEmpleadoNombre(r.empleado_asignado.nombre)}
+                        </span>
+                      )}
                     </div>
 
                     {/* Línea 3: Descripción */}

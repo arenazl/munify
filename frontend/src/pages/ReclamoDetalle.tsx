@@ -103,6 +103,20 @@ const accionIcons: Record<string, typeof CheckCircle> = {
   comentario: MessageSquare,
 };
 
+// Formatea el nombre del empleado en formato "L. Lopez"
+const formatEmpleadoNombre = (nombreCompleto: string): string => {
+  const partes = nombreCompleto.trim().split(' ');
+  if (partes.length === 0) return nombreCompleto;
+
+  // Tomar la primera letra del primer nombre
+  const inicial = partes[0][0].toUpperCase();
+
+  // Tomar el/los apellido(s) - todo excepto el primer nombre
+  const apellidos = partes.slice(1).join(' ');
+
+  return apellidos ? `${inicial}. ${apellidos}` : nombreCompleto;
+};
+
 export default function ReclamoDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -549,7 +563,7 @@ export default function ReclamoDetalle() {
                   <div>
                     <p className="text-sm font-medium" style={{ color: theme.textSecondary }}>Empleado Asignado</p>
                     <p className="font-medium" style={{ color: theme.text }}>
-                      {reclamo.empleado_asignado.nombre}
+                      {formatEmpleadoNombre(reclamo.empleado_asignado.nombre)}
                     </p>
                     {reclamo.empleado_asignado.especialidad && (
                       <p className="text-sm" style={{ color: theme.primary }}>
@@ -1021,7 +1035,7 @@ export default function ReclamoDetalle() {
                             )}
 
                             <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: theme.textSecondary }}>
-                              <span>{item.usuario.nombre} {item.usuario.apellido}</span>
+                              <span>{formatEmpleadoNombre(`${item.usuario.nombre} ${item.usuario.apellido}`)}</span>
                               <span>•</span>
                               <span>
                                 {new Date(item.created_at).toLocaleDateString('es-AR', {

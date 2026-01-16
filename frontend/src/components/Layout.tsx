@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Building2, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, themes, ThemeName, accentColors } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -234,18 +234,40 @@ export default function Layout() {
             }}
           />
         )}
-        {/* Header del sidebar */}
-        <div className="relative z-10 flex items-center justify-between h-16 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}30`, paddingLeft: isCollapsed ? '8px' : '12px', paddingRight: isCollapsed ? '8px' : '12px', transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+        {/* Header del sidebar con gradiente moderno */}
+        <div
+          className="relative z-10 flex items-center justify-between border-b overflow-hidden"
+          style={{
+            borderColor: `${theme.sidebarTextSecondary}20`,
+            paddingLeft: isCollapsed ? '8px' : '16px',
+            paddingRight: isCollapsed ? '8px' : '16px',
+            paddingTop: '20px',
+            paddingBottom: '20px',
+            transition: 'padding 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            background: `linear-gradient(135deg, ${theme.primary}15 0%, ${theme.primary}08 50%, transparent 100%)`,
+          }}
+        >
           <div
-            className="flex items-center gap-3 flex-1 min-w-0"
+            className="flex items-center gap-4 flex-1 min-w-0"
             style={{
               justifyContent: isCollapsed ? 'center' : 'flex-start',
               transition: 'justify-content 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            <Building2 className="h-10 w-10 flex-shrink-0" style={{ color: theme.sidebarText }} />
+            {/* Logo con efecto de elevación */}
             <div
-              className="flex flex-col leading-tight min-w-0 flex-1"
+              className="flex-shrink-0 rounded-xl p-2"
+              style={{
+                background: `linear-gradient(135deg, ${theme.primary}20 0%, ${theme.primary}10 100%)`,
+                boxShadow: `0 4px 12px ${theme.primary}15`,
+              }}
+            >
+              <img src="/logo-removebg-preview.png" alt="Logo" className="h-14 w-14 object-contain" />
+            </div>
+
+            {/* Información del municipio */}
+            <div
+              className="flex flex-col justify-center min-w-0 flex-1 gap-0.5"
               style={{
                 width: isCollapsed ? 0 : '100%',
                 opacity: isCollapsed ? 0 : 1,
@@ -253,8 +275,20 @@ export default function Layout() {
                 transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
-              <span className="text-[10px] font-light tracking-wide whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>Municipalidad</span>
-              <span className="text-base font-bold truncate" style={{ color: theme.sidebarText }}>{nombreMunicipio}</span>
+              <span className="text-[9px] font-medium tracking-widest uppercase whitespace-nowrap opacity-70" style={{ color: theme.sidebarTextSecondary }}>
+                Municipalidad de
+              </span>
+              <span className="text-lg font-bold truncate" style={{ color: theme.sidebarText, letterSpacing: '-0.01em' }}>
+                {nombreMunicipio}
+              </span>
+              {municipioActual?.direccion && (
+                <span className="text-[10px] font-light whitespace-nowrap opacity-60 flex items-center gap-1" style={{ color: theme.sidebarTextSecondary }}>
+                  <svg className="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  {municipioActual.direccion}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -508,7 +542,8 @@ export default function Layout() {
                                 // Enviar notificación de prueba
                                 try {
                                   const token = localStorage.getItem('token');
-                                  const res = await fetch('/api/push/test', {
+                                  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                                  const res = await fetch(`${apiUrl}/push/test`, {
                                     method: 'POST',
                                     headers: {
                                       'Authorization': `Bearer ${token}`,
@@ -516,10 +551,15 @@ export default function Layout() {
                                     }
                                   });
                                   if (res.ok) {
-                                    // Toast se mostrará con la notificación
+                                    const data = await res.json();
+                                    toast.success(data.message || 'Notificación de prueba enviada!');
+                                  } else {
+                                    const error = await res.json();
+                                    toast.error(error.message || 'Error al enviar notificación');
                                   }
-                                } catch {
-                                  console.error('Error enviando notificación de prueba');
+                                } catch (err) {
+                                  console.error('Error enviando notificación de prueba:', err);
+                                  toast.error('Error al enviar notificación de prueba');
                                 }
                               }}
                               disabled={!pushSubscribed}

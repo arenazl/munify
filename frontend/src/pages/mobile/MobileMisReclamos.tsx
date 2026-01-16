@@ -27,6 +27,20 @@ const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; b
   rechazado: { icon: AlertCircle, color: '#ef4444', bgColor: '#fee2e2', label: 'Rechazado' },
 };
 
+// Formatea el nombre del empleado en formato "L. Lopez"
+const formatEmpleadoNombre = (nombreCompleto: string): string => {
+  const partes = nombreCompleto.trim().split(' ');
+  if (partes.length === 0) return nombreCompleto;
+
+  // Tomar la primera letra del primer nombre
+  const inicial = partes[0][0].toUpperCase();
+
+  // Tomar el/los apellido(s) - todo excepto el primer nombre
+  const apellidos = partes.slice(1).join(' ');
+
+  return apellidos ? `${inicial}. ${apellidos}` : nombreCompleto;
+};
+
 export default function MobileMisReclamos() {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -231,7 +245,7 @@ export default function MobileMisReclamos() {
                 Empleado Asignado
               </p>
               <p className="font-semibold" style={{ color: '#1e3a8a' }}>
-                {selectedReclamo.empleado_asignado.nombre}
+                {formatEmpleadoNombre(selectedReclamo.empleado_asignado.nombre)}
               </p>
             </div>
           )}
@@ -291,7 +305,7 @@ export default function MobileMisReclamos() {
                     />
                     <div>
                       <p className="text-sm" style={{ color: theme.text }}>
-                        <span className="font-medium">{h.usuario.nombre} {h.usuario.apellido}</span>
+                        <span className="font-medium">{formatEmpleadoNombre(`${h.usuario.nombre} ${h.usuario.apellido}`)}</span>
                         {' '}{h.accion}
                       </p>
                       {h.comentario && (
@@ -397,6 +411,11 @@ export default function MobileMisReclamos() {
                     <Tag className="h-3 w-3" />
                     {reclamo.categoria.nombre}
                   </span>
+                  {reclamo.empleado_asignado && (
+                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      👤 {formatEmpleadoNombre(reclamo.empleado_asignado.nombre)}
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
                     {new Date(reclamo.created_at).toLocaleDateString()}
