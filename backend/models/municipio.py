@@ -28,6 +28,7 @@ class Municipio(Base):
 
     # Configuracion visual
     logo_url = Column(String(500), nullable=True)
+    imagen_portada = Column(String(500), nullable=True)  # URL de imagen para header/banner del dashboard
     color_primario = Column(String(7), default="#3B82F6")  # Hex color
     color_secundario = Column(String(7), default="#1E40AF")
 

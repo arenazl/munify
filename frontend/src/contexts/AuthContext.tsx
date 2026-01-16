@@ -13,6 +13,7 @@ export interface Municipio {
   color_primario?: string;
   color_secundario?: string;
   logo_url?: string;
+  imagen_portada?: string;  // Banner/portada del dashboard (separado del logo)
   latitud?: number;
   longitud?: number;
   // Datos de contacto

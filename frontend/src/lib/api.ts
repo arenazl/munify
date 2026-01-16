@@ -232,6 +232,11 @@ export const municipiosApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
   updateTema: (id: number, tema: any) => api.put(`/municipios/${id}/tema`, tema),
+  updateImagenPortada: (id: number, formData: FormData) =>
+    api.post(`/municipios/${id}/imagen-portada`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteImagenPortada: (id: number) => api.delete(`/municipios/${id}/imagen-portada`),
 };
 
 // Chat IA

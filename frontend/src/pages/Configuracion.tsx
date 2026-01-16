@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, Image } from 'lucide-react';
+import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, Image, ImageIcon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -67,6 +67,13 @@ export default function Configuracion() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Imagen de portada states
+  const [portadaLoading, setPortadaLoading] = useState(false);
+  const [imagenPortadaUrl, setImagenPortadaUrl] = useState(municipioActual?.imagen_portada || '');
+  const [portadaFile, setPortadaFile] = useState<File | null>(null);
+  const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
+  const portadaInputRef = useRef<HTMLInputElement>(null);
+
   // Estados para autocompletado de municipio (nombre)
   const [municipioSuggestions, setMunicipioSuggestions] = useState<AddressSuggestion[]>([]);
   const [showMunicipioSuggestions, setShowMunicipioSuggestions] = useState(false);
@@ -90,6 +97,7 @@ export default function Configuracion() {
       setColorPrimario(municipioActual.color_primario || '#3b82f6');
       setColorSecundario(municipioActual.color_secundario || '#1e40af');
       setLogoUrl(municipioActual.logo_url || '');
+      setImagenPortadaUrl(municipioActual.imagen_portada || '');
     }
   }, [municipioActual]);
 
@@ -111,6 +119,76 @@ export default function Configuracion() {
         setLogoPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle portada file selection
+  const handlePortadaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error('Por favor selecciona una imagen válida');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('La imagen no debe superar los 5MB');
+        return;
+      }
+      setPortadaFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPortadaPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Guardar imagen de portada
+  const handleSavePortada = async () => {
+    if (!municipioActual || !portadaFile) {
+      toast.error('Selecciona una imagen primero');
+      return;
+    }
+
+    setPortadaLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('imagen', portadaFile);
+
+      const response = await municipiosApi.updateImagenPortada(municipioActual.id, formData);
+
+      if (response.data) {
+        toast.success('Imagen de portada actualizada');
+        if (response.data.imagen_portada) {
+          setImagenPortadaUrl(response.data.imagen_portada);
+        }
+        await loadMunicipios();
+        setPortadaFile(null);
+        setPortadaPreview(null);
+      }
+    } catch (error) {
+      toast.error('Error al guardar imagen de portada');
+      console.error('Error:', error);
+    } finally {
+      setPortadaLoading(false);
+    }
+  };
+
+  // Eliminar imagen de portada
+  const handleDeletePortada = async () => {
+    if (!municipioActual) return;
+
+    setPortadaLoading(true);
+    try {
+      await municipiosApi.deleteImagenPortada(municipioActual.id);
+      toast.success('Imagen de portada eliminada');
+      setImagenPortadaUrl('');
+      await loadMunicipios();
+    } catch (error) {
+      toast.error('Error al eliminar imagen de portada');
+      console.error('Error:', error);
+    } finally {
+      setPortadaLoading(false);
     }
   };
 
@@ -837,6 +915,143 @@ export default function Configuracion() {
             {brandingLoading ? 'Guardando...' : 'Guardar branding'}
           </button>
         </div>
+      </div>
+
+      {/* Sección Imagen de Portada */}
+      <div
+        className="rounded-xl p-5"
+        style={{
+          backgroundColor: theme.card,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: `${theme.primary}20` }}
+          >
+            <ImageIcon className="h-5 w-5" style={{ color: theme.primary }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: theme.text }}>
+              Imagen de Portada
+            </h2>
+            <p className="text-sm" style={{ color: theme.textSecondary }}>
+              Banner del dashboard (separado del logo)
+            </p>
+          </div>
+        </div>
+
+        {/* Preview de la imagen actual */}
+        <div className="mb-4">
+          <div
+            className="relative w-full h-40 rounded-xl overflow-hidden"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `2px dashed ${theme.border}`,
+            }}
+          >
+            {portadaPreview || imagenPortadaUrl ? (
+              <>
+                <img
+                  src={portadaPreview || imagenPortadaUrl}
+                  alt="Imagen de portada"
+                  className="w-full h-full object-cover"
+                />
+                {/* Overlay con gradiente similar al dashboard */}
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${colorPrimario}cc 0%, ${colorSecundario}99 100%)`,
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-white text-sm font-medium">Vista previa del banner</p>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-2">
+                <ImageIcon className="h-10 w-10" style={{ color: theme.textSecondary }} />
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  Sin imagen de portada
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Botones de acción */}
+        <div className="flex gap-3">
+          <input
+            ref={portadaInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handlePortadaSelect}
+            className="hidden"
+          />
+          <button
+            onClick={() => portadaInputRef.current?.click()}
+            disabled={portadaLoading}
+            className="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-80"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            <Upload className="h-4 w-4" />
+            Seleccionar imagen
+          </button>
+
+          {portadaFile && (
+            <button
+              onClick={handleSavePortada}
+              disabled={portadaLoading}
+              className="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
+              style={{
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                color: '#ffffff',
+              }}
+            >
+              {portadaLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Guardar
+            </button>
+          )}
+
+          {imagenPortadaUrl && !portadaFile && (
+            <button
+              onClick={handleDeletePortada}
+              disabled={portadaLoading}
+              className="py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-80"
+              style={{
+                backgroundColor: '#ef444420',
+                color: '#ef4444',
+                border: '1px solid #ef444440',
+              }}
+            >
+              {portadaLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Eliminar
+            </button>
+          )}
+        </div>
+
+        {portadaFile && (
+          <p className="text-xs mt-2" style={{ color: theme.primary }}>
+            Archivo seleccionado: {portadaFile.name}
+          </p>
+        )}
+
+        <p className="text-xs mt-3" style={{ color: theme.textSecondary }}>
+          PNG, JPG o WebP. Máximo 5MB. Tamaño recomendado: 1920x600 píxeles.
+        </p>
       </div>
 
       {/* Tabla de otras configuraciones */}
