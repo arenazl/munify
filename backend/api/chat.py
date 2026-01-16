@@ -10,13 +10,14 @@ from sqlalchemy.orm import selectinload
 from typing import Optional
 from datetime import datetime, timedelta
 
-from core.security import get_current_user
+from core.security import get_current_user, require_roles
 from core.database import get_db
 from models.categoria import Categoria
 from models.user import User
 from models.reclamo import Reclamo
 from models.tramite import Solicitud, TipoTramite, Tramite, EstadoSolicitud
 from models.empleado import Empleado
+from models.zona import Zona
 from models.enums import EstadoReclamo
 from services import chat_service
 
@@ -43,6 +44,12 @@ class DynamicChatRequest(BaseModel):
     pregunta: str
     contexto: dict = {}
     tipo: Optional[str] = None
+
+
+class ValidarDuplicadoRequest(BaseModel):
+    """Request para validar si un nombre ya existe (con IA)"""
+    nombre: str
+    tipo: str  # "categoria", "zona", "tipo_tramite", "tramite"
 
 
 def build_system_prompt(categorias: list[dict], tramites: list[dict] = None) -> str:
@@ -749,3 +756,195 @@ async def chat_asistente(
         return ChatResponse(response=response)
 
     raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
+
+
+# ==================== VALIDACIÓN DE DUPLICADOS CON IA ====================
+
+async def get_entidades_existentes(db: AsyncSession, municipio_id: int, tipo: str) -> list[dict]:
+    """Obtiene las entidades existentes según el tipo"""
+    if tipo == "categoria":
+        query = select(Categoria).where(
+            Categoria.municipio_id == municipio_id,
+            Categoria.activo == True
+        )
+        result = await db.execute(query)
+        items = result.scalars().all()
+        return [{"nombre": c.nombre, "descripcion": c.descripcion or ""} for c in items]
+
+    elif tipo == "zona":
+        query = select(Zona).where(
+            Zona.municipio_id == municipio_id,
+            Zona.activo == True
+        )
+        result = await db.execute(query)
+        items = result.scalars().all()
+        return [{"nombre": z.nombre, "descripcion": z.descripcion or ""} for z in items]
+
+    elif tipo == "tipo_tramite":
+        query = select(TipoTramite).where(
+            TipoTramite.municipio_id == municipio_id,
+            TipoTramite.activo == True
+        )
+        result = await db.execute(query)
+        items = result.scalars().all()
+        return [{"nombre": t.nombre, "descripcion": t.descripcion or ""} for t in items]
+
+    elif tipo == "tramite":
+        query = select(Tramite).where(
+            Tramite.municipio_id == municipio_id,
+            Tramite.activo == True
+        )
+        result = await db.execute(query)
+        items = result.scalars().all()
+        return [{"nombre": t.nombre, "descripcion": t.descripcion or ""} for t in items]
+
+    return []
+
+
+def build_validacion_prompt(nombre_nuevo: str, tipo: str, existentes: list[dict]) -> str:
+    """Construye el prompt para validar duplicados con IA"""
+    tipo_labels = {
+        "categoria": "categoría de reclamos",
+        "zona": "zona/barrio",
+        "tipo_tramite": "tipo de trámite",
+        "tramite": "trámite"
+    }
+
+    tipo_label = tipo_labels.get(tipo, tipo)
+
+    existentes_str = "\n".join([
+        f"  - {e['nombre']}" + (f": {e['descripcion'][:100]}" if e.get('descripcion') else "")
+        for e in existentes
+    ]) or "  (No hay elementos existentes)"
+
+    return f"""Sos un asistente que ayuda a evitar duplicados en un sistema municipal.
+
+El usuario quiere crear una nueva {tipo_label} con el nombre: "{nombre_nuevo}"
+
+LISTA DE {tipo_label.upper()}S EXISTENTES EN EL SISTEMA:
+{existentes_str}
+
+TAREA: Analizá si el nombre "{nombre_nuevo}" es similar o equivalente a alguno existente.
+
+Considerá:
+1. Sinónimos (ej: "Luminarias" y "Alumbrado Público" son lo mismo)
+2. Variaciones de escritura (ej: "Espacios Verdes" y "Espacio verde")
+3. Abreviaturas (ej: "Tránsito" y "Transito y Vialidad")
+4. Conceptos relacionados muy cercanos
+
+RESPUESTA (formato JSON estricto):
+{{
+  "es_duplicado": true/false,
+  "similar_a": "nombre del existente similar" o null,
+  "confianza": "alta"/"media"/"baja",
+  "sugerencia": "mensaje corto explicando la situación"
+}}
+
+Si NO hay ninguno similar, respondé:
+{{
+  "es_duplicado": false,
+  "similar_a": null,
+  "confianza": "alta",
+  "sugerencia": "El nombre es único, puede crearse sin problemas."
+}}
+
+IMPORTANTE: Respondé SOLO el JSON, sin texto adicional."""
+
+
+@router.post("/validar-duplicado")
+async def validar_duplicado(
+    request: ValidarDuplicadoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Valida si un nombre de entidad ya existe o es similar a uno existente.
+    Usa IA para detectar sinónimos, variaciones y conceptos similares.
+    """
+    if not chat_service.is_available():
+        # Fallback: hacer comparación simple sin IA
+        existentes = await get_entidades_existentes(db, current_user.municipio_id, request.tipo)
+        nombre_lower = request.nombre.lower().strip()
+
+        for e in existentes:
+            if e['nombre'].lower().strip() == nombre_lower:
+                return {
+                    "es_duplicado": True,
+                    "similar_a": e['nombre'],
+                    "confianza": "alta",
+                    "sugerencia": f"Ya existe una entidad con el nombre exacto '{e['nombre']}'."
+                }
+
+        return {
+            "es_duplicado": False,
+            "similar_a": None,
+            "confianza": "media",
+            "sugerencia": "No se detectaron duplicados exactos. (Validación IA no disponible)"
+        }
+
+    # Obtener entidades existentes
+    existentes = await get_entidades_existentes(db, current_user.municipio_id, request.tipo)
+
+    # Si no hay existentes, no puede haber duplicado
+    if not existentes:
+        return {
+            "es_duplicado": False,
+            "similar_a": None,
+            "confianza": "alta",
+            "sugerencia": "No hay elementos existentes. Puede crearse sin problemas."
+        }
+
+    # Primero verificar duplicado exacto (sin IA)
+    nombre_lower = request.nombre.lower().strip()
+    for e in existentes:
+        if e['nombre'].lower().strip() == nombre_lower:
+            return {
+                "es_duplicado": True,
+                "similar_a": e['nombre'],
+                "confianza": "alta",
+                "sugerencia": f"Ya existe con el nombre exacto '{e['nombre']}'."
+            }
+
+    # Usar IA para detectar similitudes semánticas
+    prompt = build_validacion_prompt(request.nombre, request.tipo, existentes)
+
+    print(f"[VALIDAR DUPLICADO] Tipo: {request.tipo}, Nombre: {request.nombre}")
+
+    response = await chat_service.chat(prompt, max_tokens=200)
+
+    if response:
+        try:
+            # Intentar parsear JSON de la respuesta
+            import json
+            # Limpiar respuesta (a veces viene con ```json ... ```)
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                clean_response = clean_response.split("```")[1]
+                if clean_response.startswith("json"):
+                    clean_response = clean_response[4:]
+            clean_response = clean_response.strip()
+
+            result = json.loads(clean_response)
+            return {
+                "es_duplicado": result.get("es_duplicado", False),
+                "similar_a": result.get("similar_a"),
+                "confianza": result.get("confianza", "media"),
+                "sugerencia": result.get("sugerencia", "")
+            }
+        except json.JSONDecodeError:
+            print(f"[VALIDAR DUPLICADO] Error parseando JSON: {response}")
+            # Si la IA respondió pero no en JSON válido, asumir que no es duplicado
+            return {
+                "es_duplicado": False,
+                "similar_a": None,
+                "confianza": "baja",
+                "sugerencia": "No se pudo determinar con certeza. Verificá manualmente."
+            }
+
+    # Fallback si la IA no responde
+    return {
+        "es_duplicado": False,
+        "similar_a": None,
+        "confianza": "baja",
+        "sugerencia": "No se pudo validar con IA. Verificá que no exista uno similar."
+    }

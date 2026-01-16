@@ -1,11 +1,19 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Edit, Trash2, Clock, DollarSign, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { Edit, Trash2, Clock, DollarSign, ChevronDown, ChevronRight, Plus, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi } from '../lib/api';
+import api, { tramitesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import type { TipoTramite, TramiteCatalogo } from '../types';
+
+// Tipo para la respuesta de validación de duplicados
+interface ValidacionDuplicado {
+  es_duplicado: boolean;
+  similar_a: string | null;
+  confianza: 'alta' | 'media' | 'baja';
+  sugerencia: string;
+}
 
 // Iconos disponibles para tipos de trámite (organizados por categoría)
 const ICONOS_DISPONIBLES = [
@@ -61,6 +69,9 @@ export default function TiposTramite() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedTipo, setSelectedTipo] = useState<TipoTramite | null>(null);
   const [expandedTipos, setExpandedTipos] = useState<Set<number>>(new Set());
+  // Estado para validación de duplicados con IA
+  const [validando, setValidando] = useState(false);
+  const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -147,7 +158,33 @@ export default function TiposTramite() {
     });
   };
 
+  // Validar duplicado con IA antes de crear
+  const validarDuplicado = async (nombre: string) => {
+    if (!nombre.trim() || selectedTipo) {
+      setValidacion(null);
+      return;
+    }
+
+    setValidando(true);
+    try {
+      const response = await api.post('/chat/validar-duplicado', {
+        nombre: nombre.trim(),
+        tipo: 'tipo_tramite'
+      });
+      setValidacion(response.data);
+    } catch (error) {
+      console.error('Error validando duplicado:', error);
+      setValidacion(null);
+    } finally {
+      setValidando(false);
+    }
+  };
+
   const openSheet = (tipo: TipoTramite | null = null) => {
+    // Limpiar validación al abrir
+    setValidacion(null);
+    setValidando(false);
+
     if (tipo) {
       setFormData({
         nombre: tipo.nombre,
@@ -182,6 +219,12 @@ export default function TiposTramite() {
   const handleSubmit = async () => {
     if (!formData.nombre.trim()) {
       toast.error('El nombre es requerido');
+      return;
+    }
+
+    // Si estamos creando y hay un duplicado detectado con confianza alta, advertir
+    if (!selectedTipo && validacion?.es_duplicado && validacion.confianza === 'alta') {
+      toast.error(`Ya existe un tipo similar: "${validacion.similar_a}"`);
       return;
     }
 
@@ -259,6 +302,7 @@ export default function TiposTramite() {
   return (
     <ABMPage
       title="Tipos de Trámite"
+      backLink="/gestion/ajustes"
       buttonLabel="Nuevo Tipo"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar tipos o trámites..."
@@ -307,7 +351,10 @@ export default function TiposTramite() {
             label="Nombre"
             required
             value={formData.nombre}
-            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, nombre: e.target.value });
+              setValidacion(null);
+            }}
             placeholder="Ej: Obras Privadas"
           />
 
@@ -327,13 +374,56 @@ export default function TiposTramite() {
             />
           </div>
 
-          <ABMTextarea
-            label="Descripción"
-            value={formData.descripcion}
-            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-            placeholder="Descripción del tipo de trámite"
-            rows={2}
-          />
+          <div>
+            <ABMTextarea
+              label="Descripción"
+              value={formData.descripcion}
+              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+              onBlur={() => {
+                // Validar al perder foco en descripción
+                if (!selectedTipo && formData.nombre.trim().length >= 2) {
+                  validarDuplicado(formData.nombre);
+                }
+              }}
+              placeholder="Descripción del tipo de trámite"
+              rows={2}
+            />
+            {/* Indicador de validación IA */}
+            {!selectedTipo && (
+              <div className="mt-2">
+                {validando ? (
+                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Verificando con IA si ya existe...</span>
+                  </div>
+                ) : validacion ? (
+                  <div
+                    className={`flex items-start gap-2 text-sm p-2 rounded-lg ${
+                      validacion.es_duplicado
+                        ? 'bg-amber-500/10 border border-amber-500/30'
+                        : 'bg-green-500/10 border border-green-500/30'
+                    }`}
+                  >
+                    {validacion.es_duplicado ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p className={validacion.es_duplicado ? 'text-amber-600' : 'text-green-600'}>
+                        {validacion.sugerencia}
+                      </p>
+                      {validacion.es_duplicado && validacion.similar_a && (
+                        <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                          Similar a: <strong>{validacion.similar_a}</strong>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           {/* Selector de icono */}
           <div>

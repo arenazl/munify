@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, ImageIcon, RefreshCw, X, Download } from 'lucide-react';
+import { Edit, Trash2, ImageIcon, RefreshCw, X, Download, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { categoriasApi, imagenesApi, API_BASE_URL } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import type { Categoria } from '../types';
+
+// Tipo para la respuesta de validación de duplicados
+interface ValidacionDuplicado {
+  es_duplicado: boolean;
+  similar_a: string | null;
+  confianza: 'alta' | 'media' | 'baja';
+  sugerencia: string;
+}
 
 // Cache de imágenes disponibles
 const imageExistsCache: Record<string, string | null> = {};
@@ -53,6 +61,9 @@ export default function Categorias() {
   // Estado para animación staggered (solo la primera vez)
   const [visibleCards, setVisibleCards] = useState<Set<number>>(new Set());
   const [animationDone, setAnimationDone] = useState(false);
+  // Estado para validación de duplicados con IA
+  const [validando, setValidando] = useState(false);
+  const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
 
   useEffect(() => {
     fetchCategorias();
@@ -158,7 +169,34 @@ export default function Categorias() {
     }
   };
 
+  // Validar duplicado con IA antes de crear
+  const validarDuplicado = async (nombre: string) => {
+    if (!nombre.trim() || selectedCategoria) {
+      // No validar si está vacío o si estamos editando
+      setValidacion(null);
+      return;
+    }
+
+    setValidando(true);
+    try {
+      const response = await api.post('/chat/validar-duplicado', {
+        nombre: nombre.trim(),
+        tipo: 'categoria'
+      });
+      setValidacion(response.data);
+    } catch (error) {
+      console.error('Error validando duplicado:', error);
+      setValidacion(null);
+    } finally {
+      setValidando(false);
+    }
+  };
+
   const openSheet = (categoria: Categoria | null = null) => {
+    // Limpiar validación al abrir
+    setValidacion(null);
+    setValidando(false);
+
     if (categoria) {
       setFormData({
         nombre: categoria.nombre,
@@ -217,6 +255,12 @@ export default function Categorias() {
   };
 
   const handleSubmit = async () => {
+    // Si estamos creando y hay un duplicado detectado con confianza alta, advertir
+    if (!selectedCategoria && validacion?.es_duplicado && validacion.confianza === 'alta') {
+      toast.error(`Ya existe una categoría similar: "${validacion.similar_a}"`);
+      return;
+    }
+
     setSaving(true);
     try {
       if (selectedCategoria) {
@@ -324,6 +368,7 @@ export default function Categorias() {
   return (
     <ABMPage
       title="Categorías"
+      backLink="/gestion/ajustes"
       buttonLabel="Nueva Categoría"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar categorías..."
@@ -457,17 +502,64 @@ export default function Categorias() {
             label="Nombre"
             required
             value={formData.nombre}
-            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            onChange={(e) => {
+              setFormData({ ...formData, nombre: e.target.value });
+              // Limpiar validación al cambiar el nombre
+              setValidacion(null);
+            }}
             placeholder="Nombre de la categoría"
           />
 
-          <ABMTextarea
-            label="Descripción"
-            value={formData.descripcion}
-            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-            placeholder="Descripción de la categoría"
-            rows={3}
-          />
+          <div>
+            <ABMTextarea
+              label="Descripción"
+              value={formData.descripcion}
+              onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+              onBlur={() => {
+                // Validar al perder foco en descripción (después de completar nombre + descripción)
+                if (!selectedCategoria && formData.nombre.trim().length >= 2) {
+                  validarDuplicado(formData.nombre);
+                }
+              }}
+              placeholder="Descripción de la categoría"
+              rows={3}
+            />
+            {/* Indicador de validación IA - se muestra después de perder foco en descripción */}
+            {!selectedCategoria && (
+              <div className="mt-2">
+                {validando ? (
+                  <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Verificando con IA si ya existe...</span>
+                  </div>
+                ) : validacion ? (
+                  <div
+                    className={`flex items-start gap-2 text-sm p-2 rounded-lg ${
+                      validacion.es_duplicado
+                        ? 'bg-amber-500/10 border border-amber-500/30'
+                        : 'bg-green-500/10 border border-green-500/30'
+                    }`}
+                  >
+                    {validacion.es_duplicado ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p className={validacion.es_duplicado ? 'text-amber-600' : 'text-green-600'}>
+                        {validacion.sugerencia}
+                      </p>
+                      {validacion.es_duplicado && validacion.similar_a && (
+                        <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                          Similar a: <strong>{validacion.similar_a}</strong>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <ABMInput

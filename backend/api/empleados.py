@@ -79,7 +79,7 @@ async def get_empleado(
 async def create_empleado(
     data: EmpleadoCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Verificar que el email no exista
     existing_user = await db.execute(
@@ -157,7 +157,7 @@ async def update_empleado(
     empleado_id: int,
     data: EmpleadoUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
@@ -216,7 +216,7 @@ async def update_empleado(
 async def delete_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id
     result = await db.execute(

@@ -14,17 +14,8 @@ import {
   Clock,
   Eye,
   Sparkles,
-  Store,
-  Car,
-  Map,
-  TreeDeciduous,
-  CalendarDays,
-  CreditCard,
-  HardHat,
   ClipboardList,
   ExternalLink,
-  Heart,
-  Lightbulb,
   Send,
   FolderOpen,
   Play,
@@ -37,6 +28,7 @@ import {
   ChevronRight,
   MessageCircle,
   ArrowUpDown,
+  Lightbulb,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi, empleadosApi } from '../lib/api';
@@ -47,28 +39,18 @@ import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
+import { DynamicIcon } from '../components/ui/DynamicIcon';
 import type { TipoTramite, Tramite, Solicitud, Empleado, ServicioTramite } from '../types';
-import * as LucideIcons from 'lucide-react';
 
-// Iconos por nombre de servicio
-const servicioIcons: Record<string, React.ReactNode> = {
-  'Store': <Store className="h-5 w-5" />,
-  'FileCheck': <FileCheck className="h-5 w-5" />,
-  'HardHat': <HardHat className="h-5 w-5" />,
-  'Car': <Car className="h-5 w-5" />,
-  'Map': <Map className="h-5 w-5" />,
-  'TreeDeciduous': <TreeDeciduous className="h-5 w-5" />,
-  'Users': <Users className="h-5 w-5" />,
-  'CalendarDays': <CalendarDays className="h-5 w-5" />,
-  'CreditCard': <CreditCard className="h-5 w-5" />,
-  'Heart': <Heart className="h-5 w-5" />,
-  'Lightbulb': <Lightbulb className="h-5 w-5" />,
-  'default': <FileText className="h-5 w-5" />,
-};
-
-function getServicioIcon(icono?: string): React.ReactNode {
-  if (!icono) return servicioIcons.default;
-  return servicioIcons[icono] || servicioIcons.default;
+// Helper para renderizar iconos dinámicos
+function getServicioIcon(icono?: string, className = "h-5 w-5") {
+  return (
+    <DynamicIcon
+      name={icono || 'FileText'}
+      className={className}
+      fallback={<FileText className={className} />}
+    />
+  );
 }
 
 // Estado de trámites

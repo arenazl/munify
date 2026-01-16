@@ -59,10 +59,12 @@ export function PageTransition({ children }: PageTransitionProps) {
         };
       case 'idle':
       default:
+        // En idle, NO usar transform para permitir que CSS sticky funcione correctamente
+        // Los transforms crean un nuevo "containing block" que rompe sticky
         return {
           opacity: 1,
-          transform: 'translateX(0) scale(1)',
-          filter: 'blur(0px)',
+          transform: 'none',
+          filter: 'none',
         };
     }
   };
@@ -71,8 +73,7 @@ export function PageTransition({ children }: PageTransitionProps) {
     <div
       style={{
         ...getTransformStyle(),
-        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
-        
+        transition: phase === 'idle' ? 'none' : 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
     >
       {displayChildren}

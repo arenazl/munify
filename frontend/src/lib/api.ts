@@ -519,6 +519,11 @@ export const tramitesApi = {
       params: { municipio_id: municipioId, solo_activos: params?.solo_activos ?? true }
     });
   },
+  // Catálogo completo (para configuración de superusuario)
+  getTiposCatalogo: (params?: { solo_activos?: boolean }) =>
+    api.get('/tramites/tipos/catalogo', {
+      params: { solo_activos: params?.solo_activos ?? true }
+    }),
   getTipo: (id: number) => api.get(`/tramites/tipos/${id}`),
   createTipo: (data: Record<string, unknown>) => {
     const municipioId = localStorage.getItem('municipio_id');
@@ -637,6 +642,21 @@ export const tramitesApi = {
   getDocumentos: (solicitudId: number) => api.get(`/tramites/solicitudes/${solicitudId}/documentos`),
   deleteDocumento: (solicitudId: number, documentoId: number) =>
     api.delete(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}`),
+
+  // Habilitar tipos para municipio
+  habilitarTipoMunicipio: (tipoId: number, municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    return api.post(`/tramites/tipos/${tipoId}/habilitar`, null, { params: { municipio_id: mId } });
+  },
+  habilitarTodosTiposMunicipio: async (municipioId?: number) => {
+    const mId = municipioId || localStorage.getItem('municipio_id');
+    // Habilitar tipos del 1 al 10
+    const promises = [];
+    for (let i = 1; i <= 10; i++) {
+      promises.push(api.post(`/tramites/tipos/${i}/habilitar`, null, { params: { municipio_id: mId } }).catch(() => null));
+    }
+    return Promise.all(promises);
+  },
 };
 
 // Calificaciones

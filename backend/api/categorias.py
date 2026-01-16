@@ -63,7 +63,7 @@ async def create_categoria(
     request: Request,
     data: CategoriaCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     # Verificar nombre único en el municipio
@@ -88,7 +88,7 @@ async def update_categoria(
     categoria_id: int,
     data: CategoriaUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
@@ -113,7 +113,7 @@ async def delete_categoria(
     request: Request,
     categoria_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(

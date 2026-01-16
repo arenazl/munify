@@ -2500,74 +2500,65 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       key: 'empleado',
       header: 'Empleado',
       sortValue: (r: Reclamo) => r.empleado_asignado?.nombre || '',
-      render: (r: Reclamo) => (
-        <span style={{ color: r.empleado_asignado ? theme.primary : theme.textSecondary }}>
-          {r.empleado_asignado?.nombre || '-'}
-        </span>
-      ),
+      render: (r: Reclamo) => {
+        if (!r.empleado_asignado) return null;
+        const inicial = r.empleado_asignado.nombre?.charAt(0) || '';
+        const apellido = r.empleado_asignado.apellido || '';
+        return (
+          <span className="text-xs" style={{ color: theme.text }}>
+            {inicial}. {apellido}
+          </span>
+        );
+      },
     },
     {
-      key: 'fecha',
-      header: 'Creación',
+      key: 'fechas',
+      header: 'Fechas',
       sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
-      render: (r: Reclamo) => (
-        <span className="text-xs" style={{ color: theme.textSecondary }}>
-          {new Date(r.created_at).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      key: 'actualizacion',
-      header: 'Actualización',
-      sortValue: (r: Reclamo) => r.updated_at ? new Date(r.updated_at).getTime() : 0,
-      render: (r: Reclamo) => (
-        <span className="text-xs" style={{ color: theme.textSecondary }}>
-          {r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '-'}
-        </span>
-      ),
+      render: (r: Reclamo) => {
+        const creacion = new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+        const actualizacion = r.updated_at ? new Date(r.updated_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : null;
+        return (
+          <div className="flex flex-col text-[10px] leading-tight">
+            <span style={{ color: theme.textSecondary }}>{creacion}</span>
+            {actualizacion && (
+              <span style={{ color: theme.primary }}>{actualizacion}</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'vencimiento',
-      header: 'Por vencer',
+      header: 'Vence',
       sortValue: (r: Reclamo) => r.fecha_programada ? new Date(r.fecha_programada).getTime() : Infinity,
       render: (r: Reclamo) => {
-        if (!r.fecha_programada) {
-          return <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>;
-        }
+        if (!r.fecha_programada) return null;
         const fechaProg = new Date(r.fecha_programada);
         const ahora = new Date();
         const diffMs = fechaProg.getTime() - ahora.getTime();
-        const diffHoras = Math.ceil(diffMs / (1000 * 60 * 60));
         const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        const diffSemanas = Math.ceil(diffDias / 7);
 
-        let color = theme.textSecondary;
-        let bgColor = 'transparent';
-        let texto = '';
+        const vencido = diffDias < 0;
+        const porVencer = !vencido && diffDias <= 3;
+        const color = vencido ? '#ef4444' : porVencer ? '#f59e0b' : '#10b981';
+        const bg = vencido ? '#ef444420' : porVencer ? '#f59e0b20' : '#10b98120';
 
-        if (diffHoras < 0) {
-          color = '#ef4444';
-          bgColor = '#ef444415';
-          const diasVencido = Math.abs(diffDias);
-          texto = diasVencido >= 7 ? `Vencido (${Math.floor(diasVencido/7)}sem)` : `Vencido (${diasVencido}d)`;
-        } else if (diffHoras <= 24) {
-          color = '#f59e0b';
-          bgColor = '#f59e0b15';
-          texto = diffHoras <= 1 ? '1 hora' : `${diffHoras} horas`;
-        } else if (diffDias <= 2) {
-          color = '#eab308';
-          bgColor = '#eab30815';
-          texto = diffDias === 1 ? 'Mañana' : `${diffDias} días`;
-        } else if (diffDias <= 7) {
-          texto = `${diffDias} días`;
+        const diasAbs = Math.abs(diffDias);
+        let texto: string;
+        if (diffDias === 0) {
+          texto = 'Hoy';
+        } else if (diasAbs < 30) {
+          texto = vencido ? `-${diasAbs} días` : `${diasAbs} días`;
         } else {
-          texto = `${diffSemanas} sem`;
+          const meses = Math.floor(diasAbs / 30);
+          texto = vencido ? `-${meses} ${meses > 1 ? 'meses' : 'mes'}` : `${meses} ${meses > 1 ? 'meses' : 'mes'}`;
         }
 
         return (
           <span
-            className="text-xs px-2 py-0.5 rounded font-medium"
-            style={{ color, backgroundColor: bgColor }}
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full whitespace-nowrap"
+            style={{ color, backgroundColor: bg }}
           >
             {texto}
           </span>

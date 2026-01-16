@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
-import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown } from 'lucide-react';
+import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
@@ -9,6 +10,7 @@ type ViewMode = 'cards' | 'table';
 interface ABMPageProps {
   // Header
   title: string;
+  backLink?: string; // Link para volver (muestra flecha antes del título)
   buttonLabel?: string;
   buttonIcon?: ReactNode;
   onAdd?: () => void;
@@ -56,6 +58,7 @@ interface ABMPageProps {
 
 export function ABMPage({
   title,
+  backLink,
   buttonLabel,
   buttonIcon,
   onAdd,
@@ -125,10 +128,25 @@ export function ABMPage({
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
-          {/* Título - se oculta cuando el search está enfocado en mobile */}
-          <h1 className={`text-lg font-bold tracking-tight hidden sm:block flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:block' : ''}`} style={{ color: theme.text }}>
-            {title}
-          </h1>
+          {/* Título con flecha de volver opcional - se oculta cuando el search está enfocado en mobile */}
+          <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
+            {backLink && (
+              <Link
+                to={backLink}
+                className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
+                style={{
+                  backgroundColor: `${theme.primary}15`,
+                  color: theme.primary
+                }}
+                title="Volver"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            )}
+            <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
+              {title}
+            </h1>
+          </div>
 
           {/* Separador vertical - se oculta en mobile cuando search enfocado */}
           <div className={`h-8 w-px hidden sm:block ${searchFocused ? 'sm:hidden md:block' : ''}`} style={{ backgroundColor: theme.border }} />
@@ -1066,7 +1084,7 @@ export function ABMTable<T>({ data, columns, onRowClick, actions, keyExtractor }
                 return (
                   <th
                     key={col.key}
-                    className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider ${col.className || ''} ${isSortable ? 'cursor-pointer select-none hover:opacity-80' : ''}`}
+                    className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider first:pl-4 ${col.className || ''} ${isSortable ? 'cursor-pointer select-none hover:opacity-80' : ''}`}
                     style={{ color: theme.textSecondary }}
                     onClick={() => isSortable && handleSort(col)}
                   >
@@ -1110,7 +1128,7 @@ export function ABMTable<T>({ data, columns, onRowClick, actions, keyExtractor }
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className={`px-4 py-3 text-sm ${col.className || ''}`}
+                    className={`px-2 py-2 text-xs first:pl-4 ${col.className || ''}`}
                     style={{ color: theme.text }}
                   >
                     {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as ReactNode}
