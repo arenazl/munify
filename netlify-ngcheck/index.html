@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis Completo de Performance - NGCheck 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Custom color palette - Colores profesionales Munify */
+        :root {
+            --primary: #0088cc;
+            --primary-dark: #006699;
+            --primary-light: #56b4e9;
+            --teal: #2aa198;
+            --teal-light: #56cecb;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #06b6d4;
+            --purple: #8b5cf6;
+            --bg-main: #ffffff;
+            --bg-secondary: #f8fafc;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            background: #ffffff;
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Top bar - Glassmorphism */
+        .top-bar {
+            backdrop-filter: blur(20px) saturate(180%);
+            background: rgba(255, 255, 255, 0.85);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-bottom: 1px solid rgba(226, 232, 240, 0.5);
+        }
+
+        .top-bar.scrolled {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 8px 32px rgba(51, 65, 85, 0.08);
+        }
+
+        /* Sidebar */
+        .sidebar-link {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .sidebar-link.active {
+            color: var(--primary);
+            font-weight: 700;
+            transform: translateX(4px);
+        }
+
+        .sidebar-link.active span:first-child {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+            width: 8px;
+            height: 8px;
+            box-shadow: 0 0 12px rgba(0, 136, 204, 0.4);
+        }
+
+        .sidebar-link:hover {
+            transform: translateX(2px);
+            color: var(--primary);
+        }
+
+        /* Fade in animation */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Gradient text */
+        .gradient-text {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Cards */
+        .stat-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.1);
+            border-color: var(--primary);
+        }
+
+        .section-card {
+            background: #ffffff;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--border);
+            position: relative;
+        }
+
+        .section-header::before {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--teal) 100%);
+        }
+
+        .section-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        /* Architecture boxes */
+        .arch-box {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            min-width: 140px;
+            transition: all 0.3s;
+        }
+
+        .arch-box:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 15px rgba(0, 136, 204, 0.15);
+        }
+
+        .arch-box.highlight {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Config items */
+        .config-item {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .config-item:hover {
+            border-color: var(--primary);
+            background: white;
+        }
+
+        .config-item .value {
+            font-family: 'Consolas', monospace;
+            background: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 600;
+            border: 1px solid var(--border);
+        }
+
+        /* Database tags */
+        .db-tag {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-family: monospace;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .db-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .db-tag.ar { border-left: 3px solid #3b82f6; }
+        .db-tag.cl { border-left: 3px solid #ef4444; }
+        .db-tag.py { border-left: 3px solid #10b981; }
+        .db-tag.uy { border-left: 3px solid #06b6d4; }
+        .db-tag.mx { border-left: 3px solid #f59e0b; }
+        .db-tag.bo { border-left: 3px solid #8b5cf6; }
+        .db-tag.es { border-left: 3px solid #ec4899; }
+        .db-tag.co { border-left: 3px solid #14b8a6; }
+        .db-tag.ve { border-left: 3px solid #f97316; }
+        .db-tag.system { border-left: 3px solid #64748b; }
+
+        /* Alerts */
+        .alert {
+            padding: 1.25rem 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border-left: 4px solid var(--danger);
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+            border-left: 4px solid var(--warning);
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border-left: 4px solid var(--success);
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-left: 4px solid var(--info);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Badges */
+        .priority-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .priority-p0 { background: #fee2e2; color: #dc2626; }
+        .priority-p1 { background: #fed7aa; color: #ea580c; }
+        .priority-p2 { background: #fef3c7; color: #d97706; }
+        .priority-p3 { background: #dbeafe; color: #2563eb; }
+
+        .impact-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .impact-high { background: #dcfce7; color: #16a34a; }
+        .impact-medium { background: #fef3c7; color: #d97706; }
+        .impact-low { background: #e2e8f0; color: #64748b; }
+
+        /* Code blocks */
+        .code-block {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 12px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            margin: 1rem 0;
+            border: 1px solid #475569;
+        }
+
+        .code-block .comment { color: #6b7280; }
+        .code-block .keyword { color: #c084fc; }
+        .code-block .string { color: #86efac; }
+        .code-block .method { color: #60a5fa; }
+        .code-block .type { color: #22d3ee; }
+        .code-block .number { color: #fbbf24; }
+
+        /* Tech cards */
+        .tech-card {
+            background: linear-gradient(135deg, #ffffff 0%, var(--bg-secondary) 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .tech-card:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .tech-card li::before {
+            content: '';
+            color: var(--success);
+            font-weight: bold;
+        }
+
+        /* Interceptor steps */
+        .interceptor-step {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.2s;
+        }
+
+        .interceptor-step:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 136, 204, 0.1);
+        }
+
+        .interceptor-step .step-num {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        /* Repo cards */
+        .repo-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.25rem;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .repo-card:hover {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        .repo-card .name {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Timeline */
+        .recommendation-timeline {
+            position: relative;
+            padding-left: 2rem;
+            margin: 1.5rem 0;
+        }
+
+        .recommendation-timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(180deg, var(--primary) 0%, var(--teal) 100%);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: 1.5rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.65rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 3px solid white;
+            box-shadow: 0 0 0 3px var(--primary);
+        }
+
+        /* Metric comparison */
+        .metric-comparison {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            margin: 0.75rem 0;
+        }
+
+        .metric-comparison .before {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .metric-comparison .arrow {
+            color: var(--success);
+            font-size: 1.25rem;
+        }
+
+        .metric-comparison .after {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .metric-comparison .improvement {
+            margin-left: auto;
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #16a34a;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        /* TOC */
+        .toc {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #ffffff 100%);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        .toc a {
+            color: var(--text-primary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .toc a:hover {
+            background: white;
+            color: var(--primary);
+            transform: translateX(4px);
+        }
+
+        /* Architecture diagram */
+        .architecture-diagram {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 16px;
+            padding: 2rem;
+            margin: 1.5rem 0;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        @media print {
+            .top-bar, aside { display: none !important; }
+            .section-card { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <nav class="top-bar fixed top-0 left-0 right-0 z-50 px-6 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);">
+                    <i class="fas fa-chart-line text-white"></i>
+                </div>
+                <div>
+                    <span class="font-bold text-slate-800">NGCheck</span>
+                    <span class="text-slate-400 text-sm ml-2">Performance Analysis</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-slate-500">
+                    <i class="fas fa-calendar-alt mr-2"></i>16 Enero 2026
+                </span>
+                <button onclick="window.print()" class="px-4 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105" style="background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%); color: white;">
+                    <i class="fas fa-download mr-2"></i>Exportar PDF
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar -->
+    <aside class="fixed left-4 top-1/2 -translate-y-1/2 z-40 hidden lg:block">
+        <div class="backdrop-blur-xl bg-white/80 rounded-2xl p-4 shadow-lg border border-slate-200/50" style="min-width: 200px;">
+            <nav class="space-y-1">
+                <a href="#overview" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Resumen</span>
+                </a>
+                <a href="#azure" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Azure MySQL</span>
+                </a>
+                <a href="#architecture" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Arquitectura</span>
+                </a>
+                <a href="#interceptors" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Interceptores</span>
+                </a>
+                <a href="#repositories" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Repositorios</span>
+                </a>
+                <a href="#queries" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Queries Criticos</span>
+                </a>
+                <a href="#optimizations" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Optimizaciones</span>
+                </a>
+                <a href="#technologies" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Tecnologias</span>
+                </a>
+                <a href="#plan" class="sidebar-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-600 hover:text-slate-900">
+                    <span class="w-2 h-2 rounded-full bg-slate-300"></span>
+                    <span>Plan</span>
+                </a>
+            </nav>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="pt-20 pb-12">
+        <div class="max-w-5xl mx-auto px-6 lg:ml-64">
+
+            <!-- Hero Section -->
+            <section id="overview" class="fade-in mb-12">
+                <div class="text-center mb-8">
+                    <h1 class="text-4xl md:text-5xl font-bold mb-4">
+                        <span class="gradient-text">Analisis de Performance</span>
+                    </h1>
+                    <p class="text-xl text-slate-600 mb-2">NGCheck - Sistema de Gestion Gastronomica Multi-Tenant</p>
+                    <p class="text-sm text-slate-400">Azure MySQL Flexible Server | 40 Bases de Datos | 85 Repositorios</p>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                    <div class="stat-card text-center">
+                        <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                            <i class="fas fa-database text-blue-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-blue-600">40</div>
+                        <div class="text-xs text-slate-500">Bases de Datos</div>
+                    </div>
+                    <div class="stat-card text-center">
+                        <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);">
+                            <i class="fas fa-folder text-emerald-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-emerald-600">85</div>
+                        <div class="text-xs text-slate-500">Repositorios</div>
+                    </div>
+                    <div class="stat-card text-center">
+                        <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                            <i class="fas fa-exclamation-triangle text-amber-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-amber-600">23</div>
+                        <div class="text-xs text-slate-500">Queries Criticos</div>
+                    </div>
+                    <div class="stat-card text-center">
+                        <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);">
+                            <i class="fas fa-globe text-violet-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-violet-600">9</div>
+                        <div class="text-xs text-slate-500">Paises</div>
+                    </div>
+                    <div class="stat-card text-center">
+                        <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                            <i class="fas fa-memory text-red-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-red-600">4GB</div>
+                        <div class="text-xs text-slate-500">Buffer Pool</div>
+                    </div>
+                    <div class="stat-card text-center">
+                        <div class="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style="background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);">
+                            <i class="fas fa-link text-cyan-600"></i>
+                        </div>
+                        <div class="text-2xl font-bold text-cyan-600">683</div>
+                        <div class="text-xs text-slate-500">Max Connections</div>
+                    </div>
+                </div>
+
+                <!-- TOC -->
+                <div class="toc">
+                    <h3 class="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-list-ul" style="color: var(--primary);"></i>
+                        Contenido del Analisis
+                    </h3>
+                    <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+                        <li><a href="#azure"><i class="fas fa-cloud text-blue-500"></i> Azure MySQL</a></li>
+                        <li><a href="#architecture"><i class="fas fa-sitemap text-violet-500"></i> Arquitectura</a></li>
+                        <li><a href="#interceptors"><i class="fas fa-bolt text-amber-500"></i> Interceptores</a></li>
+                        <li><a href="#repositories"><i class="fas fa-folder-open text-emerald-500"></i> Repositorios (85)</a></li>
+                        <li><a href="#queries"><i class="fas fa-search text-red-500"></i> Queries Criticos</a></li>
+                        <li><a href="#optimizations"><i class="fas fa-magic text-blue-500"></i> Optimizaciones</a></li>
+                        <li><a href="#technologies"><i class="fas fa-rocket text-cyan-500"></i> Tecnologias</a></li>
+                        <li><a href="#plan"><i class="fas fa-calendar-check text-emerald-500"></i> Plan</a></li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Azure Section -->
+            <section id="azure" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #2563eb;">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Azure MySQL Flexible Server</h2>
+                        <p class="text-sm text-slate-500">Configuracion del servidor de produccion</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Informacion del Servidor</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Servidor</span>
+                        <span class="value text-sm">nucleo-check-prod-srv</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Tier</span>
+                        <span class="value text-sm" style="color: var(--primary);">General Purpose</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">SKU</span>
+                        <span class="value text-sm">Standard_D2ads_v5</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">vCPUs</span>
+                        <span class="value text-sm" style="color: var(--warning);">2 cores</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">MySQL</span>
+                        <span class="value text-sm">8.0.42</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Storage</span>
+                        <span class="value text-sm">140 GB (Auto-Grow)</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">IOPS</span>
+                        <span class="value text-sm">720 (Auto-Scaling)</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">HA</span>
+                        <span class="value text-sm" style="color: var(--success);"><i class="fas fa-check mr-1"></i>SameZone</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Region</span>
+                        <span class="value text-sm">East US</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Backup</span>
+                        <span class="value text-sm">7 dias + Geo-Redundant</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Private Endpoint</span>
+                        <span class="value text-sm" style="color: var(--success);"><i class="fas fa-check mr-1"></i>Habilitado</span>
+                    </div>
+                    <div class="config-item">
+                        <span class="text-slate-600 text-sm">Slow Query Log</span>
+                        <span class="value text-sm" style="color: var(--success);"><i class="fas fa-check mr-1"></i>ON (7s)</span>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Parametros de Performance</h3>
+                <div class="overflow-x-auto">
+                    <table class="text-sm">
+                        <thead>
+                            <tr>
+                                <th>Parametro</th>
+                                <th>Actual</th>
+                                <th>Recomendado</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">innodb_buffer_pool_size</code></td>
+                                <td>4 GB</td>
+                                <td>4-6 GB</td>
+                                <td><span class="priority-badge" style="background: #dcfce7; color: #16a34a;"><i class="fas fa-check mr-1"></i>OK</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">innodb_buffer_pool_instances</code></td>
+                                <td>8</td>
+                                <td>8 (para 4GB+)</td>
+                                <td><span class="priority-badge" style="background: #dcfce7; color: #16a34a;"><i class="fas fa-check mr-1"></i>OK</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">max_connections</code></td>
+                                <td>683</td>
+                                <td>500-1000</td>
+                                <td><span class="priority-badge" style="background: #dcfce7; color: #16a34a;"><i class="fas fa-check mr-1"></i>OK</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">innodb_io_capacity</code></td>
+                                <td>200</td>
+                                <td>500-1000 (SSD)</td>
+                                <td><span class="priority-badge priority-p1"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">innodb_io_capacity_max</code></td>
+                                <td>2000</td>
+                                <td>2000-4000</td>
+                                <td><span class="priority-badge" style="background: #dcfce7; color: #16a34a;"><i class="fas fa-check mr-1"></i>OK</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">join_buffer_size</code></td>
+                                <td>256 KB</td>
+                                <td>512 KB - 1 MB</td>
+                                <td><span class="priority-badge priority-p2"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">sort_buffer_size</code></td>
+                                <td>512 KB</td>
+                                <td>1-2 MB</td>
+                                <td><span class="priority-badge priority-p2"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">tmp_table_size</code></td>
+                                <td>16 MB</td>
+                                <td>64-128 MB</td>
+                                <td><span class="priority-badge priority-p1"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">thread_cache_size</code></td>
+                                <td>14</td>
+                                <td>50-100</td>
+                                <td><span class="priority-badge priority-p1"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">table_open_cache</code></td>
+                                <td>2400</td>
+                                <td>4000+ (multi-tenant)</td>
+                                <td><span class="priority-badge priority-p2"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">long_query_time</code></td>
+                                <td>7s</td>
+                                <td>1-2s</td>
+                                <td><span class="priority-badge priority-p2"><i class="fas fa-exclamation mr-1"></i>ALTO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">innodb_read_io_threads</code></td>
+                                <td>4</td>
+                                <td>8-16</td>
+                                <td><span class="priority-badge priority-p2"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">innodb_write_io_threads</code></td>
+                                <td>4</td>
+                                <td>8-16</td>
+                                <td><span class="priority-badge priority-p2"><i class="fas fa-exclamation mr-1"></i>BAJO</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-warning mt-4">
+                    <i class="fas fa-exclamation-triangle text-amber-500 text-lg"></i>
+                    <div>
+                        <strong class="text-amber-800">Observacion Critica:</strong>
+                        <span class="text-amber-700 text-sm"> Con 40 bases de datos y arquitectura multi-tenant con schemas dinamicos, el <code>table_open_cache</code> de 2400 puede ser insuficiente. Cada empresa tiene su propio set de tablas prefijadas, lo que multiplica el numero de tablas que MySQL necesita mantener abiertas.</span>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-4">Bases de Datos por Pais</h3>
+                <div class="flex flex-wrap gap-2">
+                    <span class="db-tag ar">ar-002</span>
+                    <span class="db-tag ar">ar-003</span>
+                    <span class="db-tag ar">ar-004</span>
+                    <span class="db-tag ar">ar-005</span>
+                    <span class="db-tag ar">ar-006</span>
+                    <span class="db-tag ar">ar-007</span>
+                    <span class="db-tag ar">ar-008</span>
+                    <span class="db-tag ar">ar-009</span>
+                    <span class="db-tag ar">ar-010</span>
+                    <span class="db-tag ar">ar-011</span>
+                    <span class="db-tag ar">ar-012</span>
+                    <span class="db-tag ar">ar-013</span>
+                    <span class="db-tag ar">ar-014</span>
+                    <span class="db-tag ar">ar-015</span>
+                    <span class="db-tag ar">ar-016</span>
+                    <span class="db-tag ar">ar-017</span>
+                    <span class="db-tag ar">ar-018</span>
+                    <span class="db-tag ar">ar-019</span>
+                    <span class="db-tag ar">ar-020</span>
+                    <span class="db-tag ar">ar-021</span>
+                    <span class="db-tag ar">ar-022</span>
+                    <span class="db-tag ar">ar-023</span>
+                    <span class="db-tag ar">ar-024</span>
+                    <span class="db-tag ar">ar-025</span>
+                    <span class="db-tag ar">ar-026</span>
+                    <span class="db-tag cl">cl-001</span>
+                    <span class="db-tag py">py-001</span>
+                    <span class="db-tag uy">uy-001</span>
+                    <span class="db-tag mx">mx-001</span>
+                    <span class="db-tag bo">bo-001</span>
+                    <span class="db-tag es">es-001</span>
+                    <span class="db-tag co">co-001</span>
+                    <span class="db-tag ve">ve-001</span>
+                    <span class="db-tag system">nucleo_check_prod</span>
+                    <span class="db-tag system">nucleo_check_prod_common</span>
+                    <span class="db-tag system">ng_hub</span>
+                </div>
+
+                <div class="alert alert-info mt-4">
+                    <i class="fas fa-chart-pie text-blue-500 text-lg"></i>
+                    <div>
+                        <strong class="text-blue-800">Distribucion:</strong>
+                        <span class="text-blue-700 text-sm"> 25 bases en Argentina (ar-*), 8 en otros paises de LATAM, 1 en Espana, y 3 bases de sistema. Cada base contiene multiples empresas con schemas prefijados (1_, 2_, 3_, etc.)</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Architecture Section -->
+            <section id="architecture" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); color: #7c3aed;">
+                        <i class="fas fa-sitemap"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Arquitectura Multi-Tenant</h2>
+                        <p class="text-sm text-slate-500">Flujo de conexion y modelo de datos</p>
+                    </div>
+                </div>
+
+                <div class="architecture-diagram">
+                    <div class="flex flex-wrap items-center justify-center gap-3">
+                        <div class="arch-box">
+                            <div class="font-semibold text-sm"><i class="fas fa-globe mr-1"></i> Request HTTP</div>
+                            <div class="text-xs text-slate-500">JWT con CompanySchema</div>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                        <div class="arch-box">
+                            <div class="font-semibold text-sm"><i class="fas fa-key mr-1"></i> Claims JWT</div>
+                            <div class="text-xs text-slate-500">CompanySchema, DatabaseName, TimeZone</div>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                        <div class="arch-box highlight">
+                            <div class="font-semibold text-sm"><i class="fas fa-database mr-1"></i> NGDbContext</div>
+                            <div class="text-xs opacity-80">Connection String Dinamica</div>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                        <div class="arch-box">
+                            <div class="font-semibold text-sm"><i class="fas fa-bolt mr-1"></i> Interceptor</div>
+                            <div class="text-xs text-slate-500">Schema Prefix Injection</div>
+                        </div>
+                        <i class="fas fa-arrow-right text-slate-400"></i>
+                        <div class="arch-box">
+                            <div class="font-semibold text-sm"><i class="fas fa-server mr-1"></i> MySQL</div>
+                            <div class="text-xs text-slate-500">ar-XXX / cl-001 / etc.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Flujo de Conexion</h3>
+                <div class="code-block">
+<span class="comment">// NGDbContext.cs - Extraccion de claims del JWT</span>
+<span class="keyword">if</span> (<span class="keyword">this</span>.accessor?.HttpContext?.User?.Claims != <span class="keyword">null</span>) {
+    <span class="keyword">this</span>.Schema = <span class="keyword">this</span>.accessor.HttpContext.User.FindFirst(<span class="string">"CompanySchema"</span>).Value;  <span class="comment">// ej: "5_"</span>
+    <span class="keyword">this</span>.DatabaseName = <span class="keyword">this</span>.accessor.HttpContext.User.FindFirst(<span class="string">"CompanyDatabase"</span>).Value; <span class="comment">// ej: "ar-005"</span>
+    <span class="keyword">this</span>.TimeZone = Convert.ToInt16(<span class="keyword">this</span>.accessor.HttpContext.User.FindFirst(<span class="string">"TimeZone"</span>).Value);
+}
+
+<span class="comment">// Construccion dinamica del connection string</span>
+<span class="keyword">var</span> connectionString = <span class="type">string</span>.<span class="method">Format</span>(<span class="keyword">this</span>.connectionStrings.Value.DbConnection, <span class="keyword">this</span>.DatabaseName);
+optionsBuilder.<span class="method">UseMySql</span>(connectionString, <span class="keyword">new</span> <span class="type">MySqlServerVersion</span>(<span class="keyword">new</span> <span class="type">Version</span>(<span class="number">8</span>, <span class="number">0</span>, <span class="number">25</span>)));
+optionsBuilder.<span class="method">AddInterceptors</span>(<span class="keyword">new</span> <span class="type">NGDbSchemaInterceptor</span>(<span class="keyword">this</span>.Schema));
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-4">Modelo de Datos Multi-Tenant</h3>
+                <div class="overflow-x-auto">
+                    <table class="text-sm">
+                        <thead>
+                            <tr>
+                                <th>Componente</th>
+                                <th>Implementacion</th>
+                                <th>Ejemplo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Database Sharding</strong></td>
+                                <td>Por region/capacidad</td>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">ar-005</code>, <code class="bg-slate-100 px-2 py-1 rounded text-xs">cl-001</code>, <code class="bg-slate-100 px-2 py-1 rounded text-xs">mx-001</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Schema Prefixing</strong></td>
+                                <td>Por empresa dentro de cada DB</td>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">5_orders</code>, <code class="bg-slate-100 px-2 py-1 rounded text-xs">12_products</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Shared Tables</strong></td>
+                                <td>Tablas comunes sin prefijo</td>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">countries</code>, <code class="bg-slate-100 px-2 py-1 rounded text-xs">doc_types</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Common Database</strong></td>
+                                <td>Datos globales</td>
+                                <td><code class="bg-slate-100 px-2 py-1 rounded text-xs">nucleo_check_prod_common</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-success mt-4">
+                    <i class="fas fa-check-circle text-emerald-500 text-lg"></i>
+                    <div>
+                        <strong class="text-emerald-800">Ventajas de esta arquitectura:</strong>
+                        <ul class="text-emerald-700 text-sm mt-2 ml-4 list-disc">
+                            <li>Aislamiento de datos por empresa garantizado a nivel de schema</li>
+                            <li>Escalabilidad horizontal agregando nuevas bases de datos regionales</li>
+                            <li>Backup y restore granular por region o empresa</li>
+                            <li>Distribucion de carga entre multiples databases</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle text-red-500 text-lg"></i>
+                    <div>
+                        <strong class="text-red-800">Problemas Identificados:</strong>
+                        <ul class="text-red-700 text-sm mt-2 ml-4 list-disc">
+                            <li><strong>String Replacement en SQL:</strong> El interceptor usa string.Replace() para inyectar el schema, lo cual puede tener edge cases y overhead de procesamiento en cada query</li>
+                            <li><strong>Connection String por Request:</strong> Se crea una nueva conexion por cada request, sin aprovechar connection pooling efectivo entre empresas de la misma DB</li>
+                            <li><strong>Cache Invalidation:</strong> El query plan cache de MySQL no se beneficia del prefixing dinamico ya que cada empresa genera queries "diferentes"</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interceptors Section -->
+            <section id="interceptors" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #d97706;">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Interceptores EF Core</h2>
+                        <p class="text-sm text-slate-500">Analisis de NGDbSchemaInterceptor y TimeZoneInterceptor</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-2">1. NGDbSchemaInterceptor (309 lineas)</h3>
+                <p class="text-slate-500 text-sm mb-4">Interceptor critico que modifica TODAS las queries SQL antes de ejecutarse, agregando el prefijo del schema de la empresa.</p>
+
+                <div class="space-y-3 mb-6">
+                    <div class="interceptor-step">
+                        <div class="step-num">1</div>
+                        <div>
+                            <div class="font-semibold text-sm text-slate-800">Query Original EF Core</div>
+                            <code class="text-xs bg-slate-100 px-2 py-1 rounded">SELECT * FROM `orders` WHERE id = 5</code>
+                        </div>
+                    </div>
+                    <div class="interceptor-step">
+                        <div class="step-num">2</div>
+                        <div>
+                            <div class="font-semibold text-sm text-slate-800">String Replace Operations</div>
+                            <span class="text-xs text-slate-500">Reemplaza: <code class="bg-slate-100 px-1 rounded">FROM `</code> -> <code class="bg-slate-100 px-1 rounded">FROM `{schema}</code>, <code class="bg-slate-100 px-1 rounded">LEFT JOIN `</code> -> <code class="bg-slate-100 px-1 rounded">LEFT JOIN `{schema}</code>, etc.</span>
+                        </div>
+                    </div>
+                    <div class="interceptor-step">
+                        <div class="step-num">3</div>
+                        <div>
+                            <div class="font-semibold text-sm text-slate-800">Query Transformada</div>
+                            <code class="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">SELECT * FROM `5_orders` WHERE id = 5</code>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="comment">// NGDbSchemaInterceptor.cs - Metodo principal de transformacion</span>
+<span class="keyword">private</span> <span class="type">string</span> <span class="method">SetSchemaTableNamesTableNames</span>(<span class="type">string</span> query)
+{
+    query = query.<span class="method">Replace</span>(<span class="string">"FROM `"</span>, $<span class="string">"FROM `{companySchema}"</span>)
+                 .<span class="method">Replace</span>(<span class="string">"LEFT JOIN `"</span>, $<span class="string">"LEFT JOIN `{companySchema}"</span>)
+                 .<span class="method">Replace</span>(<span class="string">"RIGHT JOIN `"</span>, $<span class="string">"RIGHT JOIN `{companySchema}"</span>)
+                 .<span class="method">Replace</span>(<span class="string">"INNER JOIN `"</span>, $<span class="string">"INNER JOIN `{companySchema}"</span>)
+                 .<span class="method">Replace</span>(<span class="string">"INTO `"</span>, $<span class="string">"INTO `{companySchema}"</span>)
+                 .<span class="method">Replace</span>(<span class="string">"UPDATE `"</span>, $<span class="string">"UPDATE `{companySchema}"</span>)
+                 <span class="comment">// Excepciones para funciones MySQL</span>
+                 .<span class="method">Replace</span>($<span class="string">"minute FROM `{companySchema}"</span>, $<span class="string">"minute FROM `"</span>)
+                 .<span class="method">Replace</span>($<span class="string">"hour FROM `{companySchema}"</span>, $<span class="string">"hour FROM `"</span>);
+    <span class="keyword">return</span> query;
+}
+                </div>
+
+                <div class="alert alert-warning">
+                    <i class="fas fa-tachometer-alt text-amber-500 text-lg"></i>
+                    <div>
+                        <strong class="text-amber-800">Impacto en Performance:</strong>
+                        <span class="text-amber-700 text-sm"> Este interceptor procesa CADA query con multiples string.Replace(). Para queries complejas con muchos JOINs, esto puede agregar latencia significativa. Considerar usar <code>Span&lt;char&gt;</code> o <code>StringBuilder</code> para optimizar.</span>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-2">2. TimeZoneInterceptor (52 lineas)</h3>
+                <p class="text-slate-500 text-sm mb-4">SaveChangesInterceptor que automaticamente establece la propiedad <code class="bg-slate-100 px-1 rounded">CurrentTimeZone</code> en todas las entidades antes de guardar.</p>
+
+                <div class="code-block">
+<span class="comment">// TimeZoneInterceptor.cs</span>
+<span class="keyword">private</span> <span class="keyword">void</span> <span class="method">SetTimeZone</span>(<span class="type">DbContext</span> context) {
+    <span class="keyword">foreach</span> (<span class="keyword">var</span> entry <span class="keyword">in</span> context.ChangeTracker.<span class="method">Entries</span>()) {
+        <span class="keyword">var</span> propertyInfo = entry.Entity.<span class="method">GetType</span>().<span class="method">GetProperty</span>(<span class="string">"CurrentTimeZone"</span>);
+        <span class="keyword">if</span> (propertyInfo != <span class="keyword">null</span> && propertyInfo.CanWrite) {
+            propertyInfo.<span class="method">SetValue</span>(entry.Entity, _timeZoneValue, <span class="keyword">null</span>);
+        }
+    }
+}
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="fas fa-lightbulb text-blue-500 text-lg"></i>
+                    <div>
+                        <strong class="text-blue-800">Sugerencia:</strong>
+                        <span class="text-blue-700 text-sm"> Usar reflection en cada SaveChanges es costoso. Considerar implementar una interface <code>ITimeZoneEntity</code> para evitar reflection.</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Repositories Section -->
+            <section id="repositories" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); color: #16a34a;">
+                        <i class="fas fa-folder-open"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Analisis de Repositorios</h2>
+                        <p class="text-sm text-slate-500">85 archivos analizados</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Repositorios Criticos Analizados</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>OrderRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>1,336 lineas</span>
+                            <span class="text-red-500 font-medium">25+ Include chains</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>StatsRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>1,596 lineas</span>
+                            <span class="text-amber-500 font-medium">Stored procedures</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>ProductRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>1,570 lineas</span>
+                            <span class="text-red-500 font-medium">11+ Include chains</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>CashDrawerRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>787 lineas</span>
+                            <span class="text-amber-500 font-medium">Queries complejos</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>CustomerRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>578 lineas</span>
+                            <span class="text-emerald-500 font-medium"><i class="fas fa-check mr-1"></i>Bien optimizado</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>EmployeeRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>376 lineas</span>
+                            <span class="text-amber-500 font-medium">Include con filtros</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>TableRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>413 lineas</span>
+                            <span class="text-red-500 font-medium">5+ Include chains</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>InvoiceRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>294 lineas</span>
+                            <span class="text-red-500 font-medium">Paginacion en memoria</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>KitchenOrderRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>263 lineas</span>
+                            <span class="text-emerald-500 font-medium"><i class="fas fa-check mr-1"></i>Usa AsSplitQuery</span>
+                        </div>
+                    </div>
+                    <div class="repo-card">
+                        <div class="name"><i class="fas fa-file-code mr-1"></i>InventoryRepository.cs</div>
+                        <div class="flex gap-3 text-xs text-slate-500">
+                            <span>243 lineas</span>
+                            <span class="text-emerald-500 font-medium"><i class="fas fa-check mr-1"></i>Usa proyecciones</span>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Patrones Problematicos Encontrados</h3>
+                <div class="overflow-x-auto">
+                    <table class="text-sm">
+                        <thead>
+                            <tr>
+                                <th>Patron</th>
+                                <th>Ocurrencias</th>
+                                <th>Impacto</th>
+                                <th>Repositorios Afectados</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Include() chains excesivos (5+)</td>
+                                <td>15+</td>
+                                <td><span class="impact-badge impact-high">Alto</span></td>
+                                <td>Order, Product, Table, Employee</td>
+                            </tr>
+                            <tr>
+                                <td>ThenInclude() anidados profundos</td>
+                                <td>10+</td>
+                                <td><span class="impact-badge impact-high">Alto</span></td>
+                                <td>Order, Product, Table</td>
+                            </tr>
+                            <tr>
+                                <td>Falta de AsNoTracking()</td>
+                                <td>50+</td>
+                                <td><span class="impact-badge impact-medium">Medio</span></td>
+                                <td>Todos los repositorios</td>
+                            </tr>
+                            <tr>
+                                <td>ToList() antes de paginacion</td>
+                                <td>3</td>
+                                <td><span class="impact-badge impact-high">Alto</span></td>
+                                <td>Invoice, Product</td>
+                            </tr>
+                            <tr>
+                                <td>Falta de AsSplitQuery()</td>
+                                <td>20+</td>
+                                <td><span class="impact-badge impact-high">Alto</span></td>
+                                <td>Order, Product, Table, Employee</td>
+                            </tr>
+                            <tr>
+                                <td>Reflection en loops</td>
+                                <td>2</td>
+                                <td><span class="impact-badge impact-medium">Medio</span></td>
+                                <td>TimeZoneInterceptor</td>
+                            </tr>
+                            <tr>
+                                <td>N+1 Queries potenciales</td>
+                                <td>8+</td>
+                                <td><span class="impact-badge impact-high">Alto</span></td>
+                                <td>CashDrawer, Employee, Inventory</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Queries Section -->
+            <section id="queries" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #dc2626;">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Queries Criticos Identificados</h2>
+                        <p class="text-sm text-slate-500">Para optimizacion inmediata</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Prioridad P0 - Criticos (Impacto Inmediato)</h3>
+                <div class="overflow-x-auto mb-6">
+                    <table class="text-sm">
+                        <thead>
+                            <tr>
+                                <th>Query</th>
+                                <th>Archivo:Linea</th>
+                                <th>Problema</th>
+                                <th>Includes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="bg-red-50 text-red-700 px-2 py-1 rounded text-xs">GetOrderDTOByIdAsync</code></td>
+                                <td class="text-xs">OrderRepository.cs:63-208</td>
+                                <td>Cartesian explosion masivo</td>
+                                <td><span class="priority-badge priority-p0">25+</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-red-50 text-red-700 px-2 py-1 rounded text-xs">GetOrderDetailByIdAsync</code></td>
+                                <td class="text-xs">OrderRepository.cs:520-649</td>
+                                <td>Carga completa de order con items</td>
+                                <td><span class="priority-badge priority-p0">18+</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-red-50 text-red-700 px-2 py-1 rounded text-xs">GetPendingOrdersAsync</code></td>
+                                <td class="text-xs">OrderRepository.cs:894-966</td>
+                                <td>Lista con includes profundos</td>
+                                <td><span class="priority-badge priority-p0">12+</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-red-50 text-red-700 px-2 py-1 rounded text-xs">GetProductDTOByIdAsync</code></td>
+                                <td class="text-xs">ProductRepository.cs:326-510</td>
+                                <td>Producto con todas las relaciones</td>
+                                <td><span class="priority-badge priority-p0">11+</span></td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-red-50 text-red-700 px-2 py-1 rounded text-xs">GetRestaurantTemporaryTableDetailByTableIdAsync</code></td>
+                                <td class="text-xs">TableRepository.cs:221-272</td>
+                                <td>5 ThenInclude anidados</td>
+                                <td><span class="priority-badge priority-p0">8+</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Prioridad P1 - Altos</h3>
+                <div class="overflow-x-auto mb-6">
+                    <table class="text-sm">
+                        <thead>
+                            <tr>
+                                <th>Query</th>
+                                <th>Archivo:Linea</th>
+                                <th>Problema</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs">GetDeliveryOrderAsync</code></td>
+                                <td class="text-xs">OrderRepository.cs:983-1075</td>
+                                <td>Order completa para delivery</td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs">GetPagedProductListDTOsAsync</code></td>
+                                <td class="text-xs">ProductRepository.cs:589-744</td>
+                                <td>Paginacion con sorting complejo</td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs">GetCashDrawerListDTOsAsync</code></td>
+                                <td class="text-xs">CashDrawerRepository.cs:191-279</td>
+                                <td>N+1 para usuarios</td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs">GetPagedInvoicesAsync</code></td>
+                                <td class="text-xs">InvoiceRepository.cs:65-161</td>
+                                <td>ToList() antes de Skip/Take</td>
+                            </tr>
+                            <tr>
+                                <td><code class="bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs">GetEmployeeDTOByIdAsync</code></td>
+                                <td class="text-xs">EmployeeRepository.cs:289-329</td>
+                                <td>mapper.Map dentro de Select</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Ejemplo de Cartesian Explosion</h3>
+                <div class="alert alert-danger">
+                    <i class="fas fa-bomb text-red-500 text-lg"></i>
+                    <div>
+                        <strong class="text-red-800">GetOrderDTOByIdAsync - Explosion Cartesiana:</strong>
+                        <span class="text-red-700 text-sm"> Una orden con 10 items x 3 opciones x 2 observaciones = <strong>60 filas</strong> por cada include de coleccion. Con 25+ includes, el resultado puede ser de <strong>miles de filas</strong> que EF Core debe procesar y deduplicar.</span>
+                    </div>
+                </div>
+
+                <div class="code-block">
+<span class="comment">// ANTES - OrderRepository.cs (Cartesian Explosion)</span>
+<span class="keyword">return</span> <span class="keyword">await</span> query
+    .<span class="method">Include</span>(p => p.Items)
+        .<span class="method">ThenInclude</span>(i => i.Product)
+    .<span class="method">Include</span>(p => p.Items)
+        .<span class="method">ThenInclude</span>(i => i.Options)
+            .<span class="method">ThenInclude</span>(o => o.ProductOption)
+    .<span class="method">Include</span>(p => p.Items)
+        .<span class="method">ThenInclude</span>(i => i.Observations)
+    .<span class="method">Include</span>(p => p.Payments)
+        .<span class="method">ThenInclude</span>(p => p.PaymentType)
+    <span class="comment">// ... 20+ mas includes ...</span>
+    .<span class="method">SingleOrDefaultAsync</span>(p => p.Id == orderId);
+
+<span class="comment">// DESPUES - Con AsSplitQuery()</span>
+<span class="keyword">return</span> <span class="keyword">await</span> query
+    .<span class="method">Include</span>(p => p.Items)
+        .<span class="method">ThenInclude</span>(i => i.Product)
+    .<span class="method">Include</span>(p => p.Items)
+        .<span class="method">ThenInclude</span>(i => i.Options)
+    <span class="comment">// ... mismos includes ...</span>
+    .<span class="method">AsSplitQuery</span>()  <span class="comment">// SOLUCION: Divide en queries separadas</span>
+    .<span class="method">AsNoTracking</span>()  <span class="comment">// BONUS: -30% memoria si es read-only</span>
+    .<span class="method">SingleOrDefaultAsync</span>(p => p.Id == orderId);
+                </div>
+            </section>
+
+            <!-- Optimizations Section -->
+            <section id="optimizations" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); color: #2563eb;">
+                        <i class="fas fa-magic"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Optimizaciones EF Core</h2>
+                        <p class="text-sm text-slate-500">Tecnicas recomendadas</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);">
+                                <i class="fas fa-book text-emerald-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">AsNoTracking()</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-3">Deshabilita el change tracking para queries de solo lectura. Reduce uso de memoria 30-40%.</p>
+                        <ul class="text-sm text-slate-600 ml-4 list-disc mb-3">
+                            <li>Usar en todos los GET que no modifican datos</li>
+                            <li>Especialmente importante en listas y reportes</li>
+                            <li>No usar si la entidad sera actualizada despues</li>
+                        </ul>
+                        <div class="metric-comparison">
+                            <span class="before">Con Tracking: 150ms</span>
+                            <span class="arrow"><i class="fas fa-arrow-right"></i></span>
+                            <span class="after">Sin Tracking: 95ms</span>
+                            <span class="improvement">-37%</span>
+                        </div>
+                    </div>
+
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);">
+                                <i class="fas fa-random text-violet-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">AsSplitQuery()</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-3">Divide queries con multiples Include() en queries separadas, evitando la explosion cartesiana.</p>
+                        <ul class="text-sm text-slate-600 ml-4 list-disc mb-3">
+                            <li>Usar cuando hay 3+ Include() con colecciones</li>
+                            <li>Especialmente con ThenInclude() anidados</li>
+                            <li>Trade-off: mas round-trips pero menos datos</li>
+                        </ul>
+                        <div class="metric-comparison">
+                            <span class="before">Single Query: 2.5s</span>
+                            <span class="arrow"><i class="fas fa-arrow-right"></i></span>
+                            <span class="after">Split Query: 0.4s</span>
+                            <span class="improvement">-84%</span>
+                        </div>
+                    </div>
+
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                                <i class="fas fa-filter text-amber-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Select() Proyecciones</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-3">Proyectar solo los campos necesarios en lugar de cargar entidades completas.</p>
+                        <ul class="text-sm text-slate-600 ml-4 list-disc mb-3">
+                            <li>Reduce transferencia de datos del servidor</li>
+                            <li>Evita cargar columnas innecesarias</li>
+                            <li>Ideal para listas y DTOs</li>
+                        </ul>
+                        <div class="metric-comparison">
+                            <span class="before">Full Entity: 500KB</span>
+                            <span class="arrow"><i class="fas fa-arrow-right"></i></span>
+                            <span class="after">Projection: 50KB</span>
+                            <span class="improvement">-90%</span>
+                        </div>
+                    </div>
+
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%);">
+                                <i class="fas fa-bolt text-cyan-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Compiled Queries</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-3">Pre-compilar queries frecuentes para evitar el overhead de traduccion LINQ -> SQL.</p>
+                        <ul class="text-sm text-slate-600 ml-4 list-disc mb-3">
+                            <li>Ideal para queries ejecutadas miles de veces</li>
+                            <li>Mejora 10-15% en queries simples</li>
+                            <li>Requiere definicion estatica</li>
+                        </ul>
+                        <div class="code-block text-xs">
+<span class="keyword">private static readonly</span> Func&lt;NGDbContext, <span class="type">int</span>, Task&lt;Order&gt;&gt; _getOrderById =
+    EF.<span class="method">CompileAsyncQuery</span>((NGDbContext ctx, <span class="type">int</span> id) =>
+        ctx.Orders.<span class="method">FirstOrDefault</span>(o => o.Id == id));
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-4">Codigo de Ejemplo: Optimizacion Completa</h3>
+                <div class="code-block">
+<span class="comment">// ANTES - Query problematico</span>
+<span class="keyword">public async</span> Task&lt;List&lt;OrderListDTO&gt;&gt; <span class="method">GetPendingOrdersAsync</span>()
+{
+    <span class="keyword">return await</span> dbContext.Orders
+        .<span class="method">Include</span>(o => o.Items).<span class="method">ThenInclude</span>(i => i.Product)
+        .<span class="method">Include</span>(o => o.Items).<span class="method">ThenInclude</span>(i => i.Options)
+        .<span class="method">Include</span>(o => o.Customer)
+        .<span class="method">Include</span>(o => o.Payments)
+        .<span class="method">Where</span>(o => o.Status == OrderStatus.Pending)
+        .<span class="method">ToListAsync</span>();  <span class="comment">// Carga TODO en memoria</span>
+}
+
+<span class="comment">// DESPUES - Query optimizado</span>
+<span class="keyword">public async</span> Task&lt;List&lt;OrderListDTO&gt;&gt; <span class="method">GetPendingOrdersAsync</span>()
+{
+    <span class="keyword">return await</span> dbContext.Orders
+        .<span class="method">AsNoTracking</span>()  <span class="comment">// 1. Sin tracking</span>
+        .<span class="method">Where</span>(o => o.Status == OrderStatus.Pending)  <span class="comment">// 2. Filtrar primero</span>
+        .<span class="method">Select</span>(o => <span class="keyword">new</span> OrderListDTO  <span class="comment">// 3. Proyeccion</span>
+        {
+            Id = o.Id,
+            CustomerName = o.Customer.Name,
+            Total = o.Total,
+            ItemCount = o.Items.<span class="method">Count</span>(),
+            Date = o.StartDate
+        })
+        .<span class="method">ToListAsync</span>();
+}
+                </div>
+            </section>
+
+            <!-- Technologies Section -->
+            <section id="technologies" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); color: #dc2626;">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Tecnologias y Patrones Recomendados</h2>
+                        <p class="text-sm text-slate-500">Herramientas adicionales para optimizacion</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-red-100">
+                                <i class="fas fa-database text-red-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Redis Cache</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2">Expandir el uso de Redis para cachear queries frecuentes y datos de configuracion por empresa.</p>
+                        <ul class="text-xs text-slate-500 ml-4 list-disc">
+                            <li>Cache de productos (cambian poco)</li>
+                            <li>Cache de configuracion por companyId</li>
+                            <li>Session cache</li>
+                            <li>Output cache para endpoints frecuentes</li>
+                        </ul>
+                    </div>
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-100">
+                                <i class="fas fa-plug text-blue-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Connection Pooling</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2">Optimizar el pooling de conexiones para arquitectura multi-tenant con multiples databases.</p>
+                        <ul class="text-xs text-slate-500 ml-4 list-disc">
+                            <li>Usar MySqlConnector con pooling configurado</li>
+                            <li>Pool separado por database</li>
+                            <li>Min: 5, Max: 50 por database</li>
+                            <li>Connection lifetime: 5 minutos</li>
+                        </ul>
+                    </div>
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-100">
+                                <i class="fas fa-layer-group text-emerald-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Read Replicas</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2">Azure MySQL soporta hasta 10 read replicas para distribuir carga de lectura.</p>
+                        <ul class="text-xs text-slate-500 ml-4 list-disc">
+                            <li>Replica para reportes y estadisticas</li>
+                            <li>Replica para queries de solo lectura</li>
+                            <li>Reduce carga en el servidor principal</li>
+                            <li>Latencia ~100ms de replicacion</li>
+                        </ul>
+                    </div>
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-100">
+                                <i class="fas fa-boxes text-amber-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Batch Operations</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2">Usar EF Core Bulk Extensions para operaciones masivas.</p>
+                        <ul class="text-xs text-slate-500 ml-4 list-disc">
+                            <li>BulkInsert para insercion masiva</li>
+                            <li>BulkUpdate para actualizaciones en lote</li>
+                            <li>ExecuteUpdate/Delete de EF Core 7+</li>
+                            <li>Reduce de N llamadas a 1 llamada</li>
+                        </ul>
+                    </div>
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-violet-100">
+                                <i class="fas fa-search text-violet-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">Query Performance Insights</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2">Habilitar Query Performance Insights en Azure para identificar queries lentas.</p>
+                        <ul class="text-xs text-slate-500 ml-4 list-disc">
+                            <li>Ya tienen slow_query_log en ON</li>
+                            <li>Bajar long_query_time de 7s a 1s</li>
+                            <li>Usar Azure Query Performance Insights</li>
+                            <li>Alertas automaticas</li>
+                        </ul>
+                    </div>
+                    <div class="tech-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-lg flex items-center justify-center bg-cyan-100">
+                                <i class="fas fa-project-diagram text-cyan-600"></i>
+                            </div>
+                            <h4 class="font-semibold text-slate-800">CQRS Pattern</h4>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-2">Separar comandos (escritura) de queries (lectura) para optimizar cada path.</p>
+                        <ul class="text-xs text-slate-500 ml-4 list-disc">
+                            <li>Queries: Usar Dapper para max performance</li>
+                            <li>Commands: Mantener EF Core para validacion</li>
+                            <li>Diferentes modelos para read vs write</li>
+                            <li>Ideal para reportes complejos</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Parametros MySQL Recomendados para Actualizar</h3>
+                <div class="code-block">
+<span class="comment"># Comandos Azure CLI para actualizar parametros</span>
+
+<span class="comment"># Aumentar IO capacity para SSD</span>
+az mysql flexible-server parameter set \
+    --resource-group Nucleo-Check_Dev \
+    --server-name nucleo-check-prod-srv \
+    --name innodb_io_capacity \
+    --value 1000
+
+<span class="comment"># Aumentar thread cache para conexiones frecuentes</span>
+az mysql flexible-server parameter set \
+    --resource-group Nucleo-Check_Dev \
+    --server-name nucleo-check-prod-srv \
+    --name thread_cache_size \
+    --value 50
+
+<span class="comment"># Aumentar table open cache para multi-tenant</span>
+az mysql flexible-server parameter set \
+    --resource-group Nucleo-Check_Dev \
+    --server-name nucleo-check-prod-srv \
+    --name table_open_cache \
+    --value 4000
+
+<span class="comment"># Reducir slow query threshold para mejor monitoreo</span>
+az mysql flexible-server parameter set \
+    --resource-group Nucleo-Check_Dev \
+    --server-name nucleo-check-prod-srv \
+    --name long_query_time \
+    --value 2
+
+<span class="comment"># Aumentar tmp_table_size para queries complejos</span>
+az mysql flexible-server parameter set \
+    --resource-group Nucleo-Check_Dev \
+    --server-name nucleo-check-prod-srv \
+    --name tmp_table_size \
+    --value 67108864
+                </div>
+            </section>
+
+            <!-- Plan Section -->
+            <section id="plan" class="section-card fade-in">
+                <div class="section-header">
+                    <div class="section-icon" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); color: #16a34a;">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">Plan de Implementacion</h2>
+                        <p class="text-sm text-slate-500">Fases de optimizacion</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Fase 1: Quick Wins (Impacto Inmediato)</h3>
+                <div class="recommendation-timeline mb-8">
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Agregar AsSplitQuery() a los 5 queries P0</strong>
+                        <p class="text-sm text-slate-500">OrderRepository: GetOrderDTOByIdAsync, GetOrderDetailByIdAsync, GetPendingOrdersAsync<br>ProductRepository: GetProductDTOByIdAsync<br>TableRepository: GetRestaurantTemporaryTableDetailByTableIdAsync</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Agregar AsNoTracking() a queries de solo lectura</strong>
+                        <p class="text-sm text-slate-500">Todos los metodos Get* que no modifican entidades despues</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Actualizar parametros MySQL en Azure</strong>
+                        <p class="text-sm text-slate-500">innodb_io_capacity, thread_cache_size, table_open_cache, long_query_time</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Fase 2: Refactoring Medio</h3>
+                <div class="recommendation-timeline mb-8">
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Corregir paginacion en InvoiceRepository</strong>
+                        <p class="text-sm text-slate-500">Mover Skip/Take antes del ToListAsync() para paginar en BD</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Implementar proyecciones Select() en listas</strong>
+                        <p class="text-sm text-slate-500">Reemplazar Include + AutoMapper por Select directo a DTOs</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Optimizar NGDbSchemaInterceptor</strong>
+                        <p class="text-sm text-slate-500">Usar Span&lt;char&gt; o StringBuilder en lugar de string.Replace() multiples</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Implementar ITimeZoneEntity interface</strong>
+                        <p class="text-sm text-slate-500">Evitar reflection en TimeZoneInterceptor</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Fase 3: Optimizacion Avanzada</h3>
+                <div class="recommendation-timeline mb-8">
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Implementar cache Redis para configuraciones</strong>
+                        <p class="text-sm text-slate-500">Cachear SystemConfiguration, productos, categorias por empresa</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Evaluar Read Replica para reportes</strong>
+                        <p class="text-sm text-slate-500">Mover StatsRepository y reportes a replica de lectura</p>
+                    </div>
+                    <div class="timeline-item">
+                        <strong class="text-slate-800">Implementar Compiled Queries para operaciones frecuentes</strong>
+                        <p class="text-sm text-slate-500">GetOrderById, GetProductById, GetCustomerById</p>
+                    </div>
+                </div>
+
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">ROI Estimado</h3>
+                <div class="overflow-x-auto">
+                    <table class="text-sm">
+                        <thead>
+                            <tr>
+                                <th>Optimizacion</th>
+                                <th>Esfuerzo</th>
+                                <th>Mejora Esperada</th>
+                                <th>Prioridad</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>AsSplitQuery() en queries P0</td>
+                                <td>2-4 horas</td>
+                                <td class="text-emerald-600 font-semibold">50-80% en queries afectados</td>
+                                <td><span class="priority-badge priority-p0">P0</span></td>
+                            </tr>
+                            <tr>
+                                <td>AsNoTracking() global</td>
+                                <td>4-8 horas</td>
+                                <td class="text-emerald-600 font-semibold">20-30% memoria</td>
+                                <td><span class="priority-badge priority-p0">P0</span></td>
+                            </tr>
+                            <tr>
+                                <td>Parametros MySQL</td>
+                                <td>1 hora</td>
+                                <td class="text-emerald-600 font-semibold">10-20% general</td>
+                                <td><span class="priority-badge priority-p1">P1</span></td>
+                            </tr>
+                            <tr>
+                                <td>Proyecciones Select()</td>
+                                <td>1-2 semanas</td>
+                                <td class="text-emerald-600 font-semibold">40-60% transferencia</td>
+                                <td><span class="priority-badge priority-p1">P1</span></td>
+                            </tr>
+                            <tr>
+                                <td>Cache Redis expandido</td>
+                                <td>2-3 semanas</td>
+                                <td class="text-emerald-600 font-semibold">30-50% latencia</td>
+                                <td><span class="priority-badge priority-p2">P2</span></td>
+                            </tr>
+                            <tr>
+                                <td>Read Replica</td>
+                                <td>1 semana config</td>
+                                <td class="text-emerald-600 font-semibold">50% carga en primary</td>
+                                <td><span class="priority-badge priority-p2">P2</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <footer class="text-center py-8 border-t border-slate-200 mt-8">
+                <p class="text-slate-500 text-sm">Analisis generado por Claude Code | NGCheck Performance Analysis 2026</p>
+                <p class="text-slate-400 text-xs mt-2">
+                    Servidor: nucleo-check-prod-srv.mysql.database.azure.com |
+                    Repositorios analizados: 85 |
+                    Bases de datos: 40
+                </p>
+            </footer>
+
+        </div>
+    </main>
+
+    <script>
+        // Scroll behavior for top bar
+        const topBar = document.querySelector('.top-bar');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                topBar.classList.add('scrolled');
+            } else {
+                topBar.classList.remove('scrolled');
+            }
+        });
+
+        // Intersection Observer for fade-in animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+        // Sidebar active link on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const sidebarLinks = document.querySelectorAll('.sidebar-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                if (window.scrollY >= sectionTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            sidebarLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
