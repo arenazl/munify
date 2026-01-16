@@ -32,11 +32,79 @@ class TipoTramiteUpdate(BaseModel):
 
 class TipoTramiteResponse(TipoTramiteBase):
     id: int
-    municipio_id: int
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+# ==================== Municipio-TipoTramite (Tabla intermedia) ====================
+
+class MunicipioTipoTramiteCreate(BaseModel):
+    tipo_tramite_id: int
+    activo: bool = True
+    orden: int = 0
+
+
+class MunicipioTipoTramiteResponse(BaseModel):
+    id: int
+    municipio_id: int
+    tipo_tramite_id: int
+    activo: bool
+    orden: int
+    created_at: datetime
+    tipo_tramite: Optional[TipoTramiteResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Municipio-Tramite (Tabla intermedia) ====================
+
+class MunicipioTramiteCreate(BaseModel):
+    tramite_id: int
+    activo: bool = True
+    orden: int = 0
+    tiempo_estimado_dias: Optional[int] = None
+    costo: Optional[float] = None
+    requisitos: Optional[str] = None
+    documentos_requeridos: Optional[str] = None
+
+
+class MunicipioTramiteResponse(BaseModel):
+    id: int
+    municipio_id: int
+    tramite_id: int
+    activo: bool
+    orden: int
+    tiempo_estimado_dias: Optional[int] = None
+    costo: Optional[float] = None
+    requisitos: Optional[str] = None
+    documentos_requeridos: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== Detección de duplicados ====================
+
+class DuplicadoSugerido(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str] = None
+    similitud: float  # 0-100
+
+
+class CheckDuplicadosRequest(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+
+
+class CheckDuplicadosResponse(BaseModel):
+    hay_duplicados: bool
+    duplicados: List[DuplicadoSugerido] = []
+    mensaje: Optional[str] = None
 
 
 # ==================== Tramite (Trámites específicos) ====================

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, Enum, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
@@ -18,18 +18,18 @@ class EstadoSolicitud(str, enum.Enum):
 
 class TipoTramite(Base):
     """
-    Nivel 1: Categorías principales de trámites (~15)
+    Nivel 1: Categorías principales de trámites - CATÁLOGO GENÉRICO
     Ejemplo: Obras Privadas, Comercio, Tránsito, Rentas, Salud
+    Los municipios habilitan tipos mediante MunicipioTipoTramite
     """
     __tablename__ = "tipos_tramites"
 
     id = Column(Integer, primary_key=True, index=True)
-    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
-    municipio = relationship("Municipio", back_populates="tipos_tramites")
+    # Ya no tiene municipio_id - es genérico
 
-    nombre = Column(String(200), nullable=False)
+    nombre = Column(String(200), nullable=False, unique=True)
     descripcion = Column(Text, nullable=True)
-    codigo = Column(String(50), nullable=True)
+    codigo = Column(String(50), nullable=True, unique=True)
     icono = Column(String(50), nullable=True)
     color = Column(String(20), nullable=True)
 
@@ -41,13 +41,38 @@ class TipoTramite(Base):
 
     # Relaciones
     tramites = relationship("Tramite", back_populates="tipo_tramite", order_by="Tramite.orden")
+    municipios_habilitados = relationship("MunicipioTipoTramite", back_populates="tipo_tramite")
+
+
+class MunicipioTipoTramite(Base):
+    """
+    Tabla intermedia: Qué tipos de trámite tiene habilitado cada municipio
+    """
+    __tablename__ = "municipio_tipos_tramites"
+    __table_args__ = (
+        UniqueConstraint('municipio_id', 'tipo_tramite_id', name='uq_municipio_tipo_tramite'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
+    tipo_tramite_id = Column(Integer, ForeignKey("tipos_tramites.id"), nullable=False, index=True)
+
+    activo = Column(Boolean, default=True)
+    orden = Column(Integer, default=0)  # Orden personalizado por municipio
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relaciones
+    municipio = relationship("Municipio", back_populates="tipos_tramites_habilitados")
+    tipo_tramite = relationship("TipoTramite", back_populates="municipios_habilitados")
 
 
 class Tramite(Base):
     """
-    Nivel 2: Trámites específicos dentro de cada tipo (~500 total)
+    Nivel 2: Trámites específicos dentro de cada tipo - CATÁLOGO GENÉRICO
     Ejemplo: [Obras] Permiso de obra nueva, Ampliación, Regularización
              [Comercio] Habilitación comercial, Renovación, Cambio de rubro
+    Los municipios habilitan trámites mediante MunicipioTramite
     """
     __tablename__ = "tramites"
 
@@ -59,11 +84,11 @@ class Tramite(Base):
     descripcion = Column(Text, nullable=True)
     icono = Column(String(50), nullable=True)
 
-    # Requisitos y documentación
+    # Requisitos y documentación (valores por defecto, municipios pueden personalizar)
     requisitos = Column(Text, nullable=True)
     documentos_requeridos = Column(Text, nullable=True)
 
-    # Info del trámite
+    # Info del trámite (valores por defecto)
     tiempo_estimado_dias = Column(Integer, default=15)
     costo = Column(Float, nullable=True)
     url_externa = Column(String(500), nullable=True)
@@ -76,6 +101,37 @@ class Tramite(Base):
 
     # Relaciones
     solicitudes = relationship("Solicitud", back_populates="tramite")
+    municipios_habilitados = relationship("MunicipioTramite", back_populates="tramite")
+
+
+class MunicipioTramite(Base):
+    """
+    Tabla intermedia: Qué trámites tiene habilitado cada municipio
+    Permite personalizar tiempo, costo, requisitos por municipio
+    """
+    __tablename__ = "municipio_tramites"
+    __table_args__ = (
+        UniqueConstraint('municipio_id', 'tramite_id', name='uq_municipio_tramite'),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
+    tramite_id = Column(Integer, ForeignKey("tramites.id"), nullable=False, index=True)
+
+    activo = Column(Boolean, default=True)
+    orden = Column(Integer, default=0)
+
+    # Personalizaciones por municipio (NULL = usar valor genérico)
+    tiempo_estimado_dias = Column(Integer, nullable=True)
+    costo = Column(Float, nullable=True)
+    requisitos = Column(Text, nullable=True)
+    documentos_requeridos = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relaciones
+    municipio = relationship("Municipio", back_populates="tramites_habilitados")
+    tramite = relationship("Tramite", back_populates="municipios_habilitados")
 
 
 class Solicitud(Base):

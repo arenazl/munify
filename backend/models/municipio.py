@@ -59,8 +59,11 @@ class Municipio(Base):
     empleados = relationship("Empleado", back_populates="municipio")
     reclamos = relationship("Reclamo", back_populates="municipio")
     whatsapp_config = relationship("WhatsAppConfig", back_populates="municipio", uselist=False)
-    tipos_tramites = relationship("TipoTramite", back_populates="municipio")
     solicitudes = relationship("Solicitud", back_populates="municipio")
+
+    # Relaciones con catálogo de trámites (muchos a muchos via tablas intermedias)
+    tipos_tramites_habilitados = relationship("MunicipioTipoTramite", back_populates="municipio")
+    tramites_habilitados = relationship("MunicipioTramite", back_populates="municipio")
 
     def __repr__(self):
         return f"<Municipio {self.nombre}>"

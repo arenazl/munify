@@ -30,7 +30,9 @@
       "Bash(findstr:*)",
       "Bash(ping:*)",
       "Bash(taskkill //F //PID 154876)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:gestion-municipal-landing.netlify.app)",
+      "WebFetch(domain:screenrec.com)"
     ],
     "deny": [],
     "ask": []

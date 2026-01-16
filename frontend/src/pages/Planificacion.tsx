@@ -25,6 +25,7 @@ import { planificacionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { toast } from 'sonner';
 import { ModernSelect, SelectOption } from '../components/ui/ModernSelect';
+import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 
 // Tipos
 interface CategoriaMinima {
@@ -393,29 +394,73 @@ export default function Planificacion() {
     );
   }
 
+  // Panel de filtros expandible
+  const filterPanel = showFilters ? (
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Filtro por empleado */}
+        <ModernSelect
+          value={filtroEmpleado?.toString() || ''}
+          onChange={(value) => setFiltroEmpleado(value ? parseInt(value) : null)}
+          options={empleadoOptions}
+          placeholder="Todos los empleados"
+          label="Empleado"
+          searchable={true}
+        />
+
+        {/* Filtro por tipo */}
+        <ModernSelect
+          value={filtroTipo}
+          onChange={(value) => setFiltroTipo(value)}
+          options={tipoOptions}
+          placeholder="Todos los tipos"
+          label="Tipo"
+        />
+
+        {/* Filtro por categoría */}
+        <ModernSelect
+          value={filtroCategoria?.toString() || ''}
+          onChange={(value) => setFiltroCategoria(value ? parseInt(value) : null)}
+          options={categoriaOptions}
+          placeholder="Todas las categorías"
+          label="Categoría / Skill"
+          searchable={true}
+        />
+      </div>
+
+      {/* Botón limpiar filtros */}
+      {(filtroEmpleado || filtroTipo || filtroCategoria) && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => {
+              setFiltroEmpleado(null);
+              setFiltroTipo('');
+              setFiltroCategoria(null);
+            }}
+            className="px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-all hover:opacity-80"
+            style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+          >
+            <X className="w-4 h-4" />
+            Limpiar filtros
+          </button>
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div
-        className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <CalendarDays className="w-5 h-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-              Planificación Semanal
-            </h1>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              {formatMonthYear(currentWeekStart)}
-            </p>
-          </div>
-        </div>
+      {/* Header Sticky con componente reutilizable */}
+      <StickyPageHeader filterPanel={filterPanel}>
+        <PageTitleIcon icon={<CalendarDays className="h-4 w-4" />} />
+        <PageTitle>Planificación</PageTitle>
+
+        {/* Subtítulo con mes/año */}
+        <span className="text-sm hidden sm:block" style={{ color: theme.textSecondary }}>
+          {formatMonthYear(currentWeekStart)}
+        </span>
+
+        <HeaderSeparator />
 
         {/* Controles de navegación */}
         <div className="flex items-center gap-2">
@@ -471,64 +516,7 @@ export default function Planificacion() {
             )}
           </button>
         </div>
-      </div>
-
-      {/* Filtros expandibles */}
-      {showFilters && (
-        <div
-          className="p-4 rounded-xl"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Filtro por empleado */}
-            <ModernSelect
-              value={filtroEmpleado?.toString() || ''}
-              onChange={(value) => setFiltroEmpleado(value ? parseInt(value) : null)}
-              options={empleadoOptions}
-              placeholder="Todos los empleados"
-              label="Empleado"
-              searchable={true}
-            />
-
-            {/* Filtro por tipo */}
-            <ModernSelect
-              value={filtroTipo}
-              onChange={(value) => setFiltroTipo(value)}
-              options={tipoOptions}
-              placeholder="Todos los tipos"
-              label="Tipo"
-            />
-
-            {/* Filtro por categoría */}
-            <ModernSelect
-              value={filtroCategoria?.toString() || ''}
-              onChange={(value) => setFiltroCategoria(value ? parseInt(value) : null)}
-              options={categoriaOptions}
-              placeholder="Todas las categorías"
-              label="Categoría / Skill"
-              searchable={true}
-            />
-          </div>
-
-          {/* Botón limpiar filtros */}
-          {(filtroEmpleado || filtroTipo || filtroCategoria) && (
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => {
-                  setFiltroEmpleado(null);
-                  setFiltroTipo('');
-                  setFiltroCategoria(null);
-                }}
-                className="px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-all hover:opacity-80"
-                style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-              >
-                <X className="w-4 h-4" />
-                Limpiar filtros
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      </StickyPageHeader>
 
       {/* Calendario */}
       <DragDropContext onDragEnd={handleDragEnd}>

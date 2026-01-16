@@ -7,6 +7,7 @@ import { Reclamo, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { toast } from 'sonner';
+import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 
 interface Columna {
   id: EstadoReclamo;
@@ -171,89 +172,163 @@ export default function Tablero() {
     );
   }
 
+  // Componente de filtros de columnas para mobile (va en filterPanel)
+  const mobileColumnFilters = (
+    <>
+      {/* Filtros de fecha expandibles en mobile */}
+      {showMobileFilters && (
+        <div className="flex items-center gap-2 mb-2">
+          <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+          />
+          <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+          />
+          {(fechaDesde || fechaHasta) && (
+            <button
+              onClick={limpiarFiltrosFecha}
+              className="p-1.5 rounded-lg flex-shrink-0"
+              style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Tabs/Pills para navegar entre columnas - Mobile (5 botones que entran en pantalla) */}
+      <div className="grid grid-cols-5 gap-1 md:hidden">
+        {columnas.map((col, index) => {
+          const count = getReclamosPorEstado(col.id).length;
+          const isActive = activeColumnIndex === index;
+          // Títulos cortos para mobile
+          const tituloCorto = col.id === 'nuevo' ? 'Nuevos' :
+                              col.id === 'asignado' ? 'Asig.' :
+                              col.id === 'en_proceso' ? 'Proceso' :
+                              col.id === 'pendiente_confirmacion' ? 'Conf.' : 'Resuel.';
+          return (
+            <button
+              key={col.id}
+              onClick={() => setActiveColumnIndex(index)}
+              className="flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all"
+              style={{
+                backgroundColor: isActive ? col.color : theme.card,
+                color: isActive ? '#fff' : theme.textSecondary,
+                border: `1px solid ${isActive ? col.color : theme.border}`,
+                boxShadow: isActive ? `0 2px 8px ${col.color}40` : 'none',
+              }}
+            >
+              <span className="font-bold text-sm">{count}</span>
+              <span className="text-[10px] opacity-80">{tituloCorto}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Instrucciones de drag & drop - solo desktop */}
+      {canDrag && (
+        <p className="text-sm mt-2 px-1 hidden md:block" style={{ color: theme.textSecondary }}>
+          Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
+        </p>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Sticky wrapper para header */}
-      <div
-        className="sticky top-16 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-1 pb-3"
-        style={{ backgroundColor: theme.background }}
-      >
-        {/* Header - Desktop */}
-        <div
-          className="hidden md:flex items-center gap-4 px-4 py-3 rounded-xl"
-          style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          {/* Título con icono */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: `${theme.primary}20` }}
+      {/* Header Sticky con componente reutilizable */}
+      <StickyPageHeader filterPanel={mobileColumnFilters}>
+        <PageTitleIcon icon={<Columns3 className="h-4 w-4" />} />
+        <PageTitle>Tablero</PageTitle>
+        <HeaderSeparator />
+
+        {/* Filtros de fecha - Desktop */}
+        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+          <Calendar className="w-4 h-4" style={{ color: theme.textSecondary }} />
+          <input
+            type="date"
+            value={fechaDesde}
+            onChange={(e) => setFechaDesde(e.target.value)}
+            className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+            title="Desde"
+          />
+          <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
+          <input
+            type="date"
+            value={fechaHasta}
+            onChange={(e) => setFechaHasta(e.target.value)}
+            className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+            title="Hasta"
+          />
+          {(fechaDesde || fechaHasta) && (
+            <button
+              onClick={limpiarFiltrosFecha}
+              className="p-1.5 rounded-lg hover:opacity-80 transition-opacity"
+              style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+              title="Limpiar filtros de fecha"
             >
-              <Columns3 className="h-4 w-4" style={{ color: theme.primary }} />
-            </div>
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
-              Tablero
-            </h1>
-          </div>
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
-          {/* Separador */}
-          <div className="h-8 w-px" style={{ backgroundColor: theme.border }} />
+        <HeaderSeparator />
 
-          {/* Filtros de fecha */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Calendar className="w-4 h-4" style={{ color: theme.textSecondary }} />
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={(e) => setFechaDesde(e.target.value)}
-              className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                border: `1px solid ${theme.border}`,
-                color: theme.text,
-              }}
-              title="Desde"
-            />
-            <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={(e) => setFechaHasta(e.target.value)}
-              className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                border: `1px solid ${theme.border}`,
-                color: theme.text,
-              }}
-              title="Hasta"
-            />
-            {(fechaDesde || fechaHasta) && (
-              <button
-                onClick={limpiarFiltrosFecha}
-                className="p-1.5 rounded-lg hover:opacity-80 transition-opacity"
-                style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-                title="Limpiar filtros de fecha"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+        {/* Buscador - Desktop */}
+        <div className="hidden md:block relative flex-1 min-w-[150px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
+          <input
+            type="text"
+            placeholder="Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+          />
+        </div>
 
-          {/* Separador */}
-          <div className="h-8 w-px" style={{ backgroundColor: theme.border }} />
-
-          {/* Buscador - ocupa espacio disponible */}
-          <div className="relative flex-1 min-w-[150px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
+        {/* Mobile: Buscador compacto y botón de filtros */}
+        <div className="flex md:hidden items-center gap-2 flex-1">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
             <input
               type="text"
               placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm"
               style={{
                 backgroundColor: theme.backgroundSecondary,
                 border: `1px solid ${theme.border}`,
@@ -261,138 +336,21 @@ export default function Tablero() {
               }}
             />
           </div>
-        </div>
 
-        {/* Header - Mobile */}
-        <div className="md:hidden space-y-3">
-          {/* Fila 1: Título + Filtros + Buscar */}
-          <div
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+          {/* Botón de filtros */}
+          <button
+            onClick={() => setShowMobileFilters(!showMobileFilters)}
+            className="p-2 rounded-lg flex-shrink-0 transition-all"
             style={{
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
+              backgroundColor: (fechaDesde || fechaHasta) ? theme.primary : theme.backgroundSecondary,
+              color: (fechaDesde || fechaHasta) ? '#fff' : theme.textSecondary,
+              border: `1px solid ${(fechaDesde || fechaHasta) ? theme.primary : theme.border}`,
             }}
           >
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <Columns3 className="h-4 w-4" style={{ color: theme.primary }} />
-            </div>
-
-            {/* Buscador compacto */}
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
-              <input
-                type="text"
-                placeholder="Buscar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg text-sm"
-                style={{
-                  backgroundColor: theme.backgroundSecondary,
-                  border: `1px solid ${theme.border}`,
-                  color: theme.text,
-                }}
-              />
-            </div>
-
-            {/* Botón de filtros */}
-            <button
-              onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="p-2 rounded-lg flex-shrink-0 transition-all"
-              style={{
-                backgroundColor: (fechaDesde || fechaHasta) ? theme.primary : theme.backgroundSecondary,
-                color: (fechaDesde || fechaHasta) ? '#fff' : theme.textSecondary,
-                border: `1px solid ${(fechaDesde || fechaHasta) ? theme.primary : theme.border}`,
-              }}
-            >
-              <Filter className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Filtros expandibles en mobile */}
-          {showMobileFilters && (
-            <div
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl animate-in slide-in-from-top-2"
-              style={{
-                backgroundColor: theme.card,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-              <input
-                type="date"
-                value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-                className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
-                style={{
-                  backgroundColor: theme.backgroundSecondary,
-                  border: `1px solid ${theme.border}`,
-                  color: theme.text,
-                }}
-              />
-              <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
-              <input
-                type="date"
-                value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-                className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
-                style={{
-                  backgroundColor: theme.backgroundSecondary,
-                  border: `1px solid ${theme.border}`,
-                  color: theme.text,
-                }}
-              />
-              {(fechaDesde || fechaHasta) && (
-                <button
-                  onClick={limpiarFiltrosFecha}
-                  className="p-1.5 rounded-lg flex-shrink-0"
-                  style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Tabs/Pills para navegar entre columnas - Mobile (5 botones que entran en pantalla) */}
-          <div className="grid grid-cols-5 gap-1">
-            {columnas.map((col, index) => {
-              const count = getReclamosPorEstado(col.id).length;
-              const isActive = activeColumnIndex === index;
-              // Títulos cortos para mobile
-              const tituloCorto = col.id === 'nuevo' ? 'Nuevos' :
-                                  col.id === 'asignado' ? 'Asig.' :
-                                  col.id === 'en_proceso' ? 'Proceso' :
-                                  col.id === 'pendiente_confirmacion' ? 'Conf.' : 'Resuel.';
-              return (
-                <button
-                  key={col.id}
-                  onClick={() => setActiveColumnIndex(index)}
-                  className="flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all"
-                  style={{
-                    backgroundColor: isActive ? col.color : theme.card,
-                    color: isActive ? '#fff' : theme.textSecondary,
-                    border: `1px solid ${isActive ? col.color : theme.border}`,
-                    boxShadow: isActive ? `0 2px 8px ${col.color}40` : 'none',
-                  }}
-                >
-                  <span className="font-bold text-sm">{count}</span>
-                  <span className="text-[10px] opacity-80">{tituloCorto}</span>
-                </button>
-              );
-            })}
-          </div>
+            <Filter className="w-4 h-4" />
+          </button>
         </div>
-
-        {/* Instrucciones de drag & drop - solo desktop */}
-        {canDrag && (
-          <p className="text-sm mt-2 px-1 hidden md:block" style={{ color: theme.textSecondary }}>
-            Arrastra las tarjetas entre columnas para cambiar el estado de los reclamos.
-          </p>
-        )}
-      </div>
+      </StickyPageHeader>
 
       {/* Tablero Kanban */}
       <DragDropContext onDragEnd={handleDragEnd}>

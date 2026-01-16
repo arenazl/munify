@@ -301,6 +301,7 @@ export default function TramitesCatalogo() {
   return (
     <ABMPage
       title="Catálogo de Trámites"
+      backLink="/gestion/ajustes"
       buttonLabel="Nuevo Trámite"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar trámites..."

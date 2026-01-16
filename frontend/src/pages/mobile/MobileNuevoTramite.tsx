@@ -11,48 +11,31 @@ import {
   ShieldCheck,
   Search,
   Sparkles,
-  Store,
-  Car,
-  Map,
-  TreeDeciduous,
-  CalendarDays,
-  CreditCard,
-  HardHat,
-  Heart,
-  Lightbulb,
   FolderOpen,
   FileCheck,
   Clock,
   Users,
   ArrowLeft,
   ChevronRight,
+  Lightbulb,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { WizardForm, WizardStep, WizardStepContent } from '../../components/ui/WizardForm';
+import { DynamicIcon } from '../../components/ui/DynamicIcon';
 import type { ServicioTramite } from '../../types';
 
-// Iconos por servicio
-const servicioIcons: Record<string, React.ReactNode> = {
-  'Store': <Store className="h-6 w-6" />,
-  'FileCheck': <FileCheck className="h-6 w-6" />,
-  'HardHat': <HardHat className="h-6 w-6" />,
-  'Car': <Car className="h-6 w-6" />,
-  'Map': <Map className="h-6 w-6" />,
-  'TreeDeciduous': <TreeDeciduous className="h-6 w-6" />,
-  'Users': <Users className="h-6 w-6" />,
-  'CalendarDays': <CalendarDays className="h-6 w-6" />,
-  'CreditCard': <CreditCard className="h-6 w-6" />,
-  'Heart': <Heart className="h-6 w-6" />,
-  'Lightbulb': <Lightbulb className="h-6 w-6" />,
-  'default': <FileText className="h-6 w-6" />,
-};
-
-function getServicioIcon(icono?: string): React.ReactNode {
-  if (!icono) return servicioIcons.default;
-  return servicioIcons[icono] || servicioIcons.default;
+// Helper para renderizar iconos dinámicos
+function getServicioIcon(icono?: string, className = "h-6 w-6") {
+  return (
+    <DynamicIcon
+      name={icono || 'FileText'}
+      className={className}
+      fallback={<FileText className={className} />}
+    />
+  );
 }
 
 interface Rubro {

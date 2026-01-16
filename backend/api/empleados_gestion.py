@@ -61,7 +61,7 @@ async def get_empleados_cuadrillas(
 async def asignar_empleado_cuadrilla(
     data: EmpleadoCuadrillaCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Asigna un empleado a una cuadrilla."""
     # Verificar que empleado existe y es del municipio
@@ -120,7 +120,7 @@ async def update_asignacion_cuadrilla(
     asignacion_id: int,
     data: EmpleadoCuadrillaUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Actualiza una asignacion empleado-cuadrilla (ej: cambiar lider)."""
     result = await db.execute(
@@ -146,7 +146,7 @@ async def update_asignacion_cuadrilla(
 async def desasignar_empleado_cuadrilla(
     asignacion_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Desactiva una asignacion empleado-cuadrilla."""
     result = await db.execute(
@@ -262,7 +262,7 @@ async def update_ausencia(
 async def delete_ausencia(
     ausencia_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Elimina una ausencia."""
     result = await db.execute(
@@ -305,7 +305,7 @@ async def get_horarios(
 async def create_horario(
     data: EmpleadoHorarioCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Crea un horario para un dia especifico."""
     # Verificar empleado
@@ -345,7 +345,7 @@ async def update_horario(
     horario_id: int,
     data: EmpleadoHorarioUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Actualiza un horario."""
     result = await db.execute(
@@ -376,7 +376,7 @@ async def update_horario(
 async def delete_horario(
     horario_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Elimina un horario."""
     result = await db.execute(
@@ -396,7 +396,7 @@ async def set_horarios_semana(
     empleado_id: int,
     horarios: List[EmpleadoHorarioCreate],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Establece todos los horarios de la semana para un empleado (reemplaza existentes)."""
     # Verificar empleado
@@ -464,7 +464,7 @@ async def get_metricas(
 async def create_metrica(
     data: EmpleadoMetricaCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Registra metricas de un periodo."""
     metrica = EmpleadoMetrica(**data.model_dump())
@@ -571,7 +571,7 @@ async def update_capacitacion(
 async def delete_capacitacion(
     capacitacion_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Elimina una capacitacion."""
     result = await db.execute(

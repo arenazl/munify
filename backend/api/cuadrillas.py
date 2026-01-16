@@ -127,7 +127,7 @@ async def get_cuadrilla(
 async def create_cuadrilla(
     data: CuadrillaCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Extraer categoria_ids antes de crear el modelo
     categoria_ids = data.categoria_ids or []
@@ -163,7 +163,7 @@ async def update_cuadrilla(
     cuadrilla_id: int,
     data: CuadrillaUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     result = await db.execute(
         select(Cuadrilla)
@@ -212,7 +212,7 @@ async def update_cuadrilla(
 async def delete_cuadrilla(
     cuadrilla_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     result = await db.execute(select(Cuadrilla).where(Cuadrilla.id == cuadrilla_id))
     cuadrilla = result.scalar_one_or_none()

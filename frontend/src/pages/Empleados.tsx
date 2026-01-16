@@ -211,17 +211,52 @@ export default function Empleados() {
           <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
             <User className="h-4 w-4 text-purple-600" />
           </div>
-          <div>
-            <span className="font-medium">{getNombreCompleto(c)}</span>
-            {c.categoria_principal && (
-              <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color: c.categoria_principal.color || theme.textSecondary }}>
-                <Star className="h-3 w-3 fill-current" />
-                {c.categoria_principal.nombre}
-              </div>
-            )}
-          </div>
+          <span className="font-medium">{getNombreCompleto(c)}</span>
         </div>
       ),
+    },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      sortValue: (c: Empleado) => (c as any).tipo || 'operario',
+      render: (c: Empleado) => {
+        const tipo = (c as any).tipo || 'operario';
+        const isOperario = tipo === 'operario';
+        return (
+          <span
+            className="inline-flex items-center px-2 py-0.5 text-xs rounded-full font-medium"
+            style={{
+              backgroundColor: isOperario ? '#f59e0b20' : '#3b82f620',
+              color: isOperario ? '#f59e0b' : '#3b82f6',
+            }}
+          >
+            {isOperario ? 'Operario' : 'Administrativo'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'funcion',
+      header: 'Función',
+      sortValue: (c: Empleado) => c.categoria_principal?.nombre || '',
+      render: (c: Empleado) => {
+        if (!c.categoria_principal) {
+          return <span className="text-xs" style={{ color: theme.textSecondary }}>—</span>;
+        }
+        const color = c.categoria_principal.color || '#6b7280';
+        return (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium"
+            style={{
+              backgroundColor: `${color}20`,
+              color: color,
+            }}
+          >
+            <Star className="h-3 w-3 fill-current" />
+            {c.categoria_principal.nombre}
+          </span>
+        );
+      },
     },
     {
       key: 'especialidades',
@@ -259,7 +294,11 @@ export default function Empleados() {
       },
       render: (c: Empleado) => {
         const zona = zonas.find(z => z.id === c.zona_id);
-        return zona ? zona.nombre : '-';
+        return zona ? (
+          <span className="text-xs" style={{ color: theme.text }}>{zona.nombre}</span>
+        ) : (
+          <span className="text-xs" style={{ color: theme.textSecondary }}>—</span>
+        );
       },
     },
     {
@@ -273,6 +312,7 @@ export default function Empleados() {
   return (
     <ABMPage
       title="Empleados"
+      backLink="/gestion/ajustes"
       buttonLabel="Nuevo Empleado"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar empleados..."

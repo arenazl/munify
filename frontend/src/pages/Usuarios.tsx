@@ -215,6 +215,7 @@ export default function Usuarios() {
   return (
     <ABMPage
       title="Usuarios"
+      backLink="/gestion/ajustes"
       buttonLabel="Nuevo Usuario"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar usuarios..."

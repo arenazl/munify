@@ -63,7 +63,7 @@ async def create_zona(
     request: Request,
     data: ZonaCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
@@ -87,7 +87,7 @@ async def update_zona(
     zona_id: int,
     data: ZonaUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
@@ -112,7 +112,7 @@ async def delete_zona(
     request: Request,
     zona_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(

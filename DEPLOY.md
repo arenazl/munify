@@ -101,6 +101,56 @@ El deploy es automático con cada push a `main`.
 
 ---
 
+## Landing Page Comercial (Netlify)
+
+**URL:** https://gestion-municipal-landing.netlify.app
+
+### Deploy automático
+
+El sitio ya está configurado y linkeado. Para hacer deploy:
+
+```bash
+cd landing
+netlify deploy --prod --message="Actualización de landing"
+```
+
+### Configuración inicial (ya completada)
+
+Este proceso ya fue realizado automáticamente:
+
+```bash
+# 1. Obtener account slug
+netlify api listAccountsForUser
+
+# 2. Crear sitio
+netlify api createSiteInTeam --data '{"account_slug":"arenazl","body":{"name":"gestion-municipal-landing"}}'
+
+# 3. Linkear directorio
+mkdir -p .netlify
+echo '{"siteId":"522eac1f-fa1f-43d1-86ca-128e5467a27d"}' > .netlify/state.json
+
+# 4. Deploy inicial
+netlify deploy --prod --dir=. --message="Initial deploy"
+```
+
+### Actualizar contenido
+
+Para actualizar links o datos de contacto:
+
+1. Editar `landing/index.html`
+2. Buscar y reemplazar:
+   - `href="#demos"` → URL de la app React en producción
+   - `ventas@gestionmunicipal.com` → Email real
+   - `+54 9 11 1234-5678` → WhatsApp real
+   - `www.gestionmunicipal.com` → Sitio web real
+3. Deploy:
+   ```bash
+   cd landing
+   netlify deploy --prod
+   ```
+
+---
+
 ## Checklist Pre-Deploy
 
 - [ ] `.env` NO está en el repo (verificar `.gitignore`)

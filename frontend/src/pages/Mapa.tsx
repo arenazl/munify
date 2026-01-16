@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
-import { X, MapPin, Calendar, User, Tag, Clock, Navigation, ExternalLink } from 'lucide-react';
+import { X, MapPin, Calendar, User, Tag, Clock, Navigation, ExternalLink, Map as MapIcon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { reclamosApi } from '../lib/api';
+import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { Reclamo } from '../types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -217,59 +218,66 @@ export default function Mapa() {
     setFiltroEstado(prev => prev === estado ? null : estado);
   };
 
+  // Panel de filtros por estado
+  const filterPanel = (
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* Botón "Todos" */}
+      <button
+        onClick={() => setFiltroEstado(null)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+        style={{
+          backgroundColor: filtroEstado === null ? theme.primary : `${theme.textSecondary}15`,
+          color: filtroEstado === null ? '#ffffff' : theme.textSecondary,
+          border: `1px solid ${filtroEstado === null ? theme.primary : theme.border}`,
+        }}
+      >
+        <span className="text-xs font-medium">Todos</span>
+        <span className="text-xs font-bold">({reclamos.length})</span>
+      </button>
+      {/* Botones por estado */}
+      {Object.entries(STATUS_COLORS).map(([estado, color]) => {
+        const count = conteosPorEstado[estado] || 0;
+        if (count === 0) return null;
+        const isActive = filtroEstado === estado;
+        return (
+          <button
+            key={estado}
+            onClick={() => toggleFiltro(estado)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+            style={{
+              backgroundColor: isActive ? color : `${color}15`,
+              color: isActive ? '#ffffff' : color,
+              border: `1px solid ${isActive ? color : `${color}40`}`,
+            }}
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: isActive ? '#ffffff' : color }}
+            />
+            <span className="text-xs font-medium">{STATUS_LABELS[estado]}</span>
+            <span className="text-xs font-bold">({count})</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold" style={{ color: theme.text }}>Mapa de Reclamos</h1>
-          {loadingMore && (
+      {/* Header Sticky con componente reutilizable */}
+      <StickyPageHeader filterPanel={filterPanel}>
+        <PageTitleIcon icon={<MapIcon className="h-4 w-4" />} />
+        <PageTitle>Mapa de Reclamos</PageTitle>
+        {loadingMore && (
+          <>
+            <HeaderSeparator />
             <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
               <span>Cargando más...</span>
             </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap text-sm">
-          {/* Botón "Todos" */}
-          <button
-            onClick={() => setFiltroEstado(null)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-            style={{
-              backgroundColor: filtroEstado === null ? theme.primary : `${theme.textSecondary}15`,
-              color: filtroEstado === null ? '#ffffff' : theme.textSecondary,
-              border: `1px solid ${filtroEstado === null ? theme.primary : theme.border}`,
-            }}
-          >
-            <span>Todos</span>
-            <span className="font-medium">({reclamos.length})</span>
-          </button>
-          {/* Botones por estado */}
-          {Object.entries(STATUS_COLORS).map(([estado, color]) => {
-            const count = conteosPorEstado[estado] || 0;
-            if (count === 0) return null;
-            const isActive = filtroEstado === estado;
-            return (
-              <button
-                key={estado}
-                onClick={() => toggleFiltro(estado)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-                style={{
-                  backgroundColor: isActive ? color : `${color}15`,
-                  color: isActive ? '#ffffff' : color,
-                  border: `1px solid ${isActive ? color : `${color}40`}`,
-                }}
-              >
-                <div
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: isActive ? '#ffffff' : color }}
-                />
-                <span>{STATUS_LABELS[estado]}</span>
-                <span className="font-medium">({count})</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+          </>
+        )}
+      </StickyPageHeader>
 
       <div className="relative rounded-lg shadow overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
         {/* Mapa */}
