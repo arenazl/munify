@@ -1,9 +1,12 @@
 // Service Worker para Push Notifications
-// VERSION: 2.0.0 - Forzar actualización
-const SW_VERSION = '2.0.0';
+// VERSION: 2.2.0 - Actualizar icono de notificaciones
+const SW_VERSION = '2.2.0';
 const CACHE_NAME = `app-cache-v${SW_VERSION}`;
 
 self.addEventListener('push', function(event) {
+  console.log('[SW] Push event recibido:', event);
+
+  let title = 'Sistema de Reclamos';
   const options = {
     body: 'Tienes una nueva notificación',
     icon: '/icon-notification.png',
@@ -22,17 +25,24 @@ self.addEventListener('push', function(event) {
   if (event.data) {
     try {
       const data = event.data.json();
+      console.log('[SW] Datos parseados:', data);
+
+      title = data.title || title;
       options.body = data.body || options.body;
-      options.title = data.title || 'Sistema de Reclamos';
       options.data.url = data.url || '/';
       options.icon = data.icon || options.icon;
     } catch (e) {
-      options.body = event.data.text();
+      console.error('[SW] Error parseando JSON:', e);
+      const textData = event.data.text();
+      console.log('[SW] Datos como texto:', textData);
+      options.body = textData;
     }
   }
 
+  console.log('[SW] Mostrando notificación:', title, options);
+
   event.waitUntil(
-    self.registration.showNotification(options.title || 'Sistema de Reclamos', options)
+    self.registration.showNotification(title, options)
   );
 });
 
