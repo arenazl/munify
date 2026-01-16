@@ -387,10 +387,10 @@ export default function Dashboard() {
 
       {/* Hero Header - Estilo Wok Express */}
       <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '200px' }}>
-        {/* Imagen de fondo - usa la imagen del municipio si está disponible */}
+        {/* Imagen de fondo - usa imagen_portada si existe, sino logo_url, sino placeholder */}
         <div className="absolute inset-0">
           <img
-            src={municipioActual?.logo_url || "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"}
+            src={municipioActual?.imagen_portada || municipioActual?.logo_url || "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"}
             alt={municipioActual?.nombre || "Ciudad"}
             className="w-full h-full object-cover"
           />

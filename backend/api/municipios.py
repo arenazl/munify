@@ -521,3 +521,111 @@ async def actualizar_tema(
     await db.refresh(municipio)
 
     return municipio
+
+
+@router.post("/{municipio_id}/imagen-portada", response_model=MunicipioDetalle)
+async def actualizar_imagen_portada(
+    municipio_id: int,
+    imagen: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Actualiza la imagen de portada (banner del dashboard) de un municipio.
+    Solo admin puede modificar.
+    Sube la imagen a Cloudinary.
+    """
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Verificar que el usuario es admin del municipio o super admin
+    if current_user.municipio_id and current_user.municipio_id != municipio_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este municipio")
+
+    # Validar tipo de archivo
+    allowed_types = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
+    if imagen.content_type and imagen.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"Tipo de archivo no permitido: {imagen.content_type}. Tipos permitidos: PNG, JPEG, WebP")
+
+    # Validar tamaño (5MB max para imágenes de portada más grandes)
+    content = await imagen.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="El archivo excede el tamaño máximo de 5MB")
+
+    # Subir a Cloudinary
+    try:
+        # Eliminar imagen anterior de Cloudinary si existe
+        if municipio.imagen_portada and "cloudinary" in municipio.imagen_portada:
+            try:
+                old_public_id = municipio.imagen_portada.split("/")[-1].split(".")[0]
+                old_folder = f"municipios/{municipio.codigo}/portadas"
+                cloudinary.uploader.destroy(f"{old_folder}/{old_public_id}")
+            except Exception:
+                pass  # Ignorar errores al eliminar imagen anterior
+
+        # Subir nueva imagen de portada
+        await imagen.seek(0)
+        upload_result = cloudinary.uploader.upload(
+            imagen.file,
+            folder=f"municipios/{municipio.codigo}/portadas",
+            resource_type="image",
+            transformation=[
+                {"width": 1920, "height": 600, "crop": "fill", "gravity": "center"},
+                {"quality": "auto:good"},
+                {"fetch_format": "auto"}
+            ]
+        )
+
+        # Actualizar URL de la imagen de portada
+        municipio.imagen_portada = upload_result["secure_url"]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
+
+    await db.commit()
+    await db.refresh(municipio)
+
+    return municipio
+
+
+@router.delete("/{municipio_id}/imagen-portada", response_model=MunicipioDetalle)
+async def eliminar_imagen_portada(
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Elimina la imagen de portada de un municipio.
+    """
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Verificar permisos
+    if current_user.municipio_id and current_user.municipio_id != municipio_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este municipio")
+
+    # Eliminar de Cloudinary si existe
+    if municipio.imagen_portada and "cloudinary" in municipio.imagen_portada:
+        try:
+            old_public_id = municipio.imagen_portada.split("/")[-1].split(".")[0]
+            old_folder = f"municipios/{municipio.codigo}/portadas"
+            cloudinary.uploader.destroy(f"{old_folder}/{old_public_id}")
+        except Exception:
+            pass
+
+    municipio.imagen_portada = None
+
+    await db.commit()
+    await db.refresh(municipio)
+
+    return municipio

@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'tramites_genericos_001'
-down_revision = None  # Ajustar según la última migración existente
+down_revision = '010_add_tema_config'
 branch_labels = None
 depends_on = None
 
