@@ -215,7 +215,7 @@ async def chat(
         history=request.history
     )
 
-    response = await chat_service.chat(context, max_tokens=500)
+    response = await chat_service.chat(context, max_tokens=3000)
 
     if response:
         return ChatResponse(response=response)
