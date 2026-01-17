@@ -1,0 +1,20 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Círculo exterior gris -->
+  <circle cx="100" cy="100" r="90" fill="none" stroke="#666" stroke-width="8"/>
+
+  <!-- Arco superior azul claro -->
+  <path d="M 50 50 A 70 70 0 0 1 150 50" fill="none" stroke="#5DADE2" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Arco inferior azul oscuro -->
+  <path d="M 150 150 A 70 70 0 0 1 50 150" fill="none" stroke="#2874A6" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Línea horizontal gris -->
+  <line x1="50" y1="100" x2="80" y2="100" stroke="#666" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Flecha derecha gris -->
+  <path d="M 120 100 L 150 100 L 135 85" fill="none" stroke="#666" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 150 100 L 135 115" fill="none" stroke="#666" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Texto SGM -->
+  <text x="100" y="115" font-family="Arial, sans-serif" font-size="50" font-weight="bold" fill="#555" text-anchor="middle">SGM</text>
+</svg>
