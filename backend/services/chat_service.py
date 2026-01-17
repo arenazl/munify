@@ -81,7 +81,7 @@ async def call_groq(prompt: str, max_tokens: int = 1000) -> Optional[str]:
 async def chat(prompt: str, max_tokens: int = 500) -> Optional[str]:
     """
     Servicio principal de chat con IA.
-    Intenta Groq primero (más rápido y confiable), luego Gemini como fallback.
+    Usa Groq como único proveedor.
 
     Args:
         prompt: El prompt completo a enviar
@@ -90,18 +90,12 @@ async def chat(prompt: str, max_tokens: int = 500) -> Optional[str]:
     Returns:
         Respuesta del modelo o None si falla
     """
-    # Intentar Groq primero (más rápido y sin límites restrictivos)
+    # Usar solo Groq
     response = await call_groq(prompt, max_tokens)
     if response:
         return response
 
-    # Fallback a Gemini
-    print("[CHAT SERVICE] Groq falló, probando Gemini...")
-    response = await call_gemini(prompt, max_tokens)
-    if response:
-        return response
-
-    print("[CHAT SERVICE] Todos los proveedores fallaron")
+    print("[CHAT SERVICE] Groq falló")
     return None
 
 
@@ -135,5 +129,5 @@ def build_chat_context(
 
 
 def is_available() -> bool:
-    """Verifica si al menos un proveedor de IA está disponible"""
-    return bool(settings.GEMINI_API_KEY or settings.GROQ_API_KEY)
+    """Verifica si Groq está disponible"""
+    return bool(settings.GROQ_API_KEY)
