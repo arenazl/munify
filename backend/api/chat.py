@@ -109,21 +109,52 @@ REGLAS:
 4. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
 
 FORMATO DE RESPUESTAS (MUY IMPORTANTE):
-- Usá <b>negrita</b> para títulos de categorías
-- CADA ITEM EN SU PROPIA LÍNEA (usá saltos de línea reales, no todo junto)
-- Usá emojis al inicio de cada línea: 📁 para categorías
+- Respondé en HTML con clases de Tailwind CSS
+- Usá componentes visuales: cards, badges, listas estilizadas
+- Para links usá: <a href="/ruta" class="text-blue-500 underline hover:text-blue-700">texto</a>
 - Si el usuario pide un listado completo, mostrá TODO sin recortar
 - Solo sé breve en conversaciones generales, no cuando piden listas
-- Los links deben ser markdown: [texto](/ruta)
 
-EJEMPLO DE LISTADO (seguí este formato exacto, cada item en línea separada):
+COMPONENTES DISPONIBLES (usá estas clases de Tailwind):
 
-📁 <b>Comercio</b>
-📁 <b>Cultura</b>
-📁 <b>Desarrollo Social</b>
-📁 <b>Espacios Verdes</b>
+1. CARD para cada categoría/trámite:
+<div class="bg-white/10 rounded-lg p-3 mb-2">
+  <div class="font-semibold">📁 Nombre</div>
+  <div class="text-sm opacity-80">Descripción breve</div>
+</div>
 
-Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
+2. LISTA con items:
+<div class="space-y-2">
+  <div class="flex items-center gap-2">
+    <span class="text-lg">📁</span>
+    <span class="font-medium">Item</span>
+  </div>
+</div>
+
+3. BADGE para estados:
+<span class="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400">Activo</span>
+<span class="px-2 py-1 rounded-full text-xs bg-yellow-500/20 text-yellow-400">Pendiente</span>
+
+4. TIMELINE para estados de reclamo:
+<div class="flex items-center gap-1 text-xs">
+  <span class="px-2 py-1 rounded bg-green-500/20">Nuevo</span>
+  <span>→</span>
+  <span class="px-2 py-1 rounded bg-blue-500/20">En Proceso</span>
+  <span>→</span>
+  <span class="px-2 py-1 rounded bg-gray-500/20">Resuelto</span>
+</div>
+
+EJEMPLO DE RESPUESTA PARA LISTADO DE TRÁMITES:
+<div class="space-y-2">
+  <div class="bg-white/10 rounded-lg p-3">
+    <div class="font-semibold">📁 Comercio</div>
+    <div class="text-sm opacity-70">Habilitaciones, renovaciones</div>
+  </div>
+  <div class="bg-white/10 rounded-lg p-3">
+    <div class="font-semibold">📁 Obras</div>
+    <div class="text-sm opacity-70">Permisos de construcción</div>
+  </div>
+</div>"""
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:

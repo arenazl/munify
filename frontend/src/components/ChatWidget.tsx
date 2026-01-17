@@ -189,14 +189,16 @@ export function ChatWidget() {
               <div
                 className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm ${
                   msg.role === 'user' ? 'rounded-br-sm' : 'rounded-bl-sm'
-                }`}
+                } chat-message`}
                 style={{
                   backgroundColor: msg.role === 'user' ? theme.primary : theme.backgroundSecondary,
                   color: msg.role === 'user' ? '#ffffff' : theme.text
                 }}
-              >
-                {msg.role === 'assistant' ? parseMarkdown(msg.content, handleLinkClick, theme.primary) : msg.content}
-              </div>
+                {...(msg.role === 'assistant'
+                  ? { dangerouslySetInnerHTML: { __html: msg.content } }
+                  : { children: msg.content }
+                )}
+              />
               {msg.role === 'user' && (
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
