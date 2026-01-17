@@ -50,3 +50,10 @@ htmlcov/
 Thumbs.db
 mobile/node_modules/
 nul
+
+# Carpetas obsoletas de Netlify
+netlify-landing/
+netlify-ngcheck/
+
+# Incluir frontend/dist (necesario para Heroku)
+!frontend/dist/
