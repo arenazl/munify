@@ -283,153 +283,58 @@ async def chat_landing(
 ):
     """
     Endpoint PÚBLICO para chat desde la landing page.
-    No requiere autenticación.
-
-    Flujo conversacional:
-    1. Si no hay municipio_id: Saluda y pregunta localidad
-    2. Si el usuario menciona una localidad: Detecta el municipio y responde con datos reales
-    3. Si ya tiene municipio_id: Usa los datos de ese municipio
+    Proxy al endpoint /chat usando municipio_id detectado o fallback a ID=48 (Merlo).
     """
-    if not chat_service.is_available():
-        return ChatResponse(response="El asistente no está disponible en este momento. Por favor contactanos por WhatsApp al +54 9 11 6022-3474 o por email a ventas@gestionmunicipal.com")
+    FALLBACK_MUNICIPIO_ID = 48  # Merlo - tiene datos completos
 
-    # Cargar info de Munify
-    munify_info = get_munify_info()
-
-    # Obtener municipios disponibles
-    municipios = await get_municipios_activos(db)
-    municipios_text = ", ".join([m["nombre"] for m in municipios[:10]]) if municipios else "varios municipios"
-
-    # Variables para datos del municipio
+    # Determinar municipio_id
     municipio_id = request.municipio_id
-    municipio_nombre = None
-    categorias_text = ""
-    tramites_text = ""
 
-    # Si no tenemos municipio_id, intentar detectarlo del mensaje
+    # Si no viene, intentar detectar del historial
     if not municipio_id and request.history:
-        # Buscar en el historial si ya se detectó un municipio
         for msg in request.history:
             if msg.get("municipio_id"):
                 municipio_id = msg["municipio_id"]
                 break
 
-    # Intentar detectar municipio del mensaje actual
-    if not municipio_id and municipios:
-        detected = await detectar_municipio_con_ia(request.message, municipios)
-        if detected:
-            municipio_id = detected["id"]
-            municipio_nombre = detected["nombre"]
+    # Si no hay, intentar detectar del mensaje con IA
+    if not municipio_id:
+        municipios = await get_municipios_activos(db)
+        if municipios:
+            detected = await detectar_municipio_con_ia(request.message, municipios)
+            if detected:
+                municipio_id = detected["id"]
 
-    # Si tenemos municipio_id, obtener sus datos reales
-    if municipio_id:
-        # Obtener nombre del municipio si no lo tenemos
-        if not municipio_nombre:
-            for m in municipios:
-                if m["id"] == municipio_id:
-                    municipio_nombre = m["nombre"]
-                    break
+    # Fallback a Merlo si no se detectó
+    if not municipio_id:
+        municipio_id = FALLBACK_MUNICIPIO_ID
 
-        # Obtener categorías del municipio
-        categorias = await get_categorias_municipio(db, municipio_id)
-        if categorias:
-            categorias_text = "\n".join([f"  - {c['nombre']}" for c in categorias])
+    # Usar la misma lógica que el endpoint /chat autenticado
+    categorias = await get_categorias_municipio(db, municipio_id)
+    tramites = await get_tramites_municipio(db, municipio_id)
 
-        # Obtener trámites del municipio
-        tramites = await get_tramites_municipio(db, municipio_id)
-        if tramites:
-            tramites_text = "\n".join([f"  - {t['nombre']}" for t in tramites])
+    # Si el municipio no tiene datos, usar fallback
+    if not categorias and not tramites and municipio_id != FALLBACK_MUNICIPIO_ID:
+        categorias = await get_categorias_municipio(db, FALLBACK_MUNICIPIO_ID)
+        tramites = await get_tramites_municipio(db, FALLBACK_MUNICIPIO_ID)
 
-    # Construir historial de conversación
-    history_text = ""
-    if request.history:
-        for msg in request.history[-6:]:
-            role = "Usuario" if msg.get("role") == "user" else "Asistente"
-            history_text += f"{role}: {msg.get('content', '')}\n"
+    if not categorias:
+        categorias = [
+            {"id": 1, "nombre": "Baches y Calles"},
+            {"id": 2, "nombre": "Alumbrado Público"},
+            {"id": 3, "nombre": "Agua y Cloacas"},
+            {"id": 4, "nombre": "Limpieza"},
+            {"id": 5, "nombre": "Espacios Verdes"},
+        ]
 
-    # Construir prompt según el estado de la conversación
-    if municipio_id and municipio_nombre:
-        # Ya tenemos municipio - responder con datos específicos
-        system_prompt = f"""Sos el asistente de Munify para {municipio_nombre}.
+    system_prompt = build_system_prompt(categorias, tramites)
+    context = chat_service.build_chat_context(
+        system_prompt=system_prompt,
+        message=request.message,
+        history=request.history
+    )
 
-CATEGORÍAS DE RECLAMOS:
-{categorias_text if categorias_text else "Baches, Alumbrado, Basura, Espacios Verdes, Agua/Cloacas"}
-
-TRÁMITES DISPONIBLES:
-{tramites_text if tramites_text else "Habilitaciones, Permisos, Licencias"}
-
-REGLAS ESTRICTAS:
-1. Respondé BREVE (máximo 3-4 oraciones)
-2. NO repitas información ya dicha en el historial
-3. Respondé DIRECTO a la pregunta del usuario
-4. Usá emojis con moderación
-
-{f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
-
-Usuario: {request.message}
-
-Respuesta (BREVE y directa):"""
-    else:
-        # No tenemos municipio - preguntar o dar info general
-        es_primer_mensaje = not request.history or len(request.history) == 0
-
-        if es_primer_mensaje:
-            # Primer mensaje - saludar y preguntar localidad
-            system_prompt = f"""Sos el asistente virtual de Munify, un sistema de gestión municipal.
-
-MUNICIPIOS DONDE ESTAMOS PRESENTES:
-{municipios_text}
-
-Tu PRIMERA respuesta debe ser un saludo cordial y preguntar en qué localidad/municipio vive el usuario.
-Ejemplo: "¡Hola! 👋 Soy el asistente de Munify. Para poder ayudarte mejor, ¿podrías decirme en qué localidad o municipio vivís?"
-
-Sé breve y amigable.
-
-Usuario: {request.message}
-
-Respuesta:"""
-        else:
-            # Ya hubo conversación pero no detectamos municipio
-            # Obtener datos de un municipio de ejemplo (el primero disponible) para mostrar cómo funciona
-            ejemplo_categorias = ""
-            ejemplo_tramites = ""
-            municipio_ejemplo = municipios[0]["nombre"] if municipios else "Merlo"
-            municipio_ejemplo_id = municipios[0]["id"] if municipios else 1
-
-            # Obtener datos del municipio ejemplo
-            cats_ejemplo = await get_categorias_municipio(db, municipio_ejemplo_id)
-            if cats_ejemplo:
-                ejemplo_categorias = "\n".join([f"  - {c['nombre']}" for c in cats_ejemplo])
-
-            trams_ejemplo = await get_tramites_municipio(db, municipio_ejemplo_id)
-            if trams_ejemplo:
-                ejemplo_tramites = "\n".join([f"  - {t['nombre']}" for t in trams_ejemplo])
-
-            system_prompt = f"""Sos el asistente de Munify, sistema de gestión municipal.
-
-MUNICIPIOS ACTIVOS: {municipios_text}
-
-El usuario preguntó sobre una localidad que NO está en la lista o no indicó dónde vive.
-
-REGLAS ESTRICTAS:
-1. Respondé BREVE (máximo 4 oraciones)
-2. NO repitas la lista de municipios en cada respuesta
-3. NO repitas el texto de contacto si ya lo dijiste antes
-4. Respondé DIRECTO a lo que pregunta el usuario
-5. Si preguntan por reclamos/trámites, usá ejemplos de {municipio_ejemplo}
-
-CATEGORÍAS DE RECLAMOS: {ejemplo_categorias if ejemplo_categorias else "Baches, Alumbrado, Basura, Espacios Verdes, Agua/Cloacas"}
-TRÁMITES: {ejemplo_tramites if ejemplo_tramites else "Habilitaciones, Permisos, Licencias"}
-
-CONTACTO (mencioná SOLO si es relevante): WhatsApp +54 9 11 6022-3474
-
-{f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
-
-Usuario: {request.message}
-
-Respuesta (BREVE, sin repetir info ya dicha):"""
-
-    response = await chat_service.chat(system_prompt, max_tokens=400)
+    response = await chat_service.chat(context, max_tokens=500)
 
     if response:
         return ChatResponse(response=response)
