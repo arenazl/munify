@@ -350,30 +350,25 @@ async def chat_landing(
     # Construir prompt según el estado de la conversación
     if municipio_id and municipio_nombre:
         # Ya tenemos municipio - responder con datos específicos
-        system_prompt = f"""Sos el asistente virtual de Munify para el municipio de {municipio_nombre}.
-Tu objetivo es ayudar a los ciudadanos de {municipio_nombre} a conocer qué reclamos y trámites pueden realizar.
+        system_prompt = f"""Sos el asistente de Munify para {municipio_nombre}.
 
-INFORMACIÓN SOBRE MUNIFY:
-{munify_info}
+CATEGORÍAS DE RECLAMOS:
+{categorias_text if categorias_text else "Baches, Alumbrado, Basura, Espacios Verdes, Agua/Cloacas"}
 
-CATEGORÍAS DE RECLAMOS EN {municipio_nombre.upper()}:
-{categorias_text if categorias_text else "  (Consultá con tu municipio las categorías disponibles)"}
+TRÁMITES DISPONIBLES:
+{tramites_text if tramites_text else "Habilitaciones, Permisos, Licencias"}
 
-TRÁMITES DISPONIBLES EN {municipio_nombre.upper()}:
-{tramites_text if tramites_text else "  (Consultá con tu municipio los trámites disponibles)"}
-
-REGLAS:
-1. Respondé amablemente y conciso (máximo 3-4 oraciones)
-2. Si preguntan sobre reclamos, usá las categorías de {municipio_nombre}
-3. Si preguntan sobre trámites, usá la lista de {municipio_nombre}
-4. Si no hay datos disponibles, indicá que contacten al municipio
-5. Podés usar emojis ocasionalmente
+REGLAS ESTRICTAS:
+1. Respondé BREVE (máximo 3-4 oraciones)
+2. NO repitas información ya dicha en el historial
+3. Respondé DIRECTO a la pregunta del usuario
+4. Usá emojis con moderación
 
 {f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
 
 Usuario: {request.message}
 
-Respuesta:"""
+Respuesta (BREVE y directa):"""
     else:
         # No tenemos municipio - preguntar o dar info general
         es_primer_mensaje = not request.history or len(request.history) == 0
@@ -410,38 +405,29 @@ Respuesta:"""
             if trams_ejemplo:
                 ejemplo_tramites = "\n".join([f"  - {t['nombre']}" for t in trams_ejemplo])
 
-            system_prompt = f"""Sos el asistente virtual de Munify, un sistema de gestión municipal inteligente.
+            system_prompt = f"""Sos el asistente de Munify, sistema de gestión municipal.
 
-MUNICIPIOS DONDE YA ESTAMOS FUNCIONANDO:
-{municipios_text}
+MUNICIPIOS ACTIVOS: {municipios_text}
 
-SITUACIÓN: El usuario mencionó una localidad que NO está en nuestra lista, o no indicó claramente dónde vive.
+El usuario preguntó sobre una localidad que NO está en la lista o no indicó dónde vive.
 
-QUÉ HACER:
-1. Decile amablemente que por ahora Munify está funcionando en {municipios_text}, pero que estamos expandiéndonos.
-2. IMPORTANTE: Mostrale cómo funciona el sistema usando como EJEMPLO los datos de {municipio_ejemplo}. Decile algo como "Te muestro cómo funciona en {municipio_ejemplo} para que veas el sistema en acción:"
-3. Invitalo a contactarnos si quiere que sumemos su municipio.
-4. NUNCA lo dejes sin respuesta útil.
+REGLAS ESTRICTAS:
+1. Respondé BREVE (máximo 4 oraciones)
+2. NO repitas la lista de municipios en cada respuesta
+3. NO repitas el texto de contacto si ya lo dijiste antes
+4. Respondé DIRECTO a lo que pregunta el usuario
+5. Si preguntan por reclamos/trámites, usá ejemplos de {municipio_ejemplo}
 
-EJEMPLO DE CATEGORÍAS DE RECLAMOS (de {municipio_ejemplo}):
-{ejemplo_categorias if ejemplo_categorias else "Baches, Alumbrado, Basura, Espacios Verdes, Agua/Cloacas, Tránsito"}
+CATEGORÍAS DE RECLAMOS: {ejemplo_categorias if ejemplo_categorias else "Baches, Alumbrado, Basura, Espacios Verdes, Agua/Cloacas"}
+TRÁMITES: {ejemplo_tramites if ejemplo_tramites else "Habilitaciones, Permisos, Licencias"}
 
-EJEMPLO DE TRÁMITES DISPONIBLES (de {municipio_ejemplo}):
-{ejemplo_tramites if ejemplo_tramites else "Habilitaciones, Permisos, Licencias, etc."}
-
-INFORMACIÓN ADICIONAL SOBRE MUNIFY:
-- Sistema integral de gestión de reclamos y trámites municipales
-- Los vecinos pueden reportar problemas con fotos y ubicación GPS
-- Sistema de gamificación con puntos y badges
-- Chat con IA, WhatsApp integrado, mapa interactivo
-- Período de prueba de 3 meses gratis
-- Contacto para sumar tu municipio: WhatsApp +54 9 11 6022-3474
+CONTACTO (mencioná SOLO si es relevante): WhatsApp +54 9 11 6022-3474
 
 {f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
 
 Usuario: {request.message}
 
-Respuesta (sé amable, mostrale cómo funciona con el ejemplo de {municipio_ejemplo}):"""
+Respuesta (BREVE, sin repetir info ya dicha):"""
 
     response = await chat_service.chat(system_prompt, max_tokens=400)
 
