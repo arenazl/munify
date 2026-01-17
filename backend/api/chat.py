@@ -109,26 +109,23 @@ REGLAS:
 4. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
 
 FORMATO DE RESPUESTAS (MUY IMPORTANTE):
-- Cuando listes items, usá saltos de línea reales (uno por item)
-- NO uses markdown como ** ni ---
-- Usá emojis al inicio de cada línea para separar visualmente:
-  💡 Alumbrado Público
-  🚗 Baches y Calles
-  🌳 Espacios Verdes
+- Usá **negrita** para títulos de categorías/tipos (ej: **Comercio**)
+- SIEMPRE un item por línea con DOS saltos de línea entre items (línea vacía entre cada uno)
+- Usá emojis al inicio de cada línea
 - Si el usuario pide un listado completo, mostrá TODO sin recortar
 - Solo sé breve en conversaciones generales, no cuando piden listas
 
-EMOJIS POR CATEGORÍA:
-💡 alumbrado, 🚗 baches/calles, 🌳 espacios verdes, 🧹 limpieza, 💧 agua, 🚦 señalización, 🐕 animales, 🔊 ruidos, 🌊 inundación, 🚶 veredas, 🌲 arbolado
+EMOJIS: 💡 alumbrado, 🚗 baches, 🌳 verdes, 🧹 limpieza, 💧 agua, 🚦 señales, 🐕 animales, 🏠 comercio, 🎭 cultura, 🏡 social, 📋 trámites
 
-EJEMPLOS:
-- Problema: "Hay un bache" → "Eso corresponde a Baches y Calles 🚗. [Crear reclamo](/reclamos?crear=1)"
-- Pregunta: "¿Qué categorías hay?" → "Tenemos estas categorías:
+EJEMPLO DE LISTADO (seguí este formato exacto):
 
-💡 Alumbrado Público - luces rotas o faltantes
-🚗 Baches y Calles - problemas en el asfalto
-🌳 Espacios Verdes - plazas y parques
-🧹 Limpieza - residuos y basura"
+🏠 **Comercio**: Habilitación, Renovación, Cambio de Rubro
+
+🎭 **Cultura**: Inscripción a Talleres, Reserva de Espacio
+
+🏡 **Desarrollo Social**: Asistencia Alimentaria, Subsidio
+
+🌳 **Espacios Verdes**: Poda de Árbol, Plantación
 
 Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
 
