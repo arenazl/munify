@@ -15,7 +15,7 @@ from core.database import get_db
 from models.categoria import Categoria
 from models.user import User
 from models.reclamo import Reclamo
-from models.tramite import Solicitud, TipoTramite, Tramite, EstadoSolicitud
+from models.tramite import Solicitud, TipoTramite, Tramite, EstadoSolicitud, MunicipioTipoTramite, MunicipioTramite
 from models.empleado import Empleado
 from models.zona import Zona
 from models.enums import EstadoReclamo
@@ -112,10 +112,17 @@ async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[
 
 async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
     """Obtiene los tipos de trámites activos del municipio"""
-    query = select(TipoTramite).where(
-        TipoTramite.municipio_id == municipio_id,
-        TipoTramite.activo == True
-    ).order_by(TipoTramite.nombre)
+    # TipoTramite es un catálogo genérico, se relaciona con municipios vía MunicipioTipoTramite
+    query = (
+        select(TipoTramite)
+        .join(MunicipioTipoTramite, MunicipioTipoTramite.tipo_tramite_id == TipoTramite.id)
+        .where(
+            MunicipioTipoTramite.municipio_id == municipio_id,
+            MunicipioTipoTramite.activo == True,
+            TipoTramite.activo == True
+        )
+        .order_by(TipoTramite.nombre)
+    )
 
     result = await db.execute(query)
     tramites = result.scalars().all()
@@ -781,18 +788,30 @@ async def get_entidades_existentes(db: AsyncSession, municipio_id: int, tipo: st
         return [{"nombre": z.nombre, "descripcion": z.descripcion or ""} for z in items]
 
     elif tipo == "tipo_tramite":
-        query = select(TipoTramite).where(
-            TipoTramite.municipio_id == municipio_id,
-            TipoTramite.activo == True
+        # TipoTramite es catálogo genérico, se relaciona vía MunicipioTipoTramite
+        query = (
+            select(TipoTramite)
+            .join(MunicipioTipoTramite, MunicipioTipoTramite.tipo_tramite_id == TipoTramite.id)
+            .where(
+                MunicipioTipoTramite.municipio_id == municipio_id,
+                MunicipioTipoTramite.activo == True,
+                TipoTramite.activo == True
+            )
         )
         result = await db.execute(query)
         items = result.scalars().all()
         return [{"nombre": t.nombre, "descripcion": t.descripcion or ""} for t in items]
 
     elif tipo == "tramite":
-        query = select(Tramite).where(
-            Tramite.municipio_id == municipio_id,
-            Tramite.activo == True
+        # Tramite es catálogo genérico, se relaciona vía MunicipioTramite
+        query = (
+            select(Tramite)
+            .join(MunicipioTramite, MunicipioTramite.tramite_id == Tramite.id)
+            .where(
+                MunicipioTramite.municipio_id == municipio_id,
+                MunicipioTramite.activo == True,
+                Tramite.activo == True
+            )
         )
         result = await db.execute(query)
         items = result.scalars().all()
