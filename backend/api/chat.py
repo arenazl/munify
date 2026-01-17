@@ -108,53 +108,46 @@ REGLAS:
 3. SIEMPRE incluí links markdown relevantes
 4. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
 
-FORMATO DE RESPUESTAS (MUY IMPORTANTE):
-- Respondé en HTML con clases de Tailwind CSS
-- Usá componentes visuales: cards, badges, listas estilizadas
-- Para links usá: <a href="/ruta" class="text-blue-500 underline hover:text-blue-700">texto</a>
-- Si el usuario pide un listado completo, mostrá TODO sin recortar
-- Solo sé breve en conversaciones generales, no cuando piden listas
+FORMATO DE RESPUESTAS:
+- Respondé SIEMPRE en HTML con clases de Tailwind CSS
+- Para links usá: <a href="/ruta" class="text-blue-400 underline">texto</a>
 
-COMPONENTES DISPONIBLES (usá estas clases de Tailwind):
+DETECCIÓN DE LISTADOS - Si el mensaje contiene palabras como: "listado", "lista", "listar", "todos", "cuáles", "qué hay", "mostrame", "dame", "ver", "disponibles", "opciones", "categorías", "trámites", "reclamos"
+ENTONCES respondé con CARDS usando este formato exacto:
 
-1. CARD para cada categoría/trámite:
-<div class="bg-white/10 rounded-lg p-3 mb-2">
-  <div class="font-semibold">📁 Nombre</div>
-  <div class="text-sm opacity-80">Descripción breve</div>
-</div>
-
-2. LISTA con items:
 <div class="space-y-2">
-  <div class="flex items-center gap-2">
-    <span class="text-lg">📁</span>
-    <span class="font-medium">Item</span>
+  <div class="bg-white/10 rounded-xl p-3 border border-white/10">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xl">EMOJI</span>
+      <span class="font-bold">NOMBRE</span>
+    </div>
+    <div class="text-sm opacity-70">DESCRIPCIÓN</div>
   </div>
 </div>
 
-3. BADGE para estados:
-<span class="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400">Activo</span>
-<span class="px-2 py-1 rounded-full text-xs bg-yellow-500/20 text-yellow-400">Pendiente</span>
+EMOJIS POR CATEGORÍA:
+🏠 Comercio, 🎭 Cultura, 🏡 Desarrollo Social, 🌳 Espacios Verdes, 📜 Legales, 🏗️ Obras, 💰 Rentas, 🏥 Salud, 🚗 Tránsito, 💡 Alumbrado, 🚗 Baches, 🧹 Limpieza, 💧 Agua, 🚦 Señales, 🐕 Animales
 
-4. TIMELINE para estados de reclamo:
-<div class="flex items-center gap-1 text-xs">
-  <span class="px-2 py-1 rounded bg-green-500/20">Nuevo</span>
-  <span>→</span>
-  <span class="px-2 py-1 rounded bg-blue-500/20">En Proceso</span>
-  <span>→</span>
-  <span class="px-2 py-1 rounded bg-gray-500/20">Resuelto</span>
-</div>
-
-EJEMPLO DE RESPUESTA PARA LISTADO DE TRÁMITES:
+EJEMPLO COMPLETO (usá este formato):
 <div class="space-y-2">
-  <div class="bg-white/10 rounded-lg p-3">
-    <div class="font-semibold">📁 Comercio</div>
-    <div class="text-sm opacity-70">Habilitaciones, renovaciones</div>
+  <div class="bg-white/10 rounded-xl p-3 border border-white/10">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xl">🏠</span>
+      <span class="font-bold">Comercio</span>
+    </div>
+    <div class="text-sm opacity-70">Habilitación comercial, renovaciones, cambio de rubro</div>
   </div>
-  <div class="bg-white/10 rounded-lg p-3">
-    <div class="font-semibold">📁 Obras</div>
-    <div class="text-sm opacity-70">Permisos de construcción</div>
+  <div class="bg-white/10 rounded-xl p-3 border border-white/10">
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xl">🏗️</span>
+      <span class="font-bold">Obras Privadas</span>
+    </div>
+    <div class="text-sm opacity-70">Permisos de construcción, ampliaciones, demoliciones</div>
   </div>
-</div>"""
+</div>
+
+Para conversaciones normales (saludos, preguntas simples), respondé con texto simple en HTML:
+<p>Hola! En qué puedo ayudarte?</p>"""
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
