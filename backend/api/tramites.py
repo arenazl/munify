@@ -1165,11 +1165,12 @@ async def listar_solicitudes_gestion(
         selectinload(Solicitud.empleado_asignado)
         # No cargar solicitante completo, ya tenemos nombre_solicitante, apellido_solicitante, etc.
     )
-    query = query.order_by(Solicitud.prioridad, Solicitud.created_at.desc())
+    query = query.order_by(Solicitud.created_at.desc(), Solicitud.prioridad)
     query = query.offset(skip).limit(limit)
 
     result = await db.execute(query)
-    return result.scalars().all()
+    solicitudes = result.scalars().all()
+    return solicitudes
 
 
 # ==================== DOCUMENTOS ====================

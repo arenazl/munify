@@ -33,10 +33,10 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
 import { TramiteWizard } from '../components/TramiteWizard';
-import { ABMPage, ABMTable } from '../components/ui/ABMPage';
+import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import type { Tramite, EstadoTramite, ServicioTramite, Empleado, TipoTramite } from '../types';
+import type { Tramite, EstadoTramite, ServicioTramite, Empleado, TipoTramite, EmpleadoDisponibilidad } from '../types';
 import React from 'react';
 
 // Configuración de estados
@@ -48,6 +48,16 @@ const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; color: string; l
   aprobado: { icon: CheckCircle2, color: '#10b981', label: 'Aprobado', bg: '#10b98115' },
   rechazado: { icon: XCircle, color: '#ef4444', label: 'Rechazado', bg: '#ef444415' },
   finalizado: { icon: CheckCircle2, color: '#059669', label: 'Finalizado', bg: '#05966915' },
+};
+
+// Helper para normalizar el estado (API devuelve MAYÚSCULAS, frontend usa minúsculas)
+const normalizeEstado = (estado: string | undefined | null): EstadoTramite => {
+  return (estado?.toLowerCase() || 'iniciado') as EstadoTramite;
+};
+
+// Obtener config del estado con normalización automática
+const getEstadoConfig = (estado: string | undefined | null) => {
+  return estadoConfig[normalizeEstado(estado)] || estadoConfig.iniciado;
 };
 
 const estadoTransiciones: Record<EstadoTramite, EstadoTramite[]> = {
@@ -105,9 +115,11 @@ export default function GestionTramites() {
   // Filtros visuales estilo Reclamos
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string>('');
+  const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
+  const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'por_vencer'>('reciente');
   const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
-  const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'vencimiento'>('reciente');
+
 
   // Sheet para ver/editar trámite
   const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(null);
@@ -121,6 +133,10 @@ export default function GestionTramites() {
 
   // Asignación de empleado
   const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<number | ''>('');
+  const [empleadosDisponibilidad, setEmpleadosDisponibilidad] = useState<EmpleadoDisponibilidad[]>([]);
+  const [loadingEmpleados, setLoadingEmpleados] = useState(false);
+  const [showEmpleadosDropdown, setShowEmpleadosDropdown] = useState(false);
+  const empleadosDropdownRef = useRef<HTMLDivElement>(null);
   const [sugerenciaIA, setSugerenciaIA] = useState<SugerenciaEmpleado | null>(null);
   const [loadingSugerencia, setLoadingSugerencia] = useState(false);
   const [asignando, setAsignando] = useState(false);
@@ -147,12 +163,21 @@ export default function GestionTramites() {
     loadData();
   }, []);
 
-  // Recargar trámites cuando cambien los filtros
+  // Recargar trámites cuando cambien los filtros o búsqueda
   useEffect(() => {
     if (!loading) {
-      loadTramites(filtroTipo, filtroEstado);
+      loadTramites(filtroTipo, filtroEstado, searchTerm);
     }
   }, [filtroTipo, filtroEstado]);
+
+  // Debounce para búsqueda en servidor
+  useEffect(() => {
+    if (loading) return;
+    const timeoutId = setTimeout(() => {
+      loadTramites(filtroTipo, filtroEstado, searchTerm);
+    }, 300); // 300ms debounce
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   // Abrir trámite desde URL
   useEffect(() => {
@@ -178,12 +203,10 @@ export default function GestionTramites() {
       setEmpleados(empleadosRes.data);
       setResumen(resumenRes.data);
 
-      // Cargar conteos para filtros visuales
-      loadConteos();
-      // Cargar trámites con filtros actuales
-      if (reloadTramites) {
-        await loadTramites(filtroTipo, filtroEstado);
-      }
+      // Cargar conteos para filtros visuales y trámites en paralelo
+      const conteosPromise = loadConteos();
+      const tramitesPromise = reloadTramites ? loadTramites(filtroTipo, filtroEstado) : Promise.resolve();
+      await Promise.all([conteosPromise, tramitesPromise]);
     } catch (error) {
       console.error('Error cargando datos:', error);
       toast.error('Error al cargar trámites');
@@ -193,7 +216,7 @@ export default function GestionTramites() {
   };
 
   // Cargar trámites con filtros (resetea la lista)
-  const loadTramites = async (tipo?: number | null, estado?: string) => {
+  const loadTramites = async (tipo?: number | null, estado?: string, search?: string) => {
     try {
       const params: Record<string, unknown> = {
         limit: LIMIT,
@@ -202,17 +225,22 @@ export default function GestionTramites() {
       // Usar parámetros explícitos o valores actuales del state
       const tipoFiltro = tipo !== undefined ? tipo : filtroTipo;
       const estadoFiltro = estado !== undefined ? estado : filtroEstado;
+      const searchFiltro = search !== undefined ? search : searchTerm;
 
       if (tipoFiltro) params.tipo_tramite_id = tipoFiltro;
       // El backend espera el estado en mayúsculas (enum EstadoSolicitud)
       if (estadoFiltro) params.estado = estadoFiltro.toUpperCase();
+      // Búsqueda en servidor
+      if (searchFiltro && searchFiltro.trim()) params.search = searchFiltro.trim();
 
       const res = await tramitesApi.getGestionTodos(params);
       setTramites(res.data);
       setSkip(LIMIT);
       setHasMore(res.data.length >= LIMIT);
     } catch (error) {
-      console.error('Error cargando trámites:', error);
+      console.error('[GestionTramites] Error cargando trámites:', error);
+    } finally {
+      setFilterLoading(null); // Clear filter loading state
     }
   };
 
@@ -229,6 +257,7 @@ export default function GestionTramites() {
 
       if (filtroTipo) params.tipo_tramite_id = filtroTipo;
       if (filtroEstado) params.estado = filtroEstado.toUpperCase();
+      if (searchTerm && searchTerm.trim()) params.search = searchTerm.trim();
 
       const res = await tramitesApi.getGestionTodos(params);
 
@@ -248,7 +277,7 @@ export default function GestionTramites() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, skip, filtroTipo, filtroEstado]);
+  }, [loadingMore, hasMore, skip, filtroTipo, filtroEstado, searchTerm]);
 
   // IntersectionObserver para infinite scroll
   useEffect(() => {
@@ -286,6 +315,30 @@ export default function GestionTramites() {
     }
   };
 
+  // Cargar empleados administrativos con disponibilidad
+  const loadEmpleadosDisponibilidad = async () => {
+    setLoadingEmpleados(true);
+    try {
+      const res = await empleadosApi.getDisponibilidad('administrativo');
+      setEmpleadosDisponibilidad(res.data);
+    } catch (error) {
+      console.error('Error cargando disponibilidad:', error);
+    } finally {
+      setLoadingEmpleados(false);
+    }
+  };
+
+  // Cerrar dropdown de empleados al hacer click afuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (empleadosDropdownRef.current && !empleadosDropdownRef.current.contains(event.target as Node)) {
+        setShowEmpleadosDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const openTramite = async (tramite: Tramite) => {
     setSelectedTramite(tramite);
     setNuevoEstado('');
@@ -295,8 +348,11 @@ export default function GestionTramites() {
     setSugerenciaIA(null);
     setHistorial([]);
     setShowHistorial(false);
+    setShowEmpleadosDropdown(false);
     setSheetOpen(true);
     setSearchParams({ id: String(tramite.id) });
+    // Cargar empleados con disponibilidad al abrir
+    loadEmpleadosDisponibilidad();
   };
 
   const closeSheet = () => {
@@ -407,30 +463,18 @@ export default function GestionTramites() {
     return fechaVencimiento;
   };
 
-  // Filtro local solo para búsqueda de texto (tipo y estado se filtran en backend)
-  const filteredTramites = tramites.filter(t => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return t.numero_tramite.toLowerCase().includes(term) ||
-      t.asunto.toLowerCase().includes(term) ||
-      t.nombre_solicitante?.toLowerCase().includes(term) ||
-      t.apellido_solicitante?.toLowerCase().includes(term) ||
-      t.email_solicitante?.toLowerCase().includes(term) ||
-      t.dni_solicitante?.toLowerCase().includes(term) ||
-      t.empleado_asignado?.nombre?.toLowerCase().includes(term) ||
-      t.empleado_asignado?.apellido?.toLowerCase().includes(term);
-  }).sort((a, b) => {
-    if (ordenamiento === 'reciente') {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    } else {
-      // Por vencimiento - los que vencen más pronto primero
-      const vencA = calcularVencimiento(a);
-      const vencB = calcularVencimiento(b);
-      if (!vencA && !vencB) return 0;
-      if (!vencA) return 1;
-      if (!vencB) return -1;
-      return vencA.getTime() - vencB.getTime();
+  // Aplicar ordenamiento según botones del header
+  const filteredTramites = [...tramites].sort((a, b) => {
+    if (ordenamiento === 'por_vencer') {
+      // Ordenar por fecha de vencimiento (más próxima primero)
+      const tiempoA = a.tramite?.tiempo_estimado_dias || 0;
+      const tiempoB = b.tramite?.tiempo_estimado_dias || 0;
+      const vencA = tiempoA ? new Date(a.created_at).getTime() + tiempoA * 86400000 : Infinity;
+      const vencB = tiempoB ? new Date(b.created_at).getTime() + tiempoB * 86400000 : Infinity;
+      return vencA - vencB;
     }
+    // Por defecto: más recientes primero
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   // Render de cards (children de ABMPage)
@@ -442,7 +486,7 @@ export default function GestionTramites() {
     }
 
     return filteredTramites.map((t) => {
-      const config = estadoConfig[t.estado] || estadoConfig.iniciado;
+      const config = getEstadoConfig(t.estado);
       const IconEstado = config.icon;
       const tipoTramite = t.tramite?.tipo_tramite;
       const tipoColor = tipoTramite?.color || theme.primary;
@@ -593,15 +637,18 @@ export default function GestionTramites() {
       <div className="flex gap-1.5">
         {/* Botón Todos fijo - outlined */}
         <button
-          onClick={() => setFiltroTipo(null)}
+          onClick={() => {
+            setFilterLoading('tipo-all');
+            setFiltroTipo(null);
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[34px] flex-shrink-0"
           style={{
             background: 'transparent',
             border: `1.5px solid ${filtroTipo === null ? theme.primary : theme.border}`,
           }}
         >
-          <FileText className="h-4 w-4" style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
-          <span className="text-xs font-medium whitespace-nowrap" style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
+          <FileText className={`h-4 w-4 ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
+          <span className={`text-xs font-medium whitespace-nowrap ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
             Todos
           </span>
         </button>
@@ -610,15 +657,7 @@ export default function GestionTramites() {
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
           {/* Skeleton mientras cargan los tipos */}
           {loading || tipos.length === 0 ? (
-            <>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div
-                  key={`skeleton-tipo-${i}`}
-                  className="h-[34px] w-[60px] rounded-lg animate-pulse flex-shrink-0"
-                  style={{ background: `${theme.border}40` }}
-                />
-              ))}
-            </>
+            <FilterRowSkeleton count={6} height={34} widths={[60, 80, 70, 90, 65, 85]} />
           ) : (
             <>
               {/* Chips por tipo de trámite */}
@@ -626,10 +665,14 @@ export default function GestionTramites() {
                 const isSelected = filtroTipo === tipo.id;
                 const tipoColor = tipo.color || theme.primary;
                 const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
+                const isLoadingThis = filterLoading === `tipo-${tipo.id}`;
                 return (
                   <button
                     key={tipo.id}
-                    onClick={() => setFiltroTipo(isSelected ? null : tipo.id)}
+                    onClick={() => {
+                      setFilterLoading(`tipo-${tipo.id}`);
+                      setFiltroTipo(isSelected ? null : tipo.id);
+                    }}
                     title={tipo.nombre}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[34px] flex-shrink-0"
                     style={{
@@ -639,15 +682,15 @@ export default function GestionTramites() {
                   >
                     <DynamicIcon
                       name={tipo.icono || 'FileText'}
-                      className="h-4 w-4"
+                      className={`h-4 w-4 ${isLoadingThis ? 'animate-pulse' : ''}`}
                       style={{ color: isSelected ? '#ffffff' : tipoColor }}
-                      fallback={<FileText className="h-4 w-4" style={{ color: isSelected ? '#ffffff' : tipoColor }} />}
+                      fallback={<FileText className={`h-4 w-4 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : tipoColor }} />}
                     />
-                    <span className="text-xs font-medium whitespace-nowrap" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                    <span className={`text-xs font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
                       {tipo.nombre.split(' ')[0]}
                     </span>
                     <span
-                      className="text-[10px] font-bold px-1.5 rounded-full"
+                      className={`text-[10px] font-bold px-1.5 rounded-full ${isLoadingThis ? 'animate-pulse' : ''}`}
                       style={{
                         backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${tipoColor}30`,
                         color: isSelected ? '#ffffff' : tipoColor,
@@ -667,35 +710,29 @@ export default function GestionTramites() {
       <div className="flex gap-1.5">
         {/* Botón Todos fijo - outlined */}
         <button
-          onClick={() => setFiltroEstado('')}
+          onClick={() => {
+            setFilterLoading('estado-all');
+            setFiltroEstado('');
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
           style={{
             background: 'transparent',
             border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
           }}
         >
-          <Eye className="h-4 w-4" style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
-          <span className="text-xs font-medium whitespace-nowrap" style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+          <Eye className={`h-4 w-4 ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
+          <span className={`text-xs font-medium whitespace-nowrap ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
             Todos
           </span>
-          <span className="text-[10px] font-bold" style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+          <span className={`text-[10px] font-bold ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
             {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
           </span>
         </button>
 
         {/* Scroll de estados */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-          {Object.keys(conteosEstados).length === 0 ? (
-            // Skeleton mientras cargan los conteos
-            <>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div
-                  key={`skeleton-estado-${i}`}
-                  className="h-[32px] w-[55px] rounded-lg animate-pulse flex-shrink-0"
-                  style={{ background: `${theme.border}40` }}
-                />
-              ))}
-            </>
+          {loading || Object.keys(conteosEstados).length === 0 ? (
+            <FilterRowSkeleton count={6} height={32} widths={[55, 65, 60, 70, 55, 65]} />
           ) : (
             [
               { key: 'iniciado', label: 'Nuevo', icon: Clock, color: '#6366f1', count: conteosEstados['iniciado'] || 0 },
@@ -707,22 +744,26 @@ export default function GestionTramites() {
             ].map((estado) => {
               const Icon = estado.icon;
               const isActive = filtroEstado === estado.key;
+              const isLoadingThis = filterLoading === `estado-${estado.key}`;
               return (
                 <button
                   key={estado.key}
-                  onClick={() => setFiltroEstado(filtroEstado === estado.key ? '' : estado.key)}
+                  onClick={() => {
+                    setFilterLoading(`estado-${estado.key}`);
+                    setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
                   style={{
                     background: isActive ? estado.color : `${estado.color}15`,
                     border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                   }}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0" style={{ color: isActive ? '#ffffff' : estado.color }} />
-                  <span className="text-xs font-medium whitespace-nowrap" style={{ color: isActive ? '#ffffff' : estado.color }}>
+                  <Icon className={`h-4 w-4 flex-shrink-0 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }} />
+                  <span className={`text-xs font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }}>
                     {estado.label}
                   </span>
                   <span
-                    className="text-[10px] font-bold"
+                    className={`text-[10px] font-bold ${isLoadingThis ? 'animate-pulse' : ''}`}
                     style={{ color: isActive ? '#ffffff' : estado.color }}
                   >
                     {estado.count}
@@ -736,44 +777,17 @@ export default function GestionTramites() {
     </div>
   );
 
-  // Header actions (ordenamiento)
-  const renderHeaderActions = () => (
-    <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => setOrdenamiento('reciente')}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-        style={{
-          backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
-          border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
-          color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
-        }}
-      >
-        <ArrowUpDown className="h-3 w-3" />
-        Más recientes
-      </button>
-      <button
-        onClick={() => setOrdenamiento('vencimiento')}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-        style={{
-          backgroundColor: ordenamiento === 'vencimiento' ? theme.primary : theme.backgroundSecondary,
-          border: `1px solid ${ordenamiento === 'vencimiento' ? theme.primary : theme.border}`,
-          color: ordenamiento === 'vencimiento' ? '#ffffff' : theme.textSecondary,
-        }}
-      >
-        <Calendar className="h-3 w-3" />
-        Por vencer
-      </button>
-    </div>
-  );
 
   // Table view
   const renderTableView = () => (
     <ABMTable
+      key={`table-${ordenamiento}`}
       data={filteredTramites}
       columns={[
         {
           key: 'numero_tramite',
           header: 'ID',
+          sortValue: (t) => t.numero_tramite,
           render: (t) => (
             <span className="font-mono text-xs font-medium" style={{ color: theme.primary }}>
               #{t.numero_tramite.slice(-4)}
@@ -783,6 +797,7 @@ export default function GestionTramites() {
         {
           key: 'tipo',
           header: 'Tipo',
+          sortValue: (t) => t.tramite?.tipo_tramite?.nombre || '',
           render: (t) => {
             const tipoTramite = t.tramite?.tipo_tramite;
             const tipoColor = tipoTramite?.color || theme.primary;
@@ -804,6 +819,7 @@ export default function GestionTramites() {
         {
           key: 'tramite',
           header: 'Trámite',
+          sortValue: (t) => t.tramite?.nombre || '',
           render: (t) => {
             const tipoColor = t.tramite?.tipo_tramite?.color || theme.primary;
             return (
@@ -824,6 +840,7 @@ export default function GestionTramites() {
         {
           key: 'solicitante',
           header: 'Solicitante',
+          sortValue: (t) => `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim(),
           render: (t) => (
             <span className="text-xs truncate max-w-[90px] block" style={{ color: theme.text }}>
               {t.nombre_solicitante} {t.apellido_solicitante}
@@ -833,6 +850,7 @@ export default function GestionTramites() {
         {
           key: 'asunto',
           header: 'Asunto',
+          sortValue: (t) => t.asunto,
           render: (t) => (
             <p className="text-xs truncate max-w-[100px]" style={{ color: theme.text }} title={t.asunto}>
               {t.asunto}
@@ -842,13 +860,15 @@ export default function GestionTramites() {
         {
           key: 'empleado',
           header: 'Empleado',
+          sortValue: (t) => t.empleado_asignado ? `${t.empleado_asignado.nombre || ''} ${t.empleado_asignado.apellido || ''}`.trim() : '',
           render: (t) => renderEmpleado(t, theme.text),
         },
         {
           key: 'estado',
           header: 'Estado',
+          sortValue: (t) => getEstadoConfig(t.estado).label,
           render: (t) => {
-            const config = estadoConfig[t.estado] || estadoConfig.iniciado;
+            const config = getEstadoConfig(t.estado);
             const IconEstado = config.icon;
             return (
               <span
@@ -862,27 +882,38 @@ export default function GestionTramites() {
           },
         },
         {
-          key: 'fechas',
-          header: 'Fechas',
+          key: 'creacion',
+          header: 'Creación',
+          sortValue: (t) => new Date(t.created_at).getTime(),
           render: (t) => {
             const creacion = new Date(t.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-            const venc = calcularVencimiento(t);
-            const vencimiento = venc ? venc.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : null;
             return (
-              <div className="flex flex-col text-[10px] leading-tight">
-                <span style={{ color: theme.textSecondary }}>{creacion}</span>
-                {vencimiento && (
-                  <span style={{ color: theme.primary }}>
-                    {vencimiento}
-                  </span>
-                )}
-              </div>
+              <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                {creacion}
+              </span>
+            );
+          },
+        },
+        {
+          key: 'modificacion',
+          header: 'Modif.',
+          sortValue: (t) => new Date(t.updated_at || t.created_at).getTime(),
+          render: (t) => {
+            const modificacion = new Date(t.updated_at || t.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            return (
+              <span className="text-[10px]" style={{ color: theme.text }}>
+                {modificacion}
+              </span>
             );
           },
         },
         {
           key: 'por_vencer',
           header: 'Vence',
+          sortValue: (t) => {
+            const venc = calcularVencimiento(t);
+            return venc ? venc.getTime() : Infinity; // Sin vencimiento va al final
+          },
           render: (t) => {
             const venc = calcularVencimiento(t);
             if (!venc) return <span className="text-[10px]" style={{ color: theme.textSecondary }}>—</span>;
@@ -916,6 +947,8 @@ export default function GestionTramites() {
       ]}
       keyExtractor={(t) => t.id}
       onRowClick={(t) => openTramite(t)}
+      defaultSortKey={ordenamiento === 'por_vencer' ? 'por_vencer' : 'creacion'}
+      defaultSortDirection={ordenamiento === 'por_vencer' ? 'asc' : 'desc'}
     />
   );
 
@@ -933,7 +966,34 @@ export default function GestionTramites() {
         emptyMessage="No hay trámites"
         defaultViewMode="table"
         stickyHeader={true}
-        headerActions={renderHeaderActions()}
+        headerActions={
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setOrdenamiento('reciente')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: ordenamiento === 'reciente' ? `${theme.primary}15` : theme.backgroundSecondary,
+                border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
+                color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
+              }}
+            >
+              <ArrowUpDown className="h-3 w-3" />
+              Más recientes
+            </button>
+            <button
+              onClick={() => setOrdenamiento('por_vencer')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: ordenamiento === 'por_vencer' ? `${theme.primary}15` : theme.backgroundSecondary,
+                border: `1px solid ${ordenamiento === 'por_vencer' ? theme.primary : theme.border}`,
+                color: ordenamiento === 'por_vencer' ? theme.primary : theme.textSecondary,
+              }}
+            >
+              <Calendar className="h-3 w-3" />
+              Por vencer
+            </button>
+          </div>
+        }
         secondaryFilters={renderSecondaryFilters()}
         tableView={renderTableView()}
         sheetOpen={false}
@@ -984,7 +1044,7 @@ export default function GestionTramites() {
                 </button>
               </div>
               {(() => {
-                const cfg = estadoConfig[selectedTramite.estado] || estadoConfig.iniciado;
+                const cfg = getEstadoConfig(selectedTramite.estado);
                 return (
                   <span
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium"
@@ -1112,7 +1172,17 @@ export default function GestionTramites() {
             {/* Asignación de empleado - Solo si no está en proceso/finalizado/rechazado */}
             {(() => {
               const estadosBloqueados: EstadoTramite[] = ['en_proceso', 'aprobado', 'finalizado', 'rechazado'];
-              const tramiteCerrado = estadosBloqueados.includes(selectedTramite.estado);
+              const estadoActual = normalizeEstado(selectedTramite.estado);
+              const tramiteCerrado = estadosBloqueados.includes(estadoActual);
+
+              // Helper para obtener color de disponibilidad
+              const getDisponibilidadColor = (porcentaje: number) => {
+                if (porcentaje >= 80) return '#ef4444'; // Rojo - muy ocupado
+                if (porcentaje >= 50) return '#f59e0b'; // Naranja - ocupado
+                return '#10b981'; // Verde - disponible
+              };
+
+              const empleadoSeleccionadoData = empleadosDisponibilidad.find(e => e.id === empleadoSeleccionado);
 
               return (
                 <div
@@ -1127,9 +1197,9 @@ export default function GestionTramites() {
                       <button
                         onClick={handleSugerirEmpleado}
                         disabled={loadingSugerencia}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105"
                         style={{
-                          background: `linear-gradient(135deg, #8b5cf6, #7c3aed)`,
+                          background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
                           color: '#ffffff',
                         }}
                       >
@@ -1138,7 +1208,7 @@ export default function GestionTramites() {
                         ) : (
                           <Sparkles className="h-3 w-3" />
                         )}
-                        Sugerir con IA
+                        Buscar con IA
                       </button>
                     )}
                   </div>
@@ -1171,9 +1241,9 @@ export default function GestionTramites() {
                     >
                       <p className="text-xs" style={{ color: theme.textSecondary }}>
                         No se puede modificar la asignación de un trámite {
-                          selectedTramite.estado === 'en_proceso' ? 'en proceso' :
-                          selectedTramite.estado === 'aprobado' ? 'aprobado' :
-                          selectedTramite.estado === 'finalizado' ? 'finalizado' : 'rechazado'
+                          estadoActual === 'en_proceso' ? 'en proceso' :
+                          estadoActual === 'aprobado' ? 'aprobado' :
+                          estadoActual === 'finalizado' ? 'finalizado' : 'rechazado'
                         }
                       </p>
                     </div>
@@ -1183,11 +1253,11 @@ export default function GestionTramites() {
                       {sugerenciaIA && sugerenciaIA.sugerencia && (
                         <div
                           className="mb-3 p-3 rounded-lg"
-                          style={{ backgroundColor: '#8b5cf620', border: '1px solid #8b5cf640' }}
+                          style={{ backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}30` }}
                         >
                           <div className="flex items-start gap-2">
-                            <Sparkles className="h-4 w-4 mt-0.5" style={{ color: '#8b5cf6' }} />
-                            <div>
+                            <Sparkles className="h-4 w-4 mt-0.5" style={{ color: theme.primary }} />
+                            <div className="flex-1">
                               <p className="text-sm font-medium" style={{ color: theme.text }}>
                                 {sugerenciaIA.sugerencia.nombre}
                               </p>
@@ -1202,31 +1272,151 @@ export default function GestionTramites() {
                         </div>
                       )}
 
+                      {/* Selector de empleados con disponibilidad */}
                       <div className="flex gap-2">
-                        <select
-                          value={empleadoSeleccionado}
-                          onChange={(e) => setEmpleadoSeleccionado(e.target.value ? Number(e.target.value) : '')}
-                          className="flex-1 px-3 py-2 rounded-lg text-sm"
-                          style={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        >
-                          <option value="">Seleccionar empleado...</option>
-                          {empleados.map(e => (
-                            <option key={e.id} value={e.id}>
-                              {e.nombre} {e.apellido} {e.especialidad ? `(${e.especialidad})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex-1 relative" ref={empleadosDropdownRef}>
+                          {/* Input/Botón del selector */}
+                          <button
+                            type="button"
+                            onClick={() => setShowEmpleadosDropdown(!showEmpleadosDropdown)}
+                            className="w-full px-3 py-2 rounded-lg text-sm text-left flex items-center justify-between transition-all"
+                            style={{
+                              backgroundColor: theme.card,
+                              border: `1px solid ${showEmpleadosDropdown ? theme.primary : theme.border}`,
+                              color: empleadoSeleccionado ? theme.text : theme.textSecondary,
+                            }}
+                          >
+                            <span className="truncate">
+                              {empleadoSeleccionadoData
+                                ? `${empleadoSeleccionadoData.nombre} ${empleadoSeleccionadoData.apellido || ''}`
+                                : 'Seleccionar empleado...'}
+                            </span>
+                            <ChevronDown
+                              className={`h-4 w-4 transition-transform ${showEmpleadosDropdown ? 'rotate-180' : ''}`}
+                              style={{ color: theme.textSecondary }}
+                            />
+                          </button>
+
+                          {/* Dropdown con lista de empleados */}
+                          {showEmpleadosDropdown && (
+                            <div
+                              className="absolute z-50 mt-1 w-full rounded-lg shadow-xl overflow-hidden"
+                              style={{
+                                backgroundColor: theme.card,
+                                border: `1px solid ${theme.border}`,
+                                maxHeight: '280px',
+                              }}
+                            >
+                              {loadingEmpleados ? (
+                                <div className="p-4 flex items-center justify-center">
+                                  <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+                                </div>
+                              ) : empleadosDisponibilidad.length === 0 ? (
+                                <div className="p-4 text-center">
+                                  <p className="text-sm" style={{ color: theme.textSecondary }}>
+                                    No hay empleados administrativos
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="overflow-y-auto" style={{ maxHeight: '280px' }}>
+                                  {empleadosDisponibilidad.map((emp) => {
+                                    const isSelected = empleadoSeleccionado === emp.id;
+                                    const disponColor = getDisponibilidadColor(emp.porcentaje_ocupacion);
+
+                                    return (
+                                      <button
+                                        key={emp.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setEmpleadoSeleccionado(emp.id);
+                                          setShowEmpleadosDropdown(false);
+                                        }}
+                                        className="w-full p-3 text-left transition-all hover:brightness-95"
+                                        style={{
+                                          backgroundColor: isSelected ? `${theme.primary}15` : 'transparent',
+                                          borderBottom: `1px solid ${theme.border}`,
+                                        }}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          {/* Avatar */}
+                                          <div
+                                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0"
+                                            style={{
+                                              backgroundColor: isSelected ? `${theme.primary}30` : `${theme.primary}15`,
+                                              color: theme.primary,
+                                            }}
+                                          >
+                                            {emp.nombre?.[0]}{emp.apellido?.[0] || ''}
+                                          </div>
+
+                                          {/* Info */}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                              <p
+                                                className="text-sm font-medium truncate"
+                                                style={{ color: theme.text }}
+                                              >
+                                                {emp.nombre} {emp.apellido || ''}
+                                              </p>
+                                              {/* Indicador de disponibilidad */}
+                                              <div
+                                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                                style={{ backgroundColor: disponColor }}
+                                                title={`${emp.disponibilidad} disponible(s)`}
+                                              />
+                                            </div>
+
+                                            {/* Carga y horario */}
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                              <span
+                                                className="text-xs"
+                                                style={{ color: disponColor }}
+                                              >
+                                                {emp.carga_actual}/{emp.capacidad_maxima} asignados
+                                              </span>
+                                              <span className="text-xs" style={{ color: theme.textSecondary }}>•</span>
+                                              <span
+                                                className="text-xs truncate"
+                                                style={{ color: theme.textSecondary }}
+                                              >
+                                                {emp.horario_texto}
+                                              </span>
+                                            </div>
+
+                                            {/* Barra de ocupación */}
+                                            <div
+                                              className="mt-1.5 h-1 rounded-full overflow-hidden"
+                                              style={{ backgroundColor: `${theme.border}50` }}
+                                            >
+                                              <div
+                                                className="h-full rounded-full transition-all"
+                                                style={{
+                                                  width: `${Math.min(100, emp.porcentaje_ocupacion)}%`,
+                                                  backgroundColor: disponColor,
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Botón asignar */}
                         <button
                           onClick={handleAsignarEmpleado}
                           disabled={!empleadoSeleccionado || asignando}
-                          className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+                          className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-all hover:scale-105"
                           style={{
-                            background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                            color: '#ffffff',
+                            background: empleadoSeleccionado
+                              ? `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`
+                              : theme.backgroundSecondary,
+                            color: empleadoSeleccionado ? '#ffffff' : theme.textSecondary,
                           }}
                         >
                           {asignando ? (
@@ -1313,21 +1503,21 @@ export default function GestionTramites() {
                           <span
                             className="text-xs px-2 py-0.5 rounded"
                             style={{
-                              backgroundColor: estadoConfig[h.estado_anterior]?.bg,
-                              color: estadoConfig[h.estado_anterior]?.color
+                              backgroundColor: getEstadoConfig(h.estado_anterior).bg,
+                              color: getEstadoConfig(h.estado_anterior).color
                             }}
                           >
-                            {estadoConfig[h.estado_anterior]?.label}
+                            {getEstadoConfig(h.estado_anterior).label}
                           </span>
                           <span style={{ color: theme.textSecondary }}>→</span>
                           <span
                             className="text-xs px-2 py-0.5 rounded"
                             style={{
-                              backgroundColor: estadoConfig[h.estado_nuevo]?.bg,
-                              color: estadoConfig[h.estado_nuevo]?.color
+                              backgroundColor: getEstadoConfig(h.estado_nuevo).bg,
+                              color: getEstadoConfig(h.estado_nuevo).color
                             }}
                           >
-                            {estadoConfig[h.estado_nuevo]?.label}
+                            {getEstadoConfig(h.estado_nuevo).label}
                           </span>
                         </div>
                       )}
@@ -1344,7 +1534,7 @@ export default function GestionTramites() {
             </div>
 
             {/* Actualizar estado */}
-            {(estadoTransiciones[selectedTramite.estado]?.length || 0) > 0 && (
+            {(estadoTransiciones[normalizeEstado(selectedTramite.estado)]?.length || 0) > 0 && (
               <div
                 className="p-4 rounded-xl"
                 style={{ backgroundColor: theme.backgroundSecondary }}
@@ -1370,9 +1560,9 @@ export default function GestionTramites() {
                       }}
                     >
                       <option value="">Seleccionar estado...</option>
-                      {(estadoTransiciones[selectedTramite.estado] || []).map(estado => (
+                      {(estadoTransiciones[normalizeEstado(selectedTramite.estado)] || []).map(estado => (
                         <option key={estado} value={estado}>
-                          {estadoConfig[estado]?.label || estado}
+                          {getEstadoConfig(estado).label}
                         </option>
                       ))}
                     </select>

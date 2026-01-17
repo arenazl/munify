@@ -17,9 +17,17 @@ import { useAuth } from '../../contexts/AuthContext';
 import NotificationSettings from '../../components/NotificationSettings';
 
 export default function MobilePerfil() {
-  const { theme, themeName, setTheme } = useTheme();
-  const isDarkMode = themeName === 'dark';
-  const toggleDarkMode = () => setTheme(isDarkMode ? 'light' : 'dark');
+  const { theme, currentPresetId, currentVariant, setPreset } = useTheme();
+  // Detectar si el tema actual es "oscuro" basándose en el background
+  const isDarkMode = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const toggleDarkMode = () => {
+    // Alternar entre arctic (claro) y carbon (oscuro)
+    if (isDarkMode) {
+      setPreset('arctic', currentVariant);
+    } else {
+      setPreset('carbon', currentVariant);
+    }
+  };
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);

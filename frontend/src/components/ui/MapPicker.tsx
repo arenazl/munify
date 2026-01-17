@@ -4,6 +4,12 @@ import { useTheme } from '../../contexts/ThemeContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
+// URLs de tiles para tema claro y oscuro
+const TILE_URLS = {
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+};
+
 // Fix para el icono de Leaflet en Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -56,7 +62,11 @@ export function MapPicker({
   zoom = 13,
   center = { lat: -34.6037, lng: -58.3816 }, // Buenos Aires por defecto
 }: MapPickerProps) {
-  const { theme } = useTheme();
+  const { theme, currentPresetId } = useTheme();
+  // Detectar si el tema es claro (solo sand y arctic son claros)
+  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
+
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(value || null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -100,8 +110,8 @@ export function MapPicker({
         ref={mapRef}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OSM &copy; CARTO'
+          url={tileUrl}
         />
         <MapCenterUpdater coords={value || null} />
         {!readOnly && <MapClickHandler onLocationSelect={handleLocationSelect} />}
@@ -159,7 +169,10 @@ export function MapView({
   center = { lat: -34.6037, lng: -58.3816 },
   onMarkerClick,
 }: MapViewProps) {
-  const { theme } = useTheme();
+  const { theme, currentPresetId } = useTheme();
+  // Detectar si el tema es claro (solo sand y arctic son claros)
+  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
 
   // Calcular centro basado en marcadores si existen
   const mapCenter = markers.length > 0
@@ -177,8 +190,8 @@ export function MapView({
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OSM &copy; CARTO'
+          url={tileUrl}
         />
         {markers.map((marker) => (
           <Marker

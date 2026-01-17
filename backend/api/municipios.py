@@ -56,6 +56,7 @@ class MunicipioDetalle(MunicipioPublic):
     zoom_mapa_default: int = 13
     color_secundario: str = "#1E40AF"
     tema_config: Optional[dict] = None
+    imagen_portada: Optional[str] = None  # URL de imagen para header/banner del dashboard
 
 
 class MunicipioCreate(BaseModel):
@@ -403,11 +404,11 @@ async def actualizar_branding(
     color_secundario: str = Form(default=None),
     logo: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR]))
 ):
     """
     Actualiza el branding (logo y colores) de un municipio.
-    Solo admin puede modificar.
+    Admin y supervisor pueden modificar.
     Sube el logo a Cloudinary.
     """
     print(f"DEBUG branding: municipio_id={municipio_id}, color_primario={color_primario}, color_secundario={color_secundario}, logo={logo}")
@@ -481,14 +482,22 @@ async def actualizar_branding(
 
 class TemaConfigUpdate(BaseModel):
     """Configuración completa del tema del municipio"""
+    # Nuevo sistema de presets
+    presetId: Optional[str] = None
+    variant: Optional[str] = None
+    # Campos legacy (para compatibilidad)
     theme: Optional[str] = None  # dark, light, blue, brown, amber
     customPrimary: Optional[str] = None
     customSidebar: Optional[str] = None
     customSidebarText: Optional[str] = None
+    # Imágenes de fondo
     sidebarBgImage: Optional[str] = None
     sidebarBgOpacity: Optional[float] = None
     contentBgImage: Optional[str] = None
     contentBgOpacity: Optional[float] = None
+    # Opciones de portada
+    portadaSinFiltro: Optional[bool] = None  # Desactiva overlay de colores en imagen de portada
+    portadaOpacity: Optional[float] = None  # Opacidad de la imagen de portada (0-1)
 
 
 @router.put("/{municipio_id}/tema", response_model=MunicipioDetalle)
@@ -496,11 +505,11 @@ async def actualizar_tema(
     municipio_id: int,
     tema: TemaConfigUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR]))
 ):
     """
     Actualiza la configuración completa del tema de un municipio.
-    Solo admin puede modificar.
+    Admin y supervisor pueden modificar.
     """
     # Obtener municipio
     query = select(Municipio).where(Municipio.id == municipio_id)
@@ -528,11 +537,11 @@ async def actualizar_imagen_portada(
     municipio_id: int,
     imagen: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR]))
 ):
     """
     Actualiza la imagen de portada (banner del dashboard) de un municipio.
-    Solo admin puede modificar.
+    Admin y supervisor pueden modificar.
     Sube la imagen a Cloudinary.
     """
     # Obtener municipio
@@ -597,10 +606,11 @@ async def actualizar_imagen_portada(
 async def eliminar_imagen_portada(
     municipio_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR]))
 ):
     """
     Elimina la imagen de portada de un municipio.
+    Admin y supervisor pueden modificar.
     """
     # Obtener municipio
     query = select(Municipio).where(Municipio.id == municipio_id)

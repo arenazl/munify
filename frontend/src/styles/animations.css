@@ -157,6 +157,11 @@
   animation: fadeIn var(--animation-duration) var(--animation-timing);
 }
 
+/* Clase para chat widget - soporta animation-delay inline */
+.animate-fade-in {
+  animation: fadeInUp 0.4s var(--animation-timing) both;
+}
+
 .fade-in-up {
   animation: fadeInUp 0.4s var(--animation-timing);
 }
@@ -823,6 +828,25 @@ input[type="radio"]:checked {
   background-size: 200% 100%;
   animation: skeletonWave 1.5s infinite;
   border-radius: 4px;
+}
+
+/* Skeleton shimmer para filtros - funciona en tema claro y oscuro */
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(128, 128, 128, 0.15) 0%,
+    rgba(128, 128, 128, 0.25) 25%,
+    rgba(128, 128, 128, 0.4) 50%,
+    rgba(128, 128, 128, 0.25) 75%,
+    rgba(128, 128, 128, 0.15) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s ease-in-out infinite;
 }
 
 /* Animación de flip para cards */

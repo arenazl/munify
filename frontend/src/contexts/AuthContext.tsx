@@ -23,14 +23,22 @@ export interface Municipio {
   sitio_web?: string;
   // Configuración de tema
   tema_config?: {
+    // Nuevo sistema de presets
+    presetId?: string;
+    variant?: string;
+    // Campos legacy (para compatibilidad)
     theme?: string;
     customPrimary?: string;
     customSidebar?: string;
     customSidebarText?: string;
+    // Imágenes de fondo
     sidebarBgImage?: string;
     sidebarBgOpacity?: number;
     contentBgImage?: string;
     contentBgOpacity?: number;
+    // Opciones de portada
+    portadaSinFiltro?: boolean;
+    portadaOpacity?: number; // Opacidad de la imagen de portada (0-1)
   };
 }
 
@@ -74,21 +82,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const munis = response.data;
       setMunicipios(munis);
 
-      // Si no hay municipio seleccionado, seleccionar el del usuario o el primero
-      if (!municipioActual && munis.length > 0) {
-        const storedMuniId = localStorage.getItem('municipio_actual_id');
-        const userMuniId = user?.municipio_id;
+      // Determinar qué municipio seleccionar
+      const storedMuniId = localStorage.getItem('municipio_actual_id');
+      const userMuniId = user?.municipio_id;
+      const currentMuniId = municipioActual?.id;
 
-        let selectedMuni = munis[0];
+      let selectedMuni = munis[0];
 
-        if (storedMuniId) {
-          const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
-          if (found) selectedMuni = found;
-        } else if (userMuniId) {
-          const found = munis.find((m: Municipio) => m.id === userMuniId);
-          if (found) selectedMuni = found;
-        }
+      // Prioridad: municipio actual > localStorage > usuario > primero
+      if (currentMuniId) {
+        const found = munis.find((m: Municipio) => m.id === currentMuniId);
+        if (found) selectedMuni = found;
+      } else if (storedMuniId) {
+        const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
+        if (found) selectedMuni = found;
+      } else if (userMuniId) {
+        const found = munis.find((m: Municipio) => m.id === userMuniId);
+        if (found) selectedMuni = found;
+      }
 
+      // Siempre actualizar el municipio actual con los datos más recientes
+      if (selectedMuni) {
         setMunicipioActualState(selectedMuni);
         localStorage.setItem('municipio_actual_id', String(selectedMuni.id));
         localStorage.setItem('municipio_id', String(selectedMuni.id));

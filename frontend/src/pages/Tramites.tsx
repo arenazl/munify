@@ -1449,7 +1449,7 @@ export default function Tramites() {
               onClick={() => setOrdenamiento('reciente')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
-                backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
+                backgroundColor: ordenamiento === 'reciente' ? `${theme.primary}15` : theme.backgroundSecondary,
                 border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
                 color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
               }}
@@ -1461,9 +1461,9 @@ export default function Tramites() {
               onClick={() => setOrdenamiento('vencimiento')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
-                backgroundColor: ordenamiento === 'vencimiento' ? theme.primary : theme.backgroundSecondary,
+                backgroundColor: ordenamiento === 'vencimiento' ? `${theme.primary}15` : theme.backgroundSecondary,
                 border: `1px solid ${ordenamiento === 'vencimiento' ? theme.primary : theme.border}`,
-                color: ordenamiento === 'vencimiento' ? '#ffffff' : theme.textSecondary,
+                color: ordenamiento === 'vencimiento' ? theme.primary : theme.textSecondary,
               }}
             >
               <Calendar className="h-3 w-3" />

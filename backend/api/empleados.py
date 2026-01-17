@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
-from typing import List
+from typing import List, Optional
 
 from core.database import get_db
 from core.security import get_current_user, require_roles, get_password_hash
 from models.empleado import Empleado
+from models.empleado_horario import EmpleadoHorario
+from models.tramite import Solicitud, EstadoSolicitud
+from models.reclamo import Reclamo
 from models.categoria import Categoria
 from models.user import User
-from schemas.empleado import EmpleadoCreate, EmpleadoUpdate, EmpleadoResponse
+from schemas.empleado import EmpleadoCreate, EmpleadoUpdate, EmpleadoResponse, EmpleadoDisponibilidad, HorarioSimple
 
 router = APIRouter()
 
@@ -35,6 +38,128 @@ async def get_mi_empleado(
     if not empleado:
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
     return empleado
+
+
+def _formato_horario(horarios: List[EmpleadoHorario]) -> str:
+    """Genera texto legible del horario, ej: 'Lun-Vie 8:00-16:00'"""
+    if not horarios:
+        return "Sin horario definido"
+
+    dias_nombres = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    activos = [h for h in horarios if h.activo]
+
+    if not activos:
+        return "Sin horario definido"
+
+    # Agrupar por horario similar
+    grupos = {}
+    for h in activos:
+        key = f"{h.hora_entrada.strftime('%H:%M')}-{h.hora_salida.strftime('%H:%M')}"
+        if key not in grupos:
+            grupos[key] = []
+        grupos[key].append(h.dia_semana)
+
+    partes = []
+    for horario, dias in grupos.items():
+        dias.sort()
+        # Detectar rangos consecutivos
+        if len(dias) >= 2 and dias[-1] - dias[0] == len(dias) - 1:
+            rango = f"{dias_nombres[dias[0]]}-{dias_nombres[dias[-1]]}"
+        else:
+            rango = ", ".join(dias_nombres[d] for d in dias)
+        partes.append(f"{rango} {horario}")
+
+    return " | ".join(partes)
+
+
+@router.get("/disponibilidad", response_model=List[EmpleadoDisponibilidad])
+async def get_empleados_disponibilidad(
+    tipo: Optional[str] = Query(None, description="Filtrar por tipo: operario o administrativo"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Obtener empleados con su disponibilidad y horarios.
+    Ordenados por disponibilidad (menos carga = más disponible).
+    """
+    # Query base de empleados activos del municipio
+    query = select(Empleado).options(
+        selectinload(Empleado.horarios)
+    ).where(
+        Empleado.municipio_id == current_user.municipio_id,
+        Empleado.activo == True
+    )
+
+    # Filtrar por tipo si se especifica
+    if tipo:
+        query = query.where(Empleado.tipo == tipo)
+
+    result = await db.execute(query)
+    empleados = result.scalars().all()
+
+    # Estados pendientes para trámites (solicitudes) - Enum con mayúsculas
+    estados_pendientes_tramites = [
+        EstadoSolicitud.INICIADO,
+        EstadoSolicitud.EN_REVISION,
+        EstadoSolicitud.EN_PROCESO
+    ]
+    # Estados pendientes para reclamos (strings en minúscula)
+    estados_pendientes_reclamos = ['pendiente', 'en_progreso', 'asignado']
+
+    resultado = []
+    for emp in empleados:
+        # Contar trámites pendientes (Solicitud usa empleado_id)
+        tramites_count = await db.execute(
+            select(func.count(Solicitud.id)).where(
+                Solicitud.empleado_id == emp.id,
+                Solicitud.estado.in_(estados_pendientes_tramites)
+            )
+        )
+        carga_tramites = tramites_count.scalar() or 0
+
+        # Contar reclamos pendientes (Reclamo usa empleado_asignado_id)
+        reclamos_count = await db.execute(
+            select(func.count(Reclamo.id)).where(
+                Reclamo.empleado_asignado_id == emp.id,
+                Reclamo.estado.in_(estados_pendientes_reclamos)
+            )
+        )
+        carga_reclamos = reclamos_count.scalar() or 0
+
+        carga_actual = carga_tramites + carga_reclamos
+        disponibilidad = max(0, emp.capacidad_maxima - carga_actual)
+        porcentaje = (carga_actual / emp.capacidad_maxima * 100) if emp.capacidad_maxima > 0 else 0
+
+        # Formatear horarios
+        horarios_list = [
+            HorarioSimple(
+                dia_semana=h.dia_semana,
+                hora_entrada=h.hora_entrada.strftime("%H:%M") if h.hora_entrada else "00:00",
+                hora_salida=h.hora_salida.strftime("%H:%M") if h.hora_salida else "00:00",
+                activo=h.activo
+            )
+            for h in emp.horarios
+        ]
+
+        resultado.append(EmpleadoDisponibilidad(
+            id=emp.id,
+            nombre=emp.nombre,
+            apellido=emp.apellido,
+            especialidad=emp.especialidad,
+            tipo=emp.tipo or "operario",
+            capacidad_maxima=emp.capacidad_maxima,
+            carga_actual=carga_actual,
+            disponibilidad=disponibilidad,
+            porcentaje_ocupacion=round(porcentaje, 1),
+            horarios=horarios_list,
+            horario_texto=_formato_horario(emp.horarios)
+        ))
+
+    # Ordenar por disponibilidad (más disponible primero)
+    resultado.sort(key=lambda x: (-x.disponibilidad, x.porcentaje_ocupacion))
+
+    return resultado
+
 
 @router.get("", response_model=List[EmpleadoResponse])
 async def get_empleados(

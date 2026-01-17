@@ -554,7 +554,7 @@ export default function MisReclamos() {
         onClick={() => setOrdenarPor('fecha')}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
         style={{
-          backgroundColor: ordenarPor === 'fecha' ? theme.card : theme.backgroundSecondary,
+          backgroundColor: ordenarPor === 'fecha' ? `${theme.primary}15` : theme.backgroundSecondary,
           border: `1px solid ${ordenarPor === 'fecha' ? theme.primary : theme.border}`,
           color: ordenarPor === 'fecha' ? theme.primary : theme.textSecondary,
         }}
@@ -566,9 +566,9 @@ export default function MisReclamos() {
         onClick={() => setOrdenarPor('vencimiento')}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
         style={{
-          backgroundColor: ordenarPor === 'vencimiento' ? theme.primary : theme.backgroundSecondary,
+          backgroundColor: ordenarPor === 'vencimiento' ? `${theme.primary}15` : theme.backgroundSecondary,
           border: `1px solid ${ordenarPor === 'vencimiento' ? theme.primary : theme.border}`,
-          color: ordenarPor === 'vencimiento' ? '#ffffff' : theme.textSecondary,
+          color: ordenarPor === 'vencimiento' ? theme.primary : theme.textSecondary,
         }}
       >
         <Calendar className="h-3 w-3" />

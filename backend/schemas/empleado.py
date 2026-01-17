@@ -67,3 +67,31 @@ class EmpleadoResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class HorarioSimple(BaseModel):
+    dia_semana: int  # 0=Lunes, 6=Domingo
+    hora_entrada: str
+    hora_salida: str
+    activo: bool = True
+
+    class Config:
+        from_attributes = True
+
+
+class EmpleadoDisponibilidad(BaseModel):
+    """Empleado con información de disponibilidad y horarios"""
+    id: int
+    nombre: str
+    apellido: Optional[str] = None
+    especialidad: Optional[str] = None
+    tipo: str
+    capacidad_maxima: int
+    carga_actual: int  # Cantidad de trámites/reclamos pendientes
+    disponibilidad: int  # capacidad_maxima - carga_actual
+    porcentaje_ocupacion: float  # (carga_actual / capacidad_maxima) * 100
+    horarios: List[HorarioSimple] = []
+    horario_texto: str  # Ej: "Lun-Vie 8:00-16:00"
+
+    class Config:
+        from_attributes = True

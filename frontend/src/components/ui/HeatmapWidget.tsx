@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { X, Maximize2, ZoomIn, ZoomOut, Home } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Declarar el tipo para leaflet.heat
 declare module 'leaflet' {
@@ -323,6 +324,12 @@ function getCategoryKey(categoria: string): string {
   return 'otros';
 }
 
+// URLs de tiles para tema claro y oscuro
+const TILE_URLS = {
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+};
+
 export default function HeatmapWidget({
   data,
   height = '280px',
@@ -334,6 +341,11 @@ export default function HeatmapWidget({
   title = 'Mapa de Calor',
   loading = false,
 }: HeatmapWidgetProps) {
+  const { currentPresetId } = useTheme();
+  // Detectar si el tema es claro (solo sand y arctic son claros)
+  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
+
   const [isExpanded, setIsExpanded] = useState(false);
   // Estado de filtros - todas las categorías activas por defecto
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
@@ -442,8 +454,8 @@ export default function HeatmapWidget({
   // Key que cambia cuando cambian los filtros (fuerza recrear el mapa completo)
   const filterKey = useMemo(() => Array.from(activeFilters).sort().join('-'), [activeFilters]);
 
-  // Key del mapa incluye filtros para forzar recreación cuando cambian
-  const mapKey = `map-${mapCenter[0].toFixed(4)}-${mapCenter[1].toFixed(4)}-${filterKey}`;
+  // Key del mapa incluye filtros y tema para forzar recreación cuando cambian
+  const mapKey = `map-${mapCenter[0].toFixed(4)}-${mapCenter[1].toFixed(4)}-${filterKey}-${isDarkTheme ? 'dark' : 'light'}`;
 
   // Skeleton mientras carga
   if (loading) {
@@ -514,7 +526,7 @@ export default function HeatmapWidget({
         attributionControl={false}
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url={tileUrl}
           attribution='&copy; OSM &copy; CARTO'
         />
         <FitBoundsToData data={filteredData} onReady={handleMapReady} />

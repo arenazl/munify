@@ -205,7 +205,7 @@ async def get_config_registro(db: AsyncSession = Depends(get_db)):
 @router.get("/barrios/{municipio}")
 async def buscar_barrios_municipio(
     municipio: str,
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """
     Busca los barrios/localidades de un municipio usando Overpass API (OpenStreetMap).
@@ -266,7 +266,7 @@ async def buscar_barrios_municipio(
 async def cargar_barrios_como_zonas(
     barrios: List[str],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """
     Carga una lista de barrios como zonas en la base de datos.
@@ -313,7 +313,7 @@ async def cargar_barrios_como_zonas(
 @router.get("", response_model=List[ConfiguracionResponse])
 async def get_configuraciones(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id del usuario actual
     result = await db.execute(
@@ -328,7 +328,7 @@ async def get_configuraciones(
 async def create_configuracion(
     data: ConfiguracionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: verificar duplicado solo en el mismo municipio
     result = await db.execute(
@@ -351,7 +351,7 @@ async def create_configuracion(
 async def get_configuracion(
     clave: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
@@ -370,7 +370,7 @@ async def update_configuracion(
     clave: str,
     data: ConfiguracionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id
     result = await db.execute(
@@ -398,7 +398,7 @@ async def update_configuracion(
 async def delete_configuracion(
     clave: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     # Multi-tenant: filtrar por municipio_id
     result = await db.execute(

@@ -48,6 +48,34 @@ export default function Ajustes() {
     }
   }, []);
 
+  // Tabs principales que aparecen arriba (para admin/supervisor)
+  const mainTabs = [
+    {
+      id: 'general',
+      title: 'General',
+    },
+    ...(isAdminOrSupervisor ? [
+      {
+        id: 'branding',
+        title: 'Branding',
+      },
+      {
+        id: 'whatsapp',
+        title: 'WhatsApp',
+      },
+    ] : []),
+    ...(isAdminOrSupervisor ? [
+      {
+        id: 'usuarios',
+        title: 'Usuarios',
+      },
+      {
+        id: 'catalogo',
+        title: 'Catálogos',
+      },
+    ] : []),
+  ];
+
   const sections: SettingSection[] = [
     {
       id: 'general',
@@ -63,15 +91,6 @@ export default function Ajustes() {
           show: true
         },
         {
-          id: 'whatsapp',
-          label: 'WhatsApp',
-          description: 'Integracion con WhatsApp Business',
-          icon: MessageCircle,
-          color: '#25D366',
-          link: '/gestion/whatsapp',
-          show: isAdminOrSupervisor
-        },
-        {
           id: 'dashboard',
           label: 'Dashboard',
           description: 'Personaliza los dashboards por rol',
@@ -79,15 +98,36 @@ export default function Ajustes() {
           color: '#8b5cf6',
           link: '/gestion/config-dashboard',
           show: isAdminOrSupervisor
-        },
+        }
+      ]
+    },
+    {
+      id: 'branding',
+      title: 'Branding',
+      items: [
         {
-          id: 'branding',
-          label: 'Branding',
-          description: 'Logo, colores y personalizacion',
+          id: 'configuracion',
+          label: 'Configuración',
+          description: 'Imagen de portada y datos del municipio',
           icon: Building2,
           color: '#ec4899',
-          link: '/gestion/branding',
-          show: isAdmin
+          link: '/gestion/configuracion',
+          show: isAdminOrSupervisor
+        }
+      ]
+    },
+    {
+      id: 'whatsapp',
+      title: 'WhatsApp',
+      items: [
+        {
+          id: 'whatsapp-config',
+          label: 'Configuración WhatsApp',
+          description: 'Integracion con WhatsApp Business',
+          icon: MessageCircle,
+          color: '#25D366',
+          link: '/gestion/whatsapp',
+          show: isAdminOrSupervisor
         }
       ]
     },
@@ -191,7 +231,8 @@ export default function Ajustes() {
     items: section.items.filter(item => item.show)
   })).filter(section => section.items.length > 0);
 
-  const sectionTabs = visibleSections.map(s => ({ id: s.id, title: s.title }));
+  // Usar mainTabs para los tabs visibles (ya filtrados por rol)
+  const sectionTabs = mainTabs;
 
   const currentSection = visibleSections.find(s => s.id === activeSection) || visibleSections[0];
 
