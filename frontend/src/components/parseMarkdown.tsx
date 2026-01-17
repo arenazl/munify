@@ -4,7 +4,8 @@ export function parseMarkdown(
   primaryColor: string
 ): (string | React.ReactElement)[] {
   const parts: (string | React.ReactElement)[] = [];
-  const regex = /(\*\*(.+?)\*\*)|(\[([^\]]+)\]\(([^)]+)\))/g;
+  // Regex para: **negrita**, <b>negrita</b>, [link](url), <br> o <br/>
+  const regex = /(\*\*(.+?)\*\*)|(<b>(.+?)<\/b>)|(\[([^\]]+)\]\(([^)]+)\))|(<br\s*\/?>)/gi;
   let lastIndex = 0;
   let match;
   let keyIndex = 0;
@@ -14,10 +15,15 @@ export function parseMarkdown(
       parts.push(text.slice(lastIndex, match.index));
     }
     if (match[1]) {
+      // **negrita** markdown
       parts.push(<strong key={keyIndex++}>{match[2]}</strong>);
     } else if (match[3]) {
-      const linkText = match[4];
-      const url = match[5];
+      // <b>negrita</b> HTML
+      parts.push(<strong key={keyIndex++}>{match[4]}</strong>);
+    } else if (match[5]) {
+      // [link](url) markdown
+      const linkText = match[6];
+      const url = match[7];
       parts.push(
         <a
           key={keyIndex++}
@@ -32,6 +38,9 @@ export function parseMarkdown(
           {linkText}
         </a>
       );
+    } else if (match[8]) {
+      // <br> o <br/>
+      parts.push(<br key={keyIndex++} />);
     }
     lastIndex = match.index + match[0].length;
   }
