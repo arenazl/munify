@@ -4,16 +4,24 @@ export function parseMarkdown(
   primaryColor: string
 ): (string | React.ReactElement)[] {
   const parts: (string | React.ReactElement)[] = [];
-  // Regex para: **negrita**, <b>negrita</b>, [link](url), <br><br> (doble), <br> (simple)
-  const regex = /(\*\*(.+?)\*\*)|(<b>(.+?)<\/b>)|(\[([^\]]+)\]\(([^)]+)\))|(<br\s*\/?>\s*<br\s*\/?>)|(<br\s*\/?>)/gi;
-  let lastIndex = 0;
-  let match;
   let keyIndex = 0;
 
-  while ((match = regex.exec(text)) !== null) {
+  // Primero reemplazamos <br><br> por un placeholder único
+  let processed = text.replace(/<br\s*\/?>\s*<br\s*\/?>/gi, '{{DOUBLE_BR}}');
+  // Luego <br> simple
+  processed = processed.replace(/<br\s*\/?>/gi, '{{SINGLE_BR}}');
+
+  // Regex para: **negrita**, <b>negrita</b>, [link](url), placeholders de BR
+  const regex = /(\*\*(.+?)\*\*)|(<b>(.+?)<\/b>)|(\[([^\]]+)\]\(([^)]+)\))|(\{\{DOUBLE_BR\}\})|(\{\{SINGLE_BR\}\})/gi;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(processed)) !== null) {
+    // Agregar texto antes del match
     if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
+      parts.push(processed.slice(lastIndex, match.index));
     }
+
     if (match[1]) {
       // **negrita** markdown
       parts.push(<strong key={keyIndex++}>{match[2]}</strong>);
@@ -39,17 +47,19 @@ export function parseMarkdown(
         </a>
       );
     } else if (match[8]) {
-      // <br><br> doble = separador de párrafo con espacio
+      // {{DOUBLE_BR}} = separador de párrafo con espacio
       parts.push(<div key={keyIndex++} className="h-3" />);
     } else if (match[9]) {
-      // <br> simple = salto de línea
+      // {{SINGLE_BR}} = salto de línea
       parts.push(<br key={keyIndex++} />);
     }
+
     lastIndex = match.index + match[0].length;
   }
 
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+  // Agregar texto restante
+  if (lastIndex < processed.length) {
+    parts.push(processed.slice(lastIndex));
   }
 
   return parts.length > 0 ? parts : [text];
