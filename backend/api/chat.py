@@ -145,7 +145,15 @@ REGLAS:
 - Usá español rioplatense (vos, podés, tenés)
 - NO uses markdown, SOLO HTML
 - NO escribas "CARD:", "LISTA:", ni nombres de templates
-- Usá emojis en los títulos (📋 📝 ✅ 📍 🏠)"""
+- Usá emojis en los títulos (📋 📝 ✅ 📍 🏠)
+
+LINKS INTERACTIVOS:
+Cuando listes trámites o categorías, hacelos clickeables con este formato EXACTO:
+- Para trámites: <a href="#" class="chatLink" data-mensaje="Quiero hacer el trámite de NOMBRE" style="color:#2563eb;cursor:pointer">NOMBRE</a>
+- Para categorías: <a href="#" class="chatLink" data-mensaje="Quiero reportar un problema de NOMBRE" style="color:#2563eb;cursor:pointer">NOMBRE</a>
+
+Ejemplo correcto:
+<a href="#" class="chatLink" data-mensaje="Quiero hacer el trámite de Licencia de Conducir" style="color:#2563eb;cursor:pointer">Licencia de Conducir</a>"""
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
