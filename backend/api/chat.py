@@ -18,8 +18,10 @@ from models.reclamo import Reclamo
 from models.tramite import Solicitud, TipoTramite, Tramite, EstadoSolicitud, MunicipioTipoTramite, MunicipioTramite
 from models.empleado import Empleado
 from models.zona import Zona
+from models.municipio import Municipio
 from models.enums import EstadoReclamo
 from services import chat_service
+import json
 
 
 router = APIRouter()
@@ -44,6 +46,13 @@ class DynamicChatRequest(BaseModel):
     pregunta: str
     contexto: dict = {}
     tipo: Optional[str] = None
+
+
+class LandingChatRequest(BaseModel):
+    """Request para chat público desde la landing page"""
+    message: str
+    history: list[dict] = []
+    municipio_id: Optional[int] = None  # Si se pasa, usa datos de ese municipio
 
 
 class ValidarDuplicadoRequest(BaseModel):
@@ -200,6 +209,217 @@ Respuesta:"""
         return ChatResponse(response=response)
 
     return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
+
+
+# Cargar info de Munify para el chat de la landing
+def get_munify_info() -> str:
+    """Carga el archivo MD con información de Munify"""
+    from pathlib import Path
+
+    base_path = Path(__file__).parent.parent / "static" / "munify_info.md"
+
+    if base_path.exists():
+        with open(base_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    return """
+    Munify es un sistema de gestión municipal que permite gestionar reclamos y trámites.
+    Contacto: ventas@gestionmunicipal.com / WhatsApp: +54 9 11 6022-3474
+    """
+
+
+async def get_municipios_activos(db: AsyncSession) -> list[dict]:
+    """Obtiene todos los municipios activos"""
+    query = select(Municipio).where(Municipio.activo == True).order_by(Municipio.nombre)
+    result = await db.execute(query)
+    municipios = result.scalars().all()
+    return [{"id": m.id, "nombre": m.nombre, "codigo": m.codigo} for m in municipios]
+
+
+async def detectar_municipio_con_ia(mensaje: str, municipios: list[dict]) -> Optional[dict]:
+    """Usa la IA para detectar qué municipio menciona el usuario"""
+    if not municipios:
+        return None
+
+    municipios_text = "\n".join([f"- ID:{m['id']} | {m['nombre']}" for m in municipios])
+
+    prompt = f"""Analizá el siguiente mensaje del usuario y determiná si menciona alguno de estos municipios/localidades.
+El usuario puede escribir con errores de ortografía, abreviaturas o variaciones del nombre.
+
+MUNICIPIOS DISPONIBLES:
+{municipios_text}
+
+MENSAJE DEL USUARIO: "{mensaje}"
+
+RESPUESTA: Respondé SOLO con un JSON válido en este formato exacto:
+- Si detectás un municipio: {{"encontrado": true, "municipio_id": <id>, "municipio_nombre": "<nombre>"}}
+- Si NO detectás ninguno: {{"encontrado": false}}
+
+Solo el JSON, sin explicaciones."""
+
+    response = await chat_service.chat(prompt, max_tokens=100)
+
+    if response:
+        try:
+            # Limpiar respuesta y parsear JSON
+            response = response.strip()
+            if response.startswith("```"):
+                response = response.split("```")[1]
+                if response.startswith("json"):
+                    response = response[4:]
+            result = json.loads(response.strip())
+            if result.get("encontrado") and result.get("municipio_id"):
+                return {"id": result["municipio_id"], "nombre": result.get("municipio_nombre", "")}
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    return None
+
+
+@router.post("/landing", response_model=ChatResponse)
+async def chat_landing(
+    request: LandingChatRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint PÚBLICO para chat desde la landing page.
+    No requiere autenticación.
+
+    Flujo conversacional:
+    1. Si no hay municipio_id: Saluda y pregunta localidad
+    2. Si el usuario menciona una localidad: Detecta el municipio y responde con datos reales
+    3. Si ya tiene municipio_id: Usa los datos de ese municipio
+    """
+    if not chat_service.is_available():
+        return ChatResponse(response="El asistente no está disponible en este momento. Por favor contactanos por WhatsApp al +54 9 11 6022-3474 o por email a ventas@gestionmunicipal.com")
+
+    # Cargar info de Munify
+    munify_info = get_munify_info()
+
+    # Obtener municipios disponibles
+    municipios = await get_municipios_activos(db)
+    municipios_text = ", ".join([m["nombre"] for m in municipios[:10]]) if municipios else "varios municipios"
+
+    # Variables para datos del municipio
+    municipio_id = request.municipio_id
+    municipio_nombre = None
+    categorias_text = ""
+    tramites_text = ""
+
+    # Si no tenemos municipio_id, intentar detectarlo del mensaje
+    if not municipio_id and request.history:
+        # Buscar en el historial si ya se detectó un municipio
+        for msg in request.history:
+            if msg.get("municipio_id"):
+                municipio_id = msg["municipio_id"]
+                break
+
+    # Intentar detectar municipio del mensaje actual
+    if not municipio_id and municipios:
+        detected = await detectar_municipio_con_ia(request.message, municipios)
+        if detected:
+            municipio_id = detected["id"]
+            municipio_nombre = detected["nombre"]
+
+    # Si tenemos municipio_id, obtener sus datos reales
+    if municipio_id:
+        # Obtener nombre del municipio si no lo tenemos
+        if not municipio_nombre:
+            for m in municipios:
+                if m["id"] == municipio_id:
+                    municipio_nombre = m["nombre"]
+                    break
+
+        # Obtener categorías del municipio
+        categorias = await get_categorias_municipio(db, municipio_id)
+        if categorias:
+            categorias_text = "\n".join([f"  - {c['nombre']}" for c in categorias])
+
+        # Obtener trámites del municipio
+        tramites = await get_tramites_municipio(db, municipio_id)
+        if tramites:
+            tramites_text = "\n".join([f"  - {t['nombre']}" for t in tramites])
+
+    # Construir historial de conversación
+    history_text = ""
+    if request.history:
+        for msg in request.history[-6:]:
+            role = "Usuario" if msg.get("role") == "user" else "Asistente"
+            history_text += f"{role}: {msg.get('content', '')}\n"
+
+    # Construir prompt según el estado de la conversación
+    if municipio_id and municipio_nombre:
+        # Ya tenemos municipio - responder con datos específicos
+        system_prompt = f"""Sos el asistente virtual de Munify para el municipio de {municipio_nombre}.
+Tu objetivo es ayudar a los ciudadanos de {municipio_nombre} a conocer qué reclamos y trámites pueden realizar.
+
+INFORMACIÓN SOBRE MUNIFY:
+{munify_info}
+
+CATEGORÍAS DE RECLAMOS EN {municipio_nombre.upper()}:
+{categorias_text if categorias_text else "  (Consultá con tu municipio las categorías disponibles)"}
+
+TRÁMITES DISPONIBLES EN {municipio_nombre.upper()}:
+{tramites_text if tramites_text else "  (Consultá con tu municipio los trámites disponibles)"}
+
+REGLAS:
+1. Respondé amablemente y conciso (máximo 3-4 oraciones)
+2. Si preguntan sobre reclamos, usá las categorías de {municipio_nombre}
+3. Si preguntan sobre trámites, usá la lista de {municipio_nombre}
+4. Si no hay datos disponibles, indicá que contacten al municipio
+5. Podés usar emojis ocasionalmente
+
+{f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
+
+Usuario: {request.message}
+
+Respuesta:"""
+    else:
+        # No tenemos municipio - preguntar o dar info general
+        es_primer_mensaje = not request.history or len(request.history) == 0
+
+        if es_primer_mensaje:
+            # Primer mensaje - saludar y preguntar localidad
+            system_prompt = f"""Sos el asistente virtual de Munify, un sistema de gestión municipal.
+
+MUNICIPIOS DONDE ESTAMOS PRESENTES:
+{municipios_text}
+
+Tu PRIMERA respuesta debe ser un saludo cordial y preguntar en qué localidad/municipio vive el usuario.
+Ejemplo: "¡Hola! 👋 Soy el asistente de Munify. Para poder ayudarte mejor, ¿podrías decirme en qué localidad o municipio vivís?"
+
+Sé breve y amigable.
+
+Usuario: {request.message}
+
+Respuesta:"""
+        else:
+            # Ya hubo conversación pero no detectamos municipio
+            system_prompt = f"""Sos el asistente virtual de Munify.
+
+MUNICIPIOS DISPONIBLES:
+{municipios_text}
+
+El usuario no ha indicado claramente su localidad. Intentá:
+1. Si mencionó algo que podría ser una localidad, preguntá para confirmar
+2. Si no, pedí amablemente que indique su municipio/localidad
+3. Podés dar info general sobre Munify mientras tanto
+
+INFORMACIÓN GENERAL:
+{munify_info[:2000]}
+
+{f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
+
+Usuario: {request.message}
+
+Respuesta:"""
+
+    response = await chat_service.chat(system_prompt, max_tokens=400)
+
+    if response:
+        return ChatResponse(response=response)
+
+    return ChatResponse(response="Disculpá, no pude procesar tu consulta. Contactanos por WhatsApp al +54 9 11 6022-3474.")
 
 
 @router.post("/dinamico", response_model=ChatResponse)
