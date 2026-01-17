@@ -65,9 +65,18 @@ def build_system_prompt(categorias: list[dict], tramites: list[dict] = None) -> 
     """Construye el prompt del sistema con las categorías y trámites del municipio"""
     cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']})" for c in categorias])
 
+    # Construir lista jerárquica de trámites (tipo → subtipos)
     tramites_list = ""
     if tramites:
-        tramites_list = "\n".join([f"  - {t['nombre']}" for t in tramites[:15]])
+        lines = []
+        for tipo in tramites[:10]:  # Limitar a 10 tipos
+            subtipos = tipo.get('subtipos', [])
+            if subtipos:
+                subtipos_names = ", ".join([s['nombre'] for s in subtipos[:5]])
+                lines.append(f"  📁 **{tipo['nombre']}**: {subtipos_names}")
+            else:
+                lines.append(f"  📁 **{tipo['nombre']}**")
+        tramites_list = "\n".join(lines)
     else:
         tramites_list = "  (No hay trámites configurados aún)"
 
@@ -95,11 +104,16 @@ CUANDO DESCRIBAN UN PROBLEMA EN LA CIUDAD:
 
 REGLAS:
 1. Usá español rioplatense (vos, podés, etc.)
-2. Sé breve y amigable (2-3 oraciones máximo)
+2. Sé breve y amigable
 3. SIEMPRE incluí links markdown relevantes
-4. NUNCA listes todas las categorías con IDs - agrupá en texto fluido
-5. Para listados, usá formato compacto: "Tenemos categorías como **Alumbrado**, **Baches**, **Limpieza**, entre otras."
-6. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
+4. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
+
+FORMATO DE RESPUESTAS:
+- Usá emojis relevantes: 💡 alumbrado, 🚗 baches/calles, 🌳 espacios verdes, 🧹 limpieza, 💧 agua, 🚦 señalización, 🐕 animales, 🔊 ruidos, 🌊 inundación, 🚶 veredas, 🌲 arbolado
+- Cuando listes categorías, usá formato visual con emojis y agrupá por tipo
+- Usá **negritas** para destacar categorías
+- Agregá separadores visuales (líneas ---) entre secciones si es necesario
+- Incluí breve descripción de cada categoría cuando listes
 
 EJEMPLOS:
 - Problema: "Hay un bache" → "Eso corresponde a **Baches y Calles**. [Crear reclamo](/reclamos?crear=1)"
@@ -123,10 +137,11 @@ async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[
 
 
 async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
-    """Obtiene los tipos de trámites activos del municipio"""
-    # TipoTramite es un catálogo genérico, se relaciona con municipios vía MunicipioTipoTramite
+    """Obtiene los tipos de trámites y sus subtipos activos del municipio"""
+    # Obtener TipoTramite con sus Tramites (subtipos)
     query = (
         select(TipoTramite)
+        .options(selectinload(TipoTramite.tramites))
         .join(MunicipioTipoTramite, MunicipioTipoTramite.tipo_tramite_id == TipoTramite.id)
         .where(
             MunicipioTipoTramite.municipio_id == municipio_id,
@@ -137,9 +152,35 @@ async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[di
     )
 
     result = await db.execute(query)
-    tramites = result.scalars().all()
+    tipos_tramite = result.scalars().unique().all()
 
-    return [{"id": t.id, "nombre": t.nombre} for t in tramites]
+    # Obtener IDs de trámites habilitados para este municipio
+    tramites_habilitados_query = (
+        select(MunicipioTramite.tramite_id)
+        .where(
+            MunicipioTramite.municipio_id == municipio_id,
+            MunicipioTramite.activo == True
+        )
+    )
+    tramites_result = await db.execute(tramites_habilitados_query)
+    tramites_habilitados_ids = set(r[0] for r in tramites_result.all())
+
+    # Construir estructura jerárquica
+    tramites_list = []
+    for tipo in tipos_tramite:
+        # Filtrar solo trámites habilitados para el municipio
+        subtipos = [
+            t for t in tipo.tramites
+            if t.activo and t.id in tramites_habilitados_ids
+        ]
+
+        tramites_list.append({
+            "id": tipo.id,
+            "nombre": tipo.nombre,
+            "subtipos": [{"id": s.id, "nombre": s.nombre} for s in subtipos]
+        })
+
+    return tramites_list
 
 
 @router.post("", response_model=ChatResponse)
