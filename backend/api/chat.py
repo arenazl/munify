@@ -374,7 +374,7 @@ async def chat_landing(
         history=request.history
     )
 
-    response = await chat_service.chat(context, max_tokens=500)
+    response = await chat_service.chat(context, max_tokens=1500)
 
     if response:
         return ChatResponse(response=response)
