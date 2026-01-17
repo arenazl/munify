@@ -30,6 +30,9 @@ import models  # noqa: F401
 # Frontend path
 frontend_path = Path(__file__).parent / "frontend_dist"
 
+# Landing path
+landing_path = Path(__file__).parent / "landing_dist"
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
@@ -99,7 +102,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# NO middleware custom - dejar que uvicorn maneje los logs
+# Middleware para loguear requests y responses completos (DEBUG)
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    import json
+
+    # Solo loguear requests a /api (ignorar assets, static, etc)
+    if request.url.path.startswith("/api"):
+        # Log request (sin leer body para no consumir el stream)
+        print(f"\n{'='*60}", flush=True)
+        print(f"📤 REQUEST: {request.method} {request.url.path}", flush=True)
+        query = dict(request.query_params)
+        if query:
+            print(f"   Query: {json.dumps(query, indent=2, ensure_ascii=False)}", flush=True)
+
+        # Ejecutar request
+        response = await call_next(request)
+
+        # Capturar response body
+        response_body = b""
+        async for chunk in response.body_iterator:
+            response_body += chunk
+
+        # Log response
+        response_str = response_body.decode('utf-8') if response_body else "(empty)"
+        print(f"📥 RESPONSE: {response.status_code}", flush=True)
+
+        if len(response_str) < 5000:
+            # Intentar formatear como JSON
+            try:
+                data = json.loads(response_str)
+                formatted = json.dumps(data, indent=2, ensure_ascii=False)
+                print(f"   Data:\n{formatted}", flush=True)
+            except (json.JSONDecodeError, TypeError):
+                print(f"   Data: {response_str}", flush=True)
+        else:
+            print(f"   Data: (too large: {len(response_str)} chars)", flush=True)
+        print(f"{'='*60}\n", flush=True)
+
+        # Recrear response con el body
+        from starlette.responses import Response
+        return Response(
+            content=response_body,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type=response.media_type
+        )
+
+    return await call_next(request)
 
 # Archivos estáticos del backend (imágenes subidas)
 static_path = Path(__file__).parent / "static"
@@ -114,6 +164,21 @@ app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 # ============ RUTAS API ============
 app.include_router(api_router, prefix="/api")
+
+# ============ LANDING PAGE ============
+if landing_path.exists():
+    @app.get("/landing", response_class=HTMLResponse)
+    async def serve_landing():
+        """Sirve la landing page estática"""
+        return FileResponse(
+            landing_path / "index.html",
+            media_type="text/html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
 
 @app.get("/health")
 async def health():
