@@ -395,24 +395,53 @@ Usuario: {request.message}
 Respuesta:"""
         else:
             # Ya hubo conversación pero no detectamos municipio
-            system_prompt = f"""Sos el asistente virtual de Munify.
+            # Obtener datos de un municipio de ejemplo (el primero disponible) para mostrar cómo funciona
+            ejemplo_categorias = ""
+            ejemplo_tramites = ""
+            municipio_ejemplo = municipios[0]["nombre"] if municipios else "Merlo"
+            municipio_ejemplo_id = municipios[0]["id"] if municipios else 1
 
-MUNICIPIOS DISPONIBLES:
+            # Obtener datos del municipio ejemplo
+            cats_ejemplo = await get_categorias_municipio(db, municipio_ejemplo_id)
+            if cats_ejemplo:
+                ejemplo_categorias = "\n".join([f"  - {c['nombre']}" for c in cats_ejemplo])
+
+            trams_ejemplo = await get_tramites_municipio(db, municipio_ejemplo_id)
+            if trams_ejemplo:
+                ejemplo_tramites = "\n".join([f"  - {t['nombre']}" for t in trams_ejemplo])
+
+            system_prompt = f"""Sos el asistente virtual de Munify, un sistema de gestión municipal inteligente.
+
+MUNICIPIOS DONDE YA ESTAMOS FUNCIONANDO:
 {municipios_text}
 
-El usuario no ha indicado claramente su localidad. Intentá:
-1. Si mencionó algo que podría ser una localidad, preguntá para confirmar
-2. Si no, pedí amablemente que indique su municipio/localidad
-3. Podés dar info general sobre Munify mientras tanto
+SITUACIÓN: El usuario mencionó una localidad que NO está en nuestra lista, o no indicó claramente dónde vive.
 
-INFORMACIÓN GENERAL:
-{munify_info[:2000]}
+QUÉ HACER:
+1. Decile amablemente que por ahora Munify está funcionando en {municipios_text}, pero que estamos expandiéndonos.
+2. IMPORTANTE: Mostrale cómo funciona el sistema usando como EJEMPLO los datos de {municipio_ejemplo}. Decile algo como "Te muestro cómo funciona en {municipio_ejemplo} para que veas el sistema en acción:"
+3. Invitalo a contactarnos si quiere que sumemos su municipio.
+4. NUNCA lo dejes sin respuesta útil.
+
+EJEMPLO DE CATEGORÍAS DE RECLAMOS (de {municipio_ejemplo}):
+{ejemplo_categorias if ejemplo_categorias else "Baches, Alumbrado, Basura, Espacios Verdes, Agua/Cloacas, Tránsito"}
+
+EJEMPLO DE TRÁMITES DISPONIBLES (de {municipio_ejemplo}):
+{ejemplo_tramites if ejemplo_tramites else "Habilitaciones, Permisos, Licencias, etc."}
+
+INFORMACIÓN ADICIONAL SOBRE MUNIFY:
+- Sistema integral de gestión de reclamos y trámites municipales
+- Los vecinos pueden reportar problemas con fotos y ubicación GPS
+- Sistema de gamificación con puntos y badges
+- Chat con IA, WhatsApp integrado, mapa interactivo
+- Período de prueba de 3 meses gratis
+- Contacto para sumar tu municipio: WhatsApp +54 9 11 6022-3474
 
 {f"HISTORIAL:{chr(10)}{history_text}" if history_text else ""}
 
 Usuario: {request.message}
 
-Respuesta:"""
+Respuesta (sé amable, mostrale cómo funciona con el ejemplo de {municipio_ejemplo}):"""
 
     response = await chat_service.chat(system_prompt, max_tokens=400)
 
