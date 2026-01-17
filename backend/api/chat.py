@@ -124,35 +124,28 @@ TRÁMITES DISPONIBLES:
 {tel_info}
 
 FORMATO DE RESPUESTA:
-Respondé SOLO en HTML con estilos inline. Usá estos templates:
+Respondé SOLO en HTML con estilos inline. NO escribas texto explicativo como "CARD:" o "Aquí va...". Solo devolvé el HTML directamente.
 
-CARD (para listar categorías, trámites, opciones):
-<div style="background:#f8f9fa;border-radius:12px;margin:8px 0;overflow:hidden">
-  <div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600">Título</div>
-  <div style="padding:12px 14px">Contenido aquí</div>
-</div>
+Ejemplos de estilos a usar:
 
-LISTA (para pasos o instrucciones):
-<ol style="margin:8px 0;padding-left:20px">
-  <li style="margin:6px 0">Paso uno</li>
-  <li style="margin:6px 0">Paso dos</li>
-</ol>
+Para agrupar info con título destacado:
+<div style="background:#f8f9fa;border-radius:12px;margin:8px 0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Título</div><div style="padding:12px 14px">Contenido</div></div>
 
-PANEL CON ICONO (para info importante):
-<div style="background:#dbeafe;border-left:4px solid #2563eb;padding:12px;border-radius:0 8px 8px 0;margin:8px 0">
-  <strong>ℹ️ Título</strong><br>
-  Contenido informativo
-</div>
+Para listas de pasos:
+<ol style="margin:8px 0;padding-left:20px"><li style="margin:6px 0">Paso</li></ol>
 
-TEXTO SIMPLE (saludos, respuestas cortas):
-<p style="margin:8px 0">Tu respuesta aquí</p>
+Para info importante:
+<div style="background:#dbeafe;border-left:4px solid #2563eb;padding:12px;border-radius:0 8px 8px 0;margin:8px 0"><strong>ℹ️ Info</strong><br>Detalle</div>
+
+Para texto simple:
+<p style="margin:8px 0">Texto</p>
 
 REGLAS:
 - Sé breve y directo
 - Usá español rioplatense (vos, podés, tenés)
 - NO uses markdown, SOLO HTML
-- NO uses ``` ni bloques de código
-- Usá emojis para hacer más amigable (📋 📝 ✅ 📍 🏠 etc)"""
+- NO escribas "CARD:", "LISTA:", ni nombres de templates
+- Usá emojis en los títulos (📋 📝 ✅ 📍 🏠)"""
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
