@@ -63,19 +63,21 @@ class ValidarDuplicadoRequest(BaseModel):
 
 def build_system_prompt(categorias: list[dict], tramites: list[dict] = None) -> str:
     """Construye el prompt del sistema con las categorías y trámites del municipio"""
-    cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']})" for c in categorias])
+    # Incluir icono en cada categoría
+    cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']}, icono: {c.get('icono', 'folder')})" for c in categorias])
 
-    # Construir lista jerárquica de trámites (tipo → subtipos)
+    # Construir lista jerárquica de trámites con iconos
     tramites_list = ""
     if tramites:
         lines = []
         for tipo in tramites[:10]:  # Limitar a 10 tipos
+            icono = tipo.get('icono', 'file-text')
             subtipos = tipo.get('subtipos', [])
             if subtipos:
-                subtipos_names = ", ".join([s['nombre'] for s in subtipos[:5]])
-                lines.append(f"  📁 **{tipo['nombre']}**: {subtipos_names}")
+                subtipos_info = ", ".join([f"{s['nombre']} (icono: {s.get('icono', 'file')})" for s in subtipos[:5]])
+                lines.append(f"  - {tipo['nombre']} (icono: {icono}): {subtipos_info}")
             else:
-                lines.append(f"  📁 **{tipo['nombre']}**")
+                lines.append(f"  - {tipo['nombre']} (icono: {icono})")
         tramites_list = "\n".join(lines)
     else:
         tramites_list = "  (No hay trámites configurados aún)"
@@ -105,48 +107,60 @@ CUANDO DESCRIBAN UN PROBLEMA EN LA CIUDAD:
 REGLAS:
 1. Usá español rioplatense (vos, podés, etc.)
 2. Sé breve y amigable
-3. SIEMPRE incluí links markdown relevantes
+3. SIEMPRE incluí links HTML relevantes
 4. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
 
 FORMATO DE RESPUESTAS:
 - Respondé SIEMPRE en HTML con clases de Tailwind CSS
-- Para links usá: <a href="/ruta" class="text-blue-400 underline">texto</a>
+- Para links usá: <a href="/ruta" class="text-blue-400 underline hover:text-blue-300">texto</a>
 
-DETECCIÓN DE LISTADOS - Si el mensaje contiene palabras como: "listado", "lista", "listar", "todos", "cuáles", "qué hay", "mostrame", "dame", "ver", "disponibles", "opciones", "categorías", "trámites", "reclamos"
-ENTONCES respondé con CARDS usando este formato exacto:
+DETECCIÓN DE LISTADOS:
+Cuando el usuario quiera ver una LISTA de elementos, detectalo por palabras como:
+- Intención de listar: "listado", "lista", "listar", "mostrame", "dame", "ver", "cuáles", "qué hay", "todos", "disponibles", "opciones"
 
+Luego identificá QUÉ quiere listar:
+- TRÁMITES: "trámites", "gestiones", "servicios", "permisos", "licencias", "habilitaciones", "certificados"
+- RECLAMOS: "reclamos", "quejas", "denuncias", "problemas", "reportes", "categorías de reclamos"
+
+Si no queda claro qué quiere listar, PREGUNTÁ:
+<p>¿Te referís a <a href="#" class="text-blue-400 underline">trámites</a> (gestiones municipales) o <a href="#" class="text-blue-400 underline">reclamos</a> (reportar problemas)?</p>
+
+FORMATO CARDS PARA LISTADOS:
+Usá SVGs inline de Lucide para los iconos. El HTML se renderiza directamente.
+
+SVGS DISPONIBLES (usá estos exactos):
+- Lightbulb: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+- Construction: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="M10 14 2.3 6.3"/><path d="m14 6 7.7 7.7"/><path d="m8 6 8 8"/></svg>
+- Store: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
+- FileText: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+- Trees: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10v.2A3 3 0 0 1 8.9 16v0H5v0h0a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z"/><path d="M7 16v6"/><path d="M13 19v3"/><path d="M10.3 14H19a3 3 0 0 0 .9-5.8V8a3 3 0 0 0-6 0v.2A3 3 0 0 0 13 14h-2.7"/></svg>
+- Dog: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5.172C10 3.782 8.423 2.679 6.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1 1.261-.472 1.96-1.45 2.344-2.5"/><path d="M14.267 5.172c0-1.39 1.577-2.493 3.5-2.172 2.823.47 4.113 6.006 4 7-.08.703-1.725 1.722-3.656 1-1.261-.472-1.855-1.45-2.239-2.5"/><path d="M8 14v.5"/><path d="M16 14v.5"/><path d="M11.25 16.25h1.5L12 17l-.75-.75Z"/><path d="M4.42 11.247A13.152 13.152 0 0 0 4 14.556C4 18.728 7.582 21 12 21s8-2.272 8-6.444c0-1.061-.162-2.2-.493-3.309m-9.243-6.082A8.801 8.801 0 0 1 12 5c.78 0 1.5.108 2.161.306"/></svg>
+- Droplets: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"/><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"/></svg>
+
+FORMATO CARD:
 <div class="space-y-2">
   <div class="bg-white/10 rounded-xl p-3 border border-white/10">
     <div class="flex items-center gap-2 mb-1">
-      <span class="text-xl">EMOJI</span>
+      SVG_AQUI
       <span class="font-bold">NOMBRE</span>
     </div>
     <div class="text-sm opacity-70">DESCRIPCIÓN</div>
   </div>
 </div>
 
-EMOJIS POR CATEGORÍA:
-🏠 Comercio, 🎭 Cultura, 🏡 Desarrollo Social, 🌳 Espacios Verdes, 📜 Legales, 🏗️ Obras, 💰 Rentas, 🏥 Salud, 🚗 Tránsito, 💡 Alumbrado, 🚗 Baches, 🧹 Limpieza, 💧 Agua, 🚦 Señales, 🐕 Animales
-
-EJEMPLO COMPLETO (usá este formato):
+EJEMPLO - Lista de RECLAMOS:
+<p class="mb-2">Podés reportar estos problemas:</p>
 <div class="space-y-2">
   <div class="bg-white/10 rounded-xl p-3 border border-white/10">
     <div class="flex items-center gap-2 mb-1">
-      <span class="text-xl">🏠</span>
-      <span class="font-bold">Comercio</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+      <span class="font-bold">Alumbrado Público</span>
     </div>
-    <div class="text-sm opacity-70">Habilitación comercial, renovaciones, cambio de rubro</div>
-  </div>
-  <div class="bg-white/10 rounded-xl p-3 border border-white/10">
-    <div class="flex items-center gap-2 mb-1">
-      <span class="text-xl">🏗️</span>
-      <span class="font-bold">Obras Privadas</span>
-    </div>
-    <div class="text-sm opacity-70">Permisos de construcción, ampliaciones, demoliciones</div>
+    <div class="text-sm opacity-70">Luces rotas, postes caídos</div>
   </div>
 </div>
 
-Para conversaciones normales (saludos, preguntas simples), respondé con texto simple en HTML:
+Para conversaciones normales (saludos, preguntas simples), respondé con texto simple:
 <p>Hola! En qué puedo ayudarte?</p>"""
 
 
@@ -160,7 +174,7 @@ async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[
     result = await db.execute(query)
     categorias = result.scalars().all()
 
-    return [{"id": c.id, "nombre": c.nombre} for c in categorias]
+    return [{"id": c.id, "nombre": c.nombre, "icono": c.icono or "folder"} for c in categorias]
 
 
 async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
@@ -204,7 +218,8 @@ async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[di
         tramites_list.append({
             "id": tipo.id,
             "nombre": tipo.nombre,
-            "subtipos": [{"id": s.id, "nombre": s.nombre} for s in subtipos]
+            "icono": tipo.icono or "file-text",
+            "subtipos": [{"id": s.id, "nombre": s.nombre, "icono": s.icono or "file"} for s in subtipos]
         })
 
     return tramites_list
