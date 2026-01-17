@@ -4,8 +4,8 @@ export function parseMarkdown(
   primaryColor: string
 ): (string | React.ReactElement)[] {
   const parts: (string | React.ReactElement)[] = [];
-  // Regex para: **negrita**, <b>negrita</b>, [link](url), <br> o <br/>
-  const regex = /(\*\*(.+?)\*\*)|(<b>(.+?)<\/b>)|(\[([^\]]+)\]\(([^)]+)\))|(<br\s*\/?>)/gi;
+  // Regex para: **negrita**, <b>negrita</b>, [link](url), <br><br> (doble), <br> (simple)
+  const regex = /(\*\*(.+?)\*\*)|(<b>(.+?)<\/b>)|(\[([^\]]+)\]\(([^)]+)\))|(<br\s*\/?>\s*<br\s*\/?>)|(<br\s*\/?>)/gi;
   let lastIndex = 0;
   let match;
   let keyIndex = 0;
@@ -39,7 +39,10 @@ export function parseMarkdown(
         </a>
       );
     } else if (match[8]) {
-      // <br> o <br/>
+      // <br><br> doble = separador de párrafo con espacio
+      parts.push(<div key={keyIndex++} className="h-3" />);
+    } else if (match[9]) {
+      // <br> simple = salto de línea
       parts.push(<br key={keyIndex++} />);
     }
     lastIndex = match.index + match[0].length;
