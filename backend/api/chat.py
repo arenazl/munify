@@ -1,6 +1,7 @@
 """
 Chat API con IA.
 Usa el servicio centralizado de chat con fallback automático.
+Implementa sesiones para mantener contexto sin reenviar el system prompt.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,6 +22,7 @@ from models.zona import Zona
 from models.municipio import Municipio
 from models.enums import EstadoReclamo
 from services import chat_service
+from services.chat_session import get_landing_storage, get_user_storage
 import json
 
 
@@ -29,11 +31,20 @@ router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
-    history: list[dict] = []
+    session_id: Optional[str] = None  # Opcional para backwards compatibility
+    history: list[dict] = []  # Deprecated, usar session_id
 
 
 class ChatResponse(BaseModel):
     response: str
+    session_id: Optional[str] = None  # Nuevo: devuelve session para mantener contexto
+
+
+class LandingChatResponse(BaseModel):
+    response: str
+    session_id: str  # ID de sesión para mantener contexto
+    municipio_id: Optional[int] = None
+    municipio_nombre: Optional[str] = None
 
 
 class CategoryQuestionRequest(BaseModel):
@@ -51,7 +62,7 @@ class DynamicChatRequest(BaseModel):
 class LandingChatRequest(BaseModel):
     """Request para chat público desde la landing page"""
     message: str
-    history: list[dict] = []
+    session_id: Optional[str] = None  # ID de sesión para mantener contexto
     municipio_id: Optional[int] = None  # Si se pasa, usa datos de ese municipio
 
 
@@ -61,61 +72,87 @@ class ValidarDuplicadoRequest(BaseModel):
     tipo: str  # "categoria", "zona", "tipo_tramite", "tramite"
 
 
-def build_system_prompt(categorias: list[dict], tramites: list[dict] = None) -> str:
+def build_system_prompt(categorias: list[dict], tramites: list[dict] = None, telefono_contacto: str = None) -> str:
     """Construye el prompt del sistema con las categorías y trámites del municipio"""
-    # Incluir icono en cada categoría
-    cats_list = "\n".join([f"  - {c['nombre']} (ID: {c['id']}, icono: {c.get('icono', 'folder')})" for c in categorias])
+    # Lista de categorías simple
+    cats_list = "\n".join([f"- {c['nombre']}" for c in categorias]) if categorias else "(Sin categorías)"
 
-    # Construir lista jerárquica de trámites con iconos
+    # Lista jerárquica de trámites
     tramites_list = ""
     if tramites:
         lines = []
-        for tipo in tramites[:10]:  # Limitar a 10 tipos
-            icono = tipo.get('icono', 'file-text')
+        for tipo in tramites:
             subtipos = tipo.get('subtipos', [])
             if subtipos:
-                subtipos_info = ", ".join([f"{s['nombre']} (icono: {s.get('icono', 'file')})" for s in subtipos[:5]])
-                lines.append(f"  - {tipo['nombre']} (icono: {icono}): {subtipos_info}")
+                subtipos_names = ", ".join([s['nombre'] for s in subtipos])
+                lines.append(f"- {tipo['nombre']}: {subtipos_names}")
             else:
-                lines.append(f"  - {tipo['nombre']} (icono: {icono})")
+                lines.append(f"- {tipo['nombre']}")
         tramites_list = "\n".join(lines)
     else:
-        tramites_list = "  (No hay trámites configurados aún)"
+        tramites_list = "(Sin trámites configurados)"
 
-    return f"""Sos el Asistente Municipal. Usá español rioplatense (vos, podés).
+    # Teléfono de contacto
+    tel_info = f"Teléfono de contacto: {telefono_contacto}" if telefono_contacto else ""
 
-DATOS:
-Categorías de reclamos: {cats_list}
-Trámites: {tramites_list}
+    return f"""Sos el asistente virtual de Munify, un sistema de gestión municipal que conecta vecinos con su municipio.
 
-REGLAS IMPORTANTES:
-1. Respondé SIEMPRE en HTML puro, nunca markdown
-2. NUNCA muestres "(icono: X)" - eso es metadata interna, no lo muestres al usuario
-3. Para saludos e info general: solo etiqueta p, sin cards
+QUÉ ES MUNIFY:
+Una app para reportar problemas del barrio y hacer trámites municipales 100% digital.
+El vecino reporta → el municipio gestiona → se resuelve → el vecino recibe notificación.
 
-CUÁNDO USAR CARDS:
-- Lista de CATEGORÍAS: UNA card por CADA categoría (header=nombre, body=descripción breve)
-- Lista de TRÁMITES: UNA card por CADA tipo de trámite (header=tipo, body=lista de subtipos)
+CÓMO FUNCIONA PARA CADA ROL:
 
-ESTRUCTURA DE CARD:
-<div class="space-y-2">
-  <div class="rounded-xl overflow-hidden border border-white/10 animate-fade-in">
-    <div style="background-color: var(--color-primary)" class="px-3 py-2 font-bold text-white">NOMBRE</div>
-    <div class="bg-white/10 px-3 py-2 text-sm opacity-90">CONTENIDO</div>
-  </div>
+Vecino/Ciudadano:
+- Reporta problemas en segundos desde el celular (foto + GPS automático)
+- Recibe notificaciones de cada cambio de estado
+- Puede hacer trámites sin ir al municipio
+
+Empleado Municipal:
+- Recibe trabajos automáticamente en su celular
+- Actualiza estados y sube fotos antes/después
+
+Supervisor:
+- Ve dashboards en tiempo real con métricas y mapas de calor
+
+CATEGORÍAS DE RECLAMOS DISPONIBLES:
+{cats_list}
+
+TRÁMITES DISPONIBLES:
+{tramites_list}
+
+{tel_info}
+
+FORMATO DE RESPUESTA:
+Respondé SOLO en HTML con estilos inline. Usá estos templates:
+
+CARD (para listar categorías, trámites, opciones):
+<div style="background:#f8f9fa;border-radius:12px;margin:8px 0;overflow:hidden">
+  <div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600">Título</div>
+  <div style="padding:12px 14px">Contenido aquí</div>
 </div>
 
-EJEMPLO - Lista de trámites (UNA card por tipo):
-<div class="space-y-2">
-  <div class="rounded-xl overflow-hidden border border-white/10 animate-fade-in">
-    <div style="background-color: var(--color-primary)" class="px-3 py-2 font-bold text-white">Catastro</div>
-    <div class="bg-white/10 px-3 py-2 text-sm opacity-90"><ul class="list-disc list-inside space-y-1"><li>Certificado Catastral</li><li>Plano de Mensura</li></ul></div>
-  </div>
-  <div class="rounded-xl overflow-hidden border border-white/10 animate-fade-in" style="animation-delay: 50ms">
-    <div style="background-color: var(--color-primary)" class="px-3 py-2 font-bold text-white">Comercio</div>
-    <div class="bg-white/10 px-3 py-2 text-sm opacity-90"><ul class="list-disc list-inside space-y-1"><li>Habilitación Comercial</li></ul></div>
-  </div>
-</div>"""
+LISTA (para pasos o instrucciones):
+<ol style="margin:8px 0;padding-left:20px">
+  <li style="margin:6px 0">Paso uno</li>
+  <li style="margin:6px 0">Paso dos</li>
+</ol>
+
+PANEL CON ICONO (para info importante):
+<div style="background:#dbeafe;border-left:4px solid #2563eb;padding:12px;border-radius:0 8px 8px 0;margin:8px 0">
+  <strong>ℹ️ Título</strong><br>
+  Contenido informativo
+</div>
+
+TEXTO SIMPLE (saludos, respuestas cortas):
+<p style="margin:8px 0">Tu respuesta aquí</p>
+
+REGLAS:
+- Sé breve y directo
+- Usá español rioplatense (vos, podés, tenés)
+- NO uses markdown, SOLO HTML
+- NO uses ``` ni bloques de código
+- Usá emojis para hacer más amigable (📋 📝 ✅ 📍 🏠 etc)"""
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
@@ -188,6 +225,7 @@ async def chat(
     """
     Endpoint de chat con IA (autenticado).
     Usa las categorías y trámites reales del municipio del usuario.
+    Mantiene sesión por user_id para no reenviar el system prompt.
     """
     if not chat_service.is_available():
         raise HTTPException(
@@ -195,30 +233,47 @@ async def chat(
             detail="El asistente no está disponible. Contacte al administrador."
         )
 
+    storage = get_user_storage()
+
+    FALLBACK_MUNICIPIO_ID = 48  # Merlo - tiene datos completos
+
     # Obtener categorías y trámites del municipio del usuario
     categorias = await get_categorias_municipio(db, current_user.municipio_id)
     tramites = await get_tramites_municipio(db, current_user.municipio_id)
 
-    if not categorias:
-        categorias = [
-            {"id": 1, "nombre": "Baches y Calles"},
-            {"id": 2, "nombre": "Alumbrado Público"},
-            {"id": 3, "nombre": "Agua y Cloacas"},
-            {"id": 4, "nombre": "Limpieza"},
-            {"id": 5, "nombre": "Espacios Verdes"},
-        ]
+    # Si el municipio no tiene datos, usar fallback
+    if not categorias and not tramites and current_user.municipio_id != FALLBACK_MUNICIPIO_ID:
+        categorias = await get_categorias_municipio(db, FALLBACK_MUNICIPIO_ID)
+        tramites = await get_tramites_municipio(db, FALLBACK_MUNICIPIO_ID)
 
+    # Construir system prompt
     system_prompt = build_system_prompt(categorias, tramites)
-    context = chat_service.build_chat_context(
+
+    # Obtener o crear sesión para este usuario
+    session_id, is_new = await storage.get_or_create_for_user(
+        user_id=current_user.id,
+        system_prompt=system_prompt,
+        context={"municipio_id": current_user.municipio_id, "rol": current_user.rol},
+        session_type="chat"
+    )
+
+    # Obtener historial de la sesión
+    history = await storage.get_messages(session_id)
+
+    # Construir mensajes para la API
+    context = chat_service.build_chat_messages(
         system_prompt=system_prompt,
         message=request.message,
-        history=request.history
+        history=history
     )
 
     response = await chat_service.chat(context, max_tokens=3000)
 
+    # Guardar mensajes en la sesión
+    await storage.add_message(session_id, "user", request.message)
     if response:
-        return ChatResponse(response=response)
+        await storage.add_message(session_id, "assistant", response)
+        return ChatResponse(response=response, session_id=session_id)
 
     raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
 
@@ -276,6 +331,13 @@ async def get_municipios_activos(db: AsyncSession) -> list[dict]:
     return [{"id": m.id, "nombre": m.nombre, "codigo": m.codigo} for m in municipios]
 
 
+@router.get("/municipios")
+async def listar_municipios_chat(db: AsyncSession = Depends(get_db)):
+    """Endpoint PÚBLICO para obtener municipios activos (para el combo del chat)"""
+    municipios = await get_municipios_activos(db)
+    return municipios
+
+
 async def detectar_municipio_con_ia(mensaje: str, municipios: list[dict]) -> Optional[dict]:
     """Usa la IA para detectar qué municipio menciona el usuario"""
     if not municipios:
@@ -316,70 +378,101 @@ Solo el JSON, sin explicaciones."""
     return None
 
 
-@router.post("/landing", response_model=ChatResponse)
+@router.post("/landing", response_model=LandingChatResponse)
 async def chat_landing(
     request: LandingChatRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Endpoint PÚBLICO para chat desde la landing page.
-    Proxy al endpoint /chat usando municipio_id detectado o fallback a ID=48 (Merlo).
+    Usa sesiones en memoria para mantener contexto sin reenviar el system prompt.
     """
     FALLBACK_MUNICIPIO_ID = 48  # Merlo - tiene datos completos
+    storage = get_landing_storage()
 
-    # Determinar municipio_id
-    municipio_id = request.municipio_id
+    # Verificar si ya existe sesión
+    existing_session = None
+    if request.session_id:
+        existing_session = await storage.get_session(request.session_id)
 
-    # Si no viene, intentar detectar del historial
-    if not municipio_id and request.history:
-        for msg in request.history:
-            if msg.get("municipio_id"):
-                municipio_id = msg["municipio_id"]
-                break
+    if existing_session:
+        municipio_id = existing_session.get("context", {}).get("municipio_id", FALLBACK_MUNICIPIO_ID)
+    else:
+        municipio_id = request.municipio_id
 
-    # Si no hay, intentar detectar del mensaje con IA
+    municipio_nombre = None
+
+    # Si no hay municipio, intentar detectar del mensaje con IA
     if not municipio_id:
         municipios = await get_municipios_activos(db)
         if municipios:
             detected = await detectar_municipio_con_ia(request.message, municipios)
             if detected:
                 municipio_id = detected["id"]
+                municipio_nombre = detected.get("nombre")
 
     # Fallback a Merlo si no se detectó
     if not municipio_id:
         municipio_id = FALLBACK_MUNICIPIO_ID
 
-    # Usar la misma lógica que el endpoint /chat autenticado
-    categorias = await get_categorias_municipio(db, municipio_id)
-    tramites = await get_tramites_municipio(db, municipio_id)
+    # Obtener datos del municipio
+    municipio = await db.get(Municipio, municipio_id)
+    telefono_contacto = municipio.telefono if municipio else None
 
-    # Si el municipio no tiene datos, usar fallback
-    if not categorias and not tramites and municipio_id != FALLBACK_MUNICIPIO_ID:
-        categorias = await get_categorias_municipio(db, FALLBACK_MUNICIPIO_ID)
-        tramites = await get_tramites_municipio(db, FALLBACK_MUNICIPIO_ID)
+    # Si ya existe sesión, usar historial guardado
+    if existing_session:
+        session_id = request.session_id
+        history = await storage.get_messages(session_id)
+        system_prompt = await storage.get_system_prompt(session_id)
+    else:
+        # Nueva sesión: construir system prompt
+        categorias = await get_categorias_municipio(db, municipio_id)
+        tramites = await get_tramites_municipio(db, municipio_id)
 
-    if not categorias:
-        categorias = [
-            {"id": 1, "nombre": "Baches y Calles"},
-            {"id": 2, "nombre": "Alumbrado Público"},
-            {"id": 3, "nombre": "Agua y Cloacas"},
-            {"id": 4, "nombre": "Limpieza"},
-            {"id": 5, "nombre": "Espacios Verdes"},
-        ]
+        # Si el municipio no tiene datos, usar fallback
+        if not categorias and not tramites and municipio_id != FALLBACK_MUNICIPIO_ID:
+            categorias = await get_categorias_municipio(db, FALLBACK_MUNICIPIO_ID)
+            tramites = await get_tramites_municipio(db, FALLBACK_MUNICIPIO_ID)
+            if not telefono_contacto:
+                fallback_muni = await db.get(Municipio, FALLBACK_MUNICIPIO_ID)
+                telefono_contacto = fallback_muni.telefono if fallback_muni else None
 
-    system_prompt = build_system_prompt(categorias, tramites)
-    context = chat_service.build_chat_context(
+        system_prompt = build_system_prompt(categorias, tramites, telefono_contacto)
+        session_id = await storage.create_session(system_prompt, {"municipio_id": municipio_id})
+        history = []
+
+    # Construir mensajes para la API
+    context = chat_service.build_chat_messages(
         system_prompt=system_prompt,
         message=request.message,
-        history=request.history
+        history=history
     )
 
     response = await chat_service.chat(context, max_tokens=3000)
 
+    # Guardar mensajes en la sesión
+    await storage.add_message(session_id, "user", request.message)
     if response:
-        return ChatResponse(response=response)
+        await storage.add_message(session_id, "assistant", response)
 
-    return ChatResponse(response="Disculpá, no pude procesar tu consulta. Contactanos por WhatsApp al +54 9 11 6022-3474.")
+    # Obtener nombre del municipio si no lo tenemos
+    if not municipio_nombre and municipio:
+        municipio_nombre = municipio.nombre
+
+    if response:
+        return LandingChatResponse(
+            response=response,
+            session_id=session_id,
+            municipio_id=municipio_id,
+            municipio_nombre=municipio_nombre
+        )
+
+    return LandingChatResponse(
+        response="Disculpá, no pude procesar tu consulta. Contactanos por WhatsApp al +54 9 11 6022-3474.",
+        session_id=session_id,
+        municipio_id=municipio_id,
+        municipio_nombre=municipio_nombre
+    )
 
 
 @router.post("/dinamico", response_model=ChatResponse)
@@ -479,7 +572,8 @@ async def chat_status():
 class AsistenteRequest(BaseModel):
     """Request para el asistente con acceso a datos"""
     message: str
-    history: list[dict] = []
+    session_id: Optional[str] = None  # Opcional para backwards compatibility
+    history: list[dict] = []  # Deprecated, usar session_id
 
 
 async def get_estadisticas_reclamos(db: AsyncSession, municipio_id: int) -> dict:
@@ -891,6 +985,7 @@ async def chat_asistente(
     """
     Endpoint de chat con asistente que tiene acceso a datos del municipio.
     Requiere autenticación y rol de admin/supervisor/empleado.
+    Usa sesiones persistentes por usuario (tipo "asistente").
     """
     if not chat_service.is_available():
         raise HTTPException(
@@ -907,7 +1002,7 @@ async def chat_asistente(
 
     municipio_id = current_user.municipio_id
 
-    # Obtener datos en paralelo
+    # Obtener datos en paralelo para construir contexto rico
     categorias = await get_categorias_municipio(db, municipio_id)
     stats_reclamos = await get_estadisticas_reclamos(db, municipio_id)
     stats_tramites = await get_estadisticas_tramites(db, municipio_id)
@@ -917,7 +1012,7 @@ async def chat_asistente(
     empleados = await get_empleados_activos(db, municipio_id)
     usuarios_con_reclamos = await get_usuarios_con_reclamos(db, municipio_id)
 
-    # Construir prompt con datos
+    # Construir prompt con datos del municipio
     system_prompt = build_asistente_prompt(
         categorias=categorias,
         stats_reclamos=stats_reclamos,
@@ -929,18 +1024,44 @@ async def chat_asistente(
         usuarios_con_reclamos=usuarios_con_reclamos
     )
 
+    # Usar storage de sesiones para usuarios autenticados
+    storage = get_user_storage()
+
+    # Obtener o crear sesión para este usuario (tipo "asistente" separado del chat normal)
+    session_id, is_new = await storage.get_or_create_for_user(
+        user_id=current_user.id,
+        system_prompt=system_prompt,
+        context={
+            "municipio_id": municipio_id,
+            "rol": current_user.rol,
+            "email": current_user.email
+        },
+        session_type="asistente"  # Sesión separada del chat general
+    )
+
+    # Obtener historial de la sesión
+    history = await storage.get_messages(session_id)
+
+    # Obtener system prompt de la sesión (se actualiza con datos frescos cada vez)
+    # Nota: Para el asistente, actualizamos el prompt porque los datos cambian
+    # En el futuro se podría optimizar para no regenerar si no hay cambios
+
     context = chat_service.build_chat_context(
         system_prompt=system_prompt,
         message=request.message,
-        history=request.history
+        history=history
     )
 
-    print(f"[ASISTENTE] Consulta de {current_user.email}: {request.message[:100]}...")
+    print(f"[ASISTENTE] Consulta de {current_user.email} (session: {session_id}): {request.message[:100]}...")
 
     response = await chat_service.chat(context, max_tokens=800)
 
     if response:
-        return ChatResponse(response=response)
+        # Guardar mensajes en la sesión
+        await storage.add_message(session_id, "user", request.message)
+        await storage.add_message(session_id, "assistant", response)
+
+        return ChatResponse(response=response, session_id=session_id)
 
     raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
 
