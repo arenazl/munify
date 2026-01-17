@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import { X, MapPin, Calendar, User, Tag, Clock, Navigation, ExternalLink, Map as MapIcon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+
+// URLs de tiles para tema claro y oscuro
+const TILE_URLS = {
+  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+};
 import { reclamosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { Reclamo } from '../types';
@@ -91,7 +97,11 @@ function FitBoundsToMarkers({ reclamos }: { reclamos: Reclamo[] }) {
 }
 
 export default function Mapa() {
-  const { theme } = useTheme();
+  const { theme, currentPresetId } = useTheme();
+  // Detectar si el tema es claro (solo sand y arctic son claros)
+  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
+
   const navigate = useNavigate();
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,8 +298,8 @@ export default function Mapa() {
             style={{ height: '100%', width: '100%' }}
           >
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; OSM &copy; CARTO'
+              url={tileUrl}
             />
             <FitBoundsToMarkers reclamos={reclamosFiltrados} />
             {reclamosFiltrados.map((reclamo) => (

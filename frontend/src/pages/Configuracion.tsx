@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, Image, ImageIcon, Trash2 } from 'lucide-react';
+import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, ImageIcon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import SettingsHeader from '../components/ui/SettingsHeader';
 
 // Claves que se muestran en la sección especial del Municipio
 const MUNICIPIO_KEYS = ['nombre_municipio', 'direccion_municipio', 'latitud_municipio', 'longitud_municipio', 'telefono_contacto'];
@@ -73,6 +74,8 @@ export default function Configuracion() {
   const [portadaFile, setPortadaFile] = useState<File | null>(null);
   const [portadaPreview, setPortadaPreview] = useState<string | null>(null);
   const portadaInputRef = useRef<HTMLInputElement>(null);
+  const [portadaSinFiltro, setPortadaSinFiltro] = useState(municipioActual?.tema_config?.portadaSinFiltro || false);
+  const [portadaOpacity, setPortadaOpacity] = useState(municipioActual?.tema_config?.portadaOpacity ?? 1);
 
   // Estados para autocompletado de municipio (nombre)
   const [municipioSuggestions, setMunicipioSuggestions] = useState<AddressSuggestion[]>([]);
@@ -98,6 +101,8 @@ export default function Configuracion() {
       setColorSecundario(municipioActual.color_secundario || '#1e40af');
       setLogoUrl(municipioActual.logo_url || '');
       setImagenPortadaUrl(municipioActual.imagen_portada || '');
+      setPortadaSinFiltro(municipioActual.tema_config?.portadaSinFiltro || false);
+      setPortadaOpacity(municipioActual.tema_config?.portadaOpacity ?? 1);
     }
   }, [municipioActual]);
 
@@ -158,13 +163,20 @@ export default function Configuracion() {
       const response = await municipiosApi.updateImagenPortada(municipioActual.id, formData);
 
       if (response.data) {
-        toast.success('Imagen de portada actualizada');
-        if (response.data.imagen_portada) {
-          setImagenPortadaUrl(response.data.imagen_portada);
-        }
-        await loadMunicipios();
+        // Primero limpiar el archivo seleccionado
         setPortadaFile(null);
         setPortadaPreview(null);
+
+        // Actualizar URL inmediatamente desde la respuesta
+        const nuevaUrl = response.data.imagen_portada;
+        if (nuevaUrl) {
+          setImagenPortadaUrl(nuevaUrl);
+        }
+
+        // Recargar municipios para sincronizar todo el estado
+        await loadMunicipios();
+
+        toast.success('Imagen de portada actualizada');
       }
     } catch (error) {
       toast.error('Error al guardar imagen de portada');
@@ -191,6 +203,33 @@ export default function Configuracion() {
       setPortadaLoading(false);
     }
   };
+
+  // Guardar configuración de portada (filtro + opacidad)
+  const handleSavePortadaConfig = async () => {
+    if (!municipioActual) return;
+
+    setPortadaLoading(true);
+    try {
+      const currentConfig = municipioActual.tema_config || {};
+      await municipiosApi.updateTema(municipioActual.id, {
+        ...currentConfig,
+        portadaSinFiltro: portadaSinFiltro,
+        portadaOpacity: portadaOpacity,
+      });
+      await loadMunicipios();
+      toast.success('Configuración de portada guardada');
+    } catch (error) {
+      console.error('Error guardando configuración de portada:', error);
+      toast.error('Error al guardar');
+    } finally {
+      setPortadaLoading(false);
+    }
+  };
+
+  // Verificar si hay cambios en la configuración de portada
+  const hasPortadaConfigChanges =
+    portadaSinFiltro !== (municipioActual?.tema_config?.portadaSinFiltro || false) ||
+    portadaOpacity !== (municipioActual?.tema_config?.portadaOpacity ?? 1);
 
   // Generar color secundario basado en el primario
   const generateSecondaryColor = (primary: string) => {
@@ -495,30 +534,11 @@ export default function Configuracion() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <Settings className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-              Configuración
-            </h1>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Parámetros del sistema
-            </p>
-          </div>
-        </div>
-      </div>
+      <SettingsHeader
+        title="Configuración"
+        subtitle="Parámetros del sistema y branding"
+        icon={Settings}
+      />
 
       {/* Sección Datos del Municipio */}
       <div
@@ -749,70 +769,12 @@ export default function Configuracion() {
               Branding y Personalización
             </h2>
             <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Logo y colores del municipio
+              Colores institucionales del municipio
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Logo del Municipio */}
-          <div>
-            <label className="block text-sm font-medium mb-3" style={{ color: theme.text }}>
-              Logo del Municipio
-            </label>
-            <div className="flex items-start gap-4">
-              {/* Preview del logo */}
-              <div
-                className="w-24 h-24 rounded-xl flex items-center justify-center overflow-hidden"
-                style={{
-                  backgroundColor: theme.backgroundSecondary,
-                  border: `2px dashed ${theme.border}`,
-                }}
-              >
-                {logoPreview || logoUrl ? (
-                  <img
-                    src={logoPreview || logoUrl}
-                    alt="Logo municipio"
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <Image className="h-8 w-8" style={{ color: theme.textSecondary }} />
-                )}
-              </div>
-
-              {/* Botones de upload */}
-              <div className="flex-1 space-y-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoSelect}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200 hover:opacity-80"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    color: theme.text,
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <Upload className="h-4 w-4" />
-                  Subir logo
-                </button>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  PNG, JPG o SVG. Máximo 2MB.
-                </p>
-                {logoFile && (
-                  <p className="text-xs" style={{ color: theme.primary }}>
-                    Archivo seleccionado: {logoFile.name}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Colores del Municipio */}
           <div>
             <label className="block text-sm font-medium mb-3" style={{ color: theme.text }}>
@@ -957,16 +919,21 @@ export default function Configuracion() {
                   src={portadaPreview || imagenPortadaUrl}
                   alt="Imagen de portada"
                   className="w-full h-full object-cover"
+                  style={{ opacity: portadaOpacity }}
                 />
-                {/* Overlay con gradiente similar al dashboard */}
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `linear-gradient(135deg, ${colorPrimario}cc 0%, ${colorSecundario}99 100%)`,
-                  }}
-                />
+                {/* Overlay con gradiente similar al dashboard - solo si NO está sin filtro */}
+                {!portadaSinFiltro && (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${colorPrimario}cc 0%, ${colorSecundario}99 100%)`,
+                    }}
+                  />
+                )}
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-white text-sm font-medium">Vista previa del banner</p>
+                  <p className={`text-sm font-medium ${portadaSinFiltro ? '' : 'text-white'}`} style={{ color: portadaSinFiltro ? theme.text : undefined, textShadow: portadaSinFiltro ? '0 1px 2px rgba(0,0,0,0.5)' : 'none' }}>
+                    Vista previa del banner {portadaSinFiltro ? '(sin filtro)' : '(con filtro)'} - {Math.round(portadaOpacity * 100)}%
+                  </p>
                 </div>
               </>
             ) : (
@@ -979,6 +946,75 @@ export default function Configuracion() {
             )}
           </div>
         </div>
+
+        {/* Toggle para filtro de portada */}
+        {(portadaPreview || imagenPortadaUrl) && (
+          <div
+            className="mb-4 p-3 rounded-lg flex items-center justify-between"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>
+                Mostrar sin filtro de color
+              </p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Desactiva el overlay de colores sobre la imagen
+              </p>
+            </div>
+            <button
+              onClick={() => setPortadaSinFiltro(!portadaSinFiltro)}
+              className="relative w-12 h-6 rounded-full transition-colors duration-200"
+              style={{
+                backgroundColor: portadaSinFiltro ? theme.primary : theme.border,
+              }}
+            >
+              <div
+                className="absolute top-1 w-4 h-4 rounded-full bg-white transition-transform duration-200"
+                style={{
+                  transform: portadaSinFiltro ? 'translateX(26px)' : 'translateX(4px)',
+                }}
+              />
+            </button>
+          </div>
+        )}
+
+        {/* Slider de opacidad de la portada */}
+        {(portadaPreview || imagenPortadaUrl) && (
+          <div
+            className="mb-4 p-3 rounded-lg"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-sm font-medium" style={{ color: theme.text }}>
+                  Opacidad de la imagen
+                </p>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>
+                  Ajusta qué tanto se ve la imagen sobre el fondo
+                </p>
+              </div>
+              <span className="text-sm font-mono" style={{ color: theme.primary }}>
+                {Math.round(portadaOpacity * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.05"
+              value={portadaOpacity}
+              onChange={(e) => setPortadaOpacity(parseFloat(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${((portadaOpacity - 0.1) / 0.9) * 100}%, ${theme.border} ${((portadaOpacity - 0.1) / 0.9) * 100}%, ${theme.border} 100%)`,
+              }}
+            />
+            <div className="flex justify-between mt-1">
+              <span className="text-xs" style={{ color: theme.textSecondary }}>Sutil</span>
+              <span className="text-xs" style={{ color: theme.textSecondary }}>Completa</span>
+            </div>
+          </div>
+        )}
 
         {/* Botones de acción */}
         <div className="flex gap-3">
@@ -1052,6 +1088,30 @@ export default function Configuracion() {
         <p className="text-xs mt-3" style={{ color: theme.textSecondary }}>
           PNG, JPG o WebP. Máximo 5MB. Tamaño recomendado: 1920x600 píxeles.
         </p>
+
+        {/* Botón guardar configuración de portada (filtro + opacidad) */}
+        {(imagenPortadaUrl || portadaPreview) && (
+          <div className="pt-4 mt-4 border-t" style={{ borderColor: theme.border }}>
+            <button
+              onClick={handleSavePortadaConfig}
+              disabled={portadaLoading || !hasPortadaConfigChanges}
+              className="w-full py-3 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2"
+              style={{
+                background: hasPortadaConfigChanges
+                  ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
+                  : theme.backgroundSecondary,
+                color: hasPortadaConfigChanges ? '#ffffff' : theme.textSecondary,
+              }}
+            >
+              {portadaLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              {portadaLoading ? 'Guardando...' : 'Guardar portada'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabla de otras configuraciones */}

@@ -26,7 +26,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
-import type { Tramite, EstadoTramite } from '../types';
+import { TramiteWizard } from '../components/TramiteWizard';
+import type { Tramite, EstadoTramite, ServicioTramite, TipoTramite } from '../types';
 
 const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; color: string; label: string; bg: string }> = {
   iniciado: { icon: Clock, color: '#6366f1', label: 'Iniciado', bg: '#eef2ff' },
@@ -54,6 +55,11 @@ export default function MisTramites() {
   // Sheet states
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(null);
+
+  // Wizard state
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [servicios, setServicios] = useState<ServicioTramite[]>([]);
+  const [tipos, setTipos] = useState<TipoTramite[]>([]);
 
   // Consulta por número de trámite (para usuarios no logueados)
   const [consultaNumero, setConsultaNumero] = useState('');
@@ -99,8 +105,23 @@ export default function MisTramites() {
     }
   };
 
-  const goToNuevoTramite = () => {
-    navigate('/gestion/crear-tramite');
+  const goToNuevoTramite = async () => {
+    try {
+      const [serviciosRes, tiposRes] = await Promise.all([
+        tramitesApi.getServicios(),
+        tramitesApi.getTipos()
+      ]);
+      setServicios(serviciosRes.data);
+      setTipos(tiposRes.data);
+    } catch (error) {
+      console.error('Error cargando servicios/tipos:', error);
+    }
+    setWizardOpen(true);
+  };
+
+  const handleWizardSuccess = () => {
+    setWizardOpen(false);
+    loadTramites();
   };
 
   const openViewSheet = (tramite: Tramite) => {
@@ -764,6 +785,15 @@ export default function MisTramites() {
           `}</style>
         </>
       )}
+
+      {/* Wizard para crear nuevo trámite */}
+      <TramiteWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        servicios={servicios}
+        tipos={tipos}
+        onSuccess={handleWizardSuccess}
+      />
     </>
   );
 }

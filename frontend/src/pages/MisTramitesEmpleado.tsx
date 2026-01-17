@@ -153,7 +153,7 @@ export default function MisTramitesEmpleado() {
             onClick={() => setOrdenamiento('reciente')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
             style={{
-              backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
+              backgroundColor: ordenamiento === 'reciente' ? `${theme.primary}15` : theme.backgroundSecondary,
               border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
               color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
             }}
@@ -165,9 +165,9 @@ export default function MisTramitesEmpleado() {
             onClick={() => setOrdenamiento('prioridad')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
             style={{
-              backgroundColor: ordenamiento === 'prioridad' ? theme.primary : theme.backgroundSecondary,
+              backgroundColor: ordenamiento === 'prioridad' ? `${theme.primary}15` : theme.backgroundSecondary,
               border: `1px solid ${ordenamiento === 'prioridad' ? theme.primary : theme.border}`,
-              color: ordenamiento === 'prioridad' ? '#ffffff' : theme.textSecondary,
+              color: ordenamiento === 'prioridad' ? theme.primary : theme.textSecondary,
             }}
           >
             <Calendar className="h-3 w-3" />

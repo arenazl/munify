@@ -393,35 +393,33 @@ export default function Dashboard() {
             src={municipioActual?.imagen_portada || municipioActual?.logo_url || "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"}
             alt={municipioActual?.nombre || "Ciudad"}
             className="w-full h-full object-cover"
+            style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
           />
-          {/* Gradiente oscuro que baja al color del tema */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(180deg,
-                rgba(15, 23, 42, 0.7) 0%,
-                rgba(15, 23, 42, 0.85) 40%,
-                ${municipioColor}90 100%
-              )`,
-            }}
-          />
-          {/* Overlay adicional para mejor legibilidad */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
+          {/* Gradiente oscuro que baja al color del tema - solo si NO está sin filtro */}
+          {!municipioActual?.tema_config?.portadaSinFiltro && (
+            <>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(180deg,
+                    rgba(15, 23, 42, 0.7) 0%,
+                    rgba(15, 23, 42, 0.85) 40%,
+                    ${municipioColor}90 100%
+                  )`,
+                }}
+              />
+              {/* Overlay adicional para mejor legibilidad */}
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
+            </>
+          )}
+          {/* Cuando está sin filtro, solo un gradiente sutil para legibilidad del texto */}
+          {municipioActual?.tema_config?.portadaSinFiltro && (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          )}
         </div>
 
         {/* Contenido del header */}
         <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
-          {/* Badge "Abierto" estilo Wok */}
-          <div className="absolute top-4 right-4">
-            <div
-              className="flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-sm"
-              style={{ backgroundColor: '#22c55eCC' }}
-            >
-              <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
-              <span className="text-xs font-semibold text-white">En vivo</span>
-            </div>
-          </div>
-
           {/* Info principal */}
           <div className="mt-auto">
             <h1 className="text-3xl md:text-4xl text-white mb-2 drop-shadow-lg">

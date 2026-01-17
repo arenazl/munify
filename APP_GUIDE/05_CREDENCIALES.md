@@ -72,8 +72,8 @@ FRONTEND_URL=[COMPLETAR]
 **Ejemplo completado:**
 ```
 NETLIFY_SITE_NAME=reclamos-muni
-NETLIFY_SITE_ID=d05be2e9-53e5-47f6-b5d4-a42e179eebb7
-FRONTEND_URL=https://reclamos-muni.netlify.app
+NETLIFY_SITE_ID=edff37c1-2c43-4c01-ba71-d6c59f5cdc85
+FRONTEND_URL=relative z-10 border-b h-16
 ```
 
 ---

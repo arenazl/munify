@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 const getApiUrl = () => {
   // Si hay URL completa configurada, usarla
@@ -21,6 +21,96 @@ console.log('🔗 API URL:', API_URL);
 if (!API_URL) {
   console.error('VITE_API_URL no está configurado en .env');
 }
+
+// ============================================
+// Sistema de Caché con TTL para datos estáticos
+// ============================================
+// Cachea respuestas de endpoints que raramente cambian
+// (categorías, tipos, zonas) para evitar llamadas innecesarias
+
+interface CachedResponse {
+  data: AxiosResponse;
+  timestamp: number;
+  ttl: number;
+}
+
+// Caché de respuestas (key = URL + params)
+const responseCache = new Map<string, CachedResponse>();
+
+// Configuración de TTL por endpoint (en milisegundos)
+const CACHE_TTL_CONFIG: Record<string, number> = {
+  '/categorias': 5 * 60 * 1000,           // 5 minutos
+  '/zonas': 5 * 60 * 1000,                // 5 minutos
+  '/tramites/tipos': 5 * 60 * 1000,       // 5 minutos
+  '/tramites/catalogo': 3 * 60 * 1000,    // 3 minutos
+  '/publico/categorias': 5 * 60 * 1000,   // 5 minutos
+  '/publico/zonas': 5 * 60 * 1000,        // 5 minutos
+  '/empleados': 2 * 60 * 1000,            // 2 minutos (cambia más seguido)
+};
+
+// Obtener TTL para un endpoint
+const getCacheTTL = (url: string): number | null => {
+  for (const [pattern, ttl] of Object.entries(CACHE_TTL_CONFIG)) {
+    if (url.startsWith(pattern)) {
+      return ttl;
+    }
+  }
+  return null;
+};
+
+// Verificar si una respuesta cacheada es válida
+const isCacheValid = (cached: CachedResponse): boolean => {
+  return Date.now() - cached.timestamp < cached.ttl;
+};
+
+// Invalidar caché para un patrón de URL
+export const invalidateCache = (urlPattern: string) => {
+  for (const key of responseCache.keys()) {
+    if (key.includes(urlPattern)) {
+      responseCache.delete(key);
+      console.log(`🗑️ [CACHE] Invalidado: ${key}`);
+    }
+  }
+};
+
+// Invalidar todo el caché
+export const clearCache = () => {
+  responseCache.clear();
+  console.log('🗑️ [CACHE] Limpiado completamente');
+};
+
+// ============================================
+// Sistema de Deduplicación de Requests
+// ============================================
+// Evita llamadas duplicadas cuando múltiples componentes
+// solicitan los mismos datos simultáneamente
+
+interface PendingRequest {
+  promise: Promise<AxiosResponse>;
+  timestamp: number;
+}
+
+// Mapa de requests en vuelo (key = URL + params)
+const pendingRequests = new Map<string, PendingRequest>();
+
+// Generar clave única para un request GET
+const getRequestKey = (config: AxiosRequestConfig): string | null => {
+  // Solo deduplicar GETs (no mutaciones)
+  if (config.method?.toLowerCase() !== 'get') return null;
+
+  const url = config.url || '';
+  const params = config.params ? JSON.stringify(config.params) : '';
+  return `${url}|${params}`;
+};
+
+// Limpiar requests completados después de un tiempo
+const DEDUP_WINDOW_MS = 100; // Ventana de 100ms para deduplicar
+
+const cleanupPendingRequest = (key: string) => {
+  setTimeout(() => {
+    pendingRequests.delete(key);
+  }, DEDUP_WINDOW_MS);
+};
 
 const api = axios.create({
   baseURL: API_URL,
@@ -64,6 +154,66 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ============================================
+// API con Caché + Deduplicación
+// ============================================
+// Guardar referencia al get original ANTES de crear el wrapper
+const originalGet = api.get.bind(api);
+
+// Función que envuelve api.get() con caché TTL + deduplicación
+const cachedDedupGet = <T = unknown>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+  const key = getRequestKey({ ...config, url, method: 'get' });
+
+  // Si no es deduplicable o no hay key, hacer request normal
+  if (!key) {
+    return originalGet<T>(url, config);
+  }
+
+  // 1. Verificar caché primero
+  const ttl = getCacheTTL(url);
+  if (ttl) {
+    const cached = responseCache.get(key);
+    if (cached && isCacheValid(cached)) {
+      console.log(`💾 [CACHE] Hit: ${url}`);
+      return Promise.resolve(cached.data as AxiosResponse<T>);
+    }
+  }
+
+  // 2. Si ya hay un request en vuelo para esta key, reutilizarlo
+  const pending = pendingRequests.get(key);
+  if (pending) {
+    console.log(`🔄 [DEDUP] Reutilizando request en vuelo: ${url}`);
+    return pending.promise as Promise<AxiosResponse<T>>;
+  }
+
+  // 3. Crear nuevo request y guardarlo (usar originalGet para evitar recursión)
+  const promise = originalGet<T>(url, config).then((response) => {
+    // Guardar en caché si tiene TTL configurado
+    if (ttl) {
+      responseCache.set(key, { data: response, timestamp: Date.now(), ttl });
+      console.log(`💾 [CACHE] Stored: ${url} (TTL: ${ttl / 1000}s)`);
+    }
+    return response;
+  }).finally(() => {
+    cleanupPendingRequest(key);
+  });
+
+  pendingRequests.set(key, { promise, timestamp: Date.now() });
+  return promise;
+};
+
+// Reemplazar api.get con versión con caché + deduplicación
+api.get = cachedDedupGet as typeof api.get;
+
+// Exportar api original sin dedup para casos especiales
+export const apiRaw = {
+  get: originalGet,
+  post: api.post.bind(api),
+  put: api.put.bind(api),
+  patch: api.patch.bind(api),
+  delete: api.delete.bind(api),
+};
 
 export default api;
 
@@ -148,27 +298,30 @@ export const reclamosApi = {
 export const categoriasApi = {
   getAll: (activo?: boolean) => api.get('/categorias', { params: activo !== undefined ? { activo } : {} }),
   getOne: (id: number) => api.get(`/categorias/${id}`),
-  create: (data: Record<string, unknown>) => api.post('/categorias', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/categorias/${id}`, data),
-  delete: (id: number) => api.delete(`/categorias/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/categorias', data).then(res => { invalidateCache('/categorias'); return res; }),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/categorias/${id}`, data).then(res => { invalidateCache('/categorias'); return res; }),
+  delete: (id: number) => api.delete(`/categorias/${id}`).then(res => { invalidateCache('/categorias'); return res; }),
 };
 
 // Zonas
 export const zonasApi = {
   getAll: (activo?: boolean) => api.get('/zonas', { params: activo !== undefined ? { activo } : {} }),
   getOne: (id: number) => api.get(`/zonas/${id}`),
-  create: (data: Record<string, unknown>) => api.post('/zonas', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/zonas/${id}`, data),
-  delete: (id: number) => api.delete(`/zonas/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/zonas', data).then(res => { invalidateCache('/zonas'); return res; }),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/zonas/${id}`, data).then(res => { invalidateCache('/zonas'); return res; }),
+  delete: (id: number) => api.delete(`/zonas/${id}`).then(res => { invalidateCache('/zonas'); return res; }),
 };
 
 // Empleados
 export const empleadosApi = {
   getAll: (activo?: boolean) => api.get('/empleados', { params: activo !== undefined ? { activo } : {} }),
   getOne: (id: number) => api.get(`/empleados/${id}`),
-  create: (data: Record<string, unknown>) => api.post('/empleados', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/empleados/${id}`, data),
-  delete: (id: number) => api.delete(`/empleados/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/empleados', data).then(res => { invalidateCache('/empleados'); return res; }),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/empleados/${id}`, data).then(res => { invalidateCache('/empleados'); return res; }),
+  delete: (id: number) => api.delete(`/empleados/${id}`).then(res => { invalidateCache('/empleados'); return res; }),
+  // Obtener empleados con disponibilidad y horarios, ordenados por disponibilidad
+  getDisponibilidad: (tipo?: 'operario' | 'administrativo') =>
+    api.get('/empleados/disponibilidad', { params: tipo ? { tipo } : {} }),
 };
 
 // Usuarios
@@ -532,11 +685,11 @@ export const tramitesApi = {
   getTipo: (id: number) => api.get(`/tramites/tipos/${id}`),
   createTipo: (data: Record<string, unknown>) => {
     const municipioId = localStorage.getItem('municipio_id');
-    return api.post('/tramites/tipos', { ...data, municipio_id: municipioId });
+    return api.post('/tramites/tipos', { ...data, municipio_id: municipioId }).then(res => { invalidateCache('/tramites/tipos'); return res; });
   },
   updateTipo: (id: number, data: Record<string, unknown>) =>
-    api.put(`/tramites/tipos/${id}`, data),
-  deleteTipo: (id: number) => api.delete(`/tramites/tipos/${id}`),
+    api.put(`/tramites/tipos/${id}`, data).then(res => { invalidateCache('/tramites/tipos'); return res; }),
+  deleteTipo: (id: number) => api.delete(`/tramites/tipos/${id}`).then(res => { invalidateCache('/tramites/tipos'); return res; }),
 
   // ============================================
   // NIVEL 2: Catálogo de Trámites
@@ -545,10 +698,10 @@ export const tramitesApi = {
     api.get('/tramites/catalogo', { params: { ...params, solo_activos: params?.solo_activos ?? true } }),
   getTramite: (id: number) => api.get(`/tramites/catalogo/${id}`),
   createTramite: (data: Record<string, unknown>) =>
-    api.post('/tramites/catalogo', data),
+    api.post('/tramites/catalogo', data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
   updateTramite: (id: number, data: Record<string, unknown>) =>
-    api.put(`/tramites/catalogo/${id}`, data),
-  deleteTramite: (id: number) => api.delete(`/tramites/catalogo/${id}`),
+    api.put(`/tramites/catalogo/${id}`, data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
+  deleteTramite: (id: number) => api.delete(`/tramites/catalogo/${id}`).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
 
   // ============================================
   // NIVEL 3: Solicitudes (las de vecinos)
@@ -634,9 +787,9 @@ export const tramitesApi = {
 
   // Alias de Servicios -> Catálogo (para Servicios.tsx)
   getServicio: (id: number) => api.get(`/tramites/catalogo/${id}`),
-  createServicio: (data: Record<string, unknown>) => api.post('/tramites/catalogo', data),
-  updateServicio: (id: number, data: Record<string, unknown>) => api.put(`/tramites/catalogo/${id}`, data),
-  deleteServicio: (id: number) => api.delete(`/tramites/catalogo/${id}`),
+  createServicio: (data: Record<string, unknown>) => api.post('/tramites/catalogo', data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
+  updateServicio: (id: number, data: Record<string, unknown>) => api.put(`/tramites/catalogo/${id}`, data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
+  deleteServicio: (id: number) => api.delete(`/tramites/catalogo/${id}`).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
 
   // Documentos de solicitudes
   uploadDocumento: (solicitudId: number, formData: FormData, params?: { tipo_documento?: string; descripcion?: string; etapa?: string }) =>
@@ -651,7 +804,7 @@ export const tramitesApi = {
   // Habilitar tipos para municipio
   habilitarTipoMunicipio: (tipoId: number, municipioId?: number) => {
     const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.post(`/tramites/tipos/${tipoId}/habilitar`, null, { params: { municipio_id: mId } });
+    return api.post(`/tramites/tipos/${tipoId}/habilitar`, null, { params: { municipio_id: mId } }).then(res => { invalidateCache('/tramites/tipos'); return res; });
   },
   habilitarTodosTiposMunicipio: async (municipioId?: number) => {
     const mId = municipioId || localStorage.getItem('municipio_id');
@@ -660,7 +813,9 @@ export const tramitesApi = {
     for (let i = 1; i <= 10; i++) {
       promises.push(api.post(`/tramites/tipos/${i}/habilitar`, null, { params: { municipio_id: mId } }).catch(() => null));
     }
-    return Promise.all(promises);
+    const result = await Promise.all(promises);
+    invalidateCache('/tramites/tipos');
+    return result;
   },
 };
 

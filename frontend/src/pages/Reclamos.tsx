@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable } from '../components/ui/ABMPage';
+import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
@@ -2512,21 +2512,24 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       },
     },
     {
-      key: 'fechas',
-      header: 'Fechas',
+      key: 'creacion',
+      header: 'Creación',
       sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
-      render: (r: Reclamo) => {
-        const creacion = new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-        const actualizacion = r.updated_at ? new Date(r.updated_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : null;
-        return (
-          <div className="flex flex-col text-[10px] leading-tight">
-            <span style={{ color: theme.textSecondary }}>{creacion}</span>
-            {actualizacion && (
-              <span style={{ color: theme.primary }}>{actualizacion}</span>
-            )}
-          </div>
-        );
-      },
+      render: (r: Reclamo) => (
+        <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+          {new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+        </span>
+      ),
+    },
+    {
+      key: 'modificacion',
+      header: 'Modif.',
+      sortValue: (r: Reclamo) => new Date(r.updated_at || r.created_at).getTime(),
+      render: (r: Reclamo) => (
+        <span className="text-[10px]" style={{ color: theme.text }}>
+          {new Date(r.updated_at || r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+        </span>
+      ),
     },
     {
       key: 'vencimiento',
@@ -3246,7 +3249,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setOrdenamiento('reciente')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
-                backgroundColor: ordenamiento === 'reciente' ? theme.card : theme.backgroundSecondary,
+                backgroundColor: ordenamiento === 'reciente' ? `${theme.primary}15` : theme.backgroundSecondary,
                 border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
                 color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
               }}
@@ -3258,9 +3261,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setOrdenamiento('programado')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
-                backgroundColor: ordenamiento === 'programado' ? theme.primary : theme.backgroundSecondary,
+                backgroundColor: ordenamiento === 'programado' ? `${theme.primary}15` : theme.backgroundSecondary,
                 border: `1px solid ${ordenamiento === 'programado' ? theme.primary : theme.border}`,
-                color: ordenamiento === 'programado' ? '#ffffff' : theme.textSecondary,
+                color: ordenamiento === 'programado' ? theme.primary : theme.textSecondary,
               }}
             >
               <Calendar className="h-3 w-3" />
@@ -3293,17 +3296,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
               {/* Scroll de categorías */}
               <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-              {/* Skeleton completo mientras cargan las categorías Y los conteos */}
+              {/* Skeleton solo si no hay categorías cargadas (carga inicial) */}
               {categorias.length === 0 || Object.keys(conteosCategorias).length === 0 ? (
-                <>
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div
-                      key={`skeleton-cat-${i}`}
-                      className="h-[28px] w-[50px] rounded-md animate-pulse flex-shrink-0"
-                      style={{ background: `${theme.border}40` }}
-                    />
-                  ))}
-                </>
+                <FilterRowSkeleton count={6} height={28} widths={[50, 65, 80, 50, 65, 80]} />
               ) : (
               <>
               {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
@@ -3374,17 +3369,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
               {/* Scroll de estados */}
               <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+              {/* Skeleton solo si no hay conteos cargados (carga inicial) */}
               {Object.keys(conteosEstados).length === 0 ? (
-                // Skeleton mientras cargan los conteos
-                <>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <div
-                      key={`skeleton-estado-${i}`}
-                      className="h-[26px] w-[45px] rounded-md animate-pulse flex-shrink-0"
-                      style={{ background: `${theme.border}40` }}
-                    />
-                  ))}
-                </>
+                <FilterRowSkeleton count={5} height={26} widths={[45, 55, 65, 45, 55]} />
               ) : (
                 [
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
@@ -3436,10 +3423,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         }
         tableView={
           <ABMTable
+            key={`table-${ordenamiento}`}
             data={filteredReclamos}
             columns={tableColumns}
             keyExtractor={(r) => r.id}
             onRowClick={(r) => openViewSheet(r)}
+            defaultSortKey={ordenamiento === 'programado' ? 'fecha_programada' : 'creacion'}
+            defaultSortDirection={ordenamiento === 'programado' ? 'asc' : 'desc'}
           />
         }
         sheetContent={null}

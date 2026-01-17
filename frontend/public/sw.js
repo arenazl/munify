@@ -1,6 +1,6 @@
 // Service Worker para Push Notifications
-// VERSION: 2.2.0 - Actualizar icono de notificaciones
-const SW_VERSION = '2.2.0';
+// VERSION: 2.3.0 - No interceptar API calls para evitar duplicados
+const SW_VERSION = '2.3.0';
 const CACHE_NAME = `app-cache-v${SW_VERSION}`;
 
 self.addEventListener('push', function(event) {
@@ -102,9 +102,19 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// Fetch - No cachear nada, siempre ir al network
+// Fetch - No interceptar llamadas API, solo assets estáticos
 self.addEventListener('fetch', function(event) {
-  // Para la app, siempre usar network-first
+  const url = new URL(event.request.url);
+
+  // NO interceptar llamadas a la API - dejar que el navegador las maneje directamente
+  // Esto evita duplicación de requests (fetch del SW + xhr original)
+  if (url.pathname.startsWith('/api') ||
+      url.hostname !== self.location.hostname ||
+      event.request.method !== 'GET') {
+    return; // No llamar event.respondWith() = dejar pasar sin interceptar
+  }
+
+  // Solo para assets estáticos locales, usar network-first
   event.respondWith(
     fetch(event.request).catch(function() {
       return caches.match(event.request);

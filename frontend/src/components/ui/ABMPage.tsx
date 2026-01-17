@@ -970,14 +970,26 @@ interface ABMTableProps<T> {
   onRowClick?: (item: T) => void;
   actions?: (item: T) => ReactNode;
   keyExtractor: (item: T) => string | number;
+  // Ordenamiento inicial (opcional)
+  defaultSortKey?: string;
+  defaultSortDirection?: 'asc' | 'desc';
 }
 
 type SortDirection = 'asc' | 'desc' | null;
 
-export function ABMTable<T>({ data, columns, onRowClick, actions, keyExtractor }: ABMTableProps<T>) {
+export function ABMTable<T>({
+  data,
+  columns,
+  onRowClick,
+  actions,
+  keyExtractor,
+  defaultSortKey,
+  defaultSortDirection,
+}: ABMTableProps<T>) {
   const { theme } = useTheme();
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(null);
+  // Estado de ordenamiento - inicializar con valores por defecto si se proporcionan
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection || null);
 
   const handleSort = (col: ABMTableColumn<T>) => {
     if (col.sortable === false) return;
@@ -1235,6 +1247,145 @@ export function ABMTableAction({ icon, onClick, title, variant = 'primary' }: AB
         />
       )}
     </>
+  );
+}
+
+// Skeleton para Card - se usa mientras cargan los datos
+interface ABMCardSkeletonProps {
+  index?: number;
+}
+
+export function ABMCardSkeleton({ index = 0 }: ABMCardSkeletonProps) {
+  const { theme } = useTheme();
+
+  return (
+    <div
+      className="rounded-2xl p-4 sm:p-5 animate-pulse"
+      style={{
+        backgroundColor: theme.card,
+        border: `1px solid ${theme.border}`,
+        animationDelay: `${index * 100}ms`,
+      }}
+    >
+      {/* Header skeleton */}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-lg"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          />
+          <div className="space-y-2">
+            <div
+              className="h-4 rounded w-24"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+            />
+            <div
+              className="h-3 rounded w-16"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+            />
+          </div>
+        </div>
+        <div
+          className="h-6 w-16 rounded-full"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        />
+      </div>
+
+      {/* Content skeleton */}
+      <div className="space-y-3">
+        <div
+          className="h-3 rounded w-full"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        />
+        <div
+          className="h-3 rounded w-3/4"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        />
+      </div>
+
+      {/* Footer skeleton */}
+      <div className="flex items-center justify-between mt-4 pt-3" style={{ borderTop: `1px solid ${theme.border}` }}>
+        <div className="flex items-center gap-2">
+          <div
+            className="w-6 h-6 rounded-full"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          />
+          <div
+            className="h-3 rounded w-20"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          />
+        </div>
+        <div
+          className="h-3 rounded w-16"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Skeleton individual para un chip de filtro (usa clase CSS global skeleton-shimmer)
+interface FilterChipSkeletonProps {
+  height?: number;
+  width?: number;
+}
+
+export function FilterChipSkeleton({ height = 34, width = 70 }: FilterChipSkeletonProps) {
+  return (
+    <div
+      className="rounded-lg flex-shrink-0 skeleton-shimmer"
+      style={{ height: `${height}px`, width: `${width}px` }}
+    />
+  );
+}
+
+// Skeleton para una fila de chips de filtro
+interface FilterRowSkeletonProps {
+  count?: number;
+  height?: number;
+  widths?: number[]; // anchos personalizados, si no se pasa usa defaults
+}
+
+export function FilterRowSkeleton({ count = 6, height = 34, widths }: FilterRowSkeletonProps) {
+  const defaultWidths = [60, 80, 70, 90, 65, 85];
+  const chipWidths = widths || defaultWidths.slice(0, count);
+
+  return (
+    <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+      {chipWidths.map((w, i) => (
+        <FilterChipSkeleton key={`skeleton-${i}`} height={height} width={w} />
+      ))}
+    </div>
+  );
+}
+
+// Skeleton completo para filtros secundarios (dos filas: categorías + estados)
+interface ABMFiltersSkeletonProps {
+  showCategories?: boolean;
+  showStates?: boolean;
+  categoryCount?: number;
+  stateCount?: number;
+  categoryHeight?: number;
+  stateHeight?: number;
+}
+
+export function ABMFiltersSkeleton({
+  showCategories = true,
+  showStates = true,
+  categoryCount = 6,
+  stateCount = 6,
+  categoryHeight = 34,
+  stateHeight = 32,
+}: ABMFiltersSkeletonProps) {
+  return (
+    <div className="space-y-1.5">
+      {showCategories && (
+        <FilterRowSkeleton count={categoryCount} height={categoryHeight} />
+      )}
+      {showStates && (
+        <FilterRowSkeleton count={stateCount} height={stateHeight} widths={[55, 65, 60, 70, 55, 65].slice(0, stateCount)} />
+      )}
+    </div>
   );
 }
 

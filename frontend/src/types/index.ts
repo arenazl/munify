@@ -67,6 +67,27 @@ export interface Empleado {
   miembros: { id: number; nombre: string; apellido: string; email: string }[];
 }
 
+export interface HorarioSimple {
+  dia_semana: number; // 0=Lunes, 6=Domingo
+  hora_entrada: string;
+  hora_salida: string;
+  activo: boolean;
+}
+
+export interface EmpleadoDisponibilidad {
+  id: number;
+  nombre: string;
+  apellido?: string;
+  especialidad?: string;
+  tipo: TipoEmpleado;
+  capacidad_maxima: number;
+  carga_actual: number;
+  disponibilidad: number;
+  porcentaje_ocupacion: number;
+  horarios: HorarioSimple[];
+  horario_texto: string;
+}
+
 export interface Documento {
   id: number;
   nombre_original: string;

@@ -282,7 +282,26 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
   };
 
   const selectAddressSuggestion = (suggestion: { display_name: string }) => {
-    setFormData(prev => ({ ...prev, direccion: suggestion.display_name }));
+    // Extraer número de calle de lo que escribió el usuario
+    const userInput = formData.direccion;
+    const numberMatch = userInput.match(/\d+/);
+    const userNumber = numberMatch ? numberMatch[0] : null;
+
+    let finalAddress = suggestion.display_name;
+
+    // Si el usuario escribió un número y la sugerencia no lo contiene, insertarlo
+    if (userNumber && !suggestion.display_name.includes(userNumber)) {
+      // Buscar el nombre de la calle en la sugerencia (primera parte antes de la coma)
+      const parts = suggestion.display_name.split(',');
+      if (parts.length > 0) {
+        const streetName = parts[0].trim();
+        // Reemplazar el nombre de calle por "Calle Número"
+        parts[0] = `${streetName} ${userNumber}`;
+        finalAddress = parts.join(',');
+      }
+    }
+
+    setFormData(prev => ({ ...prev, direccion: finalAddress }));
     setShowSuggestions(false);
     setAddressSuggestions([]);
   };

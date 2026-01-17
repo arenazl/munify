@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  MessageCircle, Save, Send, ToggleLeft, ToggleRight, AlertTriangle,
+  MessageCircle, Send, ToggleLeft, ToggleRight, AlertTriangle,
   CheckCircle, XCircle, Loader2, Bell, RefreshCw, History, BarChart3,
   Phone, Key, Building2, Shield, Zap, FileText, UserCheck, Play,
   ClipboardList, Search, Hash
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { whatsappApi, reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Reclamo } from '../types';
+import SettingsHeader from '../components/ui/SettingsHeader';
 
 type Provider = 'meta' | 'twilio';
 
@@ -319,54 +320,47 @@ export default function WhatsAppConfigPage() {
     );
   }
 
+  // Renderizar badge de estado
+  const renderStatusBadge = () => {
+    if (config?.id && config.id > 0) {
+      if (formData.habilitado) {
+        return (
+          <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-green-500/10 text-green-500">
+            <CheckCircle className="h-4 w-4" />
+            Activo
+          </span>
+        );
+      } else {
+        return (
+          <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-500/10 text-yellow-500">
+            <AlertTriangle className="h-4 w-4" />
+            Deshabilitado
+          </span>
+        );
+      }
+    }
+    return (
+      <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-500/10 text-gray-500">
+        <XCircle className="h-4 w-4" />
+        Sin configurar
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: '#25D36620' }}
-            >
-              <MessageCircle className="h-5 w-5" style={{ color: '#25D366' }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-                Configuracion de WhatsApp
-              </h1>
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                Integra WhatsApp Business para notificaciones
-              </p>
-            </div>
-          </div>
-
-          {/* Estado */}
-          <div className="flex items-center gap-2">
-            {config?.id && config.id > 0 ? (
-              formData.habilitado ? (
-                <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-green-500/10 text-green-500">
-                  <CheckCircle className="h-4 w-4" />
-                  Activo
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-500/10 text-yellow-500">
-                  <AlertTriangle className="h-4 w-4" />
-                  Deshabilitado
-                </span>
-              )
-            ) : (
-              <span className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium bg-gray-500/10 text-gray-500">
-                <XCircle className="h-4 w-4" />
-                Sin configurar
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+      <SettingsHeader
+        title="Configuración de WhatsApp"
+        subtitle="Integra WhatsApp Business para notificaciones"
+        icon={MessageCircle}
+        iconColor="#25D366"
+        showSave={activeTab === 'config'}
+        onSave={handleSave}
+        saving={saving}
+        saveLabel="Guardar configuración"
+        statusBadge={renderStatusBadge()}
+      />
 
       {/* Tabs */}
       <div
@@ -802,26 +796,6 @@ export default function WhatsAppConfigPage() {
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Guardar */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50"
-              style={{
-                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                color: '#ffffff',
-              }}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Guardar configuracion
-            </button>
           </div>
 
           {/* Test */}
