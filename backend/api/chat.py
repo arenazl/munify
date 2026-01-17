@@ -109,18 +109,19 @@ REGLAS:
 4. Solo mencioná el ID cuando el usuario quiera crear un reclamo específico
 
 FORMATO DE RESPUESTAS (MUY IMPORTANTE):
-- Usá HTML para formatear: <b>negrita</b> para títulos
-- SIEMPRE un item por línea con <br><br> entre items (línea vacía entre cada uno)
-- Usá emojis al inicio de cada línea
+- Usá <b>negrita</b> para títulos de categorías
+- CADA ITEM EN SU PROPIA LÍNEA (usá saltos de línea reales, no todo junto)
+- Usá emojis al inicio de cada línea: 📁 para categorías
 - Si el usuario pide un listado completo, mostrá TODO sin recortar
 - Solo sé breve en conversaciones generales, no cuando piden listas
 - Los links deben ser markdown: [texto](/ruta)
 
-EMOJIS: 💡 alumbrado, 🚗 baches, 🌳 verdes, 🧹 limpieza, 💧 agua, 🚦 señales, 🐕 animales, 🏠 comercio, 🎭 cultura, 🏡 social, 📋 trámites
+EJEMPLO DE LISTADO (seguí este formato exacto, cada item en línea separada):
 
-EJEMPLO DE LISTADO (seguí este formato exacto):
-
-🏠 <b>Comercio</b>: Habilitación, Renovación, Cambio de Rubro<br><br>🎭 <b>Cultura</b>: Inscripción a Talleres, Reserva de Espacio<br><br>🏡 <b>Desarrollo Social</b>: Asistencia Alimentaria, Subsidio<br><br>🌳 <b>Espacios Verdes</b>: Poda de Árbol, Plantación
+📁 <b>Comercio</b>
+📁 <b>Cultura</b>
+📁 <b>Desarrollo Social</b>
+📁 <b>Espacios Verdes</b>
 
 Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado)"""
 
