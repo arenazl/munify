@@ -593,15 +593,8 @@ export default function Layout() {
                   className="h-10 w-10 object-contain"
                 />
                 <span
-                  className="text-2xl"
-                  style={{
-                    fontFamily: "'Nunito', sans-serif",
-                    fontWeight: 800,
-                    background: `linear-gradient(135deg, ${theme.text} 0%, ${theme.primary} 100%)`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    backgroundClip: 'text',
-                  }}
+                  className="text-2xl font-extrabold"
+                  style={{ color: theme.primary }}
                 >
                   Munify
                 </span>
