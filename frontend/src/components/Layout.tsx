@@ -596,7 +596,10 @@ export default function Layout() {
                   className="text-2xl font-extrabold"
                   style={{
                     fontFamily: "'Nunito', sans-serif",
-                    color: theme.text,
+                    background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
                   }}
                 >
                   Munify
