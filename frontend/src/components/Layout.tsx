@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Building2 } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -215,11 +215,11 @@ export default function Layout() {
 
       {/* Sidebar - empieza debajo del topbar */}
       <div
-        className={`fixed left-0 bottom-0 z-30 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden sidebar-container ${
+        className={`fixed left-0 bottom-0 z-30 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden sidebar-container backdrop-blur-sm ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
-          backgroundColor: theme.sidebar,
+          backgroundColor: `${theme.sidebar}e6`, // ~90% opacity
           width: sidebarWidth,
           top: '64px', // h-16 = 4rem = 64px
           transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
@@ -400,20 +400,21 @@ export default function Layout() {
                   transform: 'scale(1.1)',
                 }}
               />
-              {/* Overlay con filtro de cabecera - gradiente con colores del tema */}
+              {/* Overlay con filtro de cabecera - usa el color sidebar del tema */}
               {(municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) > 0 && (
                 <div
                   className="absolute inset-0"
                   style={{
-                    background: `linear-gradient(135deg, ${theme.primary}${Math.round((municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 255).toString(16).padStart(2, '0')} 0%, ${theme.primaryHover}${Math.round((municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 200).toString(16).padStart(2, '0')} 100%)`,
+                    background: theme.sidebar,
+                    opacity: (municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 0.6,
                   }}
                 />
               )}
             </div>
           )}
           <div className="relative flex items-center justify-between h-16 px-3 sm:px-4 overflow-visible">
-            {/* Izquierda: Hamburguesa (mobile) */}
-            <div className="flex items-center">
+            {/* Izquierda: Hamburguesa (mobile) + Perfil usuario con dropdown */}
+            <div className="flex items-center gap-3">
               {/* Hamburguesa - solo mobile */}
               <button
                 className="lg:hidden p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
@@ -422,38 +423,21 @@ export default function Layout() {
               >
                 <Menu className="h-5 w-5" />
               </button>
-            </div>
-
-            {/* Centro: Logo Munify + Nombre */}
-            <div className="flex-1 flex justify-center items-center gap-2 overflow-visible">
-              <img
-                src={new URL('../assets/munify_logo_no_text (1).png', import.meta.url).href}
-                alt="Munify"
-                className="h-8 w-8 sm:h-9 sm:w-9 object-contain flex-shrink-0"
-              />
-              <span className="text-lg sm:text-xl font-semibold tracking-wide" style={{ color: theme.text }}>
-                Munify
-              </span>
-            </div>
-
-            <div className="flex items-center space-x-2 sm:space-x-3 overflow-visible">
-              {/* User info con dropdown - oculto en mobile */}
-              <div className="relative hidden sm:block">
-                {/* Botón desktop - avatar + nombre */}
+              {/* Perfil de usuario con dropdown */}
+              <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-3 pr-3 border-r cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ borderColor: 'rgba(26, 26, 26, 0.5)' }}
+                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
                 >
                   <div
-                    className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                    className="h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-medium"
                     style={{ backgroundColor: theme.primary }}
                   >
                     {user.nombre[0]}{user.apellido[0]}
                   </div>
-                  <div className="hidden md:flex items-center gap-2">
+                  <div className="hidden sm:flex items-center gap-1">
                     <div>
-                      <p className="text-sm font-medium leading-none text-left" style={{ color: theme.text }}>
+                      <p className="text-sm font-semibold leading-none text-left" style={{ color: theme.text }}>
                         {user.nombre} {user.apellido}
                       </p>
                       <p className="text-xs capitalize mt-0.5" style={{ color: theme.textSecondary }}>
@@ -475,7 +459,7 @@ export default function Layout() {
                       onClick={() => setUserMenuOpen(false)}
                     />
                     <div
-                      className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl z-50 theme-dropdown-enter overflow-hidden"
+                      className="absolute left-0 mt-2 w-56 rounded-xl shadow-2xl z-50 theme-dropdown-enter overflow-hidden"
                       style={{
                         backgroundColor: theme.card,
                         border: `1px solid ${theme.border}`,
@@ -538,7 +522,6 @@ export default function Layout() {
                             <button
                               onClick={async () => {
                                 setUserMenuOpen(false);
-                                // Enviar notificación de prueba
                                 try {
                                   const token = localStorage.getItem('token');
                                   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
@@ -599,7 +582,35 @@ export default function Layout() {
                   </>
                 )}
               </div>
+            </div>
 
+            {/* Centro: Logo Munify + texto con degradé (solo desktop) */}
+            <div className="flex-1 hidden sm:flex justify-center">
+              <div className="flex items-center gap-3">
+                <img
+                  src={new URL('../assets/munify_logo.png', import.meta.url).href}
+                  alt="Munify"
+                  className="h-10 w-10 object-contain"
+                />
+                <span
+                  className="text-2xl"
+                  style={{
+                    fontFamily: "'Nunito', sans-serif",
+                    fontWeight: 800,
+                    background: `linear-gradient(135deg, ${theme.text} 0%, ${theme.primary} 100%)`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  Munify
+                </span>
+              </div>
+            </div>
+            {/* Espacio flexible en mobile */}
+            <div className="flex-1 sm:hidden" />
+
+            <div className="flex items-center space-x-2 sm:space-x-3 overflow-visible">
               {/* Theme selector - Visible en mobile y desktop */}
               <div className="relative">
                 <button
@@ -838,15 +849,19 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
-          {/* Barra secundaria: Municipalidad de X (no sticky) */}
+          {/* Barra secundaria: Municipalidad de X (solo mobile, en desktop está en el header) */}
           <div
-            className="mb-4 px-4 py-2.5 rounded-xl flex items-center justify-center gap-2"
+            className="mb-4 px-4 py-2.5 rounded-xl flex sm:hidden items-center justify-center gap-2"
             style={{
               backgroundColor: theme.card,
               border: `1px solid ${theme.border}`,
             }}
           >
-            <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
+            <img
+              src={new URL('../assets/munify_logo.png', import.meta.url).href}
+              alt="Munify"
+              className="h-5 w-5 object-contain"
+            />
             <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>
               Municipalidad de
             </span>
