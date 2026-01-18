@@ -95,6 +95,7 @@ interface MetricasDetalle {
 }
 
 export default function Dashboard() {
+  console.log('🚀 Dashboard v156 - BUILD OK');
   const { theme } = useTheme();
   const { municipioActual } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
