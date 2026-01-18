@@ -436,7 +436,7 @@ export default function Layout() {
               </span>
             </div>
 
-            <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 overflow-visible">
               {/* User info con dropdown - oculto en mobile */}
               <div className="relative hidden sm:block">
                 {/* Botón desktop - avatar + nombre */}
