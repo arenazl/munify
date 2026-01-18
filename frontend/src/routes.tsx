@@ -42,6 +42,7 @@ import GestionAusencias from './pages/GestionAusencias';
 import GestionHorarios from './pages/GestionHorarios';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
+import Demo from './pages/Demo';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -96,6 +97,7 @@ export const router = createBrowserRouter([
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
+  { path: '/demo', element: <Demo /> },
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/merlo
@@ -239,6 +241,6 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Catch-all: redirigir a landing si no está autenticado
-  { path: '*', element: <Navigate to="/bienvenido" replace /> },
+  // Catch-all: redirigir a demo si no está autenticado
+  { path: '*', element: <Navigate to="/demo" replace /> },
 ]);

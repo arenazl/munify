@@ -30,12 +30,12 @@ export default function RootRedirect() {
     // Si hay ?municipio=xxx en la URL
     const municipioParam = searchParams.get('municipio');
     if (municipioParam) {
-      navigate(`/bienvenido?municipio=${municipioParam}`, { replace: true });
+      navigate(`/demo?municipio=${municipioParam}`, { replace: true });
       return;
     }
 
-    // Si no hay nada, ir a la landing de selección
-    navigate('/bienvenido', { replace: true });
+    // Si no hay nada, ir a la demo
+    navigate('/demo', { replace: true });
   }, [user, searchParams, navigate]);
 
   // Mostrar loading mientras decide
