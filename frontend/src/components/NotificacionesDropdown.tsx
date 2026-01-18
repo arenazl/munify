@@ -141,13 +141,13 @@ export function NotificacionesDropdown() {
       <button
         onClick={handleOpen}
         className="p-2 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 relative group"
-        style={{ color: 'rgb(102, 102, 102)' }}
+        style={{ color: theme.text }}
       >
         <Bell className={`h-5 w-5 ${isOpen ? '' : 'group-hover:animate-wiggle'}`} />
         {unreadCount > 0 && (
           <span
-            className="absolute -top-1 -right-1 min-w-[20px] h-[20px] flex items-center justify-center text-[11px] font-bold text-white rounded-full shadow-sm"
-            style={{ backgroundColor: '#ef4444', boxShadow: '0 0 0 2px var(--card-bg, white)' }}
+            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full"
+            style={{ backgroundColor: '#ef4444' }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>

@@ -613,7 +613,7 @@ export default function Layout() {
                 <button
                   className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-12 active:scale-95"
                   onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-                  style={{ color: theme.textSecondary }}
+                  style={{ color: theme.text }}
                 >
                   <Palette className="h-5 w-5" />
                 </button>
@@ -828,7 +828,7 @@ export default function Layout() {
               <Link
                 to="/gestion/ajustes"
                 className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-45 active:scale-95"
-                style={{ color: theme.textSecondary }}
+                style={{ color: theme.text }}
                 title="Ajustes"
               >
                 <Settings className="h-5 w-5" />
