@@ -593,11 +593,12 @@ export default function Layout() {
                   className="h-10 w-10 object-contain"
                 />
                 <span
-                  className="text-2xl font-extrabold"
+                  className="text-2xl font-extrabold munify-brand-text"
                   style={{
                     fontFamily: "'Nunito', sans-serif",
-                    color: theme.primary,
-                  }}
+                    '--munify-primary': theme.primary,
+                    '--munify-hover': theme.primaryHover,
+                  } as React.CSSProperties}
                 >
                   Munify
                 </span>
@@ -1192,6 +1193,16 @@ export default function Layout() {
         /* Safe area padding for iOS */
         .pb-safe {
           padding-bottom: env(safe-area-inset-bottom, 8px);
+        }
+
+        /* Munify brand text with gradient */
+        .munify-brand-text {
+          background: linear-gradient(135deg, var(--munify-primary) 0%, var(--munify-hover) 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: var(--munify-primary); /* Fallback */
+          transition: none; /* Prevent transition glitches */
         }
 
         /* Custom range slider styling */
