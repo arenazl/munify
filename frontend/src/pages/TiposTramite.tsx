@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Edit, Trash2, Clock, DollarSign, ChevronDown, ChevronRight, Plus, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { Edit, Trash2, Clock, DollarSign, ChevronDown, ChevronRight, Plus, AlertTriangle, CheckCircle, Loader2, EyeOff, Eye, RotateCcw } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import api, { tramitesApi } from '../lib/api';
@@ -72,6 +72,8 @@ export default function TiposTramite() {
   // Estado para validación de duplicados con IA
   const [validando, setValidando] = useState(false);
   const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
+  // Estado para sección de deshabilitados
+  const [showDeshabilitados, setShowDeshabilitados] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -142,6 +144,10 @@ export default function TiposTramite() {
 
     return result.sort((a, b) => a.orden - b.orden);
   }, [tipos, tramites, search]);
+
+  // Separar tipos activos y deshabilitados
+  const tiposActivos = useMemo(() => tiposConTramites.filter(t => t.activo), [tiposConTramites]);
+  const tiposDeshabilitados = useMemo(() => tiposConTramites.filter(t => !t.activo), [tiposConTramites]);
 
   const totalTipos = tipos.length;
   const totalTramites = tramites.length;
@@ -258,6 +264,42 @@ export default function TiposTramite() {
     }
   };
 
+  // Deshabilitar un tipo (soft delete - pone activo=false)
+  // También deshabilita todos los trámites hijos
+  const handleDeshabilitar = async (tipo: TipoTramite) => {
+    try {
+      // Primero deshabilitar el tipo
+      await tramitesApi.updateTipo(tipo.id, { ...tipo, activo: false });
+
+      // Luego deshabilitar todos los trámites hijos
+      const tramitesDelTipo = tramites.filter(t => t.tipo_tramite_id === tipo.id && t.activo);
+      await Promise.all(
+        tramitesDelTipo.map(t => tramitesApi.updateTramite(t.id, { ...t, activo: false }))
+      );
+
+      const msg = tramitesDelTipo.length > 0
+        ? `"${tipo.nombre}" y ${tramitesDelTipo.length} trámite${tramitesDelTipo.length > 1 ? 's' : ''} deshabilitados`
+        : `"${tipo.nombre}" deshabilitado`;
+      toast.success(msg);
+      fetchData();
+    } catch (error) {
+      toast.error('Error al deshabilitar');
+      console.error('Error:', error);
+    }
+  };
+
+  // Habilitar un tipo deshabilitado
+  const handleHabilitar = async (tipo: TipoTramite) => {
+    try {
+      await tramitesApi.updateTipo(tipo.id, { ...tipo, activo: true });
+      toast.success(`"${tipo.nombre}" habilitado nuevamente`);
+      fetchData();
+    } catch (error) {
+      toast.error('Error al habilitar');
+      console.error('Error:', error);
+    }
+  };
+
   const tableColumns = [
     {
       key: 'nombre',
@@ -317,7 +359,7 @@ export default function TiposTramite() {
       onSheetClose={closeSheet}
       tableView={
         <ABMTable
-          data={tipos}
+          data={tipos.filter(t => t.activo)}
           columns={tableColumns}
           keyExtractor={(t) => t.id}
           onRowClick={(t) => openSheet(t)}
@@ -329,14 +371,139 @@ export default function TiposTramite() {
                 title="Editar"
               />
               <ABMTableAction
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => handleDelete(t.id)}
-                title="Desactivar"
+                icon={<EyeOff className="h-4 w-4" />}
+                onClick={() => handleDeshabilitar(t)}
+                title="Deshabilitar"
                 variant="danger"
               />
             </>
           )}
         />
+      }
+      disabledSection={
+        tiposDeshabilitados.length > 0 && (
+          <div className="mt-8">
+            {/* Header colapsable */}
+            <button
+              onClick={() => setShowDeshabilitados(!showDeshabilitados)}
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-all hover:opacity-90"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
+                >
+                  <EyeOff className="h-5 w-5" style={{ color: '#ef4444' }} />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold" style={{ color: theme.text }}>
+                    Tipos Deshabilitados
+                  </h3>
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>
+                    {tiposDeshabilitados.length} tipo{tiposDeshabilitados.length !== 1 ? 's' : ''} deshabilitado{tiposDeshabilitados.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <div
+                className="p-2 rounded-lg transition-transform"
+                style={{
+                  backgroundColor: theme.card,
+                  transform: showDeshabilitados ? 'rotate(0deg)' : 'rotate(-90deg)',
+                }}
+              >
+                <ChevronDown className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              </div>
+            </button>
+
+            {/* Lista de tipos deshabilitados */}
+            {showDeshabilitados && (
+              <div className="mt-4 space-y-3">
+                {tiposDeshabilitados.map((tipo) => {
+                  const tramitesCount = tipo.tramites.length;
+
+                  return (
+                    <div
+                      key={tipo.id}
+                      className="rounded-xl overflow-hidden opacity-75 hover:opacity-100 transition-opacity"
+                      style={{
+                        backgroundColor: theme.card,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      <div
+                        className="flex items-center justify-between p-4"
+                        style={{
+                          background: `linear-gradient(135deg, ${tipo.color}10 0%, ${tipo.color}05 100%)`,
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-lg flex items-center justify-center grayscale"
+                            style={{
+                              backgroundColor: tipo.color || '#6366f1',
+                            }}
+                          >
+                            <span className="text-white">{getIcon(tipo.icono)}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold" style={{ color: theme.text }}>
+                                {tipo.nombre}
+                              </h3>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">
+                                Deshabilitado
+                              </span>
+                            </div>
+                            <p className="text-sm" style={{ color: theme.textSecondary }}>
+                              {tramitesCount > 0 ? (
+                                <>{tramitesCount} trámite{tramitesCount !== 1 ? 's' : ''}</>
+                              ) : (
+                                <span className="italic">Sin trámites definidos</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Botón habilitar */}
+                          <button
+                            onClick={() => handleHabilitar(tipo)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
+                            style={{
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10b981',
+                            }}
+                            title="Habilitar tipo"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            <span className="text-sm font-medium">Habilitar</span>
+                          </button>
+
+                          {/* Botón editar */}
+                          <button
+                            onClick={() => openSheet(tipo)}
+                            className="p-2 rounded-lg transition-colors hover:scale-105"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              color: theme.textSecondary,
+                            }}
+                            title="Editar tipo"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )
       }
       sheetFooter={
         <ABMSheetFooter
@@ -487,9 +654,9 @@ export default function TiposTramite() {
         </form>
       }
     >
-      {/* Vista agrupada por Tipos */}
+      {/* Vista agrupada por Tipos ACTIVOS */}
       <div className="space-y-4">
-        {tiposConTramites.map((tipo) => {
+        {tiposActivos.map((tipo) => {
           const isExpanded = expandedTipos.has(tipo.id);
           const tramitesCount = tipo.tramites.length;
 
@@ -550,6 +717,22 @@ export default function TiposTramite() {
                     title="Editar tipo"
                   >
                     <Edit className="h-4 w-4" />
+                  </button>
+
+                  {/* Botón deshabilitar tipo */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeshabilitar(tipo);
+                    }}
+                    className="p-2 rounded-lg transition-colors hover:scale-105"
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      color: '#ef4444',
+                    }}
+                    title="Deshabilitar tipo"
+                  >
+                    <EyeOff className="h-4 w-4" />
                   </button>
 
                   {tramitesCount > 0 && (
@@ -628,6 +811,131 @@ export default function TiposTramite() {
           );
         })}
       </div>
+
+      {/* Sección de tipos DESHABILITADOS */}
+      {tiposDeshabilitados.length > 0 && (
+        <div className="mt-8">
+          {/* Header colapsable */}
+          <button
+            onClick={() => setShowDeshabilitados(!showDeshabilitados)}
+            className="w-full flex items-center justify-between p-4 rounded-xl transition-all hover:opacity-90"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
+              >
+                <EyeOff className="h-5 w-5" style={{ color: '#ef4444' }} />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold" style={{ color: theme.text }}>
+                  Tipos Deshabilitados
+                </h3>
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  {tiposDeshabilitados.length} tipo{tiposDeshabilitados.length !== 1 ? 's' : ''} deshabilitado{tiposDeshabilitados.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div
+              className="p-2 rounded-lg transition-transform"
+              style={{
+                backgroundColor: theme.card,
+                transform: showDeshabilitados ? 'rotate(0deg)' : 'rotate(-90deg)',
+              }}
+            >
+              <ChevronDown className="h-4 w-4" style={{ color: theme.textSecondary }} />
+            </div>
+          </button>
+
+          {/* Lista de tipos deshabilitados */}
+          {showDeshabilitados && (
+            <div className="mt-4 space-y-3">
+              {tiposDeshabilitados.map((tipo) => {
+                const tramitesCount = tipo.tramites.length;
+
+                return (
+                  <div
+                    key={tipo.id}
+                    className="rounded-xl overflow-hidden opacity-75 hover:opacity-100 transition-opacity"
+                    style={{
+                      backgroundColor: theme.card,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    <div
+                      className="flex items-center justify-between p-4"
+                      style={{
+                        background: `linear-gradient(135deg, ${tipo.color}10 0%, ${tipo.color}05 100%)`,
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center grayscale"
+                          style={{
+                            backgroundColor: tipo.color || '#6366f1',
+                          }}
+                        >
+                          <span className="text-white">{getIcon(tipo.icono)}</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold" style={{ color: theme.text }}>
+                              {tipo.nombre}
+                            </h3>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">
+                              Deshabilitado
+                            </span>
+                          </div>
+                          <p className="text-sm" style={{ color: theme.textSecondary }}>
+                            {tramitesCount > 0 ? (
+                              <>{tramitesCount} trámite{tramitesCount !== 1 ? 's' : ''}</>
+                            ) : (
+                              <span className="italic">Sin trámites definidos</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* Botón habilitar */}
+                        <button
+                          onClick={() => handleHabilitar(tipo)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
+                          style={{
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            color: '#10b981',
+                          }}
+                          title="Habilitar tipo"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          <span className="text-sm font-medium">Habilitar</span>
+                        </button>
+
+                        {/* Botón editar */}
+                        <button
+                          onClick={() => openSheet(tipo)}
+                          className="p-2 rounded-lg transition-colors hover:scale-105"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            color: theme.textSecondary,
+                          }}
+                          title="Editar tipo"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </ABMPage>
   );
 }

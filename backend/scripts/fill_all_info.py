@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from core.database import async_session_factory, engine
+from core.database import AsyncSessionLocal, engine
 from models.tramite import Tramite, TipoTramite
 from models.categoria import Categoria
 from services import chat_service
@@ -61,11 +61,25 @@ Necesito información sobre el trámite "{nombre}" de la categoría "{tipo}".
 Respondé SOLO con un JSON válido:
 {{
     "descripcion": "Descripción breve del trámite (1-2 oraciones)",
-    "requisitos": "Lista de requisitos separados por | (ej: Ser mayor de 18 años | Residir en el municipio)",
-    "documentos_requeridos": "Lista de documentos separados por | (ej: DNI original y copia | Comprobante de domicilio)"
+    "requisitos": [
+        "Requisito 1",
+        "Requisito 2",
+        "Requisito 3"
+    ],
+    "documentos_requeridos": [
+        "Documento 1",
+        "Documento 2",
+        "Documento 3"
+    ],
+    "tiempo_estimado_dias": 15
 }}
 
-IMPORTANTE: Basate en normativa argentina. Requisitos y documentos van separados por " | ".
+IMPORTANTE:
+- Basate en normativa argentina
+- Los requisitos y documentos son ARRAYS de strings
+- Máximo 5-6 items por array
+- tiempo_estimado_dias es un número entero (días hábiles típicos)
+- Sé específico pero conciso
 
 Solo el JSON:"""
 
@@ -81,9 +95,18 @@ Necesito información sobre la categoría de reclamos: "{nombre}"
 Respondé SOLO con un JSON válido:
 {{
     "descripcion": "Descripción breve de qué problemas abarca (1-2 oraciones)",
-    "ejemplos_reclamos": "Ejemplos de reclamos separados por | (ej: Bache en la calle | Pozo en la vereda)",
+    "ejemplos_reclamos": [
+        "Ejemplo de reclamo 1",
+        "Ejemplo de reclamo 2",
+        "Ejemplo de reclamo 3"
+    ],
     "tip_ayuda": "Tip corto para el vecino (máx 100 caracteres)"
 }}
+
+IMPORTANTE:
+- Los ejemplos son un ARRAY de strings
+- Máximo 4-5 ejemplos concretos y comunes
+- El tip debe ser práctico
 
 Solo el JSON:"""
 
@@ -144,7 +167,7 @@ async def fill_tipos_tramite(db: AsyncSession, dry_run: bool) -> tuple[int, int]
             print("ERROR")
             errors += 1
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
     return updated, errors
 
@@ -192,9 +215,16 @@ async def fill_tramites(db: AsyncSession, dry_run: bool) -> tuple[int, int]:
                 if not item.descripcion and info.get('descripcion'):
                     item.descripcion = info['descripcion']
                 if not item.requisitos and info.get('requisitos'):
-                    item.requisitos = info['requisitos']
+                    # Convertir array a string con separador |
+                    req = info['requisitos']
+                    item.requisitos = " | ".join(req) if isinstance(req, list) else req
                 if not item.documentos_requeridos and info.get('documentos_requeridos'):
-                    item.documentos_requeridos = info['documentos_requeridos']
+                    # Convertir array a string con separador |
+                    docs = info['documentos_requeridos']
+                    item.documentos_requeridos = " | ".join(docs) if isinstance(docs, list) else docs
+                if info.get('tiempo_estimado_dias') and (not item.tiempo_estimado_dias or item.tiempo_estimado_dias == 15):
+                    # Solo actualizar si tiene el default (15) o está vacío
+                    item.tiempo_estimado_dias = info['tiempo_estimado_dias']
                 await db.commit()
             print("OK")
             updated += 1
@@ -202,7 +232,7 @@ async def fill_tramites(db: AsyncSession, dry_run: bool) -> tuple[int, int]:
             print("ERROR")
             errors += 1
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
     return updated, errors
 
@@ -238,7 +268,9 @@ async def fill_categorias(db: AsyncSession, dry_run: bool) -> tuple[int, int]:
                 if not item.descripcion and info.get('descripcion'):
                     item.descripcion = info['descripcion']
                 if not item.ejemplos_reclamos and info.get('ejemplos_reclamos'):
-                    item.ejemplos_reclamos = info['ejemplos_reclamos']
+                    # Convertir array a string con separador |
+                    ej = info['ejemplos_reclamos']
+                    item.ejemplos_reclamos = " | ".join(ej) if isinstance(ej, list) else ej
                 if not item.tip_ayuda and info.get('tip_ayuda'):
                     item.tip_ayuda = info['tip_ayuda']
                 await db.commit()
@@ -248,7 +280,7 @@ async def fill_categorias(db: AsyncSession, dry_run: bool) -> tuple[int, int]:
             print("ERROR")
             errors += 1
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
 
     return updated, errors
 
@@ -279,7 +311,7 @@ async def main():
     total_updated = 0
     total_errors = 0
 
-    async with async_session_factory() as db:
+    async with AsyncSessionLocal() as db:
         if not only or only == "tipos":
             u, e = await fill_tipos_tramite(db, dry_run)
             total_updated += u

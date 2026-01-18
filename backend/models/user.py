@@ -71,3 +71,4 @@ class User(Base):
     notificaciones = relationship("Notificacion", back_populates="usuario")
     solicitudes = relationship("Solicitud", back_populates="solicitante")
     push_subscriptions = relationship("PushSubscription", back_populates="user")
+    consultas_guardadas = relationship("ConsultaGuardada", back_populates="usuario")

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, ImageIcon, RefreshCw, X, Download, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { Edit, ImageIcon, RefreshCw, X, Download, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { categoriasApi, imagenesApi, API_BASE_URL } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -64,6 +64,8 @@ export default function Categorias() {
   // Estado para validación de duplicados con IA
   const [validando, setValidando] = useState(false);
   const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
+  // Estado para sección de deshabilitados
+  const [showDeshabilitados, setShowDeshabilitados] = useState(false);
 
   useEffect(() => {
     fetchCategorias();
@@ -291,10 +293,38 @@ export default function Categorias() {
     }
   };
 
+  // Deshabilitar una categoría (soft delete - pone activo=false)
+  const handleDeshabilitar = async (categoria: Categoria) => {
+    try {
+      await categoriasApi.update(categoria.id, { ...categoria, activo: false });
+      toast.success(`"${categoria.nombre}" deshabilitada`);
+      fetchCategorias();
+    } catch (error) {
+      toast.error('Error al deshabilitar');
+      console.error('Error:', error);
+    }
+  };
+
+  // Habilitar una categoría deshabilitada
+  const handleHabilitar = async (categoria: Categoria) => {
+    try {
+      await categoriasApi.update(categoria.id, { ...categoria, activo: true });
+      toast.success(`"${categoria.nombre}" habilitada nuevamente`);
+      fetchCategorias();
+    } catch (error) {
+      toast.error('Error al habilitar');
+      console.error('Error:', error);
+    }
+  };
+
   const filteredCategorias = categorias.filter(c =>
     c.nombre.toLowerCase().includes(search.toLowerCase()) ||
     c.descripcion?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Separar categorías activas y deshabilitadas
+  const categoriasActivas = filteredCategorias.filter(c => c.activo);
+  const categoriasDeshabilitadas = filteredCategorias.filter(c => !c.activo);
 
   // Efecto para animar cards de a una (staggered) - solo la primera vez que cargan
   useEffect(() => {
@@ -342,7 +372,13 @@ export default function Categorias() {
       header: 'Descripción',
       sortValue: (c: Categoria) => c.descripcion || '',
       render: (c: Categoria) => (
-        <span style={{ color: theme.textSecondary }}>{c.descripcion || '-'}</span>
+        <span
+          className="block max-w-xs truncate"
+          style={{ color: theme.textSecondary }}
+          title={c.descripcion || '-'}
+        >
+          {c.descripcion || '-'}
+        </span>
       ),
     },
     {
@@ -401,7 +437,7 @@ export default function Categorias() {
       onSheetClose={closeSheet}
       tableView={
         <ABMTable
-          data={filteredCategorias}
+          data={categoriasActivas}
           columns={tableColumns}
           keyExtractor={(c) => c.id}
           onRowClick={(c) => openSheet(c)}
@@ -413,14 +449,174 @@ export default function Categorias() {
                 title="Editar"
               />
               <ABMTableAction
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => handleDelete(c.id)}
-                title="Desactivar"
+                icon={<EyeOff className="h-4 w-4" />}
+                onClick={() => handleDeshabilitar(c)}
+                title="Deshabilitar"
                 variant="danger"
               />
             </>
           )}
+          renderMobileCard={(c, actionsNode) => (
+            <div
+              className="rounded-xl p-4"
+              style={{
+                backgroundColor: theme.card,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <div className="flex items-start gap-3">
+                {/* Avatar con letra */}
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: c.color || '#e5e7eb' }}
+                >
+                  <span className="text-white text-lg font-medium opacity-80">
+                    {c.nombre[0].toUpperCase()}
+                  </span>
+                </div>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-sm" style={{ color: theme.text }}>
+                      {c.nombre}
+                    </h3>
+                    <ABMBadge active={c.activo} />
+                  </div>
+                  <p className="text-xs mt-1 line-clamp-2" style={{ color: theme.textSecondary }}>
+                    {c.descripcion || 'Sin descripción'}
+                  </p>
+                  <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: theme.textSecondary }}>
+                    <span>⏱ {c.tiempo_resolucion_estimado}h</span>
+                    <span>🎯 Prioridad {c.prioridad_default}</span>
+                  </div>
+                </div>
+              </div>
+              {/* Acciones */}
+              <div className="flex justify-end gap-2 mt-3 pt-3" style={{ borderTop: `1px solid ${theme.border}` }}>
+                {actionsNode}
+              </div>
+            </div>
+          )}
         />
+      }
+      disabledSection={
+        categoriasDeshabilitadas.length > 0 && (
+          <div className="mt-8">
+            {/* Header colapsable */}
+            <button
+              onClick={() => setShowDeshabilitados(!showDeshabilitados)}
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-all hover:opacity-90"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
+                >
+                  <EyeOff className="h-5 w-5" style={{ color: '#ef4444' }} />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold" style={{ color: theme.text }}>
+                    Categorías Deshabilitadas
+                  </h3>
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>
+                    {categoriasDeshabilitadas.length} categoría{categoriasDeshabilitadas.length !== 1 ? 's' : ''} deshabilitada{categoriasDeshabilitadas.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <div
+                className="p-2 rounded-lg transition-transform"
+                style={{
+                  backgroundColor: theme.card,
+                  transform: showDeshabilitados ? 'rotate(0deg)' : 'rotate(-90deg)',
+                }}
+              >
+                <ChevronDown className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              </div>
+            </button>
+
+            {/* Lista de categorías deshabilitadas */}
+            {showDeshabilitados && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categoriasDeshabilitadas.map((c) => {
+                  const categoryColor = c.color || '#3B82F6';
+
+                  return (
+                    <div
+                      key={c.id}
+                      className="rounded-xl overflow-hidden opacity-75 hover:opacity-100 transition-opacity"
+                      style={{
+                        backgroundColor: theme.card,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      <div
+                        className="flex items-center justify-between p-4"
+                        style={{
+                          background: `linear-gradient(135deg, ${categoryColor}10 0%, ${categoryColor}05 100%)`,
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-lg flex items-center justify-center grayscale"
+                            style={{ backgroundColor: categoryColor }}
+                          >
+                            <span className="text-white font-bold">{c.nombre[0].toUpperCase()}</span>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold" style={{ color: theme.text }}>
+                                {c.nombre}
+                              </h3>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">
+                                Deshabilitada
+                              </span>
+                            </div>
+                            <p className="text-sm" style={{ color: theme.textSecondary }}>
+                              {c.tiempo_resolucion_estimado}h estimadas
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Botón habilitar */}
+                          <button
+                            onClick={() => handleHabilitar(c)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
+                            style={{
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10b981',
+                            }}
+                            title="Habilitar categoría"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            <span className="text-sm font-medium">Habilitar</span>
+                          </button>
+
+                          {/* Botón editar */}
+                          <button
+                            onClick={() => openSheet(c)}
+                            className="p-2 rounded-lg transition-colors hover:scale-105"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              color: theme.textSecondary,
+                            }}
+                            title="Editar categoría"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )
       }
       sheetFooter={
         <ABMSheetFooter
@@ -615,7 +811,7 @@ export default function Categorias() {
         </form>
       }
     >
-      {filteredCategorias.map((c) => {
+      {categoriasActivas.map((c) => {
         const categoryColor = c.color || '#3B82F6';
         // Usar URL local directa (sin llamadas API) - la imagen ya está descargada
         const bgImage = getLocalImageUrl(c.nombre);
@@ -725,7 +921,7 @@ export default function Categorias() {
                 </span>
                 <ABMCardActions
                   onEdit={() => openSheet(c)}
-                  onDelete={() => handleDelete(c.id)}
+                  onDelete={() => handleDeshabilitar(c)}
                 />
               </div>
             </div>

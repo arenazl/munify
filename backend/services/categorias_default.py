@@ -5,7 +5,7 @@ Estas categorías se crean automáticamente cuando se crea un municipio.
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from models.categoria import Categoria
+from models.categoria import Categoria, MunicipioCategoria
 
 
 # 12 categorías estándar para reclamos municipales
@@ -111,32 +111,63 @@ CATEGORIAS_DEFAULT = [
 
 async def crear_categorias_default(db: AsyncSession, municipio_id: int) -> int:
     """
-    Crea las 12 categorías por defecto para un municipio.
-    Solo crea las que no existan (por nombre).
+    Habilita las 12 categorías por defecto para un municipio.
+    - Si la categoría no existe en el catálogo global, la crea.
+    - Si ya existe, solo crea el vínculo en municipio_categorias.
 
     Args:
         db: Sesión de base de datos
         municipio_id: ID del municipio
 
     Returns:
-        Cantidad de categorías creadas
+        Cantidad de categorías habilitadas para el municipio
     """
-    creadas = 0
+    habilitadas = 0
 
-    for cat_data in CATEGORIAS_DEFAULT:
-        # Verificar si ya existe
+    for idx, cat_data in enumerate(CATEGORIAS_DEFAULT):
+        # Separar campos que van a MunicipioCategoria
+        tiempo_resolucion = cat_data.pop("tiempo_resolucion_estimado", None)
+        prioridad = cat_data.pop("prioridad_default", None)
+
+        # Buscar si la categoría ya existe en el catálogo global
         result = await db.execute(
-            select(Categoria).where(
-                Categoria.nombre == cat_data["nombre"],
-                Categoria.municipio_id == municipio_id
+            select(Categoria).where(Categoria.nombre == cat_data["nombre"])
+        )
+        categoria = result.scalar_one_or_none()
+
+        if not categoria:
+            # Crear la categoría en el catálogo global
+            categoria = Categoria(**cat_data)
+            db.add(categoria)
+            await db.flush()  # Para obtener el ID
+
+        # Verificar si ya está habilitada para este municipio
+        result = await db.execute(
+            select(MunicipioCategoria).where(
+                MunicipioCategoria.categoria_id == categoria.id,
+                MunicipioCategoria.municipio_id == municipio_id
             )
         )
-        if not result.scalar_one_or_none():
-            categoria = Categoria(**cat_data, municipio_id=municipio_id)
-            db.add(categoria)
-            creadas += 1
+        mc = result.scalar_one_or_none()
 
-    if creadas > 0:
+        if not mc:
+            # Habilitar la categoría para el municipio
+            mc = MunicipioCategoria(
+                municipio_id=municipio_id,
+                categoria_id=categoria.id,
+                activo=True,
+                orden=idx,
+                tiempo_resolucion_estimado=tiempo_resolucion,
+                prioridad_default=prioridad
+            )
+            db.add(mc)
+            habilitadas += 1
+
+        # Restaurar los campos para la siguiente iteración
+        cat_data["tiempo_resolucion_estimado"] = tiempo_resolucion
+        cat_data["prioridad_default"] = prioridad
+
+    if habilitadas > 0:
         await db.commit()
 
-    return creadas
+    return habilitadas

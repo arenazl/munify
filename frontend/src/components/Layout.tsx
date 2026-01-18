@@ -21,13 +21,13 @@ const getMobileTabs = (userRole: string) => {
   const isEmpleado = userRole === 'empleado';
 
   if (isAdminOrSupervisor) {
-    // Admin/Supervisor: Reclamos es la acción principal (centro)
+    // Admin/Supervisor: Reclamos es la acción principal (centro), Trámites al lado
     return [
       { path: '/gestion', icon: Home, label: 'Inicio', end: true },
       { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
       { path: '/gestion/reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
-      { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: false },
       { path: '/gestion/tramites', icon: FileCheck, label: 'Trámites', end: false },
+      { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: false },
     ];
   }
 
@@ -213,14 +213,15 @@ export default function Layout() {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - empieza debajo del topbar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden sidebar-container ${
+        className={`fixed left-0 bottom-0 z-30 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden sidebar-container ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
           backgroundColor: theme.sidebar,
           width: sidebarWidth,
+          top: '64px', // h-16 = 4rem = 64px
           transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
         }}
       >
@@ -240,71 +241,10 @@ export default function Layout() {
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: `linear-gradient(180deg, ${theme.sidebar}dd 0%, ${theme.sidebar}99 50%, ${theme.sidebar}dd 100%)`,
+              background: theme.sidebar,
             }}
           />
         )}
-        {/* Header del sidebar con gradiente moderno */}
-        <div
-          className="relative z-10 border-b h-16"
-          style={{
-            borderColor: `${theme.sidebarTextSecondary}20`,
-            background: `linear-gradient(to right, ${theme.primary}, #ffffff)`,
-            opacity: 0.9,
-          }}
-        >
-          {/* Logo centrado absolutamente */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <img
-              src={new URL('../assets/munify_logo_no_text (1).png', import.meta.url).href}
-              alt="Munify"
-              className="object-contain"
-              style={{
-                height: '40px',
-                width: '40px',
-                opacity: isCollapsed ? 1 : 0,
-                position: 'absolute',
-                transition: 'opacity 0.2s ease-in-out',
-              }}
-            />
-            <img
-              src={new URL('../assets/munify_logo_2.png', import.meta.url).href}
-              alt="Munify"
-              className="object-contain"
-              style={{
-                height: '48px',
-                maxWidth: '100%',
-                opacity: isCollapsed ? 0 : 1,
-                transition: 'opacity 0.2s ease-in-out',
-              }}
-            />
-          </div>
-          {/* Botón colapsar/expandir - posición absoluta derecha, solo en desktop */}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden lg:flex absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-md hover:scale-110 active:scale-95 sidebar-toggle-btn"
-            style={{
-              color: theme.sidebarText,
-              backgroundColor: `${theme.primary}30`,
-            }}
-            title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="h-5 w-5" />
-            ) : (
-              <ChevronLeft className="h-5 w-5" />
-            )}
-          </button>
-          {/* Botón cerrar - posición absoluta derecha, solo en mobile */}
-          <button
-            className="lg:hidden absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
-            onClick={() => setSidebarOpen(false)}
-            style={{ color: theme.sidebarText }}
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
         {/* Navegación */}
         <nav className="relative z-10 flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item) => {
@@ -369,10 +309,53 @@ export default function Layout() {
           })}
         </nav>
 
+        {/* Botón colapsar/expandir - al final del sidebar, solo en desktop */}
+        <div className="hidden lg:flex relative z-10 px-2 py-3 border-t justify-center" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-2 rounded-md hover:scale-110 active:scale-95 transition-all w-full flex items-center justify-center gap-2"
+            style={{
+              color: theme.sidebarText,
+              backgroundColor: `${theme.primary}20`,
+            }}
+            title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="h-5 w-5" />
+            ) : (
+              <>
+                <ChevronLeft className="h-5 w-5" />
+                <span
+                  className="text-sm"
+                  style={{
+                    opacity: isCollapsed ? 0 : 1,
+                    width: isCollapsed ? 0 : 'auto',
+                    overflow: 'hidden',
+                    transition: 'opacity 0.3s, width 0.3s',
+                  }}
+                >
+                  Colapsar
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Botón cerrar en mobile */}
+        <div className="lg:hidden relative z-10 px-2 py-3 border-t" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
+          <button
+            className="p-2 rounded-md transition-all duration-200 hover:scale-105 active:scale-95 w-full flex items-center justify-center gap-2"
+            onClick={() => setSidebarOpen(false)}
+            style={{ color: theme.sidebarText, backgroundColor: `${theme.primary}20` }}
+          >
+            <X className="h-5 w-5" />
+            <span className="text-sm">Cerrar</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main content */}
-      <div className="lg:transition-[padding] lg:duration-300 main-content-area relative">
+      {/* Main content - con padding-top para el header fijo */}
+      <div className="lg:transition-[padding] lg:duration-300 main-content-area relative pt-16">
         {/* Imagen de fondo del contenido */}
         {contentBgImage && (
           <>
@@ -395,14 +378,16 @@ export default function Layout() {
             />
           </>
         )}
-        {/* Top bar - sticky para que quede fija al hacer scroll */}
+        {/* Top bar - sticky, se extiende de punta a punta */}
         <header
-          className="sticky top-0 z-40 shadow-sm transition-colors duration-300 overflow-visible"
+          className="fixed top-0 left-0 right-0 z-40 shadow-sm transition-colors duration-300 overflow-visible"
           style={{
-            backgroundColor: theme.card,
+            background: municipioActual?.imagen_portada
+              ? theme.card
+              : `linear-gradient(135deg, ${theme.primary}dd 0%, ${theme.primaryHover}cc 50%, ${theme.sidebar} 100%)`,
           }}
         >
-          {/* Imagen de fondo con blur */}
+          {/* Imagen de fondo con blur suave */}
           {municipioActual?.imagen_portada && (
             <div className="absolute inset-0 overflow-hidden">
               <img
@@ -410,61 +395,55 @@ export default function Layout() {
                 alt=""
                 className="w-full h-full object-cover"
                 style={{
-                  filter: 'blur(4px)',
-                  opacity: 0.35,
-                  transform: 'scale(1.05)',
+                  filter: `blur(${municipioActual?.tema_config?.cabeceraBlur ?? 4}px)`,
+                  opacity: municipioActual?.tema_config?.portadaOpacity ?? 0.9,
+                  transform: 'scale(1.1)',
                 }}
               />
-              <div
-                className="absolute inset-0"
-                style={{ backgroundColor: `${theme.card}90` }}
-              />
+              {/* Overlay con filtro de cabecera - gradiente con colores del tema */}
+              {(municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) > 0 && (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${theme.primary}${Math.round((municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 255).toString(16).padStart(2, '0')} 0%, ${theme.primaryHover}${Math.round((municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 200).toString(16).padStart(2, '0')} 100%)`,
+                  }}
+                />
+              )}
             </div>
           )}
-          <div className="relative flex items-center justify-between h-16 px-4 overflow-visible">
-            <button
-              className="lg:hidden p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
-              onClick={() => setSidebarOpen(true)}
-              style={{ color: theme.text }}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-
-            {/* Nombre del Municipio - visible en el centro */}
-            <div className="flex-1 flex justify-center items-center gap-2.5 overflow-visible">
-              {/* Icono del municipio */}
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${theme.primary}15` }}
+          <div className="relative flex items-center justify-between h-16 px-3 sm:px-4 overflow-visible">
+            {/* Izquierda: Hamburguesa (mobile) */}
+            <div className="flex items-center">
+              {/* Hamburguesa - solo mobile */}
+              <button
+                className="lg:hidden p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
+                onClick={() => setSidebarOpen(true)}
+                style={{ color: theme.text }}
               >
-                <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
-              </div>
-              <h1 className="text-base md:text-lg font-semibold truncate" style={{ color: theme.text }}>
-                <span className="font-normal hidden sm:inline" style={{ color: theme.textSecondary }}>Municipalidad de </span>
-                <span style={{ color: theme.primary }}>{municipioActual?.nombre || 'Sin municipio'}</span>
-              </h1>
+                <Menu className="h-5 w-5" />
+              </button>
             </div>
 
-            <div className="flex items-center space-x-3">
-              {/* User info con dropdown */}
-              <div className="relative">
-                {/* Botón mobile - solo avatar */}
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="sm:hidden p-1 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <div
-                    className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                    style={{ backgroundColor: theme.primary }}
-                  >
-                    {user.nombre[0]}{user.apellido[0]}
-                  </div>
-                </button>
+            {/* Centro: Logo Munify + Nombre */}
+            <div className="flex-1 flex justify-center items-center gap-2 overflow-visible">
+              <img
+                src={new URL('../assets/munify_logo_no_text (1).png', import.meta.url).href}
+                alt="Munify"
+                className="h-8 w-8 sm:h-9 sm:w-9 object-contain flex-shrink-0"
+              />
+              <span className="text-lg sm:text-xl font-semibold tracking-wide" style={{ color: theme.text }}>
+                Munify
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              {/* User info con dropdown - oculto en mobile */}
+              <div className="relative hidden sm:block">
                 {/* Botón desktop - avatar + nombre */}
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="hidden sm:flex items-center gap-3 pr-3 border-r cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ borderColor: theme.border }}
+                  className="flex items-center gap-3 pr-3 border-r cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{ borderColor: 'rgba(26, 26, 26, 0.5)' }}
                 >
                   <div
                     className="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
@@ -621,7 +600,7 @@ export default function Layout() {
                 )}
               </div>
 
-              {/* Theme selector - NUEVO DISEÑO SIMPLIFICADO */}
+              {/* Theme selector - Visible en mobile y desktop */}
               <div className="relative">
                 <button
                   className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-12 active:scale-95"
@@ -859,6 +838,23 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
+          {/* Barra secundaria: Municipalidad de X (no sticky) */}
+          <div
+            className="mb-4 px-4 py-2.5 rounded-xl flex items-center justify-center gap-2"
+            style={{
+              backgroundColor: theme.card,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
+            <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>
+              Municipalidad de
+            </span>
+            <span className="text-sm font-semibold" style={{ color: theme.text }}>
+              {municipioActual?.nombre || 'Sin municipio'}
+            </span>
+          </div>
+
           {/* Banner de activar notificaciones - visible para todos si no están activas */}
           {!pushSubscribed && (
             <div
@@ -917,7 +913,8 @@ export default function Layout() {
           >
             <div className="flex items-center justify-around py-2">
               {mobileTabs.map((tab, index) => {
-                const isMainTab = index === 2; // El del medio (índice 2) siempre es el principal
+                // El tab del centro (index 2) es el principal elevado
+                const isMainTab = index === 2;
 
                 return (
                   <NavLink
@@ -929,7 +926,7 @@ export default function Layout() {
                     {({ isActive }) => (
                       <>
                         {isMainTab ? (
-                          // Botón central siempre elevado (para otros roles)
+                          // Botones principales elevados (Reclamos y Trámites)
                           <div
                             className="w-10 h-10 -mt-3 rounded-full flex items-center justify-center shadow-lg"
                             style={{

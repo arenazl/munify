@@ -39,6 +39,10 @@ export interface Municipio {
     // Opciones de portada
     portadaSinFiltro?: boolean;
     portadaOpacity?: number; // Opacidad de la imagen de portada (0-1)
+    // Opciones de cabecera (top bar)
+    cabeceraFiltroColor?: 'grafito' | 'blanco';
+    cabeceraOpacity?: number; // Opacidad del filtro de cabecera (0-1)
+    cabeceraBlur?: number; // Blur de la imagen de cabecera (0-20)
   };
 }
 

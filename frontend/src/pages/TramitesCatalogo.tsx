@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Edit, Trash2, Clock, DollarSign, FileText, Plus, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Edit, Clock, DollarSign, FileText, Plus, ChevronRight, EyeOff, RotateCcw, ChevronDown } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
@@ -57,6 +57,31 @@ export default function TramitesCatalogo() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedTramite, setSelectedTramite] = useState<TramiteCatalogo | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
+  // Estado para sección de deshabilitados
+  const [showDeshabilitados, setShowDeshabilitados] = useState(false);
+  const [filtroTipoDeshabilitados, setFiltroTipoDeshabilitados] = useState<number | null>(null);
+  const disabledSectionRef = useRef<HTMLDivElement>(null);
+
+  // Cambiar filtro de deshabilitados sin perder scroll
+  const handleFiltroDeshabilitadosChange = (tipoId: number | null) => {
+    // Guardar referencia al elemento antes del cambio
+    const sectionElement = disabledSectionRef.current;
+    if (sectionElement) {
+      const rect = sectionElement.getBoundingClientRect();
+      const offsetFromTop = rect.top;
+
+      setFiltroTipoDeshabilitados(tipoId);
+
+      // Restaurar posición después del render
+      requestAnimationFrame(() => {
+        const newRect = sectionElement.getBoundingClientRect();
+        const scrollAdjustment = newRect.top - offsetFromTop;
+        window.scrollBy(0, scrollAdjustment);
+      });
+    } else {
+      setFiltroTipoDeshabilitados(tipoId);
+    }
+  };
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -182,6 +207,30 @@ export default function TramitesCatalogo() {
     }
   };
 
+  // Deshabilitar un trámite (soft delete - pone activo=false)
+  const handleDeshabilitar = async (tramite: TramiteCatalogo) => {
+    try {
+      await tramitesApi.updateTramite(tramite.id, { ...tramite, activo: false });
+      toast.success(`"${tramite.nombre}" deshabilitado`);
+      fetchData();
+    } catch (error) {
+      toast.error('Error al deshabilitar');
+      console.error('Error:', error);
+    }
+  };
+
+  // Habilitar un trámite deshabilitado
+  const handleHabilitar = async (tramite: TramiteCatalogo) => {
+    try {
+      await tramitesApi.updateTramite(tramite.id, { ...tramite, activo: true });
+      toast.success(`"${tramite.nombre}" habilitado nuevamente`);
+      fetchData();
+    } catch (error) {
+      toast.error('Error al habilitar');
+      console.error('Error:', error);
+    }
+  };
+
   // Filtrar trámites
   const filteredTramites = tramites.filter(t => {
     const matchSearch = !search ||
@@ -190,6 +239,10 @@ export default function TramitesCatalogo() {
     const matchTipo = !filtroTipo || t.tipo_tramite_id === filtroTipo;
     return matchSearch && matchTipo;
   });
+
+  // Separar trámites activos y deshabilitados
+  const tramitesActivos = filteredTramites.filter(t => t.activo);
+  const tramitesDeshabilitados = filteredTramites.filter(t => !t.activo);
 
   // Obtener tipo de un trámite
   const getTipo = (tipoId: number) => tipos.find(t => t.id === tipoId);
@@ -317,7 +370,7 @@ export default function TramitesCatalogo() {
       secondaryFilters={renderSecondaryFilters()}
       tableView={
         <ABMTable
-          data={filteredTramites}
+          data={tramitesActivos}
           columns={tableColumns}
           keyExtractor={(t) => t.id}
           onRowClick={(t) => openSheet(t)}
@@ -329,14 +382,228 @@ export default function TramitesCatalogo() {
                 title="Editar"
               />
               <ABMTableAction
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => handleDelete(t.id)}
-                title="Desactivar"
+                icon={<EyeOff className="h-4 w-4" />}
+                onClick={() => handleDeshabilitar(t)}
+                title="Deshabilitar"
                 variant="danger"
               />
             </>
           )}
         />
+      }
+      disabledSection={
+        tramitesDeshabilitados.length > 0 && (
+          <div className="mt-8" ref={disabledSectionRef}>
+            {/* Header estilo ABMPage */}
+            <div
+              className="px-5 py-3 rounded-xl relative overflow-hidden"
+              style={{
+                backgroundColor: theme.card,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+                {/* Título con icono */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
+                  >
+                    <EyeOff className="h-4 w-4" style={{ color: '#ef4444' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold" style={{ color: theme.text }}>
+                      Deshabilitados
+                    </h2>
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>
+                      {tramitesDeshabilitados.length} trámite{tramitesDeshabilitados.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Separador */}
+                <div className="h-8 w-px hidden sm:block" style={{ backgroundColor: theme.border }} />
+
+                {/* Toggle expandir/colapsar */}
+                <button
+                  onClick={() => setShowDeshabilitados(!showDeshabilitados)}
+                  className="ml-auto flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1px solid ${theme.border}`,
+                    color: theme.text,
+                  }}
+                >
+                  <span className="text-sm font-medium">
+                    {showDeshabilitados ? 'Ocultar' : 'Mostrar'}
+                  </span>
+                  <ChevronDown
+                    className="h-4 w-4 transition-transform"
+                    style={{
+                      transform: showDeshabilitados ? 'rotate(180deg)' : 'rotate(0deg)',
+                    }}
+                  />
+                </button>
+              </div>
+
+              {/* Chips de tipos para deshabilitados */}
+              {showDeshabilitados && (
+                <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${theme.border}` }}>
+                  <div className="grid grid-cols-5 sm:flex gap-1.5 w-full">
+                    {/* Botón Todos */}
+                    <button
+                      onClick={() => handleFiltroDeshabilitadosChange(null)}
+                      className="flex flex-col items-center justify-center py-1.5 rounded-lg transition-all h-[52px] sm:flex-1 sm:min-w-0"
+                      style={{
+                        background: filtroTipoDeshabilitados === null ? theme.primary : theme.backgroundSecondary,
+                        border: `1px solid ${filtroTipoDeshabilitados === null ? theme.primary : theme.border}`,
+                      }}
+                    >
+                      <FileText className="h-4 w-4" style={{ color: filtroTipoDeshabilitados === null ? '#ffffff' : theme.primary }} />
+                      <span className="text-[8px] font-semibold leading-tight text-center mt-0.5" style={{ color: filtroTipoDeshabilitados === null ? '#ffffff' : theme.text }}>
+                        Todos
+                      </span>
+                    </button>
+
+                    {/* Chips por tipo de trámite */}
+                    {tipos.filter(t => t.activo).map(tipo => {
+                      const isSelected = filtroTipoDeshabilitados === tipo.id;
+                      const countDeshabilitados = tramitesDeshabilitados.filter(t => t.tipo_tramite_id === tipo.id).length;
+                      if (countDeshabilitados === 0) return null;
+                      return (
+                        <button
+                          key={tipo.id}
+                          onClick={() => handleFiltroDeshabilitadosChange(isSelected ? null : tipo.id)}
+                          title={tipo.nombre}
+                          className="flex flex-col items-center justify-center py-1 rounded-lg transition-all h-[52px] sm:flex-1 sm:min-w-0"
+                          style={{
+                            background: isSelected ? tipo.color : theme.backgroundSecondary,
+                            border: `1px solid ${isSelected ? tipo.color : theme.border}`,
+                          }}
+                        >
+                          <span className="text-[9px] font-bold leading-none" style={{ color: isSelected ? '#ffffff' : tipo.color }}>
+                            {countDeshabilitados}
+                          </span>
+                          <span className="[&>svg]:h-4 [&>svg]:w-4 my-0.5" style={{ color: isSelected ? '#ffffff' : tipo.color }}>
+                            {getIcon(tipo.icono)}
+                          </span>
+                          <span className="text-[8px] font-medium leading-none text-center w-full truncate px-0.5" style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                            {tipo.nombre.split(' ')[0]}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Tabla de trámites deshabilitados */}
+            {showDeshabilitados && (
+              <div
+                className="mt-2 rounded-xl overflow-hidden"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+              >
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr style={{ backgroundColor: theme.backgroundSecondary }}>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                          Nombre
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden sm:table-cell" style={{ color: theme.textSecondary }}>
+                          Tipo
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell" style={{ color: theme.textSecondary }}>
+                          Tiempo
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: theme.border }}>
+                      {tramitesDeshabilitados.filter(t => !filtroTipoDeshabilitados || t.tipo_tramite_id === filtroTipoDeshabilitados).map((t, index) => {
+                        const tipo = getTipo(t.tipo_tramite_id);
+                        const tramiteColor = t.color || tipo?.color || '#6366f1';
+                        const tramiteIcono = t.icono || tipo?.icono || 'FileText';
+
+                        return (
+                          <tr
+                            key={t.id}
+                            className="transition-colors hover:bg-opacity-50"
+                            style={{
+                              backgroundColor: index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = `${theme.primary}10`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`;
+                            }}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 grayscale"
+                                  style={{ backgroundColor: tramiteColor }}
+                                >
+                                  <span className="text-white text-sm">{getIcon(tramiteIcono)}</span>
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm" style={{ color: theme.text }}>{t.nombre}</p>
+                                  <p className="text-xs sm:hidden" style={{ color: theme.textSecondary }}>{tipo?.nombre}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 hidden sm:table-cell">
+                              <span className="text-sm" style={{ color: tipo?.color }}>{tipo?.nombre}</span>
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              <span className="text-sm" style={{ color: theme.textSecondary }}>
+                                {t.tiempo_estimado_dias} días
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleHabilitar(t)}
+                                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all hover:scale-105 text-sm font-medium"
+                                  style={{
+                                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                    color: '#10b981',
+                                  }}
+                                  title="Habilitar"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">Habilitar</span>
+                                </button>
+                                <button
+                                  onClick={() => openSheet(t)}
+                                  className="p-2 rounded-lg transition-all hover:scale-110"
+                                  style={{ color: theme.primary }}
+                                  title="Editar"
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.backgroundColor = `${theme.primary}20`;
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )
       }
       sheetFooter={
         <ABMSheetFooter
@@ -495,8 +762,8 @@ export default function TramitesCatalogo() {
         </form>
       }
     >
-      {/* Vista de cards */}
-      {filteredTramites.map((t) => {
+      {/* Vista de cards - Solo trámites activos */}
+      {tramitesActivos.map((t) => {
         const tipo = getTipo(t.tipo_tramite_id);
         // Usar color del trámite si tiene, sino el del tipo
         const tramiteColor = t.color || tipo?.color || '#6366f1';
@@ -586,7 +853,7 @@ export default function TramitesCatalogo() {
                 </span>
                 <ABMCardActions
                   onEdit={() => openSheet(t)}
-                  onDelete={() => handleDelete(t.id)}
+                  onDelete={() => handleDeshabilitar(t)}
                 />
               </div>
             </div>

@@ -1,0 +1,15 @@
+{
+  "id": "timeline",
+  "nombre": "Timeline",
+  "descripcion": "Muestra registros en orden cronológico como línea de tiempo",
+  "palabras_clave": ["historia", "historial", "cronología", "pasos", "evolución"],
+  "template_html": "<div style=\"margin:12px 0;padding-left:16px;border-left:3px solid #b08d57\">\n<div style=\"position:relative;padding:10px 0 20px 20px\">\n<div style=\"position:absolute;left:-11px;top:12px;width:14px;height:14px;background:#b08d57;border-radius:50%;border:3px solid #f8f5f0\"></div>\n<div style=\"font-size:11px;color:#8a7a6a;margin-bottom:4px\">FECHA</div>\n<div style=\"font-weight:600;color:#5c4d3d;font-size:14px\">Título o evento</div>\n<div style=\"color:#6b5d4d;font-size:12px;margin-top:4px\">Detalles adicionales</div>\n</div>\n</div>",
+  "instrucciones": [
+    "Ordená por fecha (más reciente arriba)",
+    "Mostrá todos los registros como eventos en la línea de tiempo",
+    "Incluí fecha, título del evento y detalles",
+    "NO agregues tabla debajo"
+  ],
+  "paginacion": 30,
+  "mostrar_grilla": false
+}

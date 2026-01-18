@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -6,6 +6,20 @@ import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
 
 type ViewMode = 'cards' | 'table';
+
+// Hook simple para detectar mobile (< 640px)
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+}
 
 interface ABMPageProps {
   // Header
@@ -49,6 +63,9 @@ interface ABMPageProps {
   // Vista tabla (opcional)
   tableView?: ReactNode;
 
+  // Sección de deshabilitados (se muestra en ambas vistas)
+  disabledSection?: ReactNode;
+
   // Vista por defecto
   defaultViewMode?: ViewMode;
 
@@ -80,16 +97,22 @@ export function ABMPage({
   sheetFooter,
   onSheetClose,
   tableView,
+  disabledSection,
   defaultViewMode,
   stickyHeader = false,
 }: ABMPageProps) {
   // Combinar filters con extraFilters para compatibilidad
   const allFilters = filters || extraFilters;
   const { theme } = useTheme();
+  const isMobile = useIsMobile();
+
   // Si no hay tableView, defaultear a 'cards' para evitar pantalla vacía
   const resolvedDefaultViewMode = defaultViewMode || (tableView ? 'table' : 'cards');
   const [viewMode, setViewMode] = useState<ViewMode>(resolvedDefaultViewMode);
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // En mobile, siempre usar cards (mejor UX que tabla)
+  const effectiveViewMode = isMobile ? 'cards' : viewMode;
 
   if (loading) {
     return (
@@ -333,13 +356,13 @@ export function ABMPage({
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5"
             style={{
               transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              opacity: viewMode === 'cards' ? 1 : 0,
-              transform: viewMode === 'cards'
+              opacity: effectiveViewMode === 'cards' ? 1 : 0,
+              transform: effectiveViewMode === 'cards'
                 ? 'translateX(0) rotateY(0deg)'
                 : 'translateX(-100%) rotateY(-15deg)',
-              position: viewMode === 'cards' ? 'relative' : 'absolute',
-              inset: viewMode === 'cards' ? 'auto' : 0,
-              pointerEvents: viewMode === 'cards' ? 'auto' : 'none',
+              position: effectiveViewMode === 'cards' ? 'relative' : 'absolute',
+              inset: effectiveViewMode === 'cards' ? 'auto' : 0,
+              pointerEvents: effectiveViewMode === 'cards' ? 'auto' : 'none',
               transformOrigin: 'center center',
             }}
           >
@@ -351,19 +374,22 @@ export function ABMPage({
             <div
               style={{
                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                opacity: viewMode === 'table' ? 1 : 0,
-                transform: viewMode === 'table'
+                opacity: effectiveViewMode === 'table' ? 1 : 0,
+                transform: effectiveViewMode === 'table'
                   ? 'translateX(0) rotateY(0deg)'
                   : 'translateX(100%) rotateY(15deg)',
-                position: viewMode === 'table' ? 'relative' : 'absolute',
-                inset: viewMode === 'table' ? 'auto' : 0,
-                pointerEvents: viewMode === 'table' ? 'auto' : 'none',
+                position: effectiveViewMode === 'table' ? 'relative' : 'absolute',
+                inset: effectiveViewMode === 'table' ? 'auto' : 0,
+                pointerEvents: effectiveViewMode === 'table' ? 'auto' : 'none',
                 transformOrigin: 'center center',
               }}
             >
               {tableView}
             </div>
           )}
+
+          {/* Sección de deshabilitados - visible en ambas vistas */}
+          {disabledSection}
         </div>
       ) : (
         <div
@@ -641,15 +667,14 @@ export function ABMBadge({ active = true, label, activeLabel, inactiveLabel }: A
   const displayLabel = label || (active ? (activeLabel || 'Activo') : (inactiveLabel || 'Inactivo'));
   return (
     <span className={`
-      px-3 py-1 text-xs font-semibold rounded-full
+      inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full whitespace-nowrap
       transition-all duration-300
       ${active
-        ? 'bg-green-500/20 text-green-400 shadow-green-500/20'
-        : 'bg-red-500/20 text-red-400 shadow-red-500/20'
+        ? 'bg-green-500/20 text-green-400'
+        : 'bg-red-500/20 text-red-400'
       }
-      shadow-sm
     `}>
-      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-1.5 ${active ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
       {displayLabel}
     </span>
   );
@@ -957,7 +982,7 @@ export function ABMDivider({ title }: ABMDividerProps) {
 // Componente Tabla genérica para ABM con ordenamiento
 interface ABMTableColumn<T> {
   key: string;
-  header: string;
+  header: string | ReactNode;
   render?: (item: T) => ReactNode;
   className?: string;
   sortable?: boolean; // Por defecto true
@@ -973,6 +998,8 @@ interface ABMTableProps<T> {
   // Ordenamiento inicial (opcional)
   defaultSortKey?: string;
   defaultSortDirection?: 'asc' | 'desc';
+  // Render alternativo para mobile (cards)
+  renderMobileCard?: (item: T, actions?: ReactNode) => ReactNode;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -985,6 +1012,7 @@ export function ABMTable<T>({
   keyExtractor,
   defaultSortKey,
   defaultSortDirection,
+  renderMobileCard,
 }: ABMTableProps<T>) {
   const { theme } = useTheme();
   // Estado de ordenamiento - inicializar con valores por defecto si se proporcionan
@@ -1081,6 +1109,25 @@ export function ABMTable<T>({
       </span>
     );
   };
+
+  const isMobile = useIsMobile();
+
+  // En mobile, si hay renderMobileCard, mostrar cards
+  if (isMobile && renderMobileCard) {
+    return (
+      <div className="space-y-3 animate-fade-in-up">
+        {sortedData.map((item) => (
+          <div
+            key={keyExtractor(item)}
+            onClick={() => onRowClick?.(item)}
+            className={onRowClick ? 'cursor-pointer' : ''}
+          >
+            {renderMobileCard(item, actions?.(item))}
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div

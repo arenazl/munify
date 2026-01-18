@@ -163,6 +163,7 @@ interface TramiteWizardProps {
   servicios: ServicioTramite[];
   tipos?: TipoTramite[];
   onSuccess?: () => void;
+  servicioInicial?: ServicioTramite | null; // Pre-seleccionar un servicio (desde chat)
 }
 
 interface Rubro {
@@ -173,7 +174,7 @@ interface Rubro {
   servicios: ServicioTramite[];
 }
 
-export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess }: TramiteWizardProps) {
+export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess, servicioInicial }: TramiteWizardProps) {
   const { theme } = useTheme();
   const { user, register, login, municipioActual } = useAuth();
 
@@ -194,6 +195,26 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
     email_solicitante: '',
     telefono_solicitante: '',
   });
+
+  // Si viene un servicio inicial, pre-seleccionarlo y saltar al paso de detalle
+  useEffect(() => {
+    if (open && servicioInicial && tipos.length > 0) {
+      // Seleccionar el servicio
+      setFormData(prev => ({
+        ...prev,
+        servicio_id: String(servicioInicial.id),
+        asunto: `Solicitud: ${servicioInicial.nombre}`,
+      }));
+
+      // Seleccionar el rubro (tipo/categoría) correspondiente
+      const tipoDelServicio = tipos.find(t => t.id === servicioInicial.tipo_tramite_id);
+      if (tipoDelServicio) {
+        setSelectedRubro(tipoDelServicio.nombre);
+      }
+
+      setWizardStep(1); // Ir al paso de selección (paso 1) para que vea el trámite pre-seleccionado
+    }
+  }, [open, servicioInicial, tipos]);
 
   const [registerData, setRegisterData] = useState({
     nombre: '',
@@ -425,31 +446,45 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
 
   const selectedServicio = servicios.find(s => s.id === Number(formData.servicio_id));
 
-  // Auto-cargar info de IA cuando se selecciona un trámite en el paso 1
+  // Auto-cargar tip de IA cuando se selecciona un trámite
   useEffect(() => {
-    const fetchAIInfo = async () => {
-      // Solo disparar cuando hay un servicio seleccionado y estamos en paso 1 (selección de servicio)
+    const fetchAITip = async () => {
       if (!selectedServicio || wizardStep !== 1) return;
 
       setAiLoading(true);
       setAiResponse('');
 
       try {
-        const contexto: Record<string, unknown> = {
+        const municipioNombre = municipioActual?.nombre || 'la Municipalidad';
+        const categoria = tipos.find(t => t.id === selectedServicio.tipo_tramite_id)?.nombre || '';
+        const descripcionTramite = selectedServicio.descripcion?.replace(/^\[[^\]]+\]\s*/, '') || '';
+
+        const prompt = `Sos asistente de ${municipioNombre}. Un vecino va a iniciar este trámite:
+
+TRÁMITE: ${selectedServicio.nombre}
+CATEGORÍA: ${categoria}
+DESCRIPCIÓN: ${descripcionTramite}
+TIEMPO ESTIMADO: ${selectedServicio.tiempo_estimado_dias} días
+COSTO: ${selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratuito'}
+
+En base a tu conocimiento sobre gestión municipal y este tipo de trámites específico, ¿tenés alguna recomendación práctica para el vecino?
+
+IMPORTANTE:
+- NO repitas documentos ni requisitos (ya los mostramos aparte)
+- Enfocate en: errores comunes a evitar, tips para agilizar, qué esperar después de presentar
+- Máximo 2-3 oraciones, tono amigable
+- Si no tenés info útil específica, da un consejo general breve`;
+
+        const response = await chatApi.askDynamic(prompt, {
           tramite: selectedServicio.nombre,
-          categoria: selectedRubro || '',
-          descripcion: selectedServicio.descripcion?.replace(/^\[[^\]]+\]\s*/, ''),
-          documentos_requeridos: selectedServicio.documentos_requeridos,
-          requisitos: selectedServicio.requisitos,
+          categoria,
+          descripcion: descripcionTramite,
           tiempo_estimado: `${selectedServicio.tiempo_estimado_dias} días`,
           costo: selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratuito',
-          municipio: municipioActual?.nombre || 'Municipalidad',
-          municipio_direccion: municipioActual?.direccion || '',
-          municipio_telefono: municipioActual?.telefono || '',
-        };
+          municipio: municipioNombre,
+        }, 'tramite_tip');
 
-        const response = await chatApi.askDynamic('', contexto, 'tramite');
-        setAiResponse(response.response || response.message);
+        setAiResponse(response.response || response.message || '');
       } catch {
         setAiResponse('');
       } finally {
@@ -457,8 +492,8 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess 
       }
     };
 
-    fetchAIInfo();
-  }, [selectedServicio?.id, selectedRubro, wizardStep, municipioActual?.nombre]); // Se dispara cuando cambia el servicio seleccionado
+    fetchAITip();
+  }, [selectedServicio?.id, wizardStep]);
 
   // IA contextual: analiza lo que escribe el usuario en observaciones (3+ palabras)
   useEffect(() => {
@@ -743,38 +778,43 @@ Tono amigable, 2-3 oraciones máximo.`,
     setAiLoading(true);
     try {
       const servicio = selectedServicio;
+      const municipioNombre = municipioActual?.nombre || 'la Municipalidad';
 
       // Armar contexto dinámico con toda la info disponible
-      const contexto: Record<string, unknown> = {};
+      const contexto: Record<string, unknown> = {
+        municipio: municipioNombre,
+        municipio_direccion: municipioActual?.direccion || '',
+        municipio_telefono: municipioActual?.telefono || '',
+      };
 
       if (servicio) {
         contexto.tramite = servicio.nombre;
-        contexto.descripcion = servicio.descripcion?.replace(/^\[[^\]]+\]\s*/, '');
-        contexto.documentos_requeridos = servicio.documentos_requeridos;
-        contexto.requisitos = servicio.requisitos;
+        contexto.categoria = selectedRubro || '';
         contexto.tiempo_estimado = `${servicio.tiempo_estimado_dias} días`;
         contexto.costo = servicio.costo ? `$${servicio.costo.toLocaleString()}` : 'Gratuito';
       }
 
-      if (selectedRubro) {
-        contexto.categoria = selectedRubro;
-      }
+      // Prompt mejorado que evita repetir info que ya mostramos
+      const systemPrompt = servicio
+        ? `Sos asistente de ${municipioNombre}. El vecino está iniciando el trámite "${servicio.nombre}" (${selectedRubro || 'general'}).
 
-      if (wizardStep === 0) {
-        contexto.paso = 'Asistente IA';
-      } else if (wizardStep === 1) {
-        contexto.paso = 'Selección de trámite';
-      } else if (wizardStep === 2) {
-        contexto.paso = 'Completando detalles';
-        if (formData.asunto) contexto.asunto_ingresado = formData.asunto;
-        if (formData.barrio) contexto.barrio = formData.barrio;
-        if (formData.direccion) contexto.direccion = formData.direccion;
-        if (formData.observaciones) contexto.observaciones = formData.observaciones;
-      } else if (wizardStep === 3) {
-        contexto.paso = 'Datos de contacto';
-      }
+IMPORTANTE: Ya le mostramos los documentos y requisitos, NO los repitas.
 
-      const response = await chatApi.askDynamic(aiQuestion, contexto, 'tramite');
+Respondé la pregunta del vecino dando valor agregado:
+- Tips prácticos para agilizar el trámite
+- Errores comunes que debe evitar
+- Qué esperar después de presentar la solicitud
+- Horarios o días recomendados para ir
+- Información de contacto si la tenés
+
+Tono amigable y conciso (2-3 oraciones máximo).`
+        : `Sos asistente de ${municipioNombre}. Ayudá al vecino con su consulta sobre trámites. Tono amigable y conciso.`;
+
+      const response = await chatApi.askDynamic(
+        `${systemPrompt}\n\nPregunta del vecino: ${aiQuestion}`,
+        contexto,
+        'tramite_consulta'
+      );
       setAiResponse(response.response || response.message);
       setAiQuestion('');
     } catch {
@@ -1060,26 +1100,23 @@ Tono amigable, 2-3 oraciones máximo.`,
         )}
       </div>
 
-      <div style={{ height: '70px' }}>
-        {selectedServicio && (() => {
-          const tipoDelServicio = tipos.find(t => t.id === selectedServicio.tipo_tramite_id);
-          const servicioColor = selectedServicio.color || tipoDelServicio?.color || theme.primary;
-          return (
-            <div className="p-3 rounded-xl" style={{ backgroundColor: `${servicioColor}15`, border: `2px solid ${servicioColor}` }}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: servicioColor }}>
-                  <span className="text-white">{getServicioIcon(selectedServicio.icono)}</span>
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm" style={{ color: theme.text }}>{selectedServicio.nombre}</p>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.tiempo_estimado_dias} días · {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}</p>
-                </div>
-                <CheckCircle2 className="h-5 w-5" style={{ color: servicioColor }} />
-              </div>
-            </div>
-          );
-        })()}
-      </div>
+      {/* Tip de IA para el trámite seleccionado */}
+      {selectedServicio && (
+        <div className="p-3 rounded-xl flex items-start gap-3" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}20` }}>
+          {aiLoading ? (
+            <Loader2 className="h-5 w-5 flex-shrink-0 animate-spin" style={{ color: theme.primary }} />
+          ) : (
+            <Sparkles className="h-5 w-5 flex-shrink-0" style={{ color: theme.primary }} />
+          )}
+          <p className="text-xs line-clamp-2" style={{ color: theme.textSecondary }}>
+            {aiLoading
+              ? 'Analizando el trámite...'
+              : aiResponse
+                ? aiResponse
+                : 'Mirá el panel de la derecha para ver los documentos y requisitos.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 
@@ -1426,47 +1463,91 @@ Tono amigable, 2-3 oraciones máximo.`,
     { id: 'contacto', title: 'Contacto', description: 'Datos de contacto', icon: <User className="h-5 w-5" />, content: wizardStep3, isValid: isStep3Valid },
   ];
 
+  // Obtener el tipo de trámite (categoría) del servicio seleccionado
+  const tipoDelServicioSeleccionado = selectedServicio
+    ? tipos.find(t => t.id === selectedServicio.tipo_tramite_id)
+    : null;
+
   const wizardAIPanel = (
     <div className="h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
-          <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
+      {/* Header con icono IA y categoría */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
+          <Sparkles className="h-3 w-3" style={{ color: theme.primary }} />
         </div>
-        <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente IA</span>
+        {tipoDelServicioSeleccionado ? (
+          <>
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: tipoDelServicioSeleccionado.color || theme.primary }}
+            >
+              <span className="text-white scale-75">{getServicioIcon(tipoDelServicioSeleccionado.icono)}</span>
+            </div>
+            <span className="font-medium text-sm" style={{ color: theme.text }}>{tipoDelServicioSeleccionado.nombre}</span>
+          </>
+        ) : (
+          <span className="font-medium text-sm" style={{ color: theme.textSecondary }}>Seleccioná un trámite</span>
+        )}
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto">
         {/* Info dinámica del servicio seleccionado */}
-        {selectedServicio && (
+        {selectedServicio && tipoDelServicioSeleccionado && (
           <div className="space-y-3">
-            {/* Tiempo y costo */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 rounded-lg text-center" style={{ backgroundColor: theme.card }}>
-                <Clock className="h-4 w-4 mx-auto mb-1" style={{ color: theme.primary }} />
-                <p className="text-xs font-medium" style={{ color: theme.text }}>{selectedServicio.tiempo_estimado_dias} días</p>
-                <p className="text-[10px]" style={{ color: theme.textSecondary }}>Tiempo estimado</p>
+            {/* Descripción del tipo de trámite (categoría) */}
+            {tipoDelServicioSeleccionado.descripcion && (
+              <p className="text-[11px] leading-relaxed line-clamp-2" style={{ color: theme.textSecondary }}>
+                {tipoDelServicioSeleccionado.descripcion}
+              </p>
+            )}
+
+            {/* Nombre y descripción del trámite específico */}
+            <div className="pt-2 border-t" style={{ borderColor: theme.border }}>
+              <div className="flex items-center gap-2 mb-1">
+                <div
+                  className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${selectedServicio.color || tipoDelServicioSeleccionado.color || theme.primary}20` }}
+                >
+                  <span style={{ color: selectedServicio.color || tipoDelServicioSeleccionado.color || theme.primary }} className="scale-75">
+                    {getServicioIcon(selectedServicio.icono)}
+                  </span>
+                </div>
+                <span className="font-medium text-sm" style={{ color: theme.text }}>{selectedServicio.nombre}</span>
               </div>
-              <div className="p-2 rounded-lg text-center" style={{ backgroundColor: theme.card }}>
-                <CreditCard className="h-4 w-4 mx-auto mb-1" style={{ color: selectedServicio.costo ? '#f59e0b' : '#10b981' }} />
-                <p className="text-xs font-medium" style={{ color: theme.text }}>
-                  {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}
+              {selectedServicio.descripcion && (
+                <p className="text-[11px] leading-relaxed line-clamp-2 ml-7" style={{ color: theme.textSecondary }}>
+                  {selectedServicio.descripcion.replace(/^\[[^\]]+\]\s*/, '')}
                 </p>
-                <p className="text-[10px]" style={{ color: theme.textSecondary }}>Costo</p>
+              )}
+            </div>
+
+            {/* Tiempo y costo - compacto en una línea */}
+            <div className="flex items-center gap-3 py-2 px-3 rounded-lg" style={{ backgroundColor: theme.card }}>
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+                <span className="text-xs font-medium" style={{ color: theme.text }}>{selectedServicio.tiempo_estimado_dias} días</span>
+              </div>
+              <div className="w-px h-4" style={{ backgroundColor: theme.border }} />
+              <div className="flex items-center gap-1.5">
+                <CreditCard className="h-3.5 w-3.5" style={{ color: selectedServicio.costo ? '#f59e0b' : '#10b981' }} />
+                <span className="text-xs font-medium" style={{ color: theme.text }}>
+                  {selectedServicio.costo ? `$${selectedServicio.costo.toLocaleString()}` : 'Gratis'}
+                </span>
               </div>
             </div>
 
             {/* Documentos requeridos */}
             {selectedServicio.documentos_requeridos && (
-              <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4" style={{ color: theme.primary }} />
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <FileText className="h-3.5 w-3.5" style={{ color: '#d88c0b' }} />
                   <span className="font-medium text-xs" style={{ color: theme.text }}>Documentación requerida</span>
                 </div>
-                <ul className="space-y-1">
-                  {selectedServicio.documentos_requeridos.split(',').map((doc, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
+                <ul className="space-y-1 ml-1">
+                  {selectedServicio.documentos_requeridos.split(/[|,]/).map((doc, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
                       <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                      {doc.trim()}
+                      <span>{doc.trim()}</span>
                     </li>
                   ))}
                 </ul>
@@ -1474,13 +1555,20 @@ Tono amigable, 2-3 oraciones máximo.`,
             )}
 
             {/* Requisitos */}
-            {selectedServicio.requisitos && selectedServicio.requisitos !== `Rubro: ${selectedServicio.descripcion?.match(/^\[([^\]]+)\]/)?.[1]}` && (
-              <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <Lightbulb className="h-4 w-4" style={{ color: '#f59e0b' }} />
+            {selectedServicio.requisitos && (
+              <div>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Lightbulb className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} />
                   <span className="font-medium text-xs" style={{ color: theme.text }}>Requisitos</span>
                 </div>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedServicio.requisitos}</p>
+                <ul className="space-y-1 ml-1">
+                  {selectedServicio.requisitos.split(/[|,]/).map((req, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
+                      <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                      <span>{req.trim()}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
@@ -1515,60 +1603,25 @@ Tono amigable, 2-3 oraciones máximo.`,
             </div>
           </div>
         )}
-
-        {/* Tips según el paso */}
-        {wizardStep === 2 && selectedServicio && (
-          <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <div className="flex items-start gap-2">
-              <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
-              <div>
-                <p className="font-medium text-xs mb-1" style={{ color: theme.text }}>Tip para el asunto</p>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  Sé específico. Por ejemplo: "Solicitud de habilitación para local de comidas en Av. San Martín 1234"
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {wizardStep === 3 && (
-          <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle2 className="h-4 w-4" style={{ color: theme.primary }} />
-              <span className="font-medium text-sm" style={{ color: theme.text }}>Último paso</span>
-            </div>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>
-              Completá tus datos de contacto para recibir actualizaciones sobre tu trámite.
-            </p>
-          </div>
-        )}
-
-        {aiResponse && (
-          <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Sparkles className="h-3.5 w-3.5" style={{ color: theme.primary }} />
-              <span className="font-semibold text-xs" style={{ color: theme.primary }}>Asistente IA</span>
-            </div>
-            {formatAIResponse(aiResponse, theme)}
-          </div>
-        )}
       </div>
 
-      <div className="mt-4 p-3 rounded-lg flex items-center gap-2" style={{ backgroundColor: theme.card }}>
+      {/* Input de chat IA - compacto */}
+      <div className="mt-2 pt-2 border-t flex items-center gap-2" style={{ borderColor: theme.border }}>
+        <Sparkles className="h-3 w-3 flex-shrink-0" style={{ color: theme.primary }} />
         <input
           type="text"
           value={aiQuestion}
           onChange={(e) => setAiQuestion(e.target.value)}
           onKeyDown={handleAiKeyDown}
-          placeholder="Hacé una pregunta..."
+          placeholder="Preguntá a la IA..."
           disabled={aiLoading}
-          className="flex-1 bg-transparent text-sm focus:outline-none disabled:opacity-50"
+          className="flex-1 bg-transparent text-xs focus:outline-none disabled:opacity-50"
           style={{ color: theme.text }}
         />
         <button
           onClick={askAI}
           disabled={!aiQuestion.trim() || aiLoading}
-          className="p-1.5 rounded-lg transition-colors disabled:opacity-50"
+          className="p-1 rounded transition-colors disabled:opacity-50"
           style={{ backgroundColor: theme.primary, color: 'white' }}
         >
           {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, ImageIcon, Trash2 } from 'lucide-react';
+import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, ImageIcon, Trash2, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -76,6 +76,9 @@ export default function Configuracion() {
   const portadaInputRef = useRef<HTMLInputElement>(null);
   const [portadaSinFiltro, setPortadaSinFiltro] = useState(municipioActual?.tema_config?.portadaSinFiltro || false);
   const [portadaOpacity, setPortadaOpacity] = useState(municipioActual?.tema_config?.portadaOpacity ?? 1);
+  const [cabeceraFiltroColor, setCabeceraFiltroColor] = useState<'grafito' | 'blanco'>(municipioActual?.tema_config?.cabeceraFiltroColor || 'grafito');
+  const [cabeceraOpacity, setCabeceraOpacity] = useState(municipioActual?.tema_config?.cabeceraOpacity ?? 0.4);
+  const [cabeceraBlur, setCabeceraBlur] = useState(municipioActual?.tema_config?.cabeceraBlur ?? 4);
 
   // Estados para autocompletado de municipio (nombre)
   const [municipioSuggestions, setMunicipioSuggestions] = useState<AddressSuggestion[]>([]);
@@ -103,6 +106,9 @@ export default function Configuracion() {
       setImagenPortadaUrl(municipioActual.imagen_portada || '');
       setPortadaSinFiltro(municipioActual.tema_config?.portadaSinFiltro || false);
       setPortadaOpacity(municipioActual.tema_config?.portadaOpacity ?? 1);
+      setCabeceraFiltroColor(municipioActual.tema_config?.cabeceraFiltroColor || 'grafito');
+      setCabeceraOpacity(municipioActual.tema_config?.cabeceraOpacity ?? 0.4);
+      setCabeceraBlur(municipioActual.tema_config?.cabeceraBlur ?? 4);
     }
   }, [municipioActual]);
 
@@ -230,6 +236,35 @@ export default function Configuracion() {
   const hasPortadaConfigChanges =
     portadaSinFiltro !== (municipioActual?.tema_config?.portadaSinFiltro || false) ||
     portadaOpacity !== (municipioActual?.tema_config?.portadaOpacity ?? 1);
+
+  // Verificar si hay cambios en la configuración de cabecera
+  const hasCabeceraConfigChanges =
+    cabeceraFiltroColor !== (municipioActual?.tema_config?.cabeceraFiltroColor || 'grafito') ||
+    cabeceraOpacity !== (municipioActual?.tema_config?.cabeceraOpacity ?? 0.4) ||
+    cabeceraBlur !== (municipioActual?.tema_config?.cabeceraBlur ?? 4);
+
+  // Guardar configuración de cabecera
+  const handleSaveCabeceraConfig = async () => {
+    if (!municipioActual) return;
+
+    setPortadaLoading(true);
+    try {
+      const currentConfig = municipioActual.tema_config || {};
+      await municipiosApi.updateTema(municipioActual.id, {
+        ...currentConfig,
+        cabeceraFiltroColor: cabeceraFiltroColor,
+        cabeceraOpacity: cabeceraOpacity,
+        cabeceraBlur: cabeceraBlur,
+      });
+      await loadMunicipios();
+      toast.success('Configuración de cabecera guardada');
+    } catch (error) {
+      console.error('Error guardando configuración de cabecera:', error);
+      toast.error('Error al guardar');
+    } finally {
+      setPortadaLoading(false);
+    }
+  };
 
   // Generar color secundario basado en el primario
   const generateSecondaryColor = (primary: string) => {
@@ -749,7 +784,7 @@ export default function Configuracion() {
         </div>
       </div>
 
-      {/* Sección Branding y Personalización */}
+      {/* Sección Filtro de Cabecera */}
       <div
         className="rounded-xl p-5"
         style={{
@@ -762,121 +797,150 @@ export default function Configuracion() {
             className="w-10 h-10 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: `${theme.primary}20` }}
           >
-            <Palette className="h-5 w-5" style={{ color: theme.primary }} />
+            <SlidersHorizontal className="h-5 w-5" style={{ color: theme.primary }} />
           </div>
           <div>
             <h2 className="text-lg font-bold" style={{ color: theme.text }}>
-              Branding y Personalización
+              Filtro de Cabecera
             </h2>
             <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Colores institucionales del municipio
+              Controla la apariencia de la barra superior
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Colores del Municipio */}
-          <div>
-            <label className="block text-sm font-medium mb-3" style={{ color: theme.text }}>
-              Colores Institucionales
-            </label>
-
-            {/* Color primario */}
-            <div className="mb-4">
-              <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>
-                Color primario
+        {/* Toggle para color del filtro (negro/blanco) */}
+        <div
+          className="mb-4 p-3 rounded-lg"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>
+                Color del filtro
               </p>
-              <div className="flex flex-wrap gap-2">
-                {BRAND_COLORS.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => {
-                      setColorPrimario(color.value);
-                      setColorSecundario(generateSecondaryColor(color.value));
-                    }}
-                    className="w-8 h-8 rounded-lg transition-all duration-200 hover:scale-110"
-                    style={{
-                      backgroundColor: color.value,
-                      boxShadow: colorPrimario === color.value
-                        ? `0 0 0 2px ${theme.card}, 0 0 0 4px ${color.value}`
-                        : 'none',
-                    }}
-                    title={color.name}
-                  />
-                ))}
-                {/* Color personalizado */}
-                <div className="relative">
-                  <input
-                    type="color"
-                    value={colorPrimario}
-                    onChange={(e) => {
-                      setColorPrimario(e.target.value);
-                      setColorSecundario(generateSecondaryColor(e.target.value));
-                    }}
-                    className="w-8 h-8 rounded-lg cursor-pointer border-0"
-                    style={{ backgroundColor: colorPrimario }}
-                  />
-                </div>
-              </div>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Elige entre filtro grafito o blanco para la imagen
+              </p>
             </div>
-
-            {/* Preview de colores */}
-            <div
-              className="p-3 rounded-lg flex items-center gap-3"
-              style={{ backgroundColor: theme.backgroundSecondary }}
-            >
-              <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center"
-                style={{ background: `linear-gradient(135deg, ${colorPrimario} 0%, ${colorSecundario} 100%)` }}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCabeceraFiltroColor('grafito')}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: cabeceraFiltroColor === 'grafito' ? theme.primary : theme.backgroundSecondary,
+                  color: cabeceraFiltroColor === 'grafito' ? '#ffffff' : theme.textSecondary,
+                  border: `1px solid ${cabeceraFiltroColor === 'grafito' ? theme.primary : theme.border}`,
+                }}
               >
-                <Building2 className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-medium" style={{ color: theme.text }}>
-                  Vista previa
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: colorPrimario }}
-                  />
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>
-                    {colorPrimario}
-                  </span>
-                  <span
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: colorSecundario }}
-                  />
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>
-                    {colorSecundario}
-                  </span>
-                </div>
-              </div>
+                Grafito
+              </button>
+              <button
+                onClick={() => setCabeceraFiltroColor('blanco')}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: cabeceraFiltroColor === 'blanco' ? theme.primary : theme.backgroundSecondary,
+                  color: cabeceraFiltroColor === 'blanco' ? '#ffffff' : theme.textSecondary,
+                  border: `1px solid ${cabeceraFiltroColor === 'blanco' ? theme.primary : theme.border}`,
+                }}
+              >
+                Blanco
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Botón guardar branding */}
-        <div className="pt-4 mt-4 border-t" style={{ borderColor: theme.border }}>
-          <button
-            onClick={handleSaveBranding}
-            disabled={brandingLoading || !hasBrandingChanges}
-            className="w-full py-3 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-40 flex items-center justify-center gap-2"
+        {/* Slider de blur de imagen */}
+        <div
+          className="mb-4 p-3 rounded-lg"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>
+                Blur de la imagen
+              </p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Desenfoque aplicado a la imagen de fondo
+              </p>
+            </div>
+            <span className="text-sm font-mono" style={{ color: theme.primary }}>
+              {cabeceraBlur}px
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="20"
+            step="1"
+            value={cabeceraBlur}
+            onChange={(e) => setCabeceraBlur(parseInt(e.target.value))}
+            className="w-full h-2 rounded-lg appearance-none cursor-pointer"
             style={{
-              background: hasBrandingChanges
-                ? `linear-gradient(135deg, ${colorPrimario} 0%, ${colorSecundario} 100%)`
-                : theme.backgroundSecondary,
-              color: hasBrandingChanges ? '#ffffff' : theme.textSecondary,
+              background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${(cabeceraBlur / 20) * 100}%, ${theme.border} ${(cabeceraBlur / 20) * 100}%, ${theme.border} 100%)`,
+            }}
+          />
+          <div className="flex justify-between mt-1">
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin blur</span>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Máximo</span>
+          </div>
+        </div>
+
+        {/* Slider de opacidad del filtro */}
+        <div
+          className="mb-4 p-3 rounded-lg"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>
+                Opacidad del filtro
+              </p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>
+                Intensidad del filtro de color sobre la imagen
+              </p>
+            </div>
+            <span className="text-sm font-mono" style={{ color: theme.primary }}>
+              {Math.round(cabeceraOpacity * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={cabeceraOpacity}
+            onChange={(e) => setCabeceraOpacity(parseFloat(e.target.value))}
+            className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+            style={{
+              background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${cabeceraOpacity * 100}%, ${theme.border} ${cabeceraOpacity * 100}%, ${theme.border} 100%)`,
+            }}
+          />
+          <div className="flex justify-between mt-1">
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin filtro</span>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Máximo</span>
+          </div>
+        </div>
+
+        {/* Botón guardar */}
+        {hasCabeceraConfigChanges && (
+          <button
+            onClick={handleSaveCabeceraConfig}
+            disabled={portadaLoading}
+            className="w-full py-2.5 rounded-lg text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+            style={{
+              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+              color: '#ffffff',
             }}
           >
-            {brandingLoading ? (
+            {portadaLoading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {brandingLoading ? 'Guardando...' : 'Guardar branding'}
+            Guardar configuración
           </button>
-        </div>
+        )}
       </div>
 
       {/* Sección Imagen de Portada */}

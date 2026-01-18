@@ -10,7 +10,7 @@ import sentry_sdk
 from slowapi.errors import RateLimitExceeded
 import traceback
 
-from core.database import init_db
+from core.database import init_db, close_db
 from core.config import settings
 from core.rate_limit import limiter, rate_limit_exceeded_handler
 from api import api_router
@@ -44,7 +44,10 @@ async def lifespan(app: FastAPI):
     await init_db()
     print(f"Base de datos OK", flush=True)
     yield
-    print("Cerrando...", flush=True)
+    # Shutdown
+    print("Cerrando conexiones de base de datos...", flush=True)
+    await close_db()
+    print("Cerrado OK", flush=True)
 
 app = FastAPI(
     title="Sistema de Reclamos Municipales",

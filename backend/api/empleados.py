@@ -117,10 +117,10 @@ async def get_empleados_disponibilidad(
         )
         carga_tramites = tramites_count.scalar() or 0
 
-        # Contar reclamos pendientes (Reclamo usa empleado_asignado_id)
+        # Contar reclamos pendientes (Reclamo usa empleado_id)
         reclamos_count = await db.execute(
             select(func.count(Reclamo.id)).where(
-                Reclamo.empleado_asignado_id == emp.id,
+                Reclamo.empleado_id == emp.id,
                 Reclamo.estado.in_(estados_pendientes_reclamos)
             )
         )
@@ -245,12 +245,16 @@ async def create_empleado(
 
     empleado = Empleado(**empleado_data)
 
-    # Agregar categorias si se proporcionan (solo del mismo municipio)
+    # Agregar categorias si se proporcionan (solo habilitadas para el municipio)
+    from models.categoria import MunicipioCategoria
     if categoria_ids:
         result = await db.execute(
-            select(Categoria).where(
+            select(Categoria)
+            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
+            .where(
                 Categoria.id.in_(categoria_ids),
-                Categoria.municipio_id == current_user.municipio_id
+                MunicipioCategoria.municipio_id == current_user.municipio_id,
+                MunicipioCategoria.activo == True
             )
         )
         categorias = result.scalars().all()
@@ -301,15 +305,19 @@ async def update_empleado(
 
     update_data = data.model_dump(exclude_unset=True)
 
-    # Manejar categoria_ids por separado (solo del mismo municipio)
+    # Manejar categoria_ids por separado (solo habilitadas para el municipio)
     if 'categoria_ids' in update_data:
         categoria_ids = update_data.pop('categoria_ids')
         if categoria_ids is not None:
             if categoria_ids:
+                from models.categoria import MunicipioCategoria
                 result = await db.execute(
-                    select(Categoria).where(
+                    select(Categoria)
+                    .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
+                    .where(
                         Categoria.id.in_(categoria_ids),
-                        Categoria.municipio_id == current_user.municipio_id
+                        MunicipioCategoria.municipio_id == current_user.municipio_id,
+                        MunicipioCategoria.activo == True
                     )
                 )
                 categorias = result.scalars().all()

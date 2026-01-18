@@ -428,6 +428,174 @@ export const chatApi = {
     return response.data;
   },
 
+  /**
+   * Consulta gerencial con SQL dinámico (con paginación e historial)
+   * La IA genera el SQL necesario para responder consultas complejas.
+   * Solo para admin, supervisor y empleados.
+   * Devuelve: { response: string (HTML), sql_ejecutado: string, datos_crudos: any[], total_registros, page, page_size }
+   */
+  consulta: async (pregunta: string, page: number = 1, page_size: number = 50, historial: Array<{role: string; content: string}> = []): Promise<{
+    response: string;
+    sql_ejecutado: string | null;
+    datos_crudos: any[] | null;
+    total_registros: number | null;
+    page: number;
+    page_size: number;
+    mostrar_grilla: boolean;
+  }> => {
+    const response = await api.post('/chat/consulta', { pregunta, page, page_size, historial });
+    return response.data;
+  },
+
+  /**
+   * Regenera el cache del schema de la BD
+   * Solo para admins. Usar después de agregar tablas/columnas.
+   */
+  refreshSchema: async () => {
+    const response = await api.post('/chat/refresh-schema');
+    return response.data;
+  },
+
+  /**
+   * 
+   * Obtiene KPIs en tiempo real para el panel BI
+   */
+  getKPIs: async (): Promise<{
+    reclamos: {
+      total: number;
+      pendientes: number;
+      nuevos: number;
+      asignados: number;
+      en_proceso: number;
+      resueltos: number;
+      hoy: number;
+      esta_semana: number;
+      este_mes: number;
+    };
+    tramites: {
+      total: number;
+      iniciados: number;
+      en_revision: number;
+      en_proceso: number;
+      aprobados: number;
+      esta_semana: number;
+    };
+    empleados: {
+      total: number;
+      activos: number;
+    };
+    tendencias: {
+      reclamos_cambio_semanal: number;
+      reclamos_semana_pasada: number;
+    };
+  }> => {
+    const response = await api.get('/chat/kpis');
+    return response.data;
+  },
+
+  /**
+   * Obtiene la lista de entidades/tablas disponibles para consultas
+   */
+  getEntities: async (): Promise<{
+    entities: Array<{
+      nombre: string;
+      tabla: string;
+      icono: string;
+      descripcion: string;
+      campos: Array<{ name: string; type: string; fk: string | null }>;
+    }>;
+  }> => {
+    const response = await api.get('/chat/entities');
+    return response.data;
+  },
+
+  /**
+   * Obtiene el schema de la DB para autocompletado
+   */
+  getSchema: async (): Promise<{
+    tables: Record<string, Array<{
+      name: string;
+      type: string;
+      fk: string | null;
+    }>>;
+  }> => {
+    const response = await api.get('/chat/schema');
+    return response.data;
+  },
+
+  /**
+   * Lista consultas guardadas (propias + públicas)
+   */
+  getConsultasGuardadas: async (): Promise<Array<{
+    id: number;
+    nombre: string;
+    descripcion: string | null;
+    pregunta_original: string;
+    sql_query: string | null;
+    icono: string;
+    color: string;
+    tipo_visualizacion: string;
+    es_publica: boolean;
+    veces_ejecutada: number;
+    created_at: string;
+    usuario_nombre: string | null;
+  }>> => {
+    const response = await api.get('/chat/consultas-guardadas');
+    return response.data;
+  },
+
+  /**
+   * Crea una nueva consulta guardada
+   */
+  crearConsultaGuardada: async (data: {
+    nombre: string;
+    descripcion?: string;
+    pregunta_original: string;
+    sql_query?: string;
+    icono?: string;
+    color?: string;
+    tipo_visualizacion?: string;
+    es_publica?: boolean;
+  }) => {
+    const response = await api.post('/chat/consultas-guardadas', data);
+    return response.data;
+  },
+
+  /**
+   * Actualiza una consulta guardada
+   */
+  actualizarConsultaGuardada: async (id: number, data: {
+    nombre?: string;
+    descripcion?: string;
+    icono?: string;
+    color?: string;
+    tipo_visualizacion?: string;
+    es_publica?: boolean;
+  }) => {
+    const response = await api.put(`/chat/consultas-guardadas/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Elimina una consulta guardada
+   */
+  eliminarConsultaGuardada: async (id: number) => {
+    const response = await api.delete(`/chat/consultas-guardadas/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Ejecuta una consulta guardada y devuelve resultados
+   */
+  ejecutarConsultaGuardada: async (id: number): Promise<{
+    response: string;
+    sql_ejecutado: string | null;
+    datos_crudos: any[] | null;
+  }> => {
+    const response = await api.post(`/chat/consultas-guardadas/${id}/ejecutar`);
+    return response.data;
+  },
+
   getStatus: () => api.get('/chat/status'),
 };
 
@@ -505,6 +673,24 @@ export const publicoApi = {
   getConfigRegistro: () => api.get('/configuracion/publica/registro'),
   chatConsulta: (message: string, history: { role: string; content: string }[], municipioId?: number) =>
     api.post('/publico/chat', { message, history, municipio_id: municipioId }),
+
+  /**
+   * Chat de landing con sesiones persistentes
+   * Mantiene el contexto de la conversación con session_id
+   */
+  chatLanding: async (message: string, sessionId?: string, municipioId?: number): Promise<{
+    response: string;
+    session_id: string;
+    municipio_id: number | null;
+    municipio_nombre: string | null;
+  }> => {
+    const response = await api.post('/chat/landing', {
+      message,
+      session_id: sessionId,
+      municipio_id: municipioId
+    });
+    return response.data;
+  },
 };
 
 // Alias para compatibilidad
@@ -800,6 +986,12 @@ export const tramitesApi = {
   getDocumentos: (solicitudId: number) => api.get(`/tramites/solicitudes/${solicitudId}/documentos`),
   deleteDocumento: (solicitudId: number, documentoId: number) =>
     api.delete(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}`),
+
+  // Obtener trámites habilitados para el municipio (desde municipio_tramites)
+  getTramitesMunicipio: (params?: { tipo_tramite_id?: number; solo_activos?: boolean }) => {
+    const municipioId = localStorage.getItem('municipio_id');
+    return api.get(`/tramites/municipio/${municipioId}/tramites`, { params });
+  },
 
   // Habilitar tipos para municipio
   habilitarTipoMunicipio: (tipoId: number, municipioId?: number) => {

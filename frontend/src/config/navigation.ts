@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays
+  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -67,6 +67,20 @@ export const getNavigation = (userRole: string) => {
       icon: FileDown,
       show: isAdminOrSupervisor,
       description: 'Exportar informes CSV'
+    },
+    {
+      name: 'Panel BI',
+      href: '/gestion/panel-bi',
+      icon: LayoutDashboard,
+      show: isAdminOrSupervisor,
+      description: 'Consultas y análisis con IA'
+    },
+    {
+      name: 'Ajustes',
+      href: '/gestion/ajustes',
+      icon: Settings,
+      show: isAdminOrSupervisor,
+      description: 'Configuración del sistema'
     },
 
     // === SECCIÓN EMPLEADOS ===

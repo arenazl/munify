@@ -38,6 +38,7 @@ export interface ThemeColors {
   // Acento/Primary
   primary: string;
   primaryHover: string;
+  primaryText: string; // Color de texto sobre el primary (blanco o negro según contraste)
 
   // Bordes
   border: string;
@@ -90,6 +91,17 @@ function generateVariants(
       return `#${((1 << 24) + (R << 16) + (G << 8) + B).toString(16).slice(1)}`;
     };
 
+    // Calcular si un color es claro u oscuro (para determinar texto sobre primary)
+    const isLightColor = (hex: string): boolean => {
+      const num = parseInt(hex.replace('#', ''), 16);
+      const R = num >> 16;
+      const G = (num >> 8) & 0x00ff;
+      const B = num & 0x0000ff;
+      // Fórmula de luminancia relativa
+      const luminance = (0.299 * R + 0.587 * G + 0.114 * B) / 255;
+      return luminance > 0.5;
+    };
+
     return {
       background: bg,
       backgroundSecondary: textLight ? lighten(bg, 5) : darken(bg, 5),
@@ -102,6 +114,7 @@ function generateVariants(
       textSecondary: textLight ? '#94a3b8' : '#64748b',
       primary: primary,
       primaryHover: darken(primary, 15),
+      primaryText: isLightColor(primary) ? '#1e293b' : '#ffffff',
       border: textLight ? mixColors(bg, '#ffffff', 0.15) : mixColors(bg, '#000000', 0.1),
     };
   };
@@ -148,6 +161,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#3b82f6',
         primaryHover: '#2563eb',
+        primaryText: '#ffffff',
         border: '#1e3a5f',
       },
       vintage: {
@@ -162,6 +176,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#60a5fa',
         primaryHover: '#3b82f6',
+        primaryText: '#1e293b',
         border: '#2d4a6f',
       },
       vibrante: {
@@ -176,6 +191,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#60a5fa',
         primaryHover: '#3b82f6',
+        primaryText: '#1e293b',
         border: '#1e3a5f',
       },
     },
@@ -199,6 +215,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#86efac',
         primary: '#22c55e',
         primaryHover: '#16a34a',
+        primaryText: '#1e293b',
         border: '#1f4528',
       },
       vintage: {
@@ -213,6 +230,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#86efac',
         primary: '#86efac',
         primaryHover: '#22c55e',
+        primaryText: '#1e293b',
         border: '#2d5f38',
       },
       vibrante: {
@@ -227,6 +245,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#86efac',
         primary: '#86efac',
         primaryHover: '#22c55e',
+        primaryText: '#1e293b',
         border: '#1f4528',
       },
     },
@@ -250,6 +269,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#fdba74',
         primary: '#f97316',
         primaryHover: '#ea580c',
+        primaryText: '#1e293b',
         border: '#4d2818',
       },
       vintage: {
@@ -264,6 +284,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#fdba74',
         primary: '#fdba74',
         primaryHover: '#f97316',
+        primaryText: '#1e293b',
         border: '#6d3d20',
       },
       vibrante: {
@@ -278,6 +299,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#fdba74',
         primary: '#fdba74',
         primaryHover: '#f97316',
+        primaryText: '#1e293b',
         border: '#4d2818',
       },
     },
@@ -301,6 +323,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#0ea5e9',
         primaryHover: '#0284c7',
+        primaryText: '#1e293b',
         border: '#1e3a5f',
       },
       vintage: {
@@ -315,6 +338,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#7dd3fc',
         primary: '#7dd3fc',
         primaryHover: '#0ea5e9',
+        primaryText: '#1e293b',
         border: '#2d5070',
       },
       vibrante: {
@@ -329,6 +353,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#7dd3fc',
         primaryHover: '#0ea5e9',
+        primaryText: '#1e293b',
         border: '#1e3a5f',
       },
     },
@@ -352,6 +377,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#d8b4fe',
         primary: '#a855f7',
         primaryHover: '#9333ea',
+        primaryText: '#1e293b',
         border: '#3d2660',
       },
       vintage: {
@@ -366,6 +392,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#d8b4fe',
         primary: '#d8b4fe',
         primaryHover: '#a855f7',
+        primaryText: '#1e293b',
         border: '#4f3578',
       },
       vibrante: {
@@ -380,6 +407,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#d8b4fe',
         primary: '#d8b4fe',
         primaryHover: '#a855f7',
+        primaryText: '#1e293b',
         border: '#3d2660',
       },
     },
@@ -403,6 +431,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#f9a8d4',
         primary: '#ec4899',
         primaryHover: '#db2777',
+        primaryText: '#1e293b',
         border: '#4d1a32',
       },
       vintage: {
@@ -417,6 +446,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#f9a8d4',
         primary: '#f9a8d4',
         primaryHover: '#ec4899',
+        primaryText: '#1e293b',
         border: '#6d2242',
       },
       vibrante: {
@@ -431,6 +461,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#f9a8d4',
         primary: '#f9a8d4',
         primaryHover: '#ec4899',
+        primaryText: '#1e293b',
         border: '#4d1a32',
       },
     },
@@ -454,6 +485,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#6b635a',
         primary: '#a67c52',
         primaryHover: '#8b6642',
+        primaryText: '#1e293b',
         border: '#d4c9b8',
       },
       vintage: {
@@ -468,6 +500,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#6b635a',
         primary: '#8b6642',
         primaryHover: '#725436',
+        primaryText: '#ffffff',
         border: '#c9bda8',
       },
       vibrante: {
@@ -482,6 +515,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#6b635a',
         primary: '#8b6642',
         primaryHover: '#725436',
+        primaryText: '#ffffff',
         border: '#d4c9b8',
       },
     },
@@ -505,6 +539,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#64748b',
         primary: '#3b82f6',
         primaryHover: '#2563eb',
+        primaryText: '#ffffff',
         border: '#e2e8f0',
       },
       vintage: {
@@ -519,6 +554,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#64748b',
         primary: '#1e40af',
         primaryHover: '#1e3a8a',
+        primaryText: '#ffffff',
         border: '#cbd5e1',
       },
       vibrante: {
@@ -533,6 +569,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#64748b',
         primary: '#1e40af',
         primaryHover: '#1e3a8a',
+        primaryText: '#ffffff',
         border: '#e2e8f0',
       },
     },
@@ -556,6 +593,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#64748b',
         primaryHover: '#475569',
+        primaryText: '#ffffff',
         border: '#334155',
       },
       vintage: {
@@ -570,6 +608,7 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#94a3b8',
         primaryHover: '#64748b',
+        primaryText: '#1e293b',
         border: '#475569',
       },
       vibrante: {
@@ -584,61 +623,174 @@ export const themePresets: ThemePreset[] = [
         textSecondary: '#94a3b8',
         primary: '#94a3b8',
         primaryHover: '#64748b',
+        primaryText: '#1e293b',
         border: '#334155',
       },
     },
   },
 
-  // 10. Carbon - Negro puro
+  // 10. Monochrome - Escala de grises pura (sidebar gris oscuro)
   {
-    id: 'carbon',
-    name: 'Carbon',
-    palette: ['#000000', '#0a0a0a', '#4f46e5', '#818cf8'],
+    id: 'monochrome',
+    name: 'Monochrome',
+    palette: ['#000000', '#1a1a1a', '#666666', '#ffffff'],
     variants: {
       clasico: {
         background: '#000000',
-        backgroundSecondary: '#0a0a0a',
+        backgroundSecondary: '#0d0d0d',
         contentBackground: '#000000',
-        card: '#111111',
-        sidebar: '#000000',
+        card: '#1a1a1a',
+        sidebar: '#1a1a1a',
         sidebarText: '#ffffff',
-        sidebarTextSecondary: '#94a3b8',
+        sidebarTextSecondary: '#666666',
         text: '#ffffff',
-        textSecondary: '#a0aec0',
-        primary: '#4f46e5',
-        primaryHover: '#4338ca',
+        textSecondary: '#666666',
+        primary: '#666666',
+        primaryHover: '#555555',
+        primaryText: '#ffffff',
         border: '#1a1a1a',
       },
       vintage: {
-        background: '#0a0a0a',
-        backgroundSecondary: '#121212',
-        contentBackground: '#0a0a0a',
-        card: '#1a1a1a',
+        background: '#1a1a1a',
+        backgroundSecondary: '#222222',
+        contentBackground: '#1a1a1a',
+        card: '#2a2a2a',
         sidebar: '#000000',
         sidebarText: '#ffffff',
-        sidebarTextSecondary: '#94a3b8',
-        text: '#f5f5f5',
-        textSecondary: '#a0aec0',
-        primary: '#818cf8',
-        primaryHover: '#4f46e5',
-        border: '#262626',
+        sidebarTextSecondary: '#666666',
+        text: '#ffffff',
+        textSecondary: '#666666',
+        primary: '#666666',
+        primaryHover: '#555555',
+        primaryText: '#ffffff',
+        border: '#333333',
       },
       vibrante: {
         background: '#000000',
-        backgroundSecondary: '#0a0a0a',
+        backgroundSecondary: '#0d0d0d',
         contentBackground: '#000000',
-        card: '#111111',
-        sidebar: '#4f46e5',
+        card: '#1a1a1a',
+        sidebar: '#666666',
         sidebarText: '#ffffff',
-        sidebarTextSecondary: '#e0e7ff',
+        sidebarTextSecondary: '#e0e0e0',
         text: '#ffffff',
-        textSecondary: '#a0aec0',
-        primary: '#818cf8',
-        primaryHover: '#4f46e5',
+        textSecondary: '#666666',
+        primary: '#ffffff',
+        primaryHover: '#e0e0e0',
+        primaryText: '#1e293b',
         border: '#1a1a1a',
       },
     },
   },
+
+  // 11. Ember - Tonos carbón cálidos
+  {
+    id: 'ember',
+    name: 'Ember',
+    palette: ['#1c1917', '#292524', '#dc2626', '#fca5a5'],
+    variants: {
+      clasico: {
+        background: '#1c1917',
+        backgroundSecondary: '#292524',
+        contentBackground: '#1c1917',
+        card: '#292524',
+        sidebar: '#292524',
+        sidebarText: '#fca5a5',
+        sidebarTextSecondary: '#a8a29e',
+        text: '#fafaf9',
+        textSecondary: '#a8a29e',
+        primary: '#dc2626',
+        primaryHover: '#b91c1c',
+        primaryText: '#ffffff',
+        border: '#44403c',
+      },
+      vintage: {
+        background: '#292524',
+        backgroundSecondary: '#353230',
+        contentBackground: '#292524',
+        card: '#44403c',
+        sidebar: '#1c1917',
+        sidebarText: '#fca5a5',
+        sidebarTextSecondary: '#a8a29e',
+        text: '#fafaf9',
+        textSecondary: '#a8a29e',
+        primary: '#fca5a5',
+        primaryHover: '#f87171',
+        primaryText: '#1e293b',
+        border: '#57534e',
+      },
+      vibrante: {
+        background: '#1c1917',
+        backgroundSecondary: '#292524',
+        contentBackground: '#1c1917',
+        card: '#292524',
+        sidebar: '#dc2626',
+        sidebarText: '#ffffff',
+        sidebarTextSecondary: '#fecaca',
+        text: '#fafaf9',
+        textSecondary: '#a8a29e',
+        primary: '#fca5a5',
+        primaryHover: '#f87171',
+        primaryText: '#1e293b',
+        border: '#44403c',
+      },
+    },
+  },
+
+  // 12. Graphite - Gris grafito profesional (sidebar gris claro)
+  {
+    id: 'graphite',
+    name: 'Graphite',
+    palette: ['#18181b', '#27272a', '#52525b', '#a1a1aa'],
+    variants: {
+      clasico: {
+        background: '#18181b',
+        backgroundSecondary: '#27272a',
+        contentBackground: '#18181b',
+        card: '#27272a',
+        sidebar: '#52525b',
+        sidebarText: '#ffffff',
+        sidebarTextSecondary: '#a1a1aa',
+        text: '#e4e4e7',
+        textSecondary: '#a1a1aa',
+        primary: '#a1a1aa',
+        primaryHover: '#71717a',
+        primaryText: '#1e293b',
+        border: '#3f3f46',
+      },
+      vintage: {
+        background: '#27272a',
+        backgroundSecondary: '#3f3f46',
+        contentBackground: '#27272a',
+        card: '#3f3f46',
+        sidebar: '#71717a',
+        sidebarText: '#ffffff',
+        sidebarTextSecondary: '#d4d4d8',
+        text: '#e4e4e7',
+        textSecondary: '#a1a1aa',
+        primary: '#a1a1aa',
+        primaryHover: '#71717a',
+        primaryText: '#1e293b',
+        border: '#52525b',
+      },
+      vibrante: {
+        background: '#18181b',
+        backgroundSecondary: '#27272a',
+        contentBackground: '#18181b',
+        card: '#27272a',
+        sidebar: '#52525b',
+        sidebarText: '#ffffff',
+        sidebarTextSecondary: '#d4d4d8',
+        text: '#e4e4e7',
+        textSecondary: '#a1a1aa',
+        primary: '#a1a1aa',
+        primaryHover: '#71717a',
+        primaryText: '#1e293b',
+        border: '#3f3f46',
+      },
+    },
+  },
+
 ];
 
 // Helper para obtener un tema por ID y variante
@@ -659,6 +811,6 @@ export function getPresetOptions() {
 
 // Configuración por defecto
 export const defaultThemeConfig = {
-  presetId: 'carbon',
+  presetId: 'graphite',
   variant: 'clasico' as ThemeVariant,
 };

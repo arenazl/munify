@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, MapPin, Navigation, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { Edit, MapPin, Navigation, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { zonasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -51,6 +51,8 @@ export default function Zonas() {
   // Estado para validación de duplicados con IA
   const [validando, setValidando] = useState(false);
   const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
+  // Estado para sección de deshabilitados
+  const [showDeshabilitados, setShowDeshabilitados] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     codigo: '',
@@ -175,11 +177,39 @@ export default function Zonas() {
     }
   };
 
+  // Deshabilitar una zona (soft delete - pone activo=false)
+  const handleDeshabilitar = async (zona: Zona) => {
+    try {
+      await zonasApi.update(zona.id, { ...zona, activo: false });
+      toast.success(`"${zona.nombre}" deshabilitada`);
+      fetchZonas();
+    } catch (error) {
+      toast.error('Error al deshabilitar');
+      console.error('Error:', error);
+    }
+  };
+
+  // Habilitar una zona deshabilitada
+  const handleHabilitar = async (zona: Zona) => {
+    try {
+      await zonasApi.update(zona.id, { ...zona, activo: true });
+      toast.success(`"${zona.nombre}" habilitada nuevamente`);
+      fetchZonas();
+    } catch (error) {
+      toast.error('Error al habilitar');
+      console.error('Error:', error);
+    }
+  };
+
   const filteredZonas = zonas.filter(z =>
     z.nombre.toLowerCase().includes(search.toLowerCase()) ||
     z.codigo?.toLowerCase().includes(search.toLowerCase()) ||
     z.descripcion?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Separar zonas activas y deshabilitadas
+  const zonasActivas = filteredZonas.filter(z => z.activo);
+  const zonasDeshabilitadas = filteredZonas.filter(z => !z.activo);
 
   // Efecto para animar cards de a una (staggered) - solo la primera vez
   useEffect(() => {
@@ -271,7 +301,7 @@ export default function Zonas() {
       onSheetClose={closeSheet}
       tableView={
         <ABMTable
-          data={filteredZonas}
+          data={zonasActivas}
           columns={tableColumns}
           keyExtractor={(z) => z.id}
           onRowClick={(z) => openSheet(z)}
@@ -283,14 +313,135 @@ export default function Zonas() {
                 title="Editar"
               />
               <ABMTableAction
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => handleDelete(z.id)}
-                title="Desactivar"
+                icon={<EyeOff className="h-4 w-4" />}
+                onClick={() => handleDeshabilitar(z)}
+                title="Deshabilitar"
                 variant="danger"
               />
             </>
           )}
         />
+      }
+      disabledSection={
+        zonasDeshabilitadas.length > 0 && (
+          <div className="mt-8">
+            {/* Header colapsable */}
+            <button
+              onClick={() => setShowDeshabilitados(!showDeshabilitados)}
+              className="w-full flex items-center justify-between p-4 rounded-xl transition-all hover:opacity-90"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
+                >
+                  <EyeOff className="h-5 w-5" style={{ color: '#ef4444' }} />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold" style={{ color: theme.text }}>
+                    Zonas Deshabilitadas
+                  </h3>
+                  <p className="text-sm" style={{ color: theme.textSecondary }}>
+                    {zonasDeshabilitadas.length} zona{zonasDeshabilitadas.length !== 1 ? 's' : ''} deshabilitada{zonasDeshabilitadas.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <div
+                className="p-2 rounded-lg transition-transform"
+                style={{
+                  backgroundColor: theme.card,
+                  transform: showDeshabilitados ? 'rotate(0deg)' : 'rotate(-90deg)',
+                }}
+              >
+                <ChevronDown className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              </div>
+            </button>
+
+            {/* Lista de zonas deshabilitadas */}
+            {showDeshabilitados && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {zonasDeshabilitadas.map((z, index) => {
+                  const zoneColor = ZONE_COLORS[index % ZONE_COLORS.length];
+
+                  return (
+                    <div
+                      key={z.id}
+                      className="rounded-xl overflow-hidden opacity-75 hover:opacity-100 transition-opacity"
+                      style={{
+                        backgroundColor: theme.card,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      <div
+                        className="flex items-center justify-between p-4"
+                        style={{
+                          background: `linear-gradient(135deg, ${zoneColor}10 0%, ${zoneColor}05 100%)`,
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-lg flex items-center justify-center grayscale"
+                            style={{ backgroundColor: zoneColor }}
+                          >
+                            <MapPin className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold" style={{ color: theme.text }}>
+                                {z.nombre}
+                              </h3>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-500">
+                                Deshabilitada
+                              </span>
+                            </div>
+                            {z.codigo && (
+                              <p className="text-sm font-mono" style={{ color: theme.textSecondary }}>
+                                {z.codigo}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {/* Botón habilitar */}
+                          <button
+                            onClick={() => handleHabilitar(z)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
+                            style={{
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10b981',
+                            }}
+                            title="Habilitar zona"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            <span className="text-sm font-medium">Habilitar</span>
+                          </button>
+
+                          {/* Botón editar */}
+                          <button
+                            onClick={() => openSheet(z)}
+                            className="p-2 rounded-lg transition-colors hover:scale-105"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              color: theme.textSecondary,
+                            }}
+                            title="Editar zona"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )
       }
       sheetFooter={
         <ABMSheetFooter
@@ -391,7 +542,7 @@ export default function Zonas() {
         </form>
       }
     >
-      {filteredZonas.map((z, index) => {
+      {zonasActivas.map((z, index) => {
         const zoneColor = ZONE_COLORS[index % ZONE_COLORS.length];
         const mapImage = getMapImageUrl(z.latitud_centro, z.longitud_centro);
         // Si la animación terminó, siempre visible
@@ -507,7 +658,7 @@ export default function Zonas() {
                 )}
                 <ABMCardActions
                   onEdit={() => openSheet(z)}
-                  onDelete={() => handleDelete(z.id)}
+                  onDelete={() => handleDeshabilitar(z)}
                 />
               </div>
             </div>

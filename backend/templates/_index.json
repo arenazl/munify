@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "descripcion": "Templates para generación de pantallas dinámicas con IA",
+  "templates": [
+    {
+      "id": "cards",
+      "archivo": "cards.json",
+      "uso": "Formato por defecto o cuando el usuario toca botón Cards"
+    },
+    {
+      "id": "table",
+      "archivo": "table.json",
+      "uso": "Cuando el usuario toca botón Tabla"
+    },
+    {
+      "id": "list",
+      "archivo": "list.json",
+      "uso": "Cuando el usuario toca botón Lista"
+    },
+    {
+      "id": "timeline",
+      "archivo": "timeline.json",
+      "uso": "Cuando el usuario toca botón Timeline o usa palabra 'cronología'"
+    },
+    {
+      "id": "tabs",
+      "archivo": "tabs.json",
+      "uso": "Detectado automáticamente cuando la consulta contiene 'agrupado por'"
+    },
+    {
+      "id": "wizard",
+      "archivo": "wizard.json",
+      "uso": "Detectado automáticamente cuando la consulta contiene 'historia' o 'historial'"
+    },
+    {
+      "id": "ranking",
+      "archivo": "ranking.json",
+      "uso": "Detectado automáticamente cuando la consulta contiene 'ranking', 'top', 'comparar'"
+    },
+    {
+      "id": "dashboard",
+      "archivo": "dashboard.json",
+      "uso": "Detectado automáticamente cuando la consulta contiene 'resumen', 'dashboard', 'kpis'"
+    }
+  ],
+  "deteccion_automatica": {
+    "prioridad": ["wizard", "tabs", "ranking", "dashboard", "timeline"],
+    "reglas": [
+      {
+        "palabras": ["historial", "historia", "seguimiento", "tracking"],
+        "template": "wizard"
+      },
+      {
+        "palabras": ["etapas", "pasos", "cronología", "eventos"],
+        "template": "timeline"
+      },
+      {
+        "palabras": ["agrupado", "agrupados", "agrupar"],
+        "template": "tabs"
+      },
+      {
+        "palabras": ["ranking", "top", "mejores", "peores", "comparar"],
+        "template": "ranking"
+      },
+      {
+        "palabras": ["resumen", "dashboard", "kpis", "métricas"],
+        "template": "dashboard"
+      }
+    ]
+  }
+}

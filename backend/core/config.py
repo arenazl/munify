@@ -20,13 +20,16 @@ class Settings(BaseSettings):
     # URL del frontend (para links en notificaciones)
     FRONTEND_URL: str = "http://localhost:5173"
 
-    # Gemini (Google - gratis con límites) - IA por defecto
+    # IA Provider - Orden de prioridad ("gemini,groq" o "groq,gemini")
+    AI_PROVIDER_ORDER: str = "gemini,groq"
+
+    # Gemini (Google - gratis con límites)
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-flash"
 
-    # Groq (API rápida) - alternativa/fallback
+    # Groq (API rápida)
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.1-8b-instant"
+    GROQ_MODEL: str = "groq/compound"
 
     # Pexels API (imagenes gratuitas)
     PEXELS_API_KEY: str = ""

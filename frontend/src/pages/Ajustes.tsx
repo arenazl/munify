@@ -266,14 +266,14 @@ export default function Ajustes() {
 
       {/* Section Tabs */}
       <div
-        className="flex gap-2 p-1.5 rounded-xl overflow-x-auto"
+        className="flex gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-xl overflow-x-auto scrollbar-hide"
         style={{ backgroundColor: theme.backgroundSecondary }}
       >
         {sectionTabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSection(tab.id)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all"
+            className="flex items-center gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all flex-shrink-0"
             style={{
               backgroundColor: activeSection === tab.id ? theme.card : 'transparent',
               color: activeSection === tab.id ? theme.primary : theme.textSecondary,

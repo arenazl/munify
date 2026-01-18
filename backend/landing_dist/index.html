@@ -2907,13 +2907,42 @@
         */
 
         // ========== CHAT WIDGET ==========
-        // Detectar si estamos en Heroku (mismo dominio) o local
+        // Detectar entorno: local o producción (Heroku)
         const API_URL = window.location.origin.includes('localhost')
             ? 'http://localhost:8000'
-            : '';
+            : 'https://reclamos-mun-api-aedc8e147cbe.herokuapp.com';
 
-        let chatHistory = [];
-        let detectedMunicipioId = null;
+        // Persistencia en localStorage
+        const STORAGE_KEY = 'munify_chat';
+
+        function loadChatState() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    return JSON.parse(saved);
+                }
+            } catch (e) {}
+            return { sessionId: null, municipioId: null, municipioNombre: null, messages: [] };
+        }
+
+        function saveChatState() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    sessionId: chatSessionId,
+                    municipioId: detectedMunicipioId,
+                    municipioNombre: detectedMunicipioNombre,
+                    messages: chatMessages
+                }));
+            } catch (e) {}
+        }
+
+        // Estado del chat
+        const savedState = loadChatState();
+        let chatSessionId = savedState.sessionId;
+        let detectedMunicipioId = savedState.municipioId;
+        let detectedMunicipioNombre = savedState.municipioNombre;
+        let chatMessages = savedState.messages || [];
+        let chatHistory = []; // Para compatibilidad con el backend
 
         // Crear elementos del chat
         function createChatWidget() {
@@ -2975,10 +3004,17 @@
             // Event listener del formulario
             document.getElementById('chat-form').addEventListener('submit', handleChatSubmit);
 
-            // Iniciar con mensaje de bienvenida
-            setTimeout(() => {
-                sendInitialMessage();
-            }, 500);
+            // Si hay mensajes guardados, restaurarlos
+            if (chatMessages.length > 0) {
+                chatMessages.forEach(msg => {
+                    addMessage(msg.content, msg.isUser, false); // false = no guardar de nuevo
+                });
+            } else {
+                // Solo enviar mensaje inicial si no hay historial
+                setTimeout(() => {
+                    sendInitialMessage();
+                }, 500);
+            }
         }
 
         function toggleChat() {
@@ -2997,7 +3033,7 @@
             }
         }
 
-        function addMessage(content, isUser = false) {
+        function addMessage(content, isUser = false, save = true) {
             const messagesContainer = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
@@ -3013,6 +3049,16 @@
             messageDiv.appendChild(bubble);
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // Guardar en localStorage si corresponde
+            if (save) {
+                chatMessages.push({ content, isUser });
+                // Limitar a últimos 20 mensajes para no llenar localStorage
+                if (chatMessages.length > 20) {
+                    chatMessages = chatMessages.slice(-20);
+                }
+                saveChatState();
+            }
         }
 
         function addTypingIndicator() {
@@ -3047,8 +3093,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: 'hola',
-                        history: [],
-                        municipio_id: null
+                        session_id: chatSessionId,
+                        municipio_id: detectedMunicipioId
                     })
                 });
 
@@ -3057,8 +3103,16 @@
                 if (response.ok) {
                     const data = await response.json();
                     addMessage(data.response, false);
-                    chatHistory.push({ role: 'user', content: 'hola' });
-                    chatHistory.push({ role: 'assistant', content: data.response });
+
+                    // Guardar session_id y municipio si se detectó
+                    if (data.session_id) {
+                        chatSessionId = data.session_id;
+                    }
+                    if (data.municipio_id) {
+                        detectedMunicipioId = data.municipio_id;
+                        detectedMunicipioNombre = data.municipio_nombre;
+                    }
+                    saveChatState();
                 } else {
                     addMessage('¡Hola! 👋 Soy el asistente de Munify. ¿En qué localidad vivís? Así puedo mostrarte qué reclamos y trámites podés hacer.', false);
                 }
@@ -3089,7 +3143,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message: message,
-                        history: chatHistory,
+                        session_id: chatSessionId,
                         municipio_id: detectedMunicipioId
                     })
                 });
@@ -3100,14 +3154,15 @@
                     const data = await response.json();
                     addMessage(data.response, false);
 
-                    // Actualizar historial
-                    chatHistory.push({ role: 'user', content: message });
-                    chatHistory.push({ role: 'assistant', content: data.response });
-
-                    // Limitar historial a últimos 10 mensajes
-                    if (chatHistory.length > 10) {
-                        chatHistory = chatHistory.slice(-10);
+                    // Actualizar session_id y municipio si cambiaron
+                    if (data.session_id) {
+                        chatSessionId = data.session_id;
                     }
+                    if (data.municipio_id && !detectedMunicipioId) {
+                        detectedMunicipioId = data.municipio_id;
+                        detectedMunicipioNombre = data.municipio_nombre;
+                    }
+                    saveChatState();
                 } else {
                     addMessage('Disculpá, hubo un error. Podés contactarnos por WhatsApp al +54 9 11 6022-3474.', false);
                 }

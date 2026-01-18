@@ -1,0 +1,20 @@
+{
+  "id": "ranking",
+  "nombre": "Ranking/Comparativo",
+  "descripcion": "Muestra datos ordenados como ranking con barras o podio",
+  "palabras_clave": ["ranking", "top", "mejores", "peores", "comparar", "comparativo", "más", "menos"],
+  "template_html": "<div style=\"margin:12px 0\">\n  <div style=\"display:flex;align-items:center;gap:12px;padding:12px;background:#f8f5f0;border-radius:10px;margin-bottom:8px\">\n    <div style=\"width:36px;height:36px;background:#b08d57;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px\">1</div>\n    <div style=\"flex:1\">\n      <div style=\"font-weight:600;color:#5c4d3d;font-size:14px\">Nombre del item</div>\n      <div style=\"font-size:12px;color:#8a7a6a\">Detalle secundario</div>\n    </div>\n    <div style=\"text-align:right\">\n      <div style=\"font-size:20px;font-weight:700;color:#b08d57\">VALOR</div>\n      <div style=\"font-size:11px;color:#8a7a6a\">métrica</div>\n    </div>\n  </div>\n</div>",
+  "instrucciones": [
+    "Mostrá los items ordenados de mayor a menor (o viceversa según contexto)",
+    "Numerá las posiciones (1, 2, 3...)",
+    "Destacá el valor/métrica a la derecha",
+    "Usá medallas o colores especiales para top 3: oro=#ffd700, plata=#c0c0c0, bronce=#cd7f32"
+  ],
+  "variantes_posicion": {
+    "1": { "background": "#fef7ed", "medalla": "#ffd700" },
+    "2": { "background": "#f8f9fa", "medalla": "#c0c0c0" },
+    "3": { "background": "#fef7ed", "medalla": "#cd7f32" }
+  },
+  "paginacion": 20,
+  "mostrar_grilla": false
+}

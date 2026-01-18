@@ -1,0 +1,19 @@
+{
+  "id": "tabs",
+  "nombre": "Tabs/Filtros",
+  "descripcion": "Muestra datos agrupados como TABS VISUALES ESTÁTICOS con estilos inline",
+  "palabras_clave": ["agrupado", "agrupados", "por categoría", "por estado", "por tipo", "por zona"],
+  "template_html": "<div style=\"margin:16px 0\"><div style=\"display:flex;flex-wrap:wrap;gap:4px;margin-bottom:0;border-bottom:2px solid #e5e0d8\"><div style=\"padding:10px 20px;background:#b08d57;color:white;border-radius:8px 8px 0 0;font-weight:600;font-size:14px\">🟢 En Proceso (812)</div><div style=\"padding:10px 20px;background:#f8f5f0;color:#5c4d3d;border-radius:8px 8px 0 0;font-size:14px\">⏳ Asignado (535)</div><div style=\"padding:10px 20px;background:#f8f5f0;color:#5c4d3d;border-radius:8px 8px 0 0;font-size:14px\">📋 Nuevo (306)</div><div style=\"padding:10px 20px;background:#f8f5f0;color:#5c4d3d;border-radius:8px 8px 0 0;font-size:14px\">✅ Resuelto (1480)</div><div style=\"padding:10px 20px;background:#f8f5f0;color:#5c4d3d;border-radius:8px 8px 0 0;font-size:14px\">❌ Rechazado (152)</div></div><div style=\"background:#f8f5f0;border:1px solid #e5e0d8;border-top:none;border-radius:0 0 8px 8px;padding:16px\"><div style=\"font-weight:600;color:#5c4d3d;font-size:15px;margin-bottom:8px\">📊 Detalle: En Proceso</div><div style=\"color:#6b5d4d;font-size:14px\">812 reclamos actualmente en proceso de gestión</div></div></div>",
+  "instrucciones": [
+    "⛔ PROHIBIDO: No uses markdown, no uses ```código```, no uses clases CSS, no uses JavaScript",
+    "✅ OBLIGATORIO: Respuesta SOLO en HTML con estilos inline (style=\"...\")",
+    "Generá UN div contenedor con TODOS los tabs como divs hijos",
+    "CADA valor del GROUP BY = UN tab (div) con su cantidad entre paréntesis",
+    "El PRIMER tab tiene fondo dorado (#b08d57) y texto blanco (tab activo)",
+    "Los demás tabs tienen fondo claro (#f8f5f0) y texto oscuro (#5c4d3d)",
+    "Debajo de los tabs, mostrá un panel con el detalle del primer grupo",
+    "Usá emojis según el estado: ✅ resuelto, ⏳ proceso, 📋 nuevo, ❌ rechazado, 🔄 asignado"
+  ],
+  "paginacion": null,
+  "mostrar_grilla": false
+}

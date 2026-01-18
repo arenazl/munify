@@ -182,7 +182,7 @@ export default function DashboardVecino() {
           <button
             onClick={() => navigate('/gestion/crear-reclamo')}
             className="flex items-center gap-2 px-4 lg:px-6 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95"
-            style={{ backgroundColor: theme.primary, color: 'white' }}
+            style={{ backgroundColor: theme.primary, color: theme.primaryText }}
           >
             <PlusCircle className="h-5 w-5" />
             <span>Nuevo Reclamo</span>
@@ -190,7 +190,7 @@ export default function DashboardVecino() {
           <button
             onClick={() => navigate('/gestion/crear-tramite')}
             className="flex items-center gap-2 px-4 lg:px-6 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95"
-            style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
           >
             <FileText className="h-5 w-5" />
             <span>Nuevo Trámite</span>
