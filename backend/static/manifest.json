@@ -1,11 +1,11 @@
 {
-  "name": "Reclamos Municipal",
-  "short_name": "Reclamos",
-  "description": "Sistema de gestión de reclamos municipales",
+  "name": "Munify",
+  "short_name": "Munify",
+  "description": "Sistema de gestión municipal",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#4f46e5",
+  "theme_color": "#E67E22",
   "orientation": "portrait-primary",
   "icons": [
     {

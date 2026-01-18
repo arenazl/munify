@@ -1,9 +1,12 @@
 // Service Worker para Push Notifications
-// VERSION: 2.0.0 - Forzar actualización
-const SW_VERSION = '2.0.0';
+// VERSION: 2.3.0 - No interceptar API calls para evitar duplicados
+const SW_VERSION = '2.3.0';
 const CACHE_NAME = `app-cache-v${SW_VERSION}`;
 
 self.addEventListener('push', function(event) {
+  console.log('[SW] Push event recibido:', event);
+
+  let title = 'Sistema de Reclamos';
   const options = {
     body: 'Tienes una nueva notificación',
     icon: '/icon-notification.png',
@@ -22,17 +25,24 @@ self.addEventListener('push', function(event) {
   if (event.data) {
     try {
       const data = event.data.json();
+      console.log('[SW] Datos parseados:', data);
+
+      title = data.title || title;
       options.body = data.body || options.body;
-      options.title = data.title || 'Sistema de Reclamos';
       options.data.url = data.url || '/';
       options.icon = data.icon || options.icon;
     } catch (e) {
-      options.body = event.data.text();
+      console.error('[SW] Error parseando JSON:', e);
+      const textData = event.data.text();
+      console.log('[SW] Datos como texto:', textData);
+      options.body = textData;
     }
   }
 
+  console.log('[SW] Mostrando notificación:', title, options);
+
   event.waitUntil(
-    self.registration.showNotification(options.title || 'Sistema de Reclamos', options)
+    self.registration.showNotification(title, options)
   );
 });
 
@@ -92,9 +102,19 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// Fetch - No cachear nada, siempre ir al network
+// Fetch - No interceptar llamadas API, solo assets estáticos
 self.addEventListener('fetch', function(event) {
-  // Para la app, siempre usar network-first
+  const url = new URL(event.request.url);
+
+  // NO interceptar llamadas a la API - dejar que el navegador las maneje directamente
+  // Esto evita duplicación de requests (fetch del SW + xhr original)
+  if (url.pathname.startsWith('/api') ||
+      url.hostname !== self.location.hostname ||
+      event.request.method !== 'GET') {
+    return; // No llamar event.respondWith() = dejar pasar sin interceptar
+  }
+
+  // Solo para assets estáticos locales, usar network-first
   event.respondWith(
     fetch(event.request).catch(function() {
       return caches.match(event.request);
