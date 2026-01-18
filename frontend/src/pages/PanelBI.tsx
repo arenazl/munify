@@ -3,12 +3,13 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { chatApi } from '../lib/api';
 import {
-  LayoutDashboard, AlertTriangle, Users, Folder, MapPin, FileText,
-  Layers, User, Database, Star, TrendingUp, TrendingDown, Send,
+  AlertTriangle, Users, Folder, MapPin, FileText,
+  Layers, User, Database, Star, TrendingUp, TrendingDown,
   Loader2, Save, Trash2, Table2, Download, ChevronDown, ChevronUp, RefreshCw,
-  Plus, X, History, ChevronLeft, ChevronRight, BarChart3, PieChart, LineChart,
-  LayoutGrid, List, Clock, ListOrdered, Trophy, FolderKanban, Gauge
+  Plus, X, History, ChevronLeft, ChevronRight,
+  LayoutGrid, List, Clock, Trophy, FolderKanban, Gauge, BarChart2
 } from 'lucide-react';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RePieChart, Pie, Cell, LineChart as ReLineChart, Line, Legend
@@ -450,136 +451,331 @@ export default function PanelBI() {
       .replace(/<p style="margin:8px 0">/g, `<p style="margin:8px 0;color:${theme.text}">`);
   };
 
-  return (
-    <div className="min-h-screen p-6" style={{ backgroundColor: theme.background }}>
-      {/* Header compacto */}
-      <div className="flex items-center gap-3 mb-4">
-        <div
-          className="p-2.5 rounded-xl"
-          style={{ background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})` }}
-        >
-          <LayoutDashboard className="h-5 w-5" style={{ color: theme.primaryText }} />
+  // Render del filterPanel para StickyPageHeader
+  const renderFilterPanel = () => (
+    <div className="flex flex-wrap items-center gap-2">
+      {/* Pills de KPIs activos */}
+      {loadingKpis ? (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Cargando...
         </div>
-        <div>
-          <h1 className="text-xl font-bold" style={{ color: theme.text }}>Panel BI</h1>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>
-            Consultas y análisis con IA
-          </p>
-        </div>
-      </div>
+      ) : kpis ? (
+        <>
+          {activeKpis.map(kpiId => {
+            const kpiConfig = AVAILABLE_KPIS.find(k => k.id === kpiId);
+            if (!kpiConfig) return null;
+            const value = getNestedValue(kpis, kpiConfig.path);
+            const colorInfo = KPI_COLORS.find(c => c.value === kpiConfig.defaultColor) || KPI_COLORS[0];
+            const trend = kpiConfig.hasTrend ? kpis.tendencias.reclamos_cambio_semanal : undefined;
 
-      {/* KPIs Section - Pills compactos configurables */}
-      <div className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Pills de KPIs activos */}
-          {loadingKpis ? (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Cargando...
-            </div>
-          ) : kpis ? (
-            <>
-              {activeKpis.map(kpiId => {
-                const kpiConfig = AVAILABLE_KPIS.find(k => k.id === kpiId);
-                if (!kpiConfig) return null;
-                const value = getNestedValue(kpis, kpiConfig.path);
-                const colorInfo = KPI_COLORS.find(c => c.value === kpiConfig.defaultColor) || KPI_COLORS[0];
-                const trend = kpiConfig.hasTrend ? kpis.tendencias.reclamos_cambio_semanal : undefined;
-
-                return (
-                  <div
-                    key={kpiId}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:scale-105 cursor-default"
-                    style={{
-                      backgroundColor: colorInfo.bg,
-                      color: colorInfo.value,
-                      border: `1px solid ${colorInfo.value}30`
-                    }}
-                  >
-                    <span className="font-bold">{value}</span>
-                    <span className="opacity-80">{kpiConfig.label}</span>
-                    {trend !== undefined && trend !== 0 && (
-                      <span className="flex items-center text-xs opacity-70">
-                        {trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                        {Math.abs(trend)}%
-                      </span>
-                    )}
-                    <button
-                      onClick={() => toggleKpi(kpiId)}
-                      className="ml-1 opacity-50 hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </>
-          ) : null}
-
-          {/* Botón agregar KPI */}
-          <div className="relative">
-            <button
-              onClick={() => setShowKpiSelector(!showKpiSelector)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-all hover:scale-105"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                color: theme.textSecondary,
-                border: `1px dashed ${theme.border}`
-              }}
-            >
-              <Plus className="h-3 w-3" />
-              KPI
-            </button>
-
-            {/* Dropdown selector de KPIs */}
-            {showKpiSelector && (
+            return (
               <div
-                className="absolute top-full left-0 mt-2 p-2 rounded-xl shadow-xl z-50 min-w-[200px]"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+                key={kpiId}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:scale-105 cursor-default"
+                style={{
+                  backgroundColor: colorInfo.bg,
+                  color: colorInfo.value,
+                  border: `1px solid ${colorInfo.value}30`
+                }}
               >
-                <div className="text-xs font-semibold mb-2 px-2" style={{ color: theme.textSecondary }}>
-                  Agregar métrica
-                </div>
-                {AVAILABLE_KPIS.filter(k => !activeKpis.includes(k.id)).map(kpi => {
-                  const colorInfo = KPI_COLORS.find(c => c.value === kpi.defaultColor) || KPI_COLORS[0];
-                  return (
-                    <button
-                      key={kpi.id}
-                      onClick={() => {
-                        toggleKpi(kpi.id);
-                        setShowKpiSelector(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-left transition-colors hover:bg-black/5"
-                      style={{ color: theme.text }}
-                    >
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: colorInfo.value }}
-                      />
-                      {kpi.label}
-                    </button>
-                  );
-                })}
-                {AVAILABLE_KPIS.filter(k => !activeKpis.includes(k.id)).length === 0 && (
-                  <p className="text-xs px-2 py-1" style={{ color: theme.textSecondary }}>
-                    Todos los KPIs están activos
-                  </p>
+                <span className="font-bold">{value}</span>
+                <span className="opacity-80">{kpiConfig.label}</span>
+                {trend !== undefined && trend !== 0 && (
+                  <span className="flex items-center text-xs opacity-70">
+                    {trend > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                    {Math.abs(trend)}%
+                  </span>
                 )}
+                <button
+                  onClick={() => toggleKpi(kpiId)}
+                  className="ml-1 opacity-50 hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
               </div>
+            );
+          })}
+        </>
+      ) : null}
+
+      {/* Botón agregar KPI */}
+      <div className="relative">
+        <button
+          onClick={() => setShowKpiSelector(!showKpiSelector)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition-all hover:scale-105"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.textSecondary,
+            border: `1px dashed ${theme.border}`
+          }}
+        >
+          <Plus className="h-3 w-3" />
+          KPI
+        </button>
+
+        {/* Dropdown selector de KPIs */}
+        {showKpiSelector && (
+          <div
+            className="absolute top-full left-0 mt-2 p-2 rounded-xl shadow-xl z-50 min-w-[200px]"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="text-xs font-semibold mb-2 px-2" style={{ color: theme.textSecondary }}>
+              Agregar métrica
+            </div>
+            {AVAILABLE_KPIS.filter(k => !activeKpis.includes(k.id)).map(kpi => {
+              const colorInfo = KPI_COLORS.find(c => c.value === kpi.defaultColor) || KPI_COLORS[0];
+              return (
+                <button
+                  key={kpi.id}
+                  onClick={() => {
+                    toggleKpi(kpi.id);
+                    setShowKpiSelector(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm text-left transition-colors hover:bg-black/5"
+                  style={{ color: theme.text }}
+                >
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: colorInfo.value }}
+                  />
+                  {kpi.label}
+                </button>
+              );
+            })}
+            {AVAILABLE_KPIS.filter(k => !activeKpis.includes(k.id)).length === 0 && (
+              <p className="text-xs px-2 py-1" style={{ color: theme.textSecondary }}>
+                Todos los KPIs están activos
+              </p>
             )}
           </div>
-
-          {/* Botón refresh */}
-          <button
-            onClick={loadKPIs}
-            className="p-1.5 rounded-full transition-all hover:scale-105"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-            title="Actualizar métricas"
-          >
-            <RefreshCw className={`h-3 w-3 ${loadingKpis ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        )}
       </div>
+
+      {/* Botón refresh */}
+      <button
+        onClick={loadKPIs}
+        className="p-1.5 rounded-full transition-all hover:scale-105"
+        style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+        title="Actualizar métricas"
+      >
+        <RefreshCw className={`h-3 w-3 ${loadingKpis ? 'animate-spin' : ''}`} />
+      </button>
+
+      {/* Separador */}
+      <div className="h-6 w-px mx-1" style={{ backgroundColor: theme.border }} />
+
+      {/* Botones de formato */}
+      {[
+        { key: 'cards', icon: <LayoutGrid className="h-3 w-3" />, label: 'Cards' },
+        { key: 'table', icon: <Table2 className="h-3 w-3" />, label: 'Tabla' },
+        { key: 'list', icon: <List className="h-3 w-3" />, label: 'Lista' },
+        { key: 'timeline', icon: <Clock className="h-3 w-3" />, label: 'Timeline' },
+        { key: 'ranking', icon: <Trophy className="h-3 w-3" />, label: 'Ranking' },
+        { key: 'tabs', icon: <FolderKanban className="h-3 w-3" />, label: 'Tabs' },
+        { key: 'dashboard', icon: <Gauge className="h-3 w-3" />, label: 'Dashboard' },
+      ].map(fmt => (
+        <button
+          key={fmt.key}
+          onClick={() => ejecutarConsulta(fmt.key)}
+          disabled={(!input.trim() && chips.length === 0) || loading}
+          className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:scale-105 disabled:opacity-50"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.textSecondary,
+            border: `1px solid ${theme.border}`
+          }}
+          title={fmt.label}
+        >
+          {fmt.icon}
+          <span className="hidden sm:inline">{fmt.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  // Handler para el input de consulta con autocompletado
+  const handleInputChange = (value: string) => {
+    setInput(value);
+
+    // Obtener la última palabra para autocompletar
+    const words = value.split(/\s+/);
+    const lastWord = words[words.length - 1]?.toLowerCase() || '';
+
+    if (lastWord.length >= 2) {
+      // Buscar coincidencias en tablas
+      const tableMatches = Object.keys(dbSchema).filter(t =>
+        t.toLowerCase().includes(lastWord)
+      );
+
+      if (tableMatches.length > 0) {
+        setShowAutocomplete(true);
+        setAutocompleteFilter(lastWord);
+        setSelectedTable(null);
+        setHighlightedIndex(0);
+      } else {
+        setShowAutocomplete(false);
+      }
+    } else {
+      setShowAutocomplete(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <StickyPageHeader
+        icon={<BarChart2 className="h-5 w-5" />}
+        title="Panel BI"
+        searchPlaceholder="Escribí tu consulta... (ej: traeme reclamos ordenados por fecha)"
+        searchValue={input}
+        onSearchChange={handleInputChange}
+        buttonLabel="Consultar"
+        onButtonClick={() => ejecutarConsulta()}
+        filterPanel={renderFilterPanel()}
+        actions={
+          response && input.trim() ? (
+            <button
+              onClick={() => setShowSaveModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+              title="Guardar consulta"
+            >
+              <Save className="h-4 w-4" />
+            </button>
+          ) : undefined
+        }
+      />
+
+      {/* Dropdown de autocompletado - posicionado debajo del header */}
+      {showAutocomplete && Object.keys(dbSchema).length > 0 && (
+        <div
+          className="fixed z-40 rounded-xl shadow-xl max-h-64 overflow-y-auto"
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+            top: '180px',
+            left: 'calc(var(--sidebar-width, 0px) + 120px)',
+            right: '180px',
+            maxWidth: '600px',
+          }}
+        >
+          {/* Tabla seleccionada como píldora arriba */}
+          {selectedTable && (
+            <div className="px-2 pt-2 pb-1 border-b" style={{ borderColor: theme.border }}>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px]" style={{ color: theme.textSecondary }}>Seleccionada:</span>
+                <button
+                  onClick={() => setSelectedTable(null)}
+                  className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all hover:scale-105"
+                  style={{
+                    backgroundColor: theme.primary,
+                    color: theme.primaryText,
+                  }}
+                >
+                  {selectedTable}
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Si no hay tabla seleccionada, mostrar tablas */}
+          {!selectedTable ? (
+            <div className="p-2">
+              <div className="text-xs font-semibold px-2 py-1 mb-1" style={{ color: theme.textSecondary }}>
+                Tablas (↑↓ navegar, Enter seleccionar)
+              </div>
+              <div className="flex flex-wrap gap-1 p-1">
+                {Object.keys(dbSchema)
+                  .filter(t => t.toLowerCase().includes(autocompleteFilter))
+                  .slice(0, 15)
+                  .map((tableName, idx) => (
+                    <button
+                      key={tableName}
+                      onClick={() => {
+                        // Agregar tabla como chip y mostrar sus campos
+                        setChips(prev => [...prev, { type: 'table', value: tableName }]);
+                        // Limpiar la palabra que estaba escribiendo
+                        const words = input.split(/\s+/);
+                        words.pop();
+                        setInput(words.join(' ') + (words.length > 0 ? ' ' : ''));
+                        setSelectedTable(tableName);
+                        setHighlightedIndex(0);
+                      }}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:scale-105"
+                      style={{
+                        backgroundColor: idx === highlightedIndex ? theme.primary : `${theme.primary}20`,
+                        color: idx === highlightedIndex ? theme.primaryText : theme.primary,
+                        border: `1px solid ${idx === highlightedIndex ? theme.primary : theme.primary + '40'}`
+                      }}
+                    >
+                      {tableName}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : (
+            /* Mostrar campos de la tabla seleccionada */
+            <div className="p-2">
+              <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <span className="text-xs font-semibold" style={{ color: theme.textSecondary }}>
+                  Campos de <span style={{ color: theme.primary }}>{selectedTable}</span>
+                </span>
+                <button
+                  onClick={() => {
+                    setSelectedTable(null);
+                    setHighlightedIndex(0);
+                  }}
+                  className="text-xs px-2 py-0.5 rounded hover:opacity-70"
+                  style={{ color: theme.primary, backgroundColor: `${theme.primary}20` }}
+                >
+                  ← Otras tablas
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1 p-1">
+                {dbSchema[selectedTable]?.map((col, idx) => (
+                  <button
+                    key={col.name}
+                    onClick={() => {
+                      // Agregar campo como chip (sin cerrar dropdown)
+                      setChips(prev => [...prev, { type: 'field', value: col.name, table: selectedTable }]);
+                      inputRef.current?.focus();
+                    }}
+                    className="px-2.5 py-1 rounded-full text-xs transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: idx === highlightedIndex
+                        ? theme.primary
+                        : (col.fk ? `${theme.primary}20` : theme.backgroundSecondary),
+                      color: idx === highlightedIndex
+                        ? theme.primaryText
+                        : (col.fk ? theme.primary : theme.text),
+                      border: `1px solid ${idx === highlightedIndex ? theme.primary : (col.fk ? theme.primary + '40' : theme.border)}`
+                    }}
+                    title={`${col.type}${col.fk ? ` → ${col.fk}` : ''}`}
+                  >
+                    {col.name}
+                    {col.fk && <span className="ml-1 opacity-60">→</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Cerrar */}
+          <div className="border-t px-2 py-1.5" style={{ borderColor: theme.border }}>
+            <button
+              onClick={() => {
+                setShowAutocomplete(false);
+                setSelectedTable(null);
+              }}
+              className="text-xs w-full text-center"
+              style={{ color: theme.textSecondary }}
+            >
+              Esc para cerrar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content - Grid de 3 columnas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -641,292 +837,8 @@ export default function PanelBI() {
           </div>
         </div>
 
-        {/* Columna Central - Input y Resultados */}
+        {/* Columna Central - Resultados */}
         <div className="lg:col-span-6">
-          {/* Input de consulta con autocompletado */}
-          <div
-            className="rounded-xl p-4 mb-4"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex gap-2">
-              <div className="flex-1">
-                {/* Input con autocompletado */}
-                <div className="relative">
-                  {/* Input de texto */}
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={input}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setInput(value);
-
-                      // Obtener la última palabra para autocompletar
-                      const words = value.split(/\s+/);
-                      const lastWord = words[words.length - 1]?.toLowerCase() || '';
-
-                      if (lastWord.length >= 2) {
-                        // Buscar coincidencias en tablas
-                        const tableMatches = Object.keys(dbSchema).filter(t =>
-                          t.toLowerCase().includes(lastWord)
-                        );
-
-                        if (tableMatches.length > 0) {
-                          setShowAutocomplete(true);
-                          setAutocompleteFilter(lastWord);
-                          setSelectedTable(null);
-                          setHighlightedIndex(0);
-                        } else {
-                          setShowAutocomplete(false);
-                        }
-                      } else {
-                        setShowAutocomplete(false);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (showAutocomplete) {
-                        const items = selectedTable
-                          ? dbSchema[selectedTable] || []
-                          : Object.keys(dbSchema).filter(t => t.toLowerCase().includes(autocompleteFilter)).slice(0, 15);
-
-                        if (e.key === 'ArrowDown') {
-                          e.preventDefault();
-                          setHighlightedIndex(prev => Math.min(prev + 1, items.length - 1));
-                        } else if (e.key === 'ArrowUp') {
-                          e.preventDefault();
-                          setHighlightedIndex(prev => Math.max(prev - 1, 0));
-                        } else if (e.key === 'Enter' || e.key === 'Tab') {
-                          e.preventDefault();
-                          if (selectedTable) {
-                            // Insertar campo en el texto
-                            const col = items[highlightedIndex] as { name: string };
-                            if (col) {
-                              const words = input.split(/\s+/);
-                              words.pop();
-                              setInput(words.join(' ') + (words.length > 0 ? ' ' : '') + `${selectedTable}.${col.name} `);
-                              setShowAutocomplete(false);
-                              setSelectedTable(null);
-                              setHighlightedIndex(0);
-                            }
-                          } else {
-                            // Insertar tabla en el texto y mostrar campos
-                            const tableName = items[highlightedIndex] as string;
-                            if (tableName) {
-                              const words = input.split(/\s+/);
-                              words.pop();
-                              setInput(words.join(' ') + (words.length > 0 ? ' ' : '') + tableName + ' ');
-                              setSelectedTable(tableName);
-                              setHighlightedIndex(0);
-                            }
-                          }
-                        } else if (e.key === 'Escape') {
-                          setShowAutocomplete(false);
-                          setSelectedTable(null);
-                          setHighlightedIndex(0);
-                        }
-                      } else {
-                        if (e.key === 'Enter') ejecutarConsulta();
-                      }
-                    }}
-                    onBlur={() => {
-                      setTimeout(() => {
-                        setShowAutocomplete(false);
-                        setSelectedTable(null);
-                      }, 200);
-                    }}
-                    placeholder="Escribí tu consulta... (ej: traeme reclamos ordenados por fecha)"
-                    className="w-full px-3 py-2.5 rounded-xl text-sm"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      color: theme.text,
-                      border: `1px solid ${theme.border}`,
-                    }}
-                  />
-
-                {/* Dropdown de autocompletado */}
-                {showAutocomplete && Object.keys(dbSchema).length > 0 && (
-                  <div
-                    className="absolute top-full left-0 right-0 mt-1 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto"
-                    style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-                  >
-                    {/* Tabla seleccionada como píldora arriba */}
-                    {selectedTable && (
-                      <div className="px-2 pt-2 pb-1 border-b" style={{ borderColor: theme.border }}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px]" style={{ color: theme.textSecondary }}>Seleccionada:</span>
-                          <button
-                            onClick={() => setSelectedTable(null)}
-                            className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all hover:scale-105"
-                            style={{
-                              backgroundColor: theme.primary,
-                              color: theme.primaryText,
-                            }}
-                          >
-                            {selectedTable}
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Si no hay tabla seleccionada, mostrar tablas */}
-                    {!selectedTable ? (
-                      <div className="p-2">
-                        <div className="text-xs font-semibold px-2 py-1 mb-1" style={{ color: theme.textSecondary }}>
-                          Tablas (↑↓ navegar, Enter seleccionar)
-                        </div>
-                        <div className="flex flex-wrap gap-1 p-1">
-                          {Object.keys(dbSchema)
-                            .filter(t => t.toLowerCase().includes(autocompleteFilter))
-                            .slice(0, 15)
-                            .map((tableName, idx) => (
-                              <button
-                                key={tableName}
-                                onClick={() => {
-                                  // Agregar tabla como chip y mostrar sus campos
-                                  setChips(prev => [...prev, { type: 'table', value: tableName }]);
-                                  // Limpiar la palabra que estaba escribiendo
-                                  const words = input.split(/\s+/);
-                                  words.pop();
-                                  setInput(words.join(' ') + (words.length > 0 ? ' ' : ''));
-                                  setSelectedTable(tableName);
-                                  setHighlightedIndex(0);
-                                }}
-                                className="px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:scale-105"
-                                style={{
-                                  backgroundColor: idx === highlightedIndex ? theme.primary : `${theme.primary}20`,
-                                  color: idx === highlightedIndex ? theme.primaryText : theme.primary,
-                                  border: `1px solid ${idx === highlightedIndex ? theme.primary : theme.primary + '40'}`
-                                }}
-                              >
-                                {tableName}
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Mostrar campos de la tabla seleccionada */
-                      <div className="p-2">
-                        <div className="flex items-center justify-between px-2 py-1 mb-1">
-                          <span className="text-xs font-semibold" style={{ color: theme.textSecondary }}>
-                            Campos de <span style={{ color: theme.primary }}>{selectedTable}</span>
-                          </span>
-                          <button
-                            onClick={() => {
-                              setSelectedTable(null);
-                              setHighlightedIndex(0);
-                            }}
-                            className="text-xs px-2 py-0.5 rounded hover:opacity-70"
-                            style={{ color: theme.primary, backgroundColor: `${theme.primary}20` }}
-                          >
-                            ← Otras tablas
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1 p-1">
-                          {dbSchema[selectedTable]?.map((col, idx) => (
-                            <button
-                              key={col.name}
-                              onClick={() => {
-                                // Agregar campo como chip (sin cerrar dropdown)
-                                setChips(prev => [...prev, { type: 'field', value: col.name, table: selectedTable }]);
-                                inputRef.current?.focus();
-                              }}
-                              className="px-2.5 py-1 rounded-full text-xs transition-all hover:scale-105"
-                              style={{
-                                backgroundColor: idx === highlightedIndex
-                                  ? theme.primary
-                                  : (col.fk ? `${theme.primary}20` : theme.backgroundSecondary),
-                                color: idx === highlightedIndex
-                                  ? theme.primaryText
-                                  : (col.fk ? theme.primary : theme.text),
-                                border: `1px solid ${idx === highlightedIndex ? theme.primary : (col.fk ? theme.primary + '40' : theme.border)}`
-                              }}
-                              title={`${col.type}${col.fk ? ` → ${col.fk}` : ''}`}
-                            >
-                              {col.name}
-                              {col.fk && <span className="ml-1 opacity-60">→</span>}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Cerrar */}
-                    <div className="border-t px-2 py-1.5" style={{ borderColor: theme.border }}>
-                      <button
-                        onClick={() => {
-                          setShowAutocomplete(false);
-                          setSelectedTable(null);
-                        }}
-                        className="text-xs w-full text-center"
-                        style={{ color: theme.textSecondary }}
-                      >
-                        Esc para cerrar
-                      </button>
-                    </div>
-                  </div>
-                )}
-                </div>
-              </div>
-              <button
-                onClick={() => ejecutarConsulta()}
-                disabled={(!input.trim() && chips.length === 0) || loading}
-                className="px-4 py-3 rounded-xl flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                  color: theme.primaryText
-                }}
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
-            </div>
-
-            {/* Botones de formato - ejecutan la consulta directamente con ese formato */}
-            <div className="flex flex-wrap items-center gap-1 mt-2">
-              {[
-                { key: 'cards', icon: <LayoutGrid className="h-3 w-3" />, label: 'Cards' },
-                { key: 'table', icon: <Table2 className="h-3 w-3" />, label: 'Tabla' },
-                { key: 'list', icon: <List className="h-3 w-3" />, label: 'Lista' },
-                { key: 'timeline', icon: <Clock className="h-3 w-3" />, label: 'Timeline' },
-                { key: 'wizard', icon: <ListOrdered className="h-3 w-3" />, label: 'Wizard' },
-                { key: 'ranking', icon: <Trophy className="h-3 w-3" />, label: 'Ranking' },
-                { key: 'tabs', icon: <FolderKanban className="h-3 w-3" />, label: 'Tabs' },
-                { key: 'dashboard', icon: <Gauge className="h-3 w-3" />, label: 'Dashboard' },
-              ].map(fmt => (
-                <button
-                  key={fmt.key}
-                  onClick={() => ejecutarConsulta(fmt.key)}
-                  disabled={(!input.trim() && chips.length === 0) || loading}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:scale-105 disabled:opacity-50"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    color: theme.textSecondary,
-                    border: `1px solid ${theme.border}`
-                  }}
-                  title={fmt.label}
-                >
-                  {fmt.icon}
-                  {fmt.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Botón guardar consulta */}
-            {response && input.trim() && (
-              <div className="flex justify-end mt-2">
-                <button
-                  onClick={() => setShowSaveModal(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors"
-                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
-                >
-                  <Save className="h-3 w-3" />
-                  Guardar consulta
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Resultado */}
           {loading ? (
             <div
               className="rounded-xl p-8 text-center"
