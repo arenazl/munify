@@ -846,27 +846,6 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
-          {/* Barra secundaria: Municipalidad de X (solo mobile, en desktop está en el header) */}
-          <div
-            className="mb-4 px-4 py-2.5 rounded-xl flex sm:hidden items-center justify-center gap-2"
-            style={{
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            <img
-              src={new URL('../assets/munify_logo.png', import.meta.url).href}
-              alt="Munify"
-              className="h-5 w-5 object-contain"
-            />
-            <span className="text-sm font-medium" style={{ color: theme.textSecondary }}>
-              Municipalidad de
-            </span>
-            <span className="text-sm font-semibold" style={{ color: theme.text }}>
-              {municipioActual?.nombre || 'Sin municipio'}
-            </span>
-          </div>
-
           {/* Banner de activar notificaciones - visible para todos si no están activas */}
           {!pushSubscribed && (
             <div
