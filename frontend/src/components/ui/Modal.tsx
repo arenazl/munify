@@ -9,7 +9,7 @@ interface ModalProps {
   children: ReactNode;
   title?: string;
   description?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
   showCloseButton?: boolean;
   closeOnBackdrop?: boolean;
   footer?: ReactNode;
@@ -20,7 +20,10 @@ const sizeClasses = {
   md: '28rem',    // max-w-md
   lg: '32rem',    // max-w-lg
   xl: '36rem',    // max-w-xl
-  full: '64rem',  // max-w-5xl
+  '2xl': '48rem', // max-w-2xl
+  '3xl': '56rem', // max-w-3xl
+  '4xl': '64rem', // max-w-4xl
+  full: '80rem',  // max-w-6xl
 };
 
 /**

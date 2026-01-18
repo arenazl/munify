@@ -1,0 +1,14 @@
+{
+  "id": "table",
+  "nombre": "Tabla",
+  "descripcion": "Muestra los datos en formato de tabla con columnas",
+  "palabras_clave": [],
+  "template_html": "<table style=\"width:100%;border-collapse:collapse;font-size:13px\">\n<thead><tr style=\"background:#f8f5f0;border-bottom:2px solid #e5e0d8\">\n<th style=\"padding:12px;text-align:left;font-weight:600;color:#5c4d3d\">Columna</th>\n</tr></thead>\n<tbody>\n<tr style=\"border-bottom:1px solid #f0ebe3\"><td style=\"padding:10px 12px;color:#5c4d3d\">Valor</td></tr>\n</tbody>\n</table>",
+  "instrucciones": [
+    "Incluí todas las columnas relevantes de los datos",
+    "Mostrá todos los registros",
+    "Usá colores sobrios"
+  ],
+  "paginacion": 50,
+  "mostrar_grilla": false
+}

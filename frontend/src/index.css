@@ -203,3 +203,70 @@ html, body {
 .leaflet-marker-icon {
   cursor: pointer;
 }
+
+/* ============================================
+   CHAT WIDGET - Estilos para mensajes
+   ============================================ */
+
+/* Cards del chat con fondo claro necesitan texto oscuro */
+.chat-message div[style*="background:#f8f9fa"],
+.chat-message div[style*="background: #f8f9fa"],
+.chat-message div[style*="background:#dbeafe"],
+.chat-message div[style*="background: #dbeafe"] {
+  color: #1e293b !important;
+}
+
+/* Contenido dentro de cards con fondo claro */
+.chat-message div[style*="background:#f8f9fa"] div[style*="padding"],
+.chat-message div[style*="background: #f8f9fa"] div[style*="padding"],
+.chat-message div[style*="background:#dbeafe"] div[style*="padding"],
+.chat-message div[style*="background: #dbeafe"] div[style*="padding"] {
+  color: #1e293b !important;
+}
+
+/* Texto dentro de párrafos en cards claras */
+.chat-message div[style*="background:#f8f9fa"] p,
+.chat-message div[style*="background:#f8f9fa"] span,
+.chat-message div[style*="background:#f8f9fa"] li,
+.chat-message div[style*="background:#dbeafe"] p,
+.chat-message div[style*="background:#dbeafe"] span,
+.chat-message div[style*="background:#dbeafe"] li {
+  color: #1e293b !important;
+}
+
+/* Headers con fondo azul mantienen texto blanco */
+.chat-message div[style*="background:#2563eb"],
+.chat-message div[style*="background: #2563eb"] {
+  color: white !important;
+}
+
+/* Links usan variable CSS del tema */
+.chat-message a {
+  color: var(--chat-accent-color, #3b82f6);
+  cursor: pointer;
+}
+
+.chat-message a:hover {
+  text-decoration: underline;
+}
+
+/* Strong/bold dentro de mensajes */
+.chat-message strong,
+.chat-message b {
+  color: inherit !important;
+}
+
+/* Bullets con color de acento del tema */
+.chat-message ul {
+  list-style: none;
+  padding-left: 20px;
+}
+
+.chat-message ul li::before {
+  content: "•";
+  color: var(--chat-accent-color, #3b82f6);
+  font-weight: bold;
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+}

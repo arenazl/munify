@@ -158,7 +158,7 @@ from groq import Groq
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 response = client.chat.completions.create(
-    model="llama-3.1-70b-versatile",
+    model="groq/compound-mini",
     messages=[{"role": "user", "content": mensaje}]
 )
 ```

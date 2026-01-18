@@ -401,7 +401,9 @@ async def obtener_tramite_catalogo(
 ):
     """Obtiene un trámite del catálogo por ID"""
     result = await db.execute(
-        select(Tramite).where(Tramite.id == tramite_id)
+        select(Tramite)
+        .options(selectinload(Tramite.tipo_tramite))
+        .where(Tramite.id == tramite_id)
     )
     tramite = result.scalar_one_or_none()
 
@@ -603,7 +605,9 @@ async def actualizar_tramite_catalogo(
 ):
     """Actualiza un trámite del catálogo"""
     result = await db.execute(
-        select(Tramite).where(Tramite.id == tramite_id)
+        select(Tramite)
+        .options(selectinload(Tramite.tipo_tramite))
+        .where(Tramite.id == tramite_id)
     )
     tramite = result.scalar_one_or_none()
 

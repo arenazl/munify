@@ -24,9 +24,121 @@ from models.enums import EstadoReclamo
 from services import chat_service
 from services.chat_session import get_landing_storage, get_user_storage
 import json
+import re
+import os
+from pathlib import Path
 
 
 router = APIRouter()
+
+# ==================== SISTEMA DE TEMPLATES ====================
+
+TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+_TEMPLATES_CACHE: dict = {}
+
+def load_template(template_id: str) -> dict | None:
+    """Carga un template desde el archivo JSON"""
+    global _TEMPLATES_CACHE
+
+    # Debug: mostrar qué template se está cargando
+    print(f"[TEMPLATES] Cargando template: {template_id}")
+
+    if template_id in _TEMPLATES_CACHE:
+        print(f"[TEMPLATES] Usando cache para: {template_id}")
+        return _TEMPLATES_CACHE[template_id]
+
+    template_path = TEMPLATES_DIR / f"{template_id}.json"
+    if not template_path.exists():
+        print(f"[TEMPLATES] Template no encontrado: {template_id}")
+        return None
+
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template = json.load(f)
+            _TEMPLATES_CACHE[template_id] = template
+            return template
+    except Exception as e:
+        print(f"[TEMPLATES] Error cargando template {template_id}: {e}")
+        return None
+
+def load_templates_index() -> dict | None:
+    """Carga el índice de templates con reglas de detección"""
+    index_path = TEMPLATES_DIR / "_index.json"
+    if not index_path.exists():
+        return None
+
+    try:
+        with open(index_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"[TEMPLATES] Error cargando índice: {e}")
+        return None
+
+def detectar_formato_automatico(pregunta: str) -> str | None:
+    """Detecta el formato automático basado en palabras clave de la consulta"""
+    pregunta_lower = pregunta.lower()
+    index = load_templates_index()
+
+    if not index or 'deteccion_automatica' not in index:
+        return None
+
+    for regla in index['deteccion_automatica']['reglas']:
+        for palabra in regla['palabras']:
+            if palabra in pregunta_lower:
+                print(f"[TEMPLATES] Detectado formato '{regla['template']}' por palabra '{palabra}'")
+                return regla['template']
+
+    return None
+
+def get_template_prompt(template_id: str, total: int) -> str | None:
+    """Genera el prompt para un template específico"""
+    print(f"[TEMPLATES] Generando prompt para template: {template_id}")
+    template = load_template(template_id)
+    if not template:
+        print(f"[TEMPLATES] ERROR: No se pudo cargar template {template_id}")
+        return None
+
+    print(f"[TEMPLATES] Template cargado: {template.get('nombre', 'SIN NOMBRE')}")
+    prompt_parts = [f"FORMATO SOLICITADO: {template['nombre'].upper()}"]
+    prompt_parts.append(f"\n{template.get('descripcion', '')}")
+    prompt_parts.append(f"\nTemplate HTML de ejemplo:\n{template.get('template_html', '')}")
+
+    if template.get('instrucciones'):
+        prompt_parts.append("\n\nINSTRUCCIONES:")
+        for instruccion in template['instrucciones']:
+            # Reemplazar {total} en las instrucciones
+            instruccion = instruccion.replace('{total}', str(total))
+            prompt_parts.append(f"- {instruccion}")
+
+    if template.get('variantes_color'):
+        prompt_parts.append("\n\nVariantes de color disponibles:")
+        for nombre, colores in template['variantes_color'].items():
+            prompt_parts.append(f"- {nombre}: {colores}")
+
+    if template.get('variantes_estado'):
+        prompt_parts.append("\n\nColores por estado:")
+        for estado, colores in template['variantes_estado'].items():
+            prompt_parts.append(f"- {estado}: {colores}")
+
+    # Agregar regla CRÍTICA sobre estilos inline
+    prompt_parts.append("""
+
+⛔⛔⛔ REGLAS CRÍTICAS - VIOLACIÓN = RESPUESTA INVÁLIDA ⛔⛔⛔
+
+PROHIBIDO (si hacés esto, tu respuesta será descartada):
+❌ NO uses markdown (**, ##, ```, listas con *, -)
+❌ NO uses bloques de código (```html, ```css, ```javascript)
+❌ NO generes JavaScript ni <script>
+❌ NO uses clases CSS (class="...")
+❌ NO expliques el código, NO des instrucciones
+
+OBLIGATORIO:
+✅ Respuesta ÚNICAMENTE en HTML puro con estilos inline (style="...")
+✅ El HTML debe empezar con <div y terminar con </div>
+✅ Sin texto antes ni después del HTML
+✅ Español rioplatense si hay texto visible en el HTML""")
+
+    return "\n".join(prompt_parts)
 
 
 class ChatRequest(BaseModel):
@@ -72,96 +184,150 @@ class ValidarDuplicadoRequest(BaseModel):
     tipo: str  # "categoria", "zona", "tipo_tramite", "tramite"
 
 
+def generar_html_categorias(categorias: list[dict]) -> str:
+    """Genera HTML de categorías para mostrar directo al usuario"""
+    if not categorias:
+        return '<p style="margin:8px 0">No hay categorías disponibles en este momento.</p>'
+
+    cats_items = "".join([
+        f'<li style="margin:4px 0;list-style-type:disc"><a href="/gestion/reclamos?categoria={c["nombre"]}" style="color:#2563eb">{c["nombre"]}</a></li>'
+        for c in categorias
+    ])
+    return f'<p style="margin:8px 0">Estas son las categorías de reclamos disponibles:</p><div style="background:#f8f9fa;border-radius:12px;margin:8px 0;border:1px solid #e2e8f0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Categorías de Reclamos</div><div style="padding:12px 14px"><ul style="margin:0;padding-left:20px;list-style-type:disc">{cats_items}</ul></div></div>'
+
+
+def generar_html_tramites(tramites: list[dict]) -> str:
+    """Genera HTML de trámites agrupados por tipo para mostrar directo al usuario"""
+    if not tramites:
+        return '<p style="margin:8px 0">No hay trámites disponibles en este momento.</p>'
+
+    tipos_content = ""
+    for tipo in tramites:
+        subtipos = tipo.get('subtipos', [])
+        if subtipos:
+            items = "".join([
+                f'<li style="margin:4px 0;list-style-type:disc"><a href="/gestion/tramites?tramite={s["nombre"]}" style="color:#2563eb">{s["nombre"]}</a></li>'
+                for s in subtipos
+            ])
+            tipos_content += f'<strong>{tipo["nombre"]}:</strong><ul style="margin:4px 0 12px 0;padding-left:20px;list-style-type:disc">{items}</ul>'
+
+    return f'<p style="margin:8px 0">Estos son los trámites que podés realizar:</p><div style="background:#f8f9fa;border-radius:12px;margin:8px 0;border:1px solid #e2e8f0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Trámites</div><div style="padding:12px 14px">{tipos_content}</div></div>'
+
+
+def detectar_intencion_listado(mensaje: str) -> str | None:
+    """
+    Detecta si el usuario quiere ver un listado de trámites o categorías.
+    Retorna: 'tramites', 'categorias', o None si no es un listado.
+    """
+    mensaje_lower = mensaje.lower()
+
+    # Palabras clave para trámites
+    palabras_tramites = ['tramite', 'trámite', 'tramites', 'trámites', 'gestiones', 'gestión', 'gestion']
+    # Palabras clave para categorías/reclamos
+    palabras_categorias = ['categoria', 'categoría', 'categorias', 'categorías', 'reclamo', 'reclamos', 'problema', 'problemas', 'reportar', 'denunciar']
+    # Palabras que indican listado
+    palabras_listado = ['lista', 'listado', 'listame', 'listá', 'cuales', 'cuáles', 'que', 'qué', 'mostrame', 'mostrá', 'decime', 'decí', 'ver', 'todos', 'todas', 'disponibles', 'hay', 'tienen', 'ofrecen', 'puedo']
+
+    tiene_listado = any(p in mensaje_lower for p in palabras_listado)
+    tiene_tramites = any(p in mensaje_lower for p in palabras_tramites)
+    tiene_categorias = any(p in mensaje_lower for p in palabras_categorias)
+
+    if tiene_listado or tiene_tramites or tiene_categorias:
+        # Si menciona trámites explícitamente
+        if tiene_tramites:
+            return 'tramites'
+        # Si menciona categorías/reclamos explícitamente
+        if tiene_categorias:
+            return 'categorias'
+
+    return None
+
+
 def build_system_prompt(categorias: list[dict], tramites: list[dict] = None, telefono_contacto: str = None) -> str:
     """Construye el prompt del sistema con las categorías y trámites del municipio"""
-    # Lista de categorías simple
-    cats_list = "\n".join([f"- {c['nombre']}" for c in categorias]) if categorias else "(Sin categorías)"
 
-    # Lista jerárquica de trámites
-    tramites_list = ""
+    # Generar HTML de categorías listo para usar
+    cats_html = ""
+    if categorias:
+        cats_items = "".join([
+            f'<li style="margin:4px 0;list-style-type:disc"><a href="/gestion/reclamos?categoria={c["nombre"]}" style="color:#2563eb">{c["nombre"]}</a></li>'
+            for c in categorias
+        ])
+        cats_html = f'<div style="background:#f8f9fa;border-radius:12px;margin:8px 0;border:1px solid #e2e8f0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Categorías de Reclamos</div><div style="padding:12px 14px"><ul style="margin:0;padding-left:20px;list-style-type:disc">{cats_items}</ul></div></div>'
+
+    # Generar HTML de trámites agrupados por tipo
+    tramites_html = ""
     if tramites:
-        lines = []
+        tipos_content = ""
         for tipo in tramites:
             subtipos = tipo.get('subtipos', [])
             if subtipos:
-                subtipos_names = ", ".join([s['nombre'] for s in subtipos])
-                lines.append(f"- {tipo['nombre']}: {subtipos_names}")
-            else:
-                lines.append(f"- {tipo['nombre']}")
-        tramites_list = "\n".join(lines)
-    else:
-        tramites_list = "(Sin trámites configurados)"
+                items = "".join([
+                    f'<li style="margin:4px 0;list-style-type:disc"><a href="/gestion/tramites?tramite={s["nombre"]}" style="color:#2563eb">{s["nombre"]}</a></li>'
+                    for s in subtipos
+                ])
+                tipos_content += f'<strong>{tipo["nombre"]}:</strong><ul style="margin:4px 0 12px 0;padding-left:20px;list-style-type:disc">{items}</ul>'
+
+        tramites_html = f'<div style="background:#f8f9fa;border-radius:12px;margin:8px 0;border:1px solid #e2e8f0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Trámites</div><div style="padding:12px 14px">{tipos_content}</div></div>'
 
     # Teléfono de contacto
-    tel_info = f"Teléfono de contacto: {telefono_contacto}" if telefono_contacto else ""
+    tel_info = f"\n📞 Teléfono de contacto: {telefono_contacto}" if telefono_contacto else ""
 
-    return f"""Sos el asistente virtual de Munify, un sistema de gestión municipal que conecta vecinos con su municipio.
+    return f"""Sos el asistente virtual de Munify. Hablás en español rioplatense (vos, podés, tenés).
 
-QUÉ ES MUNIFY:
-Una app para reportar problemas del barrio y hacer trámites municipales 100% digital.
-El vecino reporta → el municipio gestiona → se resuelve → el vecino recibe notificación.
+SOBRE MUNIFY:
+Munify es una plataforma que conecta a los vecinos con su municipio. Permite:
+- Reportar problemas del barrio (baches, luminarias, basura, árboles caídos, etc.)
+- Realizar trámites municipales online sin ir a la municipalidad
+- Seguir el estado de tus reclamos y trámites en tiempo real
+- Ver en un mapa los problemas reportados en tu zona
 
-CÓMO FUNCIONA PARA CADA ROL:
+CÓMO FUNCIONA UN RECLAMO:
+1. El vecino reporta un problema con fotos y ubicación
+2. El municipio lo revisa y asigna una cuadrilla
+3. La cuadrilla va al lugar y resuelve el problema
+4. El vecino recibe notificación cuando está resuelto
 
-Vecino/Ciudadano:
-- Reporta problemas en segundos desde el celular (foto + GPS automático)
-- Recibe notificaciones de cada cambio de estado
-- Puede hacer trámites sin ir al municipio
-
-Empleado Municipal:
-- Recibe trabajos automáticamente en su celular
-- Actualiza estados y sube fotos antes/después
-
-Supervisor:
-- Ve dashboards en tiempo real con métricas y mapas de calor
-
-CATEGORÍAS DE RECLAMOS DISPONIBLES:
-{cats_list}
-
-TRÁMITES DISPONIBLES:
-{tramites_list}
-
+VENTAJAS:
+- 100% digital, sin papeles ni colas
+- Seguimiento transparente de cada gestión
+- Fotos de antes y después de cada trabajo
+- Notificaciones en cada paso del proceso
 {tel_info}
 
-FORMATO DE RESPUESTA:
-Respondé SOLO en HTML con estilos inline. NO escribas texto explicativo como "CARD:" o "Aquí va...". Solo devolvé el HTML directamente.
+CATEGORÍAS DE RECLAMOS DISPONIBLES:
+Alumbrado, Bacheo, Limpieza, Arbolado, Tránsito, Agua, Cloacas, Espacios Verdes, entre otras.
 
-Ejemplos de estilos a usar:
+TU ROL:
+Sos un asistente amigable que ayuda a los vecinos a entender qué pueden hacer en Munify, cómo reportar problemas o hacer trámites. Respondé de forma breve y clara (2-3 oraciones máximo). Si te piden listados, mostralos completos.
 
-Para agrupar info con título destacado:
-<div style="background:#f8f9fa;border-radius:12px;margin:8px 0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Título</div><div style="padding:12px 14px">Contenido</div></div>
-
-Para listas de pasos:
-<ol style="margin:8px 0;padding-left:20px"><li style="margin:6px 0">Paso</li></ol>
-
-Para info importante:
-<div style="background:#dbeafe;border-left:4px solid #2563eb;padding:12px;border-radius:0 8px 8px 0;margin:8px 0"><strong>ℹ️ Info</strong><br>Detalle</div>
-
-Para texto simple:
-<p style="margin:8px 0">Texto</p>
-
-REGLAS:
-- Sé breve y directo
-- Usá español rioplatense (vos, podés, tenés)
+ESTILO:
+- Respuestas CORTAS y directas (esto es un chat, no un manual)
+- Usá HTML para formato: <p>, <strong>, <ul>, <li>
 - NO uses markdown, SOLO HTML
-- NO escribas "CARD:", "LISTA:", ni nombres de templates
-- Usá emojis en los títulos (📋 📝 ✅ 📍 🏠)
+- Sé conversacional, como un vecino que ayuda a otro
 
-LINKS INTERACTIVOS:
-Cuando listes trámites o categorías, hacelos clickeables con este formato EXACTO:
-- Para trámites: <a href="#" class="chatLink" data-mensaje="Quiero hacer el trámite de NOMBRE" style="color:#2563eb;cursor:pointer">NOMBRE</a>
-- Para categorías: <a href="#" class="chatLink" data-mensaje="Quiero reportar un problema de NOMBRE" style="color:#2563eb;cursor:pointer">NOMBRE</a>
+CUANDO PIDAN VER CATEGORÍAS:
+{cats_html}
 
-Ejemplo correcto:
-<a href="#" class="chatLink" data-mensaje="Quiero hacer el trámite de Licencia de Conducir" style="color:#2563eb;cursor:pointer">Licencia de Conducir</a>"""
+CUANDO PIDAN VER TRÁMITES:
+{tramites_html}"""
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
-    """Obtiene las categorías activas del municipio"""
-    query = select(Categoria).where(
-        Categoria.municipio_id == municipio_id,
-        Categoria.activo == True
-    ).order_by(Categoria.nombre)
+    """Obtiene las categorías activas del municipio via tabla intermedia"""
+    from models.categoria import MunicipioCategoria
+
+    query = (
+        select(Categoria)
+        .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
+        .where(
+            MunicipioCategoria.municipio_id == municipio_id,
+            MunicipioCategoria.activo == True,
+            Categoria.activo == True
+        )
+        .order_by(Categoria.nombre)
+    )
 
     result = await db.execute(query)
     categorias = result.scalars().all()
@@ -170,51 +336,42 @@ async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[
 
 
 async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
-    """Obtiene los tipos de trámites y sus subtipos activos del municipio"""
-    # Obtener TipoTramite con sus Tramites (subtipos)
+    """Obtiene los trámites activos del municipio, agrupados por tipo"""
+    # Obtener trámites habilitados para el municipio (misma lógica que el endpoint de trámites)
     query = (
-        select(TipoTramite)
-        .options(selectinload(TipoTramite.tramites))
-        .join(MunicipioTipoTramite, MunicipioTipoTramite.tipo_tramite_id == TipoTramite.id)
+        select(Tramite)
+        .join(MunicipioTramite, Tramite.id == MunicipioTramite.tramite_id)
+        .options(selectinload(Tramite.tipo_tramite))
         .where(
-            MunicipioTipoTramite.municipio_id == municipio_id,
-            MunicipioTipoTramite.activo == True,
-            TipoTramite.activo == True
+            MunicipioTramite.municipio_id == municipio_id,
+            MunicipioTramite.activo == True,
+            Tramite.activo == True
         )
-        .order_by(TipoTramite.nombre)
+        .order_by(Tramite.nombre)
     )
 
     result = await db.execute(query)
-    tipos_tramite = result.scalars().unique().all()
+    tramites = result.scalars().all()
 
-    # Obtener IDs de trámites habilitados para este municipio
-    tramites_habilitados_query = (
-        select(MunicipioTramite.tramite_id)
-        .where(
-            MunicipioTramite.municipio_id == municipio_id,
-            MunicipioTramite.activo == True
-        )
-    )
-    tramites_result = await db.execute(tramites_habilitados_query)
-    tramites_habilitados_ids = set(r[0] for r in tramites_result.all())
+    # Agrupar por tipo de trámite
+    tipos_dict = {}
+    for tramite in tramites:
+        tipo = tramite.tipo_tramite
+        if tipo:
+            if tipo.id not in tipos_dict:
+                tipos_dict[tipo.id] = {
+                    "id": tipo.id,
+                    "nombre": tipo.nombre,
+                    "icono": tipo.icono or "file-text",
+                    "subtipos": []
+                }
+            tipos_dict[tipo.id]["subtipos"].append({
+                "id": tramite.id,
+                "nombre": tramite.nombre,
+                "icono": tramite.icono or "file"
+            })
 
-    # Construir estructura jerárquica
-    tramites_list = []
-    for tipo in tipos_tramite:
-        # Filtrar solo trámites habilitados para el municipio
-        subtipos = [
-            t for t in tipo.tramites
-            if t.activo and t.id in tramites_habilitados_ids
-        ]
-
-        tramites_list.append({
-            "id": tipo.id,
-            "nombre": tipo.nombre,
-            "icono": tipo.icono or "file-text",
-            "subtipos": [{"id": s.id, "nombre": s.nombre, "icono": s.icono or "file"} for s in subtipos]
-        })
-
-    return tramites_list
+    return list(tipos_dict.values())
 
 
 @router.post("", response_model=ChatResponse)
@@ -236,16 +393,9 @@ async def chat(
 
     storage = get_user_storage()
 
-    FALLBACK_MUNICIPIO_ID = 48  # Merlo - tiene datos completos
-
     # Obtener categorías y trámites del municipio del usuario
     categorias = await get_categorias_municipio(db, current_user.municipio_id)
     tramites = await get_tramites_municipio(db, current_user.municipio_id)
-
-    # Si el municipio no tiene datos, usar fallback
-    if not categorias and not tramites and current_user.municipio_id != FALLBACK_MUNICIPIO_ID:
-        categorias = await get_categorias_municipio(db, FALLBACK_MUNICIPIO_ID)
-        tramites = await get_tramites_municipio(db, FALLBACK_MUNICIPIO_ID)
 
     # Construir system prompt
     system_prompt = build_system_prompt(categorias, tramites)
@@ -254,7 +404,7 @@ async def chat(
     session_id, is_new = await storage.get_or_create_for_user(
         user_id=current_user.id,
         system_prompt=system_prompt,
-        context={"municipio_id": current_user.municipio_id, "rol": current_user.rol},
+        context={"municipio_id": current_user.municipio_id, "user_id": current_user.id, "rol": current_user.rol},
         session_type="chat"
     )
 
@@ -299,7 +449,7 @@ indicá amablemente que solo podés ayudar con temas relacionados a reclamos de 
 
 Respuesta:"""
 
-    response = await chat_service.chat(prompt, max_tokens=200)
+    response = await chat_service.chat(prompt, max_tokens=20000)
 
     if response:
         return ChatResponse(response=response)
@@ -388,7 +538,6 @@ async def chat_landing(
     Endpoint PÚBLICO para chat desde la landing page.
     Usa sesiones en memoria para mantener contexto sin reenviar el system prompt.
     """
-    FALLBACK_MUNICIPIO_ID = 48  # Merlo - tiene datos completos
     storage = get_landing_storage()
 
     # Verificar si ya existe sesión
@@ -397,7 +546,7 @@ async def chat_landing(
         existing_session = await storage.get_session(request.session_id)
 
     if existing_session:
-        municipio_id = existing_session.get("context", {}).get("municipio_id", FALLBACK_MUNICIPIO_ID)
+        municipio_id = existing_session.get("context", {}).get("municipio_id")
     else:
         municipio_id = request.municipio_id
 
@@ -412,49 +561,111 @@ async def chat_landing(
                 municipio_id = detected["id"]
                 municipio_nombre = detected.get("nombre")
 
-    # Fallback a Merlo si no se detectó
+    # Si no se detectó municipio, responder amablemente y preguntar
     if not municipio_id:
-        municipio_id = FALLBACK_MUNICIPIO_ID
+        # Crear sesión sin municipio para mantener el contexto
+        if not existing_session:
+            session_id = await storage.create_session("", {"municipio_id": None, "esperando_municipio": True})
+        else:
+            session_id = request.session_id
+
+        # Respuesta amigable según el mensaje
+        mensaje_lower = request.message.lower().strip()
+        saludos = ['hola', 'buenas', 'buen dia', 'buen día', 'buenos dias', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'que tal', 'qué tal', 'como estas', 'cómo estás']
+
+        es_saludo = any(s in mensaje_lower for s in saludos)
+
+        if es_saludo:
+            response = '<p style="margin:8px 0">¡Hola! 👋 Bienvenido a <strong>Munify</strong>, tu plataforma para conectar con tu municipio.</p><p style="margin:8px 0">Para poder ayudarte mejor, <strong>¿de qué municipio sos?</strong></p>'
+        else:
+            response = '<p style="margin:8px 0">¡Hola! Soy el asistente de <strong>Munify</strong>. Para darte información sobre trámites y servicios, necesito saber <strong>¿de qué municipio sos?</strong></p>'
+
+        # Guardar en historial
+        await storage.add_message(session_id, "user", request.message)
+        await storage.add_message(session_id, "assistant", response)
+
+        return LandingChatResponse(
+            response=response,
+            session_id=session_id,
+            municipio_id=None,
+            municipio_nombre=None
+        )
 
     # Obtener datos del municipio
     municipio = await db.get(Municipio, municipio_id)
     telefono_contacto = municipio.telefono if municipio else None
 
-    # Si ya existe sesión, usar historial guardado
+    # Obtener categorías y trámites del municipio
+    categorias = await get_categorias_municipio(db, municipio_id)
+    tramites = await get_tramites_municipio(db, municipio_id)
+    system_prompt = build_system_prompt(categorias, tramites, telefono_contacto)
+
+    # Si ya existe sesión, verificar si necesitamos actualizar el municipio
+    municipio_recien_detectado = False
     if existing_session:
         session_id = request.session_id
         history = await storage.get_messages(session_id)
-        system_prompt = await storage.get_system_prompt(session_id)
+        old_municipio_id = existing_session.get("context", {}).get("municipio_id")
+
+        # Si la sesión no tenía municipio y ahora sí, actualizar
+        if not old_municipio_id and municipio_id:
+            await storage.update_session(session_id, system_prompt=system_prompt, context={"municipio_id": municipio_id, "esperando_municipio": False})
+            municipio_recien_detectado = True
+            print(f"[LANDING CHAT] Sesión actualizada con municipio {municipio_id}")
     else:
-        # Nueva sesión: construir system prompt
-        categorias = await get_categorias_municipio(db, municipio_id)
-        tramites = await get_tramites_municipio(db, municipio_id)
-
-        # Si el municipio no tiene datos, usar fallback
-        if not categorias and not tramites and municipio_id != FALLBACK_MUNICIPIO_ID:
-            categorias = await get_categorias_municipio(db, FALLBACK_MUNICIPIO_ID)
-            tramites = await get_tramites_municipio(db, FALLBACK_MUNICIPIO_ID)
-            if not telefono_contacto:
-                fallback_muni = await db.get(Municipio, FALLBACK_MUNICIPIO_ID)
-                telefono_contacto = fallback_muni.telefono if fallback_muni else None
-
-        system_prompt = build_system_prompt(categorias, tramites, telefono_contacto)
+        # Nueva sesión: crear con datos del municipio
         session_id = await storage.create_session(system_prompt, {"municipio_id": municipio_id})
         history = []
 
-    # Construir mensajes para la API
-    context = chat_service.build_chat_messages(
-        system_prompt=system_prompt,
-        message=request.message,
-        history=history
-    )
+    # Si acabamos de detectar el municipio, dar bienvenida directa (sin IA)
+    if municipio_recien_detectado:
+        municipio_nombre = municipio.nombre if municipio else "tu municipio"
+        response = f'<p style="margin:8px 0">¡Genial! Veo que sos de <strong>{municipio_nombre}</strong>. 🏘️</p><p style="margin:8px 0">¿En qué te puedo ayudar? Podés preguntarme sobre <strong>trámites</strong>, <strong>reclamos</strong>, o cualquier duda sobre los servicios municipales.</p>'
 
-    response = await chat_service.chat(context, max_tokens=3000)
+        await storage.add_message(session_id, "user", request.message)
+        await storage.add_message(session_id, "assistant", response)
+
+        return LandingChatResponse(
+            response=response,
+            session_id=session_id,
+            municipio_id=municipio_id,
+            municipio_nombre=municipio_nombre
+        )
+
+    # Detectar si el usuario pide un listado directo (sin pasar por IA)
+    intencion = detectar_intencion_listado(request.message)
+
+    if intencion:
+        # Obtener datos frescos de la BD para el listado
+        if intencion == 'tramites':
+            tramites_data = await get_tramites_municipio(db, municipio_id)
+            response = generar_html_tramites(tramites_data)
+            print(f"[LANDING CHAT] Listado directo de trámites: {len(tramites_data)} tipos")
+        else:  # categorias
+            categorias_data = await get_categorias_municipio(db, municipio_id)
+            response = generar_html_categorias(categorias_data)
+            print(f"[LANDING CHAT] Listado directo de categorías: {len(categorias_data)} categorías")
+    else:
+        # Conversación normal: usar IA
+        context = chat_service.build_chat_messages(
+            system_prompt=system_prompt,
+            message=request.message,
+            history=history
+        )
+        response = await chat_service.chat(context, max_tokens=3000)
 
     # Guardar mensajes en la sesión
     await storage.add_message(session_id, "user", request.message)
     if response:
         await storage.add_message(session_id, "assistant", response)
+
+    # Después de 3-4 interacciones, agregar el teléfono de contacto
+    mensajes_usuario = len([m for m in history if m.get("role") == "user"]) + 1  # +1 por el mensaje actual
+    if mensajes_usuario >= 3 and telefono_contacto:
+        # Solo agregar si no lo agregamos antes
+        ya_mostro_telefono = any("contactanos al" in m.get("content", "").lower() for m in history if m.get("role") == "assistant")
+        if not ya_mostro_telefono:
+            response += f'<p style="margin:12px 0;padding:10px;background:#f0f9ff;border-radius:8px;border-left:4px solid #2563eb">📞 Si preferís, también podés contactarnos directamente al <strong>{telefono_contacto}</strong></p>'
 
     # Obtener nombre del municipio si no lo tenemos
     if not municipio_nombre and municipio:
@@ -575,6 +786,31 @@ class AsistenteRequest(BaseModel):
     message: str
     session_id: Optional[str] = None  # Opcional para backwards compatibility
     history: list[dict] = []  # Deprecated, usar session_id
+
+
+async def get_estadisticas_temporales(db: AsyncSession, municipio_id: int) -> dict:
+    """Obtiene estadísticas de reclamos por período (hoy, esta semana, este mes)"""
+    from datetime import date
+
+    hoy = date.today()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())  # Lunes de esta semana
+    inicio_mes = hoy.replace(day=1)
+
+    query = select(
+        sql_func.count(Reclamo.id).label('total'),
+        sql_func.sum(case((sql_func.date(Reclamo.created_at) == hoy, 1), else_=0)).label('hoy'),
+        sql_func.sum(case((sql_func.date(Reclamo.created_at) >= inicio_semana, 1), else_=0)).label('esta_semana'),
+        sql_func.sum(case((sql_func.date(Reclamo.created_at) >= inicio_mes, 1), else_=0)).label('este_mes'),
+    ).where(Reclamo.municipio_id == municipio_id)
+
+    result = await db.execute(query)
+    row = result.first()
+
+    return {
+        'hoy': row.hoy or 0,
+        'esta_semana': row.esta_semana or 0,
+        'este_mes': row.este_mes or 0,
+    }
 
 
 async def get_estadisticas_reclamos(db: AsyncSession, municipio_id: int) -> dict:
@@ -745,13 +981,17 @@ async def get_tramites_recientes(db: AsyncSession, municipio_id: int, limit: int
 
 async def get_reclamos_por_categoria(db: AsyncSession, municipio_id: int) -> list:
     """Obtiene cantidad de reclamos agrupados por categoría"""
+    from models.categoria import MunicipioCategoria
+
     query = select(
         Categoria.nombre,
         sql_func.count(Reclamo.id).label('cantidad')
     ).join(
         Reclamo, Reclamo.categoria_id == Categoria.id
+    ).join(
+        MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id
     ).where(
-        Categoria.municipio_id == municipio_id
+        MunicipioCategoria.municipio_id == municipio_id
     ).group_by(Categoria.nombre).order_by(sql_func.count(Reclamo.id).desc())
 
     result = await db.execute(query)
@@ -804,10 +1044,837 @@ async def get_empleados_activos(db: AsyncSession, municipio_id: int) -> list:
     return empleados_data
 
 
+# ==================== QUERIES DINÁMICOS PARA CHAT ====================
+
+# Definición de queries disponibles para el asistente
+AVAILABLE_QUERIES = {
+    "reclamos_atrasados": {
+        "descripcion": "Reclamos más antiguos sin resolver (ordenados por antigüedad)",
+        "parametros": ["limit"]
+    },
+    "reclamos_por_estado": {
+        "descripcion": "Lista de reclamos filtrados por estado específico",
+        "parametros": ["estado", "limit"]
+    },
+    "reclamos_por_empleado": {
+        "descripcion": "Reclamos asignados a un empleado específico",
+        "parametros": ["empleado_id", "limit"]
+    },
+    "reclamos_por_categoria": {
+        "descripcion": "Reclamos de una categoría específica",
+        "parametros": ["categoria", "limit"]
+    },
+    "reclamos_por_fecha": {
+        "descripcion": "Reclamos en un rango de fechas",
+        "parametros": ["fecha_inicio", "fecha_fin", "limit"]
+    },
+    "empleados_ranking": {
+        "descripcion": "Ranking de empleados por cantidad de reclamos resueltos",
+        "parametros": ["limit"]
+    },
+    "categorias_ranking": {
+        "descripcion": "Categorías ordenadas por cantidad de reclamos",
+        "parametros": ["limit"]
+    },
+    "usuarios_frecuentes": {
+        "descripcion": "Vecinos que más reclamos han creado",
+        "parametros": ["limit"]
+    },
+    "buscar_reclamo": {
+        "descripcion": "Buscar reclamo por ID o texto en título/descripción",
+        "parametros": ["query"]
+    }
+}
+
+
+async def execute_dynamic_query(
+    db: AsyncSession,
+    municipio_id: int,
+    query_name: str,
+    params: dict
+) -> dict:
+    """Ejecuta un query dinámico y retorna los resultados formateados"""
+
+    limit = params.get("limit", 10)
+
+    if query_name == "reclamos_atrasados":
+        # Reclamos más antiguos que NO están resueltos ni rechazados
+        query = select(Reclamo).options(
+            selectinload(Reclamo.categoria),
+            selectinload(Reclamo.empleado_asignado),
+            selectinload(Reclamo.creador)
+        ).where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.estado.notin_([EstadoReclamo.RESUELTO, EstadoReclamo.RECHAZADO])
+        ).order_by(Reclamo.created_at.asc()).limit(limit)
+
+        result = await db.execute(query)
+        reclamos = result.scalars().all()
+
+        data = []
+        for r in reclamos:
+            dias = (datetime.now() - r.created_at).days if r.created_at else 0
+            data.append({
+                'id': r.id,
+                'titulo': r.titulo,
+                'estado': r.estado.value if r.estado else 'desconocido',
+                'categoria': r.categoria.nombre if r.categoria else 'Sin categoría',
+                'direccion': r.direccion or '',
+                'dias_antiguedad': dias,
+                'fecha_creacion': r.created_at.strftime('%d/%m/%Y') if r.created_at else '',
+                'empleado': f"{r.empleado_asignado.nombre} {r.empleado_asignado.apellido or ''}".strip() if r.empleado_asignado else None,
+                'creador': f"{r.creador.nombre} {r.creador.apellido or ''}".strip() if r.creador else 'Anónimo'
+            })
+
+        return {
+            "query": "reclamos_atrasados",
+            "total": len(data),
+            "descripcion": f"Los {len(data)} reclamos más antiguos sin resolver",
+            "data": data
+        }
+
+    elif query_name == "reclamos_por_estado":
+        estado_str = params.get("estado", "nuevo").lower()
+        estado_map = {
+            "nuevo": EstadoReclamo.NUEVO,
+            "asignado": EstadoReclamo.ASIGNADO,
+            "en_proceso": EstadoReclamo.EN_PROCESO,
+            "pendiente_confirmacion": EstadoReclamo.PENDIENTE_CONFIRMACION,
+            "resuelto": EstadoReclamo.RESUELTO,
+            "rechazado": EstadoReclamo.RECHAZADO
+        }
+        estado = estado_map.get(estado_str)
+
+        if not estado:
+            return {"query": query_name, "error": f"Estado '{estado_str}' no válido", "data": []}
+
+        query = select(Reclamo).options(
+            selectinload(Reclamo.categoria),
+            selectinload(Reclamo.empleado_asignado),
+            selectinload(Reclamo.creador)
+        ).where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.estado == estado
+        ).order_by(Reclamo.created_at.desc()).limit(limit)
+
+        result = await db.execute(query)
+        reclamos = result.scalars().all()
+
+        data = [{
+            'id': r.id,
+            'titulo': r.titulo,
+            'estado': r.estado.value,
+            'categoria': r.categoria.nombre if r.categoria else 'Sin categoría',
+            'direccion': r.direccion or '',
+            'fecha': r.created_at.strftime('%d/%m/%Y') if r.created_at else '',
+            'empleado': f"{r.empleado_asignado.nombre} {r.empleado_asignado.apellido or ''}".strip() if r.empleado_asignado else None,
+            'creador': f"{r.creador.nombre} {r.creador.apellido or ''}".strip() if r.creador else 'Anónimo'
+        } for r in reclamos]
+
+        return {
+            "query": "reclamos_por_estado",
+            "estado": estado_str,
+            "total": len(data),
+            "descripcion": f"{len(data)} reclamos en estado '{estado_str}'",
+            "data": data
+        }
+
+    elif query_name == "reclamos_por_empleado":
+        empleado_id = params.get("empleado_id")
+        if not empleado_id:
+            return {"query": query_name, "error": "Se requiere empleado_id", "data": []}
+
+        query = select(Reclamo).options(
+            selectinload(Reclamo.categoria),
+            selectinload(Reclamo.empleado_asignado)
+        ).where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.empleado_id == int(empleado_id)
+        ).order_by(Reclamo.created_at.desc()).limit(limit)
+
+        result = await db.execute(query)
+        reclamos = result.scalars().all()
+
+        # Obtener nombre del empleado
+        emp_query = select(Empleado).where(Empleado.id == int(empleado_id))
+        emp_result = await db.execute(emp_query)
+        empleado = emp_result.scalar_one_or_none()
+        emp_nombre = f"{empleado.nombre} {empleado.apellido or ''}".strip() if empleado else f"ID {empleado_id}"
+
+        data = [{
+            'id': r.id,
+            'titulo': r.titulo,
+            'estado': r.estado.value if r.estado else 'desconocido',
+            'categoria': r.categoria.nombre if r.categoria else 'Sin categoría',
+            'direccion': r.direccion or '',
+            'fecha': r.created_at.strftime('%d/%m/%Y') if r.created_at else ''
+        } for r in reclamos]
+
+        return {
+            "query": "reclamos_por_empleado",
+            "empleado": emp_nombre,
+            "total": len(data),
+            "descripcion": f"{len(data)} reclamos asignados a {emp_nombre}",
+            "data": data
+        }
+
+    elif query_name == "empleados_ranking":
+        # Ranking por reclamos resueltos
+        query = select(
+            Empleado.id,
+            Empleado.nombre,
+            Empleado.apellido,
+            sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).label('resueltos'),
+            sql_func.count(Reclamo.id).label('total_asignados')
+        ).outerjoin(
+            Reclamo, Reclamo.empleado_id == Empleado.id
+        ).where(
+            Empleado.municipio_id == municipio_id,
+            Empleado.activo == True
+        ).group_by(
+            Empleado.id, Empleado.nombre, Empleado.apellido
+        ).order_by(sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).desc()).limit(limit)
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        data = [{
+            'id': r.id,
+            'nombre': f"{r.nombre} {r.apellido or ''}".strip(),
+            'resueltos': r.resueltos or 0,
+            'total_asignados': r.total_asignados or 0,
+            'efectividad': round((r.resueltos / r.total_asignados * 100) if r.total_asignados else 0, 1)
+        } for r in rows]
+
+        return {
+            "query": "empleados_ranking",
+            "total": len(data),
+            "descripcion": f"Top {len(data)} empleados por reclamos resueltos",
+            "data": data
+        }
+
+    elif query_name == "buscar_reclamo":
+        search_query = params.get("query", "")
+
+        # Buscar por ID si es número
+        if search_query.isdigit():
+            query = select(Reclamo).options(
+                selectinload(Reclamo.categoria),
+                selectinload(Reclamo.empleado_asignado),
+                selectinload(Reclamo.creador)
+            ).where(
+                Reclamo.municipio_id == municipio_id,
+                Reclamo.id == int(search_query)
+            )
+        else:
+            # Buscar por texto en título o descripción
+            query = select(Reclamo).options(
+                selectinload(Reclamo.categoria),
+                selectinload(Reclamo.empleado_asignado),
+                selectinload(Reclamo.creador)
+            ).where(
+                Reclamo.municipio_id == municipio_id,
+                (Reclamo.titulo.ilike(f"%{search_query}%") | Reclamo.descripcion.ilike(f"%{search_query}%"))
+            ).order_by(Reclamo.created_at.desc()).limit(limit)
+
+        result = await db.execute(query)
+        reclamos = result.scalars().all()
+
+        data = [{
+            'id': r.id,
+            'titulo': r.titulo,
+            'descripcion': (r.descripcion[:100] + '...') if r.descripcion and len(r.descripcion) > 100 else r.descripcion,
+            'estado': r.estado.value if r.estado else 'desconocido',
+            'categoria': r.categoria.nombre if r.categoria else 'Sin categoría',
+            'direccion': r.direccion or '',
+            'fecha': r.created_at.strftime('%d/%m/%Y') if r.created_at else '',
+            'empleado': f"{r.empleado_asignado.nombre} {r.empleado_asignado.apellido or ''}".strip() if r.empleado_asignado else None,
+            'creador': f"{r.creador.nombre} {r.creador.apellido or ''}".strip() if r.creador else 'Anónimo'
+        } for r in reclamos]
+
+        return {
+            "query": "buscar_reclamo",
+            "busqueda": search_query,
+            "total": len(data),
+            "descripcion": f"{len(data)} resultados para '{search_query}'",
+            "data": data
+        }
+
+    elif query_name == "categorias_ranking":
+        from models.categoria import MunicipioCategoria
+
+        query = select(
+            Categoria.nombre,
+            sql_func.count(Reclamo.id).label('total'),
+            sql_func.count(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]), 1))).label('pendientes'),
+            sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).label('resueltos')
+        ).join(
+            Reclamo, Reclamo.categoria_id == Categoria.id
+        ).join(
+            MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id
+        ).where(
+            MunicipioCategoria.municipio_id == municipio_id
+        ).group_by(Categoria.nombre).order_by(sql_func.count(Reclamo.id).desc()).limit(limit)
+
+        result = await db.execute(query)
+        rows = result.all()
+
+        data = [{
+            'categoria': r.nombre,
+            'total': r.total,
+            'pendientes': r.pendientes or 0,
+            'resueltos': r.resueltos or 0
+        } for r in rows]
+
+        return {
+            "query": "categorias_ranking",
+            "total": len(data),
+            "descripcion": f"Top {len(data)} categorías por cantidad de reclamos",
+            "data": data
+        }
+
+    return {"query": query_name, "error": "Query no implementado", "data": []}
+
+
+def build_query_analysis_prompt(available_queries: dict, empleados: list, categorias: list) -> str:
+    """Construye el prompt para que la IA analice qué queries necesita"""
+
+    queries_desc = "\n".join([
+        f"- {name}: {info['descripcion']} (params: {', '.join(info['parametros'])})"
+        for name, info in available_queries.items()
+    ])
+
+    empleados_list = ", ".join([f"{e['nombre']} (ID:{e['id']})" for e in empleados[:10]])
+    categorias_list = ", ".join([c['nombre'] for c in categorias])
+
+    return f"""Analizá la pregunta del usuario y determiná qué queries necesitás ejecutar para responderla.
+
+QUERIES DISPONIBLES:
+{queries_desc}
+
+EMPLEADOS CONOCIDOS:
+{empleados_list}
+
+CATEGORÍAS CONOCIDAS:
+{categorias_list}
+
+INSTRUCCIONES:
+1. Analizá qué información necesita la pregunta
+2. Si la pregunta requiere datos específicos que no están en el contexto básico, pedí los queries necesarios
+3. Respondé SOLO en formato JSON
+
+FORMATO DE RESPUESTA:
+{{
+  "necesita_queries": true/false,
+  "queries": [
+    {{"name": "nombre_query", "params": {{"param1": "valor"}}}}
+  ],
+  "razonamiento": "breve explicación"
+}}
+
+Si NO necesita queries adicionales, respondé:
+{{
+  "necesita_queries": false,
+  "queries": [],
+  "razonamiento": "puedo responder con el contexto básico"
+}}
+
+IMPORTANTE:
+- Para "reclamos más atrasados/antiguos" usa "reclamos_atrasados"
+- Para buscar empleado por nombre, primero encontrá su ID en la lista
+- Siempre incluí "limit" en params (default 10)"""
+
+
+def parse_query_analysis(response: str) -> dict:
+    """Parsea la respuesta del análisis de queries"""
+    try:
+        # Intentar extraer JSON del response
+        # A veces viene con texto adicional
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        if json_match:
+            return json.loads(json_match.group())
+        return {"necesita_queries": False, "queries": [], "razonamiento": "No se pudo parsear"}
+    except Exception as e:
+        print(f"[QUERY ANALYSIS] Error parsing: {e}")
+        return {"necesita_queries": False, "queries": [], "razonamiento": str(e)}
+
+
+# ==================== SQL DINÁMICO PARA CONSULTAS GERENCIALES ====================
+
+import os
+
+# Path al archivo JSON con el schema de la BD
+SCHEMA_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'APP_GUIDE', '12_DATABASE_SCHEMA.json')
+
+# Cache en memoria - se carga una sola vez al iniciar
+_SCHEMA_JSON_CACHE: dict | None = None
+_SCHEMA_TEXT_CACHE: str | None = None
+
+
+def load_schema_json(force_refresh: bool = False) -> dict | None:
+    """Carga el schema JSON (cacheado en memoria)"""
+    global _SCHEMA_JSON_CACHE
+
+    if _SCHEMA_JSON_CACHE is not None and not force_refresh:
+        return _SCHEMA_JSON_CACHE
+
+    try:
+        if os.path.exists(SCHEMA_JSON_PATH):
+            with open(SCHEMA_JSON_PATH, 'r', encoding='utf-8') as f:
+                _SCHEMA_JSON_CACHE = json.load(f)
+                print(f"[SCHEMA] JSON cargado desde {SCHEMA_JSON_PATH}")
+                return _SCHEMA_JSON_CACHE
+        else:
+            print(f"[SCHEMA] No encontrado: {SCHEMA_JSON_PATH}")
+    except Exception as e:
+        print(f"[SCHEMA] Error loading JSON: {e}")
+    return None
+
+
+def schema_json_to_text() -> str | None:
+    """Convierte el schema JSON a texto legible para la IA (cacheado)"""
+    global _SCHEMA_TEXT_CACHE
+
+    if _SCHEMA_TEXT_CACHE is not None:
+        return _SCHEMA_TEXT_CACHE
+
+    schema = load_schema_json()
+    if not schema:
+        return None
+
+    lines = ["# Esquema de Base de Datos\n"]
+
+    # Entidades principales
+    lines.append("## Tablas Principales\n")
+    for entity_name, entity in schema.get("entities", {}).items():
+        table = entity.get("table", entity_name)
+        desc = entity.get("description", "")
+        multi_tenant_note = entity.get("multi_tenant_note", "")
+
+        lines.append(f"### {table}")
+        if desc:
+            lines.append(f"_{desc}_")
+        if multi_tenant_note:
+            lines.append(f"**NOTA**: {multi_tenant_note}")
+
+        # Columnas
+        cols = []
+        for col_name, col_info in entity.get("columns", {}).items():
+            col_type = col_info.get("type", "")
+            fk = col_info.get("foreign_key", "")
+            if fk:
+                cols.append(f"{col_name} → {fk}")
+            elif col_info.get("type") == "enum":
+                vals = col_info.get("values", [])
+                cols.append(f"{col_name} (enum: {', '.join(vals)})")
+            else:
+                cols.append(col_name)
+
+        # Agrupar columnas en líneas
+        lines.append("- " + ", ".join(cols[:8]))
+        if len(cols) > 8:
+            lines.append("- " + ", ".join(cols[8:]))
+        lines.append("")
+
+    # Tablas pivote
+    lines.append("## Tablas Pivote (Many-to-Many)\n")
+    for pivot_name, pivot in schema.get("pivot_tables", {}).items():
+        lines.append(f"### {pivot.get('table', pivot_name)}")
+        cols = list(pivot.get("columns", {}).keys())
+        lines.append(f"- {', '.join(cols)}")
+        lines.append("")
+
+    # Enums
+    lines.append("## Estados Válidos (Enums)\n")
+    for enum_name, enum_info in schema.get("enums", {}).items():
+        vals = enum_info.get("values", [])
+        lines.append(f"### {enum_name}")
+        lines.append(f"- {', '.join(vals)}")
+        lines.append("")
+
+    # JOINs comunes
+    if schema.get("common_joins"):
+        lines.append("## JOINs Comunes\n")
+        for join_name, join_info in schema["common_joins"].items():
+            lines.append(f"### {join_name}")
+            lines.append(f"_{join_info.get('description', '')}_")
+            lines.append(f"```sql")
+            lines.append(f"FROM {join_info.get('base', '')}")
+            for j in join_info.get("joins", []):
+                lines.append(j)
+            lines.append("```")
+            lines.append("")
+
+    # Reglas de filtrado multi-tenant
+    lines.append("## Reglas de Filtrado Multi-Tenant\n")
+    lines.append("Tablas con municipio_id directo: reclamos, empleados, zonas, usuarios, solicitudes")
+    lines.append("Tablas SIN municipio_id (catálogos genéricos): categorias, tramites, tipos_tramites")
+    lines.append("")
+    lines.append("**IMPORTANTE para trámites:**")
+    lines.append("- `tipos_tramites` = categorías de trámites")
+    lines.append("- `tramites` tiene `tipo_tramite_id` → tipos_tramites.id")
+    lines.append("- `solicitudes` = trámites cargados/iniciados, tiene `tramite_id` → tramites.id")
+    lines.append("- `municipio_tramites` tiene `tramite_id`, NO tiene `categoria_id` ni `tipo_tramite_id`")
+    lines.append("")
+
+    _SCHEMA_TEXT_CACHE = "\n".join(lines)
+    return _SCHEMA_TEXT_CACHE
+
+
+async def get_database_schema(db: AsyncSession = None, force_refresh: bool = False) -> str:
+    """
+    Obtiene el schema de las tablas desde el archivo JSON de documentación.
+    Devuelve el JSON completo para que la IA tenga todo el contexto del dominio.
+    """
+    try:
+        with open(SCHEMA_JSON_PATH, 'r', encoding='utf-8') as f:
+            content = f.read()
+            print(f"[SCHEMA] JSON completo cargado ({len(content)} chars)")
+            return content
+    except Exception as e:
+        print(f"[SCHEMA] Error: {e}, usando fallback")
+        return DATABASE_SCHEMA_FALLBACK
+
+
+DATABASE_SCHEMA_FALLBACK = """
+# Esquema de Base de Datos - Referencia Rápida
+
+## Tablas Principales
+
+### reclamos (con municipio_id)
+- id, municipio_id, titulo, descripcion, estado, prioridad, direccion, created_at
+- categoria_id → categorias.id
+- zona_id → zonas.id
+- creador_id → usuarios.id
+- empleado_id → empleados.id
+- estado: 'NUEVO', 'ASIGNADO', 'EN_PROCESO', 'PENDIENTE_CONFIRMACION', 'RESUELTO', 'RECHAZADO'
+
+### categorias (NO tiene municipio_id - es catálogo genérico)
+- id, nombre, descripcion, icono, color, activo
+
+### municipio_categorias (tabla intermedia para habilitar categorías por municipio)
+- id, municipio_id, categoria_id
+
+### empleados (con municipio_id)
+- id, municipio_id, nombre, apellido, especialidad, telefono, activo
+- zona_id → zonas.id
+- categoria_principal_id → categorias.id
+
+### zonas (con municipio_id)
+- id, municipio_id, nombre, codigo, descripcion, activo
+
+### usuarios (con municipio_id)
+- id, municipio_id, email, nombre, apellido, rol, activo
+- rol: 'vecino', 'empleado', 'supervisor', 'admin'
+
+## Tablas de Trámites (IMPORTANTE)
+
+### tipos_tramites (NO tiene municipio_id - es catálogo genérico)
+- id, nombre, descripcion, codigo, icono, color, activo
+- Es la CATEGORÍA de trámites (ej: "Habilitaciones", "Permisos")
+
+### tramites (NO tiene municipio_id - es catálogo genérico)
+- id, tipo_tramite_id, nombre, descripcion, requisitos, tiempo_estimado_dias, costo, activo
+- tipo_tramite_id → tipos_tramites.id
+- Es el trámite específico dentro de una categoría
+
+### municipio_tramites (tabla intermedia para habilitar trámites por municipio)
+- id, municipio_id, tramite_id
+- IMPORTANTE: tiene tramite_id, NO tiene categoria_id ni tipo_tramite_id
+
+### solicitudes (con municipio_id - son los trámites "cargados"/iniciados)
+- id, municipio_id, numero_tramite, asunto, descripcion, estado, created_at
+- tramite_id → tramites.id (el tipo de trámite)
+- solicitante_id → usuarios.id
+- empleado_id → empleados.id
+- estado: 'INICIADO', 'EN_REVISION', 'REQUIERE_DOCUMENTACION', 'EN_PROCESO', 'APROBADO', 'RECHAZADO', 'FINALIZADO'
+
+## Reglas de Filtrado Multi-Tenant
+
+Tablas con municipio_id directo: reclamos, empleados, zonas, usuarios, solicitudes
+Tablas SIN municipio_id (requieren JOIN): categorias, tramites, tipos_tramites
+
+## Ejemplos de JOINs correctos para trámites
+
+Para contar solicitudes por tipo de trámite:
+SELECT tt.nombre, COUNT(s.id) as cantidad
+FROM tipos_tramites tt
+JOIN tramites t ON t.tipo_tramite_id = tt.id
+JOIN solicitudes s ON s.tramite_id = t.id
+WHERE s.municipio_id = {municipio_id}
+GROUP BY tt.id
+
+Para listar trámites con su tipo:
+SELECT t.id, t.nombre, tt.nombre as tipo
+FROM tramites t
+JOIN tipos_tramites tt ON t.tipo_tramite_id = tt.id
+JOIN municipio_tramites mt ON mt.tramite_id = t.id
+WHERE mt.municipio_id = {municipio_id}
+"""
+
+FORBIDDEN_SQL_PATTERNS = [
+    r'\b(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE)\b',
+    r'\b(EXEC|EXECUTE|CALL)\b',
+    r'--',  # Comentarios SQL
+    r';.*;',  # Múltiples statements
+    r'\bINTO\b\s+\bOUTFILE\b',
+    r'\bLOAD_FILE\b',
+]
+
+
+def validate_sql_query(sql: str) -> tuple[bool, str]:
+    """Valida que el SQL sea seguro (solo SELECT, sin patrones peligrosos)"""
+    sql_upper = sql.upper().strip()
+
+    # Debe empezar con SELECT
+    if not sql_upper.startswith('SELECT'):
+        return False, "Solo se permiten consultas SELECT"
+
+    # Verificar patrones prohibidos
+    for pattern in FORBIDDEN_SQL_PATTERNS:
+        if re.search(pattern, sql_upper, re.IGNORECASE):
+            return False, f"Patrón no permitido detectado"
+
+    # Verificar que no haya múltiples statements
+    if sql.count(';') > 1:
+        return False, "Solo se permite una consulta"
+
+    return True, "OK"
+
+
+async def execute_dynamic_sql(
+    db: AsyncSession,
+    sql: str,
+    municipio_id: int,
+    page: int = 1,
+    page_size: int = 2000,
+    sin_limite: bool = False
+) -> dict:
+    """Ejecuta SQL dinámico de forma segura con paginación opcional"""
+    from sqlalchemy import text
+    import re as regex
+
+    # Validar SQL
+    is_valid, error = validate_sql_query(sql)
+    if not is_valid:
+        return {"error": error, "data": [], "sql": sql, "total": 0}
+
+    # Reemplazar placeholder de municipio_id
+    sql_base = sql.replace("{municipio_id}", str(municipio_id))
+
+    # Detectar si el usuario especificó un LIMIT explícito
+    limit_match = regex.search(r'\s+LIMIT\s+(\d+)', sql_base, flags=regex.IGNORECASE)
+    user_limit = int(limit_match.group(1)) if limit_match else None
+
+    # Remover LIMIT existente para hacer COUNT o para ejecutar sin límite
+    sql_sin_limit = regex.sub(r'\s+LIMIT\s+\d+(\s+OFFSET\s+\d+)?', '', sql_base, flags=regex.IGNORECASE)
+    sql_sin_limit = sql_sin_limit.rstrip(';')
+
+    try:
+        # Si sin_limite=True, ejecutar sin paginación (para cards, list, timeline)
+        if sin_limite and not user_limit:
+            print(f"[DYNAMIC SQL] Executing WITHOUT LIMIT: {sql_sin_limit[:500]}...")
+            result = await db.execute(text(sql_sin_limit))
+            rows = result.fetchall()
+            columns = result.keys()
+            data = [dict(zip(columns, row)) for row in rows]
+
+            for row in data:
+                for key, value in row.items():
+                    if isinstance(value, datetime):
+                        row[key] = value.strftime('%d/%m/%y %H:%M')
+
+            print(f"[DYNAMIC SQL] Got {len(data)} rows (sin limite)")
+            return {
+                "data": data,
+                "total": len(data),
+                "sql": sql_sin_limit,
+                "sql_base": sql_sin_limit,
+                "page": 1,
+                "page_size": len(data),
+                "user_limit": None
+            }
+
+        # Si el usuario pidió un LIMIT específico, respetarlo
+        effective_page_size = min(user_limit, page_size) if user_limit else page_size
+
+        # Primero: COUNT total (solo si no hay LIMIT del usuario o es grande)
+        if user_limit and user_limit <= 20:
+            total = user_limit
+        else:
+            count_sql = f"SELECT COUNT(*) as total FROM ({sql_sin_limit}) as subquery"
+            print(f"[DYNAMIC SQL] Count: {count_sql[:150]}...")
+            try:
+                count_result = await db.execute(text(count_sql))
+                total = count_result.scalar() or 0
+            except Exception as count_err:
+                print(f"[DYNAMIC SQL] Count failed, using fallback: {count_err}")
+                total = None
+
+        # Segundo: Query paginada
+        offset = (page - 1) * effective_page_size
+        sql_paginado = f"{sql_sin_limit} LIMIT {effective_page_size} OFFSET {offset}"
+
+        print(f"[DYNAMIC SQL] Executing: {sql_paginado[:200]}...")
+        result = await db.execute(text(sql_paginado))
+        rows = result.fetchall()
+        columns = result.keys()
+
+        data = [dict(zip(columns, row)) for row in rows]
+
+        for row in data:
+            for key, value in row.items():
+                if isinstance(value, datetime):
+                    row[key] = value.strftime('%d/%m/%y %H:%M')
+
+        if total is None:
+            total = len(data) if len(data) < page_size else len(data) + 1
+
+        print(f"[DYNAMIC SQL] Got {len(data)} rows, total: {total}, user_limit: {user_limit}")
+        return {
+            "data": data,
+            "total": total if total else len(data),
+            "sql": sql_paginado,
+            "sql_base": sql_sin_limit,
+            "page": page,
+            "page_size": effective_page_size,
+            "user_limit": user_limit
+        }
+
+    except Exception as e:
+        print(f"[DYNAMIC SQL] Error: {e}")
+        return {"error": str(e), "data": [], "sql": sql_base, "total": 0}
+
+
+def build_sql_generator_prompt(municipio_id: int, schema: str = None) -> str:
+    """Prompt para que la IA genere SQL basado en la pregunta"""
+    schema_to_use = schema or DATABASE_SCHEMA_FALLBACK
+    return f"""Sos un experto generador de consultas SQL para MySQL. Tu tarea es convertir preguntas en español a consultas SQL válidas.
+
+SCHEMA DE LA BASE DE DATOS:
+{schema_to_use}
+
+MUNICIPIO_ID ACTUAL: {municipio_id}
+
+REGLAS:
+1. Filtrá por municipio_id según las REGLAS DE FILTRADO del schema (algunas tablas usan JOIN intermedio)
+2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
+3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()
+
+IMPORTANTE - SQL MINIMALISTA:
+- Máximo 5-6 columnas (id, titulo, estado, categoria, fecha)
+- "todos los datos" = solo esos 5-6 campos, NO todas las columnas
+- Solo JOIN si necesitás un campo de esa tabla
+- NO joinées tablas de las que no usás campos
+- Máximo 2000 caracteres de SQL
+
+FORMATO DE RESPUESTA (MUY IMPORTANTE):
+- Respondé SOLO con el JSON, sin texto antes ni después
+- NO uses bloques de código markdown (```json)
+- NO agregues explicaciones
+- SOLO el JSON puro:
+{{"sql": "SELECT ...", "descripcion": "..."}}
+
+EJEMPLOS:
+
+Usuario: "traeme 10 reclamos"
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.created_at FROM reclamos r LEFT JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at DESC LIMIT 10", "descripcion": "Los 10 reclamos más recientes"}}
+
+Usuario: "10 reclamos con más atraso con todos sus datos"
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at ASC LIMIT 10", "descripcion": "Los 10 reclamos más antiguos"}}
+
+Usuario: "dame toda la info de los reclamos pendientes"
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.estado IN ('nuevo', 'asignado')", "descripcion": "Reclamos pendientes"}}
+
+Usuario: "los 5 empleados con más reclamos resueltos"
+{{"sql": "SELECT e.id, e.nombre, COUNT(*) as resueltos FROM empleados e JOIN reclamos r ON r.empleado_id = e.id WHERE e.municipio_id = {municipio_id} AND r.estado = 'resuelto' GROUP BY e.id ORDER BY resueltos DESC LIMIT 5", "descripcion": "Top 5 empleados"}}
+
+Usuario: "reclamos de esta semana por categoría"
+{{"sql": "SELECT c.nombre, COUNT(*) as cantidad FROM reclamos r JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY c.id", "descripcion": "Reclamos por categoría"}}
+
+Usuario: "lista los empleados"
+{{"sql": "SELECT e.id, e.nombre, e.descripcion, e.telefono FROM empleados e WHERE e.municipio_id = {municipio_id}", "descripcion": "Lista de empleados"}}
+
+Usuario: "proceso de la solicitud 1" o "etapas de la solicitud 1" o "historial de la solicitud 1"
+{{"sql": "SELECT hs.id, hs.accion, hs.estado_anterior, hs.estado_nuevo, hs.comentario, hs.created_at, u.nombre as usuario FROM historial_solicitudes hs JOIN solicitudes s ON hs.solicitud_id = s.id LEFT JOIN usuarios u ON hs.usuario_id = u.id WHERE s.id = 1 AND s.municipio_id = {municipio_id} ORDER BY hs.created_at ASC", "descripcion": "Proceso de la Solicitud 1"}}
+
+Usuario: "historial del reclamo 5"
+{{"sql": "SELECT hr.id, hr.accion, hr.estado_anterior, hr.estado_nuevo, hr.comentario, hr.created_at, u.nombre as usuario FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id LEFT JOIN usuarios u ON hr.usuario_id = u.id WHERE r.id = 5 AND r.municipio_id = {municipio_id} ORDER BY hr.created_at ASC", "descripcion": "Historial del Reclamo 5"}}
+
+Usuario: "ranking de empleados por reclamos resueltos"
+{{"sql": "SELECT e.id, e.nombre, COUNT(*) as cantidad FROM empleados e JOIN reclamos r ON r.empleado_id = e.id WHERE e.municipio_id = {municipio_id} AND r.estado = 'resuelto' GROUP BY e.id ORDER BY cantidad DESC", "descripcion": "Ranking de empleados por reclamos resueltos"}}
+
+Usuario: "reclamos agrupados por categoría"
+{{"sql": "SELECT c.nombre as categoria, r.id, r.titulo, r.estado, r.created_at FROM reclamos r JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY c.nombre, r.created_at DESC", "descripcion": "Reclamos agrupados por categoría"}}
+
+Usuario: "resumen de reclamos" o "dashboard de reclamos"
+{{"sql": "SELECT estado, COUNT(*) as cantidad FROM reclamos WHERE municipio_id = {municipio_id} GROUP BY estado", "descripcion": "Resumen de reclamos por estado"}}"""
+
+
+def build_response_with_data_prompt(pregunta: str, datos: list, descripcion: str, total_registros: int = None, formato: str = None) -> str:
+    """Prompt para que la IA formatee la respuesta con los datos obtenidos.
+    Carga templates desde archivos JSON en backend/templates/
+    """
+    total = total_registros or len(datos)
+
+    # Cargar template si existe
+    template = load_template(formato) if formato else None
+
+    # Determinar cuántos datos pasar según el template
+    if template and not template.get('mostrar_grilla', True):
+        # Templates que muestran todos los datos: pasar más registros
+        max_datos = template.get('paginacion', 50) or 50
+        datos_str = json.dumps(datos[:max_datos], indent=2, ensure_ascii=False, default=str)
+    else:
+        # Resumen: solo primeros 10
+        datos_str = json.dumps(datos[:10], indent=2, ensure_ascii=False, default=str)
+
+    base_prompt = f"""PREGUNTA: {pregunta}
+TOTAL REGISTROS: {total}
+DATOS:
+{datos_str}
+
+"""
+
+    # Si tenemos template JSON, usarlo
+    if template:
+        template_prompt = get_template_prompt(formato, total)
+        if template_prompt:
+            return base_prompt + template_prompt
+
+    # Fallback: formato por defecto (resumen + grilla abajo)
+    default_template = load_template('dashboard')
+    if default_template:
+        return base_prompt + f"""INSTRUCCIONES:
+1. Hacé un RESUMEN con KPIs o mini-tabla (máx 5-8 filas destacadas)
+2. Los datos completos ya se muestran en una grilla debajo
+3. Español rioplatense, respuesta CORTA
+4. HTML con estilos inline
+
+{get_template_prompt('dashboard', total) or ''}
+
+IMPORTANTE: Solo hacé un resumen, la grilla con todos los datos ya está abajo."""
+
+    # Fallback hardcodeado si no hay templates
+    return base_prompt + f"""INSTRUCCIONES:
+1. Hacé un RESUMEN con KPIs o mini-tabla (máx 5-8 filas destacadas)
+2. Los datos completos ya se muestran en una grilla debajo
+3. Español rioplatense, respuesta CORTA
+4. HTML con estilos inline
+
+KPI CARDS (para números/totales):
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
+<div style="flex:1;min-width:120px;background:#f8f5f0;border:1px solid #e5e0d8;padding:16px 20px;border-radius:12px;text-align:center"><div style="font-size:28px;font-weight:700;color:#b08d57">VALOR</div><div style="font-size:12px;color:#8b7355;margin-top:2px">Etiqueta</div></div>
+</div>
+
+IMPORTANTE: Solo hacé un resumen, la grilla con todos los datos ya está abajo."""
+
+
 def build_asistente_prompt(
     categorias: list,
     stats_reclamos: dict,
     stats_tramites: dict,
+    stats_temporales: dict,
     reclamos_recientes: list,
     tramites_recientes: list,
     reclamos_por_categoria: list,
@@ -843,138 +1910,95 @@ def build_asistente_prompt(
         for u in usuarios_con_reclamos[:15]
     ]) or "  Sin datos de usuarios"
 
-    return f"""Sos el Asistente Municipal, un asistente inteligente con acceso a datos del sistema de gestión municipal.
+    # Calcular pendientes
+    pendientes = stats_reclamos['nuevos'] + stats_reclamos['asignados'] + stats_reclamos['en_proceso'] + stats_reclamos['pendiente_confirmacion']
 
-DATOS ACTUALES DEL MUNICIPIO:
+    return f"""Sos el Asistente Municipal de Munify. Respondés consultas sobre datos del sistema.
 
-📊 ESTADÍSTICAS DE RECLAMOS:
-  - Total: {stats_reclamos['total']}
-  - Nuevos: {stats_reclamos['nuevos']}
-  - Asignados: {stats_reclamos['asignados']}
-  - En proceso: {stats_reclamos['en_proceso']}
-  - Pendiente confirmación: {stats_reclamos['pendiente_confirmacion']}
-  - Resueltos: {stats_reclamos['resueltos']}
-  - Rechazados: {stats_reclamos['rechazados']}
+REGLAS DE ESTILO:
+1. Español rioplatense (vos, podés, tenés)
+2. Respuestas CORTAS: 1-2 oraciones de texto + componentes visuales
+3. SIEMPRE usá HTML con estilos inline (Tailwind-like)
+4. Para datos numéricos, usá CARDS. Para listas, usá TABLAS o LISTAS estilizadas.
 
-📋 ESTADÍSTICAS DE TRÁMITES:
-  - Total: {stats_tramites['total']}
-  - Iniciados: {stats_tramites['iniciados']}
-  - En revisión: {stats_tramites['en_revision']}
-  - Requiere documentación: {stats_tramites['requiere_documentacion']}
-  - En proceso: {stats_tramites['en_proceso']}
-  - Aprobados: {stats_tramites['aprobados']}
-  - Rechazados: {stats_tramites['rechazados']}
-  - Finalizados: {stats_tramites['finalizados']}
+DATOS DISPONIBLES:
 
-🔔 RECLAMOS RECIENTES:
+RECLAMOS:
+- Total: {stats_reclamos['total']}
+- Pendientes: {pendientes} (nuevos:{stats_reclamos['nuevos']}, asignados:{stats_reclamos['asignados']}, en_proceso:{stats_reclamos['en_proceso']})
+- Resueltos: {stats_reclamos['resueltos']}
+- Rechazados: {stats_reclamos['rechazados']}
+- Hoy: {stats_temporales['hoy']} | Esta semana: {stats_temporales['esta_semana']} | Este mes: {stats_temporales['este_mes']}
+
+TRÁMITES:
+- Total: {stats_tramites['total']}
+- Iniciados: {stats_tramites['iniciados']} | En revisión: {stats_tramites['en_revision']} | En proceso: {stats_tramites['en_proceso']}
+- Aprobados: {stats_tramites['aprobados']} | Finalizados: {stats_tramites['finalizados']}
+
+RECLAMOS RECIENTES:
 {reclamos_list}
 
-📝 TRÁMITES RECIENTES:
+TRÁMITES RECIENTES:
 {tramites_list}
 
-📈 RECLAMOS POR CATEGORÍA:
+POR CATEGORÍA:
 {cats_stats}
 
-👥 EMPLEADOS ACTIVOS (con estadísticas de reclamos asignados):
+EMPLEADOS:
 {empleados_list}
 
-👤 VECINOS CON RECLAMOS (usuarios que crearon reclamos):
+VECINOS CON RECLAMOS:
 {usuarios_list}
 
-CATEGORÍAS DISPONIBLES: {cats_list}
+CATEGORÍAS: {cats_list}
 
-TU ROL:
-- Responder preguntas sobre el estado del sistema
-- Dar información sobre reclamos, trámites, estadísticas de empleados y vecinos
-- Ayudar a interpretar los datos
-- Sugerir acciones basadas en los datos
-- Responder consultas sobre cuántos reclamos tiene asignado cada empleado
+COMPONENTES HTML A USAR:
 
-REGLAS:
-1. Usá español argentino (vos, podés, tenés)
-2. Sé conciso pero informativo
-3. Cuando te pregunten por un empleado (ej: "cuántos reclamos tiene Juan"), buscá en la lista de EMPLEADOS ACTIVOS por nombre similar
-4. Podés hacer cálculos simples con los datos (porcentajes, comparaciones)
-5. SIEMPRE incluí links relevantes usando formato markdown: [texto](url)
-6. Si te preguntan por un empleado específico, incluí el link al tablero para ver sus reclamos
+4. LINK BUTTON:
+<a href="URL" style="display:inline-block;background:#2563eb;color:white;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:14px;margin-top:12px">TEXTO →</a>
 
-LINKS DISPONIBLES (usá el formato markdown exacto):
+5. TABLA COMPACTA:
+<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:14px">
+<tr style="background:#f1f5f9"><th style="padding:8px;text-align:left;border-bottom:2px solid #e2e8f0">Col1</th><th style="padding:8px;text-align:left;border-bottom:2px solid #e2e8f0">Col2</th></tr>
+<tr><td style="padding:8px;border-bottom:1px solid #e2e8f0">Dato1</td><td style="padding:8px;border-bottom:1px solid #e2e8f0">Dato2</td></tr>
+</table>
 
-📋 RECLAMOS:
-- Ver todos los reclamos: [Ver reclamos](/reclamos)
-- Ver reclamo específico: [Ver reclamo #ID](/reclamos/ID)
-- Crear reclamo nuevo: [Crear reclamo](/reclamos?crear=1)
-- Ver tablero Kanban: [Ver tablero](/tablero)
+6. BADGE DE ESTADO:
+<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:500">ESTADO</span>
 
-📝 TRÁMITES:
-- Ver todos los trámites: [Ver trámites](/tramites)
-- Ver trámite específico: [Ver trámite #ID](/tramites?ver=ID)
-- Iniciar trámite nuevo: [Iniciar trámite](/tramites?nuevo=1)
+EJEMPLOS DE RESPUESTAS:
 
-📊 GESTIÓN:
-- Ver dashboard: [Ver dashboard](/dashboard)
-- Ver empleados: [Ver empleados](/empleados)
-- Ver categorías: [Ver categorías](/categorias)
-- Ver zonas: [Ver zonas](/zonas)
-- Ver usuarios: [Ver usuarios](/usuarios)
-- Ver configuración: [Ver configuración](/configuracion)
+Pregunta: "¿Cuántos reclamos pendientes hay?"
+Respuesta:
+<p style="margin-bottom:12px">Tenés <strong>{pendientes}</strong> reclamos pendientes:</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<div style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['nuevos']}</div><div style="font-size:13px;opacity:0.9">Nuevos</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['asignados']}</div><div style="font-size:13px;opacity:0.9">Asignados</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['en_proceso']}</div><div style="font-size:13px;opacity:0.9">En proceso</div></div>
+</div>
+<a href="/tablero" style="display:inline-block;background:#2563eb;color:white;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:14px;margin-top:12px">Ver tablero →</a>
 
-📈 REPORTES Y ANÁLISIS:
-- Ver analytics: [Ver analytics](/analytics)
-- Ver SLA: [Ver SLA](/sla)
-- Exportar datos: [Exportar](/exportar)
+Pregunta: "¿Cuántos reclamos de esta semana?"
+Respuesta:
+<p style="margin-bottom:12px">Reclamos creados:</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<div style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_temporales['hoy']}</div><div style="font-size:13px;opacity:0.9">Hoy</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_temporales['esta_semana']}</div><div style="font-size:13px;opacity:0.9">Esta semana</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_temporales['este_mes']}</div><div style="font-size:13px;opacity:0.9">Este mes</div></div>
+</div>
 
-INSTRUCCIONES PARA CREAR RECLAMO:
-Cuando pregunten "¿Cómo creo un reclamo?" respondé:
-"Para crear un reclamo nuevo:
-1. Andá a [Crear reclamo](/reclamos?crear=1)
-2. Seleccioná la categoría del problema (ej: Baches, Alumbrado, etc.)
-3. Describí el problema y agregá la ubicación
-4. Opcionalmente, subí fotos del problema
-5. Enviá el reclamo
+Pregunta: "Dame un resumen"
+Respuesta:
+<p style="margin-bottom:12px"><strong>Resumen del municipio:</strong></p>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+<div style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{pendientes}</div><div style="font-size:13px;opacity:0.9">Pendientes</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#10b981,#059669);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['resueltos']}</div><div style="font-size:13px;opacity:0.9">Resueltos</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_temporales['esta_semana']}</div><div style="font-size:13px;opacity:0.9">Esta semana</div></div>
+</div>
+<p style="color:#64748b;font-size:14px">Lo más urgente: {stats_reclamos['nuevos']} reclamos nuevos sin asignar.</p>
+<a href="/tablero" style="display:inline-block;background:#2563eb;color:white;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:14px;margin-top:8px">Ir al tablero →</a>
 
-También podés ir a [Ver reclamos](/reclamos) y hacer clic en el botón '+ Nuevo Reclamo'."
-
-INSTRUCCIONES PARA CREAR TRÁMITE:
-Cuando pregunten "¿Cómo inicio un trámite?" respondé:
-"Para iniciar un trámite nuevo:
-1. Andá a [Iniciar trámite](/tramites?nuevo=1)
-2. Seleccioná el tipo de trámite que necesitás
-3. Completá los datos requeridos (nombre, DNI, dirección, etc.)
-4. Adjuntá la documentación necesaria
-5. Enviá la solicitud
-
-También podés ir a [Ver trámites](/tramites) y hacer clic en '+ Nueva Solicitud'."
-
-EJEMPLOS DE RESPUESTAS CON LINKS:
-- "Hay 15 reclamos nuevos sin asignar. [Ver en el tablero](/tablero) para gestionarlos."
-- "El reclamo #123 está en proceso. [Ver detalle](/reclamos/123)"
-- "La categoría con más reclamos es Baches (45). [Ver todos los reclamos](/reclamos)"
-- "Juan Pérez tiene 8 reclamos asignados. [Ver empleados](/empleados)"
-- "Para reportar un problema, podés [Crear un reclamo](/reclamos?crear=1)"
-- "¿Necesitás hacer un trámite? [Iniciá acá](/tramites?nuevo=1)"
-
-EJEMPLOS DE CONSULTAS POR USUARIO:
-- Si preguntan por "Lucas Arenaz", buscá en la lista de RECLAMOS RECIENTES y VECINOS CON RECLAMOS
-- Respondé con el listado completo de sus reclamos, estados y links para cada uno
-- Formato: "Lucas Arenaz tiene 3 reclamos:
-  • #45: Bache en calle San Martín (resuelto) - [Ver reclamo](/reclamos/45)
-  • #67: Luminaria rota (en_proceso) - [Ver reclamo](/reclamos/67)
-  • #89: Árbol caído (nuevo) - [Ver reclamo](/reclamos/89)"
-- Si no encontrás al usuario, indicá que no tiene reclamos registrados
-
-EJEMPLOS DE PREGUNTAS QUE PODÉS RESPONDER:
-- "¿Cuántos reclamos hay pendientes?"
-- "¿Cuál es la categoría con más reclamos?"
-- "¿Qué empleados tienen más carga de trabajo?"
-- "¿Cuántos trámites se resolvieron?"
-- "Dame un resumen del estado actual"
-- "¿Cuáles son los reclamos de Juan García?"
-- "Estado de reclamos de María López"
-- "¿Cómo creo un reclamo?"
-- "¿Cómo inicio un trámite?"
-- "¿Dónde veo el dashboard?"
-"""
+IMPORTANTE: Usá los componentes HTML tal cual. NO uses markdown. Adaptá los colores según el contexto (naranja=urgente, verde=positivo, azul=info)."""
 
 
 @router.post("/asistente", response_model=ChatResponse)
@@ -1007,6 +2031,7 @@ async def chat_asistente(
     categorias = await get_categorias_municipio(db, municipio_id)
     stats_reclamos = await get_estadisticas_reclamos(db, municipio_id)
     stats_tramites = await get_estadisticas_tramites(db, municipio_id)
+    stats_temporales = await get_estadisticas_temporales(db, municipio_id)
     reclamos_recientes = await get_reclamos_recientes(db, municipio_id, limit=15)
     tramites_recientes = await get_tramites_recientes(db, municipio_id)
     reclamos_por_categoria = await get_reclamos_por_categoria(db, municipio_id)
@@ -1018,6 +2043,7 @@ async def chat_asistente(
         categorias=categorias,
         stats_reclamos=stats_reclamos,
         stats_tramites=stats_tramites,
+        stats_temporales=stats_temporales,
         reclamos_recientes=reclamos_recientes,
         tramites_recientes=tramites_recientes,
         reclamos_por_categoria=reclamos_por_categoria,
@@ -1034,6 +2060,7 @@ async def chat_asistente(
         system_prompt=system_prompt,
         context={
             "municipio_id": municipio_id,
+            "user_id": current_user.id,
             "rol": current_user.rol,
             "email": current_user.email
         },
@@ -1055,7 +2082,7 @@ async def chat_asistente(
 
     print(f"[ASISTENTE] Consulta de {current_user.email} (session: {session_id}): {request.message[:100]}...")
 
-    response = await chat_service.chat(context, max_tokens=800)
+    response = await chat_service.chat(context, max_tokens=2000)
 
     if response:
         # Guardar mensajes en la sesión
@@ -1067,14 +2094,281 @@ async def chat_asistente(
     raise HTTPException(status_code=503, detail="El asistente no está disponible temporalmente.")
 
 
+# ==================== CONSULTA GERENCIAL CON SQL DINÁMICO ====================
+
+class ConsultaRequest(BaseModel):
+    """Request para consulta gerencial con SQL dinámico"""
+    pregunta: str
+    page: int = 1
+    page_size: int = 50
+    historial: list[dict] = []  # Historial de conversación para contexto
+
+
+class ConsultaResponse(BaseModel):
+    """Response de consulta gerencial"""
+    response: str
+    sql_ejecutado: str | None = None
+    datos_crudos: list | None = None
+    total_registros: int | None = None
+    page: int = 1
+    page_size: int = 50
+    mostrar_grilla: bool = True  # False si el formato ya muestra todos los datos (cards, list, etc)
+
+
+@router.post("/consulta", response_model=ConsultaResponse)
+async def consulta_gerencial(
+    request: ConsultaRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint de consulta gerencial con SQL dinámico.
+    La IA genera el SQL necesario para responder la pregunta.
+
+    Proceso:
+    1. Obtiene el schema de la BD (desde cache o genera)
+    2. La IA genera el SQL basándose en la pregunta
+    3. Se valida y ejecuta el SQL
+    4. La IA formatea la respuesta con los datos obtenidos
+    """
+    if not chat_service.is_available():
+        raise HTTPException(
+            status_code=503,
+            detail="El asistente no está disponible."
+        )
+
+    # Solo admin, supervisor o empleado pueden usar consultas gerenciales
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(
+            status_code=403,
+            detail="No tenés permisos para usar consultas gerenciales."
+        )
+
+    municipio_id = current_user.municipio_id
+    pregunta_original = request.pregunta
+    historial = request.historial
+
+    # Extraer formato si viene en la pregunta [formato: X]
+    formato_match = re.search(r'\[formato:\s*(\w+)\]', pregunta_original, re.IGNORECASE)
+    formato = formato_match.group(1).lower() if formato_match else None
+    # Limpiar la pregunta del tag de formato para el SQL
+    pregunta = re.sub(r'\s*\[formato:\s*\w+\]', '', pregunta_original).strip()
+
+    # Si no hay formato explícito, detectar automáticamente por palabras clave
+    if not formato:
+        formato_auto = detectar_formato_automatico(pregunta)
+        if formato_auto:
+            formato = formato_auto
+            print(f"[CONSULTA] Formato auto-detectado: {formato}")
+
+    print(f"[CONSULTA] {current_user.email} pregunta: {pregunta[:100]}... formato: {formato}")
+
+    # Paso 1: Obtener schema de la BD
+    schema = await get_database_schema(db)
+
+    # Paso 2: Generar SQL con la IA (incluyendo historial para contexto)
+    sql_prompt = build_sql_generator_prompt(municipio_id, schema)
+    sql_messages = [{"role": "system", "content": sql_prompt}]
+
+    # Agregar historial previo (últimas 3 interacciones para no saturar)
+    for msg in historial[-6:]:  # 3 pares user/assistant
+        role = msg.get('role', 'user')
+        content = msg.get('content', '')
+        sql_previo = msg.get('sql', '')  # SQL ejecutado en esta interacción (si existe)
+
+        # Solo agregar si tiene contenido relevante
+        if content and role in ['user', 'assistant']:
+            # Para el assistant, extraer info clave de respuestas HTML
+            if role == 'assistant':
+                resumen_parts = []
+
+                # Si tenemos el SQL ejecutado, es la info más valiosa para contexto
+                if sql_previo:
+                    resumen_parts.append(f"SQL ejecutado: {sql_previo}")
+
+                if len(content) > 200:
+                    # Extraer números y datos clave del HTML
+                    import re as re_hist
+                    # Buscar números importantes (total, conteo, etc)
+                    numeros = re_hist.findall(r'(?:Total|hay|son|tiene[ns]?|encontr[eéa]|registr[oa]s?)[:\s]*(\d+)', content, re_hist.IGNORECASE)
+                    # Buscar nombres de empleados mencionados
+                    nombres = re_hist.findall(r'<td[^>]*>([A-ZÁÉÍÓÚ][a-záéíóú]+ [A-ZÁÉÍÓÚ][a-záéíóú]+)</td>', content)
+                    # Extraer texto plano sin HTML (primeros 300 chars)
+                    texto_plano = re_hist.sub(r'<[^>]+>', ' ', content)
+                    texto_plano = re_hist.sub(r'\s+', ' ', texto_plano).strip()[:300]
+
+                    if numeros:
+                        resumen_parts.append(f"Cantidades: {', '.join(numeros[:5])}")
+                    if nombres:
+                        resumen_parts.append(f"Nombres: {', '.join(nombres[:5])}")
+                    resumen_parts.append(f"Resumen: {texto_plano}")
+
+                    content = "[Respuesta anterior: " + ". ".join(resumen_parts) + "]"
+                elif resumen_parts:
+                    # Contenido corto pero con SQL
+                    content = "[Respuesta anterior: " + ". ".join(resumen_parts) + f". Contenido: {content}]"
+
+            sql_messages.append({"role": role, "content": content})
+
+    # Agregar la pregunta actual
+    sql_messages.append({"role": "user", "content": pregunta})
+
+    sql_response = await chat_service.chat(sql_messages, max_tokens=1500)
+
+    if not sql_response:
+        raise HTTPException(status_code=503, detail="Error generando consulta SQL")
+
+    print(f"[CONSULTA] Respuesta IA COMPLETA:\n{sql_response}\n--- FIN RESPUESTA ---")
+
+    # Parsear respuesta JSON
+    try:
+        # Limpiar bloques de código markdown si existen
+        clean_response = sql_response.strip()
+
+        # Remover bloques de código markdown
+        clean_response = re.sub(r'^```json\s*\n?', '', clean_response)
+        clean_response = re.sub(r'^```\s*\n?', '', clean_response)
+        clean_response = re.sub(r'\n?```\s*$', '', clean_response)
+        clean_response = clean_response.strip()
+
+        print(f"[CONSULTA] JSON limpio: {clean_response[:200]}...")
+
+        # Intentar parsear directamente como JSON
+        try:
+            sql_data = json.loads(clean_response)
+            sql_query = sql_data.get('sql', '')
+            descripcion = sql_data.get('descripcion', 'Consulta ejecutada')
+        except json.JSONDecodeError:
+            # Si falla, buscar el JSON dentro del texto (desde { hasta el último })
+            start = clean_response.find('{')
+            end = clean_response.rfind('}')
+            if start != -1 and end != -1 and end > start:
+                json_str = clean_response[start:end+1]
+                sql_data = json.loads(json_str)
+                sql_query = sql_data.get('sql', '')
+                descripcion = sql_data.get('descripcion', 'Consulta ejecutada')
+            else:
+                raise ValueError("No se encontró JSON válido en la respuesta")
+    except json.JSONDecodeError as e:
+        print(f"[CONSULTA] Error JSON decode: {e}")
+        print(f"[CONSULTA] Respuesta completa: {sql_response}")
+        return ConsultaResponse(
+            response=f"<p style='color:#ef4444'>Error interpretando respuesta. Probá reformulando.</p>",
+            sql_ejecutado=None,
+            datos_crudos=None
+        )
+    except Exception as e:
+        print(f"[CONSULTA] Error parsing SQL response: {e}")
+        print(f"[CONSULTA] Respuesta completa: {sql_response}")
+        return ConsultaResponse(
+            response=f"<p style='color:#ef4444'>No pude generar una consulta para esa pregunta. Probá reformulando.</p>",
+            sql_ejecutado=None,
+            datos_crudos=None
+        )
+
+    print(f"[CONSULTA] SQL generado: {sql_query[:150]}...")
+
+    # Paso 3: Ejecutar SQL
+    page = request.page
+    page_size = request.page_size
+    # Si el formato muestra todos los datos, traer sin límite
+    sin_limite = formato in ['cards', 'list', 'timeline', 'wizard', 'ranking', 'tabs', 'dashboard']
+    result = await execute_dynamic_sql(db, sql_query, municipio_id, page, page_size, sin_limite=sin_limite)
+
+    if result.get('error'):
+        print(f"[CONSULTA] Error SQL: {result['error']}")
+        return ConsultaResponse(
+            response=f"<p style='color:#ef4444'>Error ejecutando consulta: {result['error']}</p>",
+            sql_ejecutado=result.get('sql'),
+            datos_crudos=None,
+            total_registros=0
+        )
+
+    datos = result.get('data', [])
+    total = result.get('total', len(datos))
+    print(f"[CONSULTA] Datos obtenidos: {len(datos)} registros de {total} total")
+
+    if not datos:
+        return ConsultaResponse(
+            response=f"<p>No encontré datos para tu consulta.</p><p style='color:#64748b;font-size:13px'>Consulta: {descripcion}</p>",
+            sql_ejecutado=result.get('sql'),
+            datos_crudos=[],
+            total_registros=0
+        )
+
+    # Paso 4: Formatear respuesta con la IA (solo si es página 1)
+    if page == 1:
+        format_prompt = build_response_with_data_prompt(pregunta, datos, descripcion, total, formato)
+        format_messages = [
+            {"role": "system", "content": format_prompt},
+            {"role": "user", "content": f"Formateá estos datos como respuesta a: {pregunta}"}
+        ]
+
+        # Más tokens si es formato que muestra todos los datos
+        max_tokens = 3000 if formato in ['cards', 'list', 'timeline', 'table', 'wizard', 'ranking', 'tabs', 'dashboard'] else 1500
+        formatted_response = await chat_service.chat(format_messages, max_tokens=max_tokens)
+
+        if not formatted_response:
+            # Fallback: mostrar datos en tabla básica
+            formatted_response = f"<p>{descripcion}</p><p>Se encontraron {total} registros.</p>"
+    else:
+        # Para páginas siguientes, no regenerar respuesta
+        formatted_response = f"<p style='color:#64748b;font-size:13px'>Página {page} de {(total + page_size - 1) // page_size}</p>"
+
+    # Ocultar grilla si el formato ya muestra todos los datos
+    mostrar_grilla = formato not in ['cards', 'list', 'timeline', 'wizard', 'ranking', 'tabs', 'dashboard']
+
+    return ConsultaResponse(
+        response=formatted_response,
+        sql_ejecutado=result.get('sql'),
+        datos_crudos=datos,
+        total_registros=total,
+        page=page,
+        page_size=page_size,
+        mostrar_grilla=mostrar_grilla
+    )
+
+
+@router.post("/refresh-schema")
+async def refresh_database_schema(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Recarga el schema desde el archivo JSON.
+    El schema se mantiene en APP_GUIDE/12_DATABASE_SCHEMA.json
+    """
+    global _SCHEMA_JSON_CACHE, _SCHEMA_TEXT_CACHE
+
+    if current_user.rol not in ['admin', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Solo admins pueden ver el schema")
+
+    # Limpiar caches para forzar recarga
+    _SCHEMA_JSON_CACHE = None
+    _SCHEMA_TEXT_CACHE = None
+
+    schema = await get_database_schema()
+    return {
+        "message": "Schema recargado desde JSON (caches limpiados)",
+        "source": SCHEMA_JSON_PATH,
+        "schema_preview": schema[:500] + "..."
+    }
+
+
 # ==================== VALIDACIÓN DE DUPLICADOS CON IA ====================
 
 async def get_entidades_existentes(db: AsyncSession, municipio_id: int, tipo: str) -> list[dict]:
     """Obtiene las entidades existentes según el tipo"""
+    from models.categoria import MunicipioCategoria
+
     if tipo == "categoria":
-        query = select(Categoria).where(
-            Categoria.municipio_id == municipio_id,
-            Categoria.activo == True
+        query = (
+            select(Categoria)
+            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
+            .where(
+                MunicipioCategoria.municipio_id == municipio_id,
+                MunicipioCategoria.activo == True,
+                Categoria.activo == True
+            )
         )
         result = await db.execute(query)
         items = result.scalars().all()
@@ -1269,3 +2563,603 @@ async def validar_duplicado(
         "confianza": "baja",
         "sugerencia": "No se pudo validar con IA. Verificá que no exista uno similar."
     }
+
+
+# ==================== PANEL BI: KPIs Y ENTIDADES ====================
+
+class KPIsResponse(BaseModel):
+    """Response con métricas KPI en tiempo real"""
+    reclamos: dict
+    tramites: dict
+    empleados: dict
+    tendencias: dict
+
+
+@router.get("/kpis", response_model=KPIsResponse)
+async def get_kpis(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene KPIs en tiempo real para el panel BI.
+    Devuelve métricas de reclamos, trámites, empleados y tendencias.
+    """
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Sin permisos para ver KPIs")
+
+    municipio_id = current_user.municipio_id
+    from datetime import date
+
+    hoy = date.today()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+    inicio_mes = hoy.replace(day=1)
+    semana_pasada = inicio_semana - timedelta(days=7)
+    mes_pasado = (inicio_mes - timedelta(days=1)).replace(day=1)
+
+    # ===== RECLAMOS =====
+    reclamos_query = select(
+        sql_func.count(Reclamo.id).label('total'),
+        sql_func.sum(case((Reclamo.estado == EstadoReclamo.NUEVO, 1), else_=0)).label('nuevos'),
+        sql_func.sum(case((Reclamo.estado == EstadoReclamo.ASIGNADO, 1), else_=0)).label('asignados'),
+        sql_func.sum(case((Reclamo.estado == EstadoReclamo.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        sql_func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
+        sql_func.sum(case((sql_func.date(Reclamo.created_at) == hoy, 1), else_=0)).label('hoy'),
+        sql_func.sum(case((sql_func.date(Reclamo.created_at) >= inicio_semana, 1), else_=0)).label('esta_semana'),
+        sql_func.sum(case((sql_func.date(Reclamo.created_at) >= inicio_mes, 1), else_=0)).label('este_mes'),
+    ).where(Reclamo.municipio_id == municipio_id)
+
+    result = await db.execute(reclamos_query)
+    r = result.first()
+
+    pendientes = (r.nuevos or 0) + (r.asignados or 0) + (r.en_proceso or 0)
+
+    # ===== TRÁMITES =====
+    tramites_query = select(
+        sql_func.count(Solicitud.id).label('total'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.INICIADO, 1), else_=0)).label('iniciados'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_REVISION, 1), else_=0)).label('en_revision'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.APROBADO, 1), else_=0)).label('aprobados'),
+        sql_func.sum(case((sql_func.date(Solicitud.created_at) >= inicio_semana, 1), else_=0)).label('esta_semana'),
+    ).where(Solicitud.municipio_id == municipio_id)
+
+    result_t = await db.execute(tramites_query)
+    t = result_t.first()
+
+    # ===== EMPLEADOS =====
+    empleados_query = select(
+        sql_func.count(Empleado.id).label('total'),
+        sql_func.sum(case((Empleado.activo == True, 1), else_=0)).label('activos'),
+    ).where(Empleado.municipio_id == municipio_id)
+
+    result_e = await db.execute(empleados_query)
+    e = result_e.first()
+
+    # ===== TENDENCIAS (comparación con período anterior) =====
+    # Reclamos semana pasada vs esta semana
+    trend_semana_query = select(
+        sql_func.count(Reclamo.id)
+    ).where(
+        Reclamo.municipio_id == municipio_id,
+        sql_func.date(Reclamo.created_at) >= semana_pasada,
+        sql_func.date(Reclamo.created_at) < inicio_semana
+    )
+    result_trend = await db.execute(trend_semana_query)
+    reclamos_semana_pasada = result_trend.scalar() or 0
+
+    cambio_semanal = 0
+    if reclamos_semana_pasada > 0:
+        cambio_semanal = round(((r.esta_semana or 0) - reclamos_semana_pasada) / reclamos_semana_pasada * 100, 1)
+
+    return KPIsResponse(
+        reclamos={
+            "total": r.total or 0,
+            "pendientes": pendientes,
+            "nuevos": r.nuevos or 0,
+            "asignados": r.asignados or 0,
+            "en_proceso": r.en_proceso or 0,
+            "resueltos": r.resueltos or 0,
+            "hoy": r.hoy or 0,
+            "esta_semana": r.esta_semana or 0,
+            "este_mes": r.este_mes or 0,
+        },
+        tramites={
+            "total": t.total or 0,
+            "iniciados": t.iniciados or 0,
+            "en_revision": t.en_revision or 0,
+            "en_proceso": t.en_proceso or 0,
+            "aprobados": t.aprobados or 0,
+            "esta_semana": t.esta_semana or 0,
+        },
+        empleados={
+            "total": e.total or 0,
+            "activos": e.activos or 0,
+        },
+        tendencias={
+            "reclamos_cambio_semanal": cambio_semanal,
+            "reclamos_semana_pasada": reclamos_semana_pasada,
+        }
+    )
+
+
+class EntidadInfo(BaseModel):
+    """Info de una entidad/tabla para el panel BI"""
+    nombre: str
+    tabla: str
+    icono: str
+    descripcion: str
+    campos_principales: list[str]
+
+
+@router.get("/entities")
+async def get_entities(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Devuelve la lista de entidades/tablas disponibles para consultas.
+    Usado para el panel lateral del BI con autocompletado.
+    Lee desde el archivo markdown 12_DATABASE_SCHEMA.md
+    """
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+    # Leer entidades desde el markdown
+    entities = parse_entities_from_markdown()
+
+    return {"entities": entities}
+
+
+def parse_schema_json_to_tables(include_relationships: bool = False, force_refresh: bool = False) -> dict:
+    """Extrae tablas/columnas del JSON para autocompletado.
+
+    Args:
+        include_relationships: Si True, incluye relaciones. Por defecto False
+                               para mantener compatibilidad con frontend actual.
+        force_refresh: Si True, fuerza recarga del archivo ignorando cache.
+
+    Returns:
+        Si include_relationships=False: { tabla: [{ name, type, fk }] }
+        Si include_relationships=True: { tabla: { columns: [...], relationships: [...] } }
+    """
+    schema = load_schema_json(force_refresh=force_refresh)
+    if not schema:
+        return {}
+
+    tables = {}
+
+    # Extraer entidades principales
+    entities = schema.get("entities", {})
+    for table_name, table_data in entities.items():
+        columns_data = table_data.get("columns", {})
+        columns = []
+        for col_name, col_info in columns_data.items():
+            col_type = col_info.get("type", "unknown")
+            fk = col_info.get("foreign_key", None)
+            columns.append({
+                "name": col_name,
+                "type": col_type,
+                "fk": fk
+            })
+
+        if include_relationships:
+            # Extraer relaciones
+            relationships = []
+            rels_data = table_data.get("relationships", {})
+            for rel_name, rel_info in rels_data.items():
+                relationships.append({
+                    "name": rel_name,
+                    "type": rel_info.get("type"),  # belongs_to, has_many, etc.
+                    "target": rel_info.get("target"),
+                    "foreign_key": rel_info.get("foreign_key")
+                })
+            tables[table_name] = {
+                "columns": columns,
+                "relationships": relationships
+            }
+        else:
+            tables[table_name] = columns
+
+    # Extraer tablas pivot
+    pivot_tables = schema.get("pivot_tables", {})
+    for table_name, table_data in pivot_tables.items():
+        columns_data = table_data.get("columns", {})
+        columns = []
+        for col_name, col_info in columns_data.items():
+            col_type = col_info.get("type", "unknown")
+            fk = col_info.get("foreign_key", None)
+            columns.append({
+                "name": col_name,
+                "type": col_type,
+                "fk": fk
+            })
+
+        if include_relationships:
+            tables[table_name] = {
+                "columns": columns,
+                "relationships": []
+            }
+        else:
+            tables[table_name] = columns
+
+    return tables
+
+
+def parse_schema_markdown_to_json() -> dict:
+    """DEPRECADO: Usa parse_schema_json_to_tables() en su lugar."""
+    return parse_schema_json_to_tables()
+
+
+def parse_entities_from_json() -> list[dict]:
+    """Extrae entidades del JSON para el panel de entidades, incluyendo relaciones"""
+    schema = load_schema_json()
+    if not schema:
+        return []
+
+    entities = []
+    # Obtener tablas con relaciones incluidas
+    tables_data = parse_schema_json_to_tables(include_relationships=True)
+    ui_entities = schema.get("ui_entities", {})
+
+    for table_name, ui_data in ui_entities.items():
+        # Obtener datos de la tabla
+        table_info = tables_data.get(table_name, {"columns": [], "relationships": []})
+
+        entities.append({
+            "tabla": table_name,
+            "nombre": ui_data.get("nombre", table_name),
+            "icono": ui_data.get("icono", "database"),
+            "descripcion": ui_data.get("descripcion", ""),
+            "campos": table_info.get("columns", []),
+            "relaciones": table_info.get("relationships", [])
+        })
+
+    return entities
+
+
+def parse_entities_from_markdown() -> list[dict]:
+    """DEPRECADO: Usa parse_entities_from_json() en su lugar."""
+    return parse_entities_from_json()
+
+
+@router.get("/schema")
+async def get_db_schema(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Devuelve el schema parseado del markdown para autocompletado.
+    """
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+    try:
+        tables = parse_schema_markdown_to_json()
+        return {"tables": tables}
+    except Exception as e:
+        return {"tables": {}, "error": str(e)}
+
+
+# ==================== CONSULTAS GUARDADAS (CUBOS) ====================
+
+from models.consulta_guardada import ConsultaGuardada
+
+
+class ConsultaGuardadaCreate(BaseModel):
+    """Request para crear una consulta guardada"""
+    nombre: str
+    descripcion: Optional[str] = None
+    pregunta_original: str
+    sql_query: Optional[str] = None
+    icono: str = "database"
+    color: str = "#3b82f6"
+    tipo_visualizacion: str = "tabla"
+    es_publica: bool = False
+
+
+class ConsultaGuardadaUpdate(BaseModel):
+    """Request para actualizar una consulta guardada"""
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    color: Optional[str] = None
+    tipo_visualizacion: Optional[str] = None
+    es_publica: Optional[bool] = None
+
+
+class ConsultaGuardadaResponse(BaseModel):
+    """Response de consulta guardada"""
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    pregunta_original: str
+    sql_query: Optional[str]
+    icono: str
+    color: str
+    tipo_visualizacion: str
+    es_publica: bool
+    veces_ejecutada: int
+    created_at: datetime
+    usuario_nombre: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/consultas-guardadas", response_model=list[ConsultaGuardadaResponse])
+async def listar_consultas_guardadas(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Lista las consultas guardadas del usuario.
+    Incluye las propias + las públicas del municipio.
+    """
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+    municipio_id = current_user.municipio_id
+
+    query = (
+        select(ConsultaGuardada, User.nombre.label('usuario_nombre'))
+        .join(User, ConsultaGuardada.usuario_id == User.id)
+        .where(
+            ConsultaGuardada.municipio_id == municipio_id,
+            ConsultaGuardada.activo == True,
+            # Propias o públicas
+            (ConsultaGuardada.usuario_id == current_user.id) | (ConsultaGuardada.es_publica == True)
+        )
+        .order_by(ConsultaGuardada.veces_ejecutada.desc(), ConsultaGuardada.created_at.desc())
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    return [
+        ConsultaGuardadaResponse(
+            id=c.id,
+            nombre=c.nombre,
+            descripcion=c.descripcion,
+            pregunta_original=c.pregunta_original,
+            sql_query=c.sql_query,
+            icono=c.icono or "database",
+            color=c.color or "#3b82f6",
+            tipo_visualizacion=c.tipo_visualizacion or "tabla",
+            es_publica=c.es_publica,
+            veces_ejecutada=c.veces_ejecutada or 0,
+            created_at=c.created_at,
+            usuario_nombre=usuario_nombre
+        )
+        for c, usuario_nombre in rows
+    ]
+
+
+@router.post("/consultas-guardadas", response_model=ConsultaGuardadaResponse)
+async def crear_consulta_guardada(
+    request: ConsultaGuardadaCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Crea una nueva consulta guardada"""
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+    nueva = ConsultaGuardada(
+        municipio_id=current_user.municipio_id,
+        usuario_id=current_user.id,
+        nombre=request.nombre,
+        descripcion=request.descripcion,
+        pregunta_original=request.pregunta_original,
+        sql_query=request.sql_query,
+        icono=request.icono,
+        color=request.color,
+        tipo_visualizacion=request.tipo_visualizacion,
+        es_publica=request.es_publica,
+    )
+
+    db.add(nueva)
+    await db.commit()
+    await db.refresh(nueva)
+
+    return ConsultaGuardadaResponse(
+        id=nueva.id,
+        nombre=nueva.nombre,
+        descripcion=nueva.descripcion,
+        pregunta_original=nueva.pregunta_original,
+        sql_query=nueva.sql_query,
+        icono=nueva.icono or "database",
+        color=nueva.color or "#3b82f6",
+        tipo_visualizacion=nueva.tipo_visualizacion or "tabla",
+        es_publica=nueva.es_publica,
+        veces_ejecutada=0,
+        created_at=nueva.created_at,
+        usuario_nombre=f"{current_user.nombre}"
+    )
+
+
+@router.put("/consultas-guardadas/{consulta_id}", response_model=ConsultaGuardadaResponse)
+async def actualizar_consulta_guardada(
+    consulta_id: int,
+    request: ConsultaGuardadaUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Actualiza una consulta guardada (solo el dueño o admin)"""
+    query = select(ConsultaGuardada).where(
+        ConsultaGuardada.id == consulta_id,
+        ConsultaGuardada.municipio_id == current_user.municipio_id,
+        ConsultaGuardada.activo == True
+    )
+    result = await db.execute(query)
+    consulta = result.scalar_one_or_none()
+
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # Solo el dueño o admin pueden editar
+    if consulta.usuario_id != current_user.id and current_user.rol not in ['admin', 'super_admin']:
+        raise HTTPException(status_code=403, detail="No podés editar esta consulta")
+
+    # Actualizar campos
+    if request.nombre is not None:
+        consulta.nombre = request.nombre
+    if request.descripcion is not None:
+        consulta.descripcion = request.descripcion
+    if request.icono is not None:
+        consulta.icono = request.icono
+    if request.color is not None:
+        consulta.color = request.color
+    if request.tipo_visualizacion is not None:
+        consulta.tipo_visualizacion = request.tipo_visualizacion
+    if request.es_publica is not None:
+        consulta.es_publica = request.es_publica
+
+    await db.commit()
+    await db.refresh(consulta)
+
+    return ConsultaGuardadaResponse(
+        id=consulta.id,
+        nombre=consulta.nombre,
+        descripcion=consulta.descripcion,
+        pregunta_original=consulta.pregunta_original,
+        sql_query=consulta.sql_query,
+        icono=consulta.icono or "database",
+        color=consulta.color or "#3b82f6",
+        tipo_visualizacion=consulta.tipo_visualizacion or "tabla",
+        es_publica=consulta.es_publica,
+        veces_ejecutada=consulta.veces_ejecutada or 0,
+        created_at=consulta.created_at,
+    )
+
+
+@router.delete("/consultas-guardadas/{consulta_id}")
+async def eliminar_consulta_guardada(
+    consulta_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Elimina (soft delete) una consulta guardada"""
+    query = select(ConsultaGuardada).where(
+        ConsultaGuardada.id == consulta_id,
+        ConsultaGuardada.municipio_id == current_user.municipio_id,
+        ConsultaGuardada.activo == True
+    )
+    result = await db.execute(query)
+    consulta = result.scalar_one_or_none()
+
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    if consulta.usuario_id != current_user.id and current_user.rol not in ['admin', 'super_admin']:
+        raise HTTPException(status_code=403, detail="No podés eliminar esta consulta")
+
+    consulta.activo = False
+    await db.commit()
+
+    return {"message": "Consulta eliminada"}
+
+
+@router.post("/consultas-guardadas/{consulta_id}/ejecutar", response_model=ConsultaResponse)
+async def ejecutar_consulta_guardada(
+    consulta_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Ejecuta una consulta guardada y devuelve los resultados.
+    Incrementa el contador de ejecuciones.
+    """
+    if current_user.rol not in ['admin', 'supervisor', 'empleado', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+    query = select(ConsultaGuardada).where(
+        ConsultaGuardada.id == consulta_id,
+        ConsultaGuardada.municipio_id == current_user.municipio_id,
+        ConsultaGuardada.activo == True,
+        # Propias o públicas
+        (ConsultaGuardada.usuario_id == current_user.id) | (ConsultaGuardada.es_publica == True)
+    )
+    result = await db.execute(query)
+    consulta = result.scalar_one_or_none()
+
+    if not consulta:
+        raise HTTPException(status_code=404, detail="Consulta no encontrada")
+
+    # Incrementar contador
+    consulta.veces_ejecutada = (consulta.veces_ejecutada or 0) + 1
+    consulta.ultima_ejecucion = datetime.now()
+    await db.commit()
+
+    # Si tiene SQL guardado, ejecutarlo directamente
+    if consulta.sql_query:
+        result_sql = await execute_dynamic_sql(db, consulta.sql_query, current_user.municipio_id)
+
+        if result_sql.get('error'):
+            return ConsultaResponse(
+                response=f"<p style='color:#ef4444'>Error: {result_sql['error']}</p>",
+                sql_ejecutado=result_sql.get('sql'),
+                datos_crudos=None
+            )
+
+        datos = result_sql.get('data', [])
+
+        # Formatear respuesta
+        if datos:
+            format_prompt = build_response_with_data_prompt(consulta.pregunta_original, datos, consulta.nombre, len(datos))
+            format_messages = [
+                {"role": "system", "content": format_prompt},
+                {"role": "user", "content": f"Formateá estos datos para: {consulta.pregunta_original}"}
+            ]
+            formatted = await chat_service.chat(format_messages, max_tokens=1500)
+
+            return ConsultaResponse(
+                response=formatted or f"<p>Se encontraron {len(datos)} registros.</p>",
+                sql_ejecutado=result_sql.get('sql'),
+                datos_crudos=datos[:20]
+            )
+
+        return ConsultaResponse(
+            response="<p>No se encontraron datos.</p>",
+            sql_ejecutado=result_sql.get('sql'),
+            datos_crudos=[]
+        )
+
+    # Si no tiene SQL, regenerarlo con la IA
+    schema = await get_database_schema(db)
+    sql_prompt = build_sql_generator_prompt(current_user.municipio_id, schema)
+    sql_messages = [
+        {"role": "system", "content": sql_prompt},
+        {"role": "user", "content": consulta.pregunta_original}
+    ]
+
+    sql_response = await chat_service.chat(sql_messages, max_tokens=500)
+
+    if not sql_response:
+        return ConsultaResponse(
+            response="<p style='color:#ef4444'>Error generando consulta</p>",
+            sql_ejecutado=None,
+            datos_crudos=None
+        )
+
+    try:
+        json_match = re.search(r'\{[\s\S]*\}', sql_response)
+        if json_match:
+            sql_data = json.loads(json_match.group())
+            sql_query = sql_data.get('sql', '')
+
+            # Guardar SQL para próximas ejecuciones
+            consulta.sql_query = sql_query
+            await db.commit()
+
+            result_sql = await execute_dynamic_sql(db, sql_query, current_user.municipio_id)
+            datos = result_sql.get('data', [])
+
+            return ConsultaResponse(
+                response=f"<p>Consulta ejecutada: {len(datos)} registros</p>",
+                sql_ejecutado=sql_query,
+                datos_crudos=datos[:20]
+            )
+    except Exception as e:
+        return ConsultaResponse(
+            response=f"<p style='color:#ef4444'>Error: {str(e)}</p>",
+            sql_ejecutado=None,
+            datos_crudos=None
+        )

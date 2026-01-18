@@ -112,6 +112,19 @@ class MemorySessionStorage(SessionStorage):
             return None
         return session.get("system_prompt")
 
+    async def update_session(self, session_id: str, system_prompt: str = None, context: dict = None) -> bool:
+        """Actualiza el system_prompt y/o context de una sesión existente"""
+        if session_id not in self._sessions:
+            return False
+
+        session = self._sessions[session_id]
+        if system_prompt is not None:
+            session["system_prompt"] = system_prompt
+        if context is not None:
+            session["context"].update(context)
+        session["last_access"] = time.time()
+        return True
+
 
 class UserSessionStorage(SessionStorage):
     """

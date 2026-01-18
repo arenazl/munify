@@ -1,6 +1,6 @@
 from .municipio import Municipio  # IMPORTANTE: Municipio debe ir primero por las relaciones FK
 from .user import User
-from .categoria import Categoria
+from .categoria import Categoria, MunicipioCategoria
 from .zona import Zona
 from .cuadrilla_categoria import cuadrilla_categoria
 from .cuadrilla import Cuadrilla  # Debe ir antes de Reclamo por la relación FK
@@ -30,11 +30,13 @@ from .noticia import Noticia
 from .tramite import TipoTramite, Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud, MunicipioTipoTramite, MunicipioTramite
 from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
+from .consulta_guardada import ConsultaGuardada
 
 __all__ = [
     "Municipio",
     "User",
     "Categoria",
+    "MunicipioCategoria",
     "Zona",
     "Cuadrilla",
     "Empleado",
@@ -85,5 +87,7 @@ __all__ = [
     "MunicipioTramite",
     "DocumentoSolicitud",
     # Push Notifications
-    "PushSubscription"
+    "PushSubscription",
+    # Consultas guardadas / BI
+    "ConsultaGuardada"
 ]

@@ -12,11 +12,58 @@ from core.database import get_db
 from core.rate_limit import limiter, LIMITS
 from core.config import settings
 from models import Reclamo, Categoria, Zona
+from models.municipio import Municipio
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
 from services.ia_service import clasificar_reclamo, CATEGORY_KEYWORDS
 
 router = APIRouter()
+
+
+# ============================================
+# Endpoint de contacto por localidad
+# ============================================
+
+class ContactoMunicipioResponse(BaseModel):
+    municipio_id: int
+    nombre: str
+    telefono: Optional[str]
+    email: Optional[str] = None
+    encontrado: bool
+
+
+@router.get("/contacto/{localidad}")
+async def get_contacto_municipio(
+    localidad: str,
+    db: AsyncSession = Depends(get_db)
+) -> ContactoMunicipioResponse:
+    """
+    Endpoint PÚBLICO para obtener datos de contacto de un municipio por nombre de localidad.
+    Busca coincidencias parciales (case-insensitive).
+    """
+    # Buscar municipio por nombre (case-insensitive, coincidencia parcial)
+    query = select(Municipio).where(
+        func.lower(Municipio.nombre).contains(localidad.lower()),
+        Municipio.activo == True
+    )
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        return ContactoMunicipioResponse(
+            municipio_id=0,
+            nombre=localidad,
+            telefono="+54 9 11 6022-3474",  # Fallback
+            encontrado=False
+        )
+
+    return ContactoMunicipioResponse(
+        municipio_id=municipio.id,
+        nombre=municipio.nombre,
+        telefono=municipio.telefono,
+        email=getattr(municipio, 'email', None),
+        encontrado=True
+    )
 
 
 # Schemas públicos (sin datos sensibles)
@@ -437,11 +484,13 @@ async def get_estadisticas_municipio(
         for nombre, cantidad in result.all()
     ]
 
-    # Por categoría (solo del municipio)
+    # Por categoría (solo del municipio via tabla intermedia)
+    from models.categoria import MunicipioCategoria
     result = await db.execute(
         select(Categoria.nombre, Categoria.color, func.count(Reclamo.id))
         .join(Reclamo, and_(Reclamo.categoria_id == Categoria.id, Reclamo.municipio_id == municipio_id))
-        .where(Categoria.municipio_id == municipio_id)
+        .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
+        .where(MunicipioCategoria.municipio_id == municipio_id)
         .group_by(Categoria.id, Categoria.nombre, Categoria.color)
         .order_by(func.count(Reclamo.id).desc())
     )
@@ -466,12 +515,24 @@ async def get_categorias_publicas(
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener lista de categorías - SIN AUTENTICACIÓN"""
-    query = select(Categoria).where(Categoria.activo == True)
+    from models.categoria import MunicipioCategoria
 
     if municipio_id:
-        query = query.where(Categoria.municipio_id == municipio_id)
+        # Obtener categorías habilitadas para el municipio
+        query = (
+            select(Categoria)
+            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
+            .where(
+                MunicipioCategoria.municipio_id == municipio_id,
+                MunicipioCategoria.activo == True,
+                Categoria.activo == True
+            )
+            .order_by(Categoria.nombre)
+        )
+    else:
+        # Sin municipio, devolver todas las activas del catálogo
+        query = select(Categoria).where(Categoria.activo == True).order_by(Categoria.nombre)
 
-    query = query.order_by(Categoria.nombre)
     result = await db.execute(query)
     categorias = result.scalars().all()
 
@@ -603,12 +664,15 @@ async def clasificar_reclamo_endpoint(
     if not data.texto or len(data.texto) < 5:
         raise HTTPException(status_code=400, detail="El texto debe tener al menos 5 caracteres")
 
-    # Obtener categorías del municipio
+    # Obtener categorías del municipio via tabla intermedia
+    from models.categoria import MunicipioCategoria
     result = await db.execute(
         select(Categoria)
+        .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
         .where(
             Categoria.activo == True,
-            Categoria.municipio_id == data.municipio_id
+            MunicipioCategoria.municipio_id == data.municipio_id,
+            MunicipioCategoria.activo == True
         )
     )
     categorias_db = result.scalars().all()
@@ -676,13 +740,16 @@ async def chat_publico(
             response="El asistente no está disponible en este momento. Por favor intentá más tarde."
         )
 
-    # Obtener categorías del municipio si se especifica
+    # Obtener categorías del municipio si se especifica (via tabla intermedia)
+    from models.categoria import MunicipioCategoria
     categorias = []
     if data.municipio_id:
         result = await db.execute(
             select(Categoria)
+            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
             .where(
-                Categoria.municipio_id == data.municipio_id,
+                MunicipioCategoria.municipio_id == data.municipio_id,
+                MunicipioCategoria.activo == True,
                 Categoria.activo == True
             )
             .order_by(Categoria.nombre)

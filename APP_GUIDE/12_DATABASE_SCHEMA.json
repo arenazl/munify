@@ -1,0 +1,992 @@
+{
+  "schema_version": "1.0",
+  "database": "sugerenciasmun",
+  "description": "Sistema de gestión de reclamos municipales con gamificación, trámites y empleados",
+
+  "entities": {
+    "municipios": {
+      "description": "Municipios/ciudades que usan el sistema",
+      "table": "municipios",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "nombre": {"type": "varchar(200)", "nullable": false, "description": "Nombre del municipio"},
+        "codigo": {"type": "varchar(50)", "nullable": false, "unique": true, "description": "Código único del municipio"},
+        "descripcion": {"type": "text", "nullable": true},
+        "latitud": {"type": "float", "nullable": false},
+        "longitud": {"type": "float", "nullable": false},
+        "radio_km": {"type": "float", "nullable": true},
+        "limites_geojson": {"type": "json", "nullable": true},
+        "logo_url": {"type": "varchar(500)", "nullable": true},
+        "color_primario": {"type": "varchar(7)", "nullable": true},
+        "color_secundario": {"type": "varchar(7)", "nullable": true},
+        "direccion": {"type": "varchar(300)", "nullable": true},
+        "telefono": {"type": "varchar(50)", "nullable": true},
+        "email": {"type": "varchar(100)", "nullable": true},
+        "sitio_web": {"type": "varchar(200)", "nullable": true},
+        "zoom_mapa_default": {"type": "int", "nullable": true},
+        "max_reclamos_dia_vecino": {"type": "int", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"},
+        "updated_at": {"type": "datetime", "nullable": true},
+        "tema_config": {"type": "json", "nullable": true},
+        "imagen_portada": {"type": "varchar(500)", "nullable": true}
+      },
+      "indexes": ["codigo", "nombre"],
+      "is_central_entity": true
+    },
+
+    "usuarios": {
+      "description": "Usuarios del sistema (vecinos, empleados, supervisores, admins)",
+      "table": "usuarios",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": true, "foreign_key": "municipios.id"},
+        "email": {"type": "varchar(255)", "nullable": false, "unique": true},
+        "password_hash": {"type": "varchar(255)", "nullable": false},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "apellido": {"type": "varchar(100)", "nullable": false},
+        "telefono": {"type": "varchar(20)", "nullable": true},
+        "dni": {"type": "varchar(20)", "nullable": true},
+        "direccion": {"type": "varchar(255)", "nullable": true},
+        "rol": {"type": "enum", "values": ["vecino", "empleado", "supervisor", "admin"], "nullable": false},
+        "activo": {"type": "boolean", "nullable": true},
+        "empleado_id": {"type": "int", "nullable": true, "foreign_key": "empleados.id"},
+        "created_at": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"},
+        "updated_at": {"type": "datetime", "nullable": true},
+        "cuadrilla_id": {"type": "int", "nullable": true},
+        "es_anonimo": {"type": "boolean", "nullable": true, "default": false},
+        "notificacion_preferencias": {"type": "json", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "empleado": {"type": "belongs_to", "target": "empleados", "foreign_key": "empleado_id", "nullable": true}
+      },
+      "is_central_entity": true
+    },
+
+    "categorias": {
+      "description": "Categorías de reclamos - CATÁLOGO GENÉRICO (sin municipio_id)",
+      "table": "categorias",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "nombre": {"type": "varchar(100)", "nullable": false, "unique": true},
+        "descripcion": {"type": "text", "nullable": true},
+        "icono": {"type": "varchar(50)", "nullable": true},
+        "color": {"type": "varchar(7)", "nullable": true},
+        "ejemplos_reclamos": {"type": "text", "nullable": true},
+        "tip_ayuda": {"type": "varchar(255)", "nullable": true},
+        "tiempo_resolucion_estimado": {"type": "int", "nullable": true, "description": "Horas estimadas"},
+        "prioridad_default": {"type": "int", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "orden": {"type": "int", "nullable": true, "default": 0},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "reclamos": {"type": "has_many", "target": "reclamos", "foreign_key": "categoria_id"},
+        "municipios_habilitados": {"type": "has_many", "target": "municipio_categorias", "foreign_key": "categoria_id"}
+      },
+      "multi_tenant_note": "NO tiene municipio_id. Filtrar via municipio_categorias"
+    },
+
+    "zonas": {
+      "description": "Zonas geográficas dentro de un municipio",
+      "table": "zonas",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": true, "foreign_key": "municipios.id"},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "codigo": {"type": "varchar(20)", "nullable": true, "unique": true},
+        "descripcion": {"type": "text", "nullable": true},
+        "latitud_centro": {"type": "float", "nullable": true},
+        "longitud_centro": {"type": "float", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "empleados": {
+      "description": "Empleados municipales (operarios, técnicos)",
+      "table": "empleados",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": true, "foreign_key": "municipios.id"},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "apellido": {"type": "varchar(100)", "nullable": true},
+        "descripcion": {"type": "text", "nullable": true},
+        "especialidad": {"type": "varchar(100)", "nullable": true},
+        "categoria_principal_id": {"type": "int", "nullable": true, "foreign_key": "categorias.id"},
+        "zona_id": {"type": "int", "nullable": true, "foreign_key": "zonas.id"},
+        "capacidad_maxima": {"type": "int", "nullable": true, "description": "Máximo de reclamos simultáneos"},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true},
+        "telefono": {"type": "varchar(50)", "nullable": true},
+        "hora_entrada": {"type": "time", "nullable": true},
+        "hora_salida": {"type": "time", "nullable": true},
+        "tipo": {"type": "varchar(20)", "nullable": false, "default": "operario"}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "categoria_principal": {"type": "belongs_to", "target": "categorias", "foreign_key": "categoria_principal_id"},
+        "zona": {"type": "belongs_to", "target": "zonas", "foreign_key": "zona_id"},
+        "categorias": {"type": "many_to_many", "target": "categorias", "pivot_table": "empleado_categorias"},
+        "cuadrillas": {"type": "many_to_many", "target": "cuadrillas", "pivot_table": "empleado_cuadrillas"}
+      }
+    },
+
+    "cuadrillas": {
+      "description": "Grupos/equipos de trabajo",
+      "table": "cuadrillas",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": true, "foreign_key": "municipios.id"},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "apellido": {"type": "varchar(100)", "nullable": true},
+        "descripcion": {"type": "text", "nullable": true},
+        "especialidad": {"type": "varchar(100)", "nullable": true},
+        "categoria_principal_id": {"type": "int", "nullable": true, "foreign_key": "categorias.id"},
+        "zona_id": {"type": "int", "nullable": true, "foreign_key": "zonas.id"},
+        "capacidad_maxima": {"type": "int", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "categoria_principal": {"type": "belongs_to", "target": "categorias", "foreign_key": "categoria_principal_id"},
+        "zona": {"type": "belongs_to", "target": "zonas", "foreign_key": "zonas.id"},
+        "categorias": {"type": "many_to_many", "target": "categorias", "pivot_table": "cuadrilla_categorias"},
+        "empleados": {"type": "many_to_many", "target": "empleados", "pivot_table": "empleado_cuadrillas"}
+      }
+    },
+
+    "reclamos": {
+      "description": "Reclamos/quejas de vecinos - ENTIDAD PRINCIPAL",
+      "table": "reclamos",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": true, "foreign_key": "municipios.id"},
+        "titulo": {"type": "varchar(200)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": false},
+        "estado": {
+          "type": "enum",
+          "values": ["NUEVO", "ASIGNADO", "EN_PROCESO", "PENDIENTE_CONFIRMACION", "RESUELTO", "RECHAZADO"],
+          "nullable": false,
+          "default": "NUEVO"
+        },
+        "prioridad": {"type": "int", "nullable": true, "description": "1=Urgente, 5=Baja"},
+        "direccion": {"type": "varchar(255)", "nullable": false},
+        "latitud": {"type": "float", "nullable": true},
+        "longitud": {"type": "float", "nullable": true},
+        "referencia": {"type": "varchar(255)", "nullable": true},
+        "categoria_id": {"type": "int", "nullable": false, "foreign_key": "categorias.id"},
+        "zona_id": {"type": "int", "nullable": true, "foreign_key": "zonas.id"},
+        "creador_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "empleado_id": {"type": "int", "nullable": true, "foreign_key": "empleados.id"},
+        "fecha_programada": {"type": "date", "nullable": true},
+        "hora_inicio": {"type": "time", "nullable": true},
+        "hora_fin": {"type": "time", "nullable": true},
+        "motivo_rechazo": {
+          "type": "enum",
+          "values": ["NO_COMPETENCIA", "DUPLICADO", "INFO_INSUFICIENTE", "FUERA_JURISDICCION", "OTRO"],
+          "nullable": true
+        },
+        "descripcion_rechazo": {"type": "text", "nullable": true},
+        "resolucion": {"type": "text", "nullable": true},
+        "fecha_resolucion": {"type": "datetime", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "categoria": {"type": "belongs_to", "target": "categorias", "foreign_key": "categoria_id"},
+        "zona": {"type": "belongs_to", "target": "zonas", "foreign_key": "zona_id"},
+        "creador": {"type": "belongs_to", "target": "usuarios", "foreign_key": "creador_id"},
+        "empleado": {"type": "belongs_to", "target": "empleados", "foreign_key": "empleado_id"},
+        "documentos": {"type": "has_many", "target": "documentos", "foreign_key": "reclamo_id"},
+        "historial": {"type": "has_many", "target": "historial_reclamos", "foreign_key": "reclamo_id"},
+        "calificacion": {"type": "has_one", "target": "calificaciones", "foreign_key": "reclamo_id"},
+        "notificaciones": {"type": "has_many", "target": "notificaciones", "foreign_key": "reclamo_id"}
+      },
+      "is_central_entity": true,
+      "common_filters": ["estado", "categoria_id", "municipio_id", "creador_id", "empleado_id", "prioridad", "zona_id"],
+      "common_aggregations": ["COUNT by estado", "COUNT by categoria", "AVG tiempo_resolucion", "COUNT by zona"]
+    },
+
+    "historial_reclamos": {
+      "description": "Historial de cambios de estado de reclamos",
+      "table": "historial_reclamos",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "reclamo_id": {"type": "int", "nullable": false, "foreign_key": "reclamos.id"},
+        "usuario_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "estado_anterior": {"type": "enum", "values": ["NUEVO", "ASIGNADO", "EN_PROCESO", "PENDIENTE_CONFIRMACION", "RESUELTO", "RECHAZADO"], "nullable": true},
+        "estado_nuevo": {"type": "enum", "values": ["NUEVO", "ASIGNADO", "EN_PROCESO", "PENDIENTE_CONFIRMACION", "RESUELTO", "RECHAZADO"], "nullable": true},
+        "accion": {"type": "varchar(100)", "nullable": false},
+        "comentario": {"type": "text", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"}
+      },
+      "relationships": {
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"}
+      }
+    },
+
+    "documentos": {
+      "description": "Archivos adjuntos a reclamos (fotos, videos)",
+      "table": "documentos",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "reclamo_id": {"type": "int", "nullable": false, "foreign_key": "reclamos.id"},
+        "usuario_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "nombre_original": {"type": "varchar(255)", "nullable": false},
+        "url": {"type": "varchar(500)", "nullable": false},
+        "public_id": {"type": "varchar(255)", "nullable": true},
+        "tipo": {"type": "varchar(50)", "nullable": false, "description": "imagen, video, documento"},
+        "mime_type": {"type": "varchar(100)", "nullable": true},
+        "tamanio": {"type": "int", "nullable": true},
+        "etapa": {"type": "varchar(50)", "nullable": true, "description": "creacion, resolucion, etc"},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"}
+      }
+    },
+
+    "calificaciones": {
+      "description": "Calificaciones de vecinos sobre resolución de reclamos",
+      "table": "calificaciones",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "reclamo_id": {"type": "int", "nullable": false, "foreign_key": "reclamos.id", "unique": true},
+        "usuario_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "puntuacion": {"type": "int", "nullable": false, "constraints": "CHECK (puntuacion >= 1 AND puntuacion <= 5)"},
+        "tiempo_respuesta": {"type": "int", "nullable": true},
+        "calidad_trabajo": {"type": "int", "nullable": true},
+        "atencion": {"type": "int", "nullable": true},
+        "comentario": {"type": "text", "nullable": true},
+        "tags": {"type": "varchar(500)", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"}
+      }
+    },
+
+    "notificaciones": {
+      "description": "Notificaciones push/in-app para usuarios",
+      "table": "notificaciones",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "usuario_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "titulo": {"type": "varchar(200)", "nullable": false},
+        "mensaje": {"type": "text", "nullable": false},
+        "tipo": {"type": "varchar(50)", "nullable": false},
+        "reclamo_id": {"type": "int", "nullable": true, "foreign_key": "reclamos.id"},
+        "leida": {"type": "boolean", "nullable": true, "default": false},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"},
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"}
+      }
+    },
+
+    "tipos_tramites": {
+      "description": "Tipos/categorías de trámites administrativos - CATÁLOGO GENÉRICO (sin municipio_id)",
+      "table": "tipos_tramites",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "nombre": {"type": "varchar(200)", "nullable": false, "unique": true},
+        "descripcion": {"type": "text", "nullable": true},
+        "codigo": {"type": "varchar(50)", "nullable": true, "unique": true},
+        "icono": {"type": "varchar(50)", "nullable": true},
+        "color": {"type": "varchar(20)", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "orden": {"type": "int", "nullable": true, "default": 0},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "tramites": {"type": "has_many", "target": "tramites", "foreign_key": "tipo_tramite_id"},
+        "municipios_habilitados": {"type": "has_many", "target": "municipio_tipos_tramites", "foreign_key": "tipo_tramite_id"}
+      },
+      "multi_tenant_note": "NO tiene municipio_id. Filtrar via municipio_tipos_tramites"
+    },
+
+    "tramites": {
+      "description": "Trámites específicos dentro de cada tipo - CATÁLOGO GENÉRICO (sin municipio_id)",
+      "table": "tramites",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "tipo_tramite_id": {"type": "int", "nullable": false, "foreign_key": "tipos_tramites.id"},
+        "nombre": {"type": "varchar(200)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": true},
+        "icono": {"type": "varchar(50)", "nullable": true},
+        "requisitos": {"type": "text", "nullable": true},
+        "documentos_requeridos": {"type": "text", "nullable": true},
+        "tiempo_estimado_dias": {"type": "int", "nullable": true, "default": 15},
+        "costo": {"type": "float", "nullable": true},
+        "url_externa": {"type": "varchar(500)", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "orden": {"type": "int", "nullable": true, "default": 0},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "tipo_tramite": {"type": "belongs_to", "target": "tipos_tramites", "foreign_key": "tipo_tramite_id"},
+        "solicitudes": {"type": "has_many", "target": "solicitudes", "foreign_key": "tramite_id"},
+        "municipios_habilitados": {"type": "has_many", "target": "municipio_tramites", "foreign_key": "tramite_id"}
+      },
+      "multi_tenant_note": "NO tiene municipio_id. Filtrar via municipio_tramites"
+    },
+
+    "solicitudes": {
+      "description": "Solicitudes de trámites realizadas por vecinos",
+      "table": "solicitudes",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "numero_tramite": {"type": "varchar(50)", "nullable": true, "unique": true},
+        "asunto": {"type": "varchar(300)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": true},
+        "estado": {
+          "type": "enum",
+          "values": ["INICIADO", "EN_REVISION", "REQUIERE_DOCUMENTACION", "EN_PROCESO", "APROBADO", "RECHAZADO", "FINALIZADO"],
+          "nullable": false
+        },
+        "solicitante_id": {"type": "int", "nullable": true, "foreign_key": "usuarios.id"},
+        "nombre_solicitante": {"type": "varchar(100)", "nullable": true},
+        "apellido_solicitante": {"type": "varchar(100)", "nullable": true},
+        "dni_solicitante": {"type": "varchar(20)", "nullable": true},
+        "email_solicitante": {"type": "varchar(200)", "nullable": true},
+        "telefono_solicitante": {"type": "varchar(50)", "nullable": true},
+        "direccion_solicitante": {"type": "varchar(300)", "nullable": true},
+        "respuesta": {"type": "text", "nullable": true},
+        "observaciones": {"type": "text", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true},
+        "fecha_resolucion": {"type": "datetime", "nullable": true},
+        "empleado_id": {"type": "int", "nullable": true, "foreign_key": "empleados.id"},
+        "prioridad": {"type": "int", "nullable": true, "default": 3},
+        "tramite_id": {"type": "int", "nullable": true, "foreign_key": "tramites.id"}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "solicitante": {"type": "belongs_to", "target": "usuarios", "foreign_key": "solicitante_id"},
+        "empleado": {"type": "belongs_to", "target": "empleados", "foreign_key": "empleado_id"},
+        "tramite": {"type": "belongs_to", "target": "tramites", "foreign_key": "tramite_id"},
+        "documentos": {"type": "has_many", "target": "documentos_solicitudes", "foreign_key": "solicitud_id"},
+        "historial": {"type": "has_many", "target": "historial_solicitudes", "foreign_key": "solicitud_id"}
+      },
+      "is_central_entity": true,
+      "common_filters": ["estado", "municipio_id", "solicitante_id", "empleado_id", "tramite_id"]
+    },
+
+    "documentos_solicitudes": {
+      "description": "Documentos adjuntos a solicitudes de trámites",
+      "table": "documentos_solicitudes",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "solicitud_id": {"type": "int", "nullable": false, "foreign_key": "solicitudes.id"},
+        "usuario_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "nombre_original": {"type": "varchar(255)", "nullable": false},
+        "url": {"type": "varchar(500)", "nullable": false},
+        "public_id": {"type": "varchar(255)", "nullable": true},
+        "tipo": {"type": "varchar(50)", "nullable": false},
+        "mime_type": {"type": "varchar(100)", "nullable": true},
+        "tamanio": {"type": "int", "nullable": true},
+        "tipo_documento": {"type": "varchar(100)", "nullable": true},
+        "descripcion": {"type": "varchar(500)", "nullable": true},
+        "etapa": {"type": "varchar(50)", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "solicitud": {"type": "belongs_to", "target": "solicitudes", "foreign_key": "solicitud_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"}
+      }
+    },
+
+    "historial_solicitudes": {
+      "description": "Historial de cambios de estado de solicitudes",
+      "table": "historial_solicitudes",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "solicitud_id": {"type": "int", "nullable": true, "foreign_key": "solicitudes.id"},
+        "usuario_id": {"type": "int", "nullable": true, "foreign_key": "usuarios.id"},
+        "estado_anterior": {"type": "enum", "values": ["INICIADO", "EN_REVISION", "REQUIERE_DOCUMENTACION", "EN_PROCESO", "APROBADO", "RECHAZADO", "FINALIZADO"], "nullable": true},
+        "estado_nuevo": {"type": "enum", "values": ["INICIADO", "EN_REVISION", "REQUIERE_DOCUMENTACION", "EN_PROCESO", "APROBADO", "RECHAZADO", "FINALIZADO"], "nullable": true},
+        "accion": {"type": "varchar(100)", "nullable": false},
+        "comentario": {"type": "text", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "solicitud": {"type": "belongs_to", "target": "solicitudes", "foreign_key": "solicitud_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"}
+      }
+    },
+
+    "puntos_usuarios": {
+      "description": "Puntos acumulados por usuarios (gamificación)",
+      "table": "puntos_usuarios",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "user_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "puntos_totales": {"type": "int", "nullable": false},
+        "puntos_mes_actual": {"type": "int", "nullable": false},
+        "reclamos_totales": {"type": "int", "nullable": false},
+        "reclamos_resueltos": {"type": "int", "nullable": false},
+        "reclamos_con_foto": {"type": "int", "nullable": false},
+        "reclamos_con_ubicacion": {"type": "int", "nullable": false},
+        "calificaciones_dadas": {"type": "int", "nullable": false},
+        "semanas_consecutivas": {"type": "int", "nullable": false},
+        "ultima_actividad": {"type": "datetime", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "user_id"},
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "historial_puntos": {
+      "description": "Registro de puntos ganados por acción",
+      "table": "historial_puntos",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "user_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "tipo_accion": {
+          "type": "enum",
+          "values": ["RECLAMO_CREADO", "RECLAMO_VERIFICADO", "RECLAMO_RESUELTO", "RECLAMO_CON_FOTO", "RECLAMO_CON_UBICACION", "PRIMER_RECLAMO", "RACHA_SEMANAL", "CALIFICACION_DADA", "BADGE_OBTENIDO", "BONUS_ZONA_ACTIVA"],
+          "nullable": false
+        },
+        "puntos": {"type": "int", "nullable": false},
+        "descripcion": {"type": "varchar(255)", "nullable": true},
+        "reclamo_id": {"type": "int", "nullable": true, "foreign_key": "reclamos.id"},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "user_id"},
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"}
+      }
+    },
+
+    "badges_usuarios": {
+      "description": "Insignias/logros obtenidos por usuarios",
+      "table": "badges_usuarios",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "user_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "tipo_badge": {
+          "type": "enum",
+          "values": ["VECINO_ACTIVO", "OJOS_DE_LA_CIUDAD", "REPORTERO_ESTRELLA", "GUARDIAN_URBANO", "HEROE_MUNICIPAL", "CAZADOR_DE_BACHES", "GUARDIAN_DE_LA_LUZ", "DEFENSOR_DEL_VERDE", "VIGILANTE_DEL_AGUA", "PRIMER_PASO", "FOTOGRAFO", "PRECISO", "CONSTANTE", "MADRUGADOR", "NOCTURNO", "TOP_DEL_MES", "TOP_3_MES"],
+          "nullable": false
+        },
+        "obtenido_en": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"}
+      },
+      "relationships": {
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "user_id"},
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "leaderboard_mensual": {
+      "description": "Ranking mensual de usuarios por puntos",
+      "table": "leaderboard_mensual",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "zona_id": {"type": "int", "nullable": true, "foreign_key": "zonas.id"},
+        "anio": {"type": "int", "nullable": false},
+        "mes": {"type": "int", "nullable": false},
+        "user_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "posicion": {"type": "int", "nullable": false},
+        "puntos": {"type": "int", "nullable": false},
+        "reclamos": {"type": "int", "nullable": false},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "zona": {"type": "belongs_to", "target": "zonas", "foreign_key": "zona_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "user_id"}
+      }
+    },
+
+    "recompensas_disponibles": {
+      "description": "Recompensas canjeables por puntos",
+      "table": "recompensas_disponibles",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": true},
+        "icono": {"type": "varchar(50)", "nullable": true},
+        "puntos_requeridos": {"type": "int", "nullable": false},
+        "stock": {"type": "int", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true},
+        "fecha_inicio": {"type": "datetime", "nullable": true},
+        "fecha_fin": {"type": "datetime", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "canjes": {"type": "has_many", "target": "recompensas_canjeadas", "foreign_key": "recompensa_id"}
+      }
+    },
+
+    "recompensas_canjeadas": {
+      "description": "Registro de recompensas canjeadas por usuarios",
+      "table": "recompensas_canjeadas",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "user_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "recompensa_id": {"type": "int", "nullable": false, "foreign_key": "recompensas_disponibles.id"},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "puntos_gastados": {"type": "int", "nullable": false},
+        "estado": {"type": "varchar(20)", "nullable": true},
+        "codigo_canje": {"type": "varchar(50)", "nullable": true},
+        "canjeado_en": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"},
+        "entregado_en": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "user_id"},
+        "recompensa": {"type": "belongs_to", "target": "recompensas_disponibles", "foreign_key": "recompensa_id"},
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "sla_config": {
+      "description": "Configuración de SLA por categoría y prioridad",
+      "table": "sla_config",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "categoria_id": {"type": "int", "nullable": true, "foreign_key": "categorias.id"},
+        "prioridad": {"type": "int", "nullable": true},
+        "tiempo_respuesta": {"type": "int", "nullable": true, "description": "Horas"},
+        "tiempo_resolucion": {"type": "int", "nullable": true, "description": "Horas"},
+        "tiempo_alerta_amarilla": {"type": "int", "nullable": true, "description": "Horas antes de alerta"},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id", "default": 1}
+      },
+      "relationships": {
+        "categoria": {"type": "belongs_to", "target": "categorias", "foreign_key": "categoria_id"},
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "sla_violaciones": {
+      "description": "Registro de violaciones de SLA",
+      "table": "sla_violaciones",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "reclamo_id": {"type": "int", "nullable": false, "foreign_key": "reclamos.id"},
+        "tipo": {"type": "varchar(50)", "nullable": false, "description": "RESPUESTA o RESOLUCION"},
+        "tiempo_limite_horas": {"type": "int", "nullable": false},
+        "tiempo_real_horas": {"type": "float", "nullable": false},
+        "exceso_horas": {"type": "float", "nullable": false},
+        "estado_reclamo": {"type": "varchar(50)", "nullable": false},
+        "fecha_vencimiento": {"type": "datetime", "nullable": false},
+        "fecha_deteccion": {"type": "datetime", "nullable": true, "default": "CURRENT_TIMESTAMP"},
+        "notificada": {"type": "boolean", "nullable": true}
+      },
+      "relationships": {
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"}
+      }
+    },
+
+    "configuracion_escalado": {
+      "description": "Reglas de escalado automático de reclamos",
+      "table": "configuracion_escalado",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": true},
+        "horas_sin_asignar": {"type": "int", "nullable": true},
+        "horas_sin_iniciar": {"type": "int", "nullable": true},
+        "horas_sin_resolver": {"type": "int", "nullable": true},
+        "categoria_id": {"type": "int", "nullable": true, "foreign_key": "categorias.id"},
+        "prioridad_minima": {"type": "int", "nullable": true},
+        "accion": {"type": "varchar(50)", "nullable": true},
+        "notificar_a": {"type": "varchar(200)", "nullable": true},
+        "aumentar_prioridad_en": {"type": "int", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "categoria": {"type": "belongs_to", "target": "categorias", "foreign_key": "categoria_id"}
+      }
+    },
+
+    "grupos_reclamos": {
+      "description": "Agrupación de reclamos similares/duplicados",
+      "table": "grupos_reclamos",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "reclamo_principal_id": {"type": "int", "nullable": false, "foreign_key": "reclamos.id"},
+        "nombre": {"type": "varchar(200)", "nullable": false},
+        "descripcion": {"type": "varchar(500)", "nullable": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "reclamo_principal": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_principal_id"},
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "reclamos": {"type": "has_many", "target": "reclamos_agrupados", "foreign_key": "grupo_id"}
+      }
+    },
+
+    "reclamos_agrupados": {
+      "description": "Tabla pivote para agrupar reclamos",
+      "table": "reclamos_agrupados",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "grupo_id": {"type": "int", "nullable": false, "foreign_key": "grupos_reclamos.id"},
+        "reclamo_id": {"type": "int", "nullable": false, "foreign_key": "reclamos.id"},
+        "es_principal": {"type": "boolean", "nullable": true, "default": false},
+        "created_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "grupo": {"type": "belongs_to", "target": "grupos_reclamos", "foreign_key": "grupo_id"},
+        "reclamo": {"type": "belongs_to", "target": "reclamos", "foreign_key": "reclamo_id"}
+      }
+    },
+
+    "noticias": {
+      "description": "Noticias/anuncios del municipio",
+      "table": "noticias",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "titulo": {"type": "varchar(200)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": false},
+        "imagen_url": {"type": "varchar(500)", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "whatsapp_configs": {
+      "description": "Configuración de WhatsApp por municipio",
+      "table": "whatsapp_configs",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id", "unique": true},
+        "habilitado": {"type": "boolean", "nullable": true},
+        "provider": {"type": "enum", "values": ["META", "TWILIO"], "nullable": true},
+        "meta_phone_number_id": {"type": "varchar(100)", "nullable": true},
+        "meta_access_token": {"type": "varchar(500)", "nullable": true},
+        "meta_business_account_id": {"type": "varchar(100)", "nullable": true},
+        "meta_webhook_verify_token": {"type": "varchar(100)", "nullable": true},
+        "twilio_account_sid": {"type": "varchar(100)", "nullable": true},
+        "twilio_auth_token": {"type": "varchar(100)", "nullable": true},
+        "twilio_phone_number": {"type": "varchar(20)", "nullable": true},
+        "notificar_reclamo_recibido": {"type": "boolean", "nullable": true},
+        "notificar_reclamo_asignado": {"type": "boolean", "nullable": true},
+        "notificar_cambio_estado": {"type": "boolean", "nullable": true},
+        "notificar_reclamo_resuelto": {"type": "boolean", "nullable": true},
+        "notificar_comentarios": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"}
+      }
+    },
+
+    "empleado_metricas": {
+      "description": "Métricas de rendimiento de empleados por período",
+      "table": "empleado_metricas",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "empleado_id": {"type": "int", "nullable": false, "foreign_key": "empleados.id"},
+        "periodo": {"type": "date", "nullable": false},
+        "reclamos_asignados": {"type": "int", "nullable": true},
+        "reclamos_resueltos": {"type": "int", "nullable": true},
+        "reclamos_rechazados": {"type": "int", "nullable": true},
+        "tiempo_promedio_respuesta": {"type": "int", "nullable": true, "description": "Minutos"},
+        "tiempo_promedio_resolucion": {"type": "int", "nullable": true, "description": "Minutos"},
+        "calificacion_promedio": {"type": "float", "nullable": true},
+        "sla_cumplido_porcentaje": {"type": "float", "nullable": true},
+        "created_at": {"type": "date", "nullable": true}
+      },
+      "relationships": {
+        "empleado": {"type": "belongs_to", "target": "empleados", "foreign_key": "empleado_id"}
+      }
+    },
+
+    "empleado_ausencias": {
+      "description": "Registro de ausencias de empleados",
+      "table": "empleado_ausencias",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "empleado_id": {"type": "int", "nullable": false, "foreign_key": "empleados.id"},
+        "tipo": {"type": "varchar(50)", "nullable": false, "description": "vacaciones, enfermedad, etc"},
+        "fecha_inicio": {"type": "date", "nullable": false},
+        "fecha_fin": {"type": "date", "nullable": false},
+        "motivo": {"type": "text", "nullable": true},
+        "aprobado": {"type": "boolean", "nullable": true},
+        "aprobado_por_id": {"type": "int", "nullable": true, "foreign_key": "usuarios.id"},
+        "fecha_aprobacion": {"type": "date", "nullable": true},
+        "created_at": {"type": "date", "nullable": true}
+      },
+      "relationships": {
+        "empleado": {"type": "belongs_to", "target": "empleados", "foreign_key": "empleado_id"},
+        "aprobador": {"type": "belongs_to", "target": "usuarios", "foreign_key": "aprobado_por_id"}
+      }
+    },
+
+    "consultas_guardadas": {
+      "description": "Consultas SQL guardadas para reportes",
+      "table": "consultas_guardadas",
+      "primary_key": "id",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "usuario_id": {"type": "int", "nullable": false, "foreign_key": "usuarios.id"},
+        "nombre": {"type": "varchar(100)", "nullable": false},
+        "descripcion": {"type": "text", "nullable": true},
+        "icono": {"type": "varchar(50)", "nullable": true},
+        "color": {"type": "varchar(20)", "nullable": true},
+        "pregunta_original": {"type": "text", "nullable": false},
+        "sql_query": {"type": "text", "nullable": true},
+        "tipo_visualizacion": {"type": "varchar(50)", "nullable": true},
+        "config_visualizacion": {"type": "json", "nullable": true},
+        "es_publica": {"type": "boolean", "nullable": true},
+        "es_predeterminada": {"type": "boolean", "nullable": true},
+        "veces_ejecutada": {"type": "int", "nullable": true},
+        "ultima_ejecucion": {"type": "datetime", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true},
+        "created_at": {"type": "datetime", "nullable": true},
+        "updated_at": {"type": "datetime", "nullable": true}
+      },
+      "relationships": {
+        "municipio": {"type": "belongs_to", "target": "municipios", "foreign_key": "municipio_id"},
+        "usuario": {"type": "belongs_to", "target": "usuarios", "foreign_key": "usuario_id"}
+      }
+    }
+  },
+
+  "pivot_tables": {
+    "municipio_categorias": {
+      "description": "Categorías habilitadas por municipio",
+      "table": "municipio_categorias",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "categoria_id": {"type": "int", "nullable": false, "foreign_key": "categorias.id"},
+        "activo": {"type": "boolean", "nullable": true},
+        "orden": {"type": "int", "nullable": true},
+        "tiempo_resolucion_estimado": {"type": "int", "nullable": true},
+        "prioridad_default": {"type": "int", "nullable": true}
+      }
+    },
+    "empleado_categorias": {
+      "description": "Categorías que maneja cada empleado",
+      "table": "empleado_categorias",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "empleado_id": {"type": "int", "nullable": false, "foreign_key": "empleados.id"},
+        "categoria_id": {"type": "int", "nullable": false, "foreign_key": "categorias.id"},
+        "es_principal": {"type": "boolean", "nullable": true}
+      }
+    },
+    "cuadrilla_categorias": {
+      "description": "Categorías que maneja cada cuadrilla",
+      "table": "cuadrilla_categorias",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "cuadrilla_id": {"type": "int", "nullable": false, "foreign_key": "cuadrillas.id"},
+        "categoria_id": {"type": "int", "nullable": false, "foreign_key": "categorias.id"},
+        "es_principal": {"type": "boolean", "nullable": true}
+      }
+    },
+    "empleado_cuadrillas": {
+      "description": "Empleados asignados a cuadrillas",
+      "table": "empleado_cuadrillas",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "empleado_id": {"type": "int", "nullable": false, "foreign_key": "empleados.id"},
+        "cuadrilla_id": {"type": "int", "nullable": false, "foreign_key": "cuadrillas.id"},
+        "es_lider": {"type": "boolean", "nullable": true},
+        "fecha_ingreso": {"type": "date", "nullable": true},
+        "activo": {"type": "boolean", "nullable": true}
+      }
+    },
+    "municipio_tipos_tramites": {
+      "description": "Tipos de trámites habilitados por municipio",
+      "table": "municipio_tipos_tramites",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "tipo_tramite_id": {"type": "int", "nullable": false, "foreign_key": "tipos_tramites.id"},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "orden": {"type": "int", "nullable": true, "default": 0},
+        "created_at": {"type": "datetime", "nullable": true}
+      }
+    },
+    "municipio_tramites": {
+      "description": "Trámites habilitados por municipio con personalizaciones",
+      "table": "municipio_tramites",
+      "columns": {
+        "id": {"type": "int", "nullable": false, "auto_increment": true},
+        "municipio_id": {"type": "int", "nullable": false, "foreign_key": "municipios.id"},
+        "tramite_id": {"type": "int", "nullable": false, "foreign_key": "tramites.id"},
+        "activo": {"type": "boolean", "nullable": true, "default": true},
+        "orden": {"type": "int", "nullable": true, "default": 0},
+        "tiempo_estimado_dias": {"type": "int", "nullable": true, "description": "Personalizado por municipio"},
+        "costo": {"type": "float", "nullable": true, "description": "Personalizado por municipio"},
+        "requisitos": {"type": "text", "nullable": true, "description": "Personalizado por municipio"},
+        "documentos_requeridos": {"type": "text", "nullable": true, "description": "Personalizado por municipio"},
+        "created_at": {"type": "datetime", "nullable": true}
+      }
+    }
+  },
+
+  "enums": {
+    "estado_reclamo": {
+      "values": ["NUEVO", "ASIGNADO", "EN_PROCESO", "PENDIENTE_CONFIRMACION", "RESUELTO", "RECHAZADO"],
+      "flow": "NUEVO -> ASIGNADO -> EN_PROCESO -> PENDIENTE_CONFIRMACION -> RESUELTO",
+      "terminal_states": ["RESUELTO", "RECHAZADO"]
+    },
+    "estado_solicitud": {
+      "values": ["INICIADO", "EN_REVISION", "REQUIERE_DOCUMENTACION", "EN_PROCESO", "APROBADO", "RECHAZADO", "FINALIZADO"],
+      "terminal_states": ["APROBADO", "RECHAZADO", "FINALIZADO"]
+    },
+    "rol_usuario": {
+      "values": ["vecino", "empleado", "supervisor", "admin"],
+      "hierarchy": "vecino < empleado < supervisor < admin"
+    },
+    "motivo_rechazo": {
+      "values": ["NO_COMPETENCIA", "DUPLICADO", "INFO_INSUFICIENTE", "FUERA_JURISDICCION", "OTRO"]
+    },
+    "tipo_badge": {
+      "values": ["VECINO_ACTIVO", "OJOS_DE_LA_CIUDAD", "REPORTERO_ESTRELLA", "GUARDIAN_URBANO", "HEROE_MUNICIPAL", "CAZADOR_DE_BACHES", "GUARDIAN_DE_LA_LUZ", "DEFENSOR_DEL_VERDE", "VIGILANTE_DEL_AGUA", "PRIMER_PASO", "FOTOGRAFO", "PRECISO", "CONSTANTE", "MADRUGADOR", "NOCTURNO", "TOP_DEL_MES", "TOP_3_MES"]
+    },
+    "tipo_accion_puntos": {
+      "values": ["RECLAMO_CREADO", "RECLAMO_VERIFICADO", "RECLAMO_RESUELTO", "RECLAMO_CON_FOTO", "RECLAMO_CON_UBICACION", "PRIMER_RECLAMO", "RACHA_SEMANAL", "CALIFICACION_DADA", "BADGE_OBTENIDO", "BONUS_ZONA_ACTIVA"]
+    }
+  },
+
+  "common_joins": {
+    "reclamo_completo": {
+      "description": "Reclamo con toda su información relacionada",
+      "base": "reclamos r",
+      "joins": [
+        "LEFT JOIN municipios m ON r.municipio_id = m.id",
+        "LEFT JOIN categorias c ON r.categoria_id = c.id",
+        "LEFT JOIN zonas z ON r.zona_id = z.id",
+        "LEFT JOIN usuarios u ON r.creador_id = u.id",
+        "LEFT JOIN empleados e ON r.empleado_id = e.id",
+        "LEFT JOIN calificaciones cal ON r.id = cal.reclamo_id"
+      ]
+    },
+    "usuario_con_puntos": {
+      "description": "Usuario con su información de gamificación",
+      "base": "usuarios u",
+      "joins": [
+        "LEFT JOIN puntos_usuarios pu ON u.id = pu.user_id",
+        "LEFT JOIN municipios m ON u.municipio_id = m.id"
+      ]
+    },
+    "empleado_completo": {
+      "description": "Empleado con categorías y zona",
+      "base": "empleados e",
+      "joins": [
+        "LEFT JOIN municipios m ON e.municipio_id = m.id",
+        "LEFT JOIN categorias c ON e.categoria_principal_id = c.id",
+        "LEFT JOIN zonas z ON e.zona_id = z.id"
+      ]
+    },
+    "solicitud_completa": {
+      "description": "Solicitud con información relacionada",
+      "base": "solicitudes s",
+      "joins": [
+        "LEFT JOIN municipios m ON s.municipio_id = m.id",
+        "LEFT JOIN usuarios u ON s.solicitante_id = u.id",
+        "LEFT JOIN empleados e ON s.empleado_id = e.id",
+        "LEFT JOIN tramites t ON s.tramite_id = t.id",
+        "LEFT JOIN tipos_tramites tt ON t.tipo_tramite_id = tt.id"
+      ]
+    }
+  },
+
+  "query_patterns": {
+    "filtrar_por_municipio": {
+      "description": "Siempre filtrar por municipio_id cuando exista",
+      "pattern": "WHERE {table}.municipio_id = :municipio_id",
+      "applies_to": ["reclamos", "usuarios", "empleados", "zonas", "cuadrillas", "solicitudes", "noticias", "puntos_usuarios"]
+    },
+    "filtrar_activos": {
+      "description": "Filtrar solo registros activos",
+      "pattern": "AND {table}.activo = 1",
+      "applies_to": ["usuarios", "empleados", "categorias", "zonas", "cuadrillas", "tramites"]
+    }
+  },
+
+  "ui_entities": {
+    "reclamos": {"nombre": "Reclamos", "icono": "alert-triangle", "descripcion": "Reclamos de vecinos"},
+    "solicitudes": {"nombre": "Solicitudes", "icono": "file-text", "descripcion": "Solicitudes de trámites"},
+    "empleados": {"nombre": "Empleados", "icono": "users", "descripcion": "Personal del municipio"},
+    "categorias": {"nombre": "Categorías", "icono": "folder", "descripcion": "Categorías de reclamos"},
+    "zonas": {"nombre": "Zonas", "icono": "map-pin", "descripcion": "Zonas geográficas"},
+    "tipos_tramites": {"nombre": "Tipos de Trámite", "icono": "layers", "descripcion": "Categorías de trámites"},
+    "tramites": {"nombre": "Trámites", "icono": "clipboard-list", "descripcion": "Trámites disponibles"},
+    "usuarios": {"nombre": "Usuarios", "icono": "user", "descripcion": "Usuarios del sistema"},
+    "historial_reclamos": {"nombre": "Historial Reclamos", "icono": "history", "descripcion": "Timeline de reclamos"},
+    "historial_solicitudes": {"nombre": "Historial Solicitudes", "icono": "history", "descripcion": "Timeline de solicitudes"},
+    "calificaciones": {"nombre": "Calificaciones", "icono": "star", "descripcion": "Valoraciones de vecinos"},
+    "cuadrillas": {"nombre": "Cuadrillas", "icono": "users", "descripcion": "Equipos de trabajo"}
+  }
+}

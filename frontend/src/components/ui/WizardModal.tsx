@@ -207,6 +207,20 @@ export function WizardModal({
       from { opacity: 0; transform: translateX(-20px); }
       to { opacity: 1; transform: translateX(0); }
     }
+    .wizard-content-area > div {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    .wizard-content-area > div::-webkit-scrollbar {
+      width: 4px;
+    }
+    .wizard-content-area > div::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .wizard-content-area > div::-webkit-scrollbar-thumb {
+      background: ${theme.border};
+      border-radius: 2px;
+    }
   `;
 
   // Contenido interno del wizard (compartido entre modal y embedded)
@@ -373,8 +387,10 @@ export function WizardModal({
             style={{
               flex: 1,
               overflow: 'auto',
-              padding: '20px',
-              minHeight: '300px',
+              overflowY: 'scroll',
+              padding: '16px 20px',
+              minHeight: '280px',
+              WebkitOverflowScrolling: 'touch',
             }}
           >
             <div
@@ -382,11 +398,11 @@ export function WizardModal({
               key={currentStep}
             >
               {/* Step title */}
-              <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span
                   style={{
-                    width: '40px',
-                    height: '40px',
+                    width: '36px',
+                    height: '36px',
                     borderRadius: '8px',
                     backgroundColor: `${theme.primary}20`,
                     color: theme.primary,

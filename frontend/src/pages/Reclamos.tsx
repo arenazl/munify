@@ -474,17 +474,28 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
     };
   }, [hasMore, loadingMore, loading]);
 
-  // Detectar parámetro ?crear=ID para abrir wizard desde chat
+  // Detectar parámetro ?crear=ID o ?categoria=NOMBRE para abrir wizard desde chat
   useEffect(() => {
+    if (categorias.length === 0) return;
+
     const crearCategoriaId = searchParams.get('crear');
-    if (crearCategoriaId && categorias.length > 0) {
-      const categoriaExiste = categorias.find(c => c.id === parseInt(crearCategoriaId));
-      if (categoriaExiste) {
-        setFormData(prev => ({ ...prev, categoria_id: crearCategoriaId }));
-        setWizardStep(2); // Saltar al paso de ubicación (después de describir y categoría)
-        setWizardOpen(true);
-        setSearchParams({}); // Limpiar URL
-      }
+    const categoriaNombre = searchParams.get('categoria');
+
+    let categoriaEncontrada: Categoria | undefined;
+
+    if (crearCategoriaId) {
+      categoriaEncontrada = categorias.find(c => c.id === parseInt(crearCategoriaId));
+    } else if (categoriaNombre) {
+      // Buscar por nombre (case insensitive)
+      const nombreLower = decodeURIComponent(categoriaNombre).toLowerCase();
+      categoriaEncontrada = categorias.find(c => c.nombre.toLowerCase() === nombreLower);
+    }
+
+    if (categoriaEncontrada) {
+      setFormData(prev => ({ ...prev, categoria_id: String(categoriaEncontrada!.id) }));
+      setWizardStep(2); // Saltar al paso de ubicación (después de describir y categoría)
+      setWizardOpen(true);
+      setSearchParams({}); // Limpiar URL
     }
   }, [searchParams, categorias, setSearchParams]);
 

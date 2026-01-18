@@ -498,6 +498,10 @@ class TemaConfigUpdate(BaseModel):
     # Opciones de portada
     portadaSinFiltro: Optional[bool] = None  # Desactiva overlay de colores en imagen de portada
     portadaOpacity: Optional[float] = None  # Opacidad de la imagen de portada (0-1)
+    # Opciones de cabecera (top bar)
+    cabeceraFiltroColor: Optional[str] = None  # 'grafito' o 'blanco'
+    cabeceraOpacity: Optional[float] = None  # Opacidad del filtro (0-1)
+    cabeceraBlur: Optional[int] = None  # Blur de la imagen (0-20)
 
 
 @router.put("/{municipio_id}/tema", response_model=MunicipioDetalle)

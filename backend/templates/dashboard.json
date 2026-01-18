@@ -1,0 +1,22 @@
+{
+  "id": "dashboard",
+  "nombre": "Dashboard/Resumen",
+  "descripcion": "Muestra KPIs y métricas resumidas con cards grandes usando SOLO estilos inline",
+  "palabras_clave": ["resumen", "dashboard", "kpis", "métricas", "totales", "estadísticas"],
+  "template_html": "<div style=\"display:flex;flex-wrap:wrap;gap:12px;margin:16px 0\">\n  <div style=\"flex:1;min-width:150px;background:#f0fdf4;border:1px solid #d1e7d8;padding:20px;border-radius:12px;text-align:center\">\n    <div style=\"font-size:24px;margin-bottom:4px\">✅</div>\n    <div style=\"font-size:36px;font-weight:700;color:#2d6a4f\">1.480</div>\n    <div style=\"font-size:13px;color:#5c4d3d;margin-top:4px\">Resueltos</div>\n    <div style=\"font-size:11px;color:#2d6a4f;margin-top:2px\">↑ 45%</div>\n  </div>\n  <div style=\"flex:1;min-width:150px;background:#fef7ed;border:1px solid #fde0b8;padding:20px;border-radius:12px;text-align:center\">\n    <div style=\"font-size:24px;margin-bottom:4px\">⏳</div>\n    <div style=\"font-size:36px;font-weight:700;color:#c2710c\">812</div>\n    <div style=\"font-size:13px;color:#5c4d3d;margin-top:4px\">En Proceso</div>\n  </div>\n  <div style=\"flex:1;min-width:150px;background:#fef2f2;border:1px solid #fecaca;padding:20px;border-radius:12px;text-align:center\">\n    <div style=\"font-size:24px;margin-bottom:4px\">❌</div>\n    <div style=\"font-size:36px;font-weight:700;color:#dc2626\">152</div>\n    <div style=\"font-size:13px;color:#5c4d3d;margin-top:4px\">Rechazados</div>\n  </div>\n</div>",
+  "instrucciones": [
+    "IMPORTANTE: Usá SOLO estilos inline en el HTML, NO uses clases CSS como 'bg-success' o 'card'",
+    "Mostrá las métricas principales como cards KPI grandes con números grandes",
+    "Cada card tiene: número grande arriba, etiqueta abajo, opcional tendencia",
+    "Usá colores de fondo suaves: verde (#f0fdf4) para positivos, amarillo (#fef7ed) para proceso, rojo (#fef2f2) para negativos",
+    "Los números deben ser grandes (font-size:36px) y en colores fuertes",
+    "Agregá un resumen en texto debajo de las cards si hay observaciones importantes"
+  ],
+  "variantes_tendencia": {
+    "positivo": { "color": "#2d6a4f", "icono": "↑" },
+    "negativo": { "color": "#dc2626", "icono": "↓" },
+    "neutral": { "color": "#8b7355", "icono": "→" }
+  },
+  "paginacion": null,
+  "mostrar_grilla": true
+}

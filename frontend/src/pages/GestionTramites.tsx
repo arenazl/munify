@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -114,11 +114,19 @@ export default function GestionTramites() {
 
   // Filtros visuales estilo Reclamos
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
+  const [filtroTramite, setFiltroTramite] = useState<number | null>(null); // Filtro por servicio específico
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'por_vencer'>('reciente');
   const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
+
+  // Click dropdown para tramites (header)
+  const [hoveredTramiteHeader, setHoveredTramiteHeader] = useState(false);
+  const [dropdownFading, setDropdownFading] = useState(false);
+  const [loadingTramiteFilter, setLoadingTramiteFilter] = useState<number | null>(null); // ID del servicio que está cargando
+  const tramiteDropdownRef = useRef<HTMLDivElement | null>(null);
+  const tramiteDropdownMenuRef = useRef<HTMLDivElement | null>(null);
 
 
   // Sheet para ver/editar trámite
@@ -151,6 +159,7 @@ export default function GestionTramites() {
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [servicioInicial, setServicioInicial] = useState<any>(null);
 
   // Infinite scroll state
   const [skip, setSkip] = useState(0);
@@ -166,34 +175,45 @@ export default function GestionTramites() {
   // Recargar trámites cuando cambien los filtros o búsqueda
   useEffect(() => {
     if (!loading) {
-      loadTramites(filtroTipo, filtroEstado, searchTerm);
+      loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite);
     }
-  }, [filtroTipo, filtroEstado]);
+  }, [filtroTipo, filtroEstado, filtroTramite]);
 
   // Debounce para búsqueda en servidor
   useEffect(() => {
     if (loading) return;
     const timeoutId = setTimeout(() => {
-      loadTramites(filtroTipo, filtroEstado, searchTerm);
+      loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite);
     }, 300); // 300ms debounce
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
-  // Abrir trámite desde URL
+  // Abrir trámite desde URL o wizard para crear nuevo
   useEffect(() => {
     const tramiteId = searchParams.get('id');
+    const tramiteNombre = searchParams.get('tramite');
+
     if (tramiteId && tramites.length > 0) {
       const tramite = tramites.find(t => t.id === Number(tramiteId));
       if (tramite) {
         openTramite(tramite);
       }
+    } else if (tramiteNombre && servicios.length > 0) {
+      // Abrir wizard con trámite pre-seleccionado (desde chat)
+      const nombreLower = decodeURIComponent(tramiteNombre).toLowerCase();
+      const servicioEncontrado = servicios.find(s => s.nombre.toLowerCase() === nombreLower);
+      if (servicioEncontrado) {
+        setServicioInicial(servicioEncontrado);
+        setWizardOpen(true);
+        setSearchParams({});
+      }
     }
-  }, [searchParams, tramites]);
+  }, [searchParams, tramites, servicios, setSearchParams]);
 
   const loadData = async (reloadTramites = true) => {
     try {
       const [serviciosRes, tiposRes, empleadosRes, resumenRes] = await Promise.all([
-        tramitesApi.getServicios(),
+        tramitesApi.getTramitesMunicipio().catch(() => ({ data: [] })), // Trámites habilitados del municipio
         tramitesApi.getTipos().catch(() => ({ data: [] })),
         empleadosApi.getAll().catch(() => ({ data: [] })),
         tramitesApi.getResumen().catch(() => ({ data: null })),
@@ -216,7 +236,7 @@ export default function GestionTramites() {
   };
 
   // Cargar trámites con filtros (resetea la lista)
-  const loadTramites = async (tipo?: number | null, estado?: string, search?: string) => {
+  const loadTramites = async (tipo?: number | null, estado?: string, search?: string, tramiteId?: number | null) => {
     try {
       const params: Record<string, unknown> = {
         limit: LIMIT,
@@ -226,8 +246,10 @@ export default function GestionTramites() {
       const tipoFiltro = tipo !== undefined ? tipo : filtroTipo;
       const estadoFiltro = estado !== undefined ? estado : filtroEstado;
       const searchFiltro = search !== undefined ? search : searchTerm;
+      const tramiteFiltro = tramiteId !== undefined ? tramiteId : filtroTramite;
 
       if (tipoFiltro) params.tipo_tramite_id = tipoFiltro;
+      if (tramiteFiltro) params.tramite_id = tramiteFiltro;
       // El backend espera el estado en mayúsculas (enum EstadoSolicitud)
       if (estadoFiltro) params.estado = estadoFiltro.toUpperCase();
       // Búsqueda en servidor
@@ -256,6 +278,7 @@ export default function GestionTramites() {
       };
 
       if (filtroTipo) params.tipo_tramite_id = filtroTipo;
+      if (filtroTramite) params.tramite_id = filtroTramite;
       if (filtroEstado) params.estado = filtroEstado.toUpperCase();
       if (searchTerm && searchTerm.trim()) params.search = searchTerm.trim();
 
@@ -277,7 +300,7 @@ export default function GestionTramites() {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, skip, filtroTipo, filtroEstado, searchTerm]);
+  }, [loadingMore, hasMore, skip, filtroTipo, filtroTramite, filtroEstado, searchTerm]);
 
   // IntersectionObserver para infinite scroll
   useEffect(() => {
@@ -301,6 +324,27 @@ export default function GestionTramites() {
       }
     };
   }, [hasMore, loadingMore, loading, loadMoreTramites]);
+
+  // Cerrar dropdown de trámites al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const clickedInsideHeader = tramiteDropdownRef.current?.contains(target);
+      const clickedInsideMenu = tramiteDropdownMenuRef.current?.contains(target);
+
+      if (!clickedInsideHeader && !clickedInsideMenu) {
+        setHoveredTramiteHeader(false);
+      }
+    };
+
+    if (hoveredTramiteHeader) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [hoveredTramiteHeader]);
 
   const loadConteos = async () => {
     try {
@@ -462,6 +506,25 @@ export default function GestionTramites() {
     fechaVencimiento.setDate(fechaVencimiento.getDate() + tiempoEstimado);
     return fechaVencimiento;
   };
+
+  // Agrupar servicios por tipo para el dropdown del header
+  const serviciosPorTipo = useMemo(() => {
+    const grouped: Record<number, { tipo: TipoTramite; servicios: ServicioTramite[] }> = {};
+    servicios.forEach(s => {
+      const tipoId = s.tipo_tramite_id;
+      if (!tipoId) return;
+      if (!grouped[tipoId]) {
+        const tipo = tipos.find(t => t.id === tipoId);
+        if (tipo) {
+          grouped[tipoId] = { tipo, servicios: [] };
+        }
+      }
+      if (grouped[tipoId]) {
+        grouped[tipoId].servicios.push(s);
+      }
+    });
+    return Object.values(grouped).sort((a, b) => a.tipo.nombre.localeCompare(b.tipo.nombre));
+  }, [servicios, tipos]);
 
   // Aplicar ordenamiento según botones del header
   const filteredTramites = [...tramites].sort((a, b) => {
@@ -818,7 +881,144 @@ export default function GestionTramites() {
         },
         {
           key: 'tramite',
-          header: 'Trámite',
+          sortable: false, // Deshabilitar sorting para esta columna (tiene dropdown custom)
+          header: (
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="flex items-center gap-1 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setHoveredTramiteHeader(!hoveredTramiteHeader);
+                }}
+                ref={tramiteDropdownRef}
+              >
+                <span>Trámite</span>
+                {serviciosPorTipo.length === 0 ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <ChevronDown className={`h-3 w-3 transition-transform ${hoveredTramiteHeader ? 'rotate-180' : ''}`} />
+                )}
+                {filtroTramite && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFiltroTramite(null);
+                    }}
+                    className="ml-1 p-0.5 rounded hover:bg-white/10 transition-colors"
+                    title="Quitar filtro"
+                  >
+                    <XCircle className="h-3 w-3" style={{ color: theme.primary }} />
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown con todos los servicios agrupados por tipo */}
+              {hoveredTramiteHeader && serviciosPorTipo.length > 0 && (
+                <div
+                  ref={tramiteDropdownMenuRef}
+                  className={`fixed z-[9999] min-w-[280px] max-w-[350px] rounded-2xl shadow-xl transition-opacity duration-500 ${dropdownFading ? 'opacity-0' : 'opacity-100'}`}
+                  style={{
+                    backgroundColor: theme.card,
+                    border: `1px solid ${theme.border}`,
+                    top: 'auto',
+                    marginTop: '4px',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-2 border-b flex items-center justify-between rounded-t-2xl" style={{ borderColor: theme.border, backgroundColor: theme.card }}>
+                    <p className="text-[10px] font-medium uppercase tracking-wide" style={{ color: theme.textSecondary }}>
+                      Filtrar por trámite
+                    </p>
+                    {filtroTramite && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFiltroTramite(null);
+                          setHoveredTramiteHeader(false);
+                        }}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] hover:bg-red-500/20 transition-colors"
+                        style={{ color: '#ef4444' }}
+                      >
+                        <XCircle className="h-3 w-3" />
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto rounded-b-2xl" style={{ backgroundColor: theme.card }}>
+                    {serviciosPorTipo.map(({ tipo, servicios: serviciosDelTipo }) => (
+                      <div key={tipo.id}>
+                        <div
+                          className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide sticky top-0 z-10 shadow-sm"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            color: tipo.color || theme.textSecondary,
+                            borderBottom: `1px solid ${theme.border}`,
+                          }}
+                        >
+                          {tipo.nombre}
+                        </div>
+                        {serviciosDelTipo.map((servicio) => {
+                          const isSelected = filtroTramite === servicio.id;
+                          const isLoading = loadingTramiteFilter === servicio.id;
+                          return (
+                            <button
+                              key={servicio.id}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (dropdownFading || loadingTramiteFilter !== null) return;
+
+                                const newValue = isSelected ? null : servicio.id;
+                                console.log('[GestionTramites] Seleccionado servicio:', servicio.id, servicio.nombre, 'newValue:', newValue);
+
+                                // Mostrar spinner en el elemento seleccionado
+                                setLoadingTramiteFilter(servicio.id);
+                                setFiltroTramite(newValue);
+
+                                // Esperar a que carguen los datos
+                                await loadTramites(filtroTipo, filtroEstado, searchTerm, newValue);
+
+                                // Datos cargados - hacer fadeout y cerrar
+                                setLoadingTramiteFilter(null);
+                                setDropdownFading(true);
+                                setTimeout(() => {
+                                  setHoveredTramiteHeader(false);
+                                  setDropdownFading(false);
+                                }, 400);
+                              }}
+                              disabled={dropdownFading || (loadingTramiteFilter !== null && loadingTramiteFilter !== servicio.id)}
+                              className="w-full px-3 py-2 text-left flex items-center gap-2 transition-all hover:brightness-95"
+                              style={{
+                                backgroundColor: isSelected ? `${theme.primary}15` : theme.card,
+                                borderBottom: `1px solid ${theme.border}`,
+                                opacity: (loadingTramiteFilter !== null && loadingTramiteFilter !== servicio.id) ? 0.5 : 1,
+                              }}
+                            >
+                              {isLoading ? (
+                                <Loader2 className="h-3.5 w-3.5 flex-shrink-0 animate-spin" style={{ color: theme.primary }} />
+                              ) : (
+                                <DynamicIcon
+                                  name={servicio.icono || 'FileText'}
+                                  className="h-3.5 w-3.5 flex-shrink-0"
+                                  style={{ color: isSelected ? theme.primary : tipo.color || theme.text }}
+                                  fallback={<FileText className="h-3.5 w-3.5" style={{ color: isSelected ? theme.primary : tipo.color || theme.text }} />}
+                                />
+                              )}
+                              <span
+                                className="text-xs truncate"
+                                style={{ color: isSelected ? theme.primary : theme.text }}
+                              >
+                                {servicio.nombre}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ),
           sortValue: (t) => t.tramite?.nombre || '',
           render: (t) => {
             const tipoColor = t.tramite?.tipo_tramite?.color || theme.primary;
@@ -1662,10 +1862,14 @@ export default function GestionTramites() {
       {/* Wizard para nuevo trámite */}
       <TramiteWizard
         open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
+        onClose={() => {
+          setWizardOpen(false);
+          setServicioInicial(null);
+        }}
         servicios={servicios}
         tipos={tipos}
         onSuccess={loadData}
+        servicioInicial={servicioInicial}
       />
     </>
   );
