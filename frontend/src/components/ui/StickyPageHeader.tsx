@@ -72,15 +72,14 @@ export function StickyPageHeader({
     <>
       {/* Spacer para ocupar el espacio del header fijo - responsive */}
       <div
-        className={filterPanel ? 'h-[110px] sm:h-[130px]' : 'h-[56px] sm:h-[70px]'}
+        className={filterPanel ? 'h-[90px] sm:h-[105px]' : 'h-[50px] sm:h-[60px]'}
       />
 
-      {/* Header fijo */}
+      {/* Header fijo - margen para coincidir con Layout p-3 sm:p-6 */}
+      {/* top = 64px (header) + padding del main (12px mobile, 24px desktop) */}
       <div
-        className="fixed z-30 right-0 px-2 sm:px-3 pt-1 pb-2"
+        className="fixed z-30 pt-1 pb-2 right-3 sm:right-6 top-[76px] sm:top-[88px] sticky-header-wrapper"
         style={{
-          top: '64px',
-          left: 'var(--sidebar-width, 0px)',
           backgroundColor: theme.background,
           boxSizing: 'border-box',
         }}

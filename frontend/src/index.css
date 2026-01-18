@@ -270,3 +270,17 @@ html, body {
   width: 1em;
   margin-left: -1em;
 }
+
+/* ============================================
+   STICKY PAGE HEADER
+   ============================================ */
+/* Márgenes responsivos para coincidir con Layout p-3 sm:p-6 */
+.sticky-header-wrapper {
+  left: calc(var(--sidebar-width, 0px) + 0.75rem); /* 12px = p-3 */
+}
+
+@media (min-width: 640px) {
+  .sticky-header-wrapper {
+    left: calc(var(--sidebar-width, 0px) + 1.5rem) !important; /* 24px = p-6 */
+  }
+}
