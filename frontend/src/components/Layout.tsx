@@ -594,7 +594,10 @@ export default function Layout() {
                 />
                 <span
                   className="text-2xl font-extrabold"
-                  style={{ color: theme.primary }}
+                  style={{
+                    fontFamily: "'Nunito', sans-serif",
+                    color: theme.text,
+                  }}
                 >
                   Munify
                 </span>
