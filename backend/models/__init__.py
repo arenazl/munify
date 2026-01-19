@@ -31,6 +31,8 @@ from .tramite import TipoTramite, Tramite, Solicitud, HistorialSolicitud, Estado
 from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
+from .pedido import Pedido
+from .compra import Compra
 
 __all__ = [
     "Municipio",
@@ -89,5 +91,9 @@ __all__ = [
     # Push Notifications
     "PushSubscription",
     # Consultas guardadas / BI
-    "ConsultaGuardada"
+    "ConsultaGuardada",
+    # Pedidos
+    "Pedido",
+    # Compras
+    "Compra"
 ]
