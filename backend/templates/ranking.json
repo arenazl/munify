@@ -1,19 +1,33 @@
 {
   "id": "ranking",
   "nombre": "Ranking/Comparativo",
-  "descripcion": "Muestra datos ordenados como ranking con barras o podio",
-  "palabras_clave": ["ranking", "top", "mejores", "peores", "comparar", "comparativo", "más", "menos"],
-  "template_html": "<div style=\"margin:12px 0\">\n  <div style=\"display:flex;align-items:center;gap:12px;padding:12px;background:#f8f5f0;border-radius:10px;margin-bottom:8px\">\n    <div style=\"width:36px;height:36px;background:#b08d57;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:16px\">1</div>\n    <div style=\"flex:1\">\n      <div style=\"font-weight:600;color:#5c4d3d;font-size:14px\">Nombre del item</div>\n      <div style=\"font-size:12px;color:#8a7a6a\">Detalle secundario</div>\n    </div>\n    <div style=\"text-align:right\">\n      <div style=\"font-size:20px;font-weight:700;color:#b08d57\">VALOR</div>\n      <div style=\"font-size:11px;color:#8a7a6a\">métrica</div>\n    </div>\n  </div>\n</div>",
+  "descripcion": "Muestra datos ordenados como ranking con múltiples métricas, barras de progreso y podio visual",
+  "palabras_clave": ["ranking", "top", "mejores", "peores", "comparar", "comparativo", "más", "menos", "eficiencia", "rendimiento"],
+  "template_html": "<div style=\"margin:12px 0\">\n  <!-- PODIO TOP 3 (solo si hay 3+ items) -->\n  <div style=\"display:flex;justify-content:center;align-items:flex-end;gap:8px;margin-bottom:24px;padding:16px\">\n    <!-- 2do lugar -->\n    <div style=\"text-align:center;width:120px\">\n      <div style=\"width:50px;height:50px;margin:0 auto 8px;background:linear-gradient(135deg,#e8e8e8,#c0c0c0);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(192,192,192,0.4)\">🥈</div>\n      <div style=\"font-weight:600;font-size:13px;color:#5c4d3d\">Nombre 2do</div>\n      <div style=\"font-size:11px;color:#8a7a6a\">Valor principal</div>\n      <div style=\"height:60px;background:linear-gradient(to top,#e8e8e8,#f5f5f5);border-radius:8px 8px 0 0;margin-top:8px\"></div>\n    </div>\n    <!-- 1er lugar -->\n    <div style=\"text-align:center;width:140px\">\n      <div style=\"width:60px;height:60px;margin:0 auto 8px;background:linear-gradient(135deg,#ffd700,#ffec8b);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 16px rgba(255,215,0,0.5)\">🥇</div>\n      <div style=\"font-weight:700;font-size:15px;color:#5c4d3d\">Nombre 1ro</div>\n      <div style=\"font-size:12px;color:#b08d57;font-weight:600\">Valor principal</div>\n      <div style=\"height:90px;background:linear-gradient(to top,#ffd700,#fff8dc);border-radius:8px 8px 0 0;margin-top:8px\"></div>\n    </div>\n    <!-- 3er lugar -->\n    <div style=\"text-align:center;width:120px\">\n      <div style=\"width:50px;height:50px;margin:0 auto 8px;background:linear-gradient(135deg,#cd7f32,#daa06d);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:0 4px 12px rgba(205,127,50,0.4)\">🥉</div>\n      <div style=\"font-weight:600;font-size:13px;color:#5c4d3d\">Nombre 3ro</div>\n      <div style=\"font-size:11px;color:#8a7a6a\">Valor principal</div>\n      <div style=\"height:40px;background:linear-gradient(to top,#cd7f32,#f5e6d3);border-radius:8px 8px 0 0;margin-top:8px\"></div>\n    </div>\n  </div>\n\n  <!-- LISTA CON MÉTRICAS -->\n  <div style=\"display:flex;align-items:center;gap:12px;padding:14px 16px;background:#f8f5f0;border-radius:12px;margin-bottom:10px;border-left:4px solid #b08d57\">\n    <div style=\"width:32px;height:32px;background:#b08d57;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:14px\">4</div>\n    <div style=\"flex:1;min-width:0\">\n      <div style=\"font-weight:600;color:#5c4d3d;font-size:14px\">Nombre del empleado</div>\n      <div style=\"display:flex;flex-wrap:wrap;gap:12px;margin-top:6px\">\n        <div style=\"display:flex;align-items:center;gap:4px\">\n          <span style=\"font-size:10px;color:#8a7a6a\">✓ Resueltos:</span>\n          <span style=\"font-size:12px;font-weight:600;color:#10b981\">45</span>\n        </div>\n        <div style=\"display:flex;align-items:center;gap:4px\">\n          <span style=\"font-size:10px;color:#8a7a6a\">⏱ Tiempo:</span>\n          <span style=\"font-size:12px;font-weight:600;color:#3b82f6\">2.5h</span>\n        </div>\n        <div style=\"display:flex;align-items:center;gap:4px\">\n          <span style=\"font-size:10px;color:#8a7a6a\">⭐ Calif:</span>\n          <span style=\"font-size:12px;font-weight:600;color:#f59e0b\">4.8</span>\n        </div>\n        <div style=\"display:flex;align-items:center;gap:4px\">\n          <span style=\"font-size:10px;color:#8a7a6a\">⚠ SLA:</span>\n          <span style=\"font-size:12px;font-weight:600;color:#ef4444\">2</span>\n        </div>\n      </div>\n    </div>\n    <div style=\"text-align:right\">\n      <div style=\"font-size:22px;font-weight:700;color:#b08d57\">95%</div>\n      <div style=\"font-size:10px;color:#8a7a6a;text-transform:uppercase\">eficiencia</div>\n    </div>\n  </div>\n</div>",
   "instrucciones": [
-    "Mostrá los items ordenados de mayor a menor (o viceversa según contexto)",
-    "Numerá las posiciones (1, 2, 3...)",
-    "Destacá el valor/métrica a la derecha",
-    "Usá medallas o colores especiales para top 3: oro=#ffd700, plata=#c0c0c0, bronce=#cd7f32"
+    "IMPORTANTE: Si hay 3+ items, incluí el PODIO visual con los top 3 usando emojis de medallas",
+    "El podio debe tener alturas diferentes: 1ro=90px, 2do=60px, 3ro=40px",
+    "Debajo del podio, listá todos los items (incluyendo top 3) con sus métricas detalladas",
+    "Cada item debe mostrar TODAS las métricas disponibles en línea (no solo una)",
+    "Usá íconos/emojis para cada métrica: ✓ resueltos, ⏱ tiempo, ⭐ calificación, ⚠ violaciones, 🏆 puntos",
+    "El valor principal (el que ordena) va destacado a la derecha con tamaño grande",
+    "Colores de métricas: verde=#10b981 (bueno), azul=#3b82f6 (neutral), amarillo=#f59e0b (rating), rojo=#ef4444 (malo)",
+    "NO uses tabla, usá flex boxes con gap",
+    "Si el ranking es de peor a mejor (ej: más violaciones), invertí los colores del podio"
   ],
   "variantes_posicion": {
-    "1": { "background": "#fef7ed", "medalla": "#ffd700" },
-    "2": { "background": "#f8f9fa", "medalla": "#c0c0c0" },
-    "3": { "background": "#fef7ed", "medalla": "#cd7f32" }
+    "1": { "background": "linear-gradient(to right, #fef7ed, #fffbf5)", "border": "#ffd700", "medalla": "🥇" },
+    "2": { "background": "linear-gradient(to right, #f8f9fa, #ffffff)", "border": "#c0c0c0", "medalla": "🥈" },
+    "3": { "background": "linear-gradient(to right, #fef7ed, #fffbf5)", "border": "#cd7f32", "medalla": "🥉" },
+    "default": { "background": "#f8f5f0", "border": "#b08d57" }
+  },
+  "metricas_comunes": {
+    "reclamos_resueltos": { "icono": "✓", "color": "#10b981", "label": "Resueltos" },
+    "tiempo_promedio": { "icono": "⏱", "color": "#3b82f6", "label": "Tiempo" },
+    "calificacion": { "icono": "⭐", "color": "#f59e0b", "label": "Calif" },
+    "violaciones_sla": { "icono": "⚠", "color": "#ef4444", "label": "SLA" },
+    "puntos_gamificacion": { "icono": "🏆", "color": "#8b5cf6", "label": "Puntos" },
+    "eficiencia": { "icono": "📊", "color": "#b08d57", "label": "Eficiencia" }
   },
   "paginacion": 20,
   "mostrar_grilla": false
