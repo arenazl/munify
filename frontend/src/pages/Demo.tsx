@@ -63,25 +63,47 @@ export default function Demo() {
     setLoadingRole(role);
     setError('');
 
-    localStorage.setItem('municipio_codigo', 'merlo');
-    localStorage.setItem('municipio_id', '1');
-    localStorage.setItem('municipio_nombre', 'Merlo');
-    localStorage.setItem('municipio_color', '#0088cc');
-
     try {
+      console.log('[Demo] Iniciando login con rol:', role);
+
+      // Primero obtener el usuario demo
       const response = await fetch(`${API_URL}/municipios/public/merlo/demo-users`);
-      if (!response.ok) throw new Error('No se pudo obtener usuarios demo');
+      if (!response.ok) {
+        console.error('[Demo] Error obteniendo usuarios demo:', response.status);
+        throw new Error('No se pudo obtener usuarios demo');
+      }
 
       const users = await response.json();
+      console.log('[Demo] Usuarios demo obtenidos:', users);
+
       const demoUser = users.find((u: { rol: string }) => u.rol === role);
+      if (!demoUser) {
+        console.error('[Demo] No se encontró usuario para rol:', role);
+        throw new Error(`No hay usuario demo para el rol ${role}`);
+      }
 
-      if (!demoUser) throw new Error(`No hay usuario demo para el rol ${role}`);
+      console.log('[Demo] Usuario demo encontrado:', demoUser.email);
 
+      // Setear información del municipio ANTES del login
+      localStorage.setItem('municipio_codigo', 'merlo');
+      localStorage.setItem('municipio_id', '1');
+      localStorage.setItem('municipio_nombre', 'Merlo');
+      localStorage.setItem('municipio_color', '#0088cc');
+
+      // Hacer login
+      console.log('[Demo] Ejecutando login...');
       await login(demoUser.email, 'demo123');
+
+      // Obtener usuario y navegar
       const user = JSON.parse(localStorage.getItem('user') || '{}');
+      console.log('[Demo] Usuario autenticado:', user);
+
       const defaultRoute = getDefaultRoute(user.rol);
+      console.log('[Demo] Navegando a:', defaultRoute);
+
       navigate(defaultRoute, { replace: true });
     } catch (err: unknown) {
+      console.error('[Demo] Error en login:', err);
       const error = err as { response?: { data?: { detail?: string } }, message?: string };
       setError(error.response?.data?.detail || error.message || 'Error al iniciar sesión');
     } finally {
