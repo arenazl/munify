@@ -7,6 +7,7 @@ from .historial import HistorialResponse
 from .documento import DocumentoResponse
 from .configuracion import ConfiguracionCreate, ConfiguracionUpdate, ConfiguracionResponse
 from .notificacion import NotificacionResponse
+from .pedido import PedidoCreate, PedidoUpdate, PedidoResponse
 
 __all__ = [
     "UserCreate", "UserUpdate", "UserResponse", "UserLogin", "Token",
@@ -17,5 +18,6 @@ __all__ = [
     "HistorialResponse",
     "DocumentoResponse",
     "ConfiguracionCreate", "ConfiguracionUpdate", "ConfiguracionResponse",
-    "NotificacionResponse"
+    "NotificacionResponse",
+    "PedidoCreate", "PedidoUpdate", "PedidoResponse"
 ]
