@@ -1139,3 +1139,13 @@ export const pedidosApi = {
   update: (id: number, data: Record<string, unknown>) => api.put(`/pedidos/${id}`, data),
   delete: (id: number) => api.delete(`/pedidos/${id}`),
 };
+
+// Compras
+export const comprasApi = {
+  getAll: (params?: { activo?: boolean; fecha_desde?: string; fecha_hasta?: string }) =>
+    api.get('/compras', { params }),
+  getOne: (id: number) => api.get(`/compras/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/compras', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/compras/${id}`, data),
+  delete: (id: number) => api.delete(`/compras/${id}`),
+};
