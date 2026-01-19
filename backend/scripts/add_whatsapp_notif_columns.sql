@@ -8,5 +8,6 @@ ALTER TABLE whatsapp_configs ADD COLUMN IF NOT EXISTS notificar_supervisor_recla
 ALTER TABLE whatsapp_configs ADD COLUMN IF NOT EXISTS notificar_supervisor_reclamo_resuelto BOOLEAN DEFAULT TRUE;
 ALTER TABLE whatsapp_configs ADD COLUMN IF NOT EXISTS notificar_supervisor_reclamo_vencido BOOLEAN DEFAULT TRUE;
 
+
 -- Agregar columna de teléfono a empleados
 ALTER TABLE empleados ADD COLUMN IF NOT EXISTS telefono VARCHAR(50);
