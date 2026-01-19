@@ -803,3 +803,113 @@ Estados de reclamos: Nuevo → Asignado → En Proceso → Resuelto (o Rechazado
         return ChatPublicoResponse(response=response)
 
     return ChatPublicoResponse(response="No pude procesar tu mensaje. Intentá de nuevo.")
+
+
+# ============================================
+# Endpoint público de trámites con requisitos
+# ============================================
+
+class TramitePublicoResponse(BaseModel):
+    id: int
+    nombre: str
+    descripcion: Optional[str]
+    tipo_tramite: str
+    tipo_tramite_id: int
+    icono: Optional[str]
+    tiempo_estimado_dias: int
+    costo: Optional[float]
+    requisitos: Optional[str]
+    documentos_requeridos: Optional[str]
+
+
+@router.get("/tramites")
+async def get_tramites_publicos(
+    municipio_id: int = Query(..., description="ID del municipio"),
+    tipo_tramite_id: Optional[int] = Query(None, description="Filtrar por tipo de trámite"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtener trámites habilitados de un municipio con requisitos - SIN AUTENTICACIÓN
+    Incluye requisitos y documentos requeridos para el wizard de la landing.
+    """
+    from models.tramite import Tramite, TipoTramite, MunicipioTramite
+
+    # Obtener trámites habilitados para el municipio con sus personalizaciones
+    query = (
+        select(Tramite, MunicipioTramite, TipoTramite)
+        .join(MunicipioTramite, MunicipioTramite.tramite_id == Tramite.id)
+        .join(TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id)
+        .where(
+            MunicipioTramite.municipio_id == municipio_id,
+            MunicipioTramite.activo == True,
+            Tramite.activo == True
+        )
+        .order_by(TipoTramite.orden, Tramite.orden)
+    )
+
+    if tipo_tramite_id:
+        query = query.where(Tramite.tipo_tramite_id == tipo_tramite_id)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    tramites = []
+    for tramite, mun_tramite, tipo in rows:
+        # Usar valores del municipio si existen, sino los genéricos
+        tramites.append({
+            "id": tramite.id,
+            "nombre": tramite.nombre,
+            "descripcion": tramite.descripcion,
+            "tipo_tramite": tipo.nombre,
+            "tipo_tramite_id": tipo.id,
+            "icono": tramite.icono or tipo.icono,
+            "tiempo_estimado_dias": mun_tramite.tiempo_estimado_dias or tramite.tiempo_estimado_dias or 15,
+            "costo": mun_tramite.costo or tramite.costo,
+            "requisitos": mun_tramite.requisitos or tramite.requisitos,
+            "documentos_requeridos": mun_tramite.documentos_requeridos or tramite.documentos_requeridos
+        })
+
+    return tramites
+
+
+@router.get("/tramites/{tramite_id}")
+async def get_tramite_detalle_publico(
+    tramite_id: int,
+    municipio_id: int = Query(..., description="ID del municipio"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtener detalle de un trámite específico con requisitos - SIN AUTENTICACIÓN
+    """
+    from models.tramite import Tramite, TipoTramite, MunicipioTramite
+
+    result = await db.execute(
+        select(Tramite, MunicipioTramite, TipoTramite)
+        .join(MunicipioTramite, MunicipioTramite.tramite_id == Tramite.id)
+        .join(TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id)
+        .where(
+            Tramite.id == tramite_id,
+            MunicipioTramite.municipio_id == municipio_id,
+            MunicipioTramite.activo == True
+        )
+    )
+    row = result.first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado para este municipio")
+
+    tramite, mun_tramite, tipo = row
+
+    return {
+        "id": tramite.id,
+        "nombre": tramite.nombre,
+        "descripcion": tramite.descripcion,
+        "tipo_tramite": tipo.nombre,
+        "tipo_tramite_id": tipo.id,
+        "icono": tramite.icono or tipo.icono,
+        "tiempo_estimado_dias": mun_tramite.tiempo_estimado_dias or tramite.tiempo_estimado_dias or 15,
+        "costo": mun_tramite.costo or tramite.costo,
+        "requisitos": mun_tramite.requisitos or tramite.requisitos,
+        "documentos_requeridos": mun_tramite.documentos_requeridos or tramite.documentos_requeridos,
+        "url_externa": tramite.url_externa
+    }
