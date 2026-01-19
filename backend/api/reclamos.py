@@ -973,6 +973,23 @@ async def asignar_reclamo(
     if reclamo.estado not in [EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]:
         raise HTTPException(status_code=400, detail="El reclamo no puede ser asignado en su estado actual")
 
+    # Verificar que el empleado sea operario (los reclamos son atendidos por operarios)
+    from models.empleado import Empleado
+    result_emp = await db.execute(
+        select(Empleado).where(
+            Empleado.id == data.empleado_id,
+            Empleado.activo == True
+        )
+    )
+    empleado_check = result_emp.scalar_one_or_none()
+    if not empleado_check:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    if empleado_check.tipo != "operario":
+        raise HTTPException(
+            status_code=400,
+            detail=f"El empleado {empleado_check.nombre} es de tipo '{empleado_check.tipo}'. Los reclamos solo pueden ser asignados a empleados operarios."
+        )
+
     estado_anterior = reclamo.estado
     reclamo.empleado_id = data.empleado_id
     reclamo.estado = EstadoReclamo.ASIGNADO
@@ -1665,7 +1682,8 @@ async def get_sugerencia_asignacion(
     if reclamo.estado != EstadoReclamo.NUEVO:
         raise HTTPException(status_code=400, detail="Solo se pueden sugerir asignaciones para reclamos nuevos")
 
-    # Obtener todos los empleados activos del municipio
+    # Obtener todos los empleados OPERARIOS activos del municipio
+    # (los reclamos son atendidos por operarios, no administrativos)
     result = await db.execute(
         select(Empleado)
         .options(
@@ -1673,12 +1691,16 @@ async def get_sugerencia_asignacion(
             selectinload(Empleado.zona_asignada),
             selectinload(Empleado.categoria_principal)
         )
-        .where(Empleado.activo == True, Empleado.municipio_id == current_user.municipio_id)
+        .where(
+            Empleado.activo == True,
+            Empleado.municipio_id == current_user.municipio_id,
+            Empleado.tipo == "operario"  # Solo operarios para reclamos
+        )
     )
     empleados = result.scalars().all()
 
     if not empleados:
-        return {"sugerencias": [], "mensaje": "No hay empleados activos disponibles"}
+        return {"sugerencias": [], "mensaje": "No hay empleados operarios activos disponibles"}
 
     sugerencias = []
     hoy = date_type.today()

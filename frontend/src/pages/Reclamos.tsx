@@ -2768,13 +2768,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 </div>
               )}
 
-              {/* Selector de empleado - muestra todos pero indica especialidad */}
-              {empleados.length > 0 ? (
+              {/* Selector de empleado - solo operarios para reclamos */}
+              {empleados.filter(e => e.tipo === 'operario').length > 0 ? (
                 <ModernSelect
                   value={empleadoSeleccionado}
                   onChange={handleEmpleadoChange}
                   placeholder="Seleccionar empleado..."
-                  searchable={empleados.length > 5}
+                  searchable={empleados.filter(e => e.tipo === 'operario').length > 5}
                   onOpen={() => setSugerenciasColapsadas(true)}
                   onClose={(selectedValue) => {
                     // Si cerró sin seleccionar y no hay empleado seleccionado, mostrar sugerencias
@@ -2782,7 +2782,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                       setSugerenciasColapsadas(false);
                     }
                   }}
-                  options={empleados.map(emp => {
+                  options={empleados.filter(e => e.tipo === 'operario').map(emp => {
                     const tieneEspecialidad = emp.categorias?.some(cat => cat.id === selectedReclamo.categoria.id);
                     return {
                       value: String(emp.id),
@@ -2800,7 +2800,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   No hay empleados disponibles
                 </div>
               )}
-              {empleadoSeleccionado && !empleados.find(c => c.id === Number(empleadoSeleccionado))?.categorias?.some(cat => cat.id === selectedReclamo.categoria.id) && (
+              {empleadoSeleccionado && !empleados.filter(e => e.tipo === 'operario').find(c => c.id === Number(empleadoSeleccionado))?.categorias?.some(cat => cat.id === selectedReclamo.categoria.id) && (
                 <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#f59e0b' }}>
                   <AlertTriangle className="h-3 w-3" />
                   Este empleado no tiene especialidad en {selectedReclamo.categoria.nombre}
