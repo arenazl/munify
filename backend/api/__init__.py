@@ -29,6 +29,7 @@ from .push import router as push_router
 from .empleados_gestion import router as empleados_gestion_router
 from .cuadrillas import router as cuadrillas_router
 from .planificacion import router as planificacion_router
+from .pedidos import router as pedidos_router
 
 api_router = APIRouter()
 
@@ -61,6 +62,7 @@ api_router.include_router(tramites_router, prefix="/tramites", tags=["Trámites"
 api_router.include_router(push_router, tags=["Push Notifications"])
 api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
 api_router.include_router(planificacion_router, prefix="/planificacion", tags=["Planificación"])
+api_router.include_router(pedidos_router, prefix="/pedidos", tags=["Pedidos"])
 
 # WebSockets
 from .ws import router as ws_router
