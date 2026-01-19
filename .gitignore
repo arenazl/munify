@@ -56,9 +56,6 @@ nul
 netlify-landing/
 netlify-ngcheck/
 
-# Landing (proyecto separado)
-landing/
-
 # Incluir frontend/dist (necesario para Heroku)
 !frontend/dist/
 
