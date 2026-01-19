@@ -8,19 +8,26 @@ from core.database import engine
 
 async def fix_usuarios_table():
     async with engine.begin() as conn:
-        try:
-            print("Agregando columna 'direccion' a la tabla usuarios...")
-            await conn.execute(text("""
-                ALTER TABLE usuarios
-                ADD COLUMN direccion VARCHAR(255) NULL AFTER dni
-            """))
-            print("OK - Columna 'direccion' agregada exitosamente")
-        except Exception as e:
-            if "Duplicate column name" in str(e):
-                print("OK - La columna 'direccion' ya existe")
-            else:
-                print(f"ERROR: {e}")
-                raise
+        # Lista de columnas a agregar
+        columnas = [
+            ("direccion", "VARCHAR(255) NULL AFTER dni"),
+            ("es_anonimo", "BOOLEAN DEFAULT FALSE AFTER direccion"),
+        ]
+
+        for columna, definicion in columnas:
+            try:
+                print(f"Verificando columna '{columna}'...")
+                await conn.execute(text(f"""
+                    ALTER TABLE usuarios
+                    ADD COLUMN {columna} {definicion}
+                """))
+                print(f"OK - Columna '{columna}' agregada exitosamente")
+            except Exception as e:
+                if "Duplicate column name" in str(e):
+                    print(f"OK - La columna '{columna}' ya existe")
+                else:
+                    print(f"ERROR en '{columna}': {e}")
+                    raise
 
 if __name__ == "__main__":
     asyncio.run(fix_usuarios_table())
