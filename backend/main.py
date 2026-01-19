@@ -189,60 +189,64 @@ async def health():
     return {"status": "ok"}
 
 # ============ FRONTEND (PWA) ============
-if frontend_path.exists():
-    # Assets del frontend
-    assets_path = frontend_path / "assets"
-    if assets_path.exists():
-        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="frontend_assets")
+# DESACTIVADO - Frontend servido desde Netlify
+# Heroku solo sirve la API en /api/*
+#
+# if frontend_path.exists():
+#     assets_path = frontend_path / "assets"
+#     if assets_path.exists():
+#         app.mount("/assets", StaticFiles(directory=str(assets_path)), name="frontend_assets")
+#
+#     @app.get("/manifest.webmanifest")
+#     async def manifest():
+#         return FileResponse(frontend_path / "manifest.webmanifest")
+#
+#     @app.get("/sw.js")
+#     async def service_worker():
+#         return FileResponse(frontend_path / "sw.js", media_type="application/javascript")
+#
+#     @app.get("/registerSW.js")
+#     async def register_sw():
+#         return FileResponse(frontend_path / "registerSW.js", media_type="application/javascript")
+#
+#     @app.get("/workbox-{filename}")
+#     async def workbox(filename: str):
+#         return FileResponse(frontend_path / f"workbox-{filename}")
+#
+#     @app.get("/favicon.svg")
+#     async def favicon_svg():
+#         return FileResponse(frontend_path / "favicon.svg", media_type="image/svg+xml")
+#
+#     @app.get("/favicon.ico")
+#     async def favicon_ico():
+#         file = frontend_path / "favicon.ico"
+#         if file.exists():
+#             return FileResponse(file)
+#         return FileResponse(frontend_path / "favicon.svg", media_type="image/svg+xml")
+#
+#     @app.get("/{full_path:path}")
+#     async def serve_spa(full_path: str):
+#         if full_path.startswith("api/"):
+#             raise HTTPException(status_code=404, detail="Not found")
+#         file_path = frontend_path / full_path
+#         if file_path.exists() and file_path.is_file():
+#             return FileResponse(file_path)
+#         return FileResponse(
+#             frontend_path / "index.html",
+#             media_type="text/html",
+#             headers={
+#                 "Cache-Control": "no-cache, no-store, must-revalidate",
+#                 "Pragma": "no-cache",
+#                 "Expires": "0"
+#             }
+#         )
 
-    # Archivos específicos del PWA
-    @app.get("/manifest.webmanifest")
-    async def manifest():
-        return FileResponse(frontend_path / "manifest.webmanifest")
-
-    @app.get("/sw.js")
-    async def service_worker():
-        return FileResponse(frontend_path / "sw.js", media_type="application/javascript")
-
-    @app.get("/registerSW.js")
-    async def register_sw():
-        return FileResponse(frontend_path / "registerSW.js", media_type="application/javascript")
-
-    @app.get("/workbox-{filename}")
-    async def workbox(filename: str):
-        return FileResponse(frontend_path / f"workbox-{filename}")
-
-    @app.get("/favicon.svg")
-    async def favicon_svg():
-        return FileResponse(frontend_path / "favicon.svg", media_type="image/svg+xml")
-
-    @app.get("/favicon.ico")
-    async def favicon_ico():
-        file = frontend_path / "favicon.ico"
-        if file.exists():
-            return FileResponse(file)
-        return FileResponse(frontend_path / "favicon.svg", media_type="image/svg+xml")
-
-    # Catch-all para SPA - DEBE IR AL FINAL
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        # Si el path empieza con api, no debería llegar acá
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="Not found")
-
-        # Intentar servir archivo estático si existe
-        file_path = frontend_path / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-
-        # Para cualquier otra ruta, servir index.html (SPA routing)
-        # No cachear el HTML para que siempre cargue los assets actualizados
-        return FileResponse(
-            frontend_path / "index.html",
-            media_type="text/html",
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
+# Ruta raíz - solo mensaje informativo
+@app.get("/")
+async def root():
+    return {
+        "service": "Munify API",
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health"
+    }
