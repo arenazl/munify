@@ -146,3 +146,56 @@ class AIService:
         except Exception as e:
             logger.error(f"[GEMINI] Exception: {e}")
             return None
+
+    async def _call_groq(
+        self, messages: List[dict], max_tokens: int = 1000, temperature: float = 0.7
+    ) -> Optional[str]:
+        """
+        Llama a Groq API con formato de mensajes (compatible OpenAI).
+
+        Args:
+            messages: Lista de mensajes con formato [{"role": "system|user|assistant", "content": "..."}]
+            max_tokens: Máximo de tokens en la respuesta
+            temperature: Temperatura para la generación (0.0 a 1.0)
+
+        Returns:
+            Texto de respuesta del modelo o None si falla
+        """
+        if not self.groq_api_key:
+            logger.info("[GROQ] No API key configured")
+            return None
+
+        try:
+            logger.info(
+                f"[GROQ] Calling API with {len(messages)} messages, model: {self.groq_model}"
+            )
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={
+                        "Content-Type": "application/json",
+                        "Authorization": f"Bearer {self.groq_api_key}",
+                    },
+                    json={
+                        "model": self.groq_model,
+                        "messages": messages,
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                    },
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                    logger.info(
+                        f"[GROQ] Response OK, length={len(text) if text else 0} chars"
+                    )
+                    return text.strip() if text else None
+                else:
+                    logger.warning(
+                        f"[GROQ] Error {response.status_code}: {response.text[:200]}"
+                    )
+                    return None
+        except Exception as e:
+            logger.error(f"[GROQ] Exception: {e}")
+            return None
