@@ -63,6 +63,20 @@ class AIService:
 
         return available
 
+    def get_available_providers(self) -> List[str]:
+        """
+        Retorna lista de proveedores que tienen API key configurada.
+
+        Returns:
+            Lista de nombres de proveedores disponibles
+        """
+        available = []
+        if self.gemini_api_key:
+            available.append("gemini")
+        if self.groq_api_key:
+            available.append("groq")
+        return available
+
     async def _call_gemini(
         self, messages: List[dict], max_tokens: int = 1000, temperature: float = 0.7
     ) -> Optional[str]:
