@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, User, Star, X, Check } from 'lucide-react';
+import { Edit, Trash2, User, Star, X, Check, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, zonasApi, categoriasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -312,6 +312,7 @@ export default function Empleados() {
   return (
     <ABMPage
       title="Empleados"
+      icon={<Users className="h-5 w-5" />}
       backLink="/gestion/ajustes"
       buttonLabel="Nuevo Empleado"
       onAdd={() => openSheet()}

@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { History, Search, Star, Clock, MapPin, Calendar, ChevronRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { History, Star, Clock, MapPin, Calendar, ChevronRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface TrabajoHistorial {
   id: number;
@@ -152,63 +153,26 @@ export default function MiHistorial() {
 
   return (
     <div className="space-y-6">
-      {/* Header estilo ABM */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <History className="h-5 w-5" style={{ color: theme.primary }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-                Mi Historial
-              </h1>
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                {total} trabajos en total
-              </p>
-            </div>
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Filtros */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: theme.textSecondary }} />
-              <input
-                type="text"
-                placeholder="Buscar..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg text-sm"
-                style={{
-                  backgroundColor: theme.backgroundSecondary,
-                  border: `1px solid ${theme.border}`,
-                  color: theme.text,
-                }}
-              />
-            </div>
-
-            <ModernSelect
-              value={filtroEstado}
-              onChange={(val) => setFiltroEstado(val)}
-              options={[
-                { value: '', label: 'Todos los estados' },
-                { value: 'resuelto', label: 'Resueltos' },
-                { value: 'en_proceso', label: 'En Proceso' },
-                { value: 'asignado', label: 'Asignados' },
-              ]}
-              placeholder="Estado"
-            />
-          </div>
-        </div>
-      </div>
+      <StickyPageHeader
+        icon={<History className="h-5 w-5" />}
+        title="Mi Historial"
+        searchPlaceholder="Buscar en historial..."
+        searchValue={search}
+        onSearchChange={setSearch}
+        actions={
+          <ModernSelect
+            value={filtroEstado}
+            onChange={(val) => setFiltroEstado(val)}
+            options={[
+              { value: '', label: 'Todos los estados' },
+              { value: 'resuelto', label: 'Resueltos' },
+              { value: 'en_proceso', label: 'En Proceso' },
+              { value: 'asignado', label: 'Asignados' },
+            ]}
+            placeholder="Estado"
+          />
+        }
+      />
 
       {/* Lista de trabajos */}
       {loading ? (

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Edit, Clock, DollarSign, FileText, Plus, ChevronRight, EyeOff, RotateCcw, ChevronDown } from 'lucide-react';
+import { Edit, Clock, DollarSign, FileText, Plus, ChevronRight, EyeOff, RotateCcw, ChevronDown, BookOpen } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
@@ -354,6 +354,7 @@ export default function TramitesCatalogo() {
   return (
     <ABMPage
       title="Catálogo de Trámites"
+      icon={<BookOpen className="h-5 w-5" />}
       backLink="/gestion/ajustes"
       buttonLabel="Nuevo Trámite"
       onAdd={() => openSheet()}

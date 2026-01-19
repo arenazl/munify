@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, Clock, DollarSign, Star, Link2, FileText } from 'lucide-react';
+import { Edit, Trash2, Clock, DollarSign, Star, Link2, FileText, Blocks } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
@@ -226,6 +226,7 @@ export default function Servicios() {
   return (
     <ABMPage
       title="Servicios de Trámites"
+      icon={<Blocks className="h-5 w-5" />}
       buttonLabel="Nuevo Servicio"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar servicios..."

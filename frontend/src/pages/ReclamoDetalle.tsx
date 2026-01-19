@@ -4,12 +4,13 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown
+  RefreshCw, Send, ChevronDown, ClipboardList
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, whatsappApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import type { Reclamo, HistorialReclamo, EstadoReclamo } from '../types';
 
 interface WhatsAppLog {
@@ -379,20 +380,11 @@ export default function ReclamoDetalle() {
 
   return (
     <div className="space-y-6">
-      {/* Header con botón volver */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={handleBack}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg transition-all hover:scale-105"
-          style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Volver
-        </button>
-        <span className="text-sm" style={{ color: theme.textSecondary }}>
-          Reclamo #{reclamo.id}
-        </span>
-      </div>
+      <StickyPageHeader
+        icon={<ClipboardList className="h-5 w-5" />}
+        title={`Reclamo #${reclamo.id}`}
+        backLink="/gestion/reclamos"
+      />
 
       {/* Card principal */}
       <div

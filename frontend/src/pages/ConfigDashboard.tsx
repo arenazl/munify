@@ -3,6 +3,7 @@ import { Settings, Eye, EyeOff, GripVertical, Save, Loader2, User, Wrench, Rotat
 import { toast } from 'sonner';
 import { configuracionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface ComponenteConfig {
   id: string;
@@ -116,34 +117,16 @@ export default function ConfigDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <Settings className="h-5 w-5" style={{ color: theme.primary }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-                Configuración del Dashboard
-              </h1>
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                Personaliza qué ven los usuarios en su panel
-              </p>
-            </div>
-          </div>
-
+      <StickyPageHeader
+        icon={<Settings className="h-5 w-5" />}
+        title="Configuración del Dashboard"
+        backLink="/gestion/ajustes"
+        actions={
           <div className="flex items-center gap-2">
             <button
               onClick={handleReset}
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm"
               style={{ color: theme.textSecondary }}
             >
               <RotateCcw className="h-4 w-4" />
@@ -152,7 +135,7 @@ export default function ConfigDashboard() {
             <button
               onClick={handleSave}
               disabled={saving || !hasChanges}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium transition-all disabled:opacity-50 text-sm"
               style={{ backgroundColor: theme.primary, color: '#fff' }}
             >
               {saving ? (
@@ -163,8 +146,8 @@ export default function ConfigDashboard() {
               Guardar
             </button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tabs */}
       <div className="flex gap-2">

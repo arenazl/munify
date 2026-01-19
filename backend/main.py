@@ -169,19 +169,20 @@ app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 app.include_router(api_router, prefix="/api")
 
 # ============ LANDING PAGE ============
-if landing_path.exists():
-    @app.get("/landing", response_class=HTMLResponse)
-    async def serve_landing():
-        """Sirve la landing page estática"""
-        return FileResponse(
-            landing_path / "index.html",
-            media_type="text/html",
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
+# DESACTIVADO - Landing page comentada temporalmente
+# if landing_path.exists():
+#     @app.get("/landing", response_class=HTMLResponse)
+#     async def serve_landing():
+#         """Sirve la landing page estática"""
+#         return FileResponse(
+#             landing_path / "index.html",
+#             media_type="text/html",
+#             headers={
+#                 "Cache-Control": "no-cache, no-store, must-revalidate",
+#                 "Pragma": "no-cache",
+#                 "Expires": "0"
+#             }
+#         )
 
 @app.get("/health")
 async def health():

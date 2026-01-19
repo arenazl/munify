@@ -10,6 +10,7 @@ import {
   LayoutGrid, List, Clock, Trophy, FolderKanban, Gauge, BarChart2
 } from 'lucide-react';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { AutocompleteInput } from '../components/ui/AutocompleteInput';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RePieChart, Pie, Cell, LineChart as ReLineChart, Line, Legend
@@ -152,7 +153,6 @@ export default function PanelBI() {
 
   // Estados del chat/consulta
   const [input, setInput] = useState('');
-  const [chips, setChips] = useState<Array<{ type: 'table' | 'field'; value: string; table?: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
   const [rawData, setRawData] = useState<any[] | null>(null);
@@ -167,11 +167,6 @@ export default function PanelBI() {
 
   // Schema para autocompletado - cargado del backend
   const [dbSchema, setDbSchema] = useState<Record<string, Array<{ name: string; type: string; fk: string | null }>>>({});
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [autocompleteFilter, setAutocompleteFilter] = useState('');
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Estado para guardar consulta
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -180,6 +175,13 @@ export default function PanelBI() {
 
   // Estado para entidad expandida
   const [expandedEntity, setExpandedEntity] = useState<string | null>(null);
+
+  // Estados para colapsar/expandir paneles laterales
+  const [consultasCollapsed, setConsultasCollapsed] = useState(false);
+  const [entidadesCollapsed, setEntidadesCollapsed] = useState(false);
+
+  // Estado para filtrar entidades
+  const [entityFilter, setEntityFilter] = useState('');
 
   // Estado para formato seleccionado (no se muestra en el input)
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
@@ -307,16 +309,9 @@ export default function PanelBI() {
     }
   };
 
-  // Construir query completa con chips
-  const buildFullQuery = () => {
-    const chipText = chips.map(c => c.type === 'table' ? c.value : `${c.table}.${c.value}`).join(' ');
-    return chipText ? `${chipText} ${input}`.trim() : input.trim();
-  };
-
   // Ejecutar consulta
   const ejecutarConsulta = async (formatOverride?: string) => {
-    const fullQuery = buildFullQuery();
-    if (!fullQuery || loading) return;
+    if (!input.trim() || loading) return;
 
     setLoading(true);
     setResponse(null);
@@ -325,7 +320,8 @@ export default function PanelBI() {
 
     // Usar formato override o el seleccionado
     const format = formatOverride || selectedFormat;
-    const queryToSend = format ? `${fullQuery} [formato: ${format}]` : fullQuery;
+    const query = input.trim();
+    const queryToSend = format ? `${query} [formato: ${format}]` : query;
 
     try {
       const result = await chatApi.consulta(queryToSend);
@@ -578,7 +574,7 @@ export default function PanelBI() {
         <button
           key={fmt.key}
           onClick={() => ejecutarConsulta(fmt.key)}
-          disabled={(!input.trim() && chips.length === 0) || loading}
+          disabled={!input.trim() || loading}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors hover:scale-105 disabled:opacity-50"
           style={{
             backgroundColor: theme.backgroundSecondary,
@@ -594,244 +590,128 @@ export default function PanelBI() {
     </div>
   );
 
-  // Handler para el input de consulta con autocompletado
-  const handleInputChange = (value: string) => {
-    setInput(value);
-
-    // Obtener la última palabra para autocompletar
-    const words = value.split(/\s+/);
-    const lastWord = words[words.length - 1]?.toLowerCase() || '';
-
-    if (lastWord.length >= 2) {
-      // Buscar coincidencias en tablas
-      const tableMatches = Object.keys(dbSchema).filter(t =>
-        t.toLowerCase().includes(lastWord)
-      );
-
-      if (tableMatches.length > 0) {
-        setShowAutocomplete(true);
-        setAutocompleteFilter(lastWord);
-        setSelectedTable(null);
-        setHighlightedIndex(0);
-      } else {
-        setShowAutocomplete(false);
-      }
-    } else {
-      setShowAutocomplete(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       <StickyPageHeader
         icon={<BarChart2 className="h-5 w-5" />}
         title="Panel BI"
-        searchPlaceholder="Escribí tu consulta... (ej: traeme reclamos ordenados por fecha)"
-        searchValue={input}
-        onSearchChange={handleInputChange}
-        buttonLabel="Consultar"
-        onButtonClick={() => ejecutarConsulta()}
         filterPanel={renderFilterPanel()}
-        actions={
-          response && input.trim() ? (
-            <button
-              onClick={() => setShowSaveModal(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors"
-              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
-              title="Guardar consulta"
-            >
-              <Save className="h-4 w-4" />
-            </button>
-          ) : undefined
-        }
-      />
+      >
+        {/* Input con autocompletado inline */}
+        <AutocompleteInput
+          value={input}
+          onChange={setInput}
+          schema={dbSchema}
+          placeholder="Escribí tu consulta... (ej: cuantos reclamos.estado = 'pendiente')"
+          onSubmit={() => ejecutarConsulta()}
+          disabled={loading}
+        />
 
-      {/* Dropdown de autocompletado - posicionado debajo del header */}
-      {showAutocomplete && Object.keys(dbSchema).length > 0 && (
-        <div
-          className="fixed z-40 rounded-xl shadow-xl max-h-64 overflow-y-auto"
+        {/* Botón guardar consulta */}
+        {response && input.trim() && (
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs transition-colors flex-shrink-0"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+            title="Guardar consulta"
+          >
+            <Save className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Botón consultar */}
+        <button
+          onClick={() => ejecutarConsulta()}
+          disabled={!input.trim() || loading}
+          className="px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
           style={{
-            backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            top: '180px',
-            left: 'calc(var(--sidebar-width, 0px) + 120px)',
-            right: '180px',
-            maxWidth: '600px',
+            background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+            color: '#ffffff',
+            boxShadow: `0 4px 14px ${theme.primary}40`,
           }}
         >
-          {/* Tabla seleccionada como píldora arriba */}
-          {selectedTable && (
-            <div className="px-2 pt-2 pb-1 border-b" style={{ borderColor: theme.border }}>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px]" style={{ color: theme.textSecondary }}>Seleccionada:</span>
-                <button
-                  onClick={() => setSelectedTable(null)}
-                  className="px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 transition-all hover:scale-105"
-                  style={{
-                    backgroundColor: theme.primary,
-                    color: theme.primaryText,
-                  }}
-                >
-                  {selectedTable}
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Si no hay tabla seleccionada, mostrar tablas */}
-          {!selectedTable ? (
-            <div className="p-2">
-              <div className="text-xs font-semibold px-2 py-1 mb-1" style={{ color: theme.textSecondary }}>
-                Tablas (↑↓ navegar, Enter seleccionar)
-              </div>
-              <div className="flex flex-wrap gap-1 p-1">
-                {Object.keys(dbSchema)
-                  .filter(t => t.toLowerCase().includes(autocompleteFilter))
-                  .slice(0, 15)
-                  .map((tableName, idx) => (
-                    <button
-                      key={tableName}
-                      onClick={() => {
-                        // Agregar tabla como chip y mostrar sus campos
-                        setChips(prev => [...prev, { type: 'table', value: tableName }]);
-                        // Limpiar la palabra que estaba escribiendo
-                        const words = input.split(/\s+/);
-                        words.pop();
-                        setInput(words.join(' ') + (words.length > 0 ? ' ' : ''));
-                        setSelectedTable(tableName);
-                        setHighlightedIndex(0);
-                      }}
-                      className="px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:scale-105"
-                      style={{
-                        backgroundColor: idx === highlightedIndex ? theme.primary : `${theme.primary}20`,
-                        color: idx === highlightedIndex ? theme.primaryText : theme.primary,
-                        border: `1px solid ${idx === highlightedIndex ? theme.primary : theme.primary + '40'}`
-                      }}
-                    >
-                      {tableName}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            /* Mostrar campos de la tabla seleccionada */
-            <div className="p-2">
-              <div className="flex items-center justify-between px-2 py-1 mb-1">
-                <span className="text-xs font-semibold" style={{ color: theme.textSecondary }}>
-                  Campos de <span style={{ color: theme.primary }}>{selectedTable}</span>
-                </span>
-                <button
-                  onClick={() => {
-                    setSelectedTable(null);
-                    setHighlightedIndex(0);
-                  }}
-                  className="text-xs px-2 py-0.5 rounded hover:opacity-70"
-                  style={{ color: theme.primary, backgroundColor: `${theme.primary}20` }}
-                >
-                  ← Otras tablas
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-1 p-1">
-                {dbSchema[selectedTable]?.map((col, idx) => (
-                  <button
-                    key={col.name}
-                    onClick={() => {
-                      // Agregar campo como chip (sin cerrar dropdown)
-                      setChips(prev => [...prev, { type: 'field', value: col.name, table: selectedTable }]);
-                      inputRef.current?.focus();
-                    }}
-                    className="px-2.5 py-1 rounded-full text-xs transition-all hover:scale-105"
-                    style={{
-                      backgroundColor: idx === highlightedIndex
-                        ? theme.primary
-                        : (col.fk ? `${theme.primary}20` : theme.backgroundSecondary),
-                      color: idx === highlightedIndex
-                        ? theme.primaryText
-                        : (col.fk ? theme.primary : theme.text),
-                      border: `1px solid ${idx === highlightedIndex ? theme.primary : (col.fk ? theme.primary + '40' : theme.border)}`
-                    }}
-                    title={`${col.type}${col.fk ? ` → ${col.fk}` : ''}`}
-                  >
-                    {col.name}
-                    {col.fk && <span className="ml-1 opacity-60">→</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Cerrar */}
-          <div className="border-t px-2 py-1.5" style={{ borderColor: theme.border }}>
-            <button
-              onClick={() => {
-                setShowAutocomplete(false);
-                setSelectedTable(null);
-              }}
-              className="text-xs w-full text-center"
-              style={{ color: theme.textSecondary }}
-            >
-              Esc para cerrar
-            </button>
-          </div>
-        </div>
-      )}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Consultar'}
+        </button>
+      </StickyPageHeader>
 
       {/* Main Content - Grid de 3 columnas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Columna Izquierda - Consultas Guardadas */}
         <div className="lg:col-span-3">
           <div
-            className="rounded-xl p-4"
+            className="rounded-xl overflow-hidden"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
-            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme.text }}>
-              <Star className="h-4 w-4" style={{ color: theme.primary }} />
-              Mis Consultas
-            </h3>
-
-            {loadingConsultas ? (
-              <div className="text-center py-4" style={{ color: theme.textSecondary }}>
-                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-              </div>
-            ) : consultasGuardadas.length === 0 ? (
-              <p className="text-xs text-center py-4" style={{ color: theme.textSecondary }}>
-                No hay consultas guardadas.
-                <br />
-                Ejecutá una consulta y guardala para acceso rápido.
-              </p>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {consultasGuardadas.map((c) => (
-                  <div
-                    key={c.id}
-                    className="p-2 rounded-lg text-xs cursor-pointer transition-all hover:scale-[1.02] flex items-center justify-between group"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      border: `1px solid ${theme.border}`,
-                    }}
+            {/* Header clickeable para colapsar */}
+            <button
+              onClick={() => setConsultasCollapsed(!consultasCollapsed)}
+              className="w-full p-4 flex items-center justify-between transition-colors hover:bg-black/5"
+            >
+              <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: theme.text }}>
+                <Star className="h-4 w-4" style={{ color: theme.primary }} />
+                Mis Consultas
+                {consultasGuardadas.length > 0 && (
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[10px]"
+                    style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
                   >
-                    <div
-                      className="flex-1"
-                      onClick={() => ejecutarConsultaGuardada(c)}
-                    >
-                      <div className="font-medium flex items-center gap-2" style={{ color: theme.text }}>
-                        {getIcon(c.icono)}
-                        {c.nombre}
-                      </div>
-                      <div className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
-                        {c.veces_ejecutada}x ejecutada
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => eliminarConsultaGuardada(c.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 transition-all"
-                      style={{ color: '#ef4444' }}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
+                    {consultasGuardadas.length}
+                  </span>
+                )}
+              </h3>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${consultasCollapsed ? '' : 'rotate-180'}`}
+                style={{ color: theme.textSecondary }}
+              />
+            </button>
+
+            {/* Contenido colapsable */}
+            {!consultasCollapsed && (
+              <div className="px-4 pb-4">
+                {loadingConsultas ? (
+                  <div className="text-center py-4" style={{ color: theme.textSecondary }}>
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                   </div>
-                ))}
+                ) : consultasGuardadas.length === 0 ? (
+                  <p className="text-xs text-center py-4" style={{ color: theme.textSecondary }}>
+                    No hay consultas guardadas.
+                    <br />
+                    Ejecutá una consulta y guardala para acceso rápido.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {consultasGuardadas.map((c) => (
+                      <div
+                        key={c.id}
+                        className="p-2 rounded-lg text-xs cursor-pointer transition-all hover:scale-[1.02] flex items-center justify-between group"
+                        style={{
+                          backgroundColor: theme.backgroundSecondary,
+                          border: `1px solid ${theme.border}`,
+                        }}
+                      >
+                        <div
+                          className="flex-1"
+                          onClick={() => ejecutarConsultaGuardada(c)}
+                        >
+                          <div className="font-medium flex items-center gap-2" style={{ color: theme.text }}>
+                            {getIcon(c.icono)}
+                            {c.nombre}
+                          </div>
+                          <div className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+                            {c.veces_ejecutada}x ejecutada
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => eliminarConsultaGuardada(c.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 transition-all"
+                          style={{ color: '#ef4444' }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1042,99 +922,168 @@ export default function PanelBI() {
         {/* Columna Derecha - Entidades */}
         <div className="lg:col-span-3">
           <div
-            className="rounded-xl p-4"
+            className="rounded-xl overflow-hidden"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
-            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2" style={{ color: theme.text }}>
-              <Database className="h-4 w-4" style={{ color: theme.primary }} />
-              Entidades
-            </h3>
+            {/* Header clickeable para colapsar */}
+            <button
+              onClick={() => setEntidadesCollapsed(!entidadesCollapsed)}
+              className="w-full p-4 flex items-center justify-between transition-colors hover:bg-black/5"
+            >
+              <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: theme.text }}>
+                <Database className="h-4 w-4" style={{ color: theme.primary }} />
+                Entidades
+                <span
+                  className="px-1.5 py-0.5 rounded-full text-[10px]"
+                  style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                >
+                  {entities.length}
+                </span>
+              </h3>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${entidadesCollapsed ? '' : 'rotate-180'}`}
+                style={{ color: theme.textSecondary }}
+              />
+            </button>
 
-            {loadingEntities ? (
-              <div className="text-center py-4" style={{ color: theme.textSecondary }}>
-                <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-              </div>
-            ) : (
-            <div className="space-y-1.5">
-              {entities.map((entity) => {
-                const isExpanded = expandedEntity === entity.tabla;
-                return (
-                  <div
-                    key={entity.tabla}
-                    className="rounded-lg transition-all"
+            {/* Contenido colapsable */}
+            {!entidadesCollapsed && (
+              <div className="px-4 pb-4">
+                {/* Input de búsqueda/filtro */}
+                <div className="mb-3">
+                  <input
+                    type="text"
+                    value={entityFilter}
+                    onChange={(e) => setEntityFilter(e.target.value)}
+                    placeholder="Buscar entidad o campo..."
+                    className="w-full px-3 py-1.5 rounded-lg text-xs"
                     style={{
                       backgroundColor: theme.backgroundSecondary,
-                      border: `1px solid ${isExpanded ? theme.primary : theme.border}`,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
                     }}
-                  >
-                    {/* Header clickeable */}
-                    <button
-                      onClick={() => setExpandedEntity(isExpanded ? null : entity.tabla)}
-                      className="w-full p-2 text-left transition-all hover:bg-black/5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span style={{ color: theme.primary }}>{getIcon(entity.icono)}</span>
-                          <span className="font-medium text-xs" style={{ color: theme.text }}>
-                            {entity.nombre}
-                          </span>
-                        </div>
-                        <ChevronDown
-                          className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          style={{ color: theme.textSecondary }}
-                        />
-                      </div>
-                      {/* Preview de campos cuando está colapsado */}
-                      {!isExpanded && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {entity.campos.slice(0, 3).map((campo) => (
-                            <span
-                              key={campo.name}
-                              className="px-1 py-0.5 rounded text-[10px]"
-                              style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-                            >
-                              {campo.name}
-                            </span>
-                          ))}
-                          {entity.campos.length > 3 && (
-                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                              +{entity.campos.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </button>
+                  />
+                </div>
 
-                    {/* Campos expandidos */}
-                    {isExpanded && (
-                      <div className="px-2 pb-2 border-t" style={{ borderColor: theme.border }}>
-                        <div className="flex flex-wrap gap-1 pt-1.5">
-                          {entity.campos.map((campo) => (
-                            <button
-                              key={campo.name}
-                              onClick={() => {
-                                setInput(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + `${entity.tabla}.${campo.name} `);
-                                inputRef.current?.focus();
-                              }}
-                              className="px-1.5 py-0.5 rounded text-[10px] transition-all hover:scale-105 cursor-pointer"
-                              style={{
-                                backgroundColor: campo.fk ? `${theme.primary}25` : `${theme.primary}10`,
-                                color: theme.primary,
-                                border: campo.fk ? `1px solid ${theme.primary}50` : 'none'
-                              }}
-                              title={`${campo.type}${campo.fk ? ` → ${campo.fk}` : ''}`}
-                            >
-                              {campo.name}
-                              {campo.fk && <span className="ml-0.5 opacity-60">→</span>}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                {loadingEntities ? (
+                  <div className="text-center py-4" style={{ color: theme.textSecondary }}>
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                   </div>
-                );
-              })}
-            </div>
+                ) : (
+                <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                  {entities
+                    .filter(entity => {
+                      if (!entityFilter.trim()) return true;
+                      const filter = entityFilter.toLowerCase();
+                      // Buscar en nombre, tabla o campos
+                      return (
+                        entity.nombre.toLowerCase().includes(filter) ||
+                        entity.tabla.toLowerCase().includes(filter) ||
+                        entity.campos.some(c => c.name.toLowerCase().includes(filter))
+                      );
+                    })
+                    .map((entity) => {
+                    const isExpanded = expandedEntity === entity.tabla;
+                    // Filtrar campos si hay filtro activo
+                    const filteredCampos = entityFilter.trim()
+                      ? entity.campos.filter(c =>
+                          c.name.toLowerCase().includes(entityFilter.toLowerCase()) ||
+                          entity.nombre.toLowerCase().includes(entityFilter.toLowerCase()) ||
+                          entity.tabla.toLowerCase().includes(entityFilter.toLowerCase())
+                        )
+                      : entity.campos;
+
+                    return (
+                      <div
+                        key={entity.tabla}
+                        className="rounded-lg transition-all"
+                        style={{
+                          backgroundColor: theme.backgroundSecondary,
+                          border: `1px solid ${isExpanded ? theme.primary : theme.border}`,
+                        }}
+                      >
+                        {/* Header clickeable */}
+                        <button
+                          onClick={() => setExpandedEntity(isExpanded ? null : entity.tabla)}
+                          className="w-full p-2 text-left transition-all hover:bg-black/5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <span style={{ color: theme.primary }}>{getIcon(entity.icono)}</span>
+                              <span className="font-medium text-xs" style={{ color: theme.text }}>
+                                {entity.nombre}
+                              </span>
+                            </div>
+                            <ChevronDown
+                              className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              style={{ color: theme.textSecondary }}
+                            />
+                          </div>
+                          {/* Preview de campos cuando está colapsado */}
+                          {!isExpanded && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {(entityFilter.trim() ? filteredCampos : entity.campos).slice(0, 3).map((campo) => (
+                                <span
+                                  key={campo.name}
+                                  className="px-1 py-0.5 rounded text-[10px]"
+                                  style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                                >
+                                  {campo.name}
+                                </span>
+                              ))}
+                              {(entityFilter.trim() ? filteredCampos : entity.campos).length > 3 && (
+                                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                                  +{(entityFilter.trim() ? filteredCampos : entity.campos).length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </button>
+
+                        {/* Campos expandidos */}
+                        {isExpanded && (
+                          <div className="px-2 pb-2 border-t" style={{ borderColor: theme.border }}>
+                            <div className="flex flex-wrap gap-1 pt-1.5">
+                              {(entityFilter.trim() ? filteredCampos : entity.campos).map((campo) => (
+                                <button
+                                  key={campo.name}
+                                  onClick={() => {
+                                    setInput(prev => prev + (prev.endsWith(' ') || prev === '' ? '' : ' ') + `${entity.tabla}.${campo.name} `);
+                                  }}
+                                  className="px-1.5 py-0.5 rounded text-[10px] transition-all hover:scale-105 cursor-pointer"
+                                  style={{
+                                    backgroundColor: campo.fk ? `${theme.primary}25` : `${theme.primary}10`,
+                                    color: theme.primary,
+                                    border: campo.fk ? `1px solid ${theme.primary}50` : 'none'
+                                  }}
+                                  title={`${campo.type}${campo.fk ? ` → ${campo.fk}` : ''}`}
+                                >
+                                  {campo.name}
+                                  {campo.fk && <span className="ml-0.5 opacity-60">→</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {entities.filter(entity => {
+                    if (!entityFilter.trim()) return true;
+                    const filter = entityFilter.toLowerCase();
+                    return (
+                      entity.nombre.toLowerCase().includes(filter) ||
+                      entity.tabla.toLowerCase().includes(filter) ||
+                      entity.campos.some(c => c.name.toLowerCase().includes(filter))
+                    );
+                  }).length === 0 && (
+                    <p className="text-xs text-center py-4" style={{ color: theme.textSecondary }}>
+                      No se encontraron entidades con "{entityFilter}"
+                    </p>
+                  )}
+                </div>
+                )}
+              </div>
             )}
           </div>
         </div>

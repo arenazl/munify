@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, CalendarOff, Check, X, Clock } from 'lucide-react';
+import { Edit, Trash2, CalendarOff, Check, X, Clock, CalendarX2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -239,6 +239,7 @@ export default function GestionAusencias() {
   return (
     <ABMPage
       title="Ausencias"
+      icon={<CalendarX2 className="h-5 w-5" />}
       buttonLabel="Nueva Ausencia"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar por empleado o tipo..."

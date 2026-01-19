@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { gamificacionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 // Mapeo de iconos por nombre
 const BADGE_ICONS: Record<string, React.ReactNode> = {
@@ -299,6 +300,11 @@ export default function Gamificacion() {
 
   return (
     <div className="space-y-6 pb-8">
+      <StickyPageHeader
+        icon={<Trophy className="h-5 w-5" />}
+        title="Gamificación"
+      />
+
       {/* Header moderno - más sutil */}
       <div className="grid md:grid-cols-3 gap-4">
         {/* Nivel y progreso circular */}

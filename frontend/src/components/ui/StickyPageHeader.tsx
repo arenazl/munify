@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
-import { Search, Plus } from 'lucide-react';
+import { Search, Plus, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface StickyPageHeaderProps {
@@ -7,6 +8,8 @@ interface StickyPageHeaderProps {
   icon?: ReactNode;
   /** Título de la página */
   title?: string;
+  /** Link para volver (muestra flecha antes del título) */
+  backLink?: string;
   /** Placeholder del buscador */
   searchPlaceholder?: string;
   /** Valor del buscador */
@@ -52,6 +55,7 @@ interface StickyPageHeaderProps {
 export function StickyPageHeader({
   icon,
   title,
+  backLink,
   searchPlaceholder = 'Buscar...',
   searchValue,
   onSearchChange,
@@ -97,20 +101,33 @@ export function StickyPageHeader({
             children
           ) : (
             <>
-              {/* Icono + Título - se oculta en mobile cuando search enfocado */}
-              {(icon || title) && (
-                <div className={`flex items-center gap-2 flex-shrink-0 transition-all duration-200 ${searchFocused ? 'hidden sm:flex' : 'flex'}`}>
+              {/* BackLink + Icono + Título - se oculta en mobile cuando search enfocado */}
+              {(backLink || icon || title) && (
+                <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
+                  {backLink && (
+                    <Link
+                      to={backLink}
+                      className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
+                      style={{
+                        backgroundColor: `${theme.primary}15`,
+                        color: theme.primary
+                      }}
+                      title="Volver"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                  )}
                   {icon && (
                     <div
                       className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${theme.primary}20` }}
+                      style={{ backgroundColor: `${theme.primary}15` }}
                     >
                       <span style={{ color: theme.primary }}>{icon}</span>
                     </div>
                   )}
                   {title && (
                     <h1
-                      className="text-lg font-bold tracking-tight hidden sm:block"
+                      className="text-lg font-bold tracking-tight"
                       style={{ color: theme.text }}
                     >
                       {title}
@@ -120,7 +137,7 @@ export function StickyPageHeader({
               )}
 
               {/* Separador - se oculta en mobile */}
-              {(icon || title) && onSearchChange && (
+              {(backLink || icon || title) && onSearchChange && (
                 <div
                   className="h-8 w-px hidden sm:block flex-shrink-0"
                   style={{ backgroundColor: theme.border }}

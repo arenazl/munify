@@ -3,7 +3,7 @@
   "nombre": "Lista",
   "descripcion": "Muestra los registros como lista con items",
   "palabras_clave": [],
-  "template_html": "<ul style=\"margin:12px 0;padding-left:0;list-style:none\">\n<li style=\"padding:10px 14px;margin:6px 0;background:#f8f5f0;border-radius:10px;color:#5c4d3d;border-left:4px solid #b08d57\">\n  <strong>Título/Nombre</strong> - Detalle 1 - Detalle 2\n</li>\n</ul>",
+  "template_html": "<ul style=\"margin:12px 0;padding-left:0;list-style:none\">\n<li style=\"padding:12px 16px;margin:10px 0;background:#f8f5f0;border-radius:10px;color:#5c4d3d;border-left:4px solid #b08d57\">\n  <strong>Título/Nombre</strong> - Detalle 1 - Detalle 2\n</li>\n</ul>",
   "instrucciones": [
     "Mostrá TODOS los registros como items de lista",
     "Cada item debe tener la info principal visible",
