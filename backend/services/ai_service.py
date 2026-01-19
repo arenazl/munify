@@ -3,7 +3,7 @@ Servicio de IA con soporte multi-proveedor.
 Soporta Gemini (Google) y Groq con fallback automático basado en AI_PROVIDER_ORDER.
 """
 import httpx
-from typing import List, Optional
+from typing import List, Optional, Union
 from core.config import settings
 from core.logger import get_logger
 
@@ -199,3 +199,50 @@ class AIService:
         except Exception as e:
             logger.error(f"[GROQ] Exception: {e}")
             return None
+
+    async def generate(
+        self,
+        prompt: Union[str, List[dict]],
+        max_tokens: int = 1000,
+        temperature: float = 0.7,
+    ) -> Optional[str]:
+        """
+        Genera texto usando IA con fallback automático entre proveedores.
+
+        Args:
+            prompt: Puede ser:
+                - str: Prompt simple (se convierte a mensaje user)
+                - List[dict]: Lista de mensajes con formato OpenAI
+            max_tokens: Máximo de tokens en la respuesta
+            temperature: Temperatura para la generación (0.0 a 1.0)
+
+        Returns:
+            Respuesta del modelo o None si fallan todos los proveedores
+        """
+        # Convertir string a formato de mensajes si es necesario
+        if isinstance(prompt, str):
+            messages = [{"role": "user", "content": prompt}]
+        else:
+            messages = prompt
+
+        providers = self.get_provider_order()
+        logger.info(f"[AI SERVICE] Provider order: {providers}")
+
+        for provider in providers:
+            if provider == "gemini":
+                response = await self._call_gemini(messages, max_tokens, temperature)
+                if response:
+                    return response
+                logger.info("[AI SERVICE] Gemini falló, intentando siguiente...")
+            elif provider == "groq":
+                response = await self._call_groq(messages, max_tokens, temperature)
+                if response:
+                    return response
+                logger.info("[AI SERVICE] Groq falló, intentando siguiente...")
+
+        logger.warning("[AI SERVICE] Todos los proveedores fallaron")
+        return None
+
+
+# Instancia singleton del servicio
+ai_service = AIService()
