@@ -72,6 +72,9 @@ class Municipio(Base):
     # Pedidos
     pedidos = relationship("Pedido", back_populates="municipio")
 
+    # Compras
+    compras = relationship("Compra", back_populates="municipio")
+
     def __repr__(self):
         return f"<Municipio {self.nombre}>"
 

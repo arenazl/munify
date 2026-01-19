@@ -32,6 +32,7 @@ from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
 from .pedido import Pedido
+from .compra import Compra
 
 __all__ = [
     "Municipio",
@@ -92,5 +93,7 @@ __all__ = [
     # Consultas guardadas / BI
     "ConsultaGuardada",
     # Pedidos
-    "Pedido"
+    "Pedido",
+    # Compras
+    "Compra"
 ]
