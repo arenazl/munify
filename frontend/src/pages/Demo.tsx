@@ -14,12 +14,13 @@ export default function Demo() {
   const [error, setError] = useState('');
 
   // Configuración visual por rol - usando colores Munify
-  // Orden: Supervisor, Vecino, Empleado
+  // Orden: Supervisor, Vecino, Empleado Técnico, Empleado Administrativo
   const demoProfiles = [
     {
       id: 'supervisor',
       name: 'Ana Martínez',
       role: 'supervisor',
+      email: 'ana.martinez@demo.com',
       label: 'Supervisor',
       description: 'Coordina equipos y monitorea métricas',
       icon: Users,
@@ -30,6 +31,7 @@ export default function Demo() {
       id: 'vecino',
       name: 'María García',
       role: 'vecino',
+      email: 'maria.garcia@demo.com',
       label: 'Vecino',
       description: 'Crea reclamos, hace trámites y sigue el estado',
       icon: User,
@@ -37,43 +39,37 @@ export default function Demo() {
       features: ['Crear reclamos', 'Iniciar trámites', 'Ver estado en tiempo real']
     },
     {
-      id: 'empleado',
+      id: 'empleado-tecnico',
       name: 'Carlos López',
       role: 'empleado',
-      label: 'Empleado',
+      email: 'carlos.lopez@demo.com',
+      label: 'Técnico',
       description: 'Resuelve trabajos en campo con la app móvil',
       icon: Wrench,
       gradient: 'from-[#2aa198] to-[#56cecb]',
       features: ['Tablero de tareas', 'Actualizar estados', 'Subir fotos']
+    },
+    {
+      id: 'empleado-admin',
+      name: 'Roberto Fernández',
+      role: 'empleado',
+      email: 'roberto.fernandez@demo.com',
+      label: 'Administrativo',
+      description: 'Gestiona trámites y documentación',
+      icon: Shield,
+      gradient: 'from-[#006699] to-[#0088cc]',
+      features: ['Gestión de trámites', 'Revisión de documentos', 'Atención al público']
     }
   ];
 
   // Login con perfil demo
-  const loginWithProfile = async (role: string) => {
+  const loginWithProfile = async (email: string, role: string) => {
     setLoading(true);
-    setLoadingRole(role);
+    setLoadingRole(email);
     setError('');
 
     try {
-      console.log('[Demo] Iniciando login con rol:', role);
-
-      // Primero obtener el usuario demo
-      const response = await fetch(`${API_URL}/municipios/public/merlo/demo-users`);
-      if (!response.ok) {
-        console.error('[Demo] Error obteniendo usuarios demo:', response.status);
-        throw new Error('No se pudo obtener usuarios demo');
-      }
-
-      const users = await response.json();
-      console.log('[Demo] Usuarios demo obtenidos:', users);
-
-      const demoUser = users.find((u: { rol: string }) => u.rol === role);
-      if (!demoUser) {
-        console.error('[Demo] No se encontró usuario para rol:', role);
-        throw new Error(`No hay usuario demo para el rol ${role}`);
-      }
-
-      console.log('[Demo] Usuario demo encontrado:', demoUser.email);
+      console.log('[Demo] Iniciando login con email:', email);
 
       // Setear información del municipio ANTES del login
       localStorage.setItem('municipio_codigo', 'merlo');
@@ -81,9 +77,9 @@ export default function Demo() {
       localStorage.setItem('municipio_nombre', 'Merlo');
       localStorage.setItem('municipio_color', '#0088cc');
 
-      // Hacer login
+      // Hacer login directamente con el email específico
       console.log('[Demo] Ejecutando login...');
-      await login(demoUser.email, 'demo123');
+      await login(email, 'demo123');
 
       // Obtener usuario y navegar
       const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -192,15 +188,15 @@ export default function Demo() {
           </div>
 
           {/* Profile Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {demoProfiles.map((profile) => {
               const Icon = profile.icon;
-              const isLoading = loadingRole === profile.role;
+              const isLoading = loadingRole === profile.email;
 
               return (
                 <button
                   key={profile.id}
-                  onClick={() => loginWithProfile(profile.role)}
+                  onClick={() => loginWithProfile(profile.email, profile.role)}
                   disabled={loading}
                   className="group relative bg-white border border-slate-200 rounded-2xl p-5 text-left transition-all hover:shadow-xl hover:shadow-slate-200/60 hover:border-[#0088cc]/30 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0"
                 >
