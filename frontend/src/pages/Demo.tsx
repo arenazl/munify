@@ -14,7 +14,18 @@ export default function Demo() {
   const [error, setError] = useState('');
 
   // Configuración visual por rol - usando colores Munify
+  // Orden: Supervisor, Vecino, Empleado
   const demoProfiles = [
+    {
+      id: 'supervisor',
+      name: 'Ana Martínez',
+      role: 'supervisor',
+      label: 'Supervisor',
+      description: 'Coordina equipos y monitorea métricas',
+      icon: Users,
+      gradient: 'from-[#0088cc] to-[#2aa198]',
+      features: ['Asignar trabajos', 'Ver reportes', 'Gestionar equipos']
+    },
     {
       id: 'vecino',
       name: 'María García',
@@ -34,26 +45,6 @@ export default function Demo() {
       icon: Wrench,
       gradient: 'from-[#2aa198] to-[#56cecb]',
       features: ['Tablero de tareas', 'Actualizar estados', 'Subir fotos']
-    },
-    {
-      id: 'supervisor',
-      name: 'Ana Martínez',
-      role: 'supervisor',
-      label: 'Supervisor',
-      description: 'Coordina equipos y monitorea métricas',
-      icon: Users,
-      gradient: 'from-[#0088cc] to-[#2aa198]',
-      features: ['Asignar trabajos', 'Ver reportes', 'Gestionar equipos']
-    },
-    {
-      id: 'admin',
-      name: 'Roberto Fernández',
-      role: 'admin',
-      label: 'Admin',
-      description: 'Control total del sistema municipal',
-      icon: Shield,
-      gradient: 'from-[#006699] to-[#0088cc]',
-      features: ['Configuración completa', 'Panel BI', 'Gestión de usuarios']
     }
   ];
 
@@ -201,7 +192,7 @@ export default function Demo() {
           </div>
 
           {/* Profile Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {demoProfiles.map((profile) => {
               const Icon = profile.icon;
               const isLoading = loadingRole === profile.role;
