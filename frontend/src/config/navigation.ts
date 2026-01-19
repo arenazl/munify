@@ -41,6 +41,13 @@ export const getNavigation = (userRole: string) => {
       description: 'Gestionar pedidos'
     },
     {
+      name: 'Compras',
+      href: '/gestion/compras',
+      icon: ShoppingCart,
+      show: isAdminOrSupervisor,
+      description: 'Gestionar compras'
+    },
+    {
       name: 'Mapa',
       href: '/gestion/mapa',
       icon: Map,

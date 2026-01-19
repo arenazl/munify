@@ -44,6 +44,7 @@ import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import Demo from './pages/Demo';
 import Pedidos from './pages/Pedidos';
+import Compras from './pages/Compras';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -210,6 +211,11 @@ export const router = createBrowserRouter([
       {
         path: 'pedidos',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><Pedidos /></ProtectedRoute>
+      },
+      // Compras
+      {
+        path: 'compras',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Compras /></ProtectedRoute>
       },
       // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
       {
