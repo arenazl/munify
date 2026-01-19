@@ -3,6 +3,7 @@ Script para crear usuarios demo
 - Maria Garcia (Vecino)
 - Carlos Lopez (Empleado)
 - Ana Martinez (Supervisor)
+- Roberto Fernandez (Admin)
 """
 import asyncio
 from sqlalchemy import text, select
@@ -67,6 +68,16 @@ async def create_demo_users():
                 "dni": "34567890",
                 "rol": RolUsuario.SUPERVISOR,
                 "descripcion": "Supervisor - Coordina equipos y monitorea metricas"
+            },
+            {
+                "email": "roberto.fernandez@demo.com",
+                "password": "demo123",
+                "nombre": "Roberto",
+                "apellido": "Fernandez",
+                "telefono": "+54 11 4567-8901",
+                "dni": "45678901",
+                "rol": RolUsuario.ADMIN,
+                "descripcion": "Admin - Control total del sistema municipal"
             }
         ]
 
@@ -118,6 +129,10 @@ async def create_demo_users():
         print("   Email: ana.martinez@demo.com")
         print("   Password: demo123")
         print("   Funciones: Asignar trabajos, ver reportes, gestionar equipos")
+        print("\n4. ADMIN:")
+        print("   Email: roberto.fernandez@demo.com")
+        print("   Password: demo123")
+        print("   Funciones: Configuracion completa, Panel BI, Gestion de usuarios")
 
 if __name__ == "__main__":
     asyncio.run(create_demo_users())
