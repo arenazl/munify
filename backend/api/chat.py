@@ -731,15 +731,17 @@ def build_system_prompt(categorias: list[dict], tramites: list[dict] = None, tel
     """Construye el prompt del sistema con las categorías y trámites del municipio"""
 
     # Generar HTML de categorías listo para usar
+    # Los links usan class="chatLink" con data-tramite para abrir el wizard modal
     cats_html = ""
     if categorias:
         cats_items = "".join([
-            f'<li style="margin:4px 0;list-style-type:disc"><a href="/gestion/reclamos?categoria={c["nombre"]}" style="color:#2563eb">{c["nombre"]}</a></li>'
+            f'<li style="margin:4px 0;list-style-type:disc"><a href="#" class="chatLink" data-tramite="{c["id"]}" data-tramite-nombre="{c["nombre"]}" data-tipo="reclamo" style="color:#2563eb;cursor:pointer">{c["nombre"]}</a></li>'
             for c in categorias
         ])
         cats_html = f'<div style="background:#f8f9fa;border-radius:12px;margin:8px 0;border:1px solid #e2e8f0"><div style="background:#2563eb;color:white;padding:10px 14px;font-weight:600;border-radius:12px 12px 0 0">📋 Categorías de Reclamos</div><div style="padding:12px 14px"><ul style="margin:0;padding-left:20px;list-style-type:disc">{cats_items}</ul></div></div>'
 
     # Generar HTML de trámites agrupados por tipo
+    # Los links usan class="chatLink" con data-tramite para abrir el wizard modal
     tramites_html = ""
     if tramites:
         tipos_content = ""
@@ -747,7 +749,7 @@ def build_system_prompt(categorias: list[dict], tramites: list[dict] = None, tel
             subtipos = tipo.get('subtipos', [])
             if subtipos:
                 items = "".join([
-                    f'<li style="margin:4px 0;list-style-type:disc"><a href="/gestion/tramites?tramite={s["nombre"]}" style="color:#2563eb">{s["nombre"]}</a></li>'
+                    f'<li style="margin:4px 0;list-style-type:disc"><a href="#" class="chatLink" data-tramite="{s["id"]}" data-tramite-nombre="{s["nombre"]}" data-tipo="tramite" style="color:#2563eb;cursor:pointer">{s["nombre"]}</a></li>'
                     for s in subtipos
                 ])
                 tipos_content += f'<strong>{tipo["nombre"]}:</strong><ul style="margin:4px 0 12px 0;padding-left:20px;list-style-type:disc">{items}</ul>'
@@ -757,16 +759,16 @@ def build_system_prompt(categorias: list[dict], tramites: list[dict] = None, tel
     # Teléfono de contacto
     tel_info = f"\n📞 Teléfono de contacto: {telefono_contacto}" if telefono_contacto else ""
 
-    # Lista de nombres de trámites para el contexto
+    # Lista de nombres de trámites para el contexto (con ID para los links)
     tramites_nombres = []
     if tramites:
         for tipo in tramites:
             for subtipo in tipo.get('subtipos', []):
-                tramites_nombres.append(f"- {subtipo['nombre']} (tipo: {tipo['nombre']})")
+                tramites_nombres.append(f"- {subtipo['nombre']} (ID: {subtipo['id']}, tipo: {tipo['nombre']})")
     tramites_lista = "\n".join(tramites_nombres) if tramites_nombres else "No hay trámites configurados para este municipio."
 
-    # Lista de categorías para el contexto
-    cats_lista = ", ".join([c["nombre"] for c in categorias]) if categorias else "No hay categorías configuradas."
+    # Lista de categorías para el contexto (con ID para los links)
+    cats_lista = ", ".join([f"{c['nombre']} (ID: {c['id']})" for c in categorias]) if categorias else "No hay categorías configuradas."
 
     return f"""Sos el asistente virtual de Munify. Hablás en español rioplatense (vos, podés, tenés).
 
@@ -785,10 +787,16 @@ TRÁMITES DISPONIBLES EN ESTE MUNICIPIO:
 
 IMPORTANTE - INFORMACIÓN DE TRÁMITES Y RECLAMOS:
 - Usá la información de categorías y trámites listados arriba como referencia de lo que está disponible en este municipio.
-- Si el usuario pregunta por un trámite específico que está en la lista, dale información sobre cómo iniciarlo en Munify.
+- Si el usuario pregunta por un trámite específico que está en la lista, dale información y ofrecé un link clickeable para ver la guía completa.
 - Si pregunta por algo que NO está en la lista, decile que puede consultarlo en la municipalidad o que todavía no está disponible en Munify.
 - Para iniciar cualquier trámite o reclamo, el usuario puede hacerlo desde la app Munify o la web.
 - NO inventes links externos a páginas del gobierno. Solo mencioná que puede hacerlo desde Munify.
+
+FORMATO DE LINKS CLICKEABLES (MUY IMPORTANTE):
+Cuando menciones un trámite o categoría específica, usá este formato exacto para que el usuario pueda hacer click y ver la guía:
+- Para trámites: <a href="#" class="chatLink" data-tramite="ID" data-tramite-nombre="NOMBRE" data-tipo="tramite" style="color:#2563eb;cursor:pointer">NOMBRE</a>
+- Para reclamos: <a href="#" class="chatLink" data-tramite="ID" data-tramite-nombre="NOMBRE" data-tipo="reclamo" style="color:#2563eb;cursor:pointer">NOMBRE</a>
+Donde ID es el número identificador y NOMBRE es el nombre del trámite/categoría.
 
 TU ROL:
 Sos un asistente amigable que ayuda a los vecinos a entender qué pueden hacer en Munify. Respondé de forma breve y clara (2-3 oraciones máximo).
@@ -797,6 +805,7 @@ ESTILO:
 - Respuestas CORTAS y directas (esto es un chat, no un manual)
 - Usá HTML para formato: <p>, <strong>, <ul>, <li>
 - NO uses markdown, SOLO HTML
+- Cuando menciones un trámite o categoría, hacelo clickeable con el formato indicado arriba
 - Sé conversacional, como un vecino que ayuda a otro
 
 CUANDO PIDAN VER CATEGORÍAS (mostrar HTML completo):
