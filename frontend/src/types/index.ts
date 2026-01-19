@@ -330,3 +330,30 @@ export interface ServicioTramite {
   // Campos de Tramite
   tipo_tramite_id?: number;
 }
+
+// Pedidos
+export interface Pedido {
+  id: number;
+  municipio_id: number;
+  fecha: string;
+  numero?: string;
+  descripcion?: string;
+  monto?: number;
+  activo: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Compras
+export interface Compra {
+  id: number;
+  municipio_id: number;
+  fecha: string;
+  numero?: string;
+  proveedor?: string;
+  descripcion?: string;
+  monto?: number;
+  activo: boolean;
+  created_at: string;
+  updated_at?: string;
+}

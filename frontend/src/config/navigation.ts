@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings
+  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, ShoppingCart
 } from 'lucide-react';
 
 export const getNavigation = (userRole: string) => {
@@ -32,6 +32,13 @@ export const getNavigation = (userRole: string) => {
       icon: FileCheck,
       show: isAdminOrSupervisor,
       description: 'Gestionar trámites'
+    },
+    {
+      name: 'Pedidos',
+      href: '/gestion/pedidos',
+      icon: ShoppingCart,
+      show: isAdminOrSupervisor,
+      description: 'Gestionar pedidos'
     },
     {
       name: 'Mapa',
