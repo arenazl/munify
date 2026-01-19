@@ -964,20 +964,31 @@ async def asignar_solicitud(
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    # Verificar empleado
+    # Verificar empleado (debe ser administrativo para trámites)
     result = await db.execute(
         select(Empleado).where(
             and_(
                 Empleado.id == asignacion.empleado_id,
                 Empleado.municipio_id == solicitud.municipio_id,
-                Empleado.activo == True
+                Empleado.activo == True,
+                Empleado.tipo == "administrativo"  # Solo administrativos para trámites
             )
         )
     )
     empleado = result.scalar_one_or_none()
 
     if not empleado:
-        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+        # Verificar si existe pero es del tipo incorrecto
+        result_check = await db.execute(
+            select(Empleado).where(Empleado.id == asignacion.empleado_id)
+        )
+        emp_check = result_check.scalar_one_or_none()
+        if emp_check and emp_check.tipo != "administrativo":
+            raise HTTPException(
+                status_code=400,
+                detail=f"El empleado {emp_check.nombre} es de tipo '{emp_check.tipo}'. Los trámites solo pueden ser asignados a empleados administrativos."
+            )
+        raise HTTPException(status_code=404, detail="Empleado no encontrado o no disponible")
 
     empleado_anterior_id = solicitud.empleado_id
     estado_anterior = solicitud.estado
