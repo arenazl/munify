@@ -69,6 +69,9 @@ class Municipio(Base):
     # Consultas guardadas / BI
     consultas_guardadas = relationship("ConsultaGuardada", back_populates="municipio")
 
+    # Pedidos
+    pedidos = relationship("Pedido", back_populates="municipio")
+
     def __repr__(self):
         return f"<Municipio {self.nombre}>"
 
