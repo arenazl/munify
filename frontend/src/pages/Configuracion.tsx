@@ -76,7 +76,6 @@ export default function Configuracion() {
   const portadaInputRef = useRef<HTMLInputElement>(null);
   const [portadaSinFiltro, setPortadaSinFiltro] = useState(municipioActual?.tema_config?.portadaSinFiltro || false);
   const [portadaOpacity, setPortadaOpacity] = useState(municipioActual?.tema_config?.portadaOpacity ?? 1);
-  const [cabeceraFiltroColor, setCabeceraFiltroColor] = useState<'grafito' | 'blanco'>(municipioActual?.tema_config?.cabeceraFiltroColor || 'grafito');
   const [cabeceraOpacity, setCabeceraOpacity] = useState(municipioActual?.tema_config?.cabeceraOpacity ?? 0.4);
   const [cabeceraBlur, setCabeceraBlur] = useState(municipioActual?.tema_config?.cabeceraBlur ?? 4);
 
@@ -106,7 +105,6 @@ export default function Configuracion() {
       setImagenPortadaUrl(municipioActual.imagen_portada || '');
       setPortadaSinFiltro(municipioActual.tema_config?.portadaSinFiltro || false);
       setPortadaOpacity(municipioActual.tema_config?.portadaOpacity ?? 1);
-      setCabeceraFiltroColor(municipioActual.tema_config?.cabeceraFiltroColor || 'grafito');
       setCabeceraOpacity(municipioActual.tema_config?.cabeceraOpacity ?? 0.4);
       setCabeceraBlur(municipioActual.tema_config?.cabeceraBlur ?? 4);
     }
@@ -239,7 +237,6 @@ export default function Configuracion() {
 
   // Verificar si hay cambios en la configuración de cabecera
   const hasCabeceraConfigChanges =
-    cabeceraFiltroColor !== (municipioActual?.tema_config?.cabeceraFiltroColor || 'grafito') ||
     cabeceraOpacity !== (municipioActual?.tema_config?.cabeceraOpacity ?? 0.4) ||
     cabeceraBlur !== (municipioActual?.tema_config?.cabeceraBlur ?? 4);
 
@@ -252,7 +249,6 @@ export default function Configuracion() {
       const currentConfig = municipioActual.tema_config || {};
       await municipiosApi.updateTema(municipioActual.id, {
         ...currentConfig,
-        cabeceraFiltroColor: cabeceraFiltroColor,
         cabeceraOpacity: cabeceraOpacity,
         cabeceraBlur: cabeceraBlur,
       });
@@ -809,43 +805,31 @@ export default function Configuracion() {
           </div>
         </div>
 
-        {/* Toggle para color del filtro (negro/blanco) */}
+        {/* Info del color del filtro (usa color de paleta) */}
         <div
           className="mb-4 p-3 rounded-lg"
           style={{ backgroundColor: theme.backgroundSecondary }}
         >
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-medium" style={{ color: theme.text }}>
                 Color del filtro
               </p>
               <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Elige entre filtro grafito o blanco para la imagen
+                El filtro usa el color de la paleta del municipio
               </p>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCabeceraFiltroColor('grafito')}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-8 rounded-lg border-2"
                 style={{
-                  backgroundColor: cabeceraFiltroColor === 'grafito' ? theme.primary : theme.backgroundSecondary,
-                  color: cabeceraFiltroColor === 'grafito' ? '#ffffff' : theme.textSecondary,
-                  border: `1px solid ${cabeceraFiltroColor === 'grafito' ? theme.primary : theme.border}`,
+                  backgroundColor: theme.primary,
+                  borderColor: theme.border,
                 }}
-              >
-                Grafito
-              </button>
-              <button
-                onClick={() => setCabeceraFiltroColor('blanco')}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                style={{
-                  backgroundColor: cabeceraFiltroColor === 'blanco' ? theme.primary : theme.backgroundSecondary,
-                  color: cabeceraFiltroColor === 'blanco' ? '#ffffff' : theme.textSecondary,
-                  border: `1px solid ${cabeceraFiltroColor === 'blanco' ? theme.primary : theme.border}`,
-                }}
-              >
-                Blanco
-              </button>
+              />
+              <span className="text-xs font-mono" style={{ color: theme.textSecondary }}>
+                {theme.primary}
+              </span>
             </div>
           </div>
         </div>
