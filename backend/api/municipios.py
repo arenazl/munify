@@ -244,11 +244,18 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Buscar usuarios de prueba (los que terminan en @codigo.test.com)
-    email_pattern = f"%@{codigo}.test.com"
+    # Buscar usuarios de prueba con dos patrones:
+    # 1. @{codigo}.test.com (patrón original)
+    # 2. @demo.com (patrón genérico para usuarios demo)
+    from sqlalchemy import or_
+    email_pattern1 = f"%@{codigo}.test.com"
+    email_pattern2 = "%@demo.com"
     query = select(User).where(
         User.municipio_id == municipio.id,
-        User.email.like(email_pattern),
+        or_(
+            User.email.like(email_pattern1),
+            User.email.like(email_pattern2)
+        ),
         User.activo == True
     )
     result = await db.execute(query)
