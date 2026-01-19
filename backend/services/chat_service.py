@@ -114,7 +114,15 @@ async def call_groq(messages: List[dict], max_tokens: int = 1000) -> Optional[st
             if response.status_code == 200:
                 data = response.json()
                 text = data.get('choices', [{}])[0].get('message', {}).get('content', '')
-                print(f"[GROQ] Response OK")
+                print(f"[GROQ] Response OK, length={len(text) if text else 0} chars")
+                # Log completo para debug (primeros y últimos 500 chars si es largo)
+                if text:
+                    if len(text) > 1200:
+                        print(f"[GROQ] Response INICIO:\n{text[:600]}")
+                        print(f"[GROQ] ... [{len(text)-1200} chars omitidos] ...")
+                        print(f"[GROQ] Response FIN:\n{text[-600:]}")
+                    else:
+                        print(f"[GROQ] Response COMPLETA:\n{text}")
                 return text.strip() if text else None
             else:
                 print(f"[GROQ] Error {response.status_code}: {response.text[:200]}")

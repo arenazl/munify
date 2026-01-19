@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, Clock, Calendar, Save } from 'lucide-react';
+import { Edit, Trash2, Clock, Calendar, Save, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -168,6 +168,7 @@ export default function GestionHorarios() {
   return (
     <ABMPage
       title="Horarios"
+      icon={<CalendarClock className="h-5 w-5" />}
       buttonLabel=""
       onAdd={() => {}}
       searchPlaceholder="Buscar empleado..."

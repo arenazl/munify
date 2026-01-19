@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, ImageIcon, RefreshCw, X, Download, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown } from 'lucide-react';
+import { Edit, ImageIcon, RefreshCw, X, Download, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown, Tags } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { categoriasApi, imagenesApi, API_BASE_URL } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -404,6 +404,7 @@ export default function Categorias() {
   return (
     <ABMPage
       title="Categorías"
+      icon={<Tags className="h-5 w-5" />}
       backLink="/gestion/ajustes"
       buttonLabel="Nueva Categoría"
       onAdd={() => openSheet()}

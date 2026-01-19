@@ -24,6 +24,7 @@ function useIsMobile() {
 interface ABMPageProps {
   // Header
   title: string;
+  icon?: ReactNode; // Icono decorativo del título (igual que StickyPageHeader)
   backLink?: string; // Link para volver (muestra flecha antes del título)
   buttonLabel?: string;
   buttonIcon?: ReactNode;
@@ -75,6 +76,7 @@ interface ABMPageProps {
 
 export function ABMPage({
   title,
+  icon,
   backLink,
   buttonLabel,
   buttonIcon,
@@ -151,7 +153,7 @@ export function ABMPage({
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
-          {/* Título con flecha de volver opcional - se oculta cuando el search está enfocado en mobile */}
+          {/* BackLink + Icono + Título - se oculta cuando el search está enfocado en mobile */}
           <div className={`hidden sm:flex items-center gap-2 flex-shrink-0 transition-all duration-300 ${searchFocused ? 'hidden sm:flex' : ''}`}>
             {backLink && (
               <Link
@@ -165,6 +167,14 @@ export function ABMPage({
               >
                 <ArrowLeft className="h-5 w-5" />
               </Link>
+            )}
+            {icon && (
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${theme.primary}15` }}
+              >
+                <span style={{ color: theme.primary }}>{icon}</span>
+              </div>
             )}
             <h1 className="text-lg font-bold tracking-tight" style={{ color: theme.text }}>
               {title}

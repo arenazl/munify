@@ -8,6 +8,7 @@ import {
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPreferences from '../components/NotificationPreferences';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface SettingCard {
   id: string;
@@ -238,31 +239,10 @@ export default function Ajustes() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <Settings className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-              Ajustes
-            </h1>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Configuracion del sistema y preferencias
-            </p>
-          </div>
-        </div>
-      </div>
+      <StickyPageHeader
+        icon={<Settings className="h-5 w-5" />}
+        title="Ajustes"
+      />
 
       {/* Section Tabs */}
       <div

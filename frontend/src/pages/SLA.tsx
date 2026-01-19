@@ -19,6 +19,7 @@ import {
 import { toast } from 'sonner';
 import { slaApi, categoriasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface SLAConfig {
   id: number;
@@ -213,41 +214,12 @@ export default function SLA() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-              style={{ backgroundColor: `${theme.primary}20` }}
-            >
-              <Clock className="h-5 w-5" style={{ color: theme.primary }} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-                Gestión de SLA
-              </h1>
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                Acuerdos de nivel de servicio
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-all hover:scale-105 w-full sm:w-auto"
-            style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)` }}
-          >
-            <Plus className="h-4 w-4" />
-            Nueva Configuración
-          </button>
-        </div>
-      </div>
+      <StickyPageHeader
+        icon={<Clock className="h-5 w-5" />}
+        title="Gestión de SLA"
+        buttonLabel="Nueva Config"
+        onButtonClick={() => setShowForm(true)}
+      />
 
       {/* Resumen Cards */}
       {resumen && (

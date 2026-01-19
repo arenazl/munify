@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 import { exportarApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface ExportOption {
   id: string;
@@ -132,31 +133,10 @@ export default function Exportar() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <FileDown className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-              Exportar Informes
-            </h1>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Genera archivos CSV para análisis externo
-            </p>
-          </div>
-        </div>
-      </div>
+      <StickyPageHeader
+        icon={<FileDown className="h-5 w-5" />}
+        title="Exportar Informes"
+      />
 
       {/* Export Options Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

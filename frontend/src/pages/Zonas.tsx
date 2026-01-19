@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, MapPin, Navigation, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown } from 'lucide-react';
+import { Edit, MapPin, Navigation, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown, Map } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { zonasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -286,6 +286,7 @@ export default function Zonas() {
   return (
     <ABMPage
       title="Zonas / Barrios"
+      icon={<Map className="h-5 w-5" />}
       backLink="/gestion/ajustes"
       buttonLabel="Nueva Zona"
       onAdd={() => openSheet()}

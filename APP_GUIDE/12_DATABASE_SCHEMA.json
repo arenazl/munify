@@ -987,6 +987,20 @@
     "historial_reclamos": {"nombre": "Historial Reclamos", "icono": "history", "descripcion": "Timeline de reclamos"},
     "historial_solicitudes": {"nombre": "Historial Solicitudes", "icono": "history", "descripcion": "Timeline de solicitudes"},
     "calificaciones": {"nombre": "Calificaciones", "icono": "star", "descripcion": "Valoraciones de vecinos"},
-    "cuadrillas": {"nombre": "Cuadrillas", "icono": "users", "descripcion": "Equipos de trabajo"}
+    "cuadrillas": {"nombre": "Cuadrillas", "icono": "users", "descripcion": "Equipos de trabajo"},
+    "empleado_metricas": {"nombre": "Métricas Empleados", "icono": "bar-chart-2", "descripcion": "Rendimiento de empleados por período"},
+    "empleado_ausencias": {"nombre": "Ausencias", "icono": "calendar-x", "descripcion": "Registro de ausencias de empleados"},
+    "puntos_usuarios": {"nombre": "Puntos Usuarios", "icono": "award", "descripcion": "Puntos de gamificación acumulados"},
+    "historial_puntos": {"nombre": "Historial Puntos", "icono": "trending-up", "descripcion": "Registro de puntos ganados por acción"},
+    "badges_usuarios": {"nombre": "Insignias", "icono": "badge", "descripcion": "Insignias obtenidas por usuarios"},
+    "leaderboard_mensual": {"nombre": "Ranking Mensual", "icono": "trophy", "descripcion": "Ranking de usuarios por puntos"},
+    "documentos": {"nombre": "Documentos Reclamos", "icono": "paperclip", "descripcion": "Archivos adjuntos a reclamos"},
+    "documentos_solicitudes": {"nombre": "Documentos Solicitudes", "icono": "file-plus", "descripcion": "Documentos adjuntos a solicitudes"},
+    "notificaciones": {"nombre": "Notificaciones", "icono": "bell", "descripcion": "Notificaciones push/in-app"},
+    "noticias": {"nombre": "Noticias", "icono": "newspaper", "descripcion": "Noticias y anuncios del municipio"},
+    "sla_config": {"nombre": "Config SLA", "icono": "clock", "descripcion": "Configuración de tiempos de SLA"},
+    "sla_violaciones": {"nombre": "Violaciones SLA", "icono": "alert-circle", "descripcion": "Registro de violaciones de SLA"},
+    "recompensas_disponibles": {"nombre": "Recompensas", "icono": "gift", "descripcion": "Recompensas canjeables por puntos"},
+    "recompensas_canjeadas": {"nombre": "Canjes", "icono": "shopping-bag", "descripcion": "Registro de recompensas canjeadas"}
   }
 }

@@ -3,6 +3,7 @@ import { BarChart3, CheckCircle, Clock, TrendingUp, Calendar, Award, Target } fr
 import { reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface EstadisticasEmpleado {
   total_asignados: number;
@@ -66,28 +67,10 @@ export default function MiRendimiento() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div
-        className="rounded-xl px-5 py-4"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${theme.primary}20` }}
-          >
-            <BarChart3 className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: theme.text }}>
-              Mi Rendimiento
-            </h1>
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Estadísticas de tu trabajo, {user?.nombre}
-            </p>
-          </div>
-        </div>
-      </div>
+      <StickyPageHeader
+        icon={<BarChart3 className="h-5 w-5" />}
+        title="Mi Rendimiento"
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

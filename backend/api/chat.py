@@ -90,15 +90,25 @@ def detectar_formato_automatico(pregunta: str) -> str | None:
 
     return None
 
-def get_template_prompt(template_id: str, total: int) -> str | None:
-    """Genera el prompt para un template específico"""
+def get_template_prompt(template_id: str, total: int, datos_count: int = None) -> str | None:
+    """Genera el prompt para un template específico
+
+    Args:
+        template_id: ID del template (cards, list, table, etc)
+        total: Total de registros en la BD
+        datos_count: Cantidad de registros que se pasan al LLM (puede ser menor que total)
+    """
     print(f"[TEMPLATES] Generando prompt para template: {template_id}")
     template = load_template(template_id)
     if not template:
         print(f"[TEMPLATES] ERROR: No se pudo cargar template {template_id}")
         return None
 
-    print(f"[TEMPLATES] Template cargado: {template.get('nombre', 'SIN NOMBRE')}")
+    # Si no se especifica datos_count, usar total
+    if datos_count is None:
+        datos_count = total
+
+    print(f"[TEMPLATES] Template cargado: {template.get('nombre', 'SIN NOMBRE')}, datos_count={datos_count}")
     prompt_parts = [f"FORMATO SOLICITADO: {template['nombre'].upper()}"]
     prompt_parts.append(f"\n{template.get('descripcion', '')}")
     prompt_parts.append(f"\nTemplate HTML de ejemplo:\n{template.get('template_html', '')}")
@@ -106,8 +116,9 @@ def get_template_prompt(template_id: str, total: int) -> str | None:
     if template.get('instrucciones'):
         prompt_parts.append("\n\nINSTRUCCIONES:")
         for instruccion in template['instrucciones']:
-            # Reemplazar {total} en las instrucciones
+            # Reemplazar {total} y {datos_count} en las instrucciones
             instruccion = instruccion.replace('{total}', str(total))
+            instruccion = instruccion.replace('{datos_count}', str(datos_count))
             prompt_parts.append(f"- {instruccion}")
 
     if template.get('variantes_color'):
@@ -182,6 +193,479 @@ class ValidarDuplicadoRequest(BaseModel):
     """Request para validar si un nombre ya existe (con IA)"""
     nombre: str
     tipo: str  # "categoria", "zona", "tipo_tramite", "tramite"
+
+
+# ==================== SISTEMA DE KEYWORDS DEL SCHEMA ====================
+
+SCHEMA_PATH = Path(__file__).parent.parent.parent / "APP_GUIDE" / "12_DATABASE_SCHEMA.json"
+_SCHEMA_KEYWORDS_CACHE: set[str] | None = None
+
+def load_schema_keywords() -> set[str]:
+    """
+    Carga las palabras clave del schema de la BD.
+    Extrae: nombres de tablas, columnas, valores de enums.
+    Se usa para resaltar en los resultados del chat.
+    """
+    global _SCHEMA_KEYWORDS_CACHE
+
+    if _SCHEMA_KEYWORDS_CACHE is not None:
+        return _SCHEMA_KEYWORDS_CACHE
+
+    keywords = set()
+
+    try:
+        with open(SCHEMA_PATH, 'r', encoding='utf-8') as f:
+            schema = json.load(f)
+
+        entities = schema.get('entities', {})
+
+        for entity_name, entity_data in entities.items():
+            # Agregar nombre de tabla (normalizado)
+            keywords.add(entity_name.lower())
+
+            # Agregar nombres de columnas
+            columns = entity_data.get('columns', {})
+            for col_name, col_info in columns.items():
+                # Solo agregar columnas "interesantes" (no ids, timestamps, etc)
+                if col_name not in ('id', 'created_at', 'updated_at', 'activo'):
+                    keywords.add(col_name.lower())
+
+                # Si es enum, agregar los valores
+                if col_info.get('type') == 'enum' and col_info.get('values'):
+                    for val in col_info['values']:
+                        keywords.add(val.lower())
+
+        # Filtrar palabras muy cortas o comunes
+        keywords = {k for k in keywords if len(k) >= 3}
+
+        _SCHEMA_KEYWORDS_CACHE = keywords
+        print(f"[SCHEMA] Cargadas {len(keywords)} keywords del schema")
+
+    except Exception as e:
+        print(f"[SCHEMA] Error cargando keywords: {e}")
+        _SCHEMA_KEYWORDS_CACHE = set()
+
+    return _SCHEMA_KEYWORDS_CACHE
+
+
+def highlight_keywords(text: str, keywords: set[str] = None) -> str:
+    """
+    Resalta palabras clave del schema en el texto con <strong>.
+    Case-insensitive pero preserva el case original.
+
+    Args:
+        text: Texto donde buscar
+        keywords: Set de keywords (si no se pasa, usa las del schema)
+
+    Returns:
+        Texto con keywords envueltas en <strong>
+    """
+    if not text or not isinstance(text, str):
+        return str(text) if text is not None else ""
+
+    if keywords is None:
+        keywords = load_schema_keywords()
+
+    if not keywords:
+        return text
+
+    # Buscar palabras en el texto que coincidan con keywords
+    # Usar word boundaries para no matchear parciales
+    result = text
+
+    for keyword in keywords:
+        # Crear pattern con word boundaries, case insensitive
+        pattern = re.compile(r'\b(' + re.escape(keyword) + r')\b', re.IGNORECASE)
+        # Reemplazar preservando el case original
+        result = pattern.sub(r'<strong>\1</strong>', result)
+
+    return result
+
+
+def generar_html_cards(datos: list[dict], descripcion: str = "", highlight: bool = True) -> str:
+    """
+    Genera HTML de tarjetas directamente desde los datos JSON.
+
+    Prioridad para el título de la tarjeta:
+    1. Campo con alias 'header' (explícito)
+    2. Campos comunes: nombre, titulo, asunto, nombre_completo
+    3. Primer campo que no sea 'id'
+
+    Args:
+        datos: Lista de diccionarios con los datos a mostrar
+        descripcion: Descripción opcional de la consulta
+
+    Returns:
+        HTML con las tarjetas generadas
+    """
+    if not datos:
+        return "<p style='color:var(--text-secondary)'>No hay datos para mostrar.</p>"
+
+    # Campos que típicamente son buenos títulos (en orden de prioridad)
+    CAMPOS_TITULO = ['header', 'nombre', 'titulo', 'asunto', 'nombre_completo', 'title', 'name']
+
+    cards_html = []
+
+    for registro in datos:
+        if not registro:
+            continue
+
+        # Buscar el mejor campo para título
+        header_key = None
+        header_value = None
+
+        # Primero buscar en campos prioritarios
+        for campo_titulo in CAMPOS_TITULO:
+            for key in registro.keys():
+                if key.lower() == campo_titulo:
+                    header_key = key
+                    header_value = registro[key]
+                    break
+            if header_key:
+                break
+
+        # Si no encontramos campo prioritario, usar el primero que no sea 'id'
+        if header_key is None:
+            for key, value in registro.items():
+                if key.lower() != 'id':
+                    header_key = key
+                    header_value = value
+                    break
+
+        # Armar lista de otros campos (excluyendo el usado como header)
+        otros_campos = [(k, v) for k, v in registro.items() if k != header_key]
+
+        # Formatear el título
+        titulo = str(header_value) if header_value is not None else "Sin título"
+        if highlight:
+            titulo = highlight_keywords(titulo)
+
+        # SVG pequeño para items (circle con dot - lucide "dot")
+        item_icon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline-block;vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="4"/></svg>'
+
+        # Generar items de la card
+        items_html = []
+        for key, value in otros_campos:
+            # Formatear el nombre del campo (quitar underscores, capitalizar)
+            campo_nombre = key.replace('_', ' ').title()
+            # Formatear el valor
+            valor_str = str(value) if value is not None else "-"
+            if highlight:
+                valor_str = highlight_keywords(valor_str)
+            items_html.append(
+                f'<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">'
+                f'{item_icon}<strong>{campo_nombre}:</strong> {valor_str}</div>'
+            )
+
+        items_content = "\n    ".join(items_html) if items_html else ""
+
+        # SVG de Lucide "file-text" inline con currentColor
+        icon_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>'
+
+        card_html = f'''<div style="flex:1;min-width:280px;max-width:400px;background:var(--bg-card);border:1px solid var(--border-color);padding:16px;border-radius:12px;margin-bottom:8px">
+    <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:8px">{icon_svg}{titulo}</div>
+    {items_content}
+  </div>'''
+        cards_html.append(card_html)
+
+    # Contenedor flex para las cards
+    html = f'''<div style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0">
+  {"".join(cards_html)}
+</div>'''
+
+    # Agregar descripción si existe
+    if descripcion:
+        html = f'<p style="color:var(--text-secondary);font-size:13px;margin-bottom:8px">{descripcion}</p>\n' + html
+
+    return html
+
+
+def generar_html_ranking(datos: list[dict], descripcion: str = "", highlight: bool = True) -> str:
+    """
+    Genera HTML de ranking directamente desde los datos JSON.
+    Diseño premium con medallas para top 3.
+    """
+    if not datos:
+        return "<p style='color:var(--text-secondary)'>No hay datos para mostrar.</p>"
+
+    # Configuración de medallas con mejor contraste
+    medallas = {
+        1: {"bg": "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)", "border": "#f59e0b", "badge": "#f59e0b", "emoji": "🥇", "shadow": "0 4px 6px -1px rgba(245, 158, 11, 0.3)"},
+        2: {"bg": "linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)", "border": "#9ca3af", "badge": "#6b7280", "emoji": "🥈", "shadow": "0 4px 6px -1px rgba(107, 114, 128, 0.3)"},
+        3: {"bg": "linear-gradient(135deg, #fed7aa 0%, #fdba74 100%)", "border": "#ea580c", "badge": "#ea580c", "emoji": "🥉", "shadow": "0 4px 6px -1px rgba(234, 88, 12, 0.3)"},
+    }
+    default_style = {"bg": "#f9fafb", "border": "#e5e7eb", "badge": "#9ca3af", "emoji": "", "shadow": "none"}
+
+    # Campos que típicamente son buenos títulos
+    CAMPOS_TITULO = ['header', 'nombre', 'titulo', 'asunto', 'nombre_completo', 'title', 'name']
+
+    # Detectar campo numérico para métrica
+    campo_metrica = None
+    primer_registro = datos[0] if datos else {}
+    for key, value in primer_registro.items():
+        if isinstance(value, (int, float)) and key.lower() not in ['id', 'posicion', 'rank']:
+            campo_metrica = key
+
+    rows_html = []
+
+    for idx, registro in enumerate(datos, 1):
+        if not registro:
+            continue
+
+        # Buscar el mejor campo para título
+        header_key = None
+        header_value = None
+
+        for campo_titulo in CAMPOS_TITULO:
+            for key in registro.keys():
+                if key.lower() == campo_titulo:
+                    header_key = key
+                    header_value = registro[key]
+                    break
+            if header_key:
+                break
+
+        if header_key is None:
+            for key, value in registro.items():
+                if key.lower() != 'id' and not isinstance(value, (int, float)):
+                    header_key = key
+                    header_value = value
+                    break
+
+        titulo = str(header_value) if header_value is not None else "Sin título"
+        if highlight:
+            titulo = highlight_keywords(titulo)
+
+        # Obtener valor de métrica
+        metrica_valor = ""
+        metrica_label = ""
+        if campo_metrica and campo_metrica in registro:
+            metrica_valor = str(registro[campo_metrica])
+            metrica_label = campo_metrica.replace('_', ' ').title()
+
+        # Estilo según posición
+        estilo = medallas.get(idx, default_style)
+        is_top3 = idx <= 3
+
+        # Badge de posición
+        if is_top3:
+            badge_html = f'''<div style="width:44px;height:44px;background:{estilo['badge']};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:{estilo['shadow']}">{estilo['emoji']}</div>'''
+        else:
+            badge_html = f'''<div style="width:36px;height:36px;background:#f3f4f6;border:2px solid #e5e7eb;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#6b7280;font-weight:700;font-size:14px">{idx}</div>'''
+
+        # Row con o sin gradiente
+        if is_top3:
+            row_html = f'''<div style="display:flex;align-items:center;gap:16px;padding:16px;background:{estilo['bg']};border:2px solid {estilo['border']};border-radius:12px;margin-bottom:10px;box-shadow:{estilo['shadow']}">
+    {badge_html}
+    <div style="flex:1">
+      <div style="font-weight:700;color:var(--text-primary);font-size:15px">{titulo}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:24px;font-weight:800;color:{estilo['badge']}">{metrica_valor}</div>
+      <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">{metrica_label}</div>
+    </div>
+  </div>'''
+        else:
+            row_html = f'''<div style="display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:10px;margin-bottom:10px">
+    {badge_html}
+    <div style="flex:1">
+      <div style="font-weight:600;color:var(--text-primary);font-size:14px">{titulo}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:18px;font-weight:700;color:var(--color-primary)">{metrica_valor}</div>
+      <div style="font-size:10px;color:var(--text-secondary);text-transform:uppercase">{metrica_label}</div>
+    </div>
+  </div>'''
+        rows_html.append(row_html)
+
+    html = f'''<div style="margin:12px 0">
+  {"".join(rows_html)}
+</div>'''
+
+    if descripcion:
+        html = f'<p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;font-weight:500">{descripcion}</p>\n' + html
+
+    return html
+
+
+def generar_html_list(datos: list[dict], descripcion: str = "", highlight: bool = True) -> str:
+    """
+    Genera HTML de lista directamente desde los datos JSON.
+    Formato limpio con borde lateral de color.
+    """
+    if not datos:
+        return "<p style='color:var(--text-secondary)'>No hay datos para mostrar.</p>"
+
+    # Campos que típicamente son buenos títulos (en orden de prioridad)
+    CAMPOS_TITULO = ['header', 'nombre', 'titulo', 'asunto', 'nombre_completo', 'title', 'name']
+
+    items_html = []
+
+    for registro in datos:
+        if not registro:
+            continue
+
+        # Buscar el mejor campo para título
+        header_key = None
+        header_value = None
+
+        for campo_titulo in CAMPOS_TITULO:
+            for key in registro.keys():
+                if key.lower() == campo_titulo:
+                    header_key = key
+                    header_value = registro[key]
+                    break
+            if header_key:
+                break
+
+        # Si no encontramos campo prioritario, usar el primero que no sea 'id'
+        if header_key is None:
+            for key, value in registro.items():
+                if key.lower() != 'id':
+                    header_key = key
+                    header_value = value
+                    break
+
+        # Armar lista de otros campos (excluyendo el usado como header)
+        otros_campos = [(k, v) for k, v in registro.items() if k != header_key]
+
+        # Formatear el título
+        titulo = str(header_value) if header_value is not None else "Sin título"
+        if highlight:
+            titulo = highlight_keywords(titulo)
+
+        # Armar el detalle
+        detalles = []
+        for key, value in otros_campos[:4]:  # Max 4 detalles para mantenerlo compacto
+            campo_nombre = key.replace('_', ' ').title()
+            valor_str = str(value) if value is not None else "-"
+            if highlight:
+                valor_str = highlight_keywords(valor_str)
+            detalles.append(f"<span style='color:var(--text-secondary)'>{campo_nombre}: <strong>{valor_str}</strong></span>")
+
+        detalles_html = " · ".join(detalles) if detalles else ""
+
+        item_html = f'''<li style="padding:14px 18px;margin:12px 0;background:var(--bg-secondary);border-radius:10px;color:var(--text-primary);border-left:4px solid var(--color-primary);list-style:none">
+    <strong style="font-size:14px">{titulo}</strong>
+    {f'<div style="font-size:12px;margin-top:6px">{detalles_html}</div>' if detalles_html else ''}
+  </li>'''
+        items_html.append(item_html)
+
+    html = f'''<ul style="margin:12px 0;padding-left:0;list-style:none">
+  {"".join(items_html)}
+</ul>'''
+
+    if descripcion:
+        html = f'<p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;font-weight:500">{descripcion}</p>\n' + html
+
+    return html
+
+
+def generar_html_timeline(datos: list[dict], descripcion: str = "", highlight: bool = True) -> str:
+    """
+    Genera HTML de timeline directamente desde los datos JSON.
+    Ordena cronológicamente y muestra como línea de tiempo vertical.
+    """
+    if not datos:
+        return "<p style='color:var(--text-secondary)'>No hay datos para mostrar.</p>"
+
+    # Campos de fecha comunes
+    CAMPOS_FECHA = ['created_at', 'fecha', 'date', 'timestamp', 'updated_at', 'fecha_creacion']
+    # Campos que típicamente son buenos títulos
+    CAMPOS_TITULO = ['accion', 'titulo', 'nombre', 'asunto', 'evento', 'header', 'title']
+
+    # Detectar campo de fecha
+    primer_registro = datos[0] if datos else {}
+    campo_fecha = None
+    for campo in CAMPOS_FECHA:
+        if campo in primer_registro:
+            campo_fecha = campo
+            break
+
+    # Ordenar por fecha si existe (más reciente primero)
+    if campo_fecha:
+        try:
+            datos_ordenados = sorted(datos, key=lambda x: str(x.get(campo_fecha, '')), reverse=True)
+        except:
+            datos_ordenados = datos
+    else:
+        datos_ordenados = datos
+
+    events_html = []
+
+    for registro in datos_ordenados:
+        if not registro:
+            continue
+
+        # Buscar fecha
+        fecha_valor = ""
+        if campo_fecha and campo_fecha in registro:
+            fecha_raw = registro[campo_fecha]
+            # Formatear fecha si es string tipo datetime
+            if fecha_raw:
+                fecha_str = str(fecha_raw)
+                # Intentar formatear si tiene formato ISO
+                if 'T' in fecha_str or len(fecha_str) > 10:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.fromisoformat(fecha_str.replace('Z', '+00:00').split('.')[0])
+                        fecha_valor = dt.strftime('%d/%m/%y %H:%M')
+                    except:
+                        fecha_valor = fecha_str[:16].replace('T', ' ')
+                else:
+                    fecha_valor = fecha_str
+
+        # Buscar título
+        header_key = None
+        header_value = None
+        for campo_titulo in CAMPOS_TITULO:
+            for key in registro.keys():
+                if key.lower() == campo_titulo:
+                    header_key = key
+                    header_value = registro[key]
+                    break
+            if header_key:
+                break
+
+        if header_key is None:
+            for key, value in registro.items():
+                if key.lower() not in ['id', campo_fecha] if campo_fecha else ['id']:
+                    header_key = key
+                    header_value = value
+                    break
+
+        titulo = str(header_value) if header_value is not None else "Evento"
+        if highlight:
+            titulo = highlight_keywords(titulo)
+
+        # Armar detalles (excluyendo fecha y título)
+        otros_campos = [(k, v) for k, v in registro.items()
+                       if k != header_key and k != campo_fecha and k.lower() != 'id']
+
+        detalles = []
+        for key, value in otros_campos[:3]:  # Max 3 detalles
+            campo_nombre = key.replace('_', ' ').title()
+            valor_str = str(value) if value is not None else "-"
+            detalles.append(f"{campo_nombre}: {valor_str}")
+
+        detalles_html = ", ".join(detalles) if detalles else ""
+
+        event_html = f'''<div style="position:relative;padding:12px 0 24px 24px">
+    <div style="position:absolute;left:-8px;top:14px;width:14px;height:14px;background:var(--color-primary);border-radius:50%;border:3px solid var(--bg-primary)"></div>
+    <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">{fecha_valor}</div>
+    <div style="font-weight:600;color:var(--text-primary);font-size:14px">{titulo}</div>
+    {f'<div style="color:var(--text-secondary);font-size:12px;margin-top:4px">{detalles_html}</div>' if detalles_html else ''}
+  </div>'''
+        events_html.append(event_html)
+
+    html = f'''<div style="margin:12px 0;padding-left:16px;border-left:3px solid var(--color-primary)">
+  {"".join(events_html)}
+</div>'''
+
+    if descripcion:
+        html = f'<p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px;font-weight:500">{descripcion}</p>\n' + html
+
+    return html
 
 
 def generar_html_categorias(categorias: list[dict]) -> str:
@@ -273,6 +757,17 @@ def build_system_prompt(categorias: list[dict], tramites: list[dict] = None, tel
     # Teléfono de contacto
     tel_info = f"\n📞 Teléfono de contacto: {telefono_contacto}" if telefono_contacto else ""
 
+    # Lista de nombres de trámites para el contexto
+    tramites_nombres = []
+    if tramites:
+        for tipo in tramites:
+            for subtipo in tipo.get('subtipos', []):
+                tramites_nombres.append(f"- {subtipo['nombre']} (tipo: {tipo['nombre']})")
+    tramites_lista = "\n".join(tramites_nombres) if tramites_nombres else "No hay trámites configurados para este municipio."
+
+    # Lista de categorías para el contexto
+    cats_lista = ", ".join([c["nombre"] for c in categorias]) if categorias else "No hay categorías configuradas."
+
     return f"""Sos el asistente virtual de Munify. Hablás en español rioplatense (vos, podés, tenés).
 
 SOBRE MUNIFY:
@@ -280,26 +775,23 @@ Munify es una plataforma que conecta a los vecinos con su municipio. Permite:
 - Reportar problemas del barrio (baches, luminarias, basura, árboles caídos, etc.)
 - Realizar trámites municipales online sin ir a la municipalidad
 - Seguir el estado de tus reclamos y trámites en tiempo real
-- Ver en un mapa los problemas reportados en tu zona
-
-CÓMO FUNCIONA UN RECLAMO:
-1. El vecino reporta un problema con fotos y ubicación
-2. El municipio lo revisa y asigna una cuadrilla
-3. La cuadrilla va al lugar y resuelve el problema
-4. El vecino recibe notificación cuando está resuelto
-
-VENTAJAS:
-- 100% digital, sin papeles ni colas
-- Seguimiento transparente de cada gestión
-- Fotos de antes y después de cada trabajo
-- Notificaciones en cada paso del proceso
 {tel_info}
 
-CATEGORÍAS DE RECLAMOS DISPONIBLES:
-Alumbrado, Bacheo, Limpieza, Arbolado, Tránsito, Agua, Cloacas, Espacios Verdes, entre otras.
+CATEGORÍAS DE RECLAMOS DISPONIBLES EN ESTE MUNICIPIO:
+{cats_lista}
+
+TRÁMITES DISPONIBLES EN ESTE MUNICIPIO:
+{tramites_lista}
+
+IMPORTANTE - INFORMACIÓN DE TRÁMITES Y RECLAMOS:
+- Usá la información de categorías y trámites listados arriba como referencia de lo que está disponible en este municipio.
+- Si el usuario pregunta por un trámite específico que está en la lista, dale información sobre cómo iniciarlo en Munify.
+- Si pregunta por algo que NO está en la lista, decile que puede consultarlo en la municipalidad o que todavía no está disponible en Munify.
+- Para iniciar cualquier trámite o reclamo, el usuario puede hacerlo desde la app Munify o la web.
+- NO inventes links externos a páginas del gobierno. Solo mencioná que puede hacerlo desde Munify.
 
 TU ROL:
-Sos un asistente amigable que ayuda a los vecinos a entender qué pueden hacer en Munify, cómo reportar problemas o hacer trámites. Respondé de forma breve y clara (2-3 oraciones máximo). Si te piden listados, mostralos completos.
+Sos un asistente amigable que ayuda a los vecinos a entender qué pueden hacer en Munify. Respondé de forma breve y clara (2-3 oraciones máximo).
 
 ESTILO:
 - Respuestas CORTAS y directas (esto es un chat, no un manual)
@@ -307,10 +799,10 @@ ESTILO:
 - NO uses markdown, SOLO HTML
 - Sé conversacional, como un vecino que ayuda a otro
 
-CUANDO PIDAN VER CATEGORÍAS:
+CUANDO PIDAN VER CATEGORÍAS (mostrar HTML completo):
 {cats_html}
 
-CUANDO PIDAN VER TRÁMITES:
+CUANDO PIDAN VER TRÁMITES (mostrar HTML completo):
 {tramites_html}"""
 
 
@@ -544,22 +1036,29 @@ async def chat_landing(
     existing_session = None
     if request.session_id:
         existing_session = await storage.get_session(request.session_id)
+        print(f"[LANDING CHAT] session_id: {request.session_id}, existe: {existing_session is not None}")
 
     if existing_session:
         municipio_id = existing_session.get("context", {}).get("municipio_id")
+        print(f"[LANDING CHAT] Sesión existente, municipio_id en contexto: {municipio_id}")
     else:
         municipio_id = request.municipio_id
+        print(f"[LANDING CHAT] Sin sesión, municipio_id del request: {municipio_id}")
 
     municipio_nombre = None
 
     # Si no hay municipio, intentar detectar del mensaje con IA
     if not municipio_id:
+        print(f"[LANDING CHAT] No hay municipio, intentando detectar de mensaje: '{request.message}'")
         municipios = await get_municipios_activos(db)
+        print(f"[LANDING CHAT] Municipios activos: {len(municipios) if municipios else 0}")
         if municipios:
             detected = await detectar_municipio_con_ia(request.message, municipios)
+            print(f"[LANDING CHAT] Resultado detección IA: {detected}")
             if detected:
                 municipio_id = detected["id"]
                 municipio_nombre = detected.get("nombre")
+                print(f"[LANDING CHAT] Municipio detectado: {municipio_id} - {municipio_nombre}")
 
     # Si no se detectó municipio, responder amablemente y preguntar
     if not municipio_id:
@@ -1757,7 +2256,7 @@ SCHEMA DE LA BASE DE DATOS:
 MUNICIPIO_ID ACTUAL: {municipio_id}
 
 REGLAS:
-1. Filtrá por municipio_id según las REGLAS DE FILTRADO del schema (algunas tablas usan JOIN intermedio)
+1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. Para filtrar por municipio: verificá en el schema si la tabla tiene columna "municipio_id". Si NO la tiene, buscá "multi_tenant_note" que te indica qué tabla pivote usar.
 2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
 3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()
 
@@ -1824,13 +2323,18 @@ def build_response_with_data_prompt(pregunta: str, datos: list, descripcion: str
     if template and not template.get('mostrar_grilla', True):
         # Templates que muestran todos los datos: pasar más registros
         max_datos = template.get('paginacion', 50) or 50
-        datos_str = json.dumps(datos[:max_datos], indent=2, ensure_ascii=False, default=str)
+        datos_a_pasar = datos[:max_datos]
+        datos_str = json.dumps(datos_a_pasar, indent=2, ensure_ascii=False, default=str)
+        datos_count = len(datos_a_pasar)
     else:
         # Resumen: solo primeros 10
-        datos_str = json.dumps(datos[:10], indent=2, ensure_ascii=False, default=str)
+        datos_a_pasar = datos[:10]
+        datos_str = json.dumps(datos_a_pasar, indent=2, ensure_ascii=False, default=str)
+        datos_count = len(datos_a_pasar)
 
     base_prompt = f"""PREGUNTA: {pregunta}
-TOTAL REGISTROS: {total}
+TOTAL REGISTROS EN BD: {total}
+REGISTROS EN ESTE JSON: {datos_count}
 DATOS:
 {datos_str}
 
@@ -1838,7 +2342,7 @@ DATOS:
 
     # Si tenemos template JSON, usarlo
     if template:
-        template_prompt = get_template_prompt(formato, total)
+        template_prompt = get_template_prompt(formato, total, datos_count)
         if template_prompt:
             return base_prompt + template_prompt
 
@@ -2296,21 +2800,36 @@ async def consulta_gerencial(
             total_registros=0
         )
 
-    # Paso 4: Formatear respuesta con la IA (solo si es página 1)
+    # Paso 4: Formatear respuesta
     if page == 1:
-        format_prompt = build_response_with_data_prompt(pregunta, datos, descripcion, total, formato)
-        format_messages = [
-            {"role": "system", "content": format_prompt},
-            {"role": "user", "content": f"Formateá estos datos como respuesta a: {pregunta}"}
-        ]
+        # Formatos con generación Python directa (sin LLM - más rápido y sin límite de tokens)
+        if formato == 'cards':
+            print(f"[CONSULTA] Generando HTML cards directamente (sin LLM) para {len(datos)} registros")
+            formatted_response = generar_html_cards(datos, descripcion)
+        elif formato == 'ranking':
+            print(f"[CONSULTA] Generando HTML ranking directamente (sin LLM) para {len(datos)} registros")
+            formatted_response = generar_html_ranking(datos, descripcion)
+        elif formato == 'list':
+            print(f"[CONSULTA] Generando HTML list directamente (sin LLM) para {len(datos)} registros")
+            formatted_response = generar_html_list(datos, descripcion)
+        elif formato == 'timeline':
+            print(f"[CONSULTA] Generando HTML timeline directamente (sin LLM) para {len(datos)} registros")
+            formatted_response = generar_html_timeline(datos, descripcion)
+        else:
+            # Otros formatos: usar LLM para formatear
+            format_prompt = build_response_with_data_prompt(pregunta, datos, descripcion, total, formato)
+            format_messages = [
+                {"role": "system", "content": format_prompt},
+                {"role": "user", "content": f"Formateá estos datos como respuesta a: {pregunta}"}
+            ]
 
-        # Más tokens si es formato que muestra todos los datos
-        max_tokens = 3000 if formato in ['cards', 'list', 'timeline', 'table', 'wizard', 'ranking', 'tabs', 'dashboard'] else 1500
-        formatted_response = await chat_service.chat(format_messages, max_tokens=max_tokens)
+            # Más tokens si es formato que muestra todos los datos
+            max_tokens = 3000 if formato in ['list', 'timeline', 'table', 'wizard', 'ranking', 'tabs', 'dashboard'] else 1500
+            formatted_response = await chat_service.chat(format_messages, max_tokens=max_tokens)
 
-        if not formatted_response:
-            # Fallback: mostrar datos en tabla básica
-            formatted_response = f"<p>{descripcion}</p><p>Se encontraron {total} registros.</p>"
+            if not formatted_response:
+                # Fallback: mostrar datos en tabla básica
+                formatted_response = f"<p>{descripcion}</p><p>Se encontraron {total} registros.</p>"
     else:
         # Para páginas siguientes, no regenerar respuesta
         formatted_response = f"<p style='color:#64748b;font-size:13px'>Página {page} de {(total + page_size - 1) // page_size}</p>"

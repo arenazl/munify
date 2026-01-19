@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, UsersRound, Star, Crown, UserPlus } from 'lucide-react';
+import { Edit, Trash2, UsersRound, Star, Crown, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -198,6 +198,7 @@ export default function GestionCuadrillas() {
   return (
     <ABMPage
       title="Cuadrillas"
+      icon={<Users className="h-5 w-5" />}
       buttonLabel="Asignar Empleado"
       buttonIcon={<UserPlus className="h-4 w-4" />}
       onAdd={() => openSheet()}

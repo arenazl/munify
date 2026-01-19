@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Edit, Trash2, Clock, DollarSign, ChevronDown, ChevronRight, Plus, AlertTriangle, CheckCircle, Loader2, EyeOff, Eye, RotateCcw } from 'lucide-react';
+import { Edit, Trash2, Clock, DollarSign, ChevronDown, ChevronRight, Plus, AlertTriangle, CheckCircle, Loader2, EyeOff, Eye, RotateCcw, FolderTree } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import api, { tramitesApi } from '../lib/api';
@@ -344,6 +344,7 @@ export default function TiposTramite() {
   return (
     <ABMPage
       title="Tipos de Trámite"
+      icon={<FolderTree className="h-5 w-5" />}
       backLink="/gestion/ajustes"
       buttonLabel="Nuevo Tipo"
       onAdd={() => openSheet()}

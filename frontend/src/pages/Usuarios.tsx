@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, User as UserIcon, Shield, Mail, Phone } from 'lucide-react';
+import { Edit, Trash2, User as UserIcon, Shield, Mail, Phone, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -215,6 +215,7 @@ export default function Usuarios() {
   return (
     <ABMPage
       title="Usuarios"
+      icon={<Users className="h-5 w-5" />}
       backLink="/gestion/ajustes"
       buttonLabel="Nuevo Usuario"
       onAdd={() => openSheet()}
