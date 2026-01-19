@@ -77,9 +77,10 @@ export default function Demo() {
 
       if (!demoUser) throw new Error(`No hay usuario demo para el rol ${role}`);
 
-      await login(demoUser.email, '123456');
+      await login(demoUser.email, 'demo123');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol));
+      const defaultRoute = getDefaultRoute(user.rol);
+      navigate(defaultRoute, { replace: true });
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } }, message?: string };
       setError(error.response?.data?.detail || error.message || 'Error al iniciar sesión');
