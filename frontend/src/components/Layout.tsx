@@ -400,12 +400,12 @@ export default function Layout() {
                   transform: 'scale(1.1)',
                 }}
               />
-              {/* Overlay con filtro de cabecera - usa el color sidebar del tema */}
+              {/* Overlay con filtro de cabecera - usa el color primario del municipio */}
               {(municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) > 0 && (
                 <div
                   className="absolute inset-0"
                   style={{
-                    background: theme.sidebar,
+                    background: theme.primary,
                     opacity: (municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 0.6,
                   }}
                 />
