@@ -7,10 +7,12 @@ import {
   Layers, User, Database, Star, TrendingUp, TrendingDown,
   Loader2, Save, Trash2, Table2, Download, ChevronDown, ChevronUp, RefreshCw,
   Plus, X, History, ChevronLeft, ChevronRight,
-  LayoutGrid, List, Clock, Trophy, FolderKanban, Gauge, BarChart2
+  LayoutGrid, List, Clock, Trophy, FolderKanban, Gauge, BarChart2,
+  MessageSquare, Sparkles
 } from 'lucide-react';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { AutocompleteInput } from '../components/ui/AutocompleteInput';
+import QueryTemplates from '../components/QueryTemplates';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RePieChart, Pie, Cell, LineChart as ReLineChart, Line, Legend
@@ -186,6 +188,9 @@ export default function PanelBI() {
   // Estado para formato seleccionado (no se muestra en el input)
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
 
+  // Modo de consulta: 'text' (lenguaje natural) o 'templates' (consultas rápidas)
+  const [queryMode, setQueryMode] = useState<'text' | 'templates'>('text');
+
   // KPIs configurables - guardar en localStorage
   const [activeKpis, setActiveKpis] = useState<string[]>(() => {
     const saved = localStorage.getItem('panelbi_kpis');
@@ -342,6 +347,16 @@ export default function PanelBI() {
       setLoading(false);
       // Reset formato después de ejecutar
       setSelectedFormat(null);
+    }
+  };
+
+  // Ejecutar consulta desde template
+  const ejecutarDesdeTemplate = (query: string, formato?: string) => {
+    setInput(query);
+    if (formato) {
+      ejecutarConsulta(formato);
+    } else {
+      ejecutarConsulta();
     }
   };
 
@@ -557,6 +572,42 @@ export default function PanelBI() {
       >
         <RefreshCw className={`h-3 w-3 ${loadingKpis ? 'animate-spin' : ''}`} />
       </button>
+
+      {/* Separador */}
+      <div className="h-6 w-px mx-1" style={{ backgroundColor: theme.border }} />
+
+      {/* Toggle modo consulta */}
+      <div
+        className="flex items-center rounded-lg p-0.5"
+        style={{ backgroundColor: theme.backgroundSecondary }}
+      >
+        <button
+          onClick={() => setQueryMode('text')}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-all ${queryMode === 'text' ? 'font-semibold' : ''}`}
+          style={{
+            backgroundColor: queryMode === 'text' ? theme.card : 'transparent',
+            color: queryMode === 'text' ? theme.primary : theme.textSecondary,
+            boxShadow: queryMode === 'text' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+          }}
+          title="Escribir consulta"
+        >
+          <MessageSquare className="h-3 w-3" />
+          Texto
+        </button>
+        <button
+          onClick={() => setQueryMode('templates')}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs transition-all ${queryMode === 'templates' ? 'font-semibold' : ''}`}
+          style={{
+            backgroundColor: queryMode === 'templates' ? theme.card : 'transparent',
+            color: queryMode === 'templates' ? theme.primary : theme.textSecondary,
+            boxShadow: queryMode === 'templates' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+          }}
+          title="Usar templates"
+        >
+          <Sparkles className="h-3 w-3" />
+          Templates
+        </button>
+      </div>
 
       {/* Separador */}
       <div className="h-6 w-px mx-1" style={{ backgroundColor: theme.border }} />
@@ -919,32 +970,40 @@ export default function PanelBI() {
           )}
         </div>
 
-        {/* Columna Derecha - Entidades */}
+        {/* Columna Derecha - Templates o Entidades según el modo */}
         <div className="lg:col-span-3">
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            {/* Header clickeable para colapsar */}
-            <button
-              onClick={() => setEntidadesCollapsed(!entidadesCollapsed)}
-              className="w-full p-4 flex items-center justify-between transition-colors hover:bg-black/5"
+          {queryMode === 'templates' ? (
+            /* Modo Templates */
+            <QueryTemplates
+              onExecute={ejecutarDesdeTemplate}
+              loading={loading}
+            />
+          ) : (
+            /* Modo Texto - Panel de Entidades */
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
             >
-              <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: theme.text }}>
-                <Database className="h-4 w-4" style={{ color: theme.primary }} />
-                Entidades
-                <span
-                  className="px-1.5 py-0.5 rounded-full text-[10px]"
-                  style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-                >
-                  {entities.length}
-                </span>
-              </h3>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${entidadesCollapsed ? '' : 'rotate-180'}`}
-                style={{ color: theme.textSecondary }}
-              />
-            </button>
+              {/* Header clickeable para colapsar */}
+              <button
+                onClick={() => setEntidadesCollapsed(!entidadesCollapsed)}
+                className="w-full p-4 flex items-center justify-between transition-colors hover:bg-black/5"
+              >
+                <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: theme.text }}>
+                  <Database className="h-4 w-4" style={{ color: theme.primary }} />
+                  Entidades
+                  <span
+                    className="px-1.5 py-0.5 rounded-full text-[10px]"
+                    style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                  >
+                    {entities.length}
+                  </span>
+                </h3>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${entidadesCollapsed ? '' : 'rotate-180'}`}
+                  style={{ color: theme.textSecondary }}
+                />
+              </button>
 
             {/* Contenido colapsable */}
             {!entidadesCollapsed && (
@@ -1085,7 +1144,8 @@ export default function PanelBI() {
                 )}
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 

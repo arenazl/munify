@@ -8,6 +8,7 @@
 
 export type ThemeVariant = 'clasico' | 'vintage' | 'vibrante';
 
+
 export interface ThemePreset {
   id: string;
   name: string;

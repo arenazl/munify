@@ -36,6 +36,12 @@ router = APIRouter()
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 _TEMPLATES_CACHE: dict = {}
 
+def clear_templates_cache():
+    """Limpia el cache de templates para forzar recarga"""
+    global _TEMPLATES_CACHE
+    _TEMPLATES_CACHE = {}
+    print("[TEMPLATES] Cache limpiado")
+
 def load_template(template_id: str) -> dict | None:
     """Carga un template desde el archivo JSON"""
     global _TEMPLATES_CACHE
@@ -3101,6 +3107,21 @@ class KPIsResponse(BaseModel):
     tramites: dict
     empleados: dict
     tendencias: dict
+
+
+@router.post("/templates/reload")
+async def reload_templates(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Recarga los templates de visualización (limpia cache).
+    Útil cuando se modifican los archivos JSON de templates.
+    """
+    if current_user.rol not in ['admin', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Solo admins pueden recargar templates")
+
+    clear_templates_cache()
+    return {"status": "ok", "message": "Cache de templates limpiado"}
 
 
 @router.get("/kpis", response_model=KPIsResponse)
