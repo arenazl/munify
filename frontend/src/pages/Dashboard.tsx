@@ -405,7 +405,7 @@ export default function Dashboard() {
                   background: `linear-gradient(180deg,
                     rgba(15, 23, 42, 0.7) 0%,
                     rgba(15, 23, 42, 0.85) 40%,
-                    ${municipioColor}90 100%
+                    ${theme.backgroundSecondary}90 100%
                   )`,
                 }}
               />

@@ -79,34 +79,8 @@ const categoryIcons: Record<string, React.ReactNode> = {
   'default': <MoreHorizontal className="h-6 w-6" />,
 };
 
-// Colores por categoría
-const categoryColors: Record<string, string> = {
-  'alumbrado': '#f59e0b',
-  'bache': '#ef4444',
-  'calle': '#ef4444',
-  'agua': '#3b82f6',
-  'cloaca': '#0ea5e9',
-  'desague': '#0ea5e9',
-  'arbolado': '#22c55e',
-  'espacio': '#10b981',
-  'verde': '#10b981',
-  'basura': '#6b7280',
-  'residuo': '#78716c',
-  'recolec': '#78716c',
-  'limpieza': '#14b8a6',
-  'transito': '#8b5cf6',
-  'señal': '#f97316',
-  'plaga': '#dc2626',
-  'fumiga': '#dc2626',
-  'edificio': '#a855f7',
-  'semaforo': '#ef4444',
-  'semáforo': '#ef4444',
-  'vereda': '#78716c',
-  'cordon': '#78716c',
-  'mobiliario': '#6366f1',
-  'ruido': '#f97316',
-  'default': '#6366f1',
-};
+// Color por defecto - los colores reales vienen de la DB
+const DEFAULT_CATEGORY_COLOR = '#64748b';
 
 function getCategoryIcon(nombre: string): React.ReactNode {
   const key = nombre.toLowerCase();
@@ -114,14 +88,6 @@ function getCategoryIcon(nombre: string): React.ReactNode {
     if (key.includes(k)) return icon;
   }
   return categoryIcons.default;
-}
-
-function getCategoryColor(nombre: string): string {
-  const key = nombre.toLowerCase();
-  for (const [k, color] of Object.entries(categoryColors)) {
-    if (key.includes(k)) return color;
-  }
-  return categoryColors.default;
 }
 
 export default function NuevoReclamo() {
@@ -1130,15 +1096,15 @@ Tono amigable, 3-4 oraciones máximo.`,
           <div
             className="p-3 rounded-xl mb-3 flex items-center justify-between"
             style={{
-              backgroundColor: `${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}15`,
-              border: `1px solid ${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}40`,
+              backgroundColor: `${chatCategoriaSugerida.categoria.color || DEFAULT_CATEGORY_COLOR}15`,
+              border: `1px solid ${chatCategoriaSugerida.categoria.color || DEFAULT_CATEGORY_COLOR}40`,
             }}
           >
             <div className="flex items-center gap-3">
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
                 style={{
-                  backgroundColor: getCategoryColor(chatCategoriaSugerida.categoria.nombre),
+                  backgroundColor: chatCategoriaSugerida.categoria.color || DEFAULT_CATEGORY_COLOR,
                   color: 'white',
                 }}
               >
@@ -1235,19 +1201,21 @@ Tono amigable, 3-4 oraciones máximo.`,
           </div>
 
           {/* Sugerencia de IA destacada si existe */}
-          {chatCategoriaSugerida && !formData.categoria_id && (
+          {chatCategoriaSugerida && !formData.categoria_id && (() => {
+            const suggestedColor = chatCategoriaSugerida.categoria.color || DEFAULT_CATEGORY_COLOR;
+            return (
             <div
               className="p-3 rounded-xl flex items-center justify-between"
               style={{
-                backgroundColor: `${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}15`,
-                border: `2px solid ${getCategoryColor(chatCategoriaSugerida.categoria.nombre)}`,
+                backgroundColor: `${suggestedColor}15`,
+                border: `2px solid ${suggestedColor}`,
               }}
             >
               <div className="flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center"
                   style={{
-                    backgroundColor: getCategoryColor(chatCategoriaSugerida.categoria.nombre),
+                    backgroundColor: suggestedColor,
                     color: 'white',
                   }}
                 >
@@ -1255,8 +1223,8 @@ Tono amigable, 3-4 oraciones máximo.`,
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <Lightbulb className="h-3.5 w-3.5" style={{ color: getCategoryColor(chatCategoriaSugerida.categoria.nombre) }} />
-                    <span className="text-xs font-medium" style={{ color: getCategoryColor(chatCategoriaSugerida.categoria.nombre) }}>
+                    <Lightbulb className="h-3.5 w-3.5" style={{ color: suggestedColor }} />
+                    <span className="text-xs font-medium" style={{ color: suggestedColor }}>
                       Sugerida por IA ({Math.round(chatCategoriaSugerida.confianza)}%)
                     </span>
                   </div>
@@ -1275,12 +1243,13 @@ Tono amigable, 3-4 oraciones máximo.`,
                   });
                 }}
                 className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105"
-                style={{ backgroundColor: getCategoryColor(chatCategoriaSugerida.categoria.nombre), color: 'white' }}
+                style={{ backgroundColor: suggestedColor, color: 'white' }}
               >
                 Usar esta
               </button>
             </div>
-          )}
+            );
+          })()}
 
           {/* Grid de categorías */}
           <div
@@ -1292,7 +1261,7 @@ Tono amigable, 3-4 oraciones máximo.`,
             {categoriasFiltradas.map((cat) => {
               const isSelected = formData.categoria_id === String(cat.id);
               const isSuggested = chatCategoriaSugerida?.categoria.id === cat.id && !formData.categoria_id;
-              const catColor = cat.color || getCategoryColor(cat.nombre);
+              const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
 
               return (
                 <button
@@ -1347,18 +1316,20 @@ Tono amigable, 3-4 oraciones máximo.`,
           </div>
 
           {/* Categoría seleccionada */}
-          {selectedCategoria && (
+          {selectedCategoria && (() => {
+            const selColor = selectedCategoria.color || DEFAULT_CATEGORY_COLOR;
+            return (
             <div
               className="p-3 rounded-xl"
               style={{
-                backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`,
-                border: `2px solid ${getCategoryColor(selectedCategoria.nombre)}`,
+                backgroundColor: `${selColor}15`,
+                border: `2px solid ${selColor}`,
               }}
             >
               <div className="flex items-center gap-3">
                 <div
                   className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: getCategoryColor(selectedCategoria.nombre) }}
+                  style={{ backgroundColor: selColor }}
                 >
                   <span className="text-white">{getCategoryIcon(selectedCategoria.nombre)}</span>
                 </div>
@@ -1368,10 +1339,11 @@ Tono amigable, 3-4 oraciones máximo.`,
                     <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedCategoria.descripcion}</p>
                   )}
                 </div>
-                <CheckCircle2 className="h-5 w-5" style={{ color: getCategoryColor(selectedCategoria.nombre) }} />
+                <CheckCircle2 className="h-5 w-5" style={{ color: selColor }} />
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </WizardStepContent>
@@ -1495,14 +1467,16 @@ Tono amigable, 3-4 oraciones máximo.`,
   const DetallesStepContent = (
     <WizardStepContent title="Contanos más detalles" description="Describí el problema con la mayor precisión posible">
       {/* Mostrar categoría seleccionada */}
-      {selectedCategoria && (
+      {selectedCategoria && (() => {
+        const selColor = selectedCategoria.color || DEFAULT_CATEGORY_COLOR;
+        return (
         <div
           className="flex items-center gap-3 p-3 rounded-xl mb-4"
-          style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}
+          style={{ backgroundColor: `${selColor}15`, border: `1px solid ${selColor}30` }}
         >
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}25`, color: getCategoryColor(selectedCategoria.nombre) }}
+            style={{ backgroundColor: `${selColor}25`, color: selColor }}
           >
             {getCategoryIcon(selectedCategoria.nombre)}
           </div>
@@ -1511,7 +1485,8 @@ Tono amigable, 3-4 oraciones máximo.`,
             <p className="font-medium" style={{ color: theme.text }}>{selectedCategoria.nombre}</p>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <div className="space-y-4">
         <div>
@@ -1658,8 +1633,8 @@ Tono amigable, 3-4 oraciones máximo.`,
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center"
             style={{
-              backgroundColor: selectedCategoria ? `${getCategoryColor(selectedCategoria.nombre)}20` : theme.border,
-              color: selectedCategoria ? getCategoryColor(selectedCategoria.nombre) : theme.textSecondary,
+              backgroundColor: selectedCategoria ? `${selectedCategoria.color || DEFAULT_CATEGORY_COLOR}20` : theme.border,
+              color: selectedCategoria ? (selectedCategoria.color || DEFAULT_CATEGORY_COLOR) : theme.textSecondary,
             }}
           >
             {selectedCategoria ? getCategoryIcon(selectedCategoria.nombre) : <FolderOpen className="h-5 w-5" />}
@@ -2063,7 +2038,7 @@ Tono amigable, 3-4 oraciones máximo.`,
           <div className="space-y-3">
             <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
               <div className="flex items-center gap-2 mb-2">
-                <div style={{ color: getCategoryColor(selectedCategoriaObj.nombre) }}>
+                <div style={{ color: selectedCategoriaObj.color || DEFAULT_CATEGORY_COLOR }}>
                   {getCategoryIcon(selectedCategoriaObj.nombre)}
                 </div>
                 <span className="font-medium text-sm" style={{ color: theme.text }}>{selectedCategoriaObj.nombre}</span>

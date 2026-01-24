@@ -613,6 +613,69 @@ async def actualizar_imagen_portada(
     return municipio
 
 
+@router.post("/{municipio_id}/sidebar-bg", response_model=dict)
+async def actualizar_sidebar_bg(
+    municipio_id: int,
+    imagen: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR]))
+):
+    """
+    Actualiza la imagen de fondo del sidebar de un municipio.
+    Admin y supervisor pueden modificar.
+    Sube la imagen a Cloudinary y devuelve la URL.
+    """
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Verificar permisos
+    if current_user.municipio_id and current_user.municipio_id != municipio_id:
+        raise HTTPException(status_code=403, detail="No tienes permisos para modificar este municipio")
+
+    # Validar tipo de archivo
+    allowed_types = ["image/png", "image/jpeg", "image/jpg", "image/webp"]
+    if imagen.content_type and imagen.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"Tipo de archivo no permitido: {imagen.content_type}")
+
+    # Validar tamaño (2MB max)
+    content = await imagen.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="El archivo excede el tamaño máximo de 2MB")
+
+    # Subir a Cloudinary
+    try:
+        await imagen.seek(0)
+        upload_result = cloudinary.uploader.upload(
+            imagen.file,
+            folder=f"municipios/{municipio.codigo}/sidebar",
+            resource_type="image",
+            transformation=[
+                {"width": 800, "height": 1200, "crop": "limit"},
+                {"quality": "auto:good"},
+                {"fetch_format": "auto"}
+            ]
+        )
+
+        sidebar_bg_url = upload_result["secure_url"]
+
+        # Actualizar tema_config con la nueva URL
+        tema_config = municipio.tema_config or {}
+        tema_config["sidebarBgImage"] = sidebar_bg_url
+        municipio.tema_config = tema_config
+
+        await db.commit()
+
+        return {"sidebar_bg_url": sidebar_bg_url}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al subir imagen: {str(e)}")
+
+
 @router.delete("/{municipio_id}/imagen-portada", response_model=MunicipioDetalle)
 async def eliminar_imagen_portada(
     municipio_id: int,

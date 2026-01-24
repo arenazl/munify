@@ -138,7 +138,7 @@ export function ABMPage({
     <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y', minHeight: '100vh' }}>
       {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
       <div
-        className={stickyHeader ? 'sticky top-[64px] z-30 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-1 pb-1' : ''}
+        className={stickyHeader ? 'sticky top-0 z-30 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pb-1' : ''}
         style={{
           backgroundColor: stickyHeader ? theme.background : 'transparent',
         }}

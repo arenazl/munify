@@ -86,26 +86,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   'default': <AlertTriangle className="h-5 w-5" />,
 };
 
-const categoryColors: Record<string, string> = {
-  'alumbrado': '#f59e0b',
-  'bache': '#ef4444',
-  'calle': '#ef4444',
-  'agua': '#3b82f6',
-  'cloaca': '#0ea5e9',
-  'desague': '#0ea5e9',
-  'arbolado': '#22c55e',
-  'espacio': '#10b981',
-  'verde': '#10b981',
-  'basura': '#6b7280',
-  'residuo': '#78716c',
-  'recolec': '#78716c',
-  'limpieza': '#14b8a6',
-  'transito': '#8b5cf6',
-  'señal': '#f97316',
-  'plaga': '#dc2626',
-  'edificio': '#a855f7',
-  'default': '#6366f1',
-};
+const DEFAULT_CATEGORY_COLOR = '#64748b'; // Color por defecto - los colores reales vienen de la DB
 
 function getCategoryIcon(nombre: string): React.ReactNode {
   const key = nombre.toLowerCase();
@@ -113,14 +94,6 @@ function getCategoryIcon(nombre: string): React.ReactNode {
     if (key.includes(k)) return icon;
   }
   return categoryIcons.default;
-}
-
-function getCategoryColor(nombre: string): string {
-  const key = nombre.toLowerCase();
-  for (const [k, color] of Object.entries(categoryColors)) {
-    if (key.includes(k)) return color;
-  }
-  return categoryColors.default;
 }
 
 // Placeholders dinámicos según categoría
@@ -1395,19 +1368,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       </div>
 
       {/* Sugerencia de categoría */}
-      {categoriaSugerida && !clasificando && (
+      {categoriaSugerida && !clasificando && (() => {
+        const sugColor = categoriaSugerida.categoria.color || DEFAULT_CATEGORY_COLOR;
+        return (
         <div
           className="p-4 rounded-xl flex items-center justify-between"
           style={{
-            backgroundColor: `${getCategoryColor(categoriaSugerida.categoria.nombre)}15`,
-            border: `2px solid ${getCategoryColor(categoriaSugerida.categoria.nombre)}`,
+            backgroundColor: `${sugColor}15`,
+            border: `2px solid ${sugColor}`,
           }}
         >
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center"
               style={{
-                backgroundColor: getCategoryColor(categoriaSugerida.categoria.nombre),
+                backgroundColor: sugColor,
                 color: 'white',
               }}
             >
@@ -1431,7 +1406,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             Confirmar
           </button>
         </div>
-      )}
+        );
+      })()}
 
       {/* Tip */}
       <p className="text-xs text-center" style={{ color: theme.textSecondary }}>
@@ -1449,7 +1425,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       <div className="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 gap-3">
         {categorias.map((cat) => {
           const isSelected = formData.categoria_id === String(cat.id);
-          const catColor = cat.color || getCategoryColor(cat.nombre);
+          const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
           return (
             <button
               key={cat.id}
@@ -1674,7 +1650,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       </div>
       <div className="space-y-3">
         <div className="flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: selectedCategoria ? getCategoryColor(selectedCategoria.nombre) : theme.border, color: 'white' }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: selectedCategoria ? (selectedCategoria.color || DEFAULT_CATEGORY_COLOR) : theme.border, color: 'white' }}>
             {selectedCategoria ? getCategoryIcon(selectedCategoria.nombre) : <FolderOpen className="h-5 w-5" />}
           </div>
           <div>
@@ -2170,11 +2146,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Paso 1: Categoría */}
-        {wizardStep === 1 && selectedCategoria ? (
+        {wizardStep === 1 && selectedCategoria ? (() => {
+          const selColor = selectedCategoria.color || DEFAULT_CATEGORY_COLOR;
+          return (
           <div className="space-y-3">
-            <div className="p-3 rounded-lg" style={{ backgroundColor: `${getCategoryColor(selectedCategoria.nombre)}15`, border: `1px solid ${getCategoryColor(selectedCategoria.nombre)}30` }}>
+            <div className="p-3 rounded-lg" style={{ backgroundColor: `${selColor}15`, border: `1px solid ${selColor}30` }}>
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: getCategoryColor(selectedCategoria.nombre), color: 'white' }}>
+                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: selColor, color: 'white' }}>
                   {getCategoryIcon(selectedCategoria.nombre)}
                 </div>
                 <span className="font-medium text-sm" style={{ color: theme.text }}>
@@ -2188,7 +2166,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               <ul className="space-y-1">
                 {getCategoryDescription(selectedCategoria.nombre).examples.map((example, i) => (
                   <li key={i} className="flex items-start gap-2" style={{ color: theme.textSecondary }}>
-                    <span style={{ color: getCategoryColor(selectedCategoria.nombre) }}>•</span>
+                    <span style={{ color: selColor }}>•</span>
                     {example}
                   </li>
                 ))}
@@ -2205,7 +2183,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               </div>
             </div>
           </div>
-        ) : wizardStep === 1 ? (
+          );
+        })() : wizardStep === 1 ? (
           <div className="p-3 rounded-lg text-sm" style={{ backgroundColor: theme.card }}>
             <div className="flex items-start gap-2">
               <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
@@ -2434,11 +2413,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       header: 'Título',
       width: '280px',
       sortValue: (r: Reclamo) => r.titulo,
-      render: (r: Reclamo) => (
+      render: (r: Reclamo) => {
+        const catColor = r.categoria.color || DEFAULT_CATEGORY_COLOR;
+        return (
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: getCategoryColor(r.categoria.nombre) + '20', color: getCategoryColor(r.categoria.nombre) }}
+            style={{ backgroundColor: catColor + '20', color: catColor }}
           >
             {getCategoryIcon(r.categoria.nombre)}
           </div>
@@ -2446,13 +2427,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <span className="text-sm font-medium block truncate" style={{ color: theme.text }}>{r.titulo}</span>
             <span
               className="text-[11px]"
-              style={{ color: getCategoryColor(r.categoria.nombre) }}
+              style={{ color: catColor }}
             >
               {r.categoria.nombre}
             </span>
           </div>
         </div>
-      ),
+        );
+      },
     },
     {
       key: 'direccion',
@@ -3086,7 +3068,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const renderSheetStickyHeader = () => {
     if (!selectedReclamo) return null;
 
-    const categoryColor = getCategoryColor(selectedReclamo.categoria.nombre);
+    const categoryColor = selectedReclamo.categoria.color || DEFAULT_CATEGORY_COLOR;
     const estadoColor = estadoColors[selectedReclamo.estado].bg;
 
     return (
@@ -3315,7 +3297,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
               {categorias.filter((cat) => (conteosCategorias[cat.id] || 0) > 0 || reclamos.some(r => r.categoria.id === cat.id)).map((cat) => {
                 const isSelected = filtroCategoria === cat.id;
-                const catColor = getCategoryColor(cat.nombre);
+                const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
                 const count = conteosCategorias[cat.id] || 0;
                 const isLoadingThis = filterLoading === `cat-${cat.id}`;
                 return (
@@ -3453,7 +3435,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         ) : (
           filteredReclamos.map((r) => {
             const estado = estadoColors[r.estado];
-            const categoryColor = getCategoryColor(r.categoria.nombre);
+            const categoryColor = r.categoria.color || DEFAULT_CATEGORY_COLOR;
             const bgImage = getCategoryImageUrl(r.categoria.nombre);
             // Si la animación terminó, siempre visible
             const isVisible = animationDone || visibleCards.has(r.id);
@@ -3650,7 +3632,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         headerBadge={selectedCategoria ? {
           icon: getCategoryIcon(selectedCategoria.nombre),
           label: selectedCategoria.nombre,
-          color: getCategoryColor(selectedCategoria.nombre),
+          color: selectedCategoria.color || DEFAULT_CATEGORY_COLOR,
         } : undefined}
       />
 

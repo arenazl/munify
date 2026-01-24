@@ -15,7 +15,15 @@ interface Notificacion {
   reclamo_id?: number;
 }
 
-export function NotificacionesDropdown() {
+interface NotificacionesDropdownProps {
+  sidebarMode?: boolean;
+  sidebarTextColor?: string;
+  sidebarHoverColor?: string;
+  sidebarBgHover?: string;
+  sidebarWidth?: string;
+}
+
+export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarHoverColor, sidebarBgHover, sidebarWidth }: NotificacionesDropdownProps = {}) {
   const { theme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
@@ -140,13 +148,25 @@ export function NotificacionesDropdown() {
       {/* Bell Button */}
       <button
         onClick={handleOpen}
-        className="p-2 rounded-full transition-all duration-200 hover:scale-110 active:scale-95 relative group"
-        style={{ color: theme.text }}
+        className={`${sidebarMode ? 'p-2 rounded-lg' : 'p-1.5 rounded-md'} transition-all duration-200 hover:scale-105 active:scale-95 relative group`}
+        style={{ color: sidebarMode ? sidebarTextColor : theme.textSecondary }}
+        onMouseEnter={(e) => {
+          if (sidebarMode && sidebarBgHover && sidebarHoverColor) {
+            e.currentTarget.style.backgroundColor = sidebarBgHover;
+            e.currentTarget.style.color = sidebarHoverColor;
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (sidebarMode) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = sidebarTextColor || theme.text;
+          }
+        }}
       >
-        <Bell className={`h-5 w-5 ${isOpen ? '' : 'group-hover:animate-wiggle'}`} />
+        <Bell className={`${sidebarMode ? 'h-5 w-5' : 'h-4 w-4'} ${isOpen ? '' : 'group-hover:animate-wiggle'}`} strokeWidth={sidebarMode ? 2 : 3} />
         {unreadCount > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white rounded-full"
+            className={`absolute ${sidebarMode ? '-top-0.5 -right-0.5 min-w-[16px] h-[16px] text-[9px]' : '-top-1 -right-1 min-w-[14px] h-[14px] text-[8px]'} flex items-center justify-center font-bold text-white rounded-full`}
             style={{ backgroundColor: '#ef4444' }}
           >
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -158,16 +178,17 @@ export function NotificacionesDropdown() {
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
+            className={`fixed inset-0 ${sidebarMode ? 'z-[60]' : 'z-40'}`}
             onClick={() => setIsOpen(false)}
           />
           <div
-            className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto mt-2 sm:w-96 rounded-xl shadow-2xl z-50 overflow-hidden animate-scale-in origin-top-right"
+            className={`fixed rounded-xl shadow-2xl ${sidebarMode ? 'z-[70] w-80' : 'z-50 left-4 right-4 sm:left-auto sm:right-2 sm:w-96'} overflow-hidden animate-scale-in ${sidebarMode ? 'origin-top-left' : 'origin-top-right'}`}
             style={{
               backgroundColor: theme.card,
               border: `1px solid ${theme.border}`,
-              maxHeight: '70vh',
-              top: 'auto',
+              maxHeight: sidebarMode ? 'calc(100vh - 100px)' : '70vh',
+              top: sidebarMode ? '180px' : '60px',
+              left: sidebarMode ? (sidebarWidth ? `calc(${sidebarWidth} + 8px)` : '200px') : undefined,
             }}
           >
             {/* Header */}

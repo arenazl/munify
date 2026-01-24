@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -78,6 +78,8 @@ export default function Layout() {
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
+  const [uploadingSidebarBg, setUploadingSidebarBg] = useState(false);
+  const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
   const [pushSubscribed, setPushSubscribed] = useState(() => localStorage.getItem('pushActivated') === 'true');
   const [pushSubscribing, setPushSubscribing] = useState(false);
@@ -90,7 +92,9 @@ export default function Layout() {
     setPreset,
     presets,
     sidebarBgImage,
+    setSidebarBgImage,
     sidebarBgOpacity,
+    setSidebarBgOpacity,
     contentBgImage,
     setContentBgImage,
     contentBgOpacity,
@@ -176,6 +180,43 @@ export default function Layout() {
     }
   };
 
+  // Handler para subir imagen de fondo del sidebar
+  const handleSidebarBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !municipioActual) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor selecciona una imagen válida');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('La imagen no debe superar los 2MB');
+      return;
+    }
+
+    setUploadingSidebarBg(true);
+    try {
+      const formData = new FormData();
+      formData.append('imagen', file);
+
+      const response = await municipiosApi.updateSidebarBg(municipioActual.id, formData);
+
+      if (response.data?.sidebar_bg_url) {
+        setSidebarBgImage(response.data.sidebar_bg_url);
+        toast.success('Imagen de fondo actualizada');
+      }
+    } catch (error) {
+      console.error('Error subiendo imagen:', error);
+      toast.error('Error al subir la imagen');
+    } finally {
+      setUploadingSidebarBg(false);
+      // Reset input
+      if (sidebarBgInputRef.current) {
+        sidebarBgInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
@@ -213,16 +254,14 @@ export default function Layout() {
         />
       )}
 
-      {/* Sidebar - empieza debajo del topbar */}
+      {/* Sidebar - full height desde arriba */}
+      {/* NOTA: En desktop NO usamos transform para evitar crear containing block que rompe position:fixed */}
+      {/* En mobile usamos -translate-x-full solo cuando está cerrado */}
       <div
-        className={`fixed left-0 bottom-0 z-30 shadow-xl transform lg:translate-x-0 flex flex-col overflow-hidden sidebar-container backdrop-blur-sm ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${isCollapsed ? 'sidebar-collapsed' : ''}`}
+        className={`fixed left-0 top-0 bottom-0 z-30 shadow-xl flex flex-col sidebar-container backdrop-blur-sm transition-all duration-300 ${isCollapsed ? 'sidebar-collapsed' : ''} ${isMobile && !sidebarOpen ? '-translate-x-full' : ''}`}
         style={{
           backgroundColor: `${theme.sidebar}e6`, // ~90% opacity
           width: sidebarWidth,
-          top: '64px', // h-16 = 4rem = 64px
-          transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s ease-out, background-color 0.3s ease',
         }}
       >
         {/* Imagen de fondo del sidebar */}
@@ -236,15 +275,226 @@ export default function Layout() {
             }}
           />
         )}
-        {/* Overlay para mejorar legibilidad */}
+        {/* Overlay para mejorar legibilidad - gradiente con color del tema */}
         {sidebarBgImage && (
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: theme.sidebar,
+              background: `linear-gradient(180deg, ${theme.sidebar}dd 0%, ${theme.sidebar}bb 50%, ${theme.sidebar}dd 100%)`,
             }}
           />
         )}
+
+        {/* Header del Sidebar: Logo + Municipio */}
+        <div className="relative z-10 px-3 py-4 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
+          <div
+            className="flex items-center gap-2"
+            style={{
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+            }}
+          >
+            <img
+              src={new URL('../assets/munify_logo.png', import.meta.url).href}
+              alt="Munify"
+              className="h-8 w-8 object-contain flex-shrink-0"
+            />
+            <div
+              style={{
+                width: isCollapsed ? 0 : 'auto',
+                opacity: isCollapsed ? 0 : 1,
+                overflow: 'hidden',
+                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
+              }}
+            >
+              <span
+                className="text-lg font-bold whitespace-nowrap"
+                style={{ color: theme.sidebarText }}
+              >
+                Munify
+              </span>
+              {municipioActual && (
+                <p
+                  className="text-[10px] whitespace-nowrap -mt-0.5"
+                  style={{ color: theme.sidebarTextSecondary }}
+                >
+                  {municipioActual.nombre}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Usuario en el Sidebar */}
+        <div className="relative z-10 px-3 py-3 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="w-full flex items-center gap-2 p-2 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              backgroundColor: `${theme.primary}15`,
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
+            }}
+          >
+            <div
+              className="h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0"
+              style={{ backgroundColor: theme.primary }}
+            >
+              {user.nombre[0]}{user.apellido[0]}
+            </div>
+            <div
+              style={{
+                width: isCollapsed ? 0 : 'auto',
+                opacity: isCollapsed ? 0 : 1,
+                overflow: 'hidden',
+                transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s',
+              }}
+            >
+              <p className="text-sm font-semibold leading-none text-left whitespace-nowrap" style={{ color: theme.sidebarText }}>
+                {user.nombre} {user.apellido}
+              </p>
+              <p className="text-xs capitalize mt-0.5 whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>
+                {user.rol}
+              </p>
+            </div>
+            {!isCollapsed && (
+              <ChevronDown
+                className={`h-4 w-4 ml-auto transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`}
+                style={{ color: theme.sidebarTextSecondary }}
+              />
+            )}
+          </button>
+
+          {/* Dropdown menu del usuario */}
+          {userMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-[60]"
+                onClick={() => setUserMenuOpen(false)}
+              />
+              <div
+                className="absolute left-full top-0 ml-2 w-56 rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden"
+                style={{
+                  backgroundColor: theme.card,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                {/* Header del menú */}
+                <div className="px-4 py-3 border-b" style={{ borderColor: theme.border, backgroundColor: theme.backgroundSecondary }}>
+                  <p className="text-sm font-medium" style={{ color: theme.text }}>
+                    {user.nombre} {user.apellido}
+                  </p>
+                  <p className="text-xs truncate" style={{ color: theme.textSecondary }}>
+                    {user.email}
+                  </p>
+                </div>
+
+                {/* Opciones */}
+                <div className="py-1">
+                  <button
+                    onClick={handleOpenProfile}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
+                    style={{ color: theme.text }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = theme.backgroundSecondary;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <User className="h-4 w-4" style={{ color: theme.primary }} />
+                    Mi Perfil
+                  </button>
+
+                  {/* Opción de Notificaciones */}
+                  <div className="px-4 py-2.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BellRing className="h-4 w-4" style={{ color: pushSubscribed ? '#22c55e' : theme.primary }} />
+                      <span className="text-sm" style={{ color: theme.text }}>Notificaciones</span>
+                      {pushSubscribed && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                          Activas
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          handleTopBarPushSubscribe();
+                        }}
+                        disabled={pushSubscribed || pushSubscribing}
+                        className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                          backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.primary,
+                          color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                          opacity: pushSubscribed ? 0.5 : 1
+                        }}
+                      >
+                        {pushSubscribing ? 'Activando...' : pushSubscribed ? 'Activado' : 'Activar'}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setUserMenuOpen(false);
+                          try {
+                            const token = localStorage.getItem('token');
+                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                            const res = await fetch(`${apiUrl}/push/test`, {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                              }
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              toast.success(data.message || 'Notificación de prueba enviada!');
+                            } else {
+                              const error = await res.json();
+                              toast.error(error.message || 'Error al enviar notificación');
+                            }
+                          } catch (err) {
+                            console.error('Error enviando notificación de prueba:', err);
+                            toast.error('Error al enviar notificación de prueba');
+                          }
+                        }}
+                        disabled={!pushSubscribed}
+                        className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                        style={{
+                          backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.border,
+                          color: pushSubscribed ? theme.text : theme.textSecondary,
+                          border: `1px solid ${theme.border}`,
+                          opacity: pushSubscribed ? 1 : 0.5
+                        }}
+                      >
+                        Probar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="my-1 border-t" style={{ borderColor: theme.border }} />
+
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
+                    style={{ color: '#ef4444' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* Navegación */}
         <nav className="relative z-10 flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
           {navigation.map((item) => {
@@ -354,8 +604,8 @@ export default function Layout() {
         </div>
       </div>
 
-      {/* Main content - con padding-top para el header fijo */}
-      <div className="lg:transition-[padding] lg:duration-300 main-content-area relative pt-16">
+      {/* Main content - sin padding-top porque no hay header fijo */}
+      <div className="lg:transition-[padding] lg:duration-300 main-content-area relative">
         {/* Imagen de fondo del contenido */}
         {contentBgImage && (
           <>
@@ -378,271 +628,58 @@ export default function Layout() {
             />
           </>
         )}
-        {/* Top bar - sticky, se extiende de punta a punta */}
-        <header
-          className="fixed top-0 left-0 right-0 z-40 shadow-sm transition-colors duration-300 overflow-visible"
+
+        {/* Page content with transition - padding reducido en móvil */}
+        <main
+          className="px-3 sm:px-6 pb-3 sm:pb-6 relative"
           style={{
-            background: municipioActual?.imagen_portada
-              ? theme.card
-              : `linear-gradient(135deg, ${theme.primary}dd 0%, ${theme.primaryHover}cc 50%, ${theme.sidebar} 100%)`,
+            color: theme.text,
+            paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar
+            zIndex: 1,
           }}
         >
-          {/* Imagen de fondo con blur suave */}
-          {municipioActual?.imagen_portada && (
-            <div className="absolute inset-0 overflow-hidden">
-              <img
-                src={municipioActual.imagen_portada}
-                alt=""
-                className="w-full h-full object-cover"
-                style={{
-                  filter: `blur(${municipioActual?.tema_config?.cabeceraBlur ?? 4}px)`,
-                  opacity: municipioActual?.tema_config?.portadaOpacity ?? 0.9,
-                  transform: 'scale(1.1)',
-                }}
-              />
-              {/* Overlay con filtro de cabecera - usa el color primario del municipio */}
-              {(municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) > 0 && (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: theme.primary,
-                    opacity: (municipioActual?.tema_config?.cabeceraOpacity ?? 0.5) * 0.6,
-                  }}
-                />
-              )}
-            </div>
-          )}
-          <div className="relative flex items-center justify-between h-16 px-3 sm:px-4 overflow-visible">
-            {/* Izquierda: Hamburguesa (mobile) + Perfil usuario con dropdown */}
-            <div className="flex items-center gap-3">
-              {/* Hamburguesa - solo mobile */}
-              <button
-                className="lg:hidden p-2 rounded-md transition-all duration-200 hover:scale-110 active:scale-95"
-                onClick={() => setSidebarOpen(true)}
-                style={{ color: theme.text }}
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              {/* Perfil de usuario con dropdown */}
+          {/* Barra superior ultra-compacta - iconos a la derecha */}
+          <div className="flex items-center justify-end mt-4 mb-2">
+            {/* Hamburguesa - solo mobile, a la izquierda */}
+            <button
+              className="lg:hidden p-1 rounded transition-all mr-auto"
+              onClick={() => setSidebarOpen(true)}
+              style={{ color: theme.textSecondary }}
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+
+            {/* Iconos de acciones */}
+            <div className="flex items-center">
+              {/* Theme selector */}
               <div className="relative">
                 <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <div
-                    className="h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                    style={{ backgroundColor: theme.primary }}
-                  >
-                    {user.nombre[0]}{user.apellido[0]}
-                  </div>
-                  <div className="hidden sm:flex items-center gap-1">
-                    <div>
-                      <p className="text-sm font-semibold leading-none text-left" style={{ color: theme.text }}>
-                        {user.nombre} {user.apellido}
-                      </p>
-                      <p className="text-xs capitalize mt-0.5" style={{ color: theme.textSecondary }}>
-                        {user.rol}
-                      </p>
-                    </div>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${userMenuOpen ? 'rotate-180' : ''}`}
-                      style={{ color: theme.textSecondary }}
-                    />
-                  </div>
-                </button>
-
-                {/* Dropdown menu del usuario */}
-                {userMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setUserMenuOpen(false)}
-                    />
-                    <div
-                      className="absolute left-0 mt-2 w-56 rounded-xl shadow-2xl z-50 theme-dropdown-enter overflow-hidden"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                      }}
-                    >
-                      {/* Header del menú */}
-                      <div className="px-4 py-3 border-b" style={{ borderColor: theme.border, backgroundColor: theme.backgroundSecondary }}>
-                        <p className="text-sm font-medium" style={{ color: theme.text }}>
-                          {user.nombre} {user.apellido}
-                        </p>
-                        <p className="text-xs truncate" style={{ color: theme.textSecondary }}>
-                          {user.email}
-                        </p>
-                      </div>
-
-                      {/* Opciones */}
-                      <div className="py-1">
-                        <button
-                          onClick={handleOpenProfile}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
-                          style={{ color: theme.text }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = theme.backgroundSecondary;
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <User className="h-4 w-4" style={{ color: theme.primary }} />
-                          Mi Perfil
-                        </button>
-
-                        {/* Opción de Notificaciones */}
-                        <div className="px-4 py-2.5">
-                          <div className="flex items-center gap-2 mb-2">
-                            <BellRing className="h-4 w-4" style={{ color: pushSubscribed ? '#22c55e' : theme.primary }} />
-                            <span className="text-sm" style={{ color: theme.text }}>Notificaciones</span>
-                            {pushSubscribed && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                                Activas
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setUserMenuOpen(false);
-                                handleTopBarPushSubscribe();
-                              }}
-                              disabled={pushSubscribed || pushSubscribing}
-                              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                              style={{
-                                backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.primary,
-                                color: pushSubscribed ? theme.textSecondary : '#ffffff',
-                                opacity: pushSubscribed ? 0.5 : 1
-                              }}
-                            >
-                              {pushSubscribing ? 'Activando...' : pushSubscribed ? 'Activado' : 'Activar'}
-                            </button>
-                            <button
-                              onClick={async () => {
-                                setUserMenuOpen(false);
-                                try {
-                                  const token = localStorage.getItem('token');
-                                  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-                                  const res = await fetch(`${apiUrl}/push/test`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Authorization': `Bearer ${token}`,
-                                      'Content-Type': 'application/json'
-                                    }
-                                  });
-                                  if (res.ok) {
-                                    const data = await res.json();
-                                    toast.success(data.message || 'Notificación de prueba enviada!');
-                                  } else {
-                                    const error = await res.json();
-                                    toast.error(error.message || 'Error al enviar notificación');
-                                  }
-                                } catch (err) {
-                                  console.error('Error enviando notificación de prueba:', err);
-                                  toast.error('Error al enviar notificación de prueba');
-                                }
-                              }}
-                              disabled={!pushSubscribed}
-                              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                              style={{
-                                backgroundColor: pushSubscribed ? theme.backgroundSecondary : theme.border,
-                                color: pushSubscribed ? theme.text : theme.textSecondary,
-                                border: `1px solid ${theme.border}`,
-                                opacity: pushSubscribed ? 1 : 0.5
-                              }}
-                            >
-                              Probar
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="my-1 border-t" style={{ borderColor: theme.border }} />
-
-                        <button
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            logout();
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-200 hover:translate-x-1"
-                          style={{ color: '#ef4444' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }}
-                        >
-                          <LogOut className="h-4 w-4" />
-                          Cerrar sesión
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Centro: Logo Munify + texto con degradé (solo desktop) */}
-            <div className="flex-1 hidden sm:flex justify-center">
-              <div className="flex items-center gap-3">
-                <img
-                  src={new URL('../assets/munify_logo.png', import.meta.url).href}
-                  alt="Munify"
-                  className="h-10 w-10 object-contain"
-                />
-                <span
-                  className="text-2xl font-extrabold munify-brand-text"
-                  style={{
-                    fontFamily: "'Nunito', sans-serif",
-                    '--munify-primary': theme.primary,
-                    '--munify-hover': theme.primaryHover,
-                  } as React.CSSProperties}
-                >
-                  Munify
-                </span>
-              </div>
-            </div>
-            {/* Espacio flexible en mobile */}
-            <div className="flex-1 sm:hidden" />
-
-            <div className="flex items-center space-x-2 sm:space-x-3 overflow-visible">
-              {/* Theme selector - Visible en mobile y desktop */}
-              <div className="relative">
-                <button
-                  className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-12 active:scale-95"
+                  className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
                   onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-                  style={{ color: theme.text }}
+                  style={{ color: theme.textSecondary }}
+                  title="Tema"
                 >
-                  <Palette className="h-5 w-5" />
+                  <Palette className="h-4 w-4" strokeWidth={3} />
                 </button>
 
                 {themeMenuOpen && (
                   <>
                     <div
-                      className="fixed inset-0 z-40"
+                      className="fixed inset-0 z-[60]"
                       onClick={() => setThemeMenuOpen(false)}
                     />
                     <div
-                      className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto mt-2 sm:w-80 rounded-xl shadow-2xl z-50 theme-dropdown-enter"
+                      className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-2xl z-[70] theme-dropdown-enter"
                       style={{
                         backgroundColor: theme.card,
                         border: `1px solid ${theme.border}`,
                         maxHeight: 'calc(100vh - 100px)',
                         overflowY: 'auto',
-                        top: 'auto',
                       }}
                     >
-                      {/* Header */}
                       <div className="px-4 py-3 border-b" style={{ borderColor: theme.border }}>
                         <h3 className="font-semibold" style={{ color: theme.text }}>Personalizar tema</h3>
-                        <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                          Elige una paleta de colores
-                        </p>
                       </div>
-
-                      {/* Paletas de colores - Grid de 2 columnas */}
                       <div className="p-3">
                         <div className="grid grid-cols-2 gap-2">
                           {presets.map((preset) => {
@@ -651,35 +688,22 @@ export default function Layout() {
                               <button
                                 key={preset.id}
                                 onClick={() => setPreset(preset.id, currentVariant)}
-                                className="relative p-2 rounded-lg transition-all duration-200 hover:scale-[1.02] group"
+                                className="relative p-2 rounded-lg transition-all duration-200 hover:scale-[1.02]"
                                 style={{
                                   backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
                                   border: `2px solid ${isSelected ? theme.primary : 'transparent'}`,
                                 }}
                               >
-                                {/* Paleta de colores */}
                                 <div className="flex h-6 rounded-md overflow-hidden mb-1.5">
                                   {preset.palette.map((color, i) => (
-                                    <div
-                                      key={i}
-                                      className="flex-1"
-                                      style={{ backgroundColor: color }}
-                                    />
+                                    <div key={i} className="flex-1" style={{ backgroundColor: color }} />
                                   ))}
                                 </div>
-                                {/* Nombre */}
-                                <span
-                                  className="text-xs font-medium"
-                                  style={{ color: isSelected ? theme.primary : theme.text }}
-                                >
+                                <span className="text-xs font-medium" style={{ color: isSelected ? theme.primary : theme.text }}>
                                   {preset.name}
                                 </span>
-                                {/* Check indicator */}
                                 {isSelected && (
-                                  <div
-                                    className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
-                                    style={{ backgroundColor: theme.primary }}
-                                  >
+                                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.primary }}>
                                     <Check className="w-2.5 h-2.5 text-white" />
                                   </div>
                                 )}
@@ -688,12 +712,8 @@ export default function Layout() {
                           })}
                         </div>
                       </div>
-
-                      {/* Selector de variante */}
                       <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                          Estilo
-                        </span>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Estilo</span>
                         <div className="flex gap-2 mt-2">
                           {(['clasico', 'vintage', 'vibrante'] as ThemeVariant[]).map((variant) => {
                             const isSelected = currentVariant === variant;
@@ -701,7 +721,7 @@ export default function Layout() {
                               <button
                                 key={variant}
                                 onClick={() => setPreset(currentPresetId, variant)}
-                                className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all duration-200"
+                                className="flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all"
                                 style={{
                                   backgroundColor: isSelected ? theme.primary : theme.backgroundSecondary,
                                   color: isSelected ? '#ffffff' : theme.text,
@@ -713,108 +733,131 @@ export default function Layout() {
                           })}
                         </div>
                       </div>
-
-                      {/* Fondo de página */}
+                      {/* Fondo del sidebar */}
                       <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-                            Fondo de página
+                            <Image className="h-3 w-3 inline mr-1" />
+                            Fondo sidebar
                           </span>
-                          {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-                            <Link
-                              to="/gestion/configuracion"
-                              onClick={() => setThemeMenuOpen(false)}
-                              className="text-xs underline hover:no-underline flex items-center gap-1"
-                              style={{ color: theme.primary }}
-                            >
-                              <Image className="w-3 h-3" />
-                              Cambiar
-                            </Link>
-                          )}
-                        </div>
-                        <div className="flex gap-2 items-center">
-                          <button
-                            onClick={() => setContentBgImage(null)}
-                            className="w-12 h-12 rounded-lg transition-all duration-200 hover:scale-105 flex items-center justify-center"
-                            style={{
-                              backgroundColor: theme.backgroundSecondary,
-                              boxShadow: !contentBgImage ? `0 0 0 2px ${theme.primary}` : 'none',
-                              border: `1px solid ${theme.border}`,
-                            }}
-                            title="Sin imagen"
-                          >
-                            <X className="w-4 h-4" style={{ color: theme.textSecondary }} />
-                          </button>
-                          {municipioActual?.imagen_portada && (
+                          {sidebarBgImage && (
                             <button
-                              onClick={() => setContentBgImage(municipioActual.imagen_portada!)}
-                              className="w-12 h-12 rounded-lg transition-all duration-200 hover:scale-105 overflow-hidden"
-                              style={{
-                                boxShadow: contentBgImage ? `0 0 0 2px ${theme.primary}` : 'none',
-                                border: `1px solid ${theme.border}`,
-                              }}
-                              title="Imagen del municipio"
+                              onClick={() => setSidebarBgImage(null)}
+                              className="text-[10px] px-2 py-0.5 rounded"
+                              style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
                             >
-                              <img
-                                src={municipioActual.imagen_portada}
-                                alt="Portada"
-                                className="w-full h-full object-cover"
-                              />
+                              Quitar
                             </button>
                           )}
                         </div>
 
+                        {/* Preview de imagen actual */}
+                        {sidebarBgImage ? (
+                          <div
+                            className="w-full h-20 rounded-lg mb-2 bg-cover bg-center"
+                            style={{
+                              backgroundImage: `url(${sidebarBgImage})`,
+                              border: `1px solid ${theme.border}`,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className="w-full h-20 rounded-lg mb-2 flex items-center justify-center"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              border: `1px dashed ${theme.border}`,
+                            }}
+                          >
+                            <span className="text-xs" style={{ color: theme.textSecondary }}>Sin imagen</span>
+                          </div>
+                        )}
+
+                        {/* Hidden file input */}
+                        <input
+                          type="file"
+                          ref={sidebarBgInputRef}
+                          onChange={handleSidebarBgUpload}
+                          className="hidden"
+                          accept="image/*"
+                        />
+
+                        {/* Upload button */}
+                        <button
+                          onClick={() => sidebarBgInputRef.current?.click()}
+                          disabled={uploadingSidebarBg}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg mb-2 transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            border: `1px solid ${theme.border}`,
+                            color: theme.text,
+                          }}
+                        >
+                          {uploadingSidebarBg ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-xs">Subiendo...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="h-4 w-4" />
+                              <span className="text-xs">Subir imagen</span>
+                            </>
+                          )}
+                        </button>
+
                         {/* Slider de opacidad */}
-                        {contentBgImage && (
-                          <div className="mt-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs" style={{ color: theme.textSecondary }}>Opacidad</span>
-                              <span className="text-xs font-mono" style={{ color: theme.text }}>{Math.round(contentBgOpacity * 100)}%</span>
-                            </div>
+                        {sidebarBgImage && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>Opacidad</span>
                             <input
                               type="range"
-                              min="0.01"
-                              max="0.6"
-                              step="0.01"
-                              value={contentBgOpacity}
-                              onChange={(e) => setContentBgOpacity(parseFloat(e.target.value))}
-                              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
-                              style={{
-                                background: `linear-gradient(to right, ${theme.primary} 0%, ${theme.primary} ${((contentBgOpacity - 0.01) / 0.59) * 100}%, ${theme.backgroundSecondary} ${((contentBgOpacity - 0.01) / 0.59) * 100}%, ${theme.backgroundSecondary} 100%)`,
-                              }}
+                              min="0.1"
+                              max="0.5"
+                              step="0.05"
+                              value={sidebarBgOpacity}
+                              onChange={(e) => setSidebarBgOpacity(parseFloat(e.target.value))}
+                              className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+                              style={{ backgroundColor: theme.border }}
                             />
+                            <span className="text-[10px] w-8" style={{ color: theme.textSecondary }}>
+                              {Math.round(sidebarBgOpacity * 100)}%
+                            </span>
                           </div>
                         )}
                       </div>
-
-                      {/* Botón para guardar tema - solo visible para admin/supervisor */}
+                      {/* Fondo del contenido */}
+                      <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                            <Image className="h-3 w-3 inline mr-1" />
+                            Fondo content
+                          </span>
+                          <button
+                            onClick={() => setContentBgImage(contentBgImage ? null : 'https://images.unsplash.com/photo-1557683316-973673baf926?w=1920')}
+                            className="relative w-10 h-5 rounded-full transition-colors"
+                            style={{
+                              backgroundColor: contentBgImage ? theme.primary : theme.border,
+                            }}
+                          >
+                            <div
+                              className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
+                              style={{
+                                transform: contentBgImage ? 'translateX(22px)' : 'translateX(2px)',
+                              }}
+                            />
+                          </button>
+                        </div>
+                      </div>
                       {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
                         <div className="p-3 border-t" style={{ borderColor: theme.border }}>
                           <button
                             onClick={handleSaveTheme}
                             disabled={savingTheme}
-                            className="w-full py-2.5 px-4 rounded-lg font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            style={{
-                              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                              color: '#ffffff',
-                              boxShadow: `0 4px 12px ${theme.primary}40`,
-                            }}
+                            className="w-full py-2 px-4 rounded-lg font-medium text-sm transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                            style={{ backgroundColor: theme.primary, color: '#ffffff' }}
                           >
-                            {savingTheme ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                                Guardando...
-                              </>
-                            ) : (
-                              <>
-                                <Palette className="h-4 w-4" />
-                                Guardar para el municipio
-                              </>
-                            )}
+                            {savingTheme ? 'Guardando...' : 'Guardar para el municipio'}
                           </button>
-                          <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
-                            Aplica este tema para todos los usuarios
-                          </p>
                         </div>
                       )}
                     </div>
@@ -822,30 +865,20 @@ export default function Layout() {
                 )}
               </div>
 
+              {/* Notificaciones */}
               <NotificacionesDropdown />
 
-              {/* Ajustes - para todos los usuarios */}
+              {/* Ajustes */}
               <Link
-                to="/gestion/ajustes"
-                className="p-2 rounded-full transition-all duration-200 hover:scale-110 hover:rotate-45 active:scale-95"
-                style={{ color: theme.text }}
-                title="Ajustes"
+                to="/gestion/configuracion"
+                className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{ color: theme.textSecondary }}
+                title="Configuración"
               >
-                <Settings className="h-5 w-5" />
+                <Settings className="h-4 w-4" strokeWidth={3} />
               </Link>
             </div>
           </div>
-        </header>
-
-        {/* Page content with transition - padding reducido en móvil */}
-        <main
-          className="p-3 sm:p-6 relative"
-          style={{
-            color: theme.text,
-            paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar
-            zIndex: 1,
-          }}
-        >
           {/* Banner de activar notificaciones - visible para todos si no están activas */}
           {!pushSubscribed && (
             <div

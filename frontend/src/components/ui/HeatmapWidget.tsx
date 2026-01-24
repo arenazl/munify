@@ -28,6 +28,7 @@ interface HeatmapPoint {
   intensidad: number;
   estado?: string;
   categoria?: string;
+  color?: string;
 }
 
 interface HeatmapWidgetProps {
@@ -42,37 +43,7 @@ interface HeatmapWidgetProps {
   loading?: boolean;
 }
 
-// Colores por categoría (usando paleta distinguible)
-const CATEGORY_COLORS: Record<string, string> = {
-  'Alumbrado Publico': '#f59e0b',
-  'Alumbrado Público': '#f59e0b',
-  'Baches y Calles': '#ef4444',
-  'Desagues Pluviales': '#3b82f6',
-  'Desagües Pluviales': '#3b82f6',
-  'Espacios Verdes': '#22c55e',
-  'Senalizacion Vial': '#8b5cf6',
-  'Señalización Vial': '#8b5cf6',
-  'Basura y Limpieza': '#06b6d4',
-  'Agua y Cloacas': '#0ea5e9',
-  'Transito': '#f97316',
-  'Tránsito': '#f97316',
-  'Otros': '#6b7280',
-};
-
-const DEFAULT_COLOR = '#ec4899'; // Rosa para categorías no mapeadas
-
-function getCategoryColor(categoria: string): string {
-  // Buscar coincidencia exacta o parcial
-  if (CATEGORY_COLORS[categoria]) {
-    return CATEGORY_COLORS[categoria];
-  }
-  // Buscar coincidencia parcial
-  const key = Object.keys(CATEGORY_COLORS).find((k) =>
-    categoria.toLowerCase().includes(k.toLowerCase()) ||
-    k.toLowerCase().includes(categoria.toLowerCase())
-  );
-  return key ? CATEGORY_COLORS[key] : DEFAULT_COLOR;
-}
+const DEFAULT_COLOR = '#64748b'; // Gris para categorías sin color
 
 // Coordenadas de Merlo, Buenos Aires (centro del partido)
 const MERLO_CENTER: [number, number] = [-34.6637, -58.7276];
@@ -239,7 +210,7 @@ function CategoryMarkers({ data }: { data: HeatmapPoint[] }) {
           center={[point.lat, point.lng]}
           radius={6}
           pathOptions={{
-            fillColor: getCategoryColor(point.categoria || 'Otros'),
+            fillColor: point.color || DEFAULT_COLOR,
             color: '#ffffff',
             weight: 1,
             opacity: 0.9,
@@ -297,30 +268,42 @@ function ZoomControls({ onReset }: { onReset?: () => void }) {
   );
 }
 
-// Categorías únicas para los filtros (sin duplicados con/sin tildes)
+// Categorías únicas para los filtros (sincronizadas con la base de datos)
 const UNIQUE_CATEGORIES = [
-  { key: 'alumbrado', label: 'Alumbrado', color: '#f59e0b' },
-  { key: 'baches', label: 'Baches y Calles', color: '#ef4444' },
-  { key: 'desagues', label: 'Desagües', color: '#3b82f6' },
+  { key: 'baches', label: 'Baches', color: '#ef4444' },
+  { key: 'iluminacion', label: 'Iluminación', color: '#f59e0b' },
+  { key: 'recoleccion', label: 'Recolección', color: '#10b981' },
   { key: 'espacios', label: 'Espacios Verdes', color: '#22c55e' },
-  { key: 'senalizacion', label: 'Señalización', color: '#8b5cf6' },
-  { key: 'basura', label: 'Basura', color: '#06b6d4' },
-  { key: 'agua', label: 'Agua y Cloacas', color: '#0ea5e9' },
-  { key: 'transito', label: 'Tránsito', color: '#f97316' },
-  { key: 'otros', label: 'Otros', color: '#6b7280' },
+  { key: 'agua', label: 'Agua y Cloacas', color: '#3b82f6' },
+  { key: 'semaforos', label: 'Señalización', color: '#f97316' },
+  { key: 'zoonosis', label: 'Zoonosis', color: '#8b5cf6' },
+  { key: 'veredas', label: 'Veredas', color: '#78716c' },
+  { key: 'ruidos', label: 'Ruidos', color: '#ec4899' },
+  { key: 'limpieza', label: 'Limpieza', color: '#14b8a6' },
+  { key: 'seguridad', label: 'Seguridad', color: '#dc2626' },
+  { key: 'obras', label: 'Obras', color: '#eab308' },
+  { key: 'salud', label: 'Salud', color: '#be185d' },
+  { key: 'transporte', label: 'Transporte', color: '#0ea5e9' },
+  { key: 'otros', label: 'Otros', color: '#64748b' },
 ];
 
 // Mapear categoría real a key de filtro
 function getCategoryKey(categoria: string): string {
   const cat = categoria.toLowerCase();
-  if (cat.includes('alumbrado')) return 'alumbrado';
-  if (cat.includes('bache') || cat.includes('calle')) return 'baches';
-  if (cat.includes('desag') || cat.includes('pluvial')) return 'desagues';
+  if (cat.includes('bache') || cat.includes('calzada')) return 'baches';
+  if (cat.includes('iluminacion') || cat.includes('iluminación')) return 'iluminacion';
+  if (cat.includes('recoleccion') || cat.includes('recolección') || cat.includes('residuo')) return 'recoleccion';
   if (cat.includes('espacio') || cat.includes('verde')) return 'espacios';
-  if (cat.includes('señal') || cat.includes('senal') || cat.includes('vial')) return 'senalizacion';
-  if (cat.includes('basura') || cat.includes('limpieza')) return 'basura';
   if (cat.includes('agua') || cat.includes('cloaca')) return 'agua';
-  if (cat.includes('transit')) return 'transito';
+  if (cat.includes('semaforo') || cat.includes('semáforo') || cat.includes('señal') || cat.includes('senal')) return 'semaforos';
+  if (cat.includes('zoonosis') || cat.includes('animal')) return 'zoonosis';
+  if (cat.includes('vereda') || cat.includes('baldio') || cat.includes('baldío')) return 'veredas';
+  if (cat.includes('ruido')) return 'ruidos';
+  if (cat.includes('limpieza')) return 'limpieza';
+  if (cat.includes('seguridad')) return 'seguridad';
+  if (cat.includes('obra')) return 'obras';
+  if (cat.includes('salud')) return 'salud';
+  if (cat.includes('transporte') || cat.includes('parada')) return 'transporte';
   return 'otros';
 }
 
