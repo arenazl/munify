@@ -1,4 +1,5 @@
 from .municipio import Municipio  # IMPORTANTE: Municipio debe ir primero por las relaciones FK
+from .barrio import Barrio  # Barrios del municipio (cargados via IA)
 from .user import User
 from .categoria import Categoria, MunicipioCategoria
 from .zona import Zona
@@ -34,6 +35,7 @@ from .consulta_guardada import ConsultaGuardada
 
 __all__ = [
     "Municipio",
+    "Barrio",
     "User",
     "Categoria",
     "MunicipioCategoria",
@@ -91,3 +93,8 @@ __all__ = [
     # Consultas guardadas / BI
     "ConsultaGuardada"
 ]
+
+# Direcciones (nuevas entidades)
+from .direccion import Direccion
+from .direccion_categoria import DireccionCategoria
+from .direccion_tipo_tramite import DireccionTipoTramite

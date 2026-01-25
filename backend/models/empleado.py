@@ -46,8 +46,6 @@ class Empleado(Base):
 
     # Relaciones
     miembros = relationship("User", back_populates="empleado")
-    reclamos_asignados = relationship("Reclamo", back_populates="empleado_asignado")
-    solicitudes_asignadas = relationship("Solicitud", back_populates="empleado_asignado")
     categorias = relationship("Categoria", secondary=empleado_categoria, backref="empleados")
 
     # Nuevas relaciones

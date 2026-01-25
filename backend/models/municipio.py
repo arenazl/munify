@@ -66,8 +66,14 @@ class Municipio(Base):
     tipos_tramites_habilitados = relationship("MunicipioTipoTramite", back_populates="municipio")
     tramites_habilitados = relationship("MunicipioTramite", back_populates="municipio")
 
+    # Relaciones con direcciones
+    direcciones = relationship("Direccion", back_populates="municipio", cascade="all, delete-orphan")
+
     # Consultas guardadas / BI
     consultas_guardadas = relationship("ConsultaGuardada", back_populates="municipio")
+
+    # Barrios (cargados automáticamente via IA al crear el municipio)
+    barrios = relationship("Barrio", back_populates="municipio", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Municipio {self.nombre}>"

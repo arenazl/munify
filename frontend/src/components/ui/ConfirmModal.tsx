@@ -1,3 +1,4 @@
+import { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { AlertTriangle, X } from 'lucide-react';
@@ -24,6 +25,24 @@ export function ConfirmModal({
   variant = 'danger'
 }: ConfirmModalProps) {
   const { theme } = useTheme();
+
+  // Keyboard handler: Enter = confirm, Escape = close
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onConfirm();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }, [onConfirm, onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, handleKeyDown]);
 
   if (!isOpen) return null;
 

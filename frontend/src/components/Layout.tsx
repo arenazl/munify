@@ -312,7 +312,8 @@ export default function Layout() {
               >
                 Munify
               </span>
-              {municipioActual && (
+              {/* Super Admin (sin municipio_id) no muestra municipio */}
+              {municipioActual && user?.municipio_id && (
                 <p
                   className="text-[10px] whitespace-nowrap -mt-0.5"
                   style={{ color: theme.sidebarTextSecondary }}
@@ -320,6 +321,7 @@ export default function Layout() {
                   {municipioActual.nombre}
                 </p>
               )}
+              {/* Super Admin (sin municipio_id): no mostrar nada */}
             </div>
           </div>
         </div>

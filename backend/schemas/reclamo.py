@@ -74,6 +74,17 @@ class ZonaSimple(BaseModel):
     class Config:
         from_attributes = True
 
+
+class BarrioSimple(BaseModel):
+    id: int
+    nombre: str
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    validado: bool = False
+
+    class Config:
+        from_attributes = True
+
 class EmpleadoSimple(BaseModel):
     id: int
     nombre: str
@@ -115,6 +126,7 @@ class ReclamoResponse(BaseModel):
 
     categoria: CategoriaSimple
     zona: Optional[ZonaSimple]
+    barrio: Optional[BarrioSimple] = None
     creador: CreadorSimple
     empleado_asignado: Optional[EmpleadoSimple]
     documentos: List[DocumentoSimple] = []

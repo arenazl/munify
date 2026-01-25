@@ -171,9 +171,9 @@ class Solicitud(Base):
     telefono_solicitante = Column(String(50), nullable=True)
     direccion_solicitante = Column(String(300), nullable=True)
 
-    # Empleado asignado
-    empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)
-    empleado_asignado = relationship("Empleado", back_populates="solicitudes_asignadas")
+    # Dirección organizativa asignada (unidad municipal que gestiona esta solicitud)
+    direccion_id = Column(Integer, ForeignKey("direcciones.id"), nullable=True, index=True)
+    direccion_asignada = relationship("Direccion", back_populates="solicitudes")
 
     # Prioridad (1=urgente, 5=baja)
     prioridad = Column(Integer, default=3)

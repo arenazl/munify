@@ -72,9 +72,9 @@ export default function Demo() {
       console.log('[Demo] Iniciando login con email:', email);
 
       // Setear información del municipio ANTES del login
-      localStorage.setItem('municipio_codigo', 'merlo');
+      localStorage.setItem('municipio_codigo', 'chacabuco');
       localStorage.setItem('municipio_id', '1');
-      localStorage.setItem('municipio_nombre', 'Merlo');
+      localStorage.setItem('municipio_nombre', 'Chacabuco');
       localStorage.setItem('municipio_color', '#0088cc');
 
       // Hacer login directamente con el email específico
@@ -100,9 +100,9 @@ export default function Demo() {
   };
 
   const continueAsGuest = () => {
-    localStorage.setItem('municipio_codigo', 'merlo');
+    localStorage.setItem('municipio_codigo', 'chacabuco');
     localStorage.setItem('municipio_id', '1');
-    localStorage.setItem('municipio_nombre', 'Merlo');
+    localStorage.setItem('municipio_nombre', 'Chacabuco');
     localStorage.setItem('municipio_color', '#0088cc');
     navigate('/home');
   };

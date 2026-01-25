@@ -53,8 +53,8 @@ export default function Landing() {
 
   // Super Admin login modal
   const [showSuperAdminLogin, setShowSuperAdminLogin] = useState(false);
-  const [superAdminEmail, setSuperAdminEmail] = useState('superadmin@sistema.gob');
-  const [superAdminPassword, setSuperAdminPassword] = useState('superadmin123');
+  const [superAdminEmail, setSuperAdminEmail] = useState('superadmin@test.com');
+  const [superAdminPassword, setSuperAdminPassword] = useState('super123');
   const [demoUsers, setDemoUsers] = useState<Array<{
     email: string;
     nombre: string;
@@ -454,7 +454,7 @@ export default function Landing() {
                                 <button
                                   key={`${user.rol}-${index}`}
                                   type="button"
-                                  onClick={() => quickLogin(user.email, '123456')}
+                                  onClick={() => quickLogin(user.email, 'demo123')}
                                   disabled={debugLoading}
                                   className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
                                 >
@@ -466,8 +466,8 @@ export default function Landing() {
                                     <div className="flex items-center gap-2">
                                       <Icon className="h-4 w-4 flex-shrink-0" />
                                       <div className="text-left min-w-0">
-                                        <div className="font-semibold truncate">{user.nombre_completo}</div>
-                                        <div className="text-[10px] opacity-80">{config.label}</div>
+                                        <div className="font-semibold truncate">{config.label}</div>
+                                        <div className="text-[10px] opacity-80 font-mono truncate">{user.email}</div>
                                       </div>
                                     </div>
                                   )}
@@ -477,7 +477,7 @@ export default function Landing() {
                           </div>
 
                           <p className="text-xs text-slate-500 text-center mt-4">
-                            Usuarios de prueba
+                            Usuarios de prueba · Pass: <span className="text-slate-400 font-mono">demo123</span>
                           </p>
                         </>
                       )}

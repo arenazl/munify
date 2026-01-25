@@ -40,6 +40,66 @@ export interface Zona {
   created_at: string;
 }
 
+// Dirección organizativa municipal (unidad que gestiona reclamos/trámites)
+export type TipoGestion = 'reclamos' | 'tramites' | 'ambos';
+
+export interface DireccionCategoria {
+  id: number;
+  categoria_id: number;
+  categoria: CategoriaSimple;
+  tiempo_resolucion_estimado?: number;
+  prioridad_default?: number;
+  activo: boolean;
+}
+
+export interface DireccionTipoTramite {
+  id: number;
+  tipo_tramite_id: number;
+  tipo_tramite: {
+    id: number;
+    nombre: string;
+    icono?: string;
+    color?: string;
+  };
+  activo: boolean;
+}
+
+export interface Direccion {
+  id: number;
+  nombre: string;
+  codigo?: string;
+  descripcion?: string;
+  direccion?: string;  // "Av. San Martin 1234"
+  localidad?: string;
+  codigo_postal?: string;
+  latitud?: number;
+  longitud?: number;
+  tipo_gestion: TipoGestion;
+  activo: boolean;
+  created_at?: string;
+  categorias_asignadas?: DireccionCategoria[];
+  tipos_tramite_asignados?: DireccionTipoTramite[];
+}
+
+// Para el drag & drop de asignaciones
+export interface CategoriaDisponible {
+  id: number;
+  nombre: string;
+  icono?: string;
+  color?: string;
+  descripcion?: string;
+  direcciones_asignadas: number[];
+}
+
+export interface TipoTramiteDisponible {
+  id: number;
+  nombre: string;
+  icono?: string;
+  color?: string;
+  descripcion?: string;
+  direcciones_asignadas: number[];
+}
+
 export interface CategoriaSimple {
   id: number;
   nombre: string;

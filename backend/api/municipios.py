@@ -244,17 +244,20 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Buscar usuarios de prueba con dos patrones:
+    # Buscar usuarios de prueba con tres patrones:
     # 1. @{codigo}.test.com (patrón original)
-    # 2. @demo.com (patrón genérico para usuarios demo)
+    # 2. @{codigo}.demo.com (patrón nuevo del seed)
+    # 3. @demo.com (patrón genérico)
     from sqlalchemy import or_
     email_pattern1 = f"%@{codigo}.test.com"
-    email_pattern2 = "%@demo.com"
+    email_pattern2 = f"%@{codigo}.demo.com"
+    email_pattern3 = "%@demo.com"
     query = select(User).where(
         User.municipio_id == municipio.id,
         or_(
             User.email.like(email_pattern1),
-            User.email.like(email_pattern2)
+            User.email.like(email_pattern2),
+            User.email.like(email_pattern3)
         ),
         User.activo == True
     )
@@ -330,16 +333,36 @@ async def obtener_municipio(
     return municipio
 
 
-@router.post("", response_model=MunicipioDetalle)
+class MunicipioCreateResponse(MunicipioDetalle):
+    """Respuesta al crear municipio con info del seed"""
+    seed_info: Optional[dict] = None
+
+
+@router.post("", response_model=MunicipioCreateResponse)
 async def crear_municipio(
     data: MunicipioCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
 ):
     """
-    Crea un nuevo municipio (solo admin).
-    Automáticamente crea las 12 categorías por defecto.
+    Crea un nuevo municipio (solo super admin).
+    Automáticamente crea:
+    - 12 categorías de reclamos por defecto
+    - 6 tipos de trámites con trámites específicos
+    - Barrios del municipio buscados con IA + Nominatim
+    - Usuarios demo (admin, supervisor, empleado, vecino)
+    - Empleados y cuadrillas
+    - Reclamos de ejemplo en distintos estados
     """
+    from services.tramites_default import crear_tipos_tramites_default
+    from services.barrios_auto import cargar_barrios_municipio
+    from services.seed_municipio import seed_municipio_completo
+    from models.barrio import Barrio
+
+    # Solo super admin (sin municipio_id) puede crear municipios
+    if current_user.municipio_id is not None:
+        raise HTTPException(status_code=403, detail="Solo el super admin puede crear municipios")
+
     # Verificar que no exista un municipio con el mismo codigo
     query = select(Municipio).where(Municipio.codigo == data.codigo)
     result = await db.execute(query)
@@ -348,13 +371,60 @@ async def crear_municipio(
 
     municipio = Municipio(**data.model_dump())
     db.add(municipio)
+    await db.flush()
+
+    # 1. Crear categorías de reclamos por defecto
+    await crear_categorias_default(db, municipio.id)
+
+    # 2. Crear tipos de trámites y trámites por defecto
+    await crear_tipos_tramites_default(db, municipio.id)
+
+    # 3. Cargar barrios automáticamente con IA + Nominatim
+    barrios = []
+    try:
+        barrios_creados = await cargar_barrios_municipio(
+            db=db,
+            municipio_id=municipio.id,
+            nombre_municipio=municipio.nombre,
+            provincia="Buenos Aires"
+        )
+        print(f"[MUNICIPIO] {barrios_creados} barrios creados para {municipio.nombre}")
+
+        # Obtener lista de barrios para el seed
+        result = await db.execute(
+            select(Barrio).where(Barrio.municipio_id == municipio.id)
+        )
+        barrios = result.scalars().all()
+    except Exception as e:
+        print(f"[MUNICIPIO] Error cargando barrios para {municipio.nombre}: {e}")
+
+    # 4. Generar seed completo (usuarios, empleados, cuadrilla, reclamos)
+    seed_info = None
+    try:
+        seed_info = await seed_municipio_completo(
+            db=db,
+            municipio_id=municipio.id,
+            codigo=municipio.codigo,
+            barrios=barrios
+        )
+        print(f"[MUNICIPIO] Seed creado: {seed_info}")
+    except Exception as e:
+        print(f"[MUNICIPIO] Error en seed: {e}")
+        import traceback
+        traceback.print_exc()
+
     await db.commit()
     await db.refresh(municipio)
 
-    # Crear categorías por defecto para el nuevo municipio
-    await crear_categorias_default(db, municipio.id)
+    # Construir respuesta
+    response_data = {
+        **municipio.__dict__,
+        "seed_info": seed_info
+    }
+    # Remover _sa_instance_state de SQLAlchemy
+    response_data.pop("_sa_instance_state", None)
 
-    return municipio
+    return response_data
 
 
 @router.put("/{municipio_id}", response_model=MunicipioDetalle)
@@ -713,3 +783,241 @@ async def eliminar_imagen_portada(
     await db.refresh(municipio)
 
     return municipio
+
+
+# ============ Endpoints de Barrios ============
+
+class BarrioSugerido(BaseModel):
+    """Un barrio sugerido por la IA y validado con Nominatim"""
+    nombre: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    display_name: Optional[str] = None
+    validado: bool = False
+
+
+class BarriosResponse(BaseModel):
+    """Respuesta de búsqueda de barrios"""
+    municipio: str
+    provincia: str
+    barrios: List[BarrioSugerido]
+    centro: Optional[dict] = None
+
+
+class ImportarBarriosRequest(BaseModel):
+    """Request para importar barrios como zonas"""
+    barrios: List[BarrioSugerido]
+
+
+class BarrioGuardado(BaseModel):
+    """Un barrio ya guardado en la BD"""
+    id: int
+    nombre: str
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+    validado: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{municipio_id}/barrios", response_model=List[BarrioGuardado])
+async def obtener_barrios_municipio(
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtiene los barrios ya guardados de un municipio.
+    """
+    from models.barrio import Barrio
+
+    # Verificar que el municipio existe
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Obtener barrios
+    query = select(Barrio).where(Barrio.municipio_id == municipio_id).order_by(Barrio.nombre)
+    result = await db.execute(query)
+    barrios = result.scalars().all()
+
+    return barrios
+
+
+@router.post("/{municipio_id}/barrios/cargar")
+async def cargar_barrios_con_ia(
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Carga barrios de un municipio usando IA + Nominatim.
+    Guarda directamente en la tabla barrios (no zonas).
+    """
+    from services.barrios_auto import cargar_barrios_municipio
+
+    # Verificar que el municipio existe
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Cargar barrios
+    try:
+        barrios_creados = await cargar_barrios_municipio(
+            db=db,
+            municipio_id=municipio_id,
+            nombre_municipio=municipio.nombre,
+            provincia="Buenos Aires"
+        )
+        await db.commit()
+
+        return {
+            "message": f"{barrios_creados} barrios cargados para {municipio.nombre}",
+            "barrios_creados": barrios_creados
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error cargando barrios: {str(e)}")
+
+
+@router.get("/{municipio_id}/barrios/buscar", response_model=BarriosResponse)
+async def buscar_barrios_municipio(
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Busca barrios/localidades de un municipio usando IA + Nominatim.
+    Solo admin puede usar este endpoint.
+
+    Retorna lista de barrios sugeridos con coordenadas cuando están disponibles.
+    """
+    from services.barrios_service import buscar_barrios_municipio as buscar_barrios, obtener_centro_municipio
+
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Buscar barrios
+    barrios = await buscar_barrios(municipio.nombre, "Buenos Aires")
+
+    # Obtener centro del municipio
+    centro = await obtener_centro_municipio(municipio.nombre, "Buenos Aires")
+
+    return BarriosResponse(
+        municipio=municipio.nombre,
+        provincia="Buenos Aires",
+        barrios=[BarrioSugerido(**b) for b in barrios],
+        centro=centro
+    )
+
+
+@router.post("/{municipio_id}/barrios/importar")
+async def importar_barrios_como_zonas(
+    municipio_id: int,
+    data: ImportarBarriosRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Importa barrios seleccionados como Zonas del municipio.
+    Solo admin puede usar este endpoint.
+    """
+    from models.zona import Zona
+
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    zonas_creadas = []
+    zonas_existentes = []
+
+    for barrio in data.barrios:
+        # Verificar si ya existe
+        query_existe = select(Zona).where(
+            Zona.nombre == barrio.nombre,
+            Zona.municipio_id == municipio_id
+        )
+        result_existe = await db.execute(query_existe)
+        if result_existe.scalar_one_or_none():
+            zonas_existentes.append(barrio.nombre)
+            continue
+
+        # Generar código
+        codigo = f"{municipio.codigo[:3].upper()}-{barrio.nombre[:3].upper()}"
+
+        # Crear zona
+        zona = Zona(
+            municipio_id=municipio_id,
+            nombre=barrio.nombre,
+            codigo=codigo,
+            latitud_centro=barrio.lat,
+            longitud_centro=barrio.lng,
+            descripcion=barrio.display_name,
+            activo=True
+        )
+        db.add(zona)
+        zonas_creadas.append(barrio.nombre)
+
+    await db.commit()
+
+    return {
+        "message": f"Se crearon {len(zonas_creadas)} zonas",
+        "zonas_creadas": zonas_creadas,
+        "zonas_existentes": zonas_existentes
+    }
+
+
+@router.post("/{municipio_id}/direcciones/generar")
+async def generar_direcciones(
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Genera 6 direcciones/departamentos para un municipio usando IA.
+    Asocia tipos de trámites a cada dirección automáticamente.
+    Solo super admin puede usar este endpoint.
+    """
+    from services.direcciones_auto import cargar_direcciones_completo
+
+    # Solo super admin
+    if current_user.municipio_id is not None:
+        raise HTTPException(status_code=403, detail="Solo el super admin puede generar direcciones")
+
+    # Obtener municipio
+    query = select(Municipio).where(Municipio.id == municipio_id)
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Generar direcciones con IA
+    resultado = await cargar_direcciones_completo(
+        db=db,
+        municipio_id=municipio_id,
+        nombre_municipio=municipio.nombre
+    )
+
+    await db.commit()
+
+    return {
+        "message": f"Se crearon {resultado['direcciones_creadas']} direcciones con {resultado['tramites_asociados']} trámites asociados",
+        "direcciones_creadas": resultado["direcciones_creadas"],
+        "tramites_asociados": resultado["tramites_asociados"]
+    }

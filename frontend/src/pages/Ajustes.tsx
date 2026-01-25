@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Clock, Building2, Check
+  CalendarOff, Clock, Building2, Check, Landmark
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,6 +35,8 @@ export default function Ajustes() {
   const isAdmin = user?.rol === 'admin';
   const isSupervisor = user?.rol === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
+  // Super Admin: admin sin municipio_id asignado (puede gestionar todos los municipios)
+  const isSuperAdmin = isAdmin && !user?.municipio_id;
 
   // Recuperar item seleccionado del localStorage
   useEffect(() => {
@@ -187,6 +189,24 @@ export default function Ajustes() {
       id: 'catalogo',
       title: 'Catalogos',
       items: [
+        {
+          id: 'municipios',
+          label: 'Municipios',
+          description: 'Alta, baja y modificación de municipios',
+          icon: Landmark,
+          color: '#ec4899',
+          link: '/gestion/municipios',
+          show: isSuperAdmin
+        },
+        {
+          id: 'direcciones',
+          label: 'Direcciones',
+          description: 'Unidades organizativas del municipio',
+          icon: Building2,
+          color: '#3b82f6',
+          link: '/gestion/direcciones',
+          show: isAdminOrSupervisor
+        },
         {
           id: 'categorias',
           label: 'Categorias',

@@ -49,8 +49,18 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+# Node modules (all locations)
+node_modules/
 mobile/node_modules/
+
+# Temp files
 nul
+
+# Netlify cache
+.netlify/
+
+# Continue extension
+.continue/
 
 # Carpetas obsoletas de Netlify
 netlify-landing/

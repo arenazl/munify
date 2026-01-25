@@ -1,5 +1,5 @@
 """
-Script para actualizar el codigo del municipio de 'demo' a 'merlo'
+Script para actualizar el codigo del municipio de 'demo' a 'chacabuco'
 """
 import asyncio
 from sqlalchemy import text
@@ -11,15 +11,15 @@ async def update_municipio_codigo():
 
         result = await db.execute(text("""
             UPDATE municipios
-            SET codigo = 'merlo', nombre = 'Merlo'
+            SET codigo = 'chacabuco', nombre = 'Chacabuco'
             WHERE codigo = 'demo'
         """))
 
         await db.commit()
 
         print(f"OK - {result.rowcount} municipio(s) actualizado(s)")
-        print("Codigo actualizado: demo -> merlo")
-        print("Nombre actualizado: Municipalidad Demo -> Merlo")
+        print("Codigo actualizado: demo -> chacabuco")
+        print("Nombre actualizado: Municipalidad Demo -> Chacabuco")
 
 if __name__ == "__main__":
     asyncio.run(update_municipio_codigo())

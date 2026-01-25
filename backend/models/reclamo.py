@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from core.database import Base
 from .enums import EstadoReclamo, MotivoRechazo
 
+
 class Reclamo(Base):
     __tablename__ = "reclamos"
 
@@ -21,24 +22,31 @@ class Reclamo(Base):
     estado = Column(Enum(EstadoReclamo), default=EstadoReclamo.NUEVO, nullable=False, index=True)
     prioridad = Column(Integer, default=3)  # 1-5, donde 1 es más urgente
 
-    # Ubicación
+    # Ubicación del reclamo (donde está el problema)
     direccion = Column(String(255), nullable=False)
     latitud = Column(Float, nullable=True)
     longitud = Column(Float, nullable=True)
     referencia = Column(String(255), nullable=True)  # "Frente a la plaza", etc.
 
-    # Relaciones con otras tablas
+    # Categoría del reclamo
     categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
     categoria = relationship("Categoria", back_populates="reclamos")
 
+    # Zona geográfica (legacy - usar barrio_id preferentemente)
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True)
     zona = relationship("Zona", back_populates="reclamos")
 
+    # Barrio detectado automáticamente desde la dirección
+    barrio_id = Column(Integer, ForeignKey("barrios.id"), nullable=True, index=True)
+    barrio = relationship("Barrio")
+
+    # Usuario que creó el reclamo
     creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     creador = relationship("User", back_populates="reclamos_creados", foreign_keys=[creador_id])
 
-    empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)
-    empleado_asignado = relationship("Empleado", back_populates="reclamos_asignados")
+    # Dirección organizativa asignada (unidad municipal que gestiona este reclamo)
+    direccion_id = Column(Integer, ForeignKey("direcciones.id"), nullable=True, index=True)
+    direccion_asignada = relationship("Direccion", back_populates="reclamos")
 
     # Programación del trabajo
     fecha_programada = Column(Date, nullable=True)

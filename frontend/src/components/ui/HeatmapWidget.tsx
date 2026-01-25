@@ -45,13 +45,13 @@ interface HeatmapWidgetProps {
 
 const DEFAULT_COLOR = '#64748b'; // Gris para categorías sin color
 
-// Coordenadas de Merlo, Buenos Aires (centro del partido)
-const MERLO_CENTER: [number, number] = [-34.6637, -58.7276];
-const MERLO_BOUNDS = {
-  minLat: -34.80,  // Sur de Merlo
-  maxLat: -34.55,  // Norte de Merlo
-  minLng: -58.85,  // Oeste de Merlo
-  maxLng: -58.60,  // Este de Merlo
+// Coordenadas de Chacabuco, Buenos Aires (centro del partido)
+const CHACABUCO_CENTER: [number, number] = [-34.6373, -60.4719];
+const CHACABUCO_BOUNDS = {
+  minLat: -34.72,  // Sur de Chacabuco
+  maxLat: -34.52,  // Norte de Chacabuco
+  minLng: -60.60,  // Oeste de Chacabuco
+  maxLng: -60.35,  // Este de Chacabuco
 };
 
 // Componente para ajustar el zoom a los datos
@@ -102,7 +102,7 @@ function FitBoundsToData({ data, onReady }: { data: HeatmapPoint[]; onReady?: ()
         }
       } else {
         // Fallback: centro de Merlo
-        map.setView(MERLO_CENTER, 13, { animate: false });
+        map.setView(CHACABUCO_CENTER, 13, { animate: false });
       }
 
       // Notificar que el mapa está listo después de un pequeño delay adicional
@@ -408,7 +408,7 @@ export default function HeatmapWidget({
   // Calcular centro basado en los datos válidos
   const mapCenter = useMemo<[number, number]>(() => {
     if (center) return center;
-    if (validData.length === 0) return MERLO_CENTER; // Merlo por defecto
+    if (validData.length === 0) return CHACABUCO_CENTER; // Chacabuco por defecto
 
     const avgLat = validData.reduce((sum, p) => sum + p.lat, 0) / validData.length;
     const avgLng = validData.reduce((sum, p) => sum + p.lng, 0) / validData.length;

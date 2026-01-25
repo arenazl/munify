@@ -2,7 +2,7 @@
  * Hook para detectar y manejar subdominios dinámicos por municipio.
  *
  * Ejemplos de URLs soportadas:
- * - merlo.reclamos.app -> municipio "merlo"
+ * - chacabuco.reclamos.app -> municipio "chacabuco"
  * - moreno.sistema.com -> municipio "moreno"
  * - localhost:5173 -> sin subdominio (landing general)
  * - 192.168.1.40:5173 -> sin subdominio (desarrollo local)
@@ -43,7 +43,7 @@ export function getSubdomainMunicipio(): string | null {
   const parts = hostname.split('.');
 
   // Si hay más de 2 partes, el primero es el subdominio
-  // ej: merlo.reclamos.app -> ['merlo', 'reclamos', 'app']
+  // ej: chacabuco.reclamos.app -> ['chacabuco', 'reclamos', 'app']
   if (parts.length > 2) {
     const subdomain = parts[0].toLowerCase();
 
@@ -63,7 +63,7 @@ export function getSubdomainMunicipio(): string | null {
 
 /**
  * Construye una URL para un municipio específico.
- * @param codigoMunicipio Código del municipio (ej: "merlo")
+ * @param codigoMunicipio Código del municipio (ej: "chacabuco")
  * @param path Path opcional (ej: "/login")
  * @returns URL completa con subdominio
  */

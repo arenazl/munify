@@ -242,6 +242,7 @@ def get_reclamos_query():
     return select(Reclamo).options(
         selectinload(Reclamo.categoria),
         selectinload(Reclamo.zona),
+        selectinload(Reclamo.barrio),
         selectinload(Reclamo.creador),
         selectinload(Reclamo.empleado_asignado),
         selectinload(Reclamo.documentos)
@@ -889,6 +890,25 @@ async def create_reclamo(
         municipio_id=current_user.municipio_id,
         estado=EstadoReclamo.NUEVO
     )
+
+    # Detectar barrio automáticamente desde la dirección
+    try:
+        from services.barrio_detector import detectar_barrio
+        barrio_id = await detectar_barrio(
+            db=db,
+            municipio_id=current_user.municipio_id,
+            direccion=data.direccion,
+            latitud=data.latitud,
+            longitud=data.longitud
+        )
+        if barrio_id:
+            reclamo.barrio_id = barrio_id
+            print(f"[BARRIO] Detectado barrio_id={barrio_id} para dirección: {data.direccion}", flush=True)
+        else:
+            print(f"[BARRIO] No se detectó barrio para dirección: {data.direccion}", flush=True)
+    except Exception as e:
+        print(f"[BARRIO] Error detectando barrio: {e}", flush=True)
+
     db.add(reclamo)
     await db.flush()
 

@@ -1,0 +1,49 @@
+[tool.ruff]
+# Versión de Python objetivo
+target-version = "py312"
+
+# Ancho máximo de línea
+line-length = 120
+
+# Excluir directorios
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "migrations",
+    "alembic",
+]
+
+[tool.ruff.lint]
+# Reglas habilitadas
+select = [
+    "E",      # errores de pycodestyle
+    "W",      # warnings de pycodestyle
+    "F",      # errores de Pyflakes
+    "I",      # isort (ordenar imports)
+    "B",      # flake8-bugbear (bugs comunes)
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade (sintaxis moderna)
+]
+
+# Reglas ignoradas
+ignore = [
+    "E501",   # línea muy larga (manejado por formatter)
+    "B008",   # function call in default argument (común en FastAPI con Depends)
+    "B904",   # raise without from (a veces innecesario)
+]
+
+[tool.ruff.lint.isort]
+# Configuración de ordenamiento de imports
+known-first-party = ["core", "models", "api", "schemas", "services"]
+
+[tool.ruff.format]
+# Usar comillas dobles
+quote-style = "double"
+
+# Indentar con espacios
+indent-style = "space"
+
+# Respetar trailing commas
+skip-magic-trailing-comma = false

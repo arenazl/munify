@@ -18,7 +18,7 @@ import Empleados from './pages/Empleados';
 import Usuarios from './pages/Usuarios';
 import Categorias from './pages/Categorias';
 import Zonas from './pages/Zonas';
-import Configuracion from './pages/Configuracion';
+// import Configuracion from './pages/Configuracion';  // Redirige a Ajustes
 import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamo from './pages/NuevoReclamo';
@@ -43,6 +43,9 @@ import GestionHorarios from './pages/GestionHorarios';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import Demo from './pages/Demo';
+import Direcciones from './pages/Direcciones';
+import DireccionesConfig from './pages/DireccionesConfig';
+import Municipios from './pages/Municipios';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -100,7 +103,7 @@ export const router = createBrowserRouter([
   { path: '/demo', element: <Demo /> },
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
-  { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/merlo
+  { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
@@ -173,6 +176,14 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute roles={['admin', 'supervisor']}><Zonas /></ProtectedRoute>
       },
       {
+        path: 'direcciones',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Direcciones /></ProtectedRoute>
+      },
+      {
+        path: 'direcciones/config',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><DireccionesConfig /></ProtectedRoute>
+      },
+      {
         path: 'tipos-tramite',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><TiposTramite /></ProtectedRoute>
       },
@@ -182,7 +193,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'configuracion',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><Configuracion /></ProtectedRoute>
+        element: <Navigate to="/gestion/ajustes" replace />
+      },
+      {
+        path: 'municipios',
+        element: <ProtectedRoute roles={['admin']}><Municipios /></ProtectedRoute>
       },
       {
         path: 'exportar',

@@ -312,6 +312,30 @@ export const zonasApi = {
   delete: (id: number) => api.delete(`/zonas/${id}`).then(res => { invalidateCache('/zonas'); return res; }),
 };
 
+// Direcciones (unidades organizativas municipales)
+export const direccionesApi = {
+  getAll: (params?: { activo?: boolean; tipo_gestion?: string }) =>
+    api.get('/direcciones', { params }),
+  getOne: (id: number) => api.get(`/direcciones/${id}`),
+  create: (data: Record<string, unknown>) =>
+    api.post('/direcciones', data).then(res => { invalidateCache('/direcciones'); return res; }),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/direcciones/${id}`, data).then(res => { invalidateCache('/direcciones'); return res; }),
+  delete: (id: number) =>
+    api.delete(`/direcciones/${id}`).then(res => { invalidateCache('/direcciones'); return res; }),
+  // Asignación de categorías
+  getCategorias: (direccionId: number) => api.get(`/direcciones/${direccionId}/categorias`),
+  asignarCategorias: (direccionId: number, categoriaIds: number[]) =>
+    api.post(`/direcciones/${direccionId}/categorias`, { categoria_ids: categoriaIds }),
+  // Asignación de tipos de trámite
+  getTiposTramite: (direccionId: number) => api.get(`/direcciones/${direccionId}/tipos-tramite`),
+  asignarTiposTramite: (direccionId: number, tipoTramiteIds: number[]) =>
+    api.post(`/direcciones/${direccionId}/tipos-tramite`, { tipo_tramite_ids: tipoTramiteIds }),
+  // Para configuración / drag & drop
+  getCategoriasDisponibles: () => api.get('/direcciones/configuracion/categorias-disponibles'),
+  getTiposTramiteDisponibles: () => api.get('/direcciones/configuracion/tipos-tramite-disponibles'),
+};
+
 // Empleados
 export const empleadosApi = {
   getAll: (activo?: boolean) => api.get('/empleados', { params: activo !== undefined ? { activo } : {} }),
@@ -394,6 +418,23 @@ export const municipiosApi = {
     api.post(`/municipios/${id}/sidebar-bg`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  // ABM de municipios (solo super admin)
+  create: (data: {
+    nombre: string;
+    codigo: string;
+    latitud: number;
+    longitud: number;
+    radio_km: number;
+    color_primario: string;
+    activo: boolean;
+  }) => api.post('/municipios', data),
+  update: (id: number, data: object) => api.put(`/municipios/${id}`, data),
+  delete: (id: number) => api.delete(`/municipios/${id}`),
+  // Barrios (se cargan automáticamente)
+  getBarrios: (municipioId: number) => api.get(`/municipios/${municipioId}/barrios`),
+  cargarBarrios: (municipioId: number) => api.post(`/municipios/${municipioId}/barrios/cargar`),
+  // Generar direcciones con IA
+  generarDirecciones: (municipioId: number) => api.post(`/municipios/${municipioId}/direcciones/generar`),
 };
 
 // Chat IA
