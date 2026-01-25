@@ -26,6 +26,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { WizardForm, WizardStep, WizardStepContent } from '../../components/ui/WizardForm';
 import { DynamicIcon } from '../../components/ui/DynamicIcon';
 import type { ServicioTramite } from '../../types';
+import { StickyPageHeader } from '../../components/ui/StickyPageHeader';
+import { Building2 } from 'lucide-react';
 
 // Helper para renderizar iconos dinámicos
 function getServicioIcon(icono?: string, className = "h-6 w-6") {
@@ -875,27 +877,19 @@ export default function MobileNuevoTramite() {
     }
   };
 
+  // Nombre del municipio para el header
+  const nombreMunicipio = municipioActual?.nombre?.replace('Municipalidad de ', '')
+    || localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '')
+    || 'Mi Municipio';
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.background }}>
-      {/* Top Bar */}
-      <div
-        className="sticky top-0 z-40 px-4 py-3 border-b"
-        style={{ backgroundColor: theme.card, borderColor: theme.border }}
-      >
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 -ml-2 rounded-lg"
-            style={{ color: theme.textSecondary }}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="text-center">
-            <h1 className="text-base font-semibold" style={{ color: theme.text }}>Nuevo Trámite</h1>
-          </div>
-          <div className="w-9" /> {/* Spacer */}
-        </div>
-      </div>
+      {/* Header sticky con municipio */}
+      <StickyPageHeader
+        icon={<Building2 className="h-5 w-5" />}
+        title={`${nombreMunicipio} - Nuevo Trámite`}
+        backLink={isInGestion ? '/gestion/tramites' : '/app'}
+      />
 
       {/* Wizard */}
       <div className="flex-1 flex flex-col">

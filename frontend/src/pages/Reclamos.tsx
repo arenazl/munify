@@ -1010,7 +1010,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const openViewSheet = async (reclamo: Reclamo) => {
     setSelectedReclamo(reclamo);
-    setEmpleadoSeleccionado(reclamo.empleado_asignado?.id?.toString() || '');
+    setEmpleadoSeleccionado(''); // TODO: Migrar a dependencia_asignada
     setComentarioAsignacion('');
     setResolucion('');
     setMotivoRechazo('');
@@ -1313,11 +1313,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`.toLowerCase().includes(searchLower) ||
       r.creador?.email?.toLowerCase().includes(searchLower) ||
       r.creador?.telefono?.includes(searchLower) ||
-      // Empleado asignado (nombre, apellido, especialidad)
-      r.empleado_asignado?.nombre?.toLowerCase().includes(searchLower) ||
-      r.empleado_asignado?.apellido?.toLowerCase().includes(searchLower) ||
-      `${r.empleado_asignado?.nombre || ''} ${r.empleado_asignado?.apellido || ''}`.toLowerCase().includes(searchLower) ||
-      r.empleado_asignado?.especialidad?.toLowerCase().includes(searchLower) ||
+      // Dependencia asignada
+      r.dependencia_asignada?.nombre?.toLowerCase().includes(searchLower) ||
       // Resolución y rechazo
       r.resolucion?.toLowerCase().includes(searchLower) ||
       r.descripcion_rechazo?.toLowerCase().includes(searchLower)
@@ -2490,16 +2487,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       ),
     },
     {
-      key: 'empleado',
-      header: 'Empleado',
-      sortValue: (r: Reclamo) => r.empleado_asignado?.nombre || '',
+      key: 'dependencia',
+      header: 'Asignado',
+      sortValue: (r: Reclamo) => r.dependencia_asignada?.nombre || '',
       render: (r: Reclamo) => {
-        if (!r.empleado_asignado) return null;
-        const inicial = r.empleado_asignado.nombre?.charAt(0) || '';
-        const apellido = r.empleado_asignado.apellido || '';
+        if (!r.dependencia_asignada?.nombre) return null;
         return (
           <span className="text-xs" style={{ color: theme.text }}>
-            {inicial}. {apellido}
+            {r.dependencia_asignada.nombre}
           </span>
         );
       },
@@ -2620,23 +2615,17 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           )}
         </ABMInfoPanel>
 
-        {/* Empleado asignado */}
-        {selectedReclamo.empleado_asignado && (
+        {/* Dependencia asignada */}
+        {selectedReclamo.dependencia_asignada?.nombre && (
           <ABMInfoPanel
-            title="Empleado Asignado"
-            icon={<Users className="h-4 w-4" />}
+            title="Asignado a"
+            icon={<Building2 className="h-4 w-4" />}
             variant="info"
           >
             <ABMField
-              label="Nombre"
-              value={`${selectedReclamo.empleado_asignado.nombre || ''}${selectedReclamo.empleado_asignado.apellido ? ' ' + selectedReclamo.empleado_asignado.apellido : ''}`.trim() || 'Sin nombre'}
+              label="Dependencia"
+              value={selectedReclamo.dependencia_asignada.nombre}
             />
-            {selectedReclamo.empleado_asignado.especialidad && (
-              <ABMField
-                label="Especialidad"
-                value={selectedReclamo.empleado_asignado.especialidad}
-              />
-            )}
           </ABMInfoPanel>
         )}
 
@@ -3575,8 +3564,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {r.empleado_asignado && (
-                    <span style={{ color: theme.primary }} className="font-medium">{r.empleado_asignado.nombre}</span>
+                  {r.dependencia_asignada?.nombre && (
+                    <span style={{ color: theme.primary }} className="font-medium">{r.dependencia_asignada.nombre}</span>
                   )}
                   <Eye className="h-4 w-4" style={{ color: theme.primary }} />
                 </div>

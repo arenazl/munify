@@ -4,6 +4,7 @@ import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import api, { tramitesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import type { TipoTramite, TramiteCatalogo } from '../types';
 
@@ -60,6 +61,7 @@ interface TipoConTramites extends TipoTramite {
 
 export default function TiposTramite() {
   const { theme } = useTheme();
+  const { isSuperAdmin } = useSuperAdmin();
 
   const [tipos, setTipos] = useState<TipoTramite[]>([]);
   const [tramites, setTramites] = useState<TramiteCatalogo[]>([]);
@@ -87,12 +89,16 @@ export default function TiposTramite() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [isSuperAdmin]);
 
   const fetchData = async () => {
     try {
+      // Superadmin: usa catálogo global (sin municipio_id)
+      // Supervisor: usa tipos habilitados para su municipio
       const [tiposRes, tramitesRes] = await Promise.all([
-        tramitesApi.getTipos({ solo_activos: false }),
+        isSuperAdmin
+          ? tramitesApi.getTiposCatalogo({ solo_activos: false })
+          : tramitesApi.getTipos({ solo_activos: false }),
         tramitesApi.getCatalogo({ solo_activos: false })
       ]);
       setTipos(tiposRes.data);

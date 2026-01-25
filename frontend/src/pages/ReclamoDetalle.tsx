@@ -4,7 +4,7 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown, ClipboardList
+  RefreshCw, Send, ChevronDown, ClipboardList, Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, whatsappApi } from '../lib/api';
@@ -544,24 +544,19 @@ export default function ReclamoDetalle() {
               </div>
             </div>
 
-            {/* Empleado asignado */}
-            {reclamo.empleado_asignado && (
+            {/* Dependencia asignada */}
+            {reclamo.dependencia_asignada?.nombre && (
               <div
                 className="p-4 rounded-xl"
                 style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
               >
                 <div className="flex items-center gap-3">
-                  <Users className="h-5 w-5" style={{ color: theme.primary }} />
+                  <Building2 className="h-5 w-5" style={{ color: theme.primary }} />
                   <div>
-                    <p className="text-sm font-medium" style={{ color: theme.textSecondary }}>Empleado Asignado</p>
+                    <p className="text-sm font-medium" style={{ color: theme.textSecondary }}>Asignado a</p>
                     <p className="font-medium" style={{ color: theme.text }}>
-                      {formatEmpleadoNombre(reclamo.empleado_asignado.nombre)}
+                      {reclamo.dependencia_asignada.nombre}
                     </p>
-                    {reclamo.empleado_asignado.especialidad && (
-                      <p className="text-sm" style={{ color: theme.primary }}>
-                        {reclamo.empleado_asignado.especialidad}
-                      </p>
-                    )}
                   </div>
                 </div>
                 {reclamo.fecha_programada && (

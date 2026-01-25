@@ -26,6 +26,26 @@ def get_effective_municipio_id(request: Request, current_user: User) -> int:
     return current_user.municipio_id
 
 
+@router.get("/catalogo", response_model=List[CategoriaResponse])
+async def get_categorias_catalogo(
+    activo: bool = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtener TODAS las categorías del catálogo maestro.
+    Usado para la pantalla de asignación de dependencias.
+    """
+    query = select(Categoria)
+
+    if activo is not None:
+        query = query.where(Categoria.activo == activo)
+
+    query = query.order_by(Categoria.orden, Categoria.nombre)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
 @router.get("", response_model=List[CategoriaResponse])
 async def get_categorias(
     request: Request,
@@ -182,3 +202,147 @@ async def delete_categoria(
     mc.activo = False
     await db.commit()
     return {"message": "Categoría desactivada para este municipio"}
+
+
+# ===========================================
+# Endpoints para habilitar/deshabilitar categorías por municipio
+# ===========================================
+
+@router.get("/municipio/habilitadas")
+async def get_categorias_municipio_con_estado(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtener IDs de categorías habilitadas para el municipio.
+    Devuelve lista de categoria_id activas.
+    """
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    result = await db.execute(
+        select(MunicipioCategoria.categoria_id)
+        .where(MunicipioCategoria.municipio_id == municipio_id)
+        .where(MunicipioCategoria.activo == True)
+    )
+    return [row[0] for row in result.fetchall()]
+
+
+@router.post("/{categoria_id}/habilitar")
+async def habilitar_categoria_municipio(
+    request: Request,
+    categoria_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Habilitar una categoría del catálogo para el municipio"""
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    # Verificar que la categoría existe en el catálogo
+    result = await db.execute(
+        select(Categoria).where(Categoria.id == categoria_id)
+    )
+    categoria = result.scalar_one_or_none()
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada en el catálogo")
+
+    # Verificar si ya existe la relación
+    result = await db.execute(
+        select(MunicipioCategoria).where(
+            MunicipioCategoria.categoria_id == categoria_id,
+            MunicipioCategoria.municipio_id == municipio_id
+        )
+    )
+    mc = result.scalar_one_or_none()
+
+    if mc:
+        # Ya existe, solo activar
+        mc.activo = True
+    else:
+        # Crear nueva relación
+        mc = MunicipioCategoria(
+            municipio_id=municipio_id,
+            categoria_id=categoria_id,
+            activo=True,
+            orden=categoria.orden
+        )
+        db.add(mc)
+
+    await db.commit()
+    return {"message": "Categoría habilitada para el municipio", "id": mc.id if mc.id else categoria_id}
+
+
+@router.delete("/{categoria_id}/deshabilitar")
+async def deshabilitar_categoria_municipio(
+    request: Request,
+    categoria_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Deshabilitar una categoría para el municipio"""
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    result = await db.execute(
+        select(MunicipioCategoria).where(
+            MunicipioCategoria.categoria_id == categoria_id,
+            MunicipioCategoria.municipio_id == municipio_id
+        )
+    )
+    mc = result.scalar_one_or_none()
+
+    if not mc:
+        raise HTTPException(status_code=404, detail="Categoría no está habilitada para este municipio")
+
+    mc.activo = False
+    await db.commit()
+    return {"message": "Categoría deshabilitada para el municipio"}
+
+
+@router.post("/habilitar-todas")
+async def habilitar_todas_categorias_municipio(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Habilitar TODAS las categorías del catálogo para el municipio"""
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    # Obtener todas las categorías activas del catálogo
+    result = await db.execute(
+        select(Categoria).where(Categoria.activo == True)
+    )
+    categorias = result.scalars().all()
+
+    habilitadas = 0
+    reactivadas = 0
+
+    for cat in categorias:
+        # Verificar si ya existe
+        result = await db.execute(
+            select(MunicipioCategoria).where(
+                MunicipioCategoria.categoria_id == cat.id,
+                MunicipioCategoria.municipio_id == municipio_id
+            )
+        )
+        mc = result.scalar_one_or_none()
+
+        if mc:
+            if not mc.activo:
+                mc.activo = True
+                reactivadas += 1
+        else:
+            mc = MunicipioCategoria(
+                municipio_id=municipio_id,
+                categoria_id=cat.id,
+                activo=True,
+                orden=cat.orden
+            )
+            db.add(mc)
+            habilitadas += 1
+
+    await db.commit()
+    return {
+        "message": f"Categorías habilitadas: {habilitadas}, reactivadas: {reactivadas}",
+        "habilitadas": habilitadas,
+        "reactivadas": reactivadas
+    }

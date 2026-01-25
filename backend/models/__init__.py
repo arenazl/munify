@@ -94,7 +94,28 @@ __all__ = [
     "ConsultaGuardada"
 ]
 
-# Direcciones (nuevas entidades)
+# Direcciones (DEPRECATED - usar Dependencias)
 from .direccion import Direccion
 from .direccion_categoria import DireccionCategoria
 from .direccion_tipo_tramite import DireccionTipoTramite
+
+# Dependencias (nuevo modelo desacoplado del municipio)
+from .dependencia import Dependencia, TipoGestionDependencia
+from .municipio_dependencia import MunicipioDependencia
+from .municipio_dependencia_categoria import MunicipioDependenciaCategoria
+from .municipio_dependencia_tipo_tramite import MunicipioDependenciaTipoTramite
+from .municipio_dependencia_tramite import MunicipioDependenciaTramite
+
+__all__ += [
+    # Direcciones (DEPRECATED)
+    "Direccion",
+    "DireccionCategoria",
+    "DireccionTipoTramite",
+    # Dependencias (nuevo modelo)
+    "Dependencia",
+    "TipoGestionDependencia",
+    "MunicipioDependencia",
+    "MunicipioDependenciaCategoria",
+    "MunicipioDependenciaTipoTramite",
+    "MunicipioDependenciaTramite",
+]

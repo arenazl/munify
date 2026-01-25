@@ -67,11 +67,11 @@ class Direccion(Base):
         cascade="all, delete-orphan"
     )
 
-    # Una direccion tiene reclamos asignados
-    reclamos = relationship("Reclamo", back_populates="direccion_asignada")
+    # Una direccion tiene reclamos asignados (DEPRECATED)
+    reclamos = relationship("Reclamo", back_populates="direccion_asignada_legacy")
 
-    # Una direccion tiene solicitudes asignadas
-    solicitudes = relationship("Solicitud", back_populates="direccion_asignada")
+    # Una direccion tiene solicitudes asignadas (DEPRECATED)
+    solicitudes = relationship("Solicitud", back_populates="direccion_asignada_legacy")
 
     def __repr__(self):
         return f"<Direccion {self.nombre}>"

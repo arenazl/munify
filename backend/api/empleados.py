@@ -108,23 +108,10 @@ async def get_empleados_disponibilidad(
 
     resultado = []
     for emp in empleados:
-        # Contar trámites pendientes (Solicitud usa empleado_id)
-        tramites_count = await db.execute(
-            select(func.count(Solicitud.id)).where(
-                Solicitud.empleado_id == emp.id,
-                Solicitud.estado.in_(estados_pendientes_tramites)
-            )
-        )
-        carga_tramites = tramites_count.scalar() or 0
-
-        # Contar reclamos pendientes (Reclamo usa empleado_id)
-        reclamos_count = await db.execute(
-            select(func.count(Reclamo.id)).where(
-                Reclamo.empleado_id == emp.id,
-                Reclamo.estado.in_(estados_pendientes_reclamos)
-            )
-        )
-        carga_reclamos = reclamos_count.scalar() or 0
+        # TODO: Migrar a dependencia cuando se implemente IA
+        # Por ahora, la carga se calcula sin filtro de empleado
+        carga_tramites = 0  # Pendiente: filtrar por dependencia asignada
+        carga_reclamos = 0  # Pendiente: filtrar por dependencia asignada
 
         carga_actual = carga_tramites + carga_reclamos
         disponibilidad = max(0, emp.capacidad_maxima - carga_actual)

@@ -14,7 +14,7 @@ from models.enums import EstadoReclamo, RolUsuario
 router = APIRouter()
 
 
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
+def get_effective_municipio_id(request: Request, current_user: User) -> int | None:
     """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
     if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
         header_municipio_id = request.headers.get('X-Municipio-ID')
@@ -310,67 +310,17 @@ async def get_empleado_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["empleado"]))
 ):
-    """Estadisticas para empleados - trabajo asignado"""
-    from models.empleado import Empleado
-
-    # Buscar empleado del usuario
-    empleado_id = current_user.empleado_id
-    if not empleado_id:
-        return {
-            "asignados_hoy": 0,
-            "en_proceso": 0,
-            "completados_hoy": 0,
-            "pendientes": 0,
-        }
-
-    hoy = datetime.utcnow().date()
-
-    # Asignados hoy
-    asignados_query = await db.execute(
-        select(func.count(Reclamo.id))
-        .where(
-            Reclamo.empleado_id == empleado_id,
-            func.date(Reclamo.fecha_programada) == hoy
-        )
-    )
-    asignados_hoy = asignados_query.scalar() or 0
-
-    # En proceso
-    en_proceso_query = await db.execute(
-        select(func.count(Reclamo.id))
-        .where(
-            Reclamo.empleado_id == empleado_id,
-            Reclamo.estado == EstadoReclamo.EN_PROCESO
-        )
-    )
-    en_proceso = en_proceso_query.scalar() or 0
-
-    # Completados hoy
-    completados_query = await db.execute(
-        select(func.count(Reclamo.id))
-        .where(
-            Reclamo.empleado_id == empleado_id,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
-            func.date(Reclamo.fecha_resolucion) == hoy
-        )
-    )
-    completados_hoy = completados_query.scalar() or 0
-
-    # Pendientes totales
-    pendientes_query = await db.execute(
-        select(func.count(Reclamo.id))
-        .where(
-            Reclamo.empleado_id == empleado_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
-        )
-    )
-    pendientes = pendientes_query.scalar() or 0
-
+    """Estadisticas para empleados - trabajo asignado
+    TODO: Migrar a dependencia cuando se implemente asignación por IA
+    """
+    # Por ahora retorna 0s ya que no hay empleado_id en reclamos
+    # Se migrará a dependencia_id cuando se implemente IA
     return {
-        "asignados_hoy": asignados_hoy,
-        "en_proceso": en_proceso,
-        "completados_hoy": completados_hoy,
-        "pendientes": pendientes,
+        "asignados_hoy": 0,
+        "en_proceso": 0,
+        "completados_hoy": 0,
+        "pendientes": 0,
+        "mensaje": "Pendiente migración a dependencias"
     }
 
 
@@ -479,29 +429,10 @@ async def get_conteo_categorias(
     if estado:
         conditions.append(Reclamo.estado == estado)
 
-    # Si es empleado, filtrar solo sus reclamos y los de su cuadrilla
-    if current_user.rol == RolUsuario.EMPLEADO:
-        from models.empleado_cuadrilla import EmpleadoCuadrilla
-
-        # Subconsulta: IDs de cuadrillas del empleado
-        cuadrillas_subq = select(EmpleadoCuadrilla.cuadrilla_id).where(
-            EmpleadoCuadrilla.empleado_id == current_user.empleado_id,
-            EmpleadoCuadrilla.activo == True
-        )
-
-        # Subconsulta: IDs de compañeros de cuadrilla
-        companeros_subq = select(EmpleadoCuadrilla.empleado_id).where(
-            EmpleadoCuadrilla.cuadrilla_id.in_(cuadrillas_subq),
-            EmpleadoCuadrilla.activo == True
-        )
-
-        # Filtrar: reclamos asignados al empleado O a compañeros de cuadrilla
-        conditions.append(
-            or_(
-                Reclamo.empleado_id == current_user.empleado_id,
-                Reclamo.empleado_id.in_(companeros_subq)
-            )
-        )
+    # TODO: Migrar filtro de empleado a dependencia cuando se implemente IA
+    # Por ahora, empleados ven todos los reclamos del municipio
+    # if current_user.rol == RolUsuario.EMPLEADO:
+    #     conditions.append(Reclamo.municipio_dependencia_id == current_user.dependencia_id)
 
     query = await db.execute(
         select(
@@ -543,29 +474,10 @@ async def get_conteo_estados(
     # Construir condiciones base
     conditions = [Reclamo.municipio_id == municipio_id]
 
-    # Si es empleado, filtrar solo sus reclamos y los de su cuadrilla
-    if current_user.rol == RolUsuario.EMPLEADO:
-        from models.empleado_cuadrilla import EmpleadoCuadrilla
-
-        # Subconsulta: IDs de cuadrillas del empleado
-        cuadrillas_subq = select(EmpleadoCuadrilla.cuadrilla_id).where(
-            EmpleadoCuadrilla.empleado_id == current_user.empleado_id,
-            EmpleadoCuadrilla.activo == True
-        )
-
-        # Subconsulta: IDs de compañeros de cuadrilla
-        companeros_subq = select(EmpleadoCuadrilla.empleado_id).where(
-            EmpleadoCuadrilla.cuadrilla_id.in_(cuadrillas_subq),
-            EmpleadoCuadrilla.activo == True
-        )
-
-        # Filtrar: reclamos asignados al empleado O a compañeros de cuadrilla
-        conditions.append(
-            or_(
-                Reclamo.empleado_id == current_user.empleado_id,
-                Reclamo.empleado_id.in_(companeros_subq)
-            )
-        )
+    # TODO: Migrar filtro de empleado a dependencia cuando se implemente IA
+    # Por ahora, empleados ven todos los reclamos del municipio
+    # if current_user.rol == RolUsuario.EMPLEADO:
+    #     conditions.append(Reclamo.municipio_dependencia_id == current_user.dependencia_id)
 
     query = await db.execute(
         select(
@@ -729,16 +641,9 @@ async def get_metricas_accion(
     else:
         cambio_eficiencia = 100 if resueltos_semana > 0 else 0
 
-    # 6. Empleados activos (con reclamos asignados pendientes)
-    empleados_activos_query = await db.execute(
-        select(func.count(func.distinct(Reclamo.empleado_id)))
-        .where(
-            Reclamo.municipio_id == municipio_id,
-            Reclamo.empleado_id != None,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
-        )
-    )
-    empleados_activos = empleados_activos_query.scalar() or 0
+    # 6. Empleados activos - TODO: Migrar a dependencias cuando se implemente IA
+    # Por ahora retornamos 0 ya que no hay empleado_id en reclamos
+    empleados_activos = 0
 
     # Total empleados
     total_empleados_query = await db.execute(

@@ -146,47 +146,9 @@ async def generar_reporte_ejecutivo(
         tendencia_mensual[mes_label] = result.scalar() or 0
 
     # === TOP EMPLEADOS ===
-    result = await db.execute(
-        select(
-            Empleado.id,
-            Empleado.nombre,
-            Empleado.apellido,
-            func.count(Reclamo.id).label("resueltos")
-        )
-        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
-        .where(
-            and_(
-                base_filter,
-                Reclamo.estado == EstadoReclamo.RESUELTO
-            )
-        )
-        .group_by(Empleado.id, Empleado.nombre, Empleado.apellido)
-        .order_by(func.count(Reclamo.id).desc())
-        .limit(5)
-    )
-
+    # TODO: Migrar a dependencia cuando se implemente asignación por IA
+    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
     top_empleados = []
-    for emp_id, nombre, apellido, resueltos_count in result.all():
-        # Obtener calificacion promedio del empleado
-        calif_result = await db.execute(
-            select(func.avg(Calificacion.puntuacion))
-            .join(Reclamo, Reclamo.id == Calificacion.reclamo_id)
-            .where(
-                and_(
-                    Reclamo.empleado_id == emp_id,
-                    func.date(Reclamo.created_at) >= fecha_inicio,
-                    func.date(Reclamo.created_at) <= fecha_fin,
-                )
-            )
-        )
-        calif_promedio = calif_result.scalar() or 0
-
-        top_empleados.append({
-            "nombre": f"{nombre} {apellido or ''}".strip(),
-            "resueltos": resueltos_count,
-            "tiempo_promedio": 24.5,  # TODO: calcular tiempo real
-            "calificacion": float(calif_promedio) if calif_promedio else 0,
-        })
 
     # === METRICAS SLA ===
     # Por ahora un valor estimado, despues se puede calcular real

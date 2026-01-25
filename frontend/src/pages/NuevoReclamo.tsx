@@ -39,7 +39,7 @@ import {
   Search
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, publicoApi, clasificacionApi, authApi, chatApi } from '../lib/api';
+import { reclamosApi, publicoApi, clasificacionApi, authApi, chatApi, dependenciasApi } from '../lib/api';
 import { validationSchemas } from '../lib/validations';
 import { Categoria, Zona } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -49,6 +49,7 @@ import { MapPicker } from '../components/ui/MapPicker';
 import { WizardModal, WizardStep } from '../components/ui/WizardModal';
 import { WizardStepContent } from '../components/ui/WizardForm';
 import { ReclamosSimilares } from '../components/ReclamosSimilares';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 // Iconos por categoría
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -92,7 +93,7 @@ function getCategoryIcon(nombre: string): React.ReactNode {
 
 export default function NuevoReclamo() {
   const { theme } = useTheme();
-  const { user, isLoading: authLoading, register, login } = useAuth();
+  const { user, isLoading: authLoading, register, login, municipioActual } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -113,6 +114,13 @@ export default function NuevoReclamo() {
   const [similaresCargados, setSimilaresCargados] = useState(false);
   const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
+  // Dependencia encargada basada en la categoría seleccionada
+  const [dependenciaEncargada, setDependenciaEncargada] = useState<{
+    id: number;
+    nombre: string;
+    codigo?: string;
+  } | null>(null);
+
   // Estado para el chat inicial (Step 0)
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<Array<{role: 'assistant' | 'user', content: string}>>([
@@ -120,6 +128,7 @@ export default function NuevoReclamo() {
   ]);
   const [chatAnalyzing, setChatAnalyzing] = useState(false);
   const [chatCategoriaSugerida, setChatCategoriaSugerida] = useState<{categoria: Categoria, confianza: number} | null>(null);
+  const [consejoAmigable, setConsejoAmigable] = useState<string>('');
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -264,7 +273,7 @@ export default function NuevoReclamo() {
     setPreviewUrls(urls);
   };
 
-  // Buscar direcciones con Nominatim (OpenStreetMap) - limitado al área del municipio
+  // Buscar direcciones con Nominatim (OpenStreetMap) - con fallback si no encuentra
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setAddressSuggestions([]);
@@ -278,30 +287,54 @@ export default function NuevoReclamo() {
       const municipioLat = localStorage.getItem('municipio_lat');
       const municipioLon = localStorage.getItem('municipio_lon');
       const municipioNombre = localStorage.getItem('municipio_nombre') || '';
+      const municipioSimple = municipioNombre.replace('Municipalidad de ', '').replace('Municipio de ', '');
 
-      // Construir el viewbox si tenemos coordenadas del municipio (±0.3 grados ≈ 30km)
+      // Construir el viewbox si tenemos coordenadas del municipio (±0.2 grados ≈ 20km)
       let viewboxParam = '';
       if (municipioLat && municipioLon) {
         const lat = parseFloat(municipioLat);
         const lon = parseFloat(municipioLon);
-        const delta = 0.3; // ~30km de radio
-        viewboxParam = `&viewbox=${lon - delta},${lat + delta},${lon + delta},${lat - delta}&bounded=1`;
+        const delta = 0.2;
+        viewboxParam = `&viewbox=${lon - delta},${lat + delta},${lon + delta},${lat - delta}`;
       }
 
-      // Agregar el nombre del municipio a la búsqueda para mejores resultados
-      const searchQuery = municipioNombre
-        ? `${query}, ${municipioNombre.replace('Municipalidad de ', '')}, Argentina`
-        : `${query}, Argentina`;
+      // Construir query de búsqueda - evitar duplicar el nombre del municipio si ya lo escribió
+      const queryLower = query.toLowerCase();
+      const hasLocationContext = municipioSimple && queryLower.includes(municipioSimple.toLowerCase());
+      const searchQuery = hasLocationContext
+        ? `${query}, Buenos Aires, Argentina`
+        : municipioSimple
+          ? `${query}, ${municipioSimple}, Buenos Aires, Argentina`
+          : `${query}, Argentina`;
 
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1${viewboxParam}`,
-        {
-          headers: {
-            'Accept-Language': 'es',
-          },
-        }
-      );
-      const data = await response.json();
+      // Primero intentar con viewbox (preferencia local pero no bounded)
+      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1${viewboxParam}`;
+
+      let response = await fetch(url, {
+        headers: { 'Accept-Language': 'es' },
+      });
+      let data = await response.json();
+
+      // Si no hay resultados, buscar sin viewbox
+      if (data.length === 0 && viewboxParam) {
+        console.log('[Address Search] Sin resultados con viewbox, intentando sin restricción');
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
+        response = await fetch(url, {
+          headers: { 'Accept-Language': 'es' },
+        });
+        data = await response.json();
+      }
+
+      // Si aún no hay resultados, probar búsqueda más simple
+      if (data.length === 0) {
+        console.log('[Address Search] Sin resultados, probando búsqueda simple');
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Argentina')}&countrycodes=ar&limit=5&addressdetails=1`;
+        response = await fetch(url, {
+          headers: { 'Accept-Language': 'es' },
+        });
+        data = await response.json();
+      }
+
       setAddressSuggestions(data);
       setShowSuggestions(data.length > 0);
     } catch (error) {
@@ -504,6 +537,47 @@ export default function NuevoReclamo() {
     toast.success(`Categoría seleccionada: "${categoria.nombre}"`);
   };
 
+  // Buscar dependencia encargada cuando cambia la categoría
+  useEffect(() => {
+    const fetchDependencia = async () => {
+      if (!formData.categoria_id) {
+        setDependenciaEncargada(null);
+        return;
+      }
+
+      try {
+        // Obtener dependencias del municipio con sus asignaciones
+        const response = await dependenciasApi.getMunicipio({
+          activo: true,
+          include_assignments: true,
+          tipo_gestion: 'RECLAMO'
+        });
+
+        const deps = response.data;
+        // Buscar cuál dependencia tiene asignada esta categoría
+        const categoriaId = Number(formData.categoria_id);
+        const depEncargada = deps.find((dep: { categorias?: { id: number }[] }) =>
+          dep.categorias?.some((cat: { id: number }) => cat.id === categoriaId)
+        );
+
+        if (depEncargada) {
+          setDependenciaEncargada({
+            id: depEncargada.id,
+            nombre: depEncargada.nombre,
+            codigo: depEncargada.codigo,
+          });
+        } else {
+          setDependenciaEncargada(null);
+        }
+      } catch (error) {
+        console.error('Error buscando dependencia:', error);
+        setDependenciaEncargada(null);
+      }
+    };
+
+    fetchDependencia();
+  }, [formData.categoria_id]);
+
   // Scroll al final del chat cuando hay nuevos mensajes
   useEffect(() => {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -602,19 +676,63 @@ Tono amigable, 3-4 oraciones máximo.`,
           const confianza = mejorSugerencia.confianza || mejorSugerencia.score || 0;
           setChatCategoriaSugerida({ categoria: cat, confianza });
 
-          // Guardar la descripción del usuario
+          // Guardar la descripción del usuario Y la categoría seleccionada automáticamente
           setFormData(prev => ({
             ...prev,
             descripcion: userMessage,
             titulo: `Problema de ${cat.nombre.toLowerCase()}`,
+            categoria_id: String(cat.id),  // Auto-seleccionar la categoría
           }));
 
-          // Mensaje de respuesta con la sugerencia
-          const confianzaTexto = confianza >= 80 ? '¡Perfecto!' : confianza >= 60 ? 'Entiendo.' : 'Creo que entendí.';
+          // Consejos amigables según la categoría
+          const consejosPorCategoria: Record<string, string> = {
+            'alumbrado': 'Si podés, anotá el número del poste o una referencia cercana. Eso ayuda mucho a que lo ubiquen rápido.',
+            'bache': 'Te recomiendo que en el siguiente paso marques bien la ubicación en el mapa. Si es grande o peligroso, mencionalo así le dan prioridad.',
+            'agua': 'Si es una pérdida grande, llamá también al teléfono de emergencias del municipio. Mientras tanto, este reclamo queda registrado.',
+            'cloaca': 'Estos temas suelen atenderse con prioridad. Incluí si hay malos olores o si afecta la vereda.',
+            'basura': 'Indicá si es un problema recurrente o puntual. Si pasa seguido, mencioná los días que notás el problema.',
+            'residuo': 'Detallá qué tipo de residuos son (escombros, poda, etc.). Eso ayuda a enviar el equipo correcto.',
+            'verde': 'Si es un árbol que representa peligro, mencionalo así lo priorizan. Incluí si hay cables cerca.',
+            'semaforo': 'Este tipo de problemas se atienden rápido por seguridad. Mencioná si está en una esquina muy transitada.',
+            'señal': 'Describí qué señal es o debería haber. Una foto ayuda mucho en estos casos.',
+            'vereda': 'Indicá si representa riesgo para peatones, especialmente si hay adultos mayores o personas con movilidad reducida en la zona.',
+            'ruido': 'Mencioná los horarios en que ocurre el problema. Eso es clave para que puedan actuar.',
+            'zoonosis': 'Si hay riesgo para personas (perros agresivos, plagas), mencionalo para que le den prioridad.',
+            'animal': 'Describí la situación del animal y si representa algún riesgo. El área de Zoonosis se encargará.',
+          };
+
+          // Buscar consejo relevante
+          let consejo = '';
+          const catLower = cat.nombre.toLowerCase();
+          for (const [key, tip] of Object.entries(consejosPorCategoria)) {
+            if (catLower.includes(key)) {
+              consejo = tip;
+              break;
+            }
+          }
+          if (!consejo) {
+            consejo = 'Cuantos más detalles incluyas (ubicación exacta, fotos, horarios), más rápido van a poder atenderte.';
+          }
+
+          // Guardar el consejo para mostrarlo en el panel derecho
+          setConsejoAmigable(consejo);
+
+          // Mensaje de respuesta amigable (sin el consejo, que va al panel)
+          const intro = confianza >= 80
+            ? '¡Perfecto, te entendí!'
+            : confianza >= 60
+              ? 'Entendido.'
+              : 'Creo que entendí tu problema.';
+
           setChatMessages(prev => [...prev, {
             role: 'assistant',
-            content: `${confianzaTexto} Parece que tu problema está relacionado con "${cat.nombre}". ¿Es correcto? Podés confirmar o elegir otra categoría en el siguiente paso.`
+            content: `${intro} Esto parece ser un tema de "${cat.nombre}". Te llevo directo a indicar la ubicación.`
           }]);
+
+          // Auto-avanzar a ubicación (paso 2) después de un breve delay
+          setTimeout(() => {
+            setCurrentStep(2); // Saltear paso de categoría, ir directo a ubicación
+          }, 1500);
         } else {
           setChatMessages(prev => [...prev, {
             role: 'assistant',
@@ -1158,10 +1276,21 @@ Tono amigable, 3-4 oraciones máximo.`,
           </button>
         </div>
 
-        {/* Tip */}
-        <p className="text-xs text-center mt-3" style={{ color: theme.textSecondary }}>
-          Ejemplo: "Hay un bache grande en la esquina de mi casa que es peligroso para los autos"
-        </p>
+        {/* Respuesta IA o Tip */}
+        {chatMessages.length > 1 ? (
+          <div className="mt-3 p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}20` }}>
+            <div className="flex items-start gap-2">
+              <Bot className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+              <p style={{ color: theme.text }}>
+                {chatMessages.filter(m => m.role === 'assistant').slice(-1)[0]?.content}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-center mt-3" style={{ color: theme.textSecondary }}>
+            Ejemplo: "Hay un bache grande en la esquina de mi casa que es peligroso para los autos"
+          </p>
+        )}
       </div>
     </WizardStepContent>
   );
@@ -1391,12 +1520,18 @@ Tono amigable, 3-4 oraciones máximo.`,
                 backgroundColor: theme.card,
                 border: `1px solid ${theme.border}`,
               }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               {addressSuggestions.map((suggestion, index) => (
                 <button
                   key={index}
                   type="button"
-                  onClick={() => selectAddressSuggestion(suggestion)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectAddressSuggestion(suggestion);
+                  }}
                   className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors touch-manipulation"
                   style={{ color: theme.text }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.backgroundSecondary}
@@ -1601,6 +1736,25 @@ Tono amigable, 3-4 oraciones máximo.`,
   const ConfirmarStepContent = (
     <WizardStepContent title="Confirmá los datos">
       <div className="space-y-3">
+        {/* Dependencia Encargada */}
+        <div
+          className="flex items-center gap-3 p-4 rounded-xl"
+          style={{ backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}30` }}
+        >
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: theme.primary, color: 'white' }}
+          >
+            <Building2 className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>Será derivado a</span>
+            <p className="font-medium" style={{ color: theme.text }}>
+              {dependenciaEncargada?.nombre || 'Área correspondiente'}
+            </p>
+          </div>
+        </div>
+
         {/* Usuario */}
         {user && (
           <div
@@ -2006,6 +2160,11 @@ Tono amigable, 3-4 oraciones máximo.`,
   // Obtener la categoría seleccionada
   const selectedCategoriaObj = categorias.find(c => String(c.id) === formData.categoria_id);
 
+  // Obtener el último mensaje del usuario del chat (la descripción del problema)
+  const userProblemDescription = chatMessages.filter(m => m.role === 'user').slice(-1)[0]?.content;
+  // Obtener la última respuesta del asistente
+  const lastAssistantResponse = chatMessages.filter(m => m.role === 'assistant').slice(-1)[0]?.content;
+
   // Panel de IA para el wizard
   const wizardAIPanel = (
     <div className="h-full flex flex-col">
@@ -2017,181 +2176,125 @@ Tono amigable, 3-4 oraciones máximo.`,
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto">
-        {/* Sugerencia de IA del chat */}
-        {chatCategoriaSugerida && (
-          <div className="p-3 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+        {/* Descripción del problema ingresada por el usuario */}
+        {userProblemDescription && (
+          <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
             <div className="flex items-center gap-2 mb-2">
-              <Lightbulb className="h-4 w-4" style={{ color: theme.primary }} />
-              <span className="font-medium text-xs" style={{ color: theme.text }}>Categoría sugerida</span>
+              <MessageCircle className="h-4 w-4" style={{ color: theme.textSecondary }} />
+              <span className="font-medium text-xs" style={{ color: theme.textSecondary }}>Tu problema</span>
             </div>
-            <p className="text-sm font-medium" style={{ color: theme.text }}>{chatCategoriaSugerida.categoria.nombre}</p>
-            {chatCategoriaSugerida.confianza && (
-              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-                Confianza: {Math.round(chatCategoriaSugerida.confianza * 100)}%
+            <p className="text-sm" style={{ color: theme.text }}>"{userProblemDescription}"</p>
+          </div>
+        )}
+
+        {/* Categoría sugerida por la IA */}
+        {chatCategoriaSugerida && (
+          <div
+            className="p-3 rounded-lg animate-fade-in-up"
+            style={{
+              backgroundColor: `${chatCategoriaSugerida.categoria.color || theme.primary}15`,
+              border: `1px solid ${chatCategoriaSugerida.categoria.color || theme.primary}40`,
+            }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: `${chatCategoriaSugerida.categoria.color || theme.primary}30` }}
+              >
+                <div style={{ color: chatCategoriaSugerida.categoria.color || theme.primary }}>
+                  {getCategoryIcon(chatCategoriaSugerida.categoria.nombre)}
+                </div>
+              </div>
+              <span className="font-medium text-xs" style={{ color: theme.text }}>Categoría asignada</span>
+            </div>
+            <p className="text-sm font-semibold" style={{ color: chatCategoriaSugerida.categoria.color || theme.primary }}>
+              {chatCategoriaSugerida.categoria.nombre}
+            </p>
+          </div>
+        )}
+
+        {/* Recomendación - color amber/naranja para consejos amigables */}
+        {consejoAmigable && chatCategoriaSugerida && (
+          <div
+            className="p-3 rounded-lg animate-fade-in-up"
+            style={{
+              backgroundColor: '#f59e0b12',
+              border: '1px solid #f59e0b30',
+              animationDelay: '150ms'
+            }}
+          >
+            <div className="flex items-center gap-2 mb-1.5">
+              <Lightbulb className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} />
+              <span className="text-xs font-medium" style={{ color: '#d97706' }}>Recomendación</span>
+            </div>
+            <p className="text-xs leading-relaxed" style={{ color: theme.text }}>
+              {consejoAmigable}
+            </p>
+          </div>
+        )}
+
+        {/* Tiempo estimado - neutro */}
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg animate-fade-in-up"
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+            animationDelay: '200ms'
+          }}
+        >
+          <Clock className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
+          <span className="text-xs" style={{ color: theme.textSecondary }}>
+            Tiempo estimado: <span style={{ color: theme.text, fontWeight: 500 }}>2-3 min</span>
+          </span>
+        </div>
+
+        {/* Asistente Municipal - color azul para IA */}
+        {(contextualAiResponse || contextualAiLoading) && (
+          <div
+            className="p-3 rounded-lg animate-fade-in-up"
+            style={{
+              backgroundColor: '#3b82f612',
+              border: '1px solid #3b82f630',
+              animationDelay: '250ms'
+            }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className="w-6 h-6 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: '#3b82f620' }}
+              >
+                <Bot className="h-3.5 w-3.5" style={{ color: '#3b82f6' }} />
+              </div>
+              <span className="text-xs font-medium" style={{ color: '#2563eb' }}>Asistente Municipal</span>
+              {contextualAiLoading && (
+                <Loader2 className="h-3 w-3 animate-spin" style={{ color: '#3b82f6' }} />
+              )}
+            </div>
+            {contextualAiResponse && !contextualAiLoading && (
+              <p className="text-xs leading-relaxed" style={{ color: theme.text }}>
+                {contextualAiResponse}
               </p>
             )}
           </div>
         )}
-
-        {/* Info de categoría seleccionada */}
-        {selectedCategoriaObj && (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div style={{ color: selectedCategoriaObj.color || DEFAULT_CATEGORY_COLOR }}>
-                  {getCategoryIcon(selectedCategoriaObj.nombre)}
-                </div>
-                <span className="font-medium text-sm" style={{ color: theme.text }}>{selectedCategoriaObj.nombre}</span>
-              </div>
-              {selectedCategoriaObj.descripcion && (
-                <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedCategoriaObj.descripcion}</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* IA contextual basada en lo que escribe el usuario */}
-        {contextualAiLoading && (
-          <div className="p-3 rounded-xl flex items-center gap-2" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
-            <Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} />
-            <span className="text-xs" style={{ color: theme.textSecondary }}>Analizando...</span>
-          </div>
-        )}
-
-        {contextualAiResponse && !contextualAiLoading && (
-          <div className="p-4 rounded-xl" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98130' }}>
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="h-4 w-4" style={{ color: '#10b981' }} />
-              <span className="text-xs font-medium" style={{ color: '#10b981' }}>Asistente Municipal</span>
-            </div>
-            <div className="space-y-2 text-sm leading-relaxed" style={{ color: theme.text }}>
-              {contextualAiResponse.split(/(?<=[.!?])\s+/).reduce((acc: string[][], sentence, idx) => {
-                const groupIdx = Math.floor(idx / 2);
-                if (!acc[groupIdx]) acc[groupIdx] = [];
-                acc[groupIdx].push(sentence);
-                return acc;
-              }, []).map((group, idx) => (
-                <p key={idx} className="flex items-start gap-2">
-                  <span className="mt-0.5" style={{ color: '#10b981' }}>
-                    {idx === 0 ? <MapPin className="h-4 w-4" /> : idx === 1 ? <FileText className="h-4 w-4" /> : <Lightbulb className="h-4 w-4" />}
-                  </span>
-                  <span>{group.join(' ')}</span>
-                </p>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {contextualAiFailed && !contextualAiResponse && !contextualAiLoading && (
-          <div className="p-3 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4" style={{ color: theme.textSecondary }} />
-              <span className="text-sm" style={{ color: theme.textSecondary }}>Recomendaciones no disponibles</span>
-            </div>
-          </div>
-        )}
-
-        {/* Tips según el paso actual */}
-        <div className="p-3 rounded-lg" style={{ backgroundColor: theme.card }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Lightbulb className="h-4 w-4" style={{ color: '#f59e0b' }} />
-            <span className="font-medium text-xs" style={{ color: theme.text }}>Tips</span>
-          </div>
-          <ul className="space-y-1.5">
-            {currentStep === 0 && (
-              <>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Describí el problema con detalle
-                </li>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  La IA sugerirá una categoría
-                </li>
-              </>
-            )}
-            {currentStep === 1 && (
-              <>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Elegí la categoría más adecuada
-                </li>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Usá el buscador si hay muchas opciones
-                </li>
-              </>
-            )}
-            {currentStep === 2 && (
-              <>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Indicá la dirección exacta
-                </li>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Usá el mapa para ajustar la ubicación
-                </li>
-              </>
-            )}
-            {currentStep === 3 && (
-              <>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Las fotos ayudan a resolver más rápido
-                </li>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Agregá referencias o números de poste
-                </li>
-              </>
-            )}
-            {currentStep >= 4 && (
-              <>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Revisá que todo esté correcto
-                </li>
-                <li className="flex items-start gap-2 text-xs" style={{ color: theme.textSecondary }}>
-                  <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                  Recibirás un número de seguimiento
-                </li>
-              </>
-            )}
-          </ul>
-        </div>
-
-        {/* Tiempo estimado */}
-        <div className="p-2 rounded-lg text-center" style={{ backgroundColor: theme.card }}>
-          <Clock className="h-4 w-4 mx-auto mb-1" style={{ color: theme.primary }} />
-          <p className="text-xs font-medium" style={{ color: theme.text }}>2-3 min</p>
-          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Tiempo estimado</p>
-        </div>
       </div>
     </div>
   );
 
+  // Nombre del municipio para el header
+  const nombreMunicipio = municipioActual?.nombre?.replace('Municipalidad de ', '')
+    || localStorage.getItem('municipio_nombre')?.replace('Municipalidad de ', '')
+    || 'Mi Municipio';
+
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.background }}>
-      {/* Top Bar - solo en /nuevo-reclamo (fuera del Layout) */}
-      {showOnlyRegister && (
-        <div
-          className="sticky top-0 z-40 px-4 py-3 border-b"
-          style={{ backgroundColor: theme.card, borderColor: theme.border }}
-        >
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ backgroundColor: theme.primary }}
-              >
-                <FileText className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-base font-semibold" style={{ color: theme.text }}>Nuevo Reclamo</h1>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>Reportá un problema</p>
-              </div>
-            </div>
+      {/* Header sticky con municipio */}
+      <StickyPageHeader
+        icon={<Building2 className="h-5 w-5" />}
+        title={`${nombreMunicipio} - Nuevo Reclamo`}
+        backLink={user ? '/gestion/reclamos' : '/bienvenido'}
+        actions={
+          showOnlyRegister ? (
             <button
               onClick={() => navigate('/login')}
               className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
@@ -2199,15 +2302,15 @@ Tono amigable, 3-4 oraciones máximo.`,
             >
               Iniciar Sesión
             </button>
-          </div>
-        </div>
-      )}
+          ) : undefined
+        }
+      />
 
-      <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 pt-2 pb-4 w-full mt-2">
+      <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 pt-2 pb-4 w-full">
         <WizardModal
           open={true}
           onClose={() => navigate(-1)}
-          title="Nuevo Reclamo"
+          title=""
           steps={steps}
           currentStep={currentStep}
           onStepChange={handleStepChange}
@@ -2216,6 +2319,7 @@ Tono amigable, 3-4 oraciones máximo.`,
           completeLabel="Enviar Reclamo"
           aiPanel={wizardAIPanel}
           embedded={true}
+          primaryButtonColor={selectedCategoriaObj?.color || chatCategoriaSugerida?.categoria?.color}
         />
       </div>
 

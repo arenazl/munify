@@ -66,8 +66,11 @@ class Municipio(Base):
     tipos_tramites_habilitados = relationship("MunicipioTipoTramite", back_populates="municipio")
     tramites_habilitados = relationship("MunicipioTramite", back_populates="municipio")
 
-    # Relaciones con direcciones
+    # Relaciones con direcciones (DEPRECATED - usar dependencias_habilitadas)
     direcciones = relationship("Direccion", back_populates="municipio", cascade="all, delete-orphan")
+
+    # Relaciones con dependencias (nuevo modelo desacoplado)
+    dependencias_habilitadas = relationship("MunicipioDependencia", back_populates="municipio")
 
     # Consultas guardadas / BI
     consultas_guardadas = relationship("ConsultaGuardada", back_populates="municipio")

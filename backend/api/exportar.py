@@ -53,8 +53,9 @@ async def exportar_reclamos_csv(
     if zona_id:
         query = query.where(Reclamo.zona_id == zona_id)
 
-    if empleado_id:
-        query = query.where(Reclamo.empleado_id == empleado_id)
+    # TODO: Migrar filtro empleado_id a dependencia_id
+    # if empleado_id:
+    #     query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
 
     if fecha_desde:
         try:
@@ -187,18 +188,9 @@ async def exportar_estadisticas_csv(
     por_zona = result.all()
 
     # Estadísticas por empleado
-    result = await db.execute(
-        select(
-            Empleado.nombre,
-            Empleado.apellido,
-            func.count(Reclamo.id).label('total'),
-            func.count(Reclamo.id).filter(Reclamo.estado == EstadoReclamo.RESUELTO).label('resueltos')
-        )
-        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
-        .where(Reclamo.created_at >= fecha_desde)
-        .group_by(Empleado.id, Empleado.nombre, Empleado.apellido)
-    )
-    por_empleado = result.all()
+    # TODO: Migrar a dependencia cuando se implemente asignación por IA
+    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
+    por_empleado = []
 
     # Tiempo promedio de resolución
     result = await db.execute(

@@ -54,6 +54,29 @@ function MapCenterUpdater({ coords }: { coords: { lat: number; lng: number } | n
   return null;
 }
 
+// Componente para forzar resize cuando el mapa se hace visible
+function MapResizeHandler() {
+  const map = useMap();
+
+  useEffect(() => {
+    // Forzar invalidateSize después de un breve delay para asegurar que el contenedor está visible
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+
+    // También escuchar resize de la ventana
+    const handleResize = () => map.invalidateSize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
+
+  return null;
+}
+
 export function MapPicker({
   value,
   onChange,
@@ -113,6 +136,7 @@ export function MapPicker({
           attribution='&copy; OSM &copy; CARTO'
           url={tileUrl}
         />
+        <MapResizeHandler />
         <MapCenterUpdater coords={value || null} />
         {!readOnly && <MapClickHandler onLocationSelect={handleLocationSelect} />}
         {position && <Marker position={[position.lat, position.lng]} />}
@@ -193,6 +217,7 @@ export function MapView({
           attribution='&copy; OSM &copy; CARTO'
           url={tileUrl}
         />
+        <MapResizeHandler />
         {markers.map((marker) => (
           <Marker
             key={marker.id}

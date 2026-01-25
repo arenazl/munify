@@ -387,7 +387,9 @@ export default function Municipios() {
                               >
                                 <span style={{ color: theme.text }}>{barrio.nombre}</span>
                                 {barrio.validado && (
-                                  <MapPin className="h-3 w-3 ml-auto text-green-500" title="Con coordenadas" />
+                                  <span title="Con coordenadas">
+                                    <MapPin className="h-3 w-3 ml-auto text-green-500" />
+                                  </span>
                                 )}
                               </div>
                             ))}
@@ -455,18 +457,18 @@ export default function Municipios() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
-                  Código (auto-generado)
+                <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
+                  Código <span className="text-xs opacity-60">(auto-generado)</span>
                 </label>
                 <input
                   type="text"
                   value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl text-sm"
+                  readOnly
+                  className="w-full px-4 py-2.5 rounded-xl text-sm cursor-not-allowed"
                   style={{
-                    backgroundColor: theme.backgroundSecondary,
+                    backgroundColor: theme.background,
                     border: `1px solid ${theme.border}`,
-                    color: theme.text
+                    color: theme.textSecondary
                   }}
                 />
               </div>

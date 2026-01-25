@@ -32,6 +32,8 @@ interface WizardModalProps {
   headerBadge?: HeaderBadge;
   /** Si es true, se renderiza como página embebida sin modal overlay */
   embedded?: boolean;
+  /** Color personalizado para el botón primario (ej: color de categoría) */
+  primaryButtonColor?: string;
 }
 
 export function WizardModal({
@@ -47,6 +49,7 @@ export function WizardModal({
   aiPanel,
   headerBadge,
   embedded = false,
+  primaryButtonColor,
 }: WizardModalProps) {
   const { theme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
@@ -193,6 +196,11 @@ export function WizardModal({
         display: block;
       }
     }
+    .wizard-bottom-recommendation {
+      padding: 12px 20px;
+      border-top: 1px solid ${theme.border};
+      background: linear-gradient(135deg, ${theme.primary}08 0%, ${theme.backgroundSecondary} 100%);
+    }
     .wizard-slide-right {
       animation: slideRight 0.3s ease-out;
     }
@@ -206,6 +214,23 @@ export function WizardModal({
     @keyframes slideLeft {
       from { opacity: 0; transform: translateX(-20px); }
       to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.4s ease-out forwards;
+    }
+    .wizard-primary-btn {
+      transform: scale(1);
+    }
+    .wizard-primary-btn:hover:not(:disabled) {
+      transform: scale(1.02);
+      filter: brightness(1.1);
+    }
+    .wizard-primary-btn:active:not(:disabled) {
+      transform: scale(0.98);
     }
     .wizard-content-area > div {
       -webkit-overflow-scrolling: touch;
@@ -489,6 +514,7 @@ export function WizardModal({
         </div>
 
         <button
+          className="wizard-primary-btn"
           onClick={isLastStep ? onComplete : handleNext}
           disabled={loading || !canProceed}
           style={{
@@ -498,12 +524,13 @@ export function WizardModal({
             padding: '10px 20px',
             borderRadius: '10px',
             border: 'none',
-            backgroundColor: theme.primary,
+            backgroundColor: primaryButtonColor || theme.primary,
             color: 'white',
             fontWeight: 600,
             cursor: loading || !canProceed ? 'not-allowed' : 'pointer',
             opacity: loading || !canProceed ? 0.5 : 1,
-            boxShadow: `0 4px 14px ${theme.primary}40`,
+            boxShadow: `0 4px 14px ${primaryButtonColor || theme.primary}40`,
+            transition: 'all 0.3s ease',
           }}
         >
           {loading ? (

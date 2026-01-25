@@ -18,9 +18,9 @@ export default function Demo() {
   const demoProfiles = [
     {
       id: 'supervisor',
-      name: 'Ana Martínez',
+      name: 'Supervisor Demo',
       role: 'supervisor',
-      email: 'ana.martinez@demo.com',
+      email: 'supervisor@chacabuco.demo.com',
       label: 'Supervisor',
       description: 'Coordina equipos y monitorea métricas',
       icon: Users,
@@ -29,9 +29,9 @@ export default function Demo() {
     },
     {
       id: 'vecino',
-      name: 'María García',
+      name: 'Vecino Demo',
       role: 'vecino',
-      email: 'maria.garcia@demo.com',
+      email: 'vecino@chacabuco.demo.com',
       label: 'Vecino',
       description: 'Crea reclamos, hace trámites y sigue el estado',
       icon: User,
@@ -39,26 +39,26 @@ export default function Demo() {
       features: ['Crear reclamos', 'Iniciar trámites', 'Ver estado en tiempo real']
     },
     {
-      id: 'empleado-tecnico',
-      name: 'Carlos López',
+      id: 'empleado',
+      name: 'Empleado Demo',
       role: 'empleado',
-      email: 'carlos.lopez@demo.com',
-      label: 'Técnico',
+      email: 'empleado@chacabuco.demo.com',
+      label: 'Empleado',
       description: 'Resuelve trabajos en campo con la app móvil',
       icon: Wrench,
       gradient: 'from-[#2aa198] to-[#56cecb]',
       features: ['Tablero de tareas', 'Actualizar estados', 'Subir fotos']
     },
     {
-      id: 'empleado-admin',
-      name: 'Roberto Fernández',
-      role: 'empleado',
-      email: 'roberto.fernandez@demo.com',
-      label: 'Administrativo',
-      description: 'Gestiona trámites y documentación',
+      id: 'admin',
+      name: 'Admin Demo',
+      role: 'admin',
+      email: 'admin@chacabuco.demo.com',
+      label: 'Administrador',
+      description: 'Gestiona configuración y usuarios',
       icon: Shield,
       gradient: 'from-[#006699] to-[#0088cc]',
-      features: ['Gestión de trámites', 'Revisión de documentos', 'Atención al público']
+      features: ['Gestión completa', 'Configuración', 'Reportes avanzados']
     }
   ];
 
@@ -73,7 +73,8 @@ export default function Demo() {
 
       // Setear información del municipio ANTES del login
       localStorage.setItem('municipio_codigo', 'chacabuco');
-      localStorage.setItem('municipio_id', '1');
+      localStorage.setItem('municipio_id', '7');
+      localStorage.setItem('municipio_actual_id', '7');
       localStorage.setItem('municipio_nombre', 'Chacabuco');
       localStorage.setItem('municipio_color', '#0088cc');
 

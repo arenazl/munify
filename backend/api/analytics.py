@@ -203,101 +203,20 @@ async def get_distancias_empleados(
     """
     Calcula la distancia promedio recorrida por los empleados.
     Basado en las coordenadas de reclamos resueltos.
+
+    TODO: Requiere agregar campo empleado_id a tabla reclamos para trackear
+    qué empleado resolvió cada reclamo.
     """
-    municipio_id = get_effective_municipio_id(request, current_user)
-    fecha_inicio = datetime.utcnow() - timedelta(days=dias)
-
-    # Obtener ubicación de la municipalidad desde tabla Municipio
-    municipio_result = await db.execute(
-        select(Municipio).where(Municipio.id == municipio_id)
-    )
-    municipio = municipio_result.scalar_one_or_none()
-    muni_lat = municipio.latitud if municipio and municipio.latitud else -34.5750
-    muni_lon = municipio.longitud if municipio and municipio.longitud else -58.5250
-
-    # Obtener reclamos resueltos por empleado (1 query optimizada)
-    result = await db.execute(
-        select(
-            Empleado.id,
-            Empleado.nombre,
-            Reclamo.latitud,
-            Reclamo.longitud,
-            Reclamo.id.label('reclamo_id')
-        )
-        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
-        .where(
-            and_(
-                Reclamo.estado == EstadoReclamo.RESUELTO,
-                Reclamo.fecha_resolucion >= fecha_inicio,
-                Reclamo.latitud.isnot(None),
-                Reclamo.longitud.isnot(None),
-                Reclamo.municipio_id == municipio_id
-            )
-        )
-        .order_by(Empleado.id, Reclamo.fecha_resolucion)
-    )
-    rows = result.all()
-
-    # Agrupar por empleado
-    empleados_data = {}
-    for row in rows:
-        if row.id not in empleados_data:
-            empleados_data[row.id] = {
-                "nombre": row.nombre,
-                "reclamos": []
-            }
-        empleados_data[row.id]["reclamos"].append({
-            "lat": row.latitud,
-            "lon": row.longitud
-        })
-
-    # Calcular distancias
-    estadisticas = []
-    distancia_total_todas = 0
-    reclamos_total = 0
-
-    for empleado_id, data in empleados_data.items():
-        reclamos = data["reclamos"]
-        distancia_total = 0
-
-        # Distancia desde municipalidad al primer reclamo + entre reclamos
-        if reclamos:
-            # Ida al primer reclamo
-            distancia_total += haversine(muni_lon, muni_lat, reclamos[0]["lon"], reclamos[0]["lat"])
-
-            # Entre reclamos consecutivos
-            for i in range(1, len(reclamos)):
-                distancia_total += haversine(
-                    reclamos[i-1]["lon"], reclamos[i-1]["lat"],
-                    reclamos[i]["lon"], reclamos[i]["lat"]
-                )
-
-            # Vuelta desde el último reclamo
-            distancia_total += haversine(reclamos[-1]["lon"], reclamos[-1]["lat"], muni_lon, muni_lat)
-
-        distancia_promedio = distancia_total / len(reclamos) if reclamos else 0
-        distancia_total_todas += distancia_total
-        reclamos_total += len(reclamos)
-
-        estadisticas.append({
-            "empleado_id": empleado_id,
-            "empleado_nombre": data["nombre"],
-            "reclamos_resueltos": len(reclamos),
-            "distancia_total_km": round(distancia_total, 2),
-            "distancia_promedio_km": round(distancia_promedio, 2)
-        })
-
-    # Ordenar por reclamos resueltos
-    estadisticas.sort(key=lambda x: x["reclamos_resueltos"], reverse=True)
-
+    # Funcionalidad pendiente - requiere campo empleado_id en reclamos
     return {
-        "empleados": estadisticas,
+        "empleados": [],
         "resumen": {
-            "distancia_total_km": round(distancia_total_todas, 2),
-            "reclamos_total": reclamos_total,
-            "distancia_promedio_por_reclamo_km": round(distancia_total_todas / reclamos_total, 2) if reclamos_total > 0 else 0,
+            "distancia_total_km": 0,
+            "reclamos_total": 0,
+            "distancia_promedio_por_reclamo_km": 0,
             "periodo_dias": dias
-        }
+        },
+        "mensaje": "Funcionalidad pendiente - requiere asignación de empleados a reclamos"
     }
 
 
@@ -451,66 +370,12 @@ async def get_rendimiento_empleados(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """
-    Rendimiento de empleados por semana - OPTIMIZADO.
-    Muestra cuántos reclamos resolvió cada empleado por semana.
+    Rendimiento de empleados por semana.
+    TODO: Migrar a dependencia cuando se implemente asignación por IA
     """
-    municipio_id = get_effective_municipio_id(request, current_user)
-
-    # Obtener empleados activos del municipio (1 query)
-    empleados_result = await db.execute(
-        select(Empleado).where(
-            Empleado.activo == True,
-            Empleado.municipio_id == municipio_id
-        )
-    )
-    empleados = empleados_result.scalars().all()
-
-    if len(empleados) == 0:
-        return {"semanas": [], "empleados": []}
-
-    empleados_map = {e.id: e.nombre for e in empleados}
-    empleados_names = [e.nombre for e in empleados]
-    ahora = datetime.utcnow()
-
-    # Obtener todos los reclamos resueltos del período en 1 sola query
-    fecha_inicio = ahora - timedelta(weeks=semanas)
-    result = await db.execute(
-        select(
-            Reclamo.empleado_id,
-            Reclamo.fecha_resolucion
-        ).where(
-            and_(
-                Reclamo.estado == EstadoReclamo.RESUELTO,
-                Reclamo.fecha_resolucion >= fecha_inicio,
-                Reclamo.empleado_id.isnot(None),
-                Reclamo.municipio_id == municipio_id
-            )
-        )
-    )
-    reclamos = result.all()
-
-    # Inicializar resultado
-    resultado = []
-    for i in range(semanas):
-        semana_data = {"semana": f"Sem {i + 1}"}
-        for nombre in empleados_names:
-            semana_data[nombre] = 0
-        resultado.append(semana_data)
-
-    # Contar reclamos por semana y empleado
-    for empleado_id, fecha_resolucion in reclamos:
-        if empleado_id not in empleados_map:
-            continue
-        nombre = empleados_map[empleado_id]
-        # Calcular en qué semana cae
-        dias_atras = (ahora - fecha_resolucion).days
-        semana_idx = min(dias_atras // 7, semanas - 1)
-        # Invertir índice (semana 1 = más antigua)
-        semana_idx = semanas - 1 - semana_idx
-        if 0 <= semana_idx < semanas:
-            resultado[semana_idx][nombre] += 1
-
+    # Por ahora retorna datos vacíos ya que no hay empleado_id en reclamos
     return {
-        "semanas": resultado,
-        "empleados": empleados_names
+        "semanas": [],
+        "empleados": [],
+        "mensaje": "Pendiente migración a dependencias"
     }

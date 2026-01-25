@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
@@ -122,17 +122,18 @@ async def check_duplicados_tipo_tramite(
 @router.post("/tipos", response_model=TipoTramiteResponse)
 async def crear_tipo_tramite(
     tipo_data: TipoTramiteCreate,
-    municipio_id: int = Query(..., description="ID del municipio del admin que crea"),
+    municipio_id: Optional[int] = Query(None, description="ID del municipio (opcional para superadmin)"),
     forzar_creacion: bool = Query(False, description="Crear aunque existan duplicados"),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Crea un nuevo tipo de trámite en el catálogo genérico y lo habilita para el municipio.
+    Crea un nuevo tipo de trámite en el catálogo genérico.
 
     - Si ya existe un tipo con nombre similar, sugiere usar el existente
     - Si forzar_creacion=True, crea de todos modos
-    - Automáticamente crea la asociación en municipio_tipos_tramites
+    - Si se pasa municipio_id, también crea la asociación en municipio_tipos_tramites
+    - Superadmin (sin municipio_id): solo crea en el catálogo global
     """
     # Verificar duplicados
     if not forzar_creacion:
@@ -152,17 +153,19 @@ async def crear_tipo_tramite(
     await db.commit()
     await db.refresh(tipo)
 
-    # Crear asociación con el municipio del admin
-    municipio_tipo = MunicipioTipoTramite(
-        municipio_id=municipio_id,
-        tipo_tramite_id=tipo.id,
-        activo=True,
-        orden=tipo_data.orden
-    )
-    db.add(municipio_tipo)
-    await db.commit()
-
-    logger.info(f"Tipo de trámite '{tipo.nombre}' creado y habilitado para municipio {municipio_id}")
+    # Si se pasa municipio_id, crear asociación con el municipio
+    if municipio_id:
+        municipio_tipo = MunicipioTipoTramite(
+            municipio_id=municipio_id,
+            tipo_tramite_id=tipo.id,
+            activo=True,
+            orden=tipo_data.orden
+        )
+        db.add(municipio_tipo)
+        await db.commit()
+        logger.info(f"Tipo de trámite '{tipo.nombre}' creado y habilitado para municipio {municipio_id}")
+    else:
+        logger.info(f"Tipo de trámite '{tipo.nombre}' creado en catálogo global (superadmin)")
 
     return tipo
 
@@ -433,17 +436,18 @@ async def check_duplicados_tramite(
 @router.post("/catalogo", response_model=TramiteResponse)
 async def crear_tramite_catalogo(
     tramite_data: TramiteCreate,
-    municipio_id: int = Query(..., description="ID del municipio del admin que crea"),
+    municipio_id: Optional[int] = Query(None, description="ID del municipio (opcional para superadmin)"),
     forzar_creacion: bool = Query(False, description="Crear aunque existan duplicados"),
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Crea un nuevo trámite en el catálogo genérico y lo habilita para el municipio.
+    Crea un nuevo trámite en el catálogo genérico.
 
     - Si ya existe un trámite con nombre similar, sugiere usar el existente
     - Si forzar_creacion=True, crea de todos modos
-    - Automáticamente crea la asociación en municipio_tramites
+    - Si se pasa municipio_id, también crea la asociación en municipio_tramites
+    - Superadmin (sin municipio_id): solo crea en el catálogo global
     """
     # Verificar que el tipo existe
     result = await db.execute(
@@ -472,21 +476,23 @@ async def crear_tramite_catalogo(
     await db.commit()
     await db.refresh(tramite)
 
-    # Crear asociación con el municipio del admin
-    municipio_tramite = MunicipioTramite(
-        municipio_id=municipio_id,
-        tramite_id=tramite.id,
-        activo=True,
-        orden=tramite_data.orden,
-        tiempo_estimado_dias=tramite_data.tiempo_estimado_dias,
-        costo=tramite_data.costo,
-        requisitos=tramite_data.requisitos,
-        documentos_requeridos=tramite_data.documentos_requeridos
-    )
-    db.add(municipio_tramite)
-    await db.commit()
-
-    logger.info(f"Trámite '{tramite.nombre}' creado y habilitado para municipio {municipio_id}")
+    # Si se pasa municipio_id, crear asociación con el municipio
+    if municipio_id:
+        municipio_tramite = MunicipioTramite(
+            municipio_id=municipio_id,
+            tramite_id=tramite.id,
+            activo=True,
+            orden=tramite_data.orden,
+            tiempo_estimado_dias=tramite_data.tiempo_estimado_dias,
+            costo=tramite_data.costo,
+            requisitos=tramite_data.requisitos,
+            documentos_requeridos=tramite_data.documentos_requeridos
+        )
+        db.add(municipio_tramite)
+        await db.commit()
+        logger.info(f"Trámite '{tramite.nombre}' creado y habilitado para municipio {municipio_id}")
+    else:
+        logger.info(f"Trámite '{tramite.nombre}' creado en catálogo global (superadmin)")
 
     return tramite
 
@@ -594,6 +600,37 @@ async def listar_tramites_municipio(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+@router.get("/municipio/habilitados")
+async def get_tramites_municipio_habilitados(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Obtener IDs de trámites habilitados para el municipio actual.
+    Usa el header X-Municipio-ID o el municipio del usuario.
+    """
+    # Obtener municipio_id efectivo
+    municipio_id = current_user.municipio_id
+    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        header_id = request.headers.get('X-Municipio-ID')
+        if header_id:
+            try:
+                municipio_id = int(header_id)
+            except (ValueError, TypeError):
+                pass
+
+    if not municipio_id:
+        return []
+
+    result = await db.execute(
+        select(MunicipioTramite.tramite_id)
+        .where(MunicipioTramite.municipio_id == municipio_id)
+        .where(MunicipioTramite.activo == True)
+    )
+    return [row[0] for row in result.fetchall()]
 
 
 @router.put("/catalogo/{tramite_id}", response_model=TramiteResponse)
@@ -1070,9 +1107,9 @@ async def conteo_estados_solicitudes(
         Solicitud.municipio_id == muni_id
     )
 
-    # Empleado solo ve los suyos
-    if current_user.rol == RolUsuario.EMPLEADO:
-        query = query.where(Solicitud.empleado_id == current_user.empleado_id)
+    # TODO: Empleado filtro por dependencia cuando se implemente IA
+    # if current_user.rol == RolUsuario.EMPLEADO:
+    #     query = query.where(Solicitud.municipio_dependencia_id == current_user.dependencia_id)
 
     query = query.group_by(Solicitud.estado)
     result = await db.execute(query)
@@ -1102,9 +1139,9 @@ async def conteo_tipos_solicitudes(
         Solicitud.municipio_id == muni_id
     )
 
-    # Empleado solo ve los suyos
-    if current_user.rol == RolUsuario.EMPLEADO:
-        query = query.where(Solicitud.empleado_id == current_user.empleado_id)
+    # TODO: Empleado filtro por dependencia cuando se implemente IA
+    # if current_user.rol == RolUsuario.EMPLEADO:
+    #     query = query.where(Solicitud.municipio_dependencia_id == current_user.dependencia_id)
 
     query = query.group_by(TipoTramite.id, TipoTramite.nombre, TipoTramite.icono, TipoTramite.color)
     query = query.order_by(func.count(Solicitud.id).desc())
@@ -1154,11 +1191,12 @@ async def listar_solicitudes_gestion(
             Tramite.tipo_tramite_id == tipo_tramite_id
         )
 
-    if empleado_id:
-        query = query.where(Solicitud.empleado_id == empleado_id)
+    # TODO: Filtro por dependencia cuando se implemente IA
+    # if empleado_id:
+    #     query = query.where(Solicitud.municipio_dependencia_id == empleado_id)
 
     if sin_asignar:
-        query = query.where(Solicitud.empleado_id == None)
+        query = query.where(Solicitud.municipio_dependencia_id == None)
 
     if search:
         search_term = f"%{search}%"
@@ -1170,14 +1208,14 @@ async def listar_solicitudes_gestion(
             (Solicitud.dni_solicitante.ilike(search_term))
         )
 
-    # Empleado solo ve los suyos
-    if current_user.rol == RolUsuario.EMPLEADO:
-        query = query.where(Solicitud.empleado_id == current_user.empleado_id)
+    # TODO: Empleado filtro por dependencia cuando se implemente IA
+    # if current_user.rol == RolUsuario.EMPLEADO:
+    #     query = query.where(Solicitud.municipio_dependencia_id == current_user.dependencia_id)
 
     # Optimización: solo cargar relaciones necesarias para la lista
     query = query.options(
         selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-        selectinload(Solicitud.empleado_asignado)
+        selectinload(Solicitud.dependencia_asignada)
         # No cargar solicitante completo, ya tenemos nombre_solicitante, apellido_solicitante, etc.
     )
     query = query.order_by(Solicitud.created_at.desc(), Solicitud.prioridad)

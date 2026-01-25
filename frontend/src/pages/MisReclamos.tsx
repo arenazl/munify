@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown } from 'lucide-react';
+import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -270,13 +270,10 @@ export default function MisReclamos() {
             </div>
           )}
 
-          {selectedReclamo.empleado_asignado && (
+          {selectedReclamo.dependencia_asignada?.nombre && (
             <div className="p-3 rounded-lg" style={{ backgroundColor: '#dbeafe' }}>
-              <label className="block text-sm font-medium" style={{ color: '#1e40af' }}>Empleado Asignado</label>
-              <p className="mt-1" style={{ color: '#1e3a8a' }}>{formatEmpleadoNombre(selectedReclamo.empleado_asignado.nombre)}</p>
-              {selectedReclamo.empleado_asignado.especialidad && (
-                <p className="text-sm" style={{ color: '#3b82f6' }}>{selectedReclamo.empleado_asignado.especialidad}</p>
-              )}
+              <label className="block text-sm font-medium" style={{ color: '#1e40af' }}>Asignado a</label>
+              <p className="mt-1" style={{ color: '#1e3a8a' }}>{selectedReclamo.dependencia_asignada.nombre}</p>
             </div>
           )}
 
@@ -661,15 +658,13 @@ export default function MisReclamos() {
                         <Calendar className="h-3 w-3 mr-1" />
                         {new Date(r.created_at).toLocaleDateString()}
                       </span>
-                      {r.empleado_asignado && (
+                      {r.dependencia_asignada?.nombre && (
                         <span
                           className="text-xs font-medium px-2 py-0.5 rounded-md flex items-center gap-1"
                           style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}
                         >
-                          <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                          {formatEmpleadoNombre(r.empleado_asignado.nombre)}
+                          <Building2 className="h-3 w-3" />
+                          {r.dependencia_asignada.nombre}
                         </span>
                       )}
                     </div>

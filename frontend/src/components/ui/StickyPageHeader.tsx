@@ -71,22 +71,13 @@ export function StickyPageHeader({
   // Modo custom: si hay children, renderizar como antes
   const useCustomMode = !!children;
 
-  // Usar position fixed - sticky no funciona por overflow en contenedores padre
+  // Usar position sticky - se queda fijo cuando llega al top
   return (
     <>
-      {/* Spacer para ocupar el espacio del header fijo - responsive */}
+      {/* Header sticky - se pega al top cuando scrolleas */}
       <div
-        className={filterPanel ? 'h-[90px] sm:h-[105px]' : 'h-[50px] sm:h-[60px]'}
-      />
-
-      {/* Header fijo - margen para coincidir con Layout p-3 sm:p-6 */}
-      {/* top = 64px (header) + padding del main (12px mobile, 24px desktop) */}
-      <div
-        className="fixed z-30 pt-1 pb-2 right-3 sm:right-6 top-[76px] sm:top-[88px] sticky-header-wrapper"
-        style={{
-          backgroundColor: theme.background,
-          boxSizing: 'border-box',
-        }}
+        className="sticky z-30 top-0 pt-1 pb-3"
+        style={{ backgroundColor: theme.background }}
       >
         {/* Parte 1: Header principal */}
         <div

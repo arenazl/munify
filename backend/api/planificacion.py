@@ -201,12 +201,14 @@ async def get_planificacion_semanal(
             ))
 
     # 2. Obtener reclamos asignados en el rango de fechas
+    # TODO: Migrar a dependencia cuando se implemente asignación por IA
+    # Por ahora traemos reclamos con fecha_programada en el rango (sin filtrar por empleado)
     query_reclamos = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.empleado_id.isnot(None),
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
             or_(
                 # Reclamos con fecha_programada en el rango
                 and_(
@@ -217,14 +219,14 @@ async def get_planificacion_semanal(
                 # O reclamos asignados recientemente sin fecha_programada
                 and_(
                     Reclamo.fecha_programada.is_(None),
-                    Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
                     Reclamo.updated_at >= datetime.combine(fecha_ini, datetime.min.time())
                 )
             )
         )
     )
-    if empleado_id:
-        query_reclamos = query_reclamos.where(Reclamo.empleado_id == empleado_id)
+    # TODO: Migrar filtro empleado_id a dependencia_id
+    # if empleado_id:
+    #     query_reclamos = query_reclamos.where(Reclamo.municipio_dependencia_id == dependencia_id)
 
     result = await db.execute(query_reclamos)
     reclamos = result.scalars().all()
@@ -244,7 +246,7 @@ async def get_planificacion_semanal(
             fecha_programada=r.fecha_programada.isoformat() if r.fecha_programada else None,
             hora_inicio=r.hora_inicio.strftime("%H:%M") if r.hora_inicio else None,
             hora_fin=r.hora_fin.strftime("%H:%M") if r.hora_fin else None,
-            empleado_id=r.empleado_id,
+            empleado_id=None,  # TODO: Migrar a dependencia_id
             prioridad=r.prioridad
         )
         for r in reclamos
@@ -294,13 +296,14 @@ async def get_planificacion_semanal(
         pass
 
     # 4. Obtener reclamos sin asignar (para el pool)
+    # TODO: Migrar a dependencia cuando se implemente asignación por IA
+    # Por ahora usamos estado NUEVO como indicador de "sin asignar"
     query_sin_asignar = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.empleado_id.is_(None),
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO])
+            Reclamo.estado == EstadoReclamo.NUEVO
         )
         .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
         .limit(30)

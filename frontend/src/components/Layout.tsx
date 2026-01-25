@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Outlet, Link, NavLink, useLocation } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2 } from 'lucide-react';
+import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -42,13 +42,13 @@ const getMobileTabs = (userRole: string) => {
     ];
   }
 
-  // Vecino: Logros en el centro (elevado), y ambos botones de crear (Reclamo y Trámite)
+  // Vecino: "+" en el centro para crear, con menú desplegable
   return [
-    { path: '/gestion/crear-reclamo', icon: AlertCircle, label: 'Nuevo', end: false },
-    { path: '/gestion/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
-    { path: '/gestion/logros', icon: Trophy, label: 'Logros', end: false },
-    { path: '/gestion/crear-tramite', icon: FileCheck, label: 'Trámite', end: false },
     { path: '/gestion/mi-panel', icon: Home, label: 'Inicio', end: true },
+    { path: '/gestion/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
+    { path: null, icon: null, label: 'Crear', isCreateMenu: true }, // Botón especial
+    { path: '/gestion/logros', icon: Trophy, label: 'Logros', end: false },
+    { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
   ];
 };
 
@@ -67,6 +67,8 @@ export default function Layout() {
   });
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const navigate = useNavigate();
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
   const [profileData, setProfileData] = useState({
@@ -370,7 +372,11 @@ export default function Layout() {
             <>
               <div
                 className="fixed inset-0 z-[60]"
-                onClick={() => setUserMenuOpen(false)}
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  // En móvil, también cerrar el sidebar
+                  if (isMobile) setSidebarOpen(false);
+                }}
               />
               <div
                 className="absolute left-full top-0 ml-2 w-56 rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden"
@@ -930,57 +936,135 @@ export default function Layout() {
       {/* Bottom Tab Bar - Solo en móvil */}
       {isMobile && (
         <>
+          {/* Backdrop del menú crear */}
+          {createMenuOpen && (
+            <div
+              className="fixed inset-0 z-[55] bg-black/40"
+              onClick={() => setCreateMenuOpen(false)}
+              style={{ animation: 'fadeIn 0.2s ease-out' }}
+            />
+          )}
+
+          {/* Menú crear animado */}
+          {createMenuOpen && (
+            <div
+              className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[56] flex flex-col gap-3"
+              style={{ animation: 'slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+            >
+              <button
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  navigate('/gestion/crear-reclamo');
+                }}
+                className="flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl"
+                style={{
+                  backgroundColor: theme.card,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
+                >
+                  <AlertCircle className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold" style={{ color: theme.text }}>Nuevo Reclamo</p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>Reportar un problema</p>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  navigate('/gestion/crear-tramite');
+                }}
+                className="flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl"
+                style={{
+                  backgroundColor: theme.card,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}
+                >
+                  <FileCheck className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold" style={{ color: theme.text }}>Nuevo Trámite</p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>Iniciar una gestión</p>
+                </div>
+              </button>
+            </div>
+          )}
+
           <nav
-            className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe"
+            className="fixed bottom-0 left-0 right-0 z-50 lg:hidden pb-safe overflow-visible"
             style={{
               backgroundColor: theme.card,
               borderTop: `1px solid ${theme.border}`,
             }}
           >
-            <div className="flex items-center justify-around py-2">
+            <div className="flex items-center justify-around py-2 overflow-visible">
               {mobileTabs.map((tab, index) => {
-                // El tab del centro (index 2) es el principal elevado
-                const isMainTab = index === 2;
+                // El tab del centro (index 2) es el botón de crear
+                const isCreateButton = 'isCreateMenu' in tab && tab.isCreateMenu;
 
+                // Botón especial de crear
+                if (isCreateButton) {
+                  return (
+                    <button
+                      key="create-menu"
+                      onClick={() => setCreateMenuOpen(!createMenuOpen)}
+                      className="flex flex-col items-center min-w-0 flex-1 relative"
+                    >
+                      <div
+                        className="w-14 h-14 -mt-7 rounded-full flex items-center justify-center shadow-xl transition-all duration-300"
+                        style={{
+                          backgroundColor: theme.primary,
+                          boxShadow: `0 6px 20px ${theme.primary}60`,
+                          transform: createMenuOpen ? 'rotate(45deg) scale(1.05)' : 'rotate(0deg) scale(1)',
+                        }}
+                      >
+                        <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
+                      </div>
+                      <span
+                        className="text-[10px] font-medium mt-1"
+                        style={{ color: theme.primary }}
+                      >
+                        {tab.label}
+                      </span>
+                    </button>
+                  );
+                }
+
+                // Tabs normales
                 return (
                   <NavLink
                     key={tab.path}
                     to={tab.path!}
                     end={'end' in tab ? tab.end : false}
                     className="flex flex-col items-center min-w-0 flex-1"
+                    onClick={() => setCreateMenuOpen(false)}
                   >
                     {({ isActive }) => (
                       <>
-                        {isMainTab ? (
-                          // Botones principales elevados (Reclamos y Trámites)
-                          <div
-                            className="w-10 h-10 -mt-3 rounded-full flex items-center justify-center shadow-lg"
-                            style={{
-                              backgroundColor: theme.primary,
-                              boxShadow: `0 4px 14px ${theme.primary}50`,
-                            }}
-                          >
-                            <tab.icon className="h-5 w-5 text-white" />
-                          </div>
-                        ) : (
-                          // Botones normales - solo cambian color al seleccionar
-                          <div
-                            className="p-2 rounded-xl transition-colors"
-                            style={{
-                              backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
-                            }}
-                          >
+                        <div
+                          className="p-2 rounded-xl transition-colors"
+                          style={{
+                            backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
+                          }}
+                        >
+                          {tab.icon && (
                             <tab.icon
                               className="h-5 w-5"
                               style={{ color: isActive ? theme.primary : theme.textSecondary }}
                             />
-                          </div>
-                        )}
+                          )}
+                        </div>
                         <span
-                          className={`text-[10px] font-medium ${isMainTab ? 'mt-1' : 'mt-0.5'}`}
-                          style={{
-                            color: isMainTab || isActive ? theme.primary : theme.textSecondary
-                          }}
+                          className="text-[10px] font-medium mt-0.5"
+                          style={{ color: isActive ? theme.primary : theme.textSecondary }}
                         >
                           {tab.label}
                         </span>
@@ -1018,6 +1102,9 @@ export default function Layout() {
             padding-left: ${sidebarWidth};
           }
         }
+
+        /* Sticky header ya no necesita posicionamiento especial */
+        /* Ahora usa position: sticky con márgenes negativos */
 
         /* Sidebar toggle button - aparece on hover cuando está colapsado */
         .sidebar-toggle-btn {

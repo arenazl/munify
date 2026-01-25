@@ -94,6 +94,16 @@ class EmpleadoSimple(BaseModel):
     class Config:
         from_attributes = True
 
+
+class DependenciaAsignadaSimple(BaseModel):
+    """Dependencia asignada a un reclamo"""
+    id: int
+    dependencia_id: int
+    nombre: Optional[str] = None  # Viene del property
+
+    class Config:
+        from_attributes = True
+
 class DocumentoSimple(BaseModel):
     id: int
     nombre_original: str
@@ -128,7 +138,7 @@ class ReclamoResponse(BaseModel):
     zona: Optional[ZonaSimple]
     barrio: Optional[BarrioSimple] = None
     creador: CreadorSimple
-    empleado_asignado: Optional[EmpleadoSimple]
+    dependencia_asignada: Optional[DependenciaAsignadaSimple] = None
     documentos: List[DocumentoSimple] = []
 
     class Config:

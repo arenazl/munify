@@ -66,17 +66,9 @@ async def get_calendario_empleado(
         raise HTTPException(status_code=404, detail="Empleado no encontrado")
 
     # Obtener reclamos asignados en el período
-    result = await db.execute(
-        select(Reclamo).where(
-            and_(
-                Reclamo.empleado_id == empleado_id,
-                Reclamo.fecha_programada >= fecha_inicio,
-                Reclamo.fecha_programada <= fecha_fin,
-                Reclamo.estado.in_([EstadoReclamo.asignado, EstadoReclamo.en_proceso])
-            )
-        ).order_by(Reclamo.fecha_programada, Reclamo.hora_inicio)
-    )
-    reclamos = result.scalars().all()
+    # TODO: Migrar a dependencia cuando se implemente asignación por IA
+    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
+    reclamos = []
 
     # Construir calendario por día
     calendario = {}
@@ -188,16 +180,9 @@ async def get_disponibilidad_general(
 
     for empleado in empleados:
         # Obtener tareas del día
-        result = await db.execute(
-            select(Reclamo).where(
-                and_(
-                    Reclamo.empleado_id == empleado.id,
-                    Reclamo.fecha_programada == fecha,
-                    Reclamo.estado.in_([EstadoReclamo.asignado, EstadoReclamo.en_proceso])
-                )
-            ).order_by(Reclamo.hora_inicio)
-        )
-        tareas = result.scalars().all()
+        # TODO: Migrar a dependencia cuando se implemente asignación por IA
+        # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
+        tareas = []
 
         # Calcular bloques ocupados
         bloques_ocupados = []

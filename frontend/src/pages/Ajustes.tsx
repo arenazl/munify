@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Clock, Building2, Check, Landmark
+  CalendarOff, Clock, Building2, Check, Landmark, Link2
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -200,12 +200,30 @@ export default function Ajustes() {
         },
         {
           id: 'direcciones',
-          label: 'Direcciones',
-          description: 'Unidades organizativas del municipio',
+          label: 'Direcciones (Legacy)',
+          description: 'Unidades organizativas del municipio (deprecado)',
+          icon: Building2,
+          color: '#94a3b8',
+          link: '/gestion/direcciones',
+          show: false // Deprecado - usar Dependencias
+        },
+        {
+          id: 'dependencias',
+          label: 'Dependencias',
+          description: 'Secretarias y direcciones que gestionan reclamos y tramites',
           icon: Building2,
           color: '#3b82f6',
-          link: '/gestion/direcciones',
+          link: '/gestion/dependencias',
           show: isAdminOrSupervisor
+        },
+        {
+          id: 'asignacion-dependencias',
+          label: 'Asignación',
+          description: 'Asignar categorías y tipos de trámite a dependencias',
+          icon: Link2,
+          color: '#f59e0b',
+          link: '/gestion/asignacion-dependencias',
+          show: isAdminOrSupervisor && !isSuperAdmin // Solo supervisor con municipio
         },
         {
           id: 'categorias',

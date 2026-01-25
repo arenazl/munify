@@ -33,6 +33,12 @@ class TipoTramite(Base):
     icono = Column(String(50), nullable=True)
     color = Column(String(20), nullable=True)
 
+    # Flags para clasificación IA
+    es_certificado = Column(Boolean, default=False)
+    es_habilitacion = Column(Boolean, default=False)
+    es_pago = Column(Boolean, default=False)
+    palabras_clave = Column(Text, nullable=True)  # CSV de palabras clave para búsqueda IA
+
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)
 
@@ -83,6 +89,12 @@ class Tramite(Base):
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
     icono = Column(String(50), nullable=True)
+
+    # Flags para clasificación IA
+    es_certificado = Column(Boolean, default=False)
+    es_habilitacion = Column(Boolean, default=False)
+    es_pago = Column(Boolean, default=False)
+    palabras_clave = Column(Text, nullable=True)  # CSV de palabras clave para búsqueda IA
 
     # Requisitos y documentación (valores por defecto, municipios pueden personalizar)
     requisitos = Column(Text, nullable=True)
@@ -171,9 +183,13 @@ class Solicitud(Base):
     telefono_solicitante = Column(String(50), nullable=True)
     direccion_solicitante = Column(String(300), nullable=True)
 
-    # Dirección organizativa asignada (unidad municipal que gestiona esta solicitud)
+    # Dirección organizativa asignada (DEPRECATED - usar dependencia_asignada)
     direccion_id = Column(Integer, ForeignKey("direcciones.id"), nullable=True, index=True)
-    direccion_asignada = relationship("Direccion", back_populates="solicitudes")
+    direccion_asignada_legacy = relationship("Direccion", back_populates="solicitudes")
+
+    # Dependencia asignada (nuevo modelo desacoplado)
+    municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
+    dependencia_asignada = relationship("MunicipioDependencia")  # Sin back_populates hasta que se migre todo
 
     # Prioridad (1=urgente, 5=baja)
     prioridad = Column(Integer, default=3)

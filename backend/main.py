@@ -105,17 +105,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware simple para loguear requests (DEBUG)
+# Middleware para loguear requests y responses (DEBUG)
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     # Solo loguear requests a /api
     if request.url.path.startswith("/api"):
-        print(f"📤 {request.method} {request.url.path}", flush=True)
+        # Log request
+        query = f"?{request.url.query}" if request.url.query else ""
+        headers_log = dict(request.headers)
+        # Ocultar token completo
+        if 'authorization' in headers_log:
+            headers_log['authorization'] = headers_log['authorization'][:30] + '...'
 
+        print(f"\n{'='*60}", flush=True)
+        print(f"📤 REQUEST: {request.method} {request.url.path}{query}", flush=True)
+        print(f"   Headers: {headers_log}", flush=True)
+
+        # Intentar leer el body (solo para POST/PUT/PATCH)
+        if request.method in ["POST", "PUT", "PATCH"]:
+            try:
+                body = await request.body()
+                if body:
+                    body_str = body.decode('utf-8')[:500]  # Limitar a 500 chars
+                    print(f"   Body: {body_str}", flush=True)
+            except:
+                pass
+
+    start_time = time.time()
     response = await call_next(request)
+    process_time = time.time() - start_time
 
     if request.url.path.startswith("/api"):
-        print(f"📥 {response.status_code}", flush=True)
+        print(f"📥 RESPONSE: {response.status_code} ({process_time:.3f}s)", flush=True)
+        print(f"{'='*60}\n", flush=True)
 
     return response
 

@@ -45,6 +45,8 @@ import PanelBI from './pages/PanelBI';
 import Demo from './pages/Demo';
 import Direcciones from './pages/Direcciones';
 import DireccionesConfig from './pages/DireccionesConfig';
+import DependenciasConfig from './pages/DependenciasConfig';
+import AsignacionDependencias from './pages/AsignacionDependencias';
 import Municipios from './pages/Municipios';
 
 // Demos de diseño
@@ -182,6 +184,14 @@ export const router = createBrowserRouter([
       {
         path: 'direcciones/config',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><DireccionesConfig /></ProtectedRoute>
+      },
+      {
+        path: 'dependencias',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><DependenciasConfig /></ProtectedRoute>
+      },
+      {
+        path: 'asignacion-dependencias',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><AsignacionDependencias /></ProtectedRoute>
       },
       {
         path: 'tipos-tramite',

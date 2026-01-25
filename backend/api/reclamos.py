@@ -17,6 +17,8 @@ from models.documento import Documento
 from models.user import User
 from models.enums import EstadoReclamo, RolUsuario
 from models.whatsapp_config import WhatsAppConfig
+from models.municipio_dependencia_categoria import MunicipioDependenciaCategoria
+from models.municipio_dependencia import MunicipioDependencia
 from schemas.reclamo import (
     ReclamoCreate, ReclamoUpdate, ReclamoResponse,
     ReclamoAsignar, ReclamoRechazar, ReclamoResolver, ReclamoComentario
@@ -244,7 +246,7 @@ def get_reclamos_query():
         selectinload(Reclamo.zona),
         selectinload(Reclamo.barrio),
         selectinload(Reclamo.creador),
-        selectinload(Reclamo.empleado_asignado),
+        selectinload(Reclamo.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
         selectinload(Reclamo.documentos)
     )
 
@@ -273,9 +275,9 @@ async def get_reclamos(
             selectinload(Reclamo.categoria),
             selectinload(Reclamo.zona),
             selectinload(Reclamo.creador),
-            selectinload(Reclamo.empleado_asignado),
+            selectinload(Reclamo.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
             selectinload(Reclamo.documentos)
-        ).join(Reclamo.creador).outerjoin(Reclamo.categoria).outerjoin(Reclamo.zona).outerjoin(Reclamo.empleado_asignado)
+        ).join(Reclamo.creador).outerjoin(Reclamo.categoria).outerjoin(Reclamo.zona).outerjoin(Reclamo.dependencia_asignada)
     else:
         query = get_reclamos_query()
 
@@ -287,28 +289,10 @@ async def get_reclamos(
     if current_user.rol == RolUsuario.VECINO:
         query = query.where(Reclamo.creador_id == current_user.id)
     elif current_user.rol == RolUsuario.EMPLEADO:
-        # Empleado ve sus reclamos + los de su cuadrilla
-        from models.empleado_cuadrilla import EmpleadoCuadrilla
-
-        # Obtener IDs de cuadrillas del empleado
-        cuadrillas_subq = select(EmpleadoCuadrilla.cuadrilla_id).where(
-            EmpleadoCuadrilla.empleado_id == current_user.empleado_id,
-            EmpleadoCuadrilla.activo == True
-        )
-
-        # Obtener IDs de compañeros de cuadrilla
-        companeros_subq = select(EmpleadoCuadrilla.empleado_id).where(
-            EmpleadoCuadrilla.cuadrilla_id.in_(cuadrillas_subq),
-            EmpleadoCuadrilla.activo == True
-        )
-
-        # Filtrar: reclamos asignados al empleado O a compañeros de cuadrilla
-        query = query.where(
-            or_(
-                Reclamo.empleado_id == current_user.empleado_id,
-                Reclamo.empleado_id.in_(companeros_subq)
-            )
-        )
+        # TODO: Migrar filtro a dependencia cuando se implemente IA
+        # Por ahora, empleados ven todos los reclamos del municipio
+        # Futuro: query = query.where(Reclamo.municipio_dependencia_id == current_user.dependencia_id)
+        pass
 
     # Filtros opcionales
     if estado:
@@ -317,8 +301,9 @@ async def get_reclamos(
         query = query.where(Reclamo.categoria_id == categoria_id)
     if zona_id:
         query = query.where(Reclamo.zona_id == zona_id)
-    if empleado_id:
-        query = query.where(Reclamo.empleado_id == empleado_id)
+    # TODO: Migrar filtro empleado_id a dependencia_id
+    # if empleado_id:
+    #     query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
 
     # Búsqueda en todos los campos
     if search and search.strip():
@@ -638,91 +623,19 @@ async def get_mis_estadisticas(
 ):
     """
     Obtiene estadísticas de rendimiento del empleado logueado.
+    TODO: Migrar a dependencia cuando se implemente asignación por IA
     """
-    from sqlalchemy import case, extract
-    from datetime import date as date_type
-
-    empleado_id = current_user.empleado_id
-    if not empleado_id:
-        raise HTTPException(status_code=400, detail="No tenés un perfil de empleado asociado")
-
-    query = select(
-        func.count(Reclamo.id).label('total'),
-        func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
-        func.sum(case((Reclamo.estado == EstadoReclamo.EN_PROCESO, 1), else_=0)).label('en_proceso'),
-        func.sum(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]), 1), else_=0)).label('pendientes'),
-    ).where(Reclamo.empleado_id == empleado_id)
-
-    result = await db.execute(query)
-    stats = result.first()
-
-    primer_dia_mes = date_type.today().replace(day=1)
-    query_mes = select(func.count(Reclamo.id)).where(
-        Reclamo.empleado_id == empleado_id,
-        Reclamo.estado == EstadoReclamo.RESUELTO,
-        Reclamo.fecha_resolucion >= primer_dia_mes
-    )
-    result_mes = await db.execute(query_mes)
-    resueltos_mes = result_mes.scalar() or 0
-
-    query_tiempo = select(
-        func.avg(
-            extract('epoch', Reclamo.fecha_resolucion - Reclamo.created_at) / 86400
-        )
-    ).where(
-        Reclamo.empleado_id == empleado_id,
-        Reclamo.estado == EstadoReclamo.RESUELTO,
-        Reclamo.fecha_resolucion.isnot(None)
-    )
-    result_tiempo = await db.execute(query_tiempo)
-    tiempo_promedio = result_tiempo.scalar() or 0
-
-    query_cats = select(
-        Reclamo.categoria_id,
-        func.count(Reclamo.id).label('cantidad')
-    ).where(
-        Reclamo.empleado_id == empleado_id
-    ).group_by(Reclamo.categoria_id)
-
-    result_cats = await db.execute(query_cats)
-    cats_data = result_cats.all()
-
-    from models.categoria import Categoria
-    por_categoria = []
-    for cat_id, cantidad in cats_data:
-        if cat_id:
-            cat_result = await db.execute(select(Categoria.nombre).where(Categoria.id == cat_id))
-            cat_nombre = cat_result.scalar() or "Sin categoría"
-            por_categoria.append({"categoria": cat_nombre, "cantidad": cantidad})
-
-    por_categoria.sort(key=lambda x: x['cantidad'], reverse=True)
-
-    query_ultimos = select(Reclamo).options(
-        selectinload(Reclamo.categoria)
-    ).where(
-        Reclamo.empleado_id == empleado_id,
-        Reclamo.estado == EstadoReclamo.RESUELTO
-    ).order_by(Reclamo.fecha_resolucion.desc()).limit(10)
-
-    result_ultimos = await db.execute(query_ultimos)
-    ultimos = result_ultimos.scalars().all()
-
-    ultimos_resueltos = [{
-        "id": r.id,
-        "titulo": r.titulo,
-        "categoria": r.categoria.nombre if r.categoria else "Sin categoría",
-        "fecha_resolucion": r.fecha_resolucion.strftime("%d/%m/%Y") if r.fecha_resolucion else ""
-    } for r in ultimos]
-
+    # Por ahora retorna 0s ya que no hay empleado_id en reclamos
     return {
-        "total_asignados": stats.total or 0,
-        "resueltos": stats.resueltos or 0,
-        "en_proceso": stats.en_proceso or 0,
-        "pendientes": stats.pendientes or 0,
-        "resueltos_este_mes": resueltos_mes,
-        "tiempo_promedio_resolucion": round(tiempo_promedio, 1) if tiempo_promedio else 0,
-        "por_categoria": por_categoria,
-        "ultimos_resueltos": ultimos_resueltos
+        "total_asignados": 0,
+        "resueltos": 0,
+        "en_proceso": 0,
+        "pendientes": 0,
+        "resueltos_este_mes": 0,
+        "tiempo_promedio_resolucion": 0,
+        "por_categoria": [],
+        "ultimos_resueltos": [],
+        "mensaje": "Pendiente migración a dependencias"
     }
 
 
@@ -736,75 +649,12 @@ async def get_mi_historial(
 ):
     """
     Obtiene el historial completo de trabajos del empleado.
+    TODO: Migrar a dependencia cuando se implemente asignación por IA
     """
-    empleado_id = current_user.empleado_id
-    if not empleado_id:
-        raise HTTPException(status_code=400, detail="No tenés un perfil de empleado asociado")
-
-    query = select(Reclamo).options(
-        selectinload(Reclamo.categoria),
-        selectinload(Reclamo.zona),
-        selectinload(Reclamo.creador),
-        selectinload(Reclamo.calificacion)
-    ).where(Reclamo.empleado_id == empleado_id)
-
-    if estado:
-        try:
-            estado_enum = EstadoReclamo(estado.lower())
-            query = query.where(Reclamo.estado == estado_enum)
-        except ValueError:
-            pass
-
-    query = query.order_by(Reclamo.created_at.desc()).offset(skip).limit(limit)
-
-    result = await db.execute(query)
-    reclamos = result.scalars().all()
-
-    historial = []
-    for r in reclamos:
-        tiempo_resolucion = None
-        if r.fecha_resolucion and r.created_at:
-            delta = r.fecha_resolucion - r.created_at
-            tiempo_resolucion = round(delta.total_seconds() / 86400, 1)
-
-        calificacion_data = None
-        if r.calificacion:
-            calificacion_data = {
-                "puntuacion": r.calificacion.puntuacion,
-                "comentario": r.calificacion.comentario,
-                "fecha": r.calificacion.created_at.strftime("%d/%m/%Y") if r.calificacion.created_at else None
-            }
-
-        historial.append({
-            "id": r.id,
-            "titulo": r.titulo,
-            "descripcion": r.descripcion[:100] + "..." if len(r.descripcion) > 100 else r.descripcion,
-            "estado": r.estado.value if r.estado else None,
-            "categoria": r.categoria.nombre if r.categoria else None,
-            "zona": r.zona.nombre if r.zona else None,
-            "direccion": r.direccion,
-            "prioridad": r.prioridad,
-            "fecha_creacion": r.created_at.strftime("%d/%m/%Y %H:%M") if r.created_at else None,
-            "fecha_resolucion": r.fecha_resolucion.strftime("%d/%m/%Y %H:%M") if r.fecha_resolucion else None,
-            "tiempo_resolucion_dias": tiempo_resolucion,
-            "creador": f"{r.creador.nombre} {r.creador.apellido}" if r.creador else "Anónimo",
-            "calificacion": calificacion_data
-        })
-
-    count_query = select(func.count(Reclamo.id)).where(Reclamo.empleado_id == empleado_id)
-    if estado:
-        try:
-            estado_enum = EstadoReclamo(estado.lower())
-            count_query = count_query.where(Reclamo.estado == estado_enum)
-        except ValueError:
-            pass
-
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-
+    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
     return {
-        "data": historial,
-        "total": total,
+        "data": [],
+        "total": 0,
         "skip": skip,
         "limit": limit
     }
@@ -908,6 +758,25 @@ async def create_reclamo(
             print(f"[BARRIO] No se detectó barrio para dirección: {data.direccion}", flush=True)
     except Exception as e:
         print(f"[BARRIO] Error detectando barrio: {e}", flush=True)
+
+    # Auto-asignar a dependencia basándose en la categoría
+    try:
+        asignacion = await db.execute(
+            select(MunicipioDependenciaCategoria)
+            .where(
+                MunicipioDependenciaCategoria.municipio_id == current_user.municipio_id,
+                MunicipioDependenciaCategoria.categoria_id == data.categoria_id,
+                MunicipioDependenciaCategoria.activo == True
+            )
+        )
+        mdc = asignacion.scalar_one_or_none()
+        if mdc:
+            reclamo.municipio_dependencia_id = mdc.municipio_dependencia_id
+            print(f"[DEPENDENCIA] Auto-asignado a dependencia_id={mdc.municipio_dependencia_id} por categoría", flush=True)
+        else:
+            print(f"[DEPENDENCIA] No hay dependencia configurada para categoría {data.categoria_id} en municipio {current_user.municipio_id}", flush=True)
+    except Exception as e:
+        print(f"[DEPENDENCIA] Error auto-asignando dependencia: {e}", flush=True)
 
     db.add(reclamo)
     await db.flush()
@@ -1575,100 +1444,17 @@ async def get_disponibilidad_empleado(
 ):
     """
     Obtiene los bloques horarios ocupados de un empleado para una fecha específica.
-    Devuelve los rangos horarios ya asignados y el próximo horario disponible.
-    Si buscar_siguiente=True y el día está lleno, busca el próximo día con disponibilidad.
+    TODO: Migrar a dependencia cuando se implemente asignación por IA
     """
-    from datetime import date as date_type, time as time_type, timedelta, datetime as datetime_type
-
-    # Parsear la fecha
-    try:
-        fecha_date = date_type.fromisoformat(fecha)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD")
-
-    hora_inicio_jornada = time_type(9, 0)   # 9:00
-    hora_fin_jornada = time_type(18, 0)     # 18:00
-    hoy = date_type.today()
-    hora_actual = datetime_type.now().time()
-
-    # Función para obtener disponibilidad de un día específico
-    async def get_disponibilidad_dia(fecha_check: date_type):
-        result = await db.execute(
-            select(Reclamo)
-            .where(
-                Reclamo.empleado_id == empleado_id,
-                Reclamo.fecha_programada == fecha_check,
-                Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
-            )
-            .order_by(Reclamo.hora_inicio)
-        )
-        reclamos = result.scalars().all()
-
-        bloques_ocupados = []
-        for r in reclamos:
-            if r.hora_inicio and r.hora_fin:
-                bloques_ocupados.append({
-                    "reclamo_id": r.id,
-                    "titulo": r.titulo,
-                    "hora_inicio": r.hora_inicio.isoformat() if r.hora_inicio else None,
-                    "hora_fin": r.hora_fin.isoformat() if r.hora_fin else None
-                })
-
-        # Calcular próximo horario disponible
-        proximo_disponible = hora_inicio_jornada
-        bloques_ocupados_sorted = sorted(bloques_ocupados, key=lambda x: x["hora_inicio"] or "00:00")
-
-        for bloque in bloques_ocupados_sorted:
-            if bloque["hora_fin"]:
-                hora_fin_bloque = time_type.fromisoformat(bloque["hora_fin"])
-                if hora_fin_bloque > proximo_disponible:
-                    proximo_disponible = hora_fin_bloque
-
-        # Si es el día de hoy y la hora actual es mayor al próximo disponible,
-        # el próximo disponible debe ser la hora actual (redondeada al próximo bloque de 30 min)
-        if fecha_check == hoy and hora_actual > proximo_disponible:
-            # Redondear hora actual al próximo bloque de 30 minutos
-            minutos = hora_actual.hour * 60 + hora_actual.minute
-            minutos_redondeados = ((minutos + 29) // 30) * 30  # Redondear hacia arriba
-            # Manejar caso donde pasa de las 24:00
-            if minutos_redondeados >= 24 * 60:
-                minutos_redondeados = 23 * 60 + 59
-            hora_redondeada = time_type(minutos_redondeados // 60, minutos_redondeados % 60)
-            proximo_disponible = hora_redondeada
-
-        # Verificar si el día está lleno:
-        # 1. Si próximo disponible >= hora fin jornada
-        # 2. Si es hoy y ya pasaron las 17:00 (no alcanza para ni 1 hora de trabajo)
-        dia_lleno = proximo_disponible >= hora_fin_jornada
-        if fecha_check == hoy and hora_actual >= time_type(17, 0):
-            dia_lleno = True
-
-        return {
-            "fecha": fecha_check.isoformat(),
-            "bloques_ocupados": bloques_ocupados,
-            "proximo_disponible": proximo_disponible.isoformat(),
-            "hora_fin_jornada": hora_fin_jornada.isoformat(),
-            "dia_lleno": dia_lleno
-        }
-
-    # Obtener disponibilidad del día solicitado
-    disponibilidad = await get_disponibilidad_dia(fecha_date)
-
-    # Si buscar_siguiente está activado y el día está lleno, buscar siguiente
-    if buscar_siguiente and disponibilidad["dia_lleno"]:
-        # Buscar hasta 30 días adelante
-        for i in range(1, 31):
-            siguiente_fecha = fecha_date + timedelta(days=i)
-            # Saltar fines de semana
-            if siguiente_fecha.weekday() >= 5:  # 5=Sábado, 6=Domingo
-                continue
-
-            disponibilidad_siguiente = await get_disponibilidad_dia(siguiente_fecha)
-            if not disponibilidad_siguiente["dia_lleno"]:
-                disponibilidad = disponibilidad_siguiente
-                break
-
-    return disponibilidad
+    # Por ahora retorna disponibilidad completa ya que no hay empleado_id en reclamos
+    return {
+        "fecha": fecha,
+        "bloques_ocupados": [],
+        "proximo_disponible": "09:00:00",
+        "hora_fin_jornada": "18:00:00",
+        "dia_lleno": False,
+        "mensaje": "Pendiente migración a dependencias"
+    }
 
 
 @router.get("/{reclamo_id}/sugerencia-asignacion")
@@ -1787,14 +1573,9 @@ async def get_sugerencia_asignacion(
         score += zona_score
 
         # 3. CARGA DE TRABAJO (25 puntos máx - menos carga = más puntos)
-        result_carga = await db.execute(
-            select(func.count(Reclamo.id))
-            .where(
-                Reclamo.empleado_id == empleado.id,
-                Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
-            )
-        )
-        carga_actual = result_carga.scalar() or 0
+        # TODO: Migrar a dependencia cuando se implemente IA
+        # Por ahora asumimos carga 0 ya que no hay empleado_id en reclamos
+        carga_actual = 0
         detalles["carga_trabajo"] = carga_actual
 
         # 0 reclamos = 25 pts, 1-2 = 20 pts, 3-4 = 15 pts, 5-6 = 10 pts, 7+ = 5 pts
@@ -1812,64 +1593,14 @@ async def get_sugerencia_asignacion(
         score += carga_score
 
         # 4. DISPONIBILIDAD PRÓXIMA (15 puntos máx)
-        # Buscar disponibilidad en los próximos 5 días laborales
-        disponibilidad_score = 0
-        dias_hasta_disponible = None
-        horas_disponibles_semana = 0
+        # TODO: Migrar a dependencia cuando se implemente IA
+        # Por ahora asumimos disponibilidad completa ya que no hay empleado_id en reclamos
+        disponibilidad_score = 15  # Máximo por defecto
+        dias_hasta_disponible = 0
+        detalles["proximo_disponible"] = hoy.isoformat()
+        detalles["disponibilidad_horas"] = 45.0  # 5 días * 9 horas
 
-        for dias_offset in range(7):  # Buscar en los próximos 7 días
-            fecha_check = hoy + timedelta(days=dias_offset)
-            # Saltar fines de semana
-            if fecha_check.weekday() >= 5:
-                continue
-
-            # Obtener reclamos programados para ese día
-            result_dia = await db.execute(
-                select(Reclamo)
-                .where(
-                    Reclamo.empleado_id == empleado.id,
-                    Reclamo.fecha_programada == fecha_check,
-                    Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
-                )
-            )
-            reclamos_dia = result_dia.scalars().all()
-
-            # Calcular horas ocupadas
-            horas_ocupadas = 0
-            for r in reclamos_dia:
-                if r.hora_inicio and r.hora_fin:
-                    inicio_min = r.hora_inicio.hour * 60 + r.hora_inicio.minute
-                    fin_min = r.hora_fin.hour * 60 + r.hora_fin.minute
-                    horas_ocupadas += (fin_min - inicio_min) / 60
-
-            horas_jornada = 9  # 9:00 a 18:00
-            horas_libres = max(0, horas_jornada - horas_ocupadas)
-            horas_disponibles_semana += horas_libres
-
-            # Si hoy y ya pasaron las 17:00, el día está lleno
-            if dias_offset == 0:
-                hora_actual = datetime_type.now().time()
-                if hora_actual >= time_type(17, 0):
-                    continue
-
-            if dias_hasta_disponible is None and horas_libres >= 1:
-                dias_hasta_disponible = dias_offset
-                detalles["proximo_disponible"] = fecha_check.isoformat()
-
-        detalles["disponibilidad_horas"] = round(horas_disponibles_semana, 1)
-
-        # Disponible hoy = 15 pts, mañana = 12 pts, 2 días = 10 pts, etc.
-        if dias_hasta_disponible is not None:
-            if dias_hasta_disponible == 0:
-                disponibilidad_score = 15
-            elif dias_hasta_disponible == 1:
-                disponibilidad_score = 12
-            elif dias_hasta_disponible == 2:
-                disponibilidad_score = 10
-            elif dias_hasta_disponible <= 4:
-                disponibilidad_score = 7
-            else:
-                disponibilidad_score = 5
+        # disponibilidad_score ya está seteado arriba como 15
 
         score += disponibilidad_score
 

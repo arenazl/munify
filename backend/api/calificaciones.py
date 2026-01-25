@@ -137,10 +137,11 @@ async def get_estadisticas_calificaciones(
     query = select(Calificacion).where(Calificacion.created_at >= fecha_desde)
 
     # Filtros
-    if empleado_id or categoria_id:
+    if categoria_id:
         query = query.join(Reclamo)
-        if empleado_id:
-            query = query.where(Reclamo.empleado_id == empleado_id)
+        # TODO: Migrar filtro empleado_id a dependencia_id
+        # if empleado_id:
+        #     query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
         if categoria_id:
             query = query.where(Reclamo.categoria_id == categoria_id)
 
@@ -208,44 +209,11 @@ async def get_ranking_empleados(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Obtener ranking de empleados por calificación"""
-    from datetime import timedelta
-    from models import Empleado
-
-    fecha_desde = datetime.utcnow() - timedelta(days=dias)
-
-    # Obtener todos los empleados activos
-    result = await db.execute(
-        select(Empleado).where(Empleado.activo == True)
-    )
-    empleados = result.scalars().all()
-
+    """Obtener ranking de empleados por calificación
+    TODO: Migrar a dependencia cuando se implemente asignación por IA
+    """
+    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
     ranking = []
-    for empleado in empleados:
-        # Obtener calificaciones de reclamos de este empleado
-        result = await db.execute(
-            select(Calificacion)
-            .join(Reclamo)
-            .where(
-                Reclamo.empleado_id == empleado.id,
-                Calificacion.created_at >= fecha_desde
-            )
-        )
-        calificaciones = result.scalars().all()
-
-        if calificaciones:
-            promedio = sum(c.puntuacion for c in calificaciones) / len(calificaciones)
-            ranking.append({
-                "empleado_id": empleado.id,
-                "empleado_nombre": f"{empleado.nombre} {empleado.apellido or ''}".strip(),
-                "total_calificaciones": len(calificaciones),
-                "promedio": round(promedio, 2),
-                "calificaciones_5_estrellas": sum(1 for c in calificaciones if c.puntuacion == 5),
-                "calificaciones_bajas": sum(1 for c in calificaciones if c.puntuacion <= 2)
-            })
-
-    # Ordenar por promedio descendente
-    ranking.sort(key=lambda x: (-x["promedio"], -x["total_calificaciones"]))
 
     return {
         "periodo_dias": dias,

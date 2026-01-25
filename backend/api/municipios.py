@@ -233,9 +233,10 @@ async def obtener_usuarios_demo(
     Obtiene los usuarios de prueba de un municipio (endpoint PUBLICO).
     Usado para los botones de acceso rápido en modo demo.
     """
-    # Primero obtener el municipio
+    # Primero obtener el municipio (case-insensitive)
+    from sqlalchemy import func
     query = select(Municipio).where(
-        Municipio.codigo == codigo,
+        func.lower(Municipio.codigo) == func.lower(codigo),
         Municipio.activo == True
     )
     result = await db.execute(query)

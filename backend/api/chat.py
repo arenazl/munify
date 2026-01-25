@@ -1527,32 +1527,18 @@ async def get_empleados_activos(db: AsyncSession, municipio_id: int) -> list:
 
     empleados_data = []
     for emp in empleados:
-        # Contar reclamos por estado para cada empleado
-        stats_query = select(
-            Reclamo.estado,
-            sql_func.count(Reclamo.id).label('cantidad')
-        ).where(
-            Reclamo.empleado_id == emp.id
-        ).group_by(Reclamo.estado)
-
-        stats_result = await db.execute(stats_query)
-        stats = {row.estado: row.cantidad for row in stats_result.all()}
-
-        asignados = stats.get(EstadoReclamo.ASIGNADO, 0)
-        en_proceso = stats.get(EstadoReclamo.EN_PROCESO, 0)
-        pend_conf = stats.get(EstadoReclamo.PENDIENTE_CONFIRMACION, 0)
-        resueltos = stats.get(EstadoReclamo.RESUELTO, 0)
-
+        # TODO: Migrar a dependencia cuando se implemente asignación por IA
+        # Por ahora stats en 0 ya que no hay empleado_id en reclamos
         empleados_data.append({
             'id': emp.id,
             'nombre': f"{emp.nombre} {emp.apellido or ''}".strip(),
             'especialidad': emp.especialidad,
-            'asignados': asignados,
-            'en_proceso': en_proceso,
-            'pendiente_confirmacion': pend_conf,
-            'resueltos': resueltos,
-            'activos': asignados + en_proceso + pend_conf,
-            'total': sum(stats.values())
+            'asignados': 0,
+            'en_proceso': 0,
+            'pendiente_confirmacion': 0,
+            'resueltos': 0,
+            'activos': 0,
+            'total': 0
         })
 
     return empleados_data
@@ -1694,20 +1680,11 @@ async def execute_dynamic_query(
         }
 
     elif query_name == "reclamos_por_empleado":
+        # TODO: Migrar a dependencia cuando se implemente asignación por IA
+        # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
         empleado_id = params.get("empleado_id")
         if not empleado_id:
             return {"query": query_name, "error": "Se requiere empleado_id", "data": []}
-
-        query = select(Reclamo).options(
-            selectinload(Reclamo.categoria),
-            selectinload(Reclamo.empleado_asignado)
-        ).where(
-            Reclamo.municipio_id == municipio_id,
-            Reclamo.empleado_id == int(empleado_id)
-        ).order_by(Reclamo.created_at.desc()).limit(limit)
-
-        result = await db.execute(query)
-        reclamos = result.scalars().all()
 
         # Obtener nombre del empleado
         emp_query = select(Empleado).where(Empleado.id == int(empleado_id))
@@ -1715,56 +1692,22 @@ async def execute_dynamic_query(
         empleado = emp_result.scalar_one_or_none()
         emp_nombre = f"{empleado.nombre} {empleado.apellido or ''}".strip() if empleado else f"ID {empleado_id}"
 
-        data = [{
-            'id': r.id,
-            'titulo': r.titulo,
-            'estado': r.estado.value if r.estado else 'desconocido',
-            'categoria': r.categoria.nombre if r.categoria else 'Sin categoría',
-            'direccion': r.direccion or '',
-            'fecha': r.created_at.strftime('%d/%m/%Y') if r.created_at else ''
-        } for r in reclamos]
-
         return {
             "query": "reclamos_por_empleado",
             "empleado": emp_nombre,
-            "total": len(data),
-            "descripcion": f"{len(data)} reclamos asignados a {emp_nombre}",
-            "data": data
+            "total": 0,
+            "descripcion": f"Pendiente migración a dependencias",
+            "data": []
         }
 
     elif query_name == "empleados_ranking":
-        # Ranking por reclamos resueltos
-        query = select(
-            Empleado.id,
-            Empleado.nombre,
-            Empleado.apellido,
-            sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).label('resueltos'),
-            sql_func.count(Reclamo.id).label('total_asignados')
-        ).outerjoin(
-            Reclamo, Reclamo.empleado_id == Empleado.id
-        ).where(
-            Empleado.municipio_id == municipio_id,
-            Empleado.activo == True
-        ).group_by(
-            Empleado.id, Empleado.nombre, Empleado.apellido
-        ).order_by(sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).desc()).limit(limit)
-
-        result = await db.execute(query)
-        rows = result.all()
-
-        data = [{
-            'id': r.id,
-            'nombre': f"{r.nombre} {r.apellido or ''}".strip(),
-            'resueltos': r.resueltos or 0,
-            'total_asignados': r.total_asignados or 0,
-            'efectividad': round((r.resueltos / r.total_asignados * 100) if r.total_asignados else 0, 1)
-        } for r in rows]
-
+        # TODO: Migrar a dependencia cuando se implemente asignación por IA
+        # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
         return {
             "query": "empleados_ranking",
-            "total": len(data),
-            "descripcion": f"Top {len(data)} empleados por reclamos resueltos",
-            "data": data
+            "total": 0,
+            "descripcion": "Pendiente migración a dependencias",
+            "data": []
         }
 
     elif query_name == "buscar_reclamo":
