@@ -97,3 +97,4 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/reclamos-frontend:latest
           build-args: |
             VITE_API_URL=${{ secrets.API_URL }}
+

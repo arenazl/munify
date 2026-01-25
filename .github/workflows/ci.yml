@@ -34,9 +34,9 @@ jobs:
 
       - name: Run tests with coverage
         env:
-          DATABASE_URL: sqlite+aiosqlite:///:memory:
-          SECRET_KEY: test-secret-key
-          ENVIRONMENT: testing
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: "test-secret-key"
+          ENVIRONMENT: "testing"
         run: |
           pytest --cov=. --cov-report=xml --cov-report=term-missing
 
@@ -131,3 +131,4 @@ jobs:
           VITE_API_URL: http://localhost:8000/api
         run: npx playwright test --project=chromium
         continue-on-error: true
+
