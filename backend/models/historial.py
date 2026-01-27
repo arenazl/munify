@@ -17,8 +17,8 @@ class HistorialReclamo(Base):
     usuario = relationship("User")
 
     # Cambio de estado
-    estado_anterior = Column(Enum(EstadoReclamo), nullable=True)
-    estado_nuevo = Column(Enum(EstadoReclamo), nullable=False)
+    estado_anterior = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    estado_nuevo = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), nullable=False)
 
     # Descripción de la acción
     accion = Column(String(100), nullable=False)  # "creado", "asignado", "en_proceso", etc.

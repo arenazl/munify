@@ -19,7 +19,7 @@ class Reclamo(Base):
     descripcion = Column(Text, nullable=False)
 
     # Estado y prioridad
-    estado = Column(Enum(EstadoReclamo), default=EstadoReclamo.NUEVO, nullable=False, index=True)
+    estado = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), default=EstadoReclamo.NUEVO, nullable=False, index=True)
     prioridad = Column(Integer, default=3)  # 1-5, donde 1 es más urgente
 
     # Ubicación del reclamo (donde está el problema)
@@ -60,7 +60,7 @@ class Reclamo(Base):
     fecha_recibido = Column(DateTime(timezone=True), nullable=True)  # Cuando la dependencia aceptó
 
     # Rechazo
-    motivo_rechazo = Column(Enum(MotivoRechazo), nullable=True)
+    motivo_rechazo = Column(Enum(MotivoRechazo, values_callable=lambda x: [e.value for e in x]), nullable=True)
     descripcion_rechazo = Column(Text, nullable=True)
 
     # Resolución
