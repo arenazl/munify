@@ -1471,7 +1471,7 @@ export default function Tramites() {
             </button>
           </div>
         }
-        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin'}
+        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin' || user?.rol === 'empleado'}
         secondaryFilters={
           <div className="w-full flex flex-col gap-1">
             {/* Tipos de trámite - botón Todos fijo + scroll horizontal */}

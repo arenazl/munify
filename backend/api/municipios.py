@@ -296,6 +296,8 @@ class DependenciaUser(BaseModel):
     icono: Optional[str] = None
     reclamos_count: int = 0
     tramites_count: int = 0
+    maneja_reclamos: bool = False
+    maneja_tramites: bool = False
 
     class Config:
         from_attributes = True
@@ -309,12 +311,13 @@ async def obtener_usuarios_dependencias(
     """
     Obtiene los usuarios de dependencias de un municipio (endpoint PUBLICO).
     Usado para los botones de acceso rápido por dependencia.
-    Solo devuelve dependencias que tienen reclamos o trámites asignados.
     """
-    from sqlalchemy import func
+    from sqlalchemy import func, exists
     from models.reclamo import Reclamo
     from models.municipio_dependencia import MunicipioDependencia
     from models.dependencia import Dependencia
+    from models.municipio_dependencia_categoria import MunicipioDependenciaCategoria
+    from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
 
     # Primero obtener el municipio
     query = select(Municipio).where(
@@ -330,22 +333,18 @@ async def obtener_usuarios_dependencias(
     # Buscar usuarios con municipio_dependencia_id asignado
     query = select(
         User.email,
+        User.municipio_dependencia_id,
         Dependencia.nombre.label('nombre_dependencia'),
         Dependencia.color,
         Dependencia.icono,
-        func.count(Reclamo.id).label('reclamos_count')
     ).select_from(User).join(
         MunicipioDependencia, User.municipio_dependencia_id == MunicipioDependencia.id
     ).join(
         Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id
-    ).outerjoin(
-        Reclamo, Reclamo.municipio_dependencia_id == MunicipioDependencia.id
     ).where(
         User.municipio_id == municipio.id,
         User.municipio_dependencia_id.isnot(None),
         User.activo == True
-    ).group_by(
-        User.email, Dependencia.nombre, Dependencia.color, Dependencia.icono
     ).order_by(
         Dependencia.nombre
     )
@@ -353,17 +352,35 @@ async def obtener_usuarios_dependencias(
     result = await db.execute(query)
     rows = result.all()
 
-    return [
-        DependenciaUser(
+    # Para cada usuario, verificar si su dependencia maneja reclamos o trámites
+    dependencia_users = []
+    for row in rows:
+        # Verificar si maneja reclamos (tiene categorías asignadas)
+        cat_query = select(func.count(MunicipioDependenciaCategoria.id)).where(
+            MunicipioDependenciaCategoria.municipio_dependencia_id == row.municipio_dependencia_id
+        )
+        cat_result = await db.execute(cat_query)
+        maneja_reclamos = cat_result.scalar() > 0
+
+        # Verificar si maneja trámites (tiene trámites asignados)
+        tram_query = select(func.count(MunicipioDependenciaTramite.id)).where(
+            MunicipioDependenciaTramite.municipio_dependencia_id == row.municipio_dependencia_id
+        )
+        tram_result = await db.execute(tram_query)
+        maneja_tramites = tram_result.scalar() > 0
+
+        dependencia_users.append(DependenciaUser(
             email=row.email,
             nombre_dependencia=row.nombre_dependencia,
             color=row.color,
             icono=row.icono,
-            reclamos_count=row.reclamos_count,
-            tramites_count=0
-        )
-        for row in rows
-    ]
+            reclamos_count=0,
+            tramites_count=0,
+            maneja_reclamos=maneja_reclamos,
+            maneja_tramites=maneja_tramites,
+        ))
+
+    return dependencia_users
 
 
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============

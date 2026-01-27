@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
-import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, Wrench, User } from 'lucide-react';
+import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, Wrench, User, AlertCircle, FileCheck } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
 
@@ -101,11 +101,24 @@ export default function Login() {
     rol: string;
   }>>([]);
 
+  // Estado para usuarios de dependencia
+  const [dependenciaUsers, setDependenciaUsers] = useState<Array<{
+    email: string;
+    nombre_dependencia: string;
+    color: string | null;
+    icono: string | null;
+    reclamos_count: number;
+    tramites_count: number;
+    maneja_reclamos: boolean;
+    maneja_tramites: boolean;
+  }>>([]);
+
   // API_URL importado desde lib/api.ts
 
-  // Cargar usuarios demo desde la API
+  // Cargar usuarios demo y dependencia desde la API
   useEffect(() => {
     if (municipioCodigo) {
+      // Cargar usuarios demo
       const loadDemoUsers = async () => {
         try {
           const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/demo-users`);
@@ -117,7 +130,22 @@ export default function Login() {
           console.error('Error al cargar usuarios demo:', error);
         }
       };
+
+      // Cargar usuarios de dependencia
+      const loadDependenciaUsers = async () => {
+        try {
+          const response = await fetch(`${API_URL}/municipios/public/${municipioCodigo}/dependencia-users`);
+          if (response.ok) {
+            const users = await response.json();
+            setDependenciaUsers(users);
+          }
+        } catch (error) {
+          console.error('Error al cargar usuarios dependencia:', error);
+        }
+      };
+
       loadDemoUsers();
+      loadDependenciaUsers();
     }
   }, [municipioCodigo]);
 
@@ -274,6 +302,75 @@ export default function Login() {
               <p className="text-xs text-slate-500 text-center mt-4">
                 Los botones de acceso rápido son solo para demostración
               </p>
+
+              {/* Dependencia Users Section - Two Columns */}
+              {dependenciaUsers.length > 0 && (
+                <>
+                  <div className="relative flex items-center gap-3 my-6">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-slate-500 text-xs">DEPENDENCIAS</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Columna Reclamos */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+                        <span className="text-[10px] font-semibold text-red-400 uppercase tracking-wide">Reclamos</span>
+                      </div>
+                      {dependenciaUsers.filter(d => d.maneja_reclamos).map((dep, index) => (
+                        <button
+                          key={`dep-rec-${index}`}
+                          type="button"
+                          onClick={() => quickLogin(dep.email, '123456')}
+                          disabled={loading}
+                          className="w-full relative overflow-hidden text-white py-2 px-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-md"
+                          style={{
+                            background: `linear-gradient(135deg, ${dep.color || '#ef4444'} 0%, ${dep.color || '#ef4444'}cc 100%)`,
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="text-[11px] font-medium truncate">{dep.nombre_dependencia}</span>
+                          </div>
+                        </button>
+                      ))}
+                      {dependenciaUsers.filter(d => d.maneja_reclamos).length === 0 && (
+                        <p className="text-[10px] text-slate-500 text-center py-2">Sin dependencias</p>
+                      )}
+                    </div>
+
+                    {/* Columna Trámites */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <FileCheck className="h-3.5 w-3.5 text-blue-400" />
+                        <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wide">Trámites</span>
+                      </div>
+                      {dependenciaUsers.filter(d => d.maneja_tramites).map((dep, index) => (
+                        <button
+                          key={`dep-tram-${index}`}
+                          type="button"
+                          onClick={() => quickLogin(dep.email, '123456')}
+                          disabled={loading}
+                          className="w-full relative overflow-hidden text-white py-2 px-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-md"
+                          style={{
+                            background: `linear-gradient(135deg, ${dep.color || '#3b82f6'} 0%, ${dep.color || '#3b82f6'}cc 100%)`,
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="text-[11px] font-medium truncate">{dep.nombre_dependencia}</span>
+                          </div>
+                        </button>
+                      ))}
+                      {dependenciaUsers.filter(d => d.maneja_tramites).length === 0 && (
+                        <p className="text-[10px] text-slate-500 text-center py-2">Sin dependencias</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Footer link */}

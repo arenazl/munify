@@ -3197,7 +3197,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             </button>
           </div>
         }
-        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin'}
+        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin' || user?.rol === 'empleado'}
         secondaryFilters={
           <div className="w-full flex flex-col gap-1">
             {/* Categorías - botón Todas fijo + scroll horizontal */}
