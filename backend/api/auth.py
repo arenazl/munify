@@ -42,7 +42,7 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
     return user
 
 @router.post("/login", response_model=Token)
-@limiter.limit(LIMITS["auth"])
+# @limiter.limit(LIMITS["auth"])  # Temporalmente deshabilitado para debug
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     # Buscar usuario por email
     result = await db.execute(
