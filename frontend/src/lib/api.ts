@@ -49,13 +49,9 @@ const CACHE_TTL_CONFIG: Record<string, number> = {
 };
 
 // Obtener TTL para un endpoint
-const getCacheTTL = (url: string): number | null => {
-  for (const [pattern, ttl] of Object.entries(CACHE_TTL_CONFIG)) {
-    if (url.startsWith(pattern)) {
-      return ttl;
-    }
-  }
-  return null;
+// CACHE DESACTIVADO - causaba problemas de datos stale
+const getCacheTTL = (_url: string): number | null => {
+  return null; // Cache desactivado
 };
 
 // Verificar si una respuesta cacheada es válida
@@ -78,6 +74,10 @@ export const clearCache = () => {
   responseCache.clear();
   console.log('🗑️ [CACHE] Limpiado completamente');
 };
+
+// Exponer en window para debug desde consola del navegador
+// Uso: window.clearApiCache()
+(window as unknown as Record<string, unknown>).clearApiCache = clearCache;
 
 // ============================================
 // Sistema de Deduplicación de Requests
@@ -373,17 +373,40 @@ export const dependenciasApi = {
   // Asignación de categorías a una dependencia del municipio
   getCategorias: (muniDepId: number) => api.get(`/dependencias/municipio/${muniDepId}/categorias`),
   asignarCategorias: (muniDepId: number, categoriaIds: number[]) =>
-    api.post(`/dependencias/municipio/${muniDepId}/categorias`, { categoria_ids: categoriaIds }),
+    api.post(`/dependencias/municipio/${muniDepId}/categorias`, { categoria_ids: categoriaIds })
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias'); return res; }),
 
   // Asignación de tipos de trámite a una dependencia del municipio
   getTiposTramite: (muniDepId: number) => api.get(`/dependencias/municipio/${muniDepId}/tipos-tramite`),
   asignarTiposTramite: (muniDepId: number, tipoTramiteIds: number[]) =>
-    api.post(`/dependencias/municipio/${muniDepId}/tipos-tramite`, { tipo_tramite_ids: tipoTramiteIds }),
+    api.post(`/dependencias/municipio/${muniDepId}/tipos-tramite`, { tipo_tramite_ids: tipoTramiteIds })
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
 
   // Asignación de trámites específicos a una dependencia del municipio
   getTramites: (muniDepId: number) => api.get(`/dependencias/municipio/${muniDepId}/tramites`),
   asignarTramites: (muniDepId: number, tramiteIds: number[]) =>
-    api.post(`/dependencias/municipio/${muniDepId}/tramites`, { tramite_ids: tramiteIds }),
+    api.post(`/dependencias/municipio/${muniDepId}/tramites`, { tramite_ids: tramiteIds })
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
+
+  // Limpiar todas las asignaciones de categorías del municipio
+  limpiarAsignacionesCategorias: () =>
+    api.delete('/dependencias/municipio/categorias/limpiar')
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias'); return res; }),
+
+  // Limpiar todas las asignaciones de tipos de trámite del municipio
+  limpiarAsignacionesTiposTramite: () =>
+    api.delete('/dependencias/municipio/tipos-tramite/limpiar')
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
+
+  // Auto-asignar categorías a dependencias usando IA
+  autoAsignarCategoriasIA: (categorias: Array<{id: number; nombre: string}>, dependencias: Array<{id: number; nombre: string; descripcion?: string}>) =>
+    api.post('/dependencias/municipio/categorias/auto-asignar', { categorias, dependencias })
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias'); return res; }),
+
+  // Auto-asignar tipos de trámite a dependencias usando IA
+  autoAsignarTiposTramiteIA: (tiposTramite: Array<{id: number; nombre: string}>, dependencias: Array<{id: number; nombre: string; descripcion?: string}>) =>
+    api.post('/dependencias/municipio/tipos-tramite/auto-asignar', { tipos_tramite: tiposTramite, dependencias })
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
 };
 
 // Empleados

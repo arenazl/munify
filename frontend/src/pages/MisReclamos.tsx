@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, Building2 } from 'lucide-react';
+import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown } from 'lucide-react';
+import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard } from '../components/ui/ABMPage';
+import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
@@ -271,9 +272,23 @@ export default function MisReclamos() {
           )}
 
           {selectedReclamo.dependencia_asignada?.nombre && (
-            <div className="p-3 rounded-lg" style={{ backgroundColor: '#dbeafe' }}>
-              <label className="block text-sm font-medium" style={{ color: '#1e40af' }}>Asignado a</label>
-              <p className="mt-1" style={{ color: '#1e3a8a' }}>{selectedReclamo.dependencia_asignada.nombre}</p>
+            <div
+              className="p-3 rounded-lg flex items-center gap-3"
+              style={{ backgroundColor: `${selectedReclamo.dependencia_asignada.color || theme.primary}15` }}
+            >
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
+              >
+                <DynamicIcon
+                  name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
+                  className="h-5 w-5 text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs" style={{ color: theme.textSecondary }}>Asignado a</label>
+                <p className="font-medium" style={{ color: theme.text }}>{selectedReclamo.dependencia_asignada.nombre}</p>
+              </div>
             </div>
           )}
 
@@ -503,76 +518,186 @@ export default function MisReclamos() {
   );
 
 
-  // Componente de filtros extra (solo chips de estados)
-  const renderExtraFilters = () => (
-    <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-      {/* Chip "Todos" */}
-      <button
-        onClick={() => setFiltroEstado('todos')}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-        style={{
-          backgroundColor: filtroEstado === 'todos' ? theme.primary : theme.backgroundSecondary,
-          color: filtroEstado === 'todos' ? '#ffffff' : theme.textSecondary,
-          border: `1px solid ${filtroEstado === 'todos' ? theme.primary : theme.border}`,
-        }}
-      >
-        Todos
-      </button>
-      {/* Chips de estados disponibles */}
-      {estadosUnicos.map(estado => {
-        const estadoColor = estadoColors[estado];
-        const isSelected = filtroEstado === estado;
-        return (
-          <button
-            key={estado}
-            onClick={() => setFiltroEstado(estado)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-            style={{
-              backgroundColor: isSelected ? estadoColor.bg : theme.backgroundSecondary,
-              color: isSelected ? estadoColor.text : theme.textSecondary,
-              border: `1px solid ${isSelected ? estadoColor.text : theme.border}`,
-            }}
-          >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: estadoColor.text }}
-            />
-            {estadoLabels[estado]}
-          </button>
-        );
-      })}
+  // Filtros secundarios: ordenamiento + estados
+  const renderSecondaryFilters = () => (
+    <div className="flex items-center gap-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {/* Ordenamiento */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          onClick={() => setOrdenarPor('fecha')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          style={{
+            backgroundColor: ordenarPor === 'fecha' ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `1px solid ${ordenarPor === 'fecha' ? theme.primary : theme.border}`,
+            color: ordenarPor === 'fecha' ? theme.primary : theme.textSecondary,
+          }}
+        >
+          <ArrowUpDown className="h-3 w-3" />
+          Más recientes
+        </button>
+        <button
+          onClick={() => setOrdenarPor('vencimiento')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          style={{
+            backgroundColor: ordenarPor === 'vencimiento' ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `1px solid ${ordenarPor === 'vencimiento' ? theme.primary : theme.border}`,
+            color: ordenarPor === 'vencimiento' ? theme.primary : theme.textSecondary,
+          }}
+        >
+          <Calendar className="h-3 w-3" />
+          Por vencer
+        </button>
+      </div>
+
+      {/* Separador */}
+      <div className="h-6 w-px flex-shrink-0" style={{ backgroundColor: theme.border }} />
+
+      {/* Filtros de estado */}
+      <div className="flex items-center gap-1.5">
+        {/* Chip "Todos" */}
+        <button
+          onClick={() => setFiltroEstado('todos')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          style={{
+            backgroundColor: filtroEstado === 'todos' ? theme.primary : theme.backgroundSecondary,
+            color: filtroEstado === 'todos' ? '#ffffff' : theme.textSecondary,
+            border: `1px solid ${filtroEstado === 'todos' ? theme.primary : theme.border}`,
+          }}
+        >
+          Todos
+        </button>
+        {/* Chips de estados disponibles */}
+        {estadosUnicos.map(estado => {
+          const estadoColor = estadoColors[estado];
+          const isSelected = filtroEstado === estado;
+          return (
+            <button
+              key={estado}
+              onClick={() => setFiltroEstado(estado)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: isSelected ? estadoColor.bg : theme.backgroundSecondary,
+                color: isSelected ? estadoColor.text : theme.textSecondary,
+                border: `1px solid ${isSelected ? estadoColor.text : theme.border}`,
+              }}
+            >
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: estadoColor.text }}
+              />
+              {estadoLabels[estado]}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 
-  // Botones de ordenamiento (van junto al cambio de vista)
-  const renderHeaderActions = () => (
-    <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => setOrdenarPor('fecha')}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-        style={{
-          backgroundColor: ordenarPor === 'fecha' ? `${theme.primary}15` : theme.backgroundSecondary,
-          border: `1px solid ${ordenarPor === 'fecha' ? theme.primary : theme.border}`,
-          color: ordenarPor === 'fecha' ? theme.primary : theme.textSecondary,
-        }}
-      >
-        <ArrowUpDown className="h-3 w-3" />
-        Más recientes
-      </button>
-      <button
-        onClick={() => setOrdenarPor('vencimiento')}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-        style={{
-          backgroundColor: ordenarPor === 'vencimiento' ? `${theme.primary}15` : theme.backgroundSecondary,
-          border: `1px solid ${ordenarPor === 'vencimiento' ? theme.primary : theme.border}`,
-          color: ordenarPor === 'vencimiento' ? theme.primary : theme.textSecondary,
-        }}
-      >
-        <Calendar className="h-3 w-3" />
-        Por vencer
-      </button>
-    </div>
-  );
+  // Columnas para la vista de tabla
+  const tableColumns: ABMTableColumn<Reclamo>[] = [
+    {
+      key: 'id',
+      header: '#',
+      width: '60px',
+      render: (r) => (
+        <span className="text-xs font-mono" style={{ color: theme.textSecondary }}>
+          #{r.id}
+        </span>
+      ),
+    },
+    {
+      key: 'titulo',
+      header: 'Título',
+      sortable: true,
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${r.categoria?.color || theme.primary}15` }}
+          >
+            <MapPin className="h-4 w-4" style={{ color: r.categoria?.color || theme.primary }} />
+          </div>
+          <span className="font-medium truncate" style={{ color: theme.text }}>
+            {r.titulo}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'categoria',
+      header: 'Categoría',
+      sortable: true,
+      render: (r) => (
+        <span
+          className="px-2 py-1 text-xs rounded-full"
+          style={{
+            backgroundColor: `${r.categoria?.color || theme.primary}15`,
+            color: r.categoria?.color || theme.primary,
+          }}
+        >
+          {r.categoria?.nombre || 'Sin categoría'}
+        </span>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortable: true,
+      render: (r) => {
+        const estado = estadoColors[r.estado];
+        return (
+          <span
+            className="px-2 py-1 text-xs font-medium rounded-full"
+            style={{ backgroundColor: estado.bg, color: estado.text }}
+          >
+            {estadoLabels[r.estado]}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'fecha',
+      header: 'Fecha',
+      sortable: true,
+      render: (r) => (
+        <span className="text-sm" style={{ color: theme.textSecondary }}>
+          {new Date(r.created_at).toLocaleDateString('es-AR')}
+        </span>
+      ),
+    },
+    {
+      key: 'dependencia',
+      header: 'Dependencia',
+      render: (r) => r.dependencia_asignada ? (
+        <div className="flex items-center gap-1.5">
+          <DynamicIcon
+            name={r.dependencia_asignada.icono || 'Building2'}
+            className="h-3.5 w-3.5"
+            style={{ color: r.dependencia_asignada.color || theme.primary }}
+          />
+          <span className="text-xs truncate max-w-[150px]" style={{ color: r.dependencia_asignada.color || theme.textSecondary }}>
+            {r.dependencia_asignada.nombre}
+          </span>
+        </div>
+      ) : (
+        <span className="text-xs" style={{ color: theme.textSecondary }}>Sin asignar</span>
+      ),
+    },
+    {
+      key: 'acciones',
+      header: '',
+      width: '50px',
+      render: (r) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); openViewSheet(r); }}
+          className="p-1.5 rounded-lg transition-all hover:scale-110"
+          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+        >
+          <Eye className="h-4 w-4" />
+        </button>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -587,8 +712,16 @@ export default function MisReclamos() {
         isEmpty={filteredReclamos.length === 0 && !search && filtroEstado === 'todos'}
         emptyMessage=""
         defaultViewMode="cards"
-        extraFilters={renderExtraFilters()}
-        headerActions={renderHeaderActions()}
+        stickyHeader={true}
+        secondaryFilters={renderSecondaryFilters()}
+        tableView={
+          <ABMTable
+            data={filteredReclamos}
+            columns={tableColumns}
+            keyExtractor={(r) => r.id}
+            onRowClick={(r) => openViewSheet(r)}
+          />
+        }
       >
         {filteredReclamos.length === 0 && !search && filtroEstado === 'todos' ? (
           renderEmptyState()
@@ -661,9 +794,12 @@ export default function MisReclamos() {
                       {r.dependencia_asignada?.nombre && (
                         <span
                           className="text-xs font-medium px-2 py-0.5 rounded-md flex items-center gap-1"
-                          style={{ backgroundColor: '#dbeafe', color: '#1e40af' }}
+                          style={{
+                            backgroundColor: `${r.dependencia_asignada.color || theme.primary}20`,
+                            color: r.dependencia_asignada.color || theme.primary
+                          }}
                         >
-                          <Building2 className="h-3 w-3" />
+                          <DynamicIcon name={r.dependencia_asignada.icono || 'Building2'} className="h-3 w-3" />
                           {r.dependencia_asignada.nombre}
                         </span>
                       )}

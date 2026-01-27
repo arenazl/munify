@@ -120,6 +120,7 @@ export default function GestionTramites() {
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'por_vencer'>('reciente');
   const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
+  const [conteosLoaded, setConteosLoaded] = useState(false);
 
   // Click dropdown para tramites (header)
   const [hoveredTramiteHeader, setHoveredTramiteHeader] = useState(false);
@@ -354,8 +355,10 @@ export default function GestionTramites() {
       ]);
       setConteosTipos(tiposRes.data);
       setConteosEstados(estadosRes.data);
+      setConteosLoaded(true);
     } catch (error) {
       console.error('Error cargando conteos:', error);
+      setConteosLoaded(true); // Marcar como cargado aunque haya error
     }
   };
 
@@ -794,7 +797,7 @@ export default function GestionTramites() {
 
         {/* Scroll de estados */}
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-          {loading || Object.keys(conteosEstados).length === 0 ? (
+          {loading && !conteosLoaded ? (
             <FilterRowSkeleton count={6} height={32} widths={[55, 65, 60, 70, 55, 65]} />
           ) : (
             [

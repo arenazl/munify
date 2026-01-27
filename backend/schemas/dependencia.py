@@ -168,6 +168,9 @@ class MunicipioDependenciaListResponse(BaseModel):
     tipo_gestion: str
     activo: bool
     orden: int
+    # Visualización
+    color: Optional[str] = "#6366f1"
+    icono: Optional[str] = "Building2"
     # Contadores
     categorias_count: int = 0
     tipos_tramite_count: int = 0

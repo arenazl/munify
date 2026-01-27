@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import Optional, List
 from datetime import datetime, date, time
 from models.enums import EstadoReclamo, MotivoRechazo
@@ -99,10 +99,26 @@ class DependenciaAsignadaSimple(BaseModel):
     """Dependencia asignada a un reclamo"""
     id: int
     dependencia_id: int
-    nombre: Optional[str] = None  # Viene del property
+    nombre: Optional[str] = None  # Viene de dependencia.nombre
+    color: Optional[str] = None   # Viene de dependencia.color
+    icono: Optional[str] = None   # Viene de dependencia.icono
 
     class Config:
         from_attributes = True
+
+    @model_validator(mode='before')
+    @classmethod
+    def extract_dependencia_data(cls, data):
+        """Extrae datos de la relación dependencia si está cargada"""
+        if hasattr(data, 'dependencia') and data.dependencia:
+            return {
+                'id': data.id,
+                'dependencia_id': data.dependencia_id,
+                'nombre': data.dependencia.nombre,
+                'color': data.dependencia.color,
+                'icono': data.dependencia.icono,
+            }
+        return data
 
 class DocumentoSimple(BaseModel):
     id: int

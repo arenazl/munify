@@ -39,6 +39,10 @@ class Dependencia(Base):
     codigo = Column(String(50), nullable=True, unique=True)  # "OBRAS_PUBLICAS"
     descripcion = Column(Text, nullable=True)
 
+    # Visualización
+    color = Column(String(20), default="#6366f1")  # Color para UI
+    icono = Column(String(50), default="Building2")  # Nombre del icono Lucide
+
     # Ubicación física (valores por defecto, municipios pueden personalizar)
     direccion = Column(String(300), nullable=True)
     localidad = Column(String(100), nullable=True)

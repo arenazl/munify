@@ -289,10 +289,10 @@ async def get_reclamos(
     if current_user.rol == RolUsuario.VECINO:
         query = query.where(Reclamo.creador_id == current_user.id)
     elif current_user.rol == RolUsuario.EMPLEADO:
-        # TODO: Migrar filtro a dependencia cuando se implemente IA
-        # Por ahora, empleados ven todos los reclamos del municipio
-        # Futuro: query = query.where(Reclamo.municipio_dependencia_id == current_user.dependencia_id)
-        pass
+        # Filtrar por dependencia si el usuario tiene una asignada
+        if current_user.municipio_dependencia_id:
+            query = query.where(Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id)
+        # Si no tiene dependencia asignada, ve todos los reclamos del municipio
 
     # Filtros opcionales
     if estado:
@@ -390,9 +390,9 @@ async def cambiar_estado_reclamo_drag(
             detail=f"No se puede cambiar de {reclamo.estado.value} a {estado_enum.value}"
         )
 
-    # Verificar permisos de empleado
-    if current_user.rol == RolUsuario.EMPLEADO:
-        if reclamo.empleado_id != current_user.empleado_id:
+    # Verificar permisos de empleado/dependencia
+    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+        if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
             raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
 
     estado_anterior = reclamo.estado
@@ -968,9 +968,10 @@ async def iniciar_reclamo(
     if reclamo.estado != EstadoReclamo.ASIGNADO:
         raise HTTPException(status_code=400, detail="El reclamo debe estar asignado para iniciarlo")
 
-    # Verificar que el empleado del usuario sea el asignado
-    if current_user.rol == RolUsuario.EMPLEADO and reclamo.empleado_id != current_user.empleado_id:
-        raise HTTPException(status_code=403, detail="No tienes permiso para iniciar este reclamo")
+    # Verificar que el usuario pertenezca a la dependencia asignada
+    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+        if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para iniciar este reclamo")
 
     estado_anterior = reclamo.estado
     reclamo.estado = EstadoReclamo.EN_PROCESO
@@ -1039,8 +1040,9 @@ async def resolver_reclamo(
     if reclamo.estado != EstadoReclamo.EN_PROCESO:
         raise HTTPException(status_code=400, detail="El reclamo debe estar en proceso para resolverlo")
 
-    if current_user.rol == RolUsuario.EMPLEADO and reclamo.empleado_id != current_user.empleado_id:
-        raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
+    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+        if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
 
     estado_anterior = reclamo.estado
     reclamo.resolucion = data.resolucion

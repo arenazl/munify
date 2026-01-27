@@ -129,13 +129,6 @@ export const getNavigation = (userRole: string) => {
       description: 'Tu panel personal'
     },
     {
-      name: 'Nuevo Reclamo',
-      href: '/gestion/crear-reclamo',
-      icon: Plus,
-      show: isVecino,
-      description: 'Reportar un problema'
-    },
-    {
       name: 'Mis Reclamos',
       href: '/gestion/mis-reclamos',
       icon: ClipboardList,

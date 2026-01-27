@@ -183,14 +183,6 @@ class Solicitud(Base):
     telefono_solicitante = Column(String(50), nullable=True)
     direccion_solicitante = Column(String(300), nullable=True)
 
-    # Dirección organizativa asignada (DEPRECATED - usar dependencia_asignada)
-    direccion_id = Column(Integer, ForeignKey("direcciones.id"), nullable=True, index=True)
-    direccion_asignada_legacy = relationship("Direccion", back_populates="solicitudes")
-
-    # Dependencia asignada (nuevo modelo desacoplado)
-    municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
-    dependencia_asignada = relationship("MunicipioDependencia")  # Sin back_populates hasta que se migre todo
-
     # Prioridad (1=urgente, 5=baja)
     prioridad = Column(Integer, default=3)
 

@@ -178,13 +178,21 @@ async def habilitar_tipo_tramite_municipio(
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Habilita un tipo de trámite existente del catálogo para un municipio"""
-    # Verificar que el tipo existe
-    result = await db.execute(select(TipoTramite).where(TipoTramite.id == tipo_id))
+    """
+    Habilita un tipo de trámite existente del catálogo para un municipio.
+    También habilita automáticamente todos los trámites (nivel 2) de ese tipo.
+    """
+    # Verificar que el tipo existe con sus trámites
+    result = await db.execute(
+        select(TipoTramite)
+        .options(selectinload(TipoTramite.tramites))
+        .where(TipoTramite.id == tipo_id)
+    )
     tipo = result.scalar_one_or_none()
     if not tipo:
         raise HTTPException(status_code=404, detail="Tipo de trámite no encontrado")
 
+    tipo_nuevo = False
     # Verificar si ya está habilitado
     result = await db.execute(
         select(MunicipioTipoTramite).where(
@@ -200,21 +208,62 @@ async def habilitar_tipo_tramite_municipio(
         # Reactivar si estaba deshabilitado
         existente.activo = True
         existente.orden = orden
-        await db.commit()
-        return {"message": "Tipo de trámite reactivado para el municipio", "id": existente.id}
+    else:
+        tipo_nuevo = True
+        # Crear nueva asociación
+        municipio_tipo = MunicipioTipoTramite(
+            municipio_id=municipio_id,
+            tipo_tramite_id=tipo_id,
+            activo=True,
+            orden=orden
+        )
+        db.add(municipio_tipo)
 
-    # Crear nueva asociación
-    municipio_tipo = MunicipioTipoTramite(
-        municipio_id=municipio_id,
-        tipo_tramite_id=tipo_id,
-        activo=True,
-        orden=orden
-    )
-    db.add(municipio_tipo)
+    # Habilitar automáticamente todos los trámites de este tipo
+    tramites_habilitados = 0
+    for tramite in tipo.tramites:
+        if not tramite.activo:
+            continue
+
+        result = await db.execute(
+            select(MunicipioTramite).where(
+                and_(
+                    MunicipioTramite.municipio_id == municipio_id,
+                    MunicipioTramite.tramite_id == tramite.id
+                )
+            )
+        )
+        tramite_existente = result.scalar_one_or_none()
+
+        if tramite_existente:
+            if not tramite_existente.activo:
+                tramite_existente.activo = True
+                tramites_habilitados += 1
+        else:
+            municipio_tramite = MunicipioTramite(
+                municipio_id=municipio_id,
+                tramite_id=tramite.id,
+                activo=True,
+                orden=tramite.orden
+            )
+            db.add(municipio_tramite)
+            tramites_habilitados += 1
+
     await db.commit()
-    await db.refresh(municipio_tipo)
 
-    return {"message": "Tipo de trámite habilitado para el municipio", "id": municipio_tipo.id}
+    if existente:
+        return {
+            "message": "Tipo de trámite reactivado para el municipio",
+            "id": existente.id,
+            "tramites_habilitados": tramites_habilitados
+        }
+
+    await db.refresh(municipio_tipo)
+    return {
+        "message": "Tipo de trámite habilitado para el municipio",
+        "id": municipio_tipo.id,
+        "tramites_habilitados": tramites_habilitados
+    }
 
 
 @router.post("/tipos/habilitar-todos")
@@ -223,16 +272,25 @@ async def habilitar_todos_tipos_tramite_municipio(
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Habilita TODOS los tipos de trámite del catálogo para un municipio"""
-    # Obtener todos los tipos activos del catálogo
-    result = await db.execute(select(TipoTramite).where(TipoTramite.activo == True))
+    """
+    Habilita TODOS los tipos de trámite del catálogo para un municipio.
+    También habilita automáticamente todos los trámites (nivel 2) de cada tipo.
+    """
+    # Obtener todos los tipos activos del catálogo con sus trámites
+    result = await db.execute(
+        select(TipoTramite)
+        .options(selectinload(TipoTramite.tramites))
+        .where(TipoTramite.activo == True)
+    )
     todos_tipos = result.scalars().all()
 
-    habilitados = 0
-    reactivados = 0
+    tipos_habilitados = 0
+    tipos_reactivados = 0
+    tramites_habilitados = 0
+    tramites_reactivados = 0
 
     for tipo in todos_tipos:
-        # Verificar si ya existe la asociación
+        # Verificar si ya existe la asociación del tipo
         result = await db.execute(
             select(MunicipioTipoTramite).where(
                 and_(
@@ -246,9 +304,9 @@ async def habilitar_todos_tipos_tramite_municipio(
         if existente:
             if not existente.activo:
                 existente.activo = True
-                reactivados += 1
+                tipos_reactivados += 1
         else:
-            # Crear nueva asociación
+            # Crear nueva asociación para el tipo
             municipio_tipo = MunicipioTipoTramite(
                 municipio_id=municipio_id,
                 tipo_tramite_id=tipo.id,
@@ -256,14 +314,47 @@ async def habilitar_todos_tipos_tramite_municipio(
                 orden=tipo.orden
             )
             db.add(municipio_tipo)
-            habilitados += 1
+            tipos_habilitados += 1
+
+        # Habilitar todos los trámites de este tipo
+        for tramite in tipo.tramites:
+            if not tramite.activo:
+                continue
+
+            # Verificar si ya existe la asociación del trámite
+            result = await db.execute(
+                select(MunicipioTramite).where(
+                    and_(
+                        MunicipioTramite.municipio_id == municipio_id,
+                        MunicipioTramite.tramite_id == tramite.id
+                    )
+                )
+            )
+            tramite_existente = result.scalar_one_or_none()
+
+            if tramite_existente:
+                if not tramite_existente.activo:
+                    tramite_existente.activo = True
+                    tramites_reactivados += 1
+            else:
+                # Crear nueva asociación para el trámite
+                municipio_tramite = MunicipioTramite(
+                    municipio_id=municipio_id,
+                    tramite_id=tramite.id,
+                    activo=True,
+                    orden=tramite.orden
+                )
+                db.add(municipio_tramite)
+                tramites_habilitados += 1
 
     await db.commit()
 
     return {
-        "message": f"Tipos de trámite configurados para municipio {municipio_id}",
-        "habilitados": habilitados,
-        "reactivados": reactivados,
+        "message": f"Tipos y trámites configurados para municipio {municipio_id}",
+        "tipos_habilitados": tipos_habilitados,
+        "tipos_reactivados": tipos_reactivados,
+        "tramites_habilitados": tramites_habilitados,
+        "tramites_reactivados": tramites_reactivados,
         "total_tipos": len(todos_tipos)
     }
 
@@ -689,7 +780,6 @@ async def listar_solicitudes(
 
     query = query.options(
         selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-        selectinload(Solicitud.empleado_asignado),
         selectinload(Solicitud.solicitante)
     )
     query = query.order_by(Solicitud.created_at.desc())
@@ -709,7 +799,6 @@ async def consultar_solicitud_por_numero(
         select(Solicitud)
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-            selectinload(Solicitud.empleado_asignado),
             selectinload(Solicitud.solicitante)
         )
         .where(Solicitud.numero_tramite == numero_tramite)
@@ -733,7 +822,6 @@ async def obtener_solicitud(
         select(Solicitud)
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-            selectinload(Solicitud.empleado_asignado),
             selectinload(Solicitud.solicitante)
         )
         .where(Solicitud.id == solicitud_id)
@@ -991,7 +1079,6 @@ async def asignar_solicitud(
         select(Solicitud)
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-            selectinload(Solicitud.empleado_asignado),
             selectinload(Solicitud.solicitante)
         )
         .where(Solicitud.id == solicitud_id)
@@ -1214,8 +1301,7 @@ async def listar_solicitudes_gestion(
 
     # Optimización: solo cargar relaciones necesarias para la lista
     query = query.options(
-        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-        selectinload(Solicitud.dependencia_asignada)
+        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite)
         # No cargar solicitante completo, ya tenemos nombre_solicitante, apellido_solicitante, etc.
     )
     query = query.order_by(Solicitud.created_at.desc(), Solicitud.prioridad)
@@ -1872,113 +1958,3 @@ Solo incluye los que tengan similitud >= 60%."""
     return []
 
 
-# ==================== HABILITAR TODOS PARA MUNICIPIO ====================
-
-@router.post("/tipos/habilitar-todos")
-async def habilitar_todos_tipos_tramite_municipio(
-    municipio_id: int = Query(..., description="ID del municipio"),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Habilita TODOS los tipos de trámite del catálogo para un municipio.
-    Crea entradas en municipio_tipo_tramite para cada tipo activo.
-    """
-    # Obtener todos los tipos de trámite activos del catálogo
-    result = await db.execute(
-        select(TipoTramite).where(TipoTramite.activo == True)
-    )
-    tipos = result.scalars().all()
-
-    if not tipos:
-        return {"message": "No hay tipos de trámite en el catálogo", "creados": 0}
-
-    creados = 0
-    ya_existentes = 0
-
-    for tipo in tipos:
-        # Verificar si ya existe la asociación
-        existe = await db.execute(
-            select(MunicipioTipoTramite)
-            .where(
-                MunicipioTipoTramite.municipio_id == municipio_id,
-                MunicipioTipoTramite.tipo_tramite_id == tipo.id
-            )
-        )
-        if existe.scalar_one_or_none():
-            ya_existentes += 1
-            continue
-
-        # Crear la asociación
-        asociacion = MunicipioTipoTramite(
-            municipio_id=municipio_id,
-            tipo_tramite_id=tipo.id,
-            activo=True,
-            orden=tipo.orden or 0
-        )
-        db.add(asociacion)
-        creados += 1
-
-    await db.commit()
-
-    return {
-        "message": f"Tipos de trámite habilitados para municipio {municipio_id}",
-        "creados": creados,
-        "ya_existentes": ya_existentes,
-        "total_catalogo": len(tipos)
-    }
-
-
-@router.post("/tramites/habilitar-todos")
-async def habilitar_todos_tramites_municipio(
-    municipio_id: int = Query(..., description="ID del municipio"),
-    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    Habilita TODOS los trámites (subtramites/nivel 2) del catálogo para un municipio.
-    Crea entradas en municipio_tramite para cada trámite activo.
-    Nota: Los trámites son el segundo nivel, debajo de los tipos de trámite.
-    """
-    # Obtener todos los trámites activos del catálogo
-    result = await db.execute(
-        select(Tramite).where(Tramite.activo == True)
-    )
-    tramites = result.scalars().all()
-
-    if not tramites:
-        return {"message": "No hay trámites en el catálogo", "creados": 0}
-
-    creados = 0
-    ya_existentes = 0
-
-    for tramite in tramites:
-        # Verificar si ya existe la asociación
-        existe = await db.execute(
-            select(MunicipioTramite)
-            .where(
-                MunicipioTramite.municipio_id == municipio_id,
-                MunicipioTramite.tramite_id == tramite.id
-            )
-        )
-        if existe.scalar_one_or_none():
-            ya_existentes += 1
-            continue
-
-        # Crear la asociación
-        asociacion = MunicipioTramite(
-            municipio_id=municipio_id,
-            tramite_id=tramite.id,
-            activo=True
-        )
-        db.add(asociacion)
-        creados += 1
-
-    await db.commit()
-
-    return {
-        "message": f"Trámites habilitados para municipio {municipio_id}",
-        "creados": creados,
-        "ya_existentes": ya_existentes,
-        "total_catalogo": len(tramites)
-    }

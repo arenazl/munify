@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   Building2, FolderKanban, FileText, Save, RefreshCw,
-  AlertCircle, BookOpen, GripVertical, Check, ChevronDown, ChevronRight, Wand2
+  AlertCircle, BookOpen, GripVertical, Check, ChevronDown, ChevronRight, Wand2, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dependenciasApi, categoriasApi, tramitesApi } from '../lib/api';
@@ -22,6 +22,8 @@ interface MunicipioDependencia {
   tipo_gestion: 'RECLAMO' | 'TRAMITE' | 'AMBOS';
   activo: boolean;
   orden: number;
+  color?: string;
+  icono?: string;
   categorias_count: number;
   tipos_tramite_count: number;
   tramites_count: number;
@@ -297,120 +299,119 @@ export default function AsignacionDependencias() {
     return tramitesDelTipo.filter(t => isTramiteActivo(depId, t.id)).length;
   };
 
-  // Auto-asignación inteligente basada en mapeo explícito
-  const autoAsignar = () => {
-    const normalize = (str: string) => str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Desasignar todo según el tab activo
+  const desasignarTodo = async () => {
+    try {
+      if (activeTab === 'reclamos') {
+        await dependenciasApi.limpiarAsignacionesCategorias();
+        // Limpiar solo categorías del estado local
+        setAsignaciones(prev => {
+          const newState: AsignacionState = {};
+          Object.keys(prev).forEach(depId => {
+            newState[parseInt(depId)] = {
+              ...prev[parseInt(depId)],
+              categorias: []
+            };
+          });
+          return newState;
+        });
+        toast.success('Se desasignaron todas las categorías');
+      } else {
+        await dependenciasApi.limpiarAsignacionesTiposTramite();
+        // Limpiar tipos de trámite del estado local
+        setAsignaciones(prev => {
+          const newState: AsignacionState = {};
+          Object.keys(prev).forEach(depId => {
+            newState[parseInt(depId)] = {
+              ...prev[parseInt(depId)],
+              tipos_tramite: [],
+              tramites: []
+            };
+          });
+          return newState;
+        });
+        toast.success('Se desasignaron todos los tipos de trámite');
+      }
+      // Recargar datos
+      fetchData();
+    } catch (error) {
+      console.error('Error al desasignar:', error);
+      toast.error('Error al desasignar');
+    }
+  };
 
-    // Mapeo explícito: qué categorías van a qué tipo de dependencia
-    // Basado en análisis manual de cada categoría
-    const categoriasMap: Record<string, string[]> = {
-      // Zoonosis y Salud Animal
-      'zoonosis': [
-        'animales sueltos', 'zoonosis', 'animal', 'mascota', 'perro', 'gato', 'fauna'
-      ],
-      // Obras Públicas
-      'obras': [
-        'bache', 'calle', 'calzada', 'vereda', 'baldio', 'pavimento', 'obra', 'construccion', 'asfalto'
-      ],
-      // Servicios Públicos y Ambiente
-      'servicios': [
-        'agua', 'cloaca', 'desague', 'alumbrado', 'iluminacion', 'luz publica'
-      ],
-      'ambiente': [
-        'espacio verde', 'verde', 'plaza', 'parque', 'arbol', 'poda',
-        'residuo', 'basura', 'recoleccion', 'limpieza', 'barrido',
-        'plaga', 'fumigacion', 'contaminacion', 'ruido', 'salud ambiental'
-      ],
-      // Tránsito y Seguridad Vial
-      'transito': [
-        'semaforo', 'señal', 'transito', 'estacionamiento', 'transporte', 'parada'
-      ],
-      // Seguridad
-      'seguridad': [
-        'seguridad', 'robo', 'delito', 'vandalismo', 'policia'
-      ],
-      // Bromatología (trámites)
-      'bromatologia': [
-        'alimento', 'comercio', 'habilitacion', 'restaurant', 'local comercial'
-      ],
-    };
+  // Auto-asignación inteligente usando IA
+  const autoAsignar = async () => {
+    try {
+      toast.loading('Analizando con IA...');
 
-    // Función para encontrar la dependencia correcta
-    const findDepByType = (depType: string, deps: MunicipioDependencia[]): MunicipioDependencia | null => {
-      const norm = normalize(depType);
-      return deps.find(d => normalize(d.nombre).includes(norm)) || null;
-    };
+      if (activeTab === 'reclamos') {
+        // Obtener dependencias tipo RECLAMO o AMBOS
+        const depsReclamo = dependencias.filter(d => d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS');
 
-    // Función para asignar una categoría/tipo a la dependencia correcta
-    const assignItem = (itemName: string, deps: MunicipioDependencia[]): MunicipioDependencia | null => {
-      const normalizedName = normalize(itemName);
+        const response = await dependenciasApi.autoAsignarCategoriasIA(
+          categorias.map(c => ({ id: c.id, nombre: c.nombre })),
+          depsReclamo.map(d => ({ id: d.dependencia_id, nombre: d.nombre, descripcion: undefined }))
+        );
 
-      // Buscar en el mapeo explícito
-      for (const [depType, keywords] of Object.entries(categoriasMap)) {
-        if (keywords.some(kw => normalizedName.includes(normalize(kw)))) {
-          const dep = findDepByType(depType, deps);
-          if (dep) return dep;
-        }
+        toast.dismiss();
+        toast.success(`IA asignó ${response.data.total} categorías automáticamente`);
+      } else {
+        // Obtener dependencias tipo TRAMITE o AMBOS
+        const depsTramite = dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS');
+
+        const response = await dependenciasApi.autoAsignarTiposTramiteIA(
+          tiposTramite.map(t => ({ id: t.id, nombre: t.nombre })),
+          depsTramite.map(d => ({ id: d.dependencia_id, nombre: d.nombre, descripcion: undefined }))
+        );
+
+        toast.dismiss();
+        toast.success(`IA asignó ${response.data.total} tipos de trámite automáticamente`);
       }
 
-      // Fallback: Atención al Vecino para lo que no matchea
-      return deps.find(d => normalize(d.nombre).includes('vecino') || normalize(d.nombre).includes('atencion')) || deps[0];
-    };
-
-    setAsignaciones(() => {
-      const newState: AsignacionState = {};
-
-      // Inicializar todas las dependencias
-      dependencias.forEach(dep => {
-        newState[dep.id] = { categorias: [], tipos_tramite: [], tramites: [] };
-      });
-
-      // Asignar TODAS las categorías
-      const depsReclamo = dependencias.filter(d => d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS');
-      categorias.forEach(cat => {
-        const dep = assignItem(cat.nombre, depsReclamo);
-        if (dep && newState[dep.id]) {
-          newState[dep.id].categorias.push(cat.id);
-        }
-      });
-
-      // Asignar TODOS los tipos de trámite y sus trámites
-      const depsTramite = dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS');
-      tiposTramite.forEach(tipo => {
-        const dep = assignItem(tipo.nombre, depsTramite);
-        if (dep && newState[dep.id]) {
-          newState[dep.id].tipos_tramite.push(tipo.id);
-          // Activar TODOS los trámites de ese tipo
-          tramitesCatalogo
-            .filter(t => t.tipo_tramite_id === tipo.id)
-            .forEach(t => {
-              if (!newState[dep.id].tramites.includes(t.id)) {
-                newState[dep.id].tramites.push(t.id);
-              }
-            });
-        }
-      });
-
-      return newState;
-    });
-
-    toast.success('Asignación completada: todas las categorías y trámites fueron distribuidos.');
+      // Recargar datos para ver las nuevas asignaciones
+      fetchData();
+    } catch (error: unknown) {
+      toast.dismiss();
+      console.error('Error en auto-asignación:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error(`Error al auto-asignar: ${errorMessage}`);
+    }
   };
 
   const itemsDisponibles = getItemsDisponibles();
+
+  // Calcular items sin asignar para cada tab (independiente del activeTab)
+  const categoriasNoAsignadas = (() => {
+    const depsReclamo = dependencias.filter(d => d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS');
+    const todasAsignadas = new Set<number>();
+    depsReclamo.forEach(dep => {
+      (asignaciones[dep.id]?.categorias || []).forEach(id => todasAsignadas.add(id));
+    });
+    return categorias.filter(c => !todasAsignadas.has(c.id)).length;
+  })();
+
+  const tiposNoAsignados = (() => {
+    const depsTramite = dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS');
+    const todosAsignados = new Set<number>();
+    depsTramite.forEach(dep => {
+      (asignaciones[dep.id]?.tipos_tramite || []).forEach(id => todosAsignados.add(id));
+    });
+    return tiposTramite.filter(t => !todosAsignados.has(t.id)).length;
+  })();
 
   const filterChips: FilterChip[] = [
     {
       key: 'reclamos',
       label: 'Reclamos',
       icon: <FolderKanban className="h-4 w-4" />,
-      count: dependencias.filter(d => d.tipo_gestion === 'RECLAMO' || d.tipo_gestion === 'AMBOS').length,
+      count: categoriasNoAsignadas,
     },
     {
       key: 'tramites',
       label: 'Trámites',
       icon: <FileText className="h-4 w-4" />,
-      count: dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS').length,
+      count: tiposNoAsignados,
     },
   ];
 
@@ -438,7 +439,7 @@ export default function AsignacionDependencias() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
+    <div className="min-h-screen pb-24" style={{ backgroundColor: theme.background }}>
       <StickyPageHeader
         icon={<BookOpen className="h-5 w-5" />}
         title="Asignación de Dependencias"
@@ -456,14 +457,24 @@ export default function AsignacionDependencias() {
           />
         }
         actions={
-          <button
-            onClick={autoAsignar}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all hover:scale-105"
-            style={{ backgroundColor: theme.primary }}
-          >
-            <Wand2 className="h-4 w-4" />
-            Auto-asignar
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={desasignarTodo}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Desasignar
+            </button>
+            <button
+              onClick={autoAsignar}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-all hover:scale-105"
+              style={{ backgroundColor: theme.primary }}
+            >
+              <Wand2 className="h-4 w-4" />
+              Auto-asignar
+            </button>
+          </div>
         }
       />
 
@@ -493,7 +504,7 @@ export default function AsignacionDependencias() {
       )}
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="px-3 sm:px-6 pb-24">
+        <div className="px-3 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Columna Izquierda: Items Disponibles */}
             <div
@@ -517,7 +528,7 @@ export default function AsignacionDependencias() {
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="p-3 min-h-[200px] max-h-[400px] overflow-y-auto space-y-2"
+                    className="p-3 space-y-2"
                     style={{
                       backgroundColor: snapshot.isDraggingOver ? `${theme.primary}10` : 'transparent',
                     }}
@@ -579,7 +590,7 @@ export default function AsignacionDependencias() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className="rounded-2xl overflow-hidden transition-all"
+                        className="rounded-2xl transition-all flex-shrink-0"
                         style={{
                           backgroundColor: snapshot.isDraggingOver ? `${theme.primary}15` : theme.card,
                           border: snapshot.isDraggingOver
@@ -594,9 +605,9 @@ export default function AsignacionDependencias() {
                         >
                           <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${theme.primary}20` }}
+                            style={{ backgroundColor: `${dep.color || theme.primary}20` }}
                           >
-                            <Building2 className="h-5 w-5" style={{ color: theme.primary }} />
+                            <DynamicIcon name={dep.icono || 'Building2'} className="h-5 w-5" style={{ color: dep.color || theme.primary }} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-bold truncate" style={{ color: theme.text }}>{dep.nombre}</h4>

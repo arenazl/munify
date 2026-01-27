@@ -58,9 +58,13 @@ class User(Base):
     # Preferencias de notificaciones push (JSON con booleanos para cada tipo)
     notificacion_preferencias = Column(JSON, default=DEFAULT_NOTIFICATION_PREFERENCES)
 
-    # Relacion con empleado (si es usuario empleado)
+    # Relacion con empleado (si es usuario empleado) - DEPRECATED
     empleado_id = Column(Integer, ForeignKey("empleados.id"), nullable=True)
     empleado = relationship("Empleado", back_populates="miembros")
+
+    # Relación con dependencia (para usuarios de tipo dependencia/área)
+    municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
+    dependencia = relationship("MunicipioDependencia")
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

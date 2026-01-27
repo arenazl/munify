@@ -76,6 +76,16 @@ class MunicipioDependencia(Base):
         return self.dependencia.nombre if self.dependencia else None
 
     @property
+    def color(self):
+        """Devuelve el color de la dependencia"""
+        return self.dependencia.color if self.dependencia else None
+
+    @property
+    def icono(self):
+        """Devuelve el icono de la dependencia"""
+        return self.dependencia.icono if self.dependencia else None
+
+    @property
     def direccion_efectiva(self):
         """Devuelve la dirección local si existe, sino la del template"""
         return self.direccion_local or (self.dependencia.direccion if self.dependencia else None)

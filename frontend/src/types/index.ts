@@ -179,7 +179,7 @@ export interface Reclamo {
   categoria: { id: number; nombre: string; icono?: string; color?: string };
   zona?: { id: number; nombre: string; codigo?: string };
   creador: { id: number; nombre: string; apellido: string; email: string; telefono?: string };
-  dependencia_asignada?: { id: number; dependencia_id: number; nombre?: string };
+  dependencia_asignada?: { id: number; dependencia_id: number; nombre?: string; color?: string; icono?: string };
   documentos: Documento[];
 }
 

@@ -44,10 +44,6 @@ class Reclamo(Base):
     creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     creador = relationship("User", back_populates="reclamos_creados", foreign_keys=[creador_id])
 
-    # Dirección organizativa asignada (DEPRECATED - usar dependencia_asignada)
-    direccion_id = Column(Integer, ForeignKey("direcciones.id"), nullable=True, index=True)
-    direccion_asignada_legacy = relationship("Direccion", back_populates="reclamos")
-
     # Dependencia asignada (nuevo modelo desacoplado)
     municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
     dependencia_asignada = relationship("MunicipioDependencia", back_populates="reclamos")

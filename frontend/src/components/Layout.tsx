@@ -68,6 +68,8 @@ export default function Layout() {
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  // Estado reactivo para detectar mobile (se actualiza con resize)
+  const [isMobile, setIsMobile] = useState(() => isMobileDevice());
   const navigate = useNavigate();
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const [notificationSettingsOpen, setNotificationSettingsOpen] = useState(false);
@@ -108,6 +110,23 @@ export default function Layout() {
   useEffect(() => {
     localStorage.setItem('sidebarCollapsed', String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Detectar cambios de tamaño de ventana y cerrar sidebar al pasar a mobile
+  useEffect(() => {
+    const handleResize = () => {
+      const nowMobile = isMobileDevice();
+      if (nowMobile !== isMobile) {
+        setIsMobile(nowMobile);
+        // Cerrar sidebar cuando se pasa a mobile
+        if (nowMobile) {
+          setSidebarOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isMobile]);
 
   // Handler para activar push desde la top bar
   const handleTopBarPushSubscribe = async () => {
@@ -236,7 +255,6 @@ export default function Layout() {
   if (!user) return null;
 
   const navigation = getNavigation(user.rol);
-  const isMobile = isMobileDevice();
   const mobileTabs = getMobileTabs(user.rol);
 
   // Anchos dinámicos con medidas relativas para mejor responsividad
@@ -1010,26 +1028,28 @@ export default function Layout() {
                 // El tab del centro (index 2) es el botón de crear
                 const isCreateButton = 'isCreateMenu' in tab && tab.isCreateMenu;
 
-                // Botón especial de crear
+                // Botón especial de crear - sobresale del footer
                 if (isCreateButton) {
                   return (
                     <button
                       key="create-menu"
                       onClick={() => setCreateMenuOpen(!createMenuOpen)}
-                      className="flex flex-col items-center min-w-0 flex-1 relative"
+                      className="flex flex-col items-center min-w-0 flex-1 relative -mt-5"
                     >
                       <div
-                        className="w-14 h-14 -mt-7 rounded-full flex items-center justify-center shadow-xl transition-all duration-300"
+                        className="w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 relative"
                         style={{
-                          backgroundColor: theme.primary,
-                          boxShadow: `0 6px 20px ${theme.primary}60`,
-                          transform: createMenuOpen ? 'rotate(45deg) scale(1.05)' : 'rotate(0deg) scale(1)',
+                          background: `linear-gradient(135deg, ${theme.primary} 0%, #ec4899 100%)`,
+                          boxShadow: createMenuOpen
+                            ? `0 6px 25px ${theme.primary}60`
+                            : `0 4px 20px ${theme.primary}50`,
+                          transform: createMenuOpen ? 'rotate(45deg) scale(1.1)' : 'rotate(0deg) scale(1)',
                         }}
                       >
                         <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
                       </div>
                       <span
-                        className="text-[10px] font-medium mt-1"
+                        className="text-[10px] font-semibold mt-1"
                         style={{ color: theme.primary }}
                       >
                         {tab.label}

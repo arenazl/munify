@@ -1,0 +1,766 @@
+{
+  "dependencias_maestras": [
+    {
+      "id": 1,
+      "nombre": "Dirección de Atención al Vecino",
+      "codigo": "ATENCION_VECINO",
+      "tipo_gestion": "RECLAMO",
+      "activo": 1
+    },
+    {
+      "id": 2,
+      "nombre": "Secretaría de Obras Públicas",
+      "codigo": "OBRAS_PUBLICAS",
+      "tipo_gestion": "AMBOS",
+      "activo": 1
+    },
+    {
+      "id": 3,
+      "nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "codigo": "SERVICIOS_PUBLICOS",
+      "tipo_gestion": "RECLAMO",
+      "activo": 1
+    },
+    {
+      "id": 4,
+      "nombre": "Dirección de Tránsito y Seguridad Vial",
+      "codigo": "TRANSITO_VIAL",
+      "tipo_gestion": "RECLAMO",
+      "activo": 1
+    },
+    {
+      "id": 5,
+      "nombre": "Secretaría de Seguridad",
+      "codigo": "SEGURIDAD",
+      "tipo_gestion": "RECLAMO",
+      "activo": 1
+    },
+    {
+      "id": 6,
+      "nombre": "Dirección de Zoonosis y Salud Animal",
+      "codigo": "ZOONOSIS",
+      "tipo_gestion": "RECLAMO",
+      "activo": 1
+    },
+    {
+      "id": 7,
+      "nombre": "Dirección de Catastro",
+      "codigo": "CATASTRO",
+      "tipo_gestion": "TRAMITE",
+      "activo": 1
+    },
+    {
+      "id": 8,
+      "nombre": "Dirección de Rentas",
+      "codigo": "RENTAS",
+      "tipo_gestion": "TRAMITE",
+      "activo": 1
+    },
+    {
+      "id": 9,
+      "nombre": "Dirección de Habilitaciones Comerciales",
+      "codigo": "HABILITACIONES",
+      "tipo_gestion": "TRAMITE",
+      "activo": 1
+    },
+    {
+      "id": 10,
+      "nombre": "Dirección de Obras Particulares",
+      "codigo": "OBRAS_PARTICULARES",
+      "tipo_gestion": "TRAMITE",
+      "activo": 1
+    },
+    {
+      "id": 11,
+      "nombre": "Dirección de Bromatología",
+      "codigo": "BROMATOLOGIA",
+      "tipo_gestion": "AMBOS",
+      "activo": 1
+    },
+    {
+      "id": 12,
+      "nombre": "Secretaría de Desarrollo Social",
+      "codigo": "DESARROLLO_SOCIAL",
+      "tipo_gestion": "TRAMITE",
+      "activo": 1
+    }
+  ],
+  "categorias_maestras": [
+    {
+      "id": 1,
+      "nombre": "Baches y Calzadas",
+      "icono": "construction",
+      "color": "#ef4444",
+      "activo": 1
+    },
+    {
+      "id": 2,
+      "nombre": "Iluminación Pública",
+      "icono": "lightbulb",
+      "color": "#f59e0b",
+      "activo": 1
+    },
+    {
+      "id": 3,
+      "nombre": "Recolección de Residuos",
+      "icono": "trash",
+      "color": "#10b981",
+      "activo": 1
+    },
+    {
+      "id": 4,
+      "nombre": "Espacios Verdes",
+      "icono": "tree",
+      "color": "#22c55e",
+      "activo": 1
+    },
+    {
+      "id": 5,
+      "nombre": "Agua y Cloacas",
+      "icono": "droplet",
+      "color": "#3b82f6",
+      "activo": 1
+    },
+    {
+      "id": 6,
+      "nombre": "Semáforos y Señalización Vial",
+      "icono": "traffic-cone",
+      "color": "#f97316",
+      "activo": 1
+    },
+    {
+      "id": 7,
+      "nombre": "Zoonosis y Animales",
+      "icono": "dog",
+      "color": "#8b5cf6",
+      "activo": 1
+    },
+    {
+      "id": 8,
+      "nombre": "Veredas y Baldíos",
+      "icono": "square",
+      "color": "#78716c",
+      "activo": 1
+    },
+    {
+      "id": 9,
+      "nombre": "Ruidos Molestos",
+      "icono": "volume-2",
+      "color": "#ec4899",
+      "activo": 1
+    },
+    {
+      "id": 10,
+      "nombre": "Limpieza Urbana",
+      "icono": "broom",
+      "color": "#14b8a6",
+      "activo": 1
+    },
+    {
+      "id": 11,
+      "nombre": "Seguridad Urbana",
+      "icono": "alert-triangle",
+      "color": "#dc2626",
+      "activo": 1
+    },
+    {
+      "id": 12,
+      "nombre": "Obras Públicas",
+      "icono": "hammer",
+      "color": "#eab308",
+      "activo": 1
+    },
+    {
+      "id": 13,
+      "nombre": "Salud Ambiental",
+      "icono": "cross",
+      "color": "#be185d",
+      "activo": 1
+    },
+    {
+      "id": 14,
+      "nombre": "Transporte y Paradas",
+      "icono": "bus",
+      "color": "#0ea5e9",
+      "activo": 1
+    },
+    {
+      "id": 15,
+      "nombre": "Otros Reclamos",
+      "icono": "help-circle",
+      "color": "#64748b",
+      "activo": 1
+    },
+    {
+      "id": 16,
+      "nombre": "Baches y Calles",
+      "icono": "Construction",
+      "color": "#EF4444",
+      "activo": 1
+    },
+    {
+      "id": 17,
+      "nombre": "Alumbrado Publico",
+      "icono": "Lightbulb",
+      "color": "#F59E0B",
+      "activo": 1
+    },
+    {
+      "id": 18,
+      "nombre": "Senalizacion",
+      "icono": "SignpostBig",
+      "color": "#3B82F6",
+      "activo": 1
+    },
+    {
+      "id": 19,
+      "nombre": "Desagues y Cloacas",
+      "icono": "Droplets",
+      "color": "#6366F1",
+      "activo": 1
+    },
+    {
+      "id": 20,
+      "nombre": "Veredas",
+      "icono": "Footprints",
+      "color": "#8B5CF6",
+      "activo": 1
+    },
+    {
+      "id": 21,
+      "nombre": "Agua y Canerias",
+      "icono": "Droplet",
+      "color": "#06B6D4",
+      "activo": 1
+    },
+    {
+      "id": 22,
+      "nombre": "Plagas y Fumigacion",
+      "icono": "Bug",
+      "color": "#F97316",
+      "activo": 1
+    },
+    {
+      "id": 23,
+      "nombre": "Animales Sueltos",
+      "icono": "Dog",
+      "color": "#84CC16",
+      "activo": 1
+    },
+    {
+      "id": 24,
+      "nombre": "Otros",
+      "icono": "HelpCircle",
+      "color": "#6B7280",
+      "activo": 1
+    }
+  ],
+  "tipos_tramite_maestros": [
+    {
+      "id": 1,
+      "nombre": "Obras Privadas",
+      "icono": "HardHat",
+      "color": "#EF4444",
+      "activo": 1
+    },
+    {
+      "id": 2,
+      "nombre": "Comercio e Industria",
+      "icono": "Store",
+      "color": "#3B82F6",
+      "activo": 1
+    },
+    {
+      "id": 3,
+      "nombre": "Tránsito y Transporte",
+      "icono": "Car",
+      "color": "#10B981",
+      "activo": 1
+    },
+    {
+      "id": 4,
+      "nombre": "Rentas y Tasas",
+      "icono": "Receipt",
+      "color": "#F59E0B",
+      "activo": 1
+    },
+    {
+      "id": 5,
+      "nombre": "Medio Ambiente",
+      "icono": "Leaf",
+      "color": "#22C55E",
+      "activo": 1
+    },
+    {
+      "id": 6,
+      "nombre": "Catastro e Inmuebles",
+      "icono": "MapPin",
+      "color": "#8B5CF6",
+      "activo": 1
+    },
+    {
+      "id": 7,
+      "nombre": "Salud y Bromatología",
+      "icono": "Heart",
+      "color": "#EC4899",
+      "activo": 1
+    },
+    {
+      "id": 8,
+      "nombre": "Desarrollo Social",
+      "icono": "Users",
+      "color": "#6366F1",
+      "activo": 1
+    },
+    {
+      "id": 9,
+      "nombre": "Cementerio",
+      "icono": "Home",
+      "color": "#78716C",
+      "activo": 1
+    },
+    {
+      "id": 10,
+      "nombre": "Documentación Personal",
+      "icono": "FileText",
+      "color": "#0EA5E9",
+      "activo": 1
+    },
+    {
+      "id": 11,
+      "nombre": "Espacio Público",
+      "icono": "Flag",
+      "color": "#14B8A6",
+      "activo": 1
+    }
+  ],
+  "dependencias_habilitadas": [
+    {
+      "md_id": 37,
+      "municipio_id": 7,
+      "dependencia_id": 1,
+      "activo": 1,
+      "nombre": "Dirección de Atención al Vecino",
+      "codigo": "ATENCION_VECINO",
+      "tipo_gestion": "RECLAMO"
+    },
+    {
+      "md_id": 38,
+      "municipio_id": 7,
+      "dependencia_id": 2,
+      "activo": 1,
+      "nombre": "Secretaría de Obras Públicas",
+      "codigo": "OBRAS_PUBLICAS",
+      "tipo_gestion": "AMBOS"
+    },
+    {
+      "md_id": 39,
+      "municipio_id": 7,
+      "dependencia_id": 3,
+      "activo": 1,
+      "nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "codigo": "SERVICIOS_PUBLICOS",
+      "tipo_gestion": "RECLAMO"
+    },
+    {
+      "md_id": 40,
+      "municipio_id": 7,
+      "dependencia_id": 4,
+      "activo": 1,
+      "nombre": "Dirección de Tránsito y Seguridad Vial",
+      "codigo": "TRANSITO_VIAL",
+      "tipo_gestion": "RECLAMO"
+    },
+    {
+      "md_id": 41,
+      "municipio_id": 7,
+      "dependencia_id": 5,
+      "activo": 1,
+      "nombre": "Secretaría de Seguridad",
+      "codigo": "SEGURIDAD",
+      "tipo_gestion": "RECLAMO"
+    },
+    {
+      "md_id": 42,
+      "municipio_id": 7,
+      "dependencia_id": 6,
+      "activo": 1,
+      "nombre": "Dirección de Zoonosis y Salud Animal",
+      "codigo": "ZOONOSIS",
+      "tipo_gestion": "RECLAMO"
+    },
+    {
+      "md_id": 43,
+      "municipio_id": 7,
+      "dependencia_id": 7,
+      "activo": 1,
+      "nombre": "Dirección de Catastro",
+      "codigo": "CATASTRO",
+      "tipo_gestion": "TRAMITE"
+    },
+    {
+      "md_id": 44,
+      "municipio_id": 7,
+      "dependencia_id": 8,
+      "activo": 1,
+      "nombre": "Dirección de Rentas",
+      "codigo": "RENTAS",
+      "tipo_gestion": "TRAMITE"
+    },
+    {
+      "md_id": 45,
+      "municipio_id": 7,
+      "dependencia_id": 9,
+      "activo": 1,
+      "nombre": "Dirección de Habilitaciones Comerciales",
+      "codigo": "HABILITACIONES",
+      "tipo_gestion": "TRAMITE"
+    },
+    {
+      "md_id": 46,
+      "municipio_id": 7,
+      "dependencia_id": 10,
+      "activo": 1,
+      "nombre": "Dirección de Obras Particulares",
+      "codigo": "OBRAS_PARTICULARES",
+      "tipo_gestion": "TRAMITE"
+    },
+    {
+      "md_id": 47,
+      "municipio_id": 7,
+      "dependencia_id": 11,
+      "activo": 1,
+      "nombre": "Dirección de Bromatología",
+      "codigo": "BROMATOLOGIA",
+      "tipo_gestion": "AMBOS"
+    },
+    {
+      "md_id": 48,
+      "municipio_id": 7,
+      "dependencia_id": 12,
+      "activo": 1,
+      "nombre": "Secretaría de Desarrollo Social",
+      "codigo": "DESARROLLO_SOCIAL",
+      "tipo_gestion": "TRAMITE"
+    }
+  ],
+  "categorias_asignadas": [
+    {
+      "id": 48,
+      "municipio_dependencia_id": 37,
+      "categoria_id": 24,
+      "activo": 1,
+      "categoria_nombre": "Otros",
+      "dependencia_nombre": "Dirección de Atención al Vecino",
+      "dep_codigo": "ATENCION_VECINO"
+    },
+    {
+      "id": 39,
+      "municipio_dependencia_id": 37,
+      "categoria_id": 15,
+      "activo": 1,
+      "categoria_nombre": "Otros Reclamos",
+      "dependencia_nombre": "Dirección de Atención al Vecino",
+      "dep_codigo": "ATENCION_VECINO"
+    },
+    {
+      "id": 30,
+      "municipio_dependencia_id": 40,
+      "categoria_id": 6,
+      "activo": 1,
+      "categoria_nombre": "Semáforos y Señalización Vial",
+      "dependencia_nombre": "Dirección de Tránsito y Seguridad Vial",
+      "dep_codigo": "TRANSITO_VIAL"
+    },
+    {
+      "id": 42,
+      "municipio_dependencia_id": 40,
+      "categoria_id": 18,
+      "activo": 1,
+      "categoria_nombre": "Senalizacion",
+      "dependencia_nombre": "Dirección de Tránsito y Seguridad Vial",
+      "dep_codigo": "TRANSITO_VIAL"
+    },
+    {
+      "id": 38,
+      "municipio_dependencia_id": 40,
+      "categoria_id": 14,
+      "activo": 1,
+      "categoria_nombre": "Transporte y Paradas",
+      "dependencia_nombre": "Dirección de Tránsito y Seguridad Vial",
+      "dep_codigo": "TRANSITO_VIAL"
+    },
+    {
+      "id": 47,
+      "municipio_dependencia_id": 42,
+      "categoria_id": 23,
+      "activo": 1,
+      "categoria_nombre": "Animales Sueltos",
+      "dependencia_nombre": "Dirección de Zoonosis y Salud Animal",
+      "dep_codigo": "ZOONOSIS"
+    },
+    {
+      "id": 31,
+      "municipio_dependencia_id": 42,
+      "categoria_id": 7,
+      "activo": 1,
+      "categoria_nombre": "Zoonosis y Animales",
+      "dependencia_nombre": "Dirección de Zoonosis y Salud Animal",
+      "dep_codigo": "ZOONOSIS"
+    },
+    {
+      "id": 40,
+      "municipio_dependencia_id": 38,
+      "categoria_id": 16,
+      "activo": 1,
+      "categoria_nombre": "Baches y Calles",
+      "dependencia_nombre": "Secretaría de Obras Públicas",
+      "dep_codigo": "OBRAS_PUBLICAS"
+    },
+    {
+      "id": 25,
+      "municipio_dependencia_id": 38,
+      "categoria_id": 1,
+      "activo": 1,
+      "categoria_nombre": "Baches y Calzadas",
+      "dependencia_nombre": "Secretaría de Obras Públicas",
+      "dep_codigo": "OBRAS_PUBLICAS"
+    },
+    {
+      "id": 36,
+      "municipio_dependencia_id": 38,
+      "categoria_id": 12,
+      "activo": 1,
+      "categoria_nombre": "Obras Públicas",
+      "dependencia_nombre": "Secretaría de Obras Públicas",
+      "dep_codigo": "OBRAS_PUBLICAS"
+    },
+    {
+      "id": 44,
+      "municipio_dependencia_id": 38,
+      "categoria_id": 20,
+      "activo": 1,
+      "categoria_nombre": "Veredas",
+      "dependencia_nombre": "Secretaría de Obras Públicas",
+      "dep_codigo": "OBRAS_PUBLICAS"
+    },
+    {
+      "id": 32,
+      "municipio_dependencia_id": 38,
+      "categoria_id": 8,
+      "activo": 1,
+      "categoria_nombre": "Veredas y Baldíos",
+      "dependencia_nombre": "Secretaría de Obras Públicas",
+      "dep_codigo": "OBRAS_PUBLICAS"
+    },
+    {
+      "id": 35,
+      "municipio_dependencia_id": 41,
+      "categoria_id": 11,
+      "activo": 1,
+      "categoria_nombre": "Seguridad Urbana",
+      "dependencia_nombre": "Secretaría de Seguridad",
+      "dep_codigo": "SEGURIDAD"
+    },
+    {
+      "id": 45,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 21,
+      "activo": 1,
+      "categoria_nombre": "Agua y Canerias",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 29,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 5,
+      "activo": 1,
+      "categoria_nombre": "Agua y Cloacas",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 41,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 17,
+      "activo": 1,
+      "categoria_nombre": "Alumbrado Publico",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 43,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 19,
+      "activo": 1,
+      "categoria_nombre": "Desagues y Cloacas",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 28,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 4,
+      "activo": 1,
+      "categoria_nombre": "Espacios Verdes",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 26,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 2,
+      "activo": 1,
+      "categoria_nombre": "Iluminación Pública",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 34,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 10,
+      "activo": 1,
+      "categoria_nombre": "Limpieza Urbana",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 46,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 22,
+      "activo": 1,
+      "categoria_nombre": "Plagas y Fumigacion",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 27,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 3,
+      "activo": 1,
+      "categoria_nombre": "Recolección de Residuos",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 33,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 9,
+      "activo": 1,
+      "categoria_nombre": "Ruidos Molestos",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    },
+    {
+      "id": 37,
+      "municipio_dependencia_id": 39,
+      "categoria_id": 13,
+      "activo": 1,
+      "categoria_nombre": "Salud Ambiental",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    }
+  ],
+  "tipos_tramite_asignados": [
+    {
+      "id": 21,
+      "municipio_dependencia_id": 37,
+      "tipo_tramite_id": 9,
+      "activo": 1,
+      "tipo_nombre": "Cementerio",
+      "dependencia_nombre": "Dirección de Atención al Vecino",
+      "dep_codigo": "ATENCION_VECINO"
+    },
+    {
+      "id": 22,
+      "municipio_dependencia_id": 37,
+      "tipo_tramite_id": 10,
+      "activo": 1,
+      "tipo_nombre": "Documentación Personal",
+      "dependencia_nombre": "Dirección de Atención al Vecino",
+      "dep_codigo": "ATENCION_VECINO"
+    },
+    {
+      "id": 19,
+      "municipio_dependencia_id": 47,
+      "tipo_tramite_id": 7,
+      "activo": 1,
+      "tipo_nombre": "Salud y Bromatología",
+      "dependencia_nombre": "Dirección de Bromatología",
+      "dep_codigo": "BROMATOLOGIA"
+    },
+    {
+      "id": 18,
+      "municipio_dependencia_id": 43,
+      "tipo_tramite_id": 6,
+      "activo": 1,
+      "tipo_nombre": "Catastro e Inmuebles",
+      "dependencia_nombre": "Dirección de Catastro",
+      "dep_codigo": "CATASTRO"
+    },
+    {
+      "id": 14,
+      "municipio_dependencia_id": 45,
+      "tipo_tramite_id": 2,
+      "activo": 1,
+      "tipo_nombre": "Comercio e Industria",
+      "dependencia_nombre": "Dirección de Habilitaciones Comerciales",
+      "dep_codigo": "HABILITACIONES"
+    },
+    {
+      "id": 23,
+      "municipio_dependencia_id": 45,
+      "tipo_tramite_id": 11,
+      "activo": 1,
+      "tipo_nombre": "Espacio Público",
+      "dependencia_nombre": "Dirección de Habilitaciones Comerciales",
+      "dep_codigo": "HABILITACIONES"
+    },
+    {
+      "id": 13,
+      "municipio_dependencia_id": 46,
+      "tipo_tramite_id": 1,
+      "activo": 1,
+      "tipo_nombre": "Obras Privadas",
+      "dependencia_nombre": "Dirección de Obras Particulares",
+      "dep_codigo": "OBRAS_PARTICULARES"
+    },
+    {
+      "id": 16,
+      "municipio_dependencia_id": 44,
+      "tipo_tramite_id": 4,
+      "activo": 1,
+      "tipo_nombre": "Rentas y Tasas",
+      "dependencia_nombre": "Dirección de Rentas",
+      "dep_codigo": "RENTAS"
+    },
+    {
+      "id": 15,
+      "municipio_dependencia_id": 40,
+      "tipo_tramite_id": 3,
+      "activo": 1,
+      "tipo_nombre": "Tránsito y Transporte",
+      "dependencia_nombre": "Dirección de Tránsito y Seguridad Vial",
+      "dep_codigo": "TRANSITO_VIAL"
+    },
+    {
+      "id": 20,
+      "municipio_dependencia_id": 48,
+      "tipo_tramite_id": 8,
+      "activo": 1,
+      "tipo_nombre": "Desarrollo Social",
+      "dependencia_nombre": "Secretaría de Desarrollo Social",
+      "dep_codigo": "DESARROLLO_SOCIAL"
+    },
+    {
+      "id": 17,
+      "municipio_dependencia_id": 39,
+      "tipo_tramite_id": 5,
+      "activo": 1,
+      "tipo_nombre": "Medio Ambiente",
+      "dependencia_nombre": "Secretaría de Servicios Públicos y Ambiente",
+      "dep_codigo": "SERVICIOS_PUBLICOS"
+    }
+  ]
+}

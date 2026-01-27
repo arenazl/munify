@@ -50,6 +50,7 @@ import { WizardModal, WizardStep } from '../components/ui/WizardModal';
 import { WizardStepContent } from '../components/ui/WizardForm';
 import { ReclamosSimilares } from '../components/ReclamosSimilares';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { DynamicIcon } from '../components/ui/DynamicIcon';
 
 // Iconos por categoría
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -119,6 +120,8 @@ export default function NuevoReclamo() {
     id: number;
     nombre: string;
     codigo?: string;
+    color?: string;
+    icono?: string;
   } | null>(null);
 
   // Estado para el chat inicial (Step 0)
@@ -259,6 +262,47 @@ export default function NuevoReclamo() {
     buscarSimilares();
   }, [formData.categoria_id, formData.latitud, formData.longitud, user, ignorarSimilares]);
 
+  // Auto-detectar zona basada en coordenadas
+  useEffect(() => {
+    if (!formData.latitud || !formData.longitud || zonas.length === 0) return;
+
+    // Calcular distancia entre dos puntos (fórmula de Haversine simplificada)
+    const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+      const R = 6371; // Radio de la Tierra en km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    // Encontrar la zona más cercana
+    let zonaMasCercana: Zona | null = null;
+    let distanciaMinima = Infinity;
+
+    for (const zona of zonas) {
+      if (zona.latitud_centro && zona.longitud_centro) {
+        const distancia = calcularDistancia(
+          formData.latitud,
+          formData.longitud,
+          zona.latitud_centro,
+          zona.longitud_centro
+        );
+        if (distancia < distanciaMinima) {
+          distanciaMinima = distancia;
+          zonaMasCercana = zona;
+        }
+      }
+    }
+
+    // Auto-seleccionar la zona más cercana (si está dentro de 20km)
+    if (zonaMasCercana && distanciaMinima < 20) {
+      setFormData(prev => ({ ...prev, zona_id: String(zonaMasCercana!.id) }));
+    }
+  }, [formData.latitud, formData.longitud, zonas]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length + selectedFiles.length > 5) {
@@ -298,17 +342,13 @@ export default function NuevoReclamo() {
         viewboxParam = `&viewbox=${lon - delta},${lat + delta},${lon + delta},${lat - delta}`;
       }
 
-      // Construir query de búsqueda - evitar duplicar el nombre del municipio si ya lo escribió
-      const queryLower = query.toLowerCase();
-      const hasLocationContext = municipioSimple && queryLower.includes(municipioSimple.toLowerCase());
-      const searchQuery = hasLocationContext
-        ? `${query}, Buenos Aires, Argentina`
-        : municipioSimple
-          ? `${query}, ${municipioSimple}, Buenos Aires, Argentina`
-          : `${query}, Argentina`;
+      // Construir query de búsqueda - NO agregar el nombre del municipio porque
+      // puede haber múltiples localidades (ej: Padua, Rawson dentro de Chacabuco)
+      // Usamos viewbox para filtrar geográficamente y solo agregamos la provincia
+      const searchQuery = `${query}, Buenos Aires, Argentina`;
 
       // Primero intentar con viewbox (preferencia local pero no bounded)
-      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1${viewboxParam}`;
+      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=8&addressdetails=1${viewboxParam}`;
 
       let response = await fetch(url, {
         headers: { 'Accept-Language': 'es' },
@@ -325,14 +365,29 @@ export default function NuevoReclamo() {
         data = await response.json();
       }
 
-      // Si aún no hay resultados, probar búsqueda más simple
+      // Si aún no hay resultados, probar búsqueda más simple (solo Argentina)
       if (data.length === 0) {
         console.log('[Address Search] Sin resultados, probando búsqueda simple');
-        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Argentina')}&countrycodes=ar&limit=5&addressdetails=1`;
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Argentina')}&countrycodes=ar&limit=8&addressdetails=1`;
         response = await fetch(url, {
           headers: { 'Accept-Language': 'es' },
         });
         data = await response.json();
+      }
+
+      // Último intento: búsqueda estructurada con street parameter
+      if (data.length === 0) {
+        console.log('[Address Search] Último intento con búsqueda estructurada');
+        // Extraer posible calle y número
+        const streetMatch = query.match(/^(.+?)\s+(\d+)/);
+        if (streetMatch) {
+          const street = streetMatch[1] + ' ' + streetMatch[2];
+          url = `https://nominatim.openstreetmap.org/search?format=json&street=${encodeURIComponent(street)}&state=Buenos%20Aires&country=Argentina&limit=8&addressdetails=1`;
+          response = await fetch(url, {
+            headers: { 'Accept-Language': 'es' },
+          });
+          data = await response.json();
+        }
       }
 
       setAddressSuggestions(data);
@@ -565,6 +620,8 @@ export default function NuevoReclamo() {
             id: depEncargada.id,
             nombre: depEncargada.nombre,
             codigo: depEncargada.codigo,
+            color: depEncargada.color,
+            icono: depEncargada.icono,
           });
         } else {
           setDependenciaEncargada(null);
@@ -1739,13 +1796,19 @@ Tono amigable, 3-4 oraciones máximo.`,
         {/* Dependencia Encargada */}
         <div
           className="flex items-center gap-3 p-4 rounded-xl"
-          style={{ backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}30` }}
+          style={{
+            backgroundColor: `${dependenciaEncargada?.color || theme.primary}15`,
+            border: `1px solid ${dependenciaEncargada?.color || theme.primary}30`
+          }}
         >
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: theme.primary, color: 'white' }}
+            style={{
+              backgroundColor: dependenciaEncargada?.color || theme.primary,
+              color: 'white'
+            }}
           >
-            <Building2 className="h-5 w-5" />
+            <DynamicIcon name={dependenciaEncargada?.icono || 'Building2'} className="h-5 w-5" />
           </div>
           <div>
             <span className="text-xs" style={{ color: theme.textSecondary }}>Será derivado a</span>
@@ -2319,7 +2382,6 @@ Tono amigable, 3-4 oraciones máximo.`,
           completeLabel="Enviar Reclamo"
           aiPanel={wizardAIPanel}
           embedded={true}
-          primaryButtonColor={selectedCategoriaObj?.color || chatCategoriaSugerida?.categoria?.color}
         />
       </div>
 
