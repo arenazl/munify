@@ -743,10 +743,10 @@ export default function Planificacion() {
                                         <span
                                           className="px-1.5 py-0.5 rounded text-[10px] font-medium"
                                           style={{
-                                            backgroundColor: tarea.estado === 'RESUELTO' ? '#22c55e20' :
-                                              tarea.estado === 'EN_PROCESO' ? '#f59e0b20' : '#3b82f620',
-                                            color: tarea.estado === 'RESUELTO' ? '#22c55e' :
-                                              tarea.estado === 'EN_PROCESO' ? '#f59e0b' : '#3b82f6',
+                                            backgroundColor: tarea.estado === 'resuelto' ? '#22c55e20' :
+                                              tarea.estado === 'en_proceso' ? '#f59e0b20' : '#3b82f620',
+                                            color: tarea.estado === 'resuelto' ? '#22c55e' :
+                                              tarea.estado === 'en_proceso' ? '#f59e0b' : '#3b82f6',
                                           }}
                                         >
                                           {tarea.estado.replace('_', ' ')}

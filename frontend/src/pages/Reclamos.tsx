@@ -14,23 +14,23 @@ import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  NUEVO: { bg: '#6366f1', text: '#ffffff' },
-  RECIBIDO: { bg: '#0891b2', text: '#ffffff' },
-  ASIGNADO: { bg: '#3b82f6', text: '#ffffff' },
-  EN_PROCESO: { bg: '#f59e0b', text: '#ffffff' },
-  PENDIENTE_CONFIRMACION: { bg: '#8b5cf6', text: '#ffffff' },
-  RESUELTO: { bg: '#10b981', text: '#ffffff' },
-  RECHAZADO: { bg: '#ef4444', text: '#ffffff' },
+  nuevo: { bg: '#6366f1', text: '#ffffff' },
+  recibido: { bg: '#0891b2', text: '#ffffff' },
+  asignado: { bg: '#3b82f6', text: '#ffffff' },
+  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
+  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
+  resuelto: { bg: '#10b981', text: '#ffffff' },
+  rechazado: { bg: '#ef4444', text: '#ffffff' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  NUEVO: 'Nuevo',
-  RECIBIDO: 'Recibido',
-  ASIGNADO: 'Asignado',
-  EN_PROCESO: 'En Proceso',
-  PENDIENTE_CONFIRMACION: 'Pendiente Confirmación',
-  RESUELTO: 'Resuelto',
-  RECHAZADO: 'Rechazado',
+  nuevo: 'Nuevo',
+  recibido: 'Recibido',
+  asignado: 'Asignado',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente Confirmación',
+  resuelto: 'Resuelto',
+  rechazado: 'Rechazado',
 };
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
@@ -48,11 +48,11 @@ const getCategoryImageUrl = (nombre: string): string | null => {
 // Función para obtener el icono del estado
 const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
   switch (estado) {
-    case 'NUEVO': return <Sparkles className="h-3 w-3" />;
-    case 'ASIGNADO': return <UserPlus className="h-3 w-3" />;
-    case 'EN_PROCESO': return <Play className="h-3 w-3" />;
-    case 'RESUELTO': return <CheckCircle className="h-3 w-3" />;
-    case 'RECHAZADO': return <XCircle className="h-3 w-3" />;
+    case 'nuevo': return <Sparkles className="h-3 w-3" />;
+    case 'asignado': return <UserPlus className="h-3 w-3" />;
+    case 'en_proceso': return <Play className="h-3 w-3" />;
+    case 'resuelto': return <CheckCircle className="h-3 w-3" />;
+    case 'rechazado': return <XCircle className="h-3 w-3" />;
     default: return null;
   }
 };
@@ -1050,7 +1050,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
 
     // Si el reclamo es nuevo, cargar sugerencias de asignación
-    if (reclamo.estado === 'NUEVO') {
+    if (reclamo.estado === 'nuevo') {
       setLoadingSugerencias(true);
       try {
         console.log('[DEBUG] Cargando sugerencias para reclamo:', reclamo.id);
@@ -1136,7 +1136,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     // Actualización optimista
     const reclamoActualizado = {
       ...selectedReclamo,
-      estado: 'RECIBIDO' as const,
+      estado: 'recibido' as const,
       tiempo_estimado_dias: tiempoEstimadoDias,
       tiempo_estimado_horas: tiempoEstimadoHoras,
     };
@@ -1175,7 +1175,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     // Actualización optimista
     const reclamoActualizado = {
       ...selectedReclamo,
-      estado: 'ASIGNADO' as const,
+      estado: 'asignado' as const,
       municipio_dependencia_id: Number(dependenciaSeleccionada),
       dependencia_asignada: dependenciaData ? {
         id: dependenciaData.id,
@@ -1260,7 +1260,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
 
     // Actualización optimista: actualizar UI inmediatamente
-    const reclamoActualizado = { ...selectedReclamo, estado: 'EN_PROCESO' as const };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'en_proceso' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Trabajo iniciado');
@@ -1291,7 +1291,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
 
     // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'RESUELTO' as const, resolucion };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'resuelto' as const, resolucion };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Reclamo resuelto');
@@ -1313,7 +1313,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo || !motivoRechazo) return;
 
     // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'RECHAZADO' as const };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Reclamo rechazado');
@@ -1340,7 +1340,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     try {
       // Volver a estado asignado con comentario
       const comentario = `Trabajo no finalizado: ${motivoNoFinalizado}${resolucion ? `. ${resolucion}` : ''}`;
-      await reclamosApi.cambiarEstado(selectedReclamo.id, 'ASIGNADO', comentario);
+      await reclamosApi.cambiarEstado(selectedReclamo.id, 'asignado', comentario);
       toast.success('Reclamo vuelto a asignado para reprogramar');
       fetchReclamos();
       closeSheet();
@@ -2696,7 +2696,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               value={selectedReclamo.dependencia_asignada.nombre}
             />
             {/* Mostrar tiempo estimado si ya fue recibido */}
-            {selectedReclamo.estado === 'RECIBIDO' && selectedReclamo.fecha_estimada_resolucion && (
+            {selectedReclamo.estado === 'recibido' && selectedReclamo.fecha_estimada_resolucion && (
               <ABMField
                 label="Resolución estimada"
                 value={new Date(selectedReclamo.fecha_estimada_resolucion).toLocaleString('es-AR', {
@@ -2713,7 +2713,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Tiempo estimado de resolución - Solo para aceptar reclamos nuevos */}
-        {selectedReclamo.estado === 'NUEVO' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (
+        {selectedReclamo.estado === 'nuevo' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (
           <ABMInfoPanel
             title="Tiempo estimado de resolución"
             icon={<Clock className="h-4 w-4" />}
@@ -2835,7 +2835,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Acciones según estado */}
-        {selectedReclamo.estado === 'NUEVO' && (
+        {selectedReclamo.estado === 'nuevo' && (
           <ABMCollapsible
             title={selectedReclamo.dependencia_asignada ? "Reasignar a otra dependencia" : "Asignar Dependencia"}
             icon={<Building2 className="h-4 w-4" />}
@@ -3012,7 +3012,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {selectedReclamo.estado === 'ASIGNADO' && (
+        {selectedReclamo.estado === 'asignado' && (
           <ABMInfoPanel
             title="Iniciar Trabajo"
             icon={<Play className="h-4 w-4" />}
@@ -3024,7 +3024,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
-        {selectedReclamo.estado === 'EN_PROCESO' && (
+        {selectedReclamo.estado === 'en_proceso' && (
           <ABMCollapsible
             title="Finalizar Trabajo"
             icon={<CheckCircle className="h-4 w-4" />}
@@ -3108,7 +3108,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {motivoRechazo && selectedReclamo.estado === 'NUEVO' && (
+        {motivoRechazo && selectedReclamo.estado === 'nuevo' && (
           <ABMInfoPanel
             title="Rechazar Reclamo"
             icon={<XCircle className="h-4 w-4" />}
@@ -3224,9 +3224,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const renderSheetFooter = () => {
     if (!selectedReclamo) return null;
 
-    const canAsignar = selectedReclamo.estado === 'NUEVO';
-    const canIniciar = selectedReclamo.estado === 'ASIGNADO';
-    const canResolver = selectedReclamo.estado === 'EN_PROCESO';
+    const canAsignar = selectedReclamo.estado === 'nuevo';
+    const canIniciar = selectedReclamo.estado === 'asignado';
+    const canResolver = selectedReclamo.estado === 'en_proceso';
     // Puede aceptar si ya tiene dependencia asignada y no quiere reasignar
     const canAceptar = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
 
@@ -3337,16 +3337,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Estados finales - solo info */}
-        {(selectedReclamo.estado === 'RESUELTO' || selectedReclamo.estado === 'RECHAZADO') && (
+        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'rechazado') && (
           <div
             className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
             style={{
-              backgroundColor: selectedReclamo.estado === 'RESUELTO' ? '#16a34a20' : '#ef444420',
-              color: selectedReclamo.estado === 'RESUELTO' ? '#16a34a' : '#ef4444',
-              border: `1px solid ${selectedReclamo.estado === 'RESUELTO' ? '#16a34a50' : '#ef444450'}`
+              backgroundColor: selectedReclamo.estado === 'resuelto' ? '#16a34a20' : '#ef444420',
+              color: selectedReclamo.estado === 'resuelto' ? '#16a34a' : '#ef4444',
+              border: `1px solid ${selectedReclamo.estado === 'resuelto' ? '#16a34a50' : '#ef444450'}`
             }}
           >
-            {selectedReclamo.estado === 'RESUELTO' ? '✓ Resuelto' : '✗ Rechazado'}
+            {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
           </div>
         )}
       </div>
@@ -3501,11 +3501,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 <FilterRowSkeleton count={5} height={26} widths={[45, 55, 65, 45, 55]} />
               ) : (
                 [
-                  { key: 'NUEVO', label: 'Nuevo', icon: Sparkles, color: estadoColors.NUEVO.bg, count: conteosEstados['NUEVO'] || 0 },
-                  { key: 'ASIGNADO', label: 'Asig.', icon: UserPlus, color: estadoColors.ASIGNADO.bg, count: conteosEstados['ASIGNADO'] || 0 },
-                  { key: 'EN_PROCESO', label: 'Proc.', icon: Play, color: estadoColors.EN_PROCESO.bg, count: conteosEstados['EN_PROCESO'] || 0 },
-                  { key: 'RESUELTO', label: 'Resu.', icon: CheckCircle, color: estadoColors.RESUELTO.bg, count: conteosEstados['RESUELTO'] || 0 },
-                  { key: 'RECHAZADO', label: 'Rech.', icon: XCircle, color: estadoColors.RECHAZADO.bg, count: conteosEstados['RECHAZADO'] || 0 },
+                  { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.NUEVO.bg, count: conteosEstados['nuevo'] || 0 },
+                  { key: 'asignado', label: 'Asig.', icon: UserPlus, color: estadoColors.ASIGNADO.bg, count: conteosEstados['asignado'] || 0 },
+                  { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.EN_PROCESO.bg, count: conteosEstados['en_proceso'] || 0 },
+                  { key: 'resuelto', label: 'Resu.', icon: CheckCircle, color: estadoColors.RESUELTO.bg, count: conteosEstados['resuelto'] || 0 },
+                  { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.RECHAZADO.bg, count: conteosEstados['rechazado'] || 0 },
                 ].map((estado) => {
                   const Icon = estado.icon;
                   const isActive = filtroEstado === estado.key;
@@ -3609,10 +3609,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               <div
                 className="flex items-center justify-between -mx-5 -mt-5 mb-4 px-4 py-3 rounded-t-xl"
                 style={{
-                  background: r.estado === 'ASIGNADO'
+                  background: r.estado === 'asignado'
                     ? 'linear-gradient(135deg, rgb(74 79 160 / 0%) 0%, rgba(59, 130, 246, 0.5) 100%)'
                     : `linear-gradient(135deg, ${estado.bg} 0%, ${estado.bg}80 100%)`,
-                  borderBottom: r.estado === 'ASIGNADO'
+                  borderBottom: r.estado === 'asignado'
                     ? '1px solid rgb(59 130 246 / 0%)'
                     : `1px solid ${estado.bg}`
                 }}

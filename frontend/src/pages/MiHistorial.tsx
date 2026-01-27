@@ -295,7 +295,7 @@ export default function MiHistorial() {
               >
                 {estadoLabels[selectedTrabajo.estado] || selectedTrabajo.estado}
               </span>
-              {selectedTrabajo.estado === 'RESUELTO' && (
+              {selectedTrabajo.estado === 'resuelto' && (
                 <CheckCircle className="h-5 w-5 text-green-500" />
               )}
             </div>
@@ -415,7 +415,7 @@ export default function MiHistorial() {
                   </p>
                 )}
               </div>
-            ) : selectedTrabajo.estado === 'RESUELTO' ? (
+            ) : selectedTrabajo.estado === 'resuelto' ? (
               <div
                 className="rounded-xl p-4 flex items-center gap-3"
                 style={{

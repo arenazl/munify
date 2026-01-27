@@ -922,12 +922,12 @@ export default function WhatsAppConfigPage() {
                           <span
                             className="px-2 py-0.5 rounded text-xs font-medium capitalize"
                             style={{
-                              backgroundColor: reclamo.estado === 'RESUELTO' ? '#22c55e20' :
-                                reclamo.estado === 'EN_PROCESO' ? '#f59e0b20' :
-                                reclamo.estado === 'RECHAZADO' ? '#ef444420' : '#3b82f620',
-                              color: reclamo.estado === 'RESUELTO' ? '#22c55e' :
-                                reclamo.estado === 'EN_PROCESO' ? '#f59e0b' :
-                                reclamo.estado === 'RECHAZADO' ? '#ef4444' : '#3b82f6',
+                              backgroundColor: reclamo.estado === 'resuelto' ? '#22c55e20' :
+                                reclamo.estado === 'en_proceso' ? '#f59e0b20' :
+                                reclamo.estado === 'rechazado' ? '#ef444420' : '#3b82f620',
+                              color: reclamo.estado === 'resuelto' ? '#22c55e' :
+                                reclamo.estado === 'en_proceso' ? '#f59e0b' :
+                                reclamo.estado === 'rechazado' ? '#ef4444' : '#3b82f6',
                             }}
                           >
                             {reclamo.estado.replace('_', ' ')}
