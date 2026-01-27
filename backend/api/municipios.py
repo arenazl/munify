@@ -346,10 +346,8 @@ async def obtener_usuarios_dependencias(
         User.activo == True
     ).group_by(
         User.email, Dependencia.nombre, Dependencia.color, Dependencia.icono
-    ).having(
-        func.count(Reclamo.id) > 0  # Solo dependencias con reclamos
     ).order_by(
-        func.count(Reclamo.id).desc()
+        Dependencia.nombre
     )
 
     result = await db.execute(query)
