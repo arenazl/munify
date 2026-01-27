@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from datetime import timedelta
 
 from core.database import get_db
@@ -9,7 +10,8 @@ from core.security import verify_password, get_password_hash, create_access_toke
 from core.config import settings
 from core.rate_limit import limiter, LIMITS
 from models.user import User
-from schemas.user import UserCreate, UserResponse, Token
+from models.municipio_dependencia import MunicipioDependencia
+from schemas.user import UserCreate, UserResponse, Token, DependenciaInfo
 
 router = APIRouter()
 
@@ -42,8 +44,12 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
 @router.post("/login", response_model=Token)
 @limiter.limit(LIMITS["auth"])
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    # Buscar usuario por email
-    result = await db.execute(select(User).where(User.email == form_data.username))
+    # Buscar usuario por email con dependencia
+    result = await db.execute(
+        select(User)
+        .where(User.email == form_data.username)
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
+    )
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -62,14 +68,64 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
+    # Construir respuesta con info de dependencia si existe
+    user_response = UserResponse(
+        id=user.id,
+        municipio_id=user.municipio_id,
+        email=user.email,
+        nombre=user.nombre,
+        apellido=user.apellido,
+        telefono=user.telefono,
+        dni=user.dni,
+        direccion=user.direccion,
+        es_anonimo=user.es_anonimo,
+        rol=user.rol,
+        activo=user.activo,
+        empleado_id=user.empleado_id,
+        municipio_dependencia_id=user.municipio_dependencia_id,
+        dependencia=DependenciaInfo(
+            id=user.dependencia.id,
+            nombre=user.dependencia.dependencia.nombre,
+            color=user.dependencia.dependencia.color,
+            icono=user.dependencia.dependencia.icono,
+            direccion=user.dependencia.direccion_efectiva,
+            telefono=user.dependencia.telefono_efectivo,
+        ) if user.dependencia and user.dependencia.dependencia else None,
+        created_at=user.created_at,
+    )
+
     return Token(
         access_token=access_token,
-        user=UserResponse.model_validate(user)
+        user=user_response
     )
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
+    # Construir respuesta con info de dependencia si existe
+    return UserResponse(
+        id=current_user.id,
+        municipio_id=current_user.municipio_id,
+        email=current_user.email,
+        nombre=current_user.nombre,
+        apellido=current_user.apellido,
+        telefono=current_user.telefono,
+        dni=current_user.dni,
+        direccion=current_user.direccion,
+        es_anonimo=current_user.es_anonimo,
+        rol=current_user.rol,
+        activo=current_user.activo,
+        empleado_id=current_user.empleado_id,
+        municipio_dependencia_id=current_user.municipio_dependencia_id,
+        dependencia=DependenciaInfo(
+            id=current_user.dependencia.id,
+            nombre=current_user.dependencia.dependencia.nombre,
+            color=current_user.dependencia.dependencia.color,
+            icono=current_user.dependencia.dependencia.icono,
+            direccion=current_user.dependencia.direccion_efectiva,
+            telefono=current_user.dependencia.telefono_efectivo,
+        ) if current_user.dependencia and current_user.dependencia.dependencia else None,
+        created_at=current_user.created_at,
+    )
 
 
 @router.get("/check-email")

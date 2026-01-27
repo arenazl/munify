@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -254,7 +254,7 @@ export default function Layout() {
 
   if (!user) return null;
 
-  const navigation = getNavigation(user.rol);
+  const navigation = getNavigation({ userRole: user.rol, hasDependencia: !!user.dependencia });
   const mobileTabs = getMobileTabs(user.rol);
 
   // Anchos dinámicos con medidas relativas para mejor responsividad
@@ -374,7 +374,7 @@ export default function Layout() {
                 {user.nombre} {user.apellido}
               </p>
               <p className="text-xs capitalize mt-0.5 whitespace-nowrap" style={{ color: theme.sidebarTextSecondary }}>
-                {user.rol}
+                {user.dependencia ? 'Dependencia' : user.rol}
               </p>
             </div>
             {!isCollapsed && (
@@ -851,29 +851,76 @@ export default function Layout() {
                           </div>
                         )}
                       </div>
-                      {/* Fondo del contenido */}
+                      {/* Fondo del contenido - usa imagen_portada del municipio */}
+                      {(() => {
+                        // Usar la misma lógica de fallback que Dashboard
+                        const defaultBgImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
+                        const availableBgImage = municipioActual?.imagen_portada || municipioActual?.logo_url || defaultBgImage;
+
+                        return (
                       <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
                             <Image className="h-3 w-3 inline mr-1" />
                             Fondo content
                           </span>
-                          <button
-                            onClick={() => setContentBgImage(contentBgImage ? null : 'https://images.unsplash.com/photo-1557683316-973673baf926?w=1920')}
-                            className="relative w-10 h-5 rounded-full transition-colors"
-                            style={{
-                              backgroundColor: contentBgImage ? theme.primary : theme.border,
-                            }}
-                          >
-                            <div
-                              className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform"
-                              style={{
-                                transform: contentBgImage ? 'translateX(22px)' : 'translateX(2px)',
-                              }}
-                            />
-                          </button>
+                          {contentBgImage && (
+                            <button
+                              onClick={() => setContentBgImage(null)}
+                              className="text-[10px] px-2 py-0.5 rounded"
+                              style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
+                            >
+                              Quitar
+                            </button>
+                          )}
                         </div>
+
+                        {/* Preview de imagen - siempre muestra preview */}
+                        <div
+                          className="w-full h-16 rounded-lg mb-2 bg-cover bg-center"
+                          style={{
+                            backgroundImage: `url(${contentBgImage || availableBgImage})`,
+                            border: `1px solid ${theme.border}`,
+                            opacity: contentBgImage ? 1 : 0.5,
+                          }}
+                        />
+
+                        {/* Toggle para activar/desactivar */}
+                        <button
+                          onClick={() => setContentBgImage(contentBgImage ? null : availableBgImage)}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-lg mb-2 transition-all hover:opacity-90 active:scale-[0.98]"
+                          style={{
+                            backgroundColor: contentBgImage ? theme.primary : theme.backgroundSecondary,
+                            border: `1px solid ${contentBgImage ? theme.primary : theme.border}`,
+                            color: contentBgImage ? '#ffffff' : theme.text,
+                          }}
+                        >
+                          <Image className="h-4 w-4" />
+                          <span className="text-xs">{contentBgImage ? 'Fondo activo' : 'Usar imagen municipio'}</span>
+                        </button>
+
+                        {/* Slider de opacidad */}
+                        {contentBgImage && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px]" style={{ color: theme.textSecondary }}>Opacidad</span>
+                            <input
+                              type="range"
+                              min="0.1"
+                              max="0.5"
+                              step="0.05"
+                              value={contentBgOpacity}
+                              onChange={(e) => setContentBgOpacity(parseFloat(e.target.value))}
+                              className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
+                              style={{ backgroundColor: theme.border }}
+                            />
+                            <span className="text-[10px] w-8" style={{ color: theme.textSecondary }}>
+                              {Math.round(contentBgOpacity * 100)}%
+                            </span>
+                          </div>
+                        )}
                       </div>
+                        );
+                      })()}
                       {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
                         <div className="p-3 border-t" style={{ borderColor: theme.border }}>
                           <button
@@ -905,6 +952,96 @@ export default function Layout() {
               </Link>
             </div>
           </div>
+
+          {/* Banner de Dependencia - visible solo para usuarios de dependencia */}
+          {user.dependencia && (() => {
+            // Usar imagen_portada, logo_url, o una imagen por defecto
+            const defaultBannerImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
+            const bannerImage = municipioActual?.imagen_portada || municipioActual?.logo_url || defaultBannerImage;
+            const hasBannerImage = true; // Siempre tenemos imagen (al menos la default)
+
+            return (
+            <div
+              className="mb-4 p-4 sm:p-5 rounded-2xl overflow-hidden relative"
+              style={{
+                backgroundColor: theme.card,
+                minHeight: hasBannerImage ? '120px' : undefined,
+              }}
+            >
+              {/* Imagen de fondo del municipio */}
+              {hasBannerImage && (
+                <>
+                  <div
+                    className="absolute inset-0 bg-cover bg-center"
+                    style={{
+                      backgroundImage: `url(${bannerImage})`,
+                    }}
+                  />
+                  {/* Overlay oscuro para legibilidad */}
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 50%, ${municipioActual?.color_primario || theme.primary}80 100%)`,
+                    }}
+                  />
+                </>
+              )}
+
+              <div className="relative z-10 flex items-center gap-4">
+                {/* Logo del municipio */}
+                {municipioActual?.logo_url ? (
+                  <img
+                    src={municipioActual.logo_url}
+                    alt={municipioActual.nombre}
+                    className="h-14 w-14 sm:h-16 sm:w-16 object-contain rounded-xl p-1"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}
+                  />
+                ) : (
+                  <div
+                    className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: municipioActual?.color_primario || user.dependencia.color || theme.primary }}
+                  >
+                    <Building2 className="h-7 w-7 sm:h-8 sm:w-8 text-white" />
+                  </div>
+                )}
+
+                {/* Nombre de la dependencia */}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-xs uppercase tracking-wider font-medium mb-0.5"
+                    style={{
+                      color: hasBannerImage ? 'rgba(255,255,255,0.8)' : theme.textSecondary,
+                    }}
+                  >
+                    {municipioActual?.nombre || 'Municipalidad'}
+                  </p>
+                  <h1
+                    className="text-lg sm:text-xl font-bold leading-tight truncate"
+                    style={{
+                      color: hasBannerImage
+                        ? '#ffffff'
+                        : (municipioActual?.color_primario || user.dependencia.color || theme.primary),
+                    }}
+                  >
+                    {user.dependencia.nombre}
+                  </h1>
+                  {user.dependencia.direccion && (
+                    <p
+                      className="text-xs mt-1 flex items-center gap-1"
+                      style={{
+                        color: hasBannerImage ? 'rgba(255,255,255,0.7)' : theme.textSecondary,
+                      }}
+                    >
+                      <MapPin className="h-3 w-3" />
+                      {user.dependencia.direccion}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+          })()}
+
           {/* Banner de activar notificaciones - visible para todos si no están activas */}
           {!pushSubscribed && (
             <div

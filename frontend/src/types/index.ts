@@ -2,6 +2,16 @@ export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin';
 export type EstadoReclamo = 'nuevo' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto' | 'rechazado';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
+// Info de dependencia para usuarios de dependencia
+export interface DependenciaInfo {
+  id: number;
+  nombre: string;
+  color?: string;
+  icono?: string;
+  direccion?: string;
+  telefono?: string;
+}
+
 export interface User {
   id: number;
   municipio_id?: number;
@@ -14,6 +24,8 @@ export interface User {
   rol: RolUsuario;
   activo: boolean;
   empleado_id?: number;
+  municipio_dependencia_id?: number;
+  dependencia?: DependenciaInfo;
   created_at: string;
 }
 

@@ -474,10 +474,9 @@ async def get_conteo_estados(
     # Construir condiciones base
     conditions = [Reclamo.municipio_id == municipio_id]
 
-    # TODO: Migrar filtro de empleado a dependencia cuando se implemente IA
-    # Por ahora, empleados ven todos los reclamos del municipio
-    # if current_user.rol == RolUsuario.EMPLEADO:
-    #     conditions.append(Reclamo.municipio_dependencia_id == current_user.dependencia_id)
+    # Filtrar por dependencia si es empleado
+    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+        conditions.append(Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id)
 
     query = await db.execute(
         select(

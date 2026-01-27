@@ -99,7 +99,11 @@ interface SugerenciaEmpleado {
   }>;
 }
 
-export default function GestionTramites() {
+interface GestionTramitesProps {
+  soloMiArea?: boolean;
+}
+
+export default function GestionTramites({ soloMiArea = false }: GestionTramitesProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -255,6 +259,10 @@ export default function GestionTramites() {
       if (estadoFiltro) params.estado = estadoFiltro.toUpperCase();
       // Búsqueda en servidor
       if (searchFiltro && searchFiltro.trim()) params.search = searchFiltro.trim();
+      // Filtrar por dependencia del usuario si es modo "soloMiArea"
+      if (soloMiArea && user?.dependencia?.id) {
+        params.municipio_dependencia_id = user.dependencia.id;
+      }
 
       const res = await tramitesApi.getGestionTodos(params);
       setTramites(res.data);
@@ -700,30 +708,30 @@ export default function GestionTramites() {
   const renderSecondaryFilters = () => (
     <div className="flex flex-col gap-1.5">
       {/* Tipos de trámite - botón Todos fijo + scroll horizontal */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1">
         {/* Botón Todos fijo - outlined */}
         <button
           onClick={() => {
             setFilterLoading('tipo-all');
             setFiltroTipo(null);
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[34px] flex-shrink-0"
+          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
           style={{
             background: 'transparent',
             border: `1.5px solid ${filtroTipo === null ? theme.primary : theme.border}`,
           }}
         >
-          <FileText className={`h-4 w-4 ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
-          <span className={`text-xs font-medium whitespace-nowrap ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
+          <FileText className={`h-3 w-3 ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
+          <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
             Todos
           </span>
         </button>
 
         {/* Scroll de tipos */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
           {/* Skeleton mientras cargan los tipos */}
           {loading || tipos.length === 0 ? (
-            <FilterRowSkeleton count={6} height={34} widths={[60, 80, 70, 90, 65, 85]} />
+            <FilterRowSkeleton count={6} height={28} widths={[60, 80, 70, 90, 65, 85]} />
           ) : (
             <>
               {/* Chips por tipo de trámite */}
@@ -740,7 +748,7 @@ export default function GestionTramites() {
                       setFiltroTipo(isSelected ? null : tipo.id);
                     }}
                     title={tipo.nombre}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[34px] flex-shrink-0"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
                     style={{
                       background: isSelected ? tipoColor : theme.backgroundSecondary,
                       border: `1px solid ${isSelected ? tipoColor : theme.border}`,
@@ -748,15 +756,15 @@ export default function GestionTramites() {
                   >
                     <DynamicIcon
                       name={tipo.icono || 'FileText'}
-                      className={`h-4 w-4 ${isLoadingThis ? 'animate-pulse' : ''}`}
+                      className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse' : ''}`}
                       style={{ color: isSelected ? '#ffffff' : tipoColor }}
-                      fallback={<FileText className={`h-4 w-4 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : tipoColor }} />}
+                      fallback={<FileText className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : tipoColor }} />}
                     />
-                    <span className={`text-xs font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                    <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
                       {tipo.nombre.split(' ')[0]}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-1.5 rounded-full ${isLoadingThis ? 'animate-pulse' : ''}`}
+                      className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse' : ''}`}
                       style={{
                         backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${tipoColor}30`,
                         color: isSelected ? '#ffffff' : tipoColor,
@@ -773,32 +781,32 @@ export default function GestionTramites() {
       </div>
 
       {/* Estados - botón Todos fijo + scroll horizontal */}
-      <div className="flex gap-1.5">
+      <div className="flex gap-1">
         {/* Botón Todos fijo - outlined */}
         <button
           onClick={() => {
             setFilterLoading('estado-all');
             setFiltroEstado('');
           }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
+          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
           style={{
             background: 'transparent',
             border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
           }}
         >
-          <Eye className={`h-4 w-4 ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
-          <span className={`text-xs font-medium whitespace-nowrap ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+          <Eye className={`h-3 w-3 ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
+          <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
             Todos
           </span>
-          <span className={`text-[10px] font-bold ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
+          <span className={`text-[9px] font-bold ${filterLoading === 'estado-all' ? 'animate-pulse' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
             {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
           </span>
         </button>
 
         {/* Scroll de estados */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
           {loading && !conteosLoaded ? (
-            <FilterRowSkeleton count={6} height={32} widths={[55, 65, 60, 70, 55, 65]} />
+            <FilterRowSkeleton count={6} height={28} widths={[55, 65, 60, 70, 55, 65]} />
           ) : (
             [
               { key: 'iniciado', label: 'Nuevo', icon: Clock, color: '#6366f1', count: conteosEstados['iniciado'] || 0 },
@@ -818,18 +826,18 @@ export default function GestionTramites() {
                     setFilterLoading(`estado-${estado.key}`);
                     setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
                   style={{
                     background: isActive ? estado.color : `${estado.color}15`,
                     border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
                   }}
                 >
-                  <Icon className={`h-4 w-4 flex-shrink-0 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }} />
-                  <span className={`text-xs font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }}>
+                  <Icon className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }} />
+                  <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }}>
                     {estado.label}
                   </span>
                   <span
-                    className={`text-[10px] font-bold ${isLoadingThis ? 'animate-pulse' : ''}`}
+                    className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse' : ''}`}
                     style={{ color: isActive ? '#ffffff' : estado.color }}
                   >
                     {estado.count}

@@ -23,7 +23,7 @@ export default function RootRedirect() {
   useEffect(() => {
     // Si hay usuario logueado, ir a su ruta por defecto en /gestion
     if (user) {
-      navigate(getDefaultRoute(user.rol), { replace: true });
+      navigate(getDefaultRoute(user.rol, !!user.dependencia), { replace: true });
       return;
     }
 

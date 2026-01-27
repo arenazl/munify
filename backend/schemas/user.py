@@ -7,6 +7,20 @@ from core.config import settings
 # Usar str si SKIP_EMAIL_VALIDATION está activado, sino EmailStr
 EmailField = str if settings.SKIP_EMAIL_VALIDATION else EmailStr
 
+
+class DependenciaInfo(BaseModel):
+    """Info de dependencia para usuarios de dependencia"""
+    id: int
+    nombre: str
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class UserCreate(BaseModel):
     email: EmailField  # type: ignore
     password: str
@@ -49,6 +63,8 @@ class UserResponse(BaseModel):
     rol: RolUsuario
     activo: bool
     empleado_id: Optional[int]
+    municipio_dependencia_id: Optional[int] = None
+    dependencia: Optional[DependenciaInfo] = None
     created_at: datetime
 
     class Config:

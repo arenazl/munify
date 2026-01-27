@@ -249,6 +249,7 @@ async def obtener_usuarios_demo(
     # 1. @{codigo}.test.com (patrón original)
     # 2. @{codigo}.demo.com (patrón nuevo del seed)
     # 3. @demo.com (patrón genérico)
+    # EXCLUIR usuarios de dependencia (tienen municipio_dependencia_id)
     from sqlalchemy import or_
     email_pattern1 = f"%@{codigo}.test.com"
     email_pattern2 = f"%@{codigo}.demo.com"
@@ -260,7 +261,8 @@ async def obtener_usuarios_demo(
             User.email.like(email_pattern2),
             User.email.like(email_pattern3)
         ),
-        User.activo == True
+        User.activo == True,
+        User.municipio_dependencia_id.is_(None)  # Excluir usuarios de dependencia
     )
     result = await db.execute(query)
     users = result.scalars().all()

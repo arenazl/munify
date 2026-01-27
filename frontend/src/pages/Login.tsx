@@ -57,7 +57,7 @@ export default function Login() {
     try {
       await login(email, password);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol));
+      navigate(getDefaultRoute(user.rol, !!user.dependencia));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || 'Email o contraseña incorrectos');
@@ -75,7 +75,7 @@ export default function Login() {
     try {
       await login(userEmail, userPassword);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol));
+      navigate(getDefaultRoute(user.rol, !!user.dependencia));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || 'Error al iniciar sesión');

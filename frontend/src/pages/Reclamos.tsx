@@ -129,9 +129,10 @@ type SheetMode = 'closed' | 'view';
 
 interface ReclamosProps {
   soloMisTrabajos?: boolean;
+  soloMiArea?: boolean;
 }
 
-export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
+export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }: ReclamosProps) {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -824,6 +825,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       }
       if (debouncedSearch && debouncedSearch.trim()) {
         params.search = debouncedSearch.trim();
+      }
+      // Filtrar por dependencia del usuario si es modo "soloMiArea"
+      if (soloMiArea && user?.dependencia?.id) {
+        params.municipio_dependencia_id = user.dependencia.id;
       }
 
       const reclamosRes = await reclamosApi.getAll(params);
@@ -3150,9 +3155,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   return (
     <>
       <ABMPage
-        title={soloMisTrabajos ? "Mis Trabajos" : "Reclamos"}
-        buttonLabel={soloMisTrabajos || user?.rol === 'empleado' ? undefined : "Nuevo Reclamo"}
-        onAdd={soloMisTrabajos || user?.rol === 'empleado' ? undefined : openWizard}
+        title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
+        buttonLabel={soloMisTrabajos || soloMiArea || user?.rol === 'empleado' ? undefined : "Nuevo Reclamo"}
+        onAdd={soloMisTrabajos || soloMiArea || user?.rol === 'empleado' ? undefined : openWizard}
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}

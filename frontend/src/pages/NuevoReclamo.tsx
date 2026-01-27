@@ -859,7 +859,7 @@ Tono amigable, 3-4 oraciones máximo.`,
 
       // Si viene de mobile (/app/nuevo), volver a /app. Si no, ir a la ruta por defecto
       const isMobile = window.location.pathname.startsWith('/app');
-      const destino = isMobile ? '/app' : (user ? getDefaultRoute(user.rol) : '/mis-reclamos');
+      const destino = isMobile ? '/app' : (user ? getDefaultRoute(user.rol, !!user.dependencia) : '/mis-reclamos');
       console.log('Navegando a:', destino);
       navigate(destino, { replace: true });
     } catch (err: unknown) {

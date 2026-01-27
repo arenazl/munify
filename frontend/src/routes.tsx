@@ -48,6 +48,7 @@ import DireccionesConfig from './pages/DireccionesConfig';
 import DependenciasConfig from './pages/DependenciasConfig';
 import AsignacionDependencias from './pages/AsignacionDependencias';
 import Municipios from './pages/Municipios';
+import MiArea from './pages/MiArea';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -130,6 +131,15 @@ export const router = createBrowserRouter([
 
       // Dashboard Vecino
       { path: 'mi-panel', element: <ProtectedRoute roles={['vecino']}><DashboardVecino /></ProtectedRoute> },
+
+      // Dashboard Dependencia (para usuarios de dependencia)
+      { path: 'mi-area', element: <ProtectedRoute roles={['empleado']}><MiArea /></ProtectedRoute> },
+      // Reclamos del área (dependencia)
+      { path: 'reclamos-area', element: <ProtectedRoute roles={['empleado']}><Reclamos soloMiArea /></ProtectedRoute> },
+      // Trámites del área (dependencia)
+      { path: 'tramites-area', element: <ProtectedRoute roles={['empleado']}><GestionTramites soloMiArea /></ProtectedRoute> },
+      // Estadísticas del área (dependencia)
+      { path: 'estadisticas-area', element: <ProtectedRoute roles={['empleado']}><MiRendimiento /></ProtectedRoute> },
 
       // Nuevo Reclamo (dentro del Layout para usuarios logueados)
       { path: 'crear-reclamo', element: <NuevoReclamo /> },

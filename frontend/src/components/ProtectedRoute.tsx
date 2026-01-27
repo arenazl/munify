@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, roles }: Props) {
   }
 
   if (roles && !roles.includes(user.rol)) {
-    return <Navigate to={getDefaultRoute(user.rol)} replace />;
+    return <Navigate to={getDefaultRoute(user.rol, !!user.dependencia)} replace />;
   }
 
   return <>{children}</>;

@@ -86,7 +86,7 @@ export default function Demo() {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       console.log('[Demo] Usuario autenticado:', user);
 
-      const defaultRoute = getDefaultRoute(user.rol);
+      const defaultRoute = getDefaultRoute(user.rol, !!user.dependencia);
       console.log('[Demo] Navegando a:', defaultRoute);
 
       navigate(defaultRoute, { replace: true });
