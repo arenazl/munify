@@ -246,7 +246,7 @@ export const reclamosApi = {
   create: (data: Record<string, unknown>) => api.post('/reclamos', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/reclamos/${id}`, data),
   asignar: (id: number, data: {
-    empleado_id: number;
+    dependencia_id: number;
     fecha_programada?: string;
     hora_inicio?: string;
     hora_fin?: string;

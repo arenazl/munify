@@ -40,20 +40,36 @@ async def main():
         print("CREANDO USUARIOS PARA DEPENDENCIAS")
         print("=" * 60)
 
-        # Primero ejecutar la migración si no existe la columna
+        # Primero verificar si la columna existe, si no, crearla (MySQL)
         try:
-            await db.execute(text("""
-                ALTER TABLE usuarios
-                ADD COLUMN IF NOT EXISTS municipio_dependencia_id INTEGER REFERENCES municipio_dependencias(id)
+            # Verificar si la columna existe
+            result = await db.execute(text("""
+                SELECT COUNT(*) as cnt FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                AND table_name = 'usuarios'
+                AND column_name = 'municipio_dependencia_id'
             """))
-            await db.execute(text("""
-                CREATE INDEX IF NOT EXISTS ix_usuarios_municipio_dependencia_id
-                ON usuarios(municipio_dependencia_id)
-            """))
-            await db.commit()
-            print("[OK] Columna municipio_dependencia_id verificada/creada")
+            column_exists = result.scalar() > 0
+
+            if not column_exists:
+                await db.execute(text("""
+                    ALTER TABLE usuarios
+                    ADD COLUMN municipio_dependencia_id INT NULL
+                """))
+                await db.execute(text("""
+                    ALTER TABLE usuarios
+                    ADD CONSTRAINT fk_usuarios_municipio_dependencia
+                    FOREIGN KEY (municipio_dependencia_id) REFERENCES municipio_dependencias(id)
+                """))
+                await db.execute(text("""
+                    CREATE INDEX ix_usuarios_municipio_dependencia_id ON usuarios(municipio_dependencia_id)
+                """))
+                await db.commit()
+                print("[OK] Columna municipio_dependencia_id creada")
+            else:
+                print("[OK] Columna municipio_dependencia_id ya existe")
         except Exception as e:
-            print(f"[WARN] Error en migración (puede que ya exista): {e}")
+            print(f"[WARN] Error en migración: {e}")
             await db.rollback()
 
         # Obtener dependencias con reclamos asignados

@@ -854,6 +854,7 @@ async def asignar_reclamo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
+    """Asignar o reasignar un reclamo a una dependencia"""
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
     if not reclamo:
@@ -862,25 +863,21 @@ async def asignar_reclamo(
     if reclamo.estado not in [EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]:
         raise HTTPException(status_code=400, detail="El reclamo no puede ser asignado en su estado actual")
 
-    # Verificar que el empleado sea operario (los reclamos son atendidos por operarios)
-    from models.empleado import Empleado
-    result_emp = await db.execute(
-        select(Empleado).where(
-            Empleado.id == data.empleado_id,
-            Empleado.activo == True
+    # Verificar que la dependencia existe y pertenece al municipio
+    from models.municipio_dependencia import MunicipioDependencia
+    result_dep = await db.execute(
+        select(MunicipioDependencia).where(
+            MunicipioDependencia.id == data.dependencia_id,
+            MunicipioDependencia.municipio_id == reclamo.municipio_id,
+            MunicipioDependencia.activo == True
         )
     )
-    empleado_check = result_emp.scalar_one_or_none()
-    if not empleado_check:
-        raise HTTPException(status_code=404, detail="Empleado no encontrado")
-    if empleado_check.tipo != "operario":
-        raise HTTPException(
-            status_code=400,
-            detail=f"El empleado {empleado_check.nombre} es de tipo '{empleado_check.tipo}'. Los reclamos solo pueden ser asignados a empleados operarios."
-        )
+    dependencia = result_dep.scalar_one_or_none()
+    if not dependencia:
+        raise HTTPException(status_code=404, detail="Dependencia no encontrada o no pertenece a este municipio")
 
     estado_anterior = reclamo.estado
-    reclamo.empleado_id = data.empleado_id
+    reclamo.municipio_dependencia_id = data.dependencia_id
     reclamo.estado = EstadoReclamo.ASIGNADO
 
     # Programacion del trabajo
@@ -891,8 +888,11 @@ async def asignar_reclamo(
     if data.hora_fin:
         reclamo.hora_fin = data.hora_fin
 
+    # Obtener nombre de la dependencia para el historial
+    dependencia_nombre = dependencia.dependencia.nombre if dependencia.dependencia else f"Dependencia #{data.dependencia_id}"
+
     # Construir comentario del historial
-    comentario_historial = data.comentario or f"Asignado a empleado #{data.empleado_id}"
+    comentario_historial = data.comentario or f"Asignado a {dependencia_nombre}"
     if data.fecha_programada:
         comentario_historial += f" - Programado para {data.fecha_programada}"
         if data.hora_inicio and data.hora_fin:
@@ -912,21 +912,20 @@ async def asignar_reclamo(
 
     # Guardar IDs antes de cerrar la sesión para usar en background tasks
     reclamo_id_for_push = reclamo.id
-    empleado_id_for_push = data.empleado_id
+    dependencia_id_for_push = data.dependencia_id
     creador_id_for_push = reclamo.creador_id
 
-    # Notificación Push al EMPLEADO: nueva asignación
-    # Buscar el user_id del empleado asignado (antes de cerrar la sesión)
-    empleado_result = await db.execute(
-        select(User).where(User.empleado_id == data.empleado_id)
+    # Buscar usuarios de la dependencia para notificarles
+    dependencia_users_result = await db.execute(
+        select(User).where(User.municipio_dependencia_id == data.dependencia_id)
     )
-    empleado_user = empleado_result.scalar_one_or_none()
-    empleado_user_id = empleado_user.id if empleado_user else None
+    dependencia_users = dependencia_users_result.scalars().all()
+    dependencia_user_ids = [u.id for u in dependencia_users]
 
     # Enviar notificaciones en background con nueva sesión
     async def enviar_push_asignacion():
         from core.database import AsyncSessionLocal
-        from services.push_service import notificar_asignacion_empleado, send_push_to_user
+        from services.push_service import send_push_to_user
         try:
             async with AsyncSessionLocal() as new_db:
                 # Notificar al vecino
@@ -934,17 +933,20 @@ async def asignar_reclamo(
                     new_db,
                     creador_id_for_push,
                     "Reclamo Asignado",
-                    f"Tu reclamo #{reclamo_id_for_push} fue asignado a un empleado.",
+                    f"Tu reclamo #{reclamo_id_for_push} fue asignado a {dependencia_nombre}.",
                     f"/reclamos/{reclamo_id_for_push}",
                     data={"tipo": "reclamo_asignado", "reclamo_id": reclamo_id_for_push}
                 )
-                # Notificar al empleado
-                if empleado_user_id:
-                    # Recargar el reclamo en la nueva sesión
-                    result = await new_db.execute(select(Reclamo).where(Reclamo.id == reclamo_id_for_push))
-                    reclamo_fresh = result.scalar_one_or_none()
-                    if reclamo_fresh:
-                        await notificar_asignacion_empleado(new_db, empleado_user_id, reclamo_fresh)
+                # Notificar a los usuarios de la dependencia
+                for user_id in dependencia_user_ids:
+                    await send_push_to_user(
+                        new_db,
+                        user_id,
+                        "Nuevo Reclamo Asignado",
+                        f"Se asignó el reclamo #{reclamo_id_for_push} a tu dependencia.",
+                        f"/reclamos/{reclamo_id_for_push}",
+                        data={"tipo": "asignacion_empleado", "reclamo_id": reclamo_id_for_push}
+                    )
                 print(f"[PUSH] Notificaciones de asignación enviadas para reclamo #{reclamo_id_for_push}", flush=True)
         except Exception as e:
             print(f"[PUSH] Error en background task: {e}", flush=True)
@@ -1063,12 +1065,8 @@ async def resolver_reclamo(
 
         await db.commit()
 
-        # Obtener nombre del empleado
-        result_emp = await db.execute(
-            select(Empleado).where(Empleado.id == current_user.empleado_id)
-        )
-        empleado = result_emp.scalar_one_or_none()
-        empleado_nombre = f"{empleado.nombre} {empleado.apellido or ''}".strip() if empleado else "Empleado"
+        # Usar el nombre del usuario directamente (funciona para dependencia y empleado)
+        empleado_nombre = f"{current_user.nombre} {current_user.apellido or ''}".strip()
 
         # Notificar a supervisores (in-app + WhatsApp)
         mensaje_supervisor = NotificacionService.generar_mensaje_pendiente_confirmacion(

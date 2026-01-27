@@ -286,6 +286,86 @@ async def obtener_usuarios_demo(
     ]
 
 
+class DependenciaUser(BaseModel):
+    """Usuario de dependencia para acceso rápido"""
+    email: str
+    nombre_dependencia: str
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    reclamos_count: int = 0
+    tramites_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/public/{codigo}/dependencia-users", response_model=List[DependenciaUser])
+async def obtener_usuarios_dependencias(
+    codigo: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Obtiene los usuarios de dependencias de un municipio (endpoint PUBLICO).
+    Usado para los botones de acceso rápido por dependencia.
+    Solo devuelve dependencias que tienen reclamos o trámites asignados.
+    """
+    from sqlalchemy import func
+    from models.reclamo import Reclamo
+    from models.municipio_dependencia import MunicipioDependencia
+    from models.dependencia import Dependencia
+
+    # Primero obtener el municipio
+    query = select(Municipio).where(
+        func.lower(Municipio.codigo) == func.lower(codigo),
+        Municipio.activo == True
+    )
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Buscar usuarios con municipio_dependencia_id asignado
+    query = select(
+        User.email,
+        Dependencia.nombre.label('nombre_dependencia'),
+        Dependencia.color,
+        Dependencia.icono,
+        func.count(Reclamo.id).label('reclamos_count')
+    ).select_from(User).join(
+        MunicipioDependencia, User.municipio_dependencia_id == MunicipioDependencia.id
+    ).join(
+        Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id
+    ).outerjoin(
+        Reclamo, Reclamo.municipio_dependencia_id == MunicipioDependencia.id
+    ).where(
+        User.municipio_id == municipio.id,
+        User.municipio_dependencia_id.isnot(None),
+        User.activo == True
+    ).group_by(
+        User.email, Dependencia.nombre, Dependencia.color, Dependencia.icono
+    ).having(
+        func.count(Reclamo.id) > 0  # Solo dependencias con reclamos
+    ).order_by(
+        func.count(Reclamo.id).desc()
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    return [
+        DependenciaUser(
+            email=row.email,
+            nombre_dependencia=row.nombre_dependencia,
+            color=row.color,
+            icono=row.icono,
+            reclamos_count=row.reclamos_count,
+            tramites_count=0
+        )
+        for row in rows
+    ]
+
+
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
 @router.get("", response_model=List[MunicipioDetalle])

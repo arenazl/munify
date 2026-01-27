@@ -1,13 +1,13 @@
--- Migración: Agregar municipio_dependencia_id a usuarios
+-- Migración: Agregar municipio_dependencia_id a usuarios (MySQL)
 -- Para asociar usuarios con dependencias específicas (usuarios de área)
 
--- Agregar columna municipio_dependencia_id
+-- Verificar si la columna existe, si no, crearla
+-- En MySQL no hay IF NOT EXISTS para ALTER TABLE, ejecutar directamente
+
 ALTER TABLE usuarios
-ADD COLUMN IF NOT EXISTS municipio_dependencia_id INTEGER REFERENCES municipio_dependencias(id);
+ADD COLUMN municipio_dependencia_id INT NULL,
+ADD CONSTRAINT fk_usuarios_municipio_dependencia
+FOREIGN KEY (municipio_dependencia_id) REFERENCES municipio_dependencias(id);
 
 -- Crear índice para búsquedas rápidas
-CREATE INDEX IF NOT EXISTS ix_usuarios_municipio_dependencia_id
-ON usuarios(municipio_dependencia_id);
-
--- Comentario
-COMMENT ON COLUMN usuarios.municipio_dependencia_id IS 'Dependencia asignada al usuario (para usuarios de tipo área/dependencia)';
+CREATE INDEX ix_usuarios_municipio_dependencia_id ON usuarios(municipio_dependencia_id);

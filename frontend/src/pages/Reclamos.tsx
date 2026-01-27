@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
@@ -139,6 +139,8 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [dependenciasDisponibles, setDependenciasDisponibles] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [loading, setLoading] = useState(true);
@@ -196,7 +198,7 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
 
 
   // Action states for view
-  const [empleadoSeleccionado, setEmpleadoSeleccionado] = useState<string>('');
+  const [dependenciaSeleccionada, setDependenciaSeleccionada] = useState<string>('');
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
   const [fechaProgramada, setFechaProgramada] = useState('');
   const [horaInicio, setHoraInicio] = useState('09:00');
@@ -353,6 +355,13 @@ export default function Reclamos({ soloMisTrabajos = false }: ReclamosProps) {
       }).catch(() => {
         // Silenciar error - usuarios sin permisos no necesitan ver empleados
         setEmpleados([]);
+      });
+
+      // Cargar dependencias del municipio para asignación
+      dependenciasApi.getMunicipio({ activo: true, tipo_gestion: 'reclamos' }).then((dependenciasRes) => {
+        setDependenciasDisponibles(dependenciasRes.data || []);
+      }).catch(() => {
+        setDependenciasDisponibles([]);
       });
     }
   }, [soloMisTrabajos]);
@@ -1010,7 +1019,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const openViewSheet = async (reclamo: Reclamo) => {
     setSelectedReclamo(reclamo);
-    setEmpleadoSeleccionado(''); // TODO: Migrar a dependencia_asignada
+    setDependenciaSeleccionada(''); // TODO: Migrar a dependencia_asignada
     setComentarioAsignacion('');
     setResolucion('');
     setMotivoRechazo('');
@@ -1051,7 +1060,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setSelectedReclamo(null);
     setHistorial([]);
     // Reset asignación states
-    setEmpleadoSeleccionado('');
+    setDependenciaSeleccionada('');
     setFechaProgramada('');
     setHoraInicio('09:00');
     setDuracion('1');
@@ -1099,22 +1108,23 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   };
 
   const handleAsignar = async () => {
-    if (!selectedReclamo || !empleadoSeleccionado) return;
+    if (!selectedReclamo || !dependenciaSeleccionada) return;
 
-    // Encontrar nombre del empleado para la actualización optimista
-    const empleadoData = empleados.find(e => e.id === Number(empleadoSeleccionado));
+    // Encontrar la dependencia seleccionada para la actualización optimista
+    const dependenciaData = dependenciasDisponibles.find(d => d.id === Number(dependenciaSeleccionada));
 
     // Actualización optimista
     const reclamoActualizado = {
       ...selectedReclamo,
       estado: 'asignado' as const,
-      empleado_id: Number(empleadoSeleccionado),
-      empleado_asignado: empleadoData ? {
-        id: empleadoData.id,
-        nombre: empleadoData.nombre,
-        apellido: empleadoData.apellido,
-        especialidad: empleadoData.especialidad
-      } : selectedReclamo.empleado_asignado,
+      municipio_dependencia_id: Number(dependenciaSeleccionada),
+      dependencia_asignada: dependenciaData ? {
+        id: dependenciaData.id,
+        dependencia_id: dependenciaData.dependencia_id,
+        nombre: dependenciaData.dependencia?.nombre || dependenciaData.nombre,
+        color: dependenciaData.dependencia?.color,
+        icono: dependenciaData.dependencia?.icono
+      } : selectedReclamo.dependencia_asignada,
       fecha_programada: fechaProgramada || selectedReclamo.fecha_programada
     };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
@@ -1124,7 +1134,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setSaving(true);
     try {
       await reclamosApi.asignar(selectedReclamo.id, {
-        empleado_id: Number(empleadoSeleccionado),
+        dependencia_id: Number(dependenciaSeleccionada),
         fecha_programada: fechaProgramada || undefined,
         hora_inicio: horaInicio || undefined,
         hora_fin: horaFin || undefined,
@@ -1168,7 +1178,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   // Auto-cargar fecha y disponibilidad cuando se selecciona un empleado
   const handleEmpleadoChange = async (empleadoId: string) => {
-    setEmpleadoSeleccionado(empleadoId);
+    setDependenciaSeleccionada(empleadoId);
     if (empleadoId) {
       // Usar fecha de hoy como punto de partida y buscar el próximo día disponible
       const hoy = new Date().toISOString().split('T')[0];
@@ -2662,124 +2672,53 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Acciones según estado */}
         {selectedReclamo.estado === 'nuevo' && (
           <ABMCollapsible
-            title="Asignar Empleado"
-            icon={<UserPlus className="h-4 w-4" />}
+            title="Asignar Dependencia"
+            icon={<Building2 className="h-4 w-4" />}
             defaultOpen={true}
           >
             <div className="space-y-3">
-              {/* Panel de sugerencias IA */}
-              {loadingSugerencias ? (
+              {/* Info: Los reclamos se asignan a dependencias basándose en la categoría */}
+              {selectedReclamo?.dependencia_asignada && (
                 <div
-                  className="rounded-xl p-4 flex items-center gap-3"
-                  style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+                  className="rounded-xl p-3 flex items-center gap-2"
+                  style={{ backgroundColor: `${selectedReclamo.dependencia_asignada.color || theme.primary}15`, border: `1px solid ${selectedReclamo.dependencia_asignada.color || theme.primary}30` }}
                 >
-                  <div className="h-5 w-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: theme.primary, borderTopColor: 'transparent' }} />
-                  <span className="text-sm" style={{ color: theme.textSecondary }}>Analizando mejor empleado...</span>
-                </div>
-              ) : sugerencias.length > 0 && !sugerenciasColapsadas && (
-                <div
-                  className="rounded-xl p-3 space-y-1.5"
-                  style={{ backgroundColor: `${theme.primary}08`, border: `1px solid ${theme.primary}20` }}
-                >
-                  <div className="space-y-1.5">
-                    {sugerencias.slice(0, 3).map((sug, idx) => (
-                      <button
-                        key={sug.empleado_id}
-                        onClick={() => {
-                          handleEmpleadoChange(String(sug.empleado_id));
-                          setSugerenciasColapsadas(true);
-                        }}
-                        className={`w-full px-2.5 py-2 rounded-lg text-left transition-all hover:scale-[1.01] ${empleadoSeleccionado === String(sug.empleado_id) ? 'ring-1' : ''}`}
-                        style={{
-                          backgroundColor: empleadoSeleccionado === String(sug.empleado_id) ? `${theme.primary}20` : theme.card,
-                          border: `1px solid ${empleadoSeleccionado === String(sug.empleado_id) ? theme.primary : theme.border}`,
-                          ['--tw-ring-color' as string]: theme.primary,
-                        }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
-                              style={{
-                                backgroundColor: idx === 0 ? '#10b981' : idx === 1 ? '#3b82f6' : '#6b7280',
-                                color: '#ffffff'
-                              }}
-                            >
-                              {idx + 1}
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium" style={{ color: theme.text }}>
-                                {sug.empleado_nombre}
-                              </span>
-                              <span className="text-xs ml-2" style={{ color: theme.textSecondary }}>
-                                {sug.razon_principal}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs" style={{ color: theme.textSecondary }}>
-                              {sug.detalles.carga_trabajo} pend.
-                            </span>
-                            <span
-                              className="text-sm font-bold"
-                              style={{ color: sug.score_porcentaje >= 70 ? '#10b981' : sug.score_porcentaje >= 50 ? '#f59e0b' : theme.textSecondary }}
-                            >
-                              {sug.score_porcentaje}%
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {sugerencias.length === 0 && (
-                    <p className="text-xs text-center py-2" style={{ color: theme.textSecondary }}>
-                      No hay empleados disponibles para esta categoría
-                    </p>
-                  )}
+                  <Building2 className="h-4 w-4" style={{ color: selectedReclamo.dependencia_asignada.color || theme.primary }} />
+                  <span className="text-sm" style={{ color: theme.text }}>
+                    Actualmente asignado a: <strong>{selectedReclamo.dependencia_asignada.nombre}</strong>
+                  </span>
                 </div>
               )}
 
-              {/* Selector de empleado - solo operarios para reclamos */}
-              {empleados.filter(e => e.tipo === 'operario').length > 0 ? (
+              {/* Selector de dependencia */}
+              {dependenciasDisponibles.length > 0 ? (
                 <ModernSelect
-                  value={empleadoSeleccionado}
-                  onChange={handleEmpleadoChange}
-                  placeholder="Seleccionar empleado..."
-                  searchable={empleados.filter(e => e.tipo === 'operario').length > 5}
+                  value={dependenciaSeleccionada}
+                  onChange={(value) => setDependenciaSeleccionada(value || '')}
+                  placeholder="Seleccionar dependencia..."
+                  searchable={dependenciasDisponibles.length > 5}
                   onOpen={() => setSugerenciasColapsadas(true)}
                   onClose={(selectedValue) => {
-                    // Si cerró sin seleccionar y no hay empleado seleccionado, mostrar sugerencias
-                    if (selectedValue === null && !empleadoSeleccionado) {
+                    if (selectedValue === null && !dependenciaSeleccionada) {
                       setSugerenciasColapsadas(false);
                     }
                   }}
-                  options={empleados.filter(e => e.tipo === 'operario').map(emp => {
-                    const tieneEspecialidad = emp.categorias?.some(cat => cat.id === selectedReclamo.categoria.id);
-                    return {
-                      value: String(emp.id),
-                      label: emp.apellido ? `${emp.nombre} ${emp.apellido}` : emp.nombre,
-                      description: tieneEspecialidad
-                        ? `✓ Especialista en ${selectedReclamo.categoria.nombre}`
-                        : emp.categoria_principal?.nombre || emp.especialidad || 'Sin especialidad asignada',
-                      icon: <User className="h-4 w-4" />,
-                      color: tieneEspecialidad ? '#10b981' : (emp.categoria_principal?.color || '#6b7280'),
-                    };
-                  })}
+                  options={dependenciasDisponibles.map(dep => ({
+                    value: String(dep.id),
+                    label: dep.dependencia?.nombre || dep.nombre || `Dependencia #${dep.id}`,
+                    description: dep.dependencia?.descripcion || 'Área municipal',
+                    icon: <Building2 className="h-4 w-4" />,
+                    color: dep.dependencia?.color || '#6366f1',
+                  }))}
                 />
               ) : (
                 <div className="text-sm py-2 px-3 rounded-lg" style={{ backgroundColor: theme.card, color: theme.textSecondary }}>
-                  No hay empleados disponibles
+                  No hay dependencias disponibles
                 </div>
-              )}
-              {empleadoSeleccionado && !empleados.filter(e => e.tipo === 'operario').find(c => c.id === Number(empleadoSeleccionado))?.categorias?.some(cat => cat.id === selectedReclamo.categoria.id) && (
-                <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#f59e0b' }}>
-                  <AlertTriangle className="h-3 w-3" />
-                  Este empleado no tiene especialidad en {selectedReclamo.categoria.nombre}
-                </p>
               )}
 
               {/* Programación - Solo se muestra cuando hay empleado seleccionado */}
-              {empleadoSeleccionado && (
+              {dependenciaSeleccionada && (
                 <div className="space-y-3">
                   {/* Loading de disponibilidad */}
                   {loadingDisponibilidad && (
@@ -2803,8 +2742,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                           min={new Date().toISOString().split('T')[0]}
                           onChange={(e) => {
                             setFechaProgramada(e.target.value);
-                            if (empleadoSeleccionado && e.target.value) {
-                              fetchDisponibilidad(empleadoSeleccionado, e.target.value, true);
+                            if (dependenciaSeleccionada && e.target.value) {
+                              fetchDisponibilidad(dependenciaSeleccionada, e.target.value, true);
                             }
                           }}
                           className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
@@ -3121,7 +3060,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <>
             <button
               onClick={handleAsignar}
-              disabled={saving || !empleadoSeleccionado || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
+              disabled={saving || !dependenciaSeleccionada || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
               style={{
                 backgroundColor: theme.primary,

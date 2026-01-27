@@ -31,7 +31,8 @@ class ReclamoUpdate(BaseModel):
     prioridad: Optional[int] = None
 
 class ReclamoAsignar(BaseModel):
-    empleado_id: int
+    """Asignar o reasignar un reclamo a una dependencia"""
+    dependencia_id: int  # municipio_dependencia_id
     fecha_programada: Optional[date] = None
     hora_inicio: Optional[time] = None
     hora_fin: Optional[time] = None

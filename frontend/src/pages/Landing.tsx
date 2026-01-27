@@ -62,6 +62,14 @@ export default function Landing() {
     nombre_completo: string;
     rol: string;
   }>>([]);
+  const [dependenciaUsers, setDependenciaUsers] = useState<Array<{
+    email: string;
+    nombre_dependencia: string;
+    color: string | null;
+    icono: string | null;
+    reclamos_count: number;
+    tramites_count: number;
+  }>>([]);
 
   useEffect(() => {
     // No limpiar si viene de un subdominio específico
@@ -199,6 +207,17 @@ export default function Landing() {
     } catch {
       // Silent fail - demo users won't be shown
     }
+
+    // Cargar usuarios de dependencias desde la API
+    try {
+      const response = await fetch(`${API_URL}/municipios/public/${municipio.codigo}/dependencia-users`);
+      if (response.ok) {
+        const users = await response.json();
+        setDependenciaUsers(users);
+      }
+    } catch {
+      // Silent fail
+    }
   };
 
   // Login rápido para debug
@@ -227,6 +246,7 @@ export default function Landing() {
     setSelectedMunicipio(null);
     setDebugError('');
     setDemoUsers([]);
+    setDependenciaUsers([]);
   };
 
   // Configuración visual por rol
@@ -478,6 +498,56 @@ export default function Landing() {
 
                           <p className="text-xs text-slate-500 text-center mt-4">
                             Usuarios de prueba · Pass: <span className="text-slate-400 font-mono">demo123</span>
+                          </p>
+                        </>
+                      )}
+
+                      {/* Sección de dependencias con reclamos */}
+                      {dependenciaUsers.length > 0 && (
+                        <>
+                          <div className="relative flex items-center gap-3 my-4">
+                            <div className="flex-1 h-px bg-white/10" />
+                            <span className="text-slate-500 text-xs">ACCESO POR ÁREA</span>
+                            <div className="flex-1 h-px bg-white/10" />
+                          </div>
+
+                          {/* Grid de dependencias */}
+                          <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                            {dependenciaUsers.map((dep) => (
+                              <button
+                                key={dep.email}
+                                type="button"
+                                onClick={() => quickLogin(dep.email, 'demo1234')}
+                                disabled={debugLoading}
+                                className="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                                style={{
+                                  backgroundColor: `${dep.color || '#6366f1'}15`,
+                                  border: `1px solid ${dep.color || '#6366f1'}30`
+                                }}
+                              >
+                                {debugLoading ? (
+                                  <Loader2 className="h-5 w-5 animate-spin" style={{ color: dep.color || '#6366f1' }} />
+                                ) : (
+                                  <>
+                                    <div
+                                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                                      style={{ backgroundColor: `${dep.color || '#6366f1'}25` }}
+                                    >
+                                      <Building2 className="h-5 w-5" style={{ color: dep.color || '#6366f1' }} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-white text-sm truncate">{dep.nombre_dependencia}</div>
+                                      <div className="text-xs text-slate-400">{dep.reclamos_count} reclamos asignados</div>
+                                    </div>
+                                    <ChevronRight className="h-4 w-4 text-slate-500" />
+                                  </>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+
+                          <p className="text-xs text-slate-500 text-center mt-3">
+                            Acceso por área · Pass: <span className="text-slate-400 font-mono">demo1234</span>
                           </p>
                         </>
                       )}
