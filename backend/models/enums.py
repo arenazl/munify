@@ -8,7 +8,8 @@ class RolUsuario(str, enum.Enum):
 
 class EstadoReclamo(str, enum.Enum):
     NUEVO = "nuevo"
-    ASIGNADO = "asignado"
+    RECIBIDO = "recibido"  # Dependencia aceptó, tiene tiempo estimado de resolución
+    ASIGNADO = "asignado"  # Legacy - mantener por compatibilidad
     EN_PROCESO = "en_proceso"
     PENDIENTE_CONFIRMACION = "pendiente_confirmacion"  # Empleado terminó, espera confirmación del supervisor
     RESUELTO = "resuelto"

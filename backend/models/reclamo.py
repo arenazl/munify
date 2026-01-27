@@ -53,6 +53,12 @@ class Reclamo(Base):
     hora_inicio = Column(Time, nullable=True)
     hora_fin = Column(Time, nullable=True)
 
+    # Tiempo estimado de resolución (al recibir el reclamo)
+    tiempo_estimado_dias = Column(Integer, nullable=True, default=0)
+    tiempo_estimado_horas = Column(Integer, nullable=True, default=0)
+    fecha_estimada_resolucion = Column(DateTime(timezone=True), nullable=True)
+    fecha_recibido = Column(DateTime(timezone=True), nullable=True)  # Cuando la dependencia aceptó
+
     # Rechazo
     motivo_rechazo = Column(Enum(MotivoRechazo), nullable=True)
     descripcion_rechazo = Column(Text, nullable=True)

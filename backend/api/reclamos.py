@@ -852,9 +852,14 @@ async def asignar_reclamo(
     reclamo_id: int,
     data: ReclamoAsignar,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+    current_user: User = Depends(get_current_user)
 ):
-    """Asignar o reasignar un reclamo a una dependencia"""
+    """Asignar o reasignar un reclamo a una dependencia.
+
+    Permisos:
+    - Admin/Supervisor: puede asignar a cualquier dependencia
+    - Empleado: solo puede aceptar reclamos ya asignados a su propia dependencia
+    """
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
     if not reclamo:
@@ -862,6 +867,22 @@ async def asignar_reclamo(
 
     if reclamo.estado not in [EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]:
         raise HTTPException(status_code=400, detail="El reclamo no puede ser asignado en su estado actual")
+
+    # Verificar permisos
+    is_admin_or_supervisor = current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]
+
+    if not is_admin_or_supervisor:
+        # Empleados solo pueden aceptar reclamos ya asignados a su dependencia
+        if current_user.rol != RolUsuario.EMPLEADO:
+            raise HTTPException(status_code=403, detail="No tienes permiso para asignar reclamos")
+
+        # Verificar que el reclamo ya está asignado a la dependencia del empleado
+        if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="Solo puedes aceptar reclamos asignados a tu dependencia")
+
+        # Verificar que no está intentando reasignar a otra dependencia
+        if data.dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="No puedes reasignar a otra dependencia")
 
     # Verificar que la dependencia existe y pertenece al municipio
     from models.municipio_dependencia import MunicipioDependencia
@@ -876,9 +897,24 @@ async def asignar_reclamo(
     if not dependencia:
         raise HTTPException(status_code=404, detail="Dependencia no encontrada o no pertenece a este municipio")
 
+    from datetime import datetime as dt, timedelta
+
     estado_anterior = reclamo.estado
     reclamo.municipio_dependencia_id = data.dependencia_id
-    reclamo.estado = EstadoReclamo.ASIGNADO
+    reclamo.estado = EstadoReclamo.RECIBIDO  # Usar RECIBIDO en vez de ASIGNADO
+
+    # Tiempo estimado de resolución
+    reclamo.tiempo_estimado_dias = data.tiempo_estimado_dias or 0
+    reclamo.tiempo_estimado_horas = data.tiempo_estimado_horas or 0
+    reclamo.fecha_recibido = dt.now()
+
+    # Calcular fecha estimada de resolución
+    if data.tiempo_estimado_dias or data.tiempo_estimado_horas:
+        tiempo_total = timedelta(
+            days=data.tiempo_estimado_dias or 0,
+            hours=data.tiempo_estimado_horas or 0
+        )
+        reclamo.fecha_estimada_resolucion = dt.now() + tiempo_total
 
     # Programacion del trabajo
     if data.fecha_programada:
@@ -892,7 +928,16 @@ async def asignar_reclamo(
     dependencia_nombre = dependencia.dependencia.nombre if dependencia.dependencia else f"Dependencia #{data.dependencia_id}"
 
     # Construir comentario del historial
-    comentario_historial = data.comentario or f"Asignado a {dependencia_nombre}"
+    tiempo_estimado_str = ""
+    if data.tiempo_estimado_dias or data.tiempo_estimado_horas:
+        partes = []
+        if data.tiempo_estimado_dias:
+            partes.append(f"{data.tiempo_estimado_dias} día{'s' if data.tiempo_estimado_dias > 1 else ''}")
+        if data.tiempo_estimado_horas:
+            partes.append(f"{data.tiempo_estimado_horas} hora{'s' if data.tiempo_estimado_horas > 1 else ''}")
+        tiempo_estimado_str = f" - Tiempo estimado: {' y '.join(partes)}"
+
+    comentario_historial = data.comentario or f"Recibido por {dependencia_nombre}{tiempo_estimado_str}"
     if data.fecha_programada:
         comentario_historial += f" - Programado para {data.fecha_programada}"
         if data.hora_inicio and data.hora_fin:
@@ -902,8 +947,8 @@ async def asignar_reclamo(
         reclamo_id=reclamo.id,
         usuario_id=current_user.id,
         estado_anterior=estado_anterior,
-        estado_nuevo=EstadoReclamo.ASIGNADO,
-        accion="asignado",
+        estado_nuevo=EstadoReclamo.RECIBIDO,
+        accion="recibido",
         comentario=comentario_historial
     )
     db.add(historial)
@@ -1461,7 +1506,7 @@ async def get_disponibilidad_empleado(
 async def get_sugerencia_asignacion(
     reclamo_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+    current_user: User = Depends(get_current_user)
 ):
     """
     Algoritmo de asignación automática inteligente.
@@ -1470,7 +1515,15 @@ async def get_sugerencia_asignacion(
     2. Zona geográfica (peso: 20%)
     3. Carga de trabajo actual (peso: 25%)
     4. Disponibilidad próxima (peso: 15%)
+
+    Solo disponible para admin/supervisor. Empleados reciben respuesta vacía.
     """
+    # Empleados no necesitan sugerencias (no pueden reasignar)
+    if current_user.rol not in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
+        return {
+            "sugerencias": [],
+            "mensaje": "Las sugerencias de asignación solo están disponibles para supervisores"
+        }
     from datetime import date as date_type, time as time_type, timedelta, datetime as datetime_type
     from models.empleado import Empleado
     from models.categoria import Categoria

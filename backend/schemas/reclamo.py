@@ -37,6 +37,9 @@ class ReclamoAsignar(BaseModel):
     hora_inicio: Optional[time] = None
     hora_fin: Optional[time] = None
     comentario: Optional[str] = None
+    # Tiempo estimado de resolución (para estado 'recibido')
+    tiempo_estimado_dias: Optional[int] = 0
+    tiempo_estimado_horas: Optional[int] = 0
 
 class ReclamoRechazar(BaseModel):
     motivo: MotivoRechazo
@@ -148,6 +151,11 @@ class ReclamoResponse(BaseModel):
     fecha_programada: Optional[date] = None
     hora_inicio: Optional[time] = None
     hora_fin: Optional[time] = None
+    # Tiempo estimado de resolución
+    tiempo_estimado_dias: Optional[int] = 0
+    tiempo_estimado_horas: Optional[int] = 0
+    fecha_estimada_resolucion: Optional[datetime] = None
+    fecha_recibido: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
