@@ -10,23 +10,23 @@ import { Sheet } from '../components/ui/Sheet';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  NUEVO: { bg: '#e5e7eb', text: '#374151' },
-  RECIBIDO: { bg: '#cffafe', text: '#0e7490' },
-  ASIGNADO: { bg: '#dbeafe', text: '#1e40af' },
-  EN_PROCESO: { bg: '#fef3c7', text: '#92400e' },
-  PENDIENTE_CONFIRMACION: { bg: '#ede9fe', text: '#5b21b6' },
-  RESUELTO: { bg: '#d1fae5', text: '#065f46' },
-  RECHAZADO: { bg: '#fee2e2', text: '#991b1b' },
+  nuevo: { bg: '#e5e7eb', text: '#374151' },
+  recibido: { bg: '#cffafe', text: '#0e7490' },
+  asignado: { bg: '#dbeafe', text: '#1e40af' },
+  en_proceso: { bg: '#fef3c7', text: '#92400e' },
+  pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
+  resuelto: { bg: '#d1fae5', text: '#065f46' },
+  rechazado: { bg: '#fee2e2', text: '#991b1b' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  NUEVO: 'Nuevo',
-  RECIBIDO: 'Recibido',
-  ASIGNADO: 'Asignado',
-  EN_PROCESO: 'En Proceso',
-  PENDIENTE_CONFIRMACION: 'Pendiente Confirmación',
-  RESUELTO: 'Resuelto',
-  RECHAZADO: 'Rechazado',
+  nuevo: 'Nuevo',
+  recibido: 'Recibido',
+  asignado: 'Asignado',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente Confirmación',
+  resuelto: 'Resuelto',
+  rechazado: 'Rechazado',
 };
 
 // Formatea el nombre del empleado en formato "L. Lopez"
@@ -112,7 +112,7 @@ export default function MisReclamos() {
     }
 
     // Si está resuelto, verificar si ya tiene calificación
-    if (reclamo.estado === 'RESUELTO') {
+    if (reclamo.estado === 'resuelto') {
       setLoadingCalificacion(true);
       try {
         const res = await calificacionesApi.getReclamo(reclamo.id);
@@ -318,7 +318,7 @@ export default function MisReclamos() {
         </div>
 
         {/* Calificación (solo para reclamos resueltos) */}
-        {selectedReclamo.estado === 'RESUELTO' && (
+        {selectedReclamo.estado === 'resuelto' && (
           <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <h4 className="font-medium flex items-center mb-3">
               <Star className="h-4 w-4 mr-2" />
@@ -830,7 +830,7 @@ export default function MisReclamos() {
                       </span>
                     )}
                     {/* Por vencer - basado en fecha_programada */}
-                    {r.fecha_programada && !['RESUELTO', 'RECHAZADO'].includes(r.estado) && (() => {
+                    {r.fecha_programada && !['resuelto', 'rechazado'].includes(r.estado) && (() => {
                       const hoy = new Date();
                       hoy.setHours(0, 0, 0, 0);
                       const fechaVenc = new Date(r.fecha_programada);

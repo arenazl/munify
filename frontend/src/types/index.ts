@@ -1,5 +1,5 @@
 export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin';
-export type EstadoReclamo = 'NUEVO' | 'RECIBIDO' | 'ASIGNADO' | 'EN_PROCESO' | 'PENDIENTE_CONFIRMACION' | 'RESUELTO' | 'RECHAZADO';
+export type EstadoReclamo = 'nuevo' | 'recibido' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto' | 'rechazado';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
 // Info de dependencia para usuarios de dependencia

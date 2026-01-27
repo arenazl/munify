@@ -180,23 +180,23 @@ const noticiasCarrusel = [
 ];
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  NUEVO: { bg: '#e5e7eb', text: '#374151' },
-  RECIBIDO: { bg: '#cffafe', text: '#0e7490' },
-  ASIGNADO: { bg: '#dbeafe', text: '#1e40af' },
-  EN_PROCESO: { bg: '#fef3c7', text: '#92400e' },
-  PENDIENTE_CONFIRMACION: { bg: '#ede9fe', text: '#5b21b6' },
-  RESUELTO: { bg: '#d1fae5', text: '#065f46' },
-  RECHAZADO: { bg: '#fee2e2', text: '#991b1b' },
+  nuevo: { bg: '#e5e7eb', text: '#374151' },
+  recibido: { bg: '#cffafe', text: '#0e7490' },
+  asignado: { bg: '#dbeafe', text: '#1e40af' },
+  en_proceso: { bg: '#fef3c7', text: '#92400e' },
+  pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
+  resuelto: { bg: '#d1fae5', text: '#065f46' },
+  rechazado: { bg: '#fee2e2', text: '#991b1b' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  NUEVO: 'Nuevo',
-  RECIBIDO: 'Recibido',
-  ASIGNADO: 'Asignado',
-  EN_PROCESO: 'En Proceso',
-  PENDIENTE_CONFIRMACION: 'Pendiente',
-  RESUELTO: 'Resuelto',
-  RECHAZADO: 'Rechazado',
+  nuevo: 'Nuevo',
+  recibido: 'Recibido',
+  asignado: 'Asignado',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente',
+  resuelto: 'Resuelto',
+  rechazado: 'Rechazado',
 };
 
 export default function DashboardVecino() {
@@ -236,11 +236,11 @@ export default function DashboardVecino() {
 
       const stats: MisEstadisticas = {
         total: reclamos.length,
-        nuevos: reclamos.filter(r => r.estado === 'NUEVO').length,
-        asignados: reclamos.filter(r => r.estado === 'ASIGNADO').length,
-        en_proceso: reclamos.filter(r => r.estado === 'EN_PROCESO').length,
-        resueltos: reclamos.filter(r => r.estado === 'RESUELTO').length,
-        rechazados: reclamos.filter(r => r.estado === 'RECHAZADO').length,
+        nuevos: reclamos.filter(r => r.estado === 'nuevo').length,
+        asignados: reclamos.filter(r => r.estado === 'asignado').length,
+        en_proceso: reclamos.filter(r => r.estado === 'en_proceso').length,
+        resueltos: reclamos.filter(r => r.estado === 'resuelto').length,
+        rechazados: reclamos.filter(r => r.estado === 'rechazado').length,
       };
       setMisEstadisticas(stats);
 
@@ -269,7 +269,7 @@ export default function DashboardVecino() {
     .slice(0, 3);
 
   const reclamosPendientes = misReclamos.filter(
-    r => r.estado !== 'RESUELTO' && r.estado !== 'RECHAZADO'
+    r => r.estado !== 'resuelto' && r.estado !== 'rechazado'
   ).length;
 
   const isComponentVisible = (componentId: string): boolean => {
