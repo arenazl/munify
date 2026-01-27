@@ -12,6 +12,7 @@
       "whatsapp": {
         "plantilla": "✅ *Reclamo Recibido*\n\nHola {nombre}! Tu reclamo ha sido registrado correctamente.\n\n📋 *Número:* #{reclamo_id}\n📝 *Asunto:* {titulo}\n_{descripcion}_\n\n📍 *Ubicación:* {direccion}\n\nTe notificaremos cuando haya novedades.\n\n🔗 *Ver detalle:* {url}"
       }
+      
     },
     "reclamo_asignado": {
       "nombre": "Reclamo Asignado",
