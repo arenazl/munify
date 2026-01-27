@@ -105,68 +105,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware para loguear requests con payloads (DEBUG)
-import json as json_module
-from starlette.responses import StreamingResponse
-from starlette.concurrency import iterate_in_threadpool
-
+# Middleware simple para loguear requests
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     if not request.url.path.startswith("/api"):
         return await call_next(request)
 
-    query = f"?{request.url.query}" if request.url.query else ""
     method = request.method
-
-    # Leer request body para POST/PUT/PATCH
-    req_body = None
-    if method in ("POST", "PUT", "PATCH"):
-        try:
-            body_bytes = await request.body()
-            if body_bytes:
-                req_body = body_bytes.decode("utf-8")[:500]  # Limitar a 500 chars
-        except:
-            pass
-
-    # Log request
-    print(f"\n{'='*60}", flush=True)
-    print(f">> {method} {request.url.path}{query}", flush=True)
-    if req_body:
-        try:
-            # Intentar formatear como JSON
-            parsed = json_module.loads(req_body)
-            print(f"   BODY: {json_module.dumps(parsed, ensure_ascii=False, indent=2)[:500]}", flush=True)
-        except:
-            print(f"   BODY: {req_body}", flush=True)
-
+    path = request.url.path
     start_time = time.time()
+
     response = await call_next(request)
+
     ms = (time.time() - start_time) * 1000
+    print(f"{method} {path} - {response.status_code} ({ms:.0f}ms)", flush=True)
 
-    # Capturar response body
-    resp_body = b""
-    async for chunk in response.body_iterator:
-        resp_body += chunk
-
-    # Log response
-    print(f"<< {response.status_code} ({ms:.0f}ms)", flush=True)
-    if resp_body and len(resp_body) < 1000:  # Solo si es pequeño
-        try:
-            parsed = json_module.loads(resp_body.decode("utf-8"))
-            print(f"   RESP: {json_module.dumps(parsed, ensure_ascii=False, indent=2)[:800]}", flush=True)
-        except:
-            pass
-    elif resp_body:
-        print(f"   RESP: [{len(resp_body)} bytes]", flush=True)
-    print(f"{'='*60}\n", flush=True)
-
-    # Recrear response con el body capturado
-    return StreamingResponse(
-        iter([resp_body]),
-        status_code=response.status_code,
-        headers=dict(response.headers),
-        media_type=response.media_type
-    )
+    return response
 
 # Archivos estáticos del backend (imágenes subidas)
 static_path = Path(__file__).parent / "static"
