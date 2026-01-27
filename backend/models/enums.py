@@ -1,4 +1,5 @@
 import enum
+# Force rebuild - enum values are lowercase to match MySQL ENUM
 
 class RolUsuario(str, enum.Enum):
     VECINO = "vecino"
