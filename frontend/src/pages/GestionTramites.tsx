@@ -508,6 +508,108 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     }
   };
 
+  // Funciones directas para cambio de estado (botones de acción)
+  const handleDirectStateChange = async (nuevoEstadoDirecto: EstadoTramite, mensajeExito: string) => {
+    if (!selectedTramite) return;
+    setSaving(true);
+    try {
+      await tramitesApi.update(selectedTramite.id, {
+        estado: nuevoEstadoDirecto.toUpperCase(),
+        respuesta: respuesta || undefined,
+        observaciones: observaciones || undefined,
+      });
+      toast.success(mensajeExito);
+      closeSheet();
+      await recargarDespuesDeAccion();
+    } catch (error) {
+      console.error('Error actualizando trámite:', error);
+      toast.error('Error al actualizar trámite');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAceptar = () => handleDirectStateChange('en_revision', 'Trámite aceptado - En revisión');
+  const handleProcesar = () => handleDirectStateChange('en_proceso', 'Trámite en proceso');
+  const handleAprobar = () => handleDirectStateChange('aprobado', 'Trámite aprobado');
+  const handleFinalizar = () => handleDirectStateChange('finalizado', 'Trámite finalizado');
+  const handleRechazar = () => handleDirectStateChange('rechazado', 'Trámite rechazado');
+
+  // Renderizar footer con botones de acción
+  const renderTramiteFooter = () => {
+    if (!selectedTramite) return null;
+
+    const estadoActual = normalizeEstado(selectedTramite.estado);
+
+    // Estados finales - solo info
+    if (estadoActual === 'rechazado' || estadoActual === 'finalizado') {
+      return (
+        <div
+          className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
+          style={{
+            backgroundColor: estadoActual === 'finalizado' ? '#05966920' : '#ef444420',
+            color: estadoActual === 'finalizado' ? '#059669' : '#ef4444',
+            border: `1px solid ${estadoActual === 'finalizado' ? '#05966950' : '#ef444450'}`
+          }}
+        >
+          {estadoActual === 'finalizado' ? '✓ Finalizado' : '✗ Rechazado'}
+        </div>
+      );
+    }
+
+    // Determinar acción principal según estado
+    let mainAction: { label: string; loadingLabel: string; handler: () => void; color: string } | null = null;
+
+    switch (estadoActual) {
+      case 'iniciado':
+        mainAction = { label: 'Aceptar', loadingLabel: 'Aceptando...', handler: handleAceptar, color: '#16a34a' };
+        break;
+      case 'en_revision':
+      case 'requiere_documentacion':
+        mainAction = { label: 'Procesar', loadingLabel: 'Procesando...', handler: handleProcesar, color: theme.primary };
+        break;
+      case 'en_proceso':
+        mainAction = { label: 'Aprobar', loadingLabel: 'Aprobando...', handler: handleAprobar, color: '#10b981' };
+        break;
+      case 'aprobado':
+        mainAction = { label: 'Finalizado', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#059669' };
+        break;
+    }
+
+    if (!mainAction) return null;
+
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={mainAction.handler}
+          disabled={saving}
+          className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
+          style={{
+            backgroundColor: mainAction.color,
+            color: '#ffffff',
+            boxShadow: `0 4px 14px ${mainAction.color}40`
+          }}
+        >
+          {saving ? mainAction.loadingLabel : mainAction.label}
+        </button>
+        {estadoActual !== 'aprobado' && (
+          <button
+            onClick={handleRechazar}
+            disabled={saving}
+            className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50"
+            style={{
+              backgroundColor: '#ef444415',
+              border: '1px solid #ef444450',
+              color: '#ef4444'
+            }}
+          >
+            Rechazar
+          </button>
+        )}
+      </div>
+    );
+  };
+
   // Función para calcular fecha de vencimiento
   const calcularVencimiento = (t: Tramite) => {
     const tiempoEstimado = t.tramite?.tiempo_estimado_dias || 0;
@@ -1232,7 +1334,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       </div>
 
       {/* Sheet de detalle */}
-      <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite">
+      <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite" stickyFooter={renderTramiteFooter()}>
         {selectedTramite && (
           <div className="space-y-6">
             {/* Número y estado */}

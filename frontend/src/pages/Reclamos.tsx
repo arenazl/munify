@@ -3294,8 +3294,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo) return null;
 
     const canAsignar = selectedReclamo.estado === 'nuevo';
-    const canIniciar = selectedReclamo.estado === 'asignado';
-    const canResolver = selectedReclamo.estado === 'en_proceso';
+    const canProcesar = selectedReclamo.estado === 'recibido' || selectedReclamo.estado === 'asignado';
+    const canFinalizar = selectedReclamo.estado === 'en_proceso';
     // Puede aceptar si ya tiene dependencia asignada y no quiere reasignar
     const canAceptar = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
 
@@ -3359,50 +3359,89 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </>
         )}
 
-        {/* Botón Iniciar - para estado asignado */}
-        {canIniciar && (
-          <button
-            onClick={handleIniciar}
-            disabled={saving}
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
-            style={{
-              backgroundColor: theme.primary,
-              color: '#ffffff',
-              boxShadow: `0 4px 14px ${theme.primary}40`
-            }}
-          >
-            {saving ? 'Iniciando...' : 'Iniciar Trabajo'}
-          </button>
+        {/* Botón Procesando - para estado recibido o asignado */}
+        {canProcesar && (
+          <>
+            <button
+              onClick={handleIniciar}
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
+              style={{
+                backgroundColor: theme.primary,
+                color: '#ffffff',
+                boxShadow: `0 4px 14px ${theme.primary}40`
+              }}
+            >
+              {saving ? 'Iniciando...' : 'Procesando'}
+            </button>
+            <button
+              onClick={() => setMotivoRechazo('otro')}
+              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: '#ef444415',
+                border: '1px solid #ef444450',
+                color: '#ef4444'
+              }}
+            >
+              Rechazar
+            </button>
+          </>
         )}
 
-        {/* Botón Resolver/No Finalizar - para estado en_proceso */}
-        {canResolver && tipoFinalizacion === 'resuelto' && (
-          <button
-            onClick={handleResolver}
-            disabled={saving || !resolucion}
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
-            style={{
-              backgroundColor: '#16a34a',
-              color: '#ffffff',
-              boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
-            }}
-          >
-            {saving ? 'Resolviendo...' : 'Marcar Resuelto'}
-          </button>
+        {/* Botón Finalizado/No Finalizar - para estado en_proceso */}
+        {canFinalizar && tipoFinalizacion === 'resuelto' && (
+          <>
+            <button
+              onClick={handleResolver}
+              disabled={saving || !resolucion}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
+              style={{
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
+              }}
+            >
+              {saving ? 'Finalizando...' : 'Finalizado'}
+            </button>
+            <button
+              onClick={() => setMotivoRechazo('otro')}
+              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: '#ef444415',
+                border: '1px solid #ef444450',
+                color: '#ef4444'
+              }}
+            >
+              Rechazar
+            </button>
+          </>
         )}
-        {canResolver && tipoFinalizacion === 'no_finalizado' && (
-          <button
-            onClick={handleNoFinalizado}
-            disabled={saving || !motivoNoFinalizado}
-            className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
-            style={{
-              backgroundColor: `${theme.primary}20`,
-              color: theme.primary,
-              border: `1px solid ${theme.primary}50`
-            }}
-          >
-            {saving ? 'Procesando...' : 'Volver a Asignado'}
-          </button>
+        {canFinalizar && tipoFinalizacion === 'no_finalizado' && (
+          <>
+            <button
+              onClick={handleNoFinalizado}
+              disabled={saving || !motivoNoFinalizado}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: `${theme.primary}20`,
+                color: theme.primary,
+                border: `1px solid ${theme.primary}50`
+              }}
+            >
+              {saving ? 'Procesando...' : 'Volver a Asignado'}
+            </button>
+            <button
+              onClick={() => setMotivoRechazo('otro')}
+              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: '#ef444415',
+                border: '1px solid #ef444450',
+                color: '#ef4444'
+              }}
+            >
+              Rechazar
+            </button>
+          </>
         )}
 
         {/* Estados finales - solo info */}
