@@ -2892,9 +2892,78 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 </button>
               )}
 
-              {/* Programación - Solo se muestra cuando hay empleado seleccionado */}
+              {/* Tiempo estimado y programación - Solo se muestra cuando hay dependencia seleccionada */}
               {dependenciaSeleccionada && (
                 <div className="space-y-3">
+                  {/* Tiempo estimado de resolución */}
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium" style={{ color: theme.text }}>
+                      <Clock className="h-4 w-4 inline mr-1" />
+                      Tiempo estimado de resolución
+                    </p>
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>
+                      Indicá en cuánto tiempo estimás resolver este reclamo
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                          Días
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="365"
+                          value={tiempoEstimadoDias}
+                          onChange={(e) => setTiempoEstimadoDias(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            color: theme.text,
+                            border: `1px solid ${theme.border}`,
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                          Horas
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={tiempoEstimadoHoras}
+                          onChange={(e) => setTiempoEstimadoHoras(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                          className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            color: theme.text,
+                            border: `1px solid ${theme.border}`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    {(tiempoEstimadoDias > 0 || tiempoEstimadoHoras > 0) && (
+                      <div
+                        className="rounded-xl p-3 flex items-center gap-2"
+                        style={{ backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}30` }}
+                      >
+                        <Clock className="h-4 w-4" style={{ color: theme.primary }} />
+                        <span className="text-sm" style={{ color: theme.text }}>
+                          Resolución estimada: {' '}
+                          <strong>
+                            {new Date(Date.now() + (tiempoEstimadoDias * 24 + tiempoEstimadoHoras) * 60 * 60 * 1000).toLocaleString('es-AR', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </strong>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Loading de disponibilidad */}
                   {loadingDisponibilidad && (
                     <div className="flex items-center justify-center py-3">
