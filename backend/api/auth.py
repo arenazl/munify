@@ -44,11 +44,9 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
 @router.post("/login", response_model=Token)
 @limiter.limit(LIMITS["auth"])
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
-    # Buscar usuario por email con dependencia
+    # Buscar usuario por email
     result = await db.execute(
-        select(User)
-        .where(User.email == form_data.username)
-        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
+        select(User).where(User.email == form_data.username)
     )
     user = result.scalar_one_or_none()
 
@@ -68,6 +66,25 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
 
+    # Cargar dependencia si el usuario tiene una asignada
+    dependencia_info = None
+    if user.municipio_dependencia_id:
+        dep_result = await db.execute(
+            select(MunicipioDependencia)
+            .where(MunicipioDependencia.id == user.municipio_dependencia_id)
+            .options(selectinload(MunicipioDependencia.dependencia))
+        )
+        muni_dep = dep_result.scalar_one_or_none()
+        if muni_dep and muni_dep.dependencia:
+            dependencia_info = DependenciaInfo(
+                id=muni_dep.id,
+                nombre=muni_dep.dependencia.nombre,
+                color=muni_dep.dependencia.color,
+                icono=muni_dep.dependencia.icono,
+                direccion=muni_dep.direccion_efectiva,
+                telefono=muni_dep.telefono_efectivo,
+            )
+
     # Construir respuesta con info de dependencia si existe
     user_response = UserResponse(
         id=user.id,
@@ -83,14 +100,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         activo=user.activo,
         empleado_id=user.empleado_id,
         municipio_dependencia_id=user.municipio_dependencia_id,
-        dependencia=DependenciaInfo(
-            id=user.dependencia.id,
-            nombre=user.dependencia.dependencia.nombre,
-            color=user.dependencia.dependencia.color,
-            icono=user.dependencia.dependencia.icono,
-            direccion=user.dependencia.direccion_efectiva,
-            telefono=user.dependencia.telefono_efectivo,
-        ) if user.dependencia and user.dependencia.dependencia else None,
+        dependencia=dependencia_info,
         created_at=user.created_at,
     )
 
