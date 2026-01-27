@@ -2518,7 +2518,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       header: 'Estado',
       sortValue: (r: Reclamo) => r.estado,
       render: (r: Reclamo) => {
-        const color = estadoColors[r.estado].bg;
+        const color = estadoColors[r.estado]?.bg || '#6366f1';
         return (
           <span
             className="px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm"
@@ -3172,7 +3172,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo) return null;
 
     const categoryColor = selectedReclamo.categoria.color || DEFAULT_CATEGORY_COLOR;
-    const estadoColor = estadoColors[selectedReclamo.estado].bg;
+    const estadoColor = estadoColors[selectedReclamo.estado]?.bg || '#6366f1';
 
     return (
       <div className="flex items-center gap-2">
@@ -3501,11 +3501,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 <FilterRowSkeleton count={5} height={26} widths={[45, 55, 65, 45, 55]} />
               ) : (
                 [
-                  { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.NUEVO.bg, count: conteosEstados['nuevo'] || 0 },
-                  { key: 'asignado', label: 'Asig.', icon: UserPlus, color: estadoColors.ASIGNADO.bg, count: conteosEstados['asignado'] || 0 },
-                  { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.EN_PROCESO.bg, count: conteosEstados['en_proceso'] || 0 },
-                  { key: 'resuelto', label: 'Resu.', icon: CheckCircle, color: estadoColors.RESUELTO.bg, count: conteosEstados['resuelto'] || 0 },
-                  { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.RECHAZADO.bg, count: conteosEstados['rechazado'] || 0 },
+                  { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
+                  { key: 'asignado', label: 'Asig.', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
+                  { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
+                  { key: 'resuelto', label: 'Resu.', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
+                  { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
                 ].map((estado) => {
                   const Icon = estado.icon;
                   const isActive = filtroEstado === estado.key;
