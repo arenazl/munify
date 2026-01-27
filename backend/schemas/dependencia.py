@@ -253,3 +253,7 @@ class AsignacionMasivaRequest(BaseModel):
     municipio_dependencia_id: int
     categoria_ids: Optional[List[int]] = None
     tipo_tramite_ids: Optional[List[int]] = None
+
+
+# Resolver forward references
+MunicipioDependenciaResponse.model_rebuild()
