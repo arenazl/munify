@@ -169,7 +169,7 @@ class Solicitud(Base):
     descripcion = Column(Text, nullable=True)
 
     # Estado
-    estado = Column(Enum(EstadoSolicitud), default=EstadoSolicitud.INICIADO, nullable=False, index=True)
+    estado = Column(Enum(EstadoSolicitud, values_callable=lambda x: [e.value for e in x]), default=EstadoSolicitud.INICIADO, nullable=False, index=True)
 
     # Solicitante (usuario registrado o anónimo)
     solicitante_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
@@ -211,8 +211,8 @@ class HistorialSolicitud(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     usuario = relationship("User")
 
-    estado_anterior = Column(Enum(EstadoSolicitud), nullable=True)
-    estado_nuevo = Column(Enum(EstadoSolicitud), nullable=True)
+    estado_anterior = Column(Enum(EstadoSolicitud, values_callable=lambda x: [e.value for e in x]), nullable=True)
+    estado_nuevo = Column(Enum(EstadoSolicitud, values_callable=lambda x: [e.value for e in x]), nullable=True)
     accion = Column(String(100), nullable=False)
     comentario = Column(Text, nullable=True)
 
