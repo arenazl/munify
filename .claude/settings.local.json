@@ -32,7 +32,8 @@
       "Bash(taskkill //F //PID 154876)",
       "Bash(find:*)",
       "WebFetch(domain:gestion-municipal-landing.netlify.app)",
-      "WebFetch(domain:screenrec.com)"
+      "WebFetch(domain:screenrec.com)",
+      "WebFetch(domain:reclamos-mun-api-aedc8e147cbe.herokuapp.com)"
     ],
     "deny": [],
     "ask": []

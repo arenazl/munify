@@ -292,7 +292,7 @@ async def get_mis_stats(
     estados = {estado.value: count for estado, count in query.all()}
 
     total = sum(estados.values())
-    pendientes = estados.get('nuevo', 0) + estados.get('asignado', 0) + estados.get('en_proceso', 0)
+    pendientes = estados.get('nuevo', 0) + estados.get('ASIGNADO', 0) + estados.get('en_proceso', 0)
 
     return {
         "total": total,
