@@ -27,19 +27,19 @@ def upgrade() -> None:
         op.execute("ALTER TYPE estadoreclamo ADD VALUE IF NOT EXISTS 'pendiente_confirmacion' AFTER 'en_proceso'")
 
     elif dialect == 'mysql':
-        # MySQL: Modificar columna enum para incluir nuevo valor (MAYUSCULAS para coincidir con SQLAlchemy)
+        # MySQL: Modificar columna enum para incluir nuevo valor (lowercase para coincidir con Python enum)
         op.execute("""
             ALTER TABLE reclamos
-            MODIFY COLUMN estado ENUM('NUEVO','ASIGNADO','EN_PROCESO','PENDIENTE_CONFIRMACION','RESUELTO','RECHAZADO')
-            NOT NULL DEFAULT 'NUEVO'
+            MODIFY COLUMN estado ENUM('nuevo','recibido','asignado','en_proceso','pendiente_confirmacion','resuelto','rechazado')
+            NOT NULL DEFAULT 'nuevo'
         """)
         op.execute("""
             ALTER TABLE historial_reclamos
-            MODIFY COLUMN estado_anterior ENUM('NUEVO','ASIGNADO','EN_PROCESO','PENDIENTE_CONFIRMACION','RESUELTO','RECHAZADO') NULL
+            MODIFY COLUMN estado_anterior ENUM('nuevo','recibido','asignado','en_proceso','pendiente_confirmacion','resuelto','rechazado') NULL
         """)
         op.execute("""
             ALTER TABLE historial_reclamos
-            MODIFY COLUMN estado_nuevo ENUM('NUEVO','ASIGNADO','EN_PROCESO','PENDIENTE_CONFIRMACION','RESUELTO','RECHAZADO') NULL
+            MODIFY COLUMN estado_nuevo ENUM('nuevo','recibido','asignado','en_proceso','pendiente_confirmacion','resuelto','rechazado') NULL
         """)
 
     # Para SQLite y otras bases que usan strings, no se necesita hacer nada
