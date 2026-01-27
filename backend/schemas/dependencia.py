@@ -256,4 +256,5 @@ class AsignacionMasivaRequest(BaseModel):
 
 
 # Resolver forward references
+MunicipioDependenciaListResponse.model_rebuild()
 MunicipioDependenciaResponse.model_rebuild()
