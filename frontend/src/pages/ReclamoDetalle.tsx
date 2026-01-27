@@ -83,12 +83,13 @@ const getFriendlyError = (error: string): string => {
 };
 
 const estadoConfig: Record<EstadoReclamo, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
-  nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
-  asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
-  en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
-  pendiente_confirmacion: { label: 'Pendiente Confirmación', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
-  resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
-  rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
+  NUEVO: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
+  RECIBIDO: { label: 'Recibido', color: '#0891b2', bg: '#cffafe', icon: CheckCircle },
+  ASIGNADO: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
+  EN_PROCESO: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
+  PENDIENTE_CONFIRMACION: { label: 'Pendiente Confirmación', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
+  RESUELTO: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
+  RECHAZADO: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
 };
 
 const accionIcons: Record<string, typeof CheckCircle> = {
@@ -577,18 +578,18 @@ export default function ReclamoDetalle() {
                 className="p-4 rounded-xl"
                 style={{
                   backgroundColor: theme.backgroundSecondary,
-                  border: `1px solid ${reclamo.estado === 'pendiente_confirmacion' ? '#8b5cf6' : '#059669'}`
+                  border: `1px solid ${reclamo.estado === 'PENDIENTE_CONFIRMACION' ? '#8b5cf6' : '#059669'}`
                 }}
               >
                 <div className="flex items-start gap-3">
-                  {reclamo.estado === 'pendiente_confirmacion' ? (
+                  {reclamo.estado === 'PENDIENTE_CONFIRMACION' ? (
                     <Clock className="h-5 w-5 mt-0.5" style={{ color: '#8b5cf6' }} />
                   ) : (
                     <CheckCircle className="h-5 w-5 mt-0.5" style={{ color: '#059669' }} />
                   )}
                   <div className="flex-1">
-                    <p className="text-sm font-medium" style={{ color: reclamo.estado === 'pendiente_confirmacion' ? '#8b5cf6' : '#059669' }}>
-                      {reclamo.estado === 'pendiente_confirmacion' ? 'Trabajo Terminado (Pendiente Confirmación)' : 'Resolución'}
+                    <p className="text-sm font-medium" style={{ color: reclamo.estado === 'PENDIENTE_CONFIRMACION' ? '#8b5cf6' : '#059669' }}>
+                      {reclamo.estado === 'PENDIENTE_CONFIRMACION' ? 'Trabajo Terminado (Pendiente Confirmación)' : 'Resolución'}
                     </p>
                     <p className="mt-1" style={{ color: theme.text }}>{reclamo.resolucion}</p>
                     {reclamo.fecha_resolucion && (
@@ -602,7 +603,7 @@ export default function ReclamoDetalle() {
             )}
 
             {/* Botones de Confirmar/Devolver para supervisores cuando está pendiente confirmación */}
-            {reclamo.estado === 'pendiente_confirmacion' && user && ['admin', 'supervisor'].includes(user.rol) && (
+            {reclamo.estado === 'PENDIENTE_CONFIRMACION' && user && ['admin', 'supervisor'].includes(user.rol) && (
               <div
                 className="p-4 rounded-xl"
                 style={{ backgroundColor: '#8b5cf620', border: `1px solid #8b5cf6` }}
@@ -824,7 +825,7 @@ export default function ReclamoDetalle() {
             )}
 
             {/* Formulario para agregar comentario */}
-            {reclamo.estado !== 'resuelto' && reclamo.estado !== 'rechazado' && (
+            {reclamo.estado !== 'RESUELTO' && reclamo.estado !== 'RECHAZADO' && (
               <div
                 className="p-4 rounded-xl mt-6"
                 style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}

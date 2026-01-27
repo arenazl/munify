@@ -250,7 +250,9 @@ export const reclamosApi = {
     fecha_programada?: string;
     hora_inicio?: string;
     hora_fin?: string;
-    comentario?: string
+    comentario?: string;
+    tiempo_estimado_dias?: number;
+    tiempo_estimado_horas?: number;
   }) => api.post(`/reclamos/${id}/asignar`, data),
   iniciar: (id: number) => api.post(`/reclamos/${id}/iniciar`),
   resolver: (id: number, data: { resolucion: string }) => api.post(`/reclamos/${id}/resolver`, data),

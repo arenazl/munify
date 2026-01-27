@@ -7,13 +7,13 @@ class RolUsuario(str, enum.Enum):
     ADMIN = "admin"
 
 class EstadoReclamo(str, enum.Enum):
-    NUEVO = "nuevo"
-    RECIBIDO = "recibido"  # Dependencia aceptó, tiene tiempo estimado de resolución
-    ASIGNADO = "asignado"  # Legacy - mantener por compatibilidad
-    EN_PROCESO = "en_proceso"
-    PENDIENTE_CONFIRMACION = "pendiente_confirmacion"  # Empleado terminó, espera confirmación del supervisor
-    RESUELTO = "resuelto"
-    RECHAZADO = "rechazado"
+    NUEVO = "NUEVO"
+    RECIBIDO = "RECIBIDO"  # Dependencia aceptó, tiene tiempo estimado de resolución
+    ASIGNADO = "ASIGNADO"  # Legacy - mantener por compatibilidad
+    EN_PROCESO = "EN_PROCESO"
+    PENDIENTE_CONFIRMACION = "PENDIENTE_CONFIRMACION"  # Empleado terminó, espera confirmación del supervisor
+    RESUELTO = "RESUELTO"
+    RECHAZADO = "RECHAZADO"
 
 class MotivoRechazo(str, enum.Enum):
     NO_COMPETENCIA = "no_competencia"

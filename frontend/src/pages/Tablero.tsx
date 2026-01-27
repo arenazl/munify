@@ -20,7 +20,7 @@ interface Columna {
 
 const columnas: Columna[] = [
   {
-    id: 'nuevo',
+    id: 'NUEVO',
     titulo: 'Nuevos',
     color: '#ef4444',
     headerClass: 'column-header-red',
@@ -28,7 +28,7 @@ const columnas: Columna[] = [
     badgeClass: 'badge-gradient-red',
   },
   {
-    id: 'asignado',
+    id: 'ASIGNADO',
     titulo: 'Asignados',
     color: '#3b82f6',
     headerClass: 'column-header-blue',
@@ -36,7 +36,7 @@ const columnas: Columna[] = [
     badgeClass: 'badge-gradient-blue',
   },
   {
-    id: 'en_proceso',
+    id: 'EN_PROCESO',
     titulo: 'En Proceso',
     color: '#f59e0b',
     headerClass: 'column-header-orange',
@@ -44,7 +44,7 @@ const columnas: Columna[] = [
     badgeClass: 'badge-gradient-orange',
   },
   {
-    id: 'pendiente_confirmacion',
+    id: 'PENDIENTE_CONFIRMACION',
     titulo: 'Pend. Confirmación',
     color: '#8b5cf6',
     headerClass: 'column-header-purple',
@@ -52,7 +52,7 @@ const columnas: Columna[] = [
     badgeClass: 'badge-gradient-purple',
   },
   {
-    id: 'resuelto',
+    id: 'RESUELTO',
     titulo: 'Resueltos',
     color: '#22c55e',
     headerClass: 'column-header-green',
@@ -220,10 +220,10 @@ export default function Tablero() {
           const count = getReclamosPorEstado(col.id).length;
           const isActive = activeColumnIndex === index;
           // Títulos cortos para mobile
-          const tituloCorto = col.id === 'nuevo' ? 'Nuevos' :
-                              col.id === 'asignado' ? 'Asig.' :
-                              col.id === 'en_proceso' ? 'Proceso' :
-                              col.id === 'pendiente_confirmacion' ? 'Conf.' : 'Resuel.';
+          const tituloCorto = col.id === 'NUEVO' ? 'Nuevos' :
+                              col.id === 'ASIGNADO' ? 'Asig.' :
+                              col.id === 'EN_PROCESO' ? 'Proceso' :
+                              col.id === 'PENDIENTE_CONFIRMACION' ? 'Conf.' : 'Resuel.';
           return (
             <button
               key={col.id}

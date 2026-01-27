@@ -31,12 +31,13 @@ interface DashboardConfig {
 }
 
 const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; label: string }> = {
-  nuevo: { icon: Clock, color: '#6b7280', label: 'Nuevo' },
-  asignado: { icon: AlertCircle, color: '#3b82f6', label: 'Asignado' },
-  en_proceso: { icon: Clock, color: '#f59e0b', label: 'En Proceso' },
-  pendiente_confirmacion: { icon: Clock, color: '#8b5cf6', label: 'Pendiente Confirmación' },
-  resuelto: { icon: CheckCircle2, color: '#10b981', label: 'Resuelto' },
-  rechazado: { icon: AlertCircle, color: '#ef4444', label: 'Rechazado' },
+  NUEVO: { icon: Clock, color: '#6b7280', label: 'Nuevo' },
+  RECIBIDO: { icon: CheckCircle2, color: '#0891b2', label: 'Recibido' },
+  ASIGNADO: { icon: AlertCircle, color: '#3b82f6', label: 'Asignado' },
+  EN_PROCESO: { icon: Clock, color: '#f59e0b', label: 'En Proceso' },
+  PENDIENTE_CONFIRMACION: { icon: Clock, color: '#8b5cf6', label: 'Pendiente Confirmación' },
+  RESUELTO: { icon: CheckCircle2, color: '#10b981', label: 'Resuelto' },
+  RECHAZADO: { icon: AlertCircle, color: '#ef4444', label: 'Rechazado' },
 };
 
 export default function MobileHome() {
@@ -67,8 +68,8 @@ export default function MobileHome() {
       setReclamos(data.slice(0, 3));
       setStats({
         total: data.length,
-        pendientes: data.filter((r: Reclamo) => ['nuevo', 'asignado', 'en_proceso'].includes(r.estado)).length,
-        resueltos: data.filter((r: Reclamo) => r.estado === 'resuelto').length,
+        pendientes: data.filter((r: Reclamo) => ['NUEVO', 'ASIGNADO', 'EN_PROCESO'].includes(r.estado)).length,
+        resueltos: data.filter((r: Reclamo) => r.estado === 'RESUELTO').length,
       });
 
       // Cargar configuración del dashboard

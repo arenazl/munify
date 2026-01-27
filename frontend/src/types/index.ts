@@ -1,5 +1,5 @@
 export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin';
-export type EstadoReclamo = 'nuevo' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto' | 'rechazado';
+export type EstadoReclamo = 'NUEVO' | 'RECIBIDO' | 'ASIGNADO' | 'EN_PROCESO' | 'PENDIENTE_CONFIRMACION' | 'RESUELTO' | 'RECHAZADO';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
 // Info de dependencia para usuarios de dependencia
@@ -186,6 +186,11 @@ export interface Reclamo {
   fecha_programada?: string;
   hora_inicio?: string;
   hora_fin?: string;
+  // Tiempo estimado de resolución
+  tiempo_estimado_dias?: number;
+  tiempo_estimado_horas?: number;
+  fecha_estimada_resolucion?: string;
+  fecha_recibido?: string;
   created_at: string;
   updated_at?: string;
   categoria: { id: number; nombre: string; icono?: string; color?: string };

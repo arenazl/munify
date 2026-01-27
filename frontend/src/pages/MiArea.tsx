@@ -53,9 +53,9 @@ export default function MiArea() {
         // Procesar conteos por estado
         conteoData.forEach((item) => {
           reclamosStats.total += item.cantidad;
-          if (item.estado === 'nuevo') reclamosStats.nuevos = item.cantidad;
-          if (item.estado === 'en_proceso') reclamosStats.en_proceso = item.cantidad;
-          if (item.estado === 'resuelto') reclamosStats.resueltos = item.cantidad;
+          if (item.estado === 'NUEVO') reclamosStats.nuevos = item.cantidad;
+          if (item.estado === 'EN_PROCESO') reclamosStats.en_proceso = item.cantidad;
+          if (item.estado === 'RESUELTO') reclamosStats.resueltos = item.cantidad;
         });
         reclamosStats.pendientes = reclamosStats.total - reclamosStats.resueltos;
 

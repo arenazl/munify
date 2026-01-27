@@ -14,21 +14,23 @@ import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  nuevo: { bg: '#6366f1', text: '#ffffff' },
-  asignado: { bg: '#3b82f6', text: '#ffffff' },
-  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
-  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
-  resuelto: { bg: '#10b981', text: '#ffffff' },
-  rechazado: { bg: '#ef4444', text: '#ffffff' },
+  NUEVO: { bg: '#6366f1', text: '#ffffff' },
+  RECIBIDO: { bg: '#0891b2', text: '#ffffff' },
+  ASIGNADO: { bg: '#3b82f6', text: '#ffffff' },
+  EN_PROCESO: { bg: '#f59e0b', text: '#ffffff' },
+  PENDIENTE_CONFIRMACION: { bg: '#8b5cf6', text: '#ffffff' },
+  RESUELTO: { bg: '#10b981', text: '#ffffff' },
+  RECHAZADO: { bg: '#ef4444', text: '#ffffff' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  nuevo: 'Nuevo',
-  asignado: 'Asignado',
-  en_proceso: 'En Proceso',
-  pendiente_confirmacion: 'Pendiente Confirmación',
-  resuelto: 'Resuelto',
-  rechazado: 'Rechazado',
+  NUEVO: 'Nuevo',
+  RECIBIDO: 'Recibido',
+  ASIGNADO: 'Asignado',
+  EN_PROCESO: 'En Proceso',
+  PENDIENTE_CONFIRMACION: 'Pendiente Confirmación',
+  RESUELTO: 'Resuelto',
+  RECHAZADO: 'Rechazado',
 };
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
@@ -46,11 +48,11 @@ const getCategoryImageUrl = (nombre: string): string | null => {
 // Función para obtener el icono del estado
 const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
   switch (estado) {
-    case 'nuevo': return <Sparkles className="h-3 w-3" />;
-    case 'asignado': return <UserPlus className="h-3 w-3" />;
-    case 'en_proceso': return <Play className="h-3 w-3" />;
-    case 'resuelto': return <CheckCircle className="h-3 w-3" />;
-    case 'rechazado': return <XCircle className="h-3 w-3" />;
+    case 'NUEVO': return <Sparkles className="h-3 w-3" />;
+    case 'ASIGNADO': return <UserPlus className="h-3 w-3" />;
+    case 'EN_PROCESO': return <Play className="h-3 w-3" />;
+    case 'RESUELTO': return <CheckCircle className="h-3 w-3" />;
+    case 'RECHAZADO': return <XCircle className="h-3 w-3" />;
     default: return null;
   }
 };
@@ -204,6 +206,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [fechaProgramada, setFechaProgramada] = useState('');
   const [horaInicio, setHoraInicio] = useState('09:00');
   const [duracion, setDuracion] = useState('1');  // en horas (string para el select)
+  // Tiempo estimado de resolución (para aceptar reclamos)
+  const [tiempoEstimadoDias, setTiempoEstimadoDias] = useState(1);
+  const [tiempoEstimadoHoras, setTiempoEstimadoHoras] = useState(0);
   const [loadingDisponibilidad, setLoadingDisponibilidad] = useState(false);
   const [disponibilidad, setDisponibilidad] = useState<{
     fecha: string;
@@ -1045,7 +1050,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
 
     // Si el reclamo es nuevo, cargar sugerencias de asignación
-    if (reclamo.estado === 'nuevo') {
+    if (reclamo.estado === 'NUEVO') {
       setLoadingSugerencias(true);
       try {
         console.log('[DEBUG] Cargando sugerencias para reclamo:', reclamo.id);
@@ -1112,6 +1117,55 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
+  // Aceptar reclamo que ya está asignado a mi dependencia
+  const handleAceptar = async () => {
+    if (!selectedReclamo || !selectedReclamo.dependencia_asignada) return;
+
+    // Validar que se haya ingresado tiempo estimado
+    if (tiempoEstimadoDias === 0 && tiempoEstimadoHoras === 0) {
+      toast.error('Ingresá un tiempo estimado de resolución');
+      return;
+    }
+
+    // Validar comentario obligatorio
+    if (!comentarioAsignacion.trim()) {
+      toast.error('Ingresá un comentario');
+      return;
+    }
+
+    // Actualización optimista
+    const reclamoActualizado = {
+      ...selectedReclamo,
+      estado: 'RECIBIDO' as const,
+      tiempo_estimado_dias: tiempoEstimadoDias,
+      tiempo_estimado_horas: tiempoEstimadoHoras,
+    };
+    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
+    closeSheet();
+    toast.success('Reclamo aceptado correctamente');
+
+    setSaving(true);
+    try {
+      await reclamosApi.asignar(selectedReclamo.id, {
+        dependencia_id: selectedReclamo.dependencia_asignada.id,
+        tiempo_estimado_dias: tiempoEstimadoDias,
+        tiempo_estimado_horas: tiempoEstimadoHoras,
+        comentario: comentarioAsignacion.trim(),
+      });
+      fetchReclamos();
+      // Limpiar campos
+      setComentarioAsignacion('');
+      setTiempoEstimadoDias(1);
+      setTiempoEstimadoHoras(0);
+    } catch (error) {
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
+      toast.error('Error al aceptar reclamo');
+      console.error('Error:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAsignar = async () => {
     if (!selectedReclamo || !dependenciaSeleccionada) return;
 
@@ -1121,7 +1175,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     // Actualización optimista
     const reclamoActualizado = {
       ...selectedReclamo,
-      estado: 'asignado' as const,
+      estado: 'ASIGNADO' as const,
       municipio_dependencia_id: Number(dependenciaSeleccionada),
       dependencia_asignada: dependenciaData ? {
         id: dependenciaData.id,
@@ -1206,7 +1260,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
 
     // Actualización optimista: actualizar UI inmediatamente
-    const reclamoActualizado = { ...selectedReclamo, estado: 'en_proceso' as const };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'EN_PROCESO' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Trabajo iniciado');
@@ -1237,7 +1291,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
 
     // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'resuelto' as const, resolucion };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'RESUELTO' as const, resolucion };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Reclamo resuelto');
@@ -1259,7 +1313,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo || !motivoRechazo) return;
 
     // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'RECHAZADO' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Reclamo rechazado');
@@ -1286,7 +1340,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     try {
       // Volver a estado asignado con comentario
       const comentario = `Trabajo no finalizado: ${motivoNoFinalizado}${resolucion ? `. ${resolucion}` : ''}`;
-      await reclamosApi.cambiarEstado(selectedReclamo.id, 'asignado', comentario);
+      await reclamosApi.cambiarEstado(selectedReclamo.id, 'ASIGNADO', comentario);
       toast.success('Reclamo vuelto a asignado para reprogramar');
       fetchReclamos();
       closeSheet();
@@ -2641,6 +2695,112 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               label="Dependencia"
               value={selectedReclamo.dependencia_asignada.nombre}
             />
+            {/* Mostrar tiempo estimado si ya fue recibido */}
+            {selectedReclamo.estado === 'RECIBIDO' && selectedReclamo.fecha_estimada_resolucion && (
+              <ABMField
+                label="Resolución estimada"
+                value={new Date(selectedReclamo.fecha_estimada_resolucion).toLocaleString('es-AR', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+                icon={<Clock className="h-4 w-4" style={{ color: theme.primary }} />}
+              />
+            )}
+          </ABMInfoPanel>
+        )}
+
+        {/* Tiempo estimado de resolución - Solo para aceptar reclamos nuevos */}
+        {selectedReclamo.estado === 'NUEVO' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (
+          <ABMInfoPanel
+            title="Tiempo estimado de resolución"
+            icon={<Clock className="h-4 w-4" />}
+            variant="default"
+          >
+            <div className="space-y-3">
+              <p className="text-sm" style={{ color: theme.textSecondary }}>
+                Indicá en cuánto tiempo estimás resolver este reclamo
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                    Días
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="365"
+                    value={tiempoEstimadoDias}
+                    onChange={(e) => setTiempoEstimadoDias(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                    Horas
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={tiempoEstimadoHoras}
+                    onChange={(e) => setTiempoEstimadoHoras(Math.max(0, Math.min(23, parseInt(e.target.value) || 0)))}
+                    className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                </div>
+              </div>
+              {(tiempoEstimadoDias > 0 || tiempoEstimadoHoras > 0) && (
+                <div
+                  className="rounded-xl p-3 flex items-center gap-2"
+                  style={{ backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}30` }}
+                >
+                  <Clock className="h-4 w-4" style={{ color: theme.primary }} />
+                  <span className="text-sm" style={{ color: theme.text }}>
+                    Resolución estimada: {' '}
+                    <strong>
+                      {new Date(Date.now() + (tiempoEstimadoDias * 24 + tiempoEstimadoHoras) * 60 * 60 * 1000).toLocaleString('es-AR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </strong>
+                  </span>
+                </div>
+              )}
+
+              {/* Comentario obligatorio */}
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                  Comentario <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <textarea
+                  value={comentarioAsignacion}
+                  onChange={(e) => setComentarioAsignacion(e.target.value)}
+                  placeholder="Indicá cómo se va a resolver este reclamo..."
+                  rows={3}
+                  className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all resize-none"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.text,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                />
+              </div>
+            </div>
           </ABMInfoPanel>
         )}
 
@@ -2675,22 +2835,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Acciones según estado */}
-        {selectedReclamo.estado === 'nuevo' && (
+        {selectedReclamo.estado === 'NUEVO' && (
           <ABMCollapsible
-            title="Asignar Dependencia"
+            title={selectedReclamo.dependencia_asignada ? "Reasignar a otra dependencia" : "Asignar Dependencia"}
             icon={<Building2 className="h-4 w-4" />}
-            defaultOpen={true}
+            defaultOpen={!selectedReclamo.dependencia_asignada}
           >
             <div className="space-y-3">
               {/* Info: Los reclamos se asignan a dependencias basándose en la categoría */}
-              {selectedReclamo?.dependencia_asignada && (
+              {selectedReclamo?.dependencia_asignada && !dependenciaSeleccionada && (
                 <div
                   className="rounded-xl p-3 flex items-center gap-2"
-                  style={{ backgroundColor: `${selectedReclamo.dependencia_asignada.color || theme.primary}15`, border: `1px solid ${selectedReclamo.dependencia_asignada.color || theme.primary}30` }}
+                  style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.border}` }}
                 >
-                  <Building2 className="h-4 w-4" style={{ color: selectedReclamo.dependencia_asignada.color || theme.primary }} />
-                  <span className="text-sm" style={{ color: theme.text }}>
-                    Actualmente asignado a: <strong>{selectedReclamo.dependencia_asignada.nombre}</strong>
+                  <span className="text-sm" style={{ color: theme.textSecondary }}>
+                    Selecciona una dependencia diferente si deseas reasignar
                   </span>
                 </div>
               )}
@@ -2700,7 +2859,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 <ModernSelect
                   value={dependenciaSeleccionada}
                   onChange={(value) => setDependenciaSeleccionada(value || '')}
-                  placeholder="Seleccionar dependencia..."
+                  placeholder={selectedReclamo.dependencia_asignada ? "Seleccionar otra dependencia..." : "Seleccionar dependencia..."}
                   searchable={dependenciasDisponibles.length > 5}
                   onOpen={() => setSugerenciasColapsadas(true)}
                   onClose={(selectedValue) => {
@@ -2720,6 +2879,17 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 <div className="text-sm py-2 px-3 rounded-lg" style={{ backgroundColor: theme.card, color: theme.textSecondary }}>
                   No hay dependencias disponibles
                 </div>
+              )}
+
+              {/* Botón para cancelar reasignación */}
+              {dependenciaSeleccionada && selectedReclamo.dependencia_asignada && (
+                <button
+                  onClick={() => setDependenciaSeleccionada('')}
+                  className="text-sm px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                  style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                >
+                  Cancelar reasignación
+                </button>
               )}
 
               {/* Programación - Solo se muestra cuando hay empleado seleccionado */}
@@ -2842,7 +3012,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {selectedReclamo.estado === 'asignado' && (
+        {selectedReclamo.estado === 'ASIGNADO' && (
           <ABMInfoPanel
             title="Iniciar Trabajo"
             icon={<Play className="h-4 w-4" />}
@@ -2854,7 +3024,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
-        {selectedReclamo.estado === 'en_proceso' && (
+        {selectedReclamo.estado === 'EN_PROCESO' && (
           <ABMCollapsible
             title="Finalizar Trabajo"
             icon={<CheckCircle className="h-4 w-4" />}
@@ -2938,7 +3108,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {motivoRechazo && selectedReclamo.estado === 'nuevo' && (
+        {motivoRechazo && selectedReclamo.estado === 'NUEVO' && (
           <ABMInfoPanel
             title="Rechazar Reclamo"
             icon={<XCircle className="h-4 w-4" />}
@@ -3054,14 +3224,45 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const renderSheetFooter = () => {
     if (!selectedReclamo) return null;
 
-    const canAsignar = selectedReclamo.estado === 'nuevo';
-    const canIniciar = selectedReclamo.estado === 'asignado';
-    const canResolver = selectedReclamo.estado === 'en_proceso';
+    const canAsignar = selectedReclamo.estado === 'NUEVO';
+    const canIniciar = selectedReclamo.estado === 'ASIGNADO';
+    const canResolver = selectedReclamo.estado === 'EN_PROCESO';
+    // Puede aceptar si ya tiene dependencia asignada y no quiere reasignar
+    const canAceptar = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
 
     return (
       <div className="flex gap-2">
-        {/* Botón Asignar - para estado nuevo */}
-        {canAsignar && (
+        {/* Botón Aceptar - para estado nuevo con dependencia ya asignada */}
+        {canAceptar && (
+          <>
+            <button
+              onClick={handleAceptar}
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
+              style={{
+                backgroundColor: '#16a34a',
+                color: '#ffffff',
+                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
+              }}
+            >
+              {saving ? 'Aceptando...' : 'Aceptar'}
+            </button>
+            <button
+              onClick={() => setMotivoRechazo('otro')}
+              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: '#ef444415',
+                border: '1px solid #ef444450',
+                color: '#ef4444'
+              }}
+            >
+              Rechazar
+            </button>
+          </>
+        )}
+
+        {/* Botón Asignar/Reasignar - para estado nuevo sin dependencia o queriendo reasignar */}
+        {canAsignar && !canAceptar && (
           <>
             <button
               onClick={handleAsignar}
@@ -3073,7 +3274,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 boxShadow: `0 4px 14px ${theme.primary}40`
               }}
             >
-              {saving ? 'Asignando...' : 'Asignar'}
+              {saving ? 'Asignando...' : selectedReclamo.dependencia_asignada ? 'Reasignar' : 'Asignar'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
@@ -3136,16 +3337,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Estados finales - solo info */}
-        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'rechazado') && (
+        {(selectedReclamo.estado === 'RESUELTO' || selectedReclamo.estado === 'RECHAZADO') && (
           <div
             className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
             style={{
-              backgroundColor: selectedReclamo.estado === 'resuelto' ? '#16a34a20' : '#ef444420',
-              color: selectedReclamo.estado === 'resuelto' ? '#16a34a' : '#ef4444',
-              border: `1px solid ${selectedReclamo.estado === 'resuelto' ? '#16a34a50' : '#ef444450'}`
+              backgroundColor: selectedReclamo.estado === 'RESUELTO' ? '#16a34a20' : '#ef444420',
+              color: selectedReclamo.estado === 'RESUELTO' ? '#16a34a' : '#ef4444',
+              border: `1px solid ${selectedReclamo.estado === 'RESUELTO' ? '#16a34a50' : '#ef444450'}`
             }}
           >
-            {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
+            {selectedReclamo.estado === 'RESUELTO' ? '✓ Resuelto' : '✗ Rechazado'}
           </div>
         )}
       </div>
@@ -3300,11 +3501,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 <FilterRowSkeleton count={5} height={26} widths={[45, 55, 65, 45, 55]} />
               ) : (
                 [
-                  { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
-                  { key: 'asignado', label: 'Asig.', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
-                  { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
-                  { key: 'resuelto', label: 'Resu.', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
-                  { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
+                  { key: 'NUEVO', label: 'Nuevo', icon: Sparkles, color: estadoColors.NUEVO.bg, count: conteosEstados['NUEVO'] || 0 },
+                  { key: 'ASIGNADO', label: 'Asig.', icon: UserPlus, color: estadoColors.ASIGNADO.bg, count: conteosEstados['ASIGNADO'] || 0 },
+                  { key: 'EN_PROCESO', label: 'Proc.', icon: Play, color: estadoColors.EN_PROCESO.bg, count: conteosEstados['EN_PROCESO'] || 0 },
+                  { key: 'RESUELTO', label: 'Resu.', icon: CheckCircle, color: estadoColors.RESUELTO.bg, count: conteosEstados['RESUELTO'] || 0 },
+                  { key: 'RECHAZADO', label: 'Rech.', icon: XCircle, color: estadoColors.RECHAZADO.bg, count: conteosEstados['RECHAZADO'] || 0 },
                 ].map((estado) => {
                   const Icon = estado.icon;
                   const isActive = filtroEstado === estado.key;
@@ -3408,10 +3609,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               <div
                 className="flex items-center justify-between -mx-5 -mt-5 mb-4 px-4 py-3 rounded-t-xl"
                 style={{
-                  background: r.estado === 'asignado'
+                  background: r.estado === 'ASIGNADO'
                     ? 'linear-gradient(135deg, rgb(74 79 160 / 0%) 0%, rgba(59, 130, 246, 0.5) 100%)'
                     : `linear-gradient(135deg, ${estado.bg} 0%, ${estado.bg}80 100%)`,
-                  borderBottom: r.estado === 'asignado'
+                  borderBottom: r.estado === 'ASIGNADO'
                     ? '1px solid rgb(59 130 246 / 0%)'
                     : `1px solid ${estado.bg}`
                 }}
