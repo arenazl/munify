@@ -79,3 +79,4 @@ netlify-ngcheck/
 .worktrees/
 .security-key
 logs/security/
+landing

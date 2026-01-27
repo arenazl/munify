@@ -239,13 +239,13 @@ export default function MobileMisReclamos() {
             </div>
           </div>
 
-          {selectedReclamo.empleado_asignado && (
+          {selectedReclamo.dependencia_asignada && (
             <div className="rounded-xl p-4" style={{ backgroundColor: '#dbeafe' }}>
               <p className="text-xs font-medium mb-1" style={{ color: '#1e40af' }}>
-                Empleado Asignado
+                Dependencia Asignada
               </p>
               <p className="font-semibold" style={{ color: '#1e3a8a' }}>
-                {formatEmpleadoNombre(selectedReclamo.empleado_asignado.nombre)}
+                {selectedReclamo.dependencia_asignada.nombre}
               </p>
             </div>
           )}
@@ -411,9 +411,9 @@ export default function MobileMisReclamos() {
                     <Tag className="h-3 w-3" />
                     {reclamo.categoria.nombre}
                   </span>
-                  {reclamo.empleado_asignado && (
+                  {reclamo.dependencia_asignada && (
                     <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                      👤 {formatEmpleadoNombre(reclamo.empleado_asignado.nombre)}
+                      🏢 {reclamo.dependencia_asignada.nombre}
                     </span>
                   )}
                   <span className="flex items-center gap-1">

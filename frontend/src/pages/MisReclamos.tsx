@@ -598,7 +598,6 @@ export default function MisReclamos() {
     {
       key: 'id',
       header: '#',
-      width: '60px',
       render: (r) => (
         <span className="text-xs font-mono" style={{ color: theme.textSecondary }}>
           #{r.id}
@@ -686,7 +685,6 @@ export default function MisReclamos() {
     {
       key: 'acciones',
       header: '',
-      width: '50px',
       render: (r) => (
         <button
           onClick={(e) => { e.stopPropagation(); openViewSheet(r); }}

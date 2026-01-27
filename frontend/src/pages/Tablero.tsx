@@ -145,14 +145,14 @@ export default function Tablero() {
       .filter(r => {
         if (searchTerm === '') return true;
         const term = searchTerm.toLowerCase();
-        const empleadoNombre = r.empleado_asignado
-          ? `${r.empleado_asignado.nombre} ${r.empleado_asignado.apellido || ''}`.toLowerCase()
+        const dependenciaNombre = r.dependencia_asignada
+          ? r.dependencia_asignada.nombre?.toLowerCase() || ''
           : '';
         return (
           r.titulo.toLowerCase().includes(term) ||
           r.direccion?.toLowerCase().includes(term) ||
           r.categoria?.nombre?.toLowerCase().includes(term) ||
-          empleadoNombre.includes(term)
+          dependenciaNombre.includes(term)
         );
       });
   };
@@ -445,16 +445,16 @@ export default function Tablero() {
                                       month: 'short'
                                     })}
                                   </span>
-                                  {/* Si tiene empleado asignado mostrar su nombre, sino la categoría */}
-                                  {reclamo.empleado_asignado ? (
+                                  {/* Si tiene dependencia asignada mostrar su nombre, sino la categoría */}
+                                  {reclamo.dependencia_asignada ? (
                                     <span
                                       className="text-xs px-2 py-1 rounded-full text-white truncate max-w-[120px] font-medium"
                                       style={{
-                                        background: `linear-gradient(135deg, ${col.color}, ${col.color}dd)`
+                                        background: `linear-gradient(135deg, ${reclamo.dependencia_asignada.color || col.color}, ${reclamo.dependencia_asignada.color || col.color}dd)`
                                       }}
-                                      title={`${reclamo.empleado_asignado.nombre} ${reclamo.empleado_asignado.apellido || ''}`}
+                                      title={reclamo.dependencia_asignada.nombre}
                                     >
-                                      {reclamo.empleado_asignado.nombre}
+                                      {reclamo.dependencia_asignada.nombre}
                                     </span>
                                   ) : (
                                     <span
