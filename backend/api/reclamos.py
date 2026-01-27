@@ -886,8 +886,11 @@ async def asignar_reclamo(
 
     # Verificar que la dependencia existe y pertenece al municipio
     from models.municipio_dependencia import MunicipioDependencia
+    from sqlalchemy.orm import selectinload
     result_dep = await db.execute(
-        select(MunicipioDependencia).where(
+        select(MunicipioDependencia)
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(
             MunicipioDependencia.id == data.dependencia_id,
             MunicipioDependencia.municipio_id == reclamo.municipio_id,
             MunicipioDependencia.activo == True
