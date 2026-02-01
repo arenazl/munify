@@ -89,6 +89,8 @@ const estadoConfig: Record<EstadoReclamo, { label: string; color: string; bg: st
   en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
   pendiente_confirmacion: { label: 'Pendiente Confirmación', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
   resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
+  finalizado: { label: 'Finalizado', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
+  pospuesto: { label: 'Pospuesto', color: '#ea580c', bg: '#ffedd5', icon: Clock },
   rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
 };
 

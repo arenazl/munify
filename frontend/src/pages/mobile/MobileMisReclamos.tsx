@@ -25,6 +25,8 @@ const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; b
   en_proceso: { icon: Clock, color: '#f59e0b', bgColor: '#fef3c7', label: 'En Proceso' },
   pendiente_confirmacion: { icon: Clock, color: '#8b5cf6', bgColor: '#ede9fe', label: 'Pendiente Confirmación' },
   resuelto: { icon: CheckCircle2, color: '#10b981', bgColor: '#d1fae5', label: 'Resuelto' },
+  finalizado: { icon: CheckCircle2, color: '#10b981', bgColor: '#d1fae5', label: 'Finalizado' },
+  pospuesto: { icon: Clock, color: '#f97316', bgColor: '#ffedd5', label: 'Pospuesto' },
   rechazado: { icon: AlertCircle, color: '#ef4444', bgColor: '#fee2e2', label: 'Rechazado' },
 };
 
