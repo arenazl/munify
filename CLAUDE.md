@@ -52,6 +52,31 @@ components/ui/
 ### 5. Revisar antes de crear
 Antes de escribir un componente visual, BUSCAR si ya existe algo similar que pueda reutilizarse o extenderse.
 
+### 6. Código Resiliente a Cambios (Open/Closed Principle)
+- Agregar un estado nuevo NO debería romper funcionalidades existentes
+- Usar **patrones con fallback** en lugar de switch/if exhaustivos:
+```tsx
+// ✅ CORRECTO - Con fallback, no se rompe con estados nuevos
+const color = estadoColors[estado] || estadoColors.default || '#6366f1';
+const label = estadoLabels[estado] || estado;
+
+// ❌ INCORRECTO - Se rompe si falta un case
+switch(estado) {
+  case 'recibido': return 'blue';
+  case 'en_curso': return 'yellow';
+  // Falta 'pospuesto' → rompe
+}
+```
+
+- Las notificaciones, subscripciones y eventos deben manejar estados desconocidos gracefully
+- Si un mapa/diccionario no tiene la clave, usar valor por defecto, NO fallar
+- **Test mental**: "Si agrego un estado mañana, ¿cuántos archivos tengo que tocar?" → Si son más de 2-3, el diseño está mal
+
+### 7. Single Source of Truth para Enums/Estados
+- Los estados y sus propiedades (colores, labels, iconos) se definen en UN solo lugar
+- Ese lugar exporta todo lo necesario: `estadoColors`, `estadoLabels`, `estadoIcons`
+- Todos los demás archivos importan de ahí, NO duplican definiciones
+
 ---
 
 ## ESTADO ACTUAL DE DESARROLLO (2025-02-01)
