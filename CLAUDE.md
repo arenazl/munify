@@ -13,7 +13,67 @@ La guía `00_COMO_USAR.md` tiene el índice de todas las guías disponibles.
 
 ---
 
-## ESTADO ACTUAL DE DESARROLLO (2025-01-25)
+## ESTADO ACTUAL DE DESARROLLO (2025-02-01)
+
+### Cambios Completados: Eliminación rol "empleado" y nuevo flujo de estados
+
+#### 1. Eliminación del rol "empleado"
+
+El rol `empleado` fue eliminado del sistema. Los roles válidos ahora son:
+- `vecino` - Ciudadanos que crean reclamos
+- `supervisor` - Usuarios de dependencias que procesan reclamos
+- `admin` - Administradores del municipio
+
+**Usuarios de dependencia:** Tienen `municipio_dependencia_id` asignado y rol `supervisor`.
+
+**Archivos modificados:**
+- `backend/models/enums.py` - Rol EMPLEADO marcado como legacy
+- `backend/scripts/crear_usuarios_dependencias.py` - Crea usuarios con rol supervisor
+- `frontend/src/types/index.ts` - RolUsuario sin empleado
+- `frontend/src/routes.tsx` - Rutas actualizadas
+- `frontend/src/config/navigation.ts` - Navegación sin sección empleados
+- `frontend/src/pages/Demo.tsx` - Removido perfil "Empleado Demo"
+- Múltiples componentes actualizados para remover referencias a empleado
+
+#### 2. Nuevo flujo de estados de reclamos
+
+Estados activos (en orden):
+1. **recibido** - Dependencia recibió el reclamo
+2. **en_curso** - Trabajo en progreso (antes era "en_proceso")
+3. **finalizado** - Trabajo completado
+4. **pospuesto** - Trabajo diferido
+5. **rechazado** - Disponible desde cualquier estado
+
+**Estados legacy** (compatibilidad con datos existentes):
+- nuevo, asignado, en_proceso, pendiente_confirmacion, resuelto
+
+**Transiciones válidas:**
+```
+recibido → en_curso, rechazado
+en_curso → finalizado, pospuesto, rechazado
+pospuesto → en_curso, finalizado, rechazado
+finalizado → (estado final)
+rechazado → (estado final)
+```
+
+**Cambios en base de datos:**
+- MySQL ENUM actualizado para incluir `en_curso`
+- Datos migrados de `en_proceso` a `en_curso`
+- Datos migrados de `nuevo` a `recibido`
+- `historial_reclamos` actualizado con nuevos valores de enum
+
+**Descripción obligatoria:** Todos los cambios de estado requieren una descripción/comentario.
+
+#### 3. UI de estados actualizada
+
+- Botón "Iniciar" renombrado a **"En Curso"**
+- Panel muestra **"Poner En Proceso"**
+- Toast: **"Reclamo en proceso"**
+- Colores y labels actualizados en todos los componentes
+
+---
+
+## ESTADO ANTERIOR (2025-01-25)
 
 ### Tarea Completada: Asignación de Trámites Específicos a Dependencias
 
