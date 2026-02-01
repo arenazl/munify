@@ -488,35 +488,82 @@ export default function MisReclamos() {
           </div>
         )}
 
-        {/* Historial */}
+        {/* Timeline de Historial */}
         <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
-          <h4 className="font-medium flex items-center mb-3">
+          <h4 className="font-medium flex items-center mb-4">
             <Clock className="h-4 w-4 mr-2" />
-            Historial
+            Timeline
           </h4>
           {loadingHistorial ? (
             <div className="text-center py-4">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 mx-auto" style={{ borderColor: theme.primary }}></div>
             </div>
           ) : historial.length > 0 ? (
-            <div className="space-y-3">
-              {historial.map((h) => (
-                <div key={h.id} className="flex items-start space-x-3 text-sm">
-                  <div className="w-2 h-2 mt-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: theme.primary }}></div>
-                  <div className="flex-1">
-                    <p>
-                      <span className="font-medium">{h.usuario.nombre} {h.usuario.apellido}</span>
-                      {' '}{h.accion}
-                    </p>
-                    {h.comentario && (
-                      <p className="mt-0.5" style={{ color: theme.textSecondary }}>{h.comentario}</p>
-                    )}
-                    <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
-                      {new Date(h.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <div className="relative">
+              {/* Línea vertical del timeline */}
+              <div
+                className="absolute left-[7px] top-2 bottom-2 w-0.5"
+                style={{ backgroundColor: theme.border }}
+              />
+              <div className="space-y-4">
+                {historial.map((h, index) => {
+                  const estadoColor = h.estado_nuevo ? estadoColors[h.estado_nuevo]?.bg : theme.primary;
+                  return (
+                    <div key={h.id} className="relative flex items-start gap-3 pl-6">
+                      {/* Punto del timeline */}
+                      <div
+                        className="absolute left-0 w-[14px] h-[14px] rounded-full border-2 flex-shrink-0"
+                        style={{
+                          backgroundColor: theme.card,
+                          borderColor: estadoColor,
+                        }}
+                        title={h.estado_nuevo ? estadoLabels[h.estado_nuevo] : h.accion}
+                      >
+                        {index === 0 && (
+                          <div
+                            className="absolute inset-1 rounded-full"
+                            style={{ backgroundColor: estadoColor }}
+                          />
+                        )}
+                      </div>
+                      {/* Contenido */}
+                      <div className="flex-1 min-w-0 pb-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {h.estado_nuevo && (
+                            <span
+                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                              style={{
+                                backgroundColor: estadoColor,
+                                color: '#ffffff'
+                              }}
+                            >
+                              {estadoLabels[h.estado_nuevo]}
+                            </span>
+                          )}
+                          <span className="text-xs" style={{ color: theme.textSecondary }}>
+                            {new Date(h.created_at).toLocaleDateString()} {new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-sm mt-1" style={{ color: theme.text }}>
+                          <span className="font-medium">{h.usuario.nombre}</span>
+                          {' '}{h.accion}
+                        </p>
+                        {h.comentario && (
+                          <p
+                            className="text-xs mt-1 p-2 rounded-lg"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              color: theme.textSecondary
+                            }}
+                          >
+                            "{h.comentario}"
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <p className="text-sm" style={{ color: theme.textSecondary }}>Sin historial</p>
@@ -876,21 +923,6 @@ export default function MisReclamos() {
         onClose={closeSheet}
         title={`Reclamo #${selectedReclamo?.id || ''}`}
         description={selectedReclamo?.titulo}
-        stickyFooter={
-          selectedReclamo && (
-            <button
-              onClick={() => {
-                closeSheet();
-                navigate(`/gestion/reclamos/${selectedReclamo.id}`);
-              }}
-              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-            >
-              <ExternalLink className="h-4 w-4" />
-              Ver Historial Completo
-            </button>
-          )
-        }
       >
         {renderViewContent()}
       </Sheet>
