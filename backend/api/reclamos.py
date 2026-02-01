@@ -1032,18 +1032,19 @@ async def asignar_reclamo(
 async def iniciar_reclamo(
     reclamo_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.ASIGNADO:
-        raise HTTPException(status_code=400, detail="El reclamo debe estar asignado para iniciarlo")
+    # Permitir iniciar desde recibido o asignado (legacy)
+    if reclamo.estado not in [EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO]:
+        raise HTTPException(status_code=400, detail="El reclamo debe estar recibido para iniciarlo")
 
     # Verificar que el usuario pertenezca a la dependencia asignada
-    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+    if current_user.municipio_dependencia_id:
         if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
             raise HTTPException(status_code=403, detail="No tienes permiso para iniciar este reclamo")
 
