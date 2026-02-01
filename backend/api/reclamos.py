@@ -257,7 +257,7 @@ async def get_reclamos(
     estado: Optional[EstadoReclamo] = None,
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
-    empleado_id: Optional[int] = None,
+    municipio_dependencia_id: Optional[int] = None,
     search: Optional[str] = Query(None, description="Búsqueda en todos los campos"),
     skip: int = Query(0, ge=0, description="Número de registros a saltar"),
     limit: int = Query(20, ge=1, le=100, description="Número de registros a retornar"),
@@ -266,7 +266,6 @@ async def get_reclamos(
 ):
     from models.categoria import Categoria
     from models.zona import Zona
-    from models.empleado import Empleado
     from sqlalchemy import or_, cast, String
     from sqlalchemy.orm import joinedload
 
@@ -302,9 +301,8 @@ async def get_reclamos(
         query = query.where(Reclamo.categoria_id == categoria_id)
     if zona_id:
         query = query.where(Reclamo.zona_id == zona_id)
-    # TODO: Migrar filtro empleado_id a dependencia_id
-    # if empleado_id:
-    #     query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
+    if municipio_dependencia_id:
+        query = query.where(Reclamo.municipio_dependencia_id == municipio_dependencia_id)
 
     # Búsqueda en todos los campos
     if search and search.strip():
