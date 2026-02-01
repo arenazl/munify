@@ -274,6 +274,7 @@ async def get_reclamos(
         query = select(Reclamo).options(
             selectinload(Reclamo.categoria),
             selectinload(Reclamo.zona),
+            selectinload(Reclamo.barrio),
             selectinload(Reclamo.creador),
             selectinload(Reclamo.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
             selectinload(Reclamo.documentos)
