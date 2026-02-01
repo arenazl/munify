@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -1093,56 +1093,114 @@ export default function Layout() {
             />
           )}
 
-          {/* Menú crear animado */}
+          {/* Menú crear animado - Estilo horizontal con iconos */}
           {createMenuOpen && (
             <div
-              className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[56] flex flex-col gap-3"
-              style={{ animation: 'slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
+              className="fixed bottom-24 left-4 right-4 z-[56] px-4 py-4 rounded-3xl"
+              style={{
+                backgroundColor: theme.card,
+                border: `1px solid ${theme.border}`,
+                boxShadow: '0 -4px 30px rgba(0,0,0,0.3)',
+                animation: 'slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
+              }}
             >
-              <button
-                onClick={() => {
-                  setCreateMenuOpen(false);
-                  navigate('/gestion/crear-reclamo');
-                }}
-                className="flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl"
-                style={{
-                  backgroundColor: theme.card,
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
+              <div className="flex items-center justify-around gap-2">
+                {/* Reclamo */}
+                <button
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    navigate('/gestion/crear-reclamo');
+                  }}
+                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1.5px solid ${theme.border}`,
+                    minWidth: '80px'
+                  }}
                 >
-                  <AlertCircle className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold" style={{ color: theme.text }}>Nuevo Reclamo</p>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>Reportar un problema</p>
-                </div>
-              </button>
-              <button
-                onClick={() => {
-                  setCreateMenuOpen(false);
-                  navigate('/gestion/crear-tramite');
-                }}
-                className="flex items-center gap-3 px-5 py-3 rounded-2xl shadow-xl"
-                style={{
-                  backgroundColor: theme.card,
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: '#ef444415' }}
+                  >
+                    <AlertCircle className="h-6 w-6" style={{ color: '#ef4444' }} />
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#ef4444' }}>
+                    Reclamo
+                  </span>
+                </button>
+
+                {/* Trámite */}
+                <button
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    navigate('/gestion/crear-tramite');
+                  }}
+                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1.5px solid ${theme.border}`,
+                    minWidth: '80px'
+                  }}
                 >
-                  <FileCheck className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold" style={{ color: theme.text }}>Nuevo Trámite</p>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>Iniciar una gestión</p>
-                </div>
-              </button>
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: '#3b82f615' }}
+                  >
+                    <FileCheck className="h-6 w-6" style={{ color: '#3b82f6' }} />
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#3b82f6' }}>
+                    Trámite
+                  </span>
+                </button>
+
+                {/* Mapa */}
+                <button
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    navigate('/gestion/mapa');
+                  }}
+                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1.5px solid ${theme.border}`,
+                    minWidth: '80px'
+                  }}
+                >
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: '#10b98115' }}
+                  >
+                    <Map className="h-6 w-6" style={{ color: '#10b981' }} />
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#10b981' }}>
+                    Mapa
+                  </span>
+                </button>
+
+                {/* Ayuda */}
+                <button
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    // Podría abrir un modal de ayuda
+                  }}
+                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1.5px solid ${theme.border}`,
+                    minWidth: '80px'
+                  }}
+                >
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: '#8b5cf615' }}
+                  >
+                    <HelpCircle className="h-6 w-6" style={{ color: '#8b5cf6' }} />
+                  </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#8b5cf6' }}>
+                    Ayuda
+                  </span>
+                </button>
+              </div>
             </div>
           )}
 
