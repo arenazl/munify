@@ -1452,8 +1452,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       const fechaB = b.fecha_programada ? new Date(b.fecha_programada).getTime() : Infinity;
       return fechaA - fechaB;
     } else {
-      // Ordenar por fecha de creación (más reciente primero)
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      // Ordenar por última actualización (más reciente primero) - incluye comentarios
+      const fechaA = new Date(a.updated_at || a.created_at).getTime();
+      const fechaB = new Date(b.updated_at || b.created_at).getTime();
+      return fechaB - fechaA;
     }
   });
 
@@ -3887,17 +3889,29 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     {r.titulo}
                   </span>
                 </div>
-                <span
-                  className="px-3 py-1 text-xs font-semibold rounded-full shadow-sm flex-shrink-0 ml-2 flex items-center gap-1.5"
-                  style={{
-                    backgroundColor: theme.card,
-                    color: estado.text,
-                    boxShadow: `0 2px 4px ${estado.text}20`
-                  }}
-                >
-                  {getEstadoIcon(r.estado)}
-                  {estadoLabels[r.estado]}
-                </span>
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  {/* Indicador de actividad reciente (comentario) */}
+                  {r.updated_at && new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000 && (
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center animate-pulse"
+                      style={{ backgroundColor: '#3b82f620' }}
+                      title="Actividad reciente"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" style={{ color: '#3b82f6' }} />
+                    </span>
+                  )}
+                  <span
+                    className="px-3 py-1 text-xs font-semibold rounded-full shadow-sm flex items-center gap-1.5"
+                    style={{
+                      backgroundColor: theme.card,
+                      color: estado.text,
+                      boxShadow: `0 2px 4px ${estado.text}20`
+                    }}
+                  >
+                    {getEstadoIcon(r.estado)}
+                    {estadoLabels[r.estado]}
+                  </span>
+                </div>
               </div>
 
               {/* Badge de categoría destacado */}

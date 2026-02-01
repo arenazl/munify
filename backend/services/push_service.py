@@ -271,6 +271,56 @@ async def notificar_comentario_vecino_a_empleado(db: AsyncSession, empleado_user
     )
 
 
+async def notificar_comentario_vecino_a_dependencia(
+    db: AsyncSession,
+    reclamo,
+    comentario: str,
+    vecino_nombre: str
+) -> int:
+    """
+    Notifica a todos los usuarios de la dependencia asignada cuando un vecino comenta.
+    """
+    from models import MunicipioDependencia
+    from models.enums import RolUsuario
+
+    if not reclamo.municipio_dependencia_id:
+        logger.info(f"Reclamo #{reclamo.id} no tiene dependencia asignada, no se envía notificación")
+        return 0
+
+    # Buscar usuarios de la dependencia (supervisores)
+    result = await db.execute(
+        select(User).where(
+            User.municipio_dependencia_id == reclamo.municipio_dependencia_id,
+            User.rol == RolUsuario.SUPERVISOR,
+            User.activo == True
+        )
+    )
+    usuarios_dependencia = result.scalars().all()
+
+    if not usuarios_dependencia:
+        logger.info(f"No hay usuarios en la dependencia {reclamo.municipio_dependencia_id}")
+        return 0
+
+    # Truncar comentario
+    comentario_preview = comentario[:60] + "..." if len(comentario) > 60 else comentario
+
+    total_enviados = 0
+    for usuario in usuarios_dependencia:
+        if await check_user_notification_preference(db, usuario.id, "comentario_vecino"):
+            enviados = await send_push_to_user(
+                db=db,
+                user_id=usuario.id,
+                title=f"💬 Comentario de {vecino_nombre}",
+                body=f"Reclamo #{reclamo.id}: {comentario_preview}",
+                url=f"/gestion/reclamos/{reclamo.id}",
+                data={"tipo": "comentario_vecino", "reclamo_id": reclamo.id}
+            )
+            total_enviados += enviados
+
+    logger.info(f"Notificación de comentario enviada a {total_enviados} usuarios de la dependencia")
+    return total_enviados
+
+
 async def notificar_supervisor_reclamo_nuevo(db: AsyncSession, supervisor_user_id: int, reclamo) -> int:
     """Notifica al supervisor que hay un nuevo reclamo"""
     if not await check_user_notification_preference(db, supervisor_user_id, "reclamo_nuevo_supervisor"):

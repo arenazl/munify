@@ -497,9 +497,7 @@ export default function ReclamoDetalle() {
         </div>
 
         {/* Contenido */}
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna izquierda: Información del reclamo */}
-          <div className="lg:col-span-2 space-y-6">
+        <div className="p-6 space-y-6">
             {/* Descripción */}
             <div>
               <h3 className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
@@ -575,6 +573,158 @@ export default function ReclamoDetalle() {
                 )}
               </div>
             )}
+
+            {/* Timeline de eventos */}
+            <div
+              className="p-4 rounded-xl"
+              style={{ backgroundColor: theme.backgroundSecondary }}
+            >
+              <h3 className="font-medium mb-4 flex items-center gap-2" style={{ color: theme.text }}>
+                <Clock className="h-4 w-4" style={{ color: theme.primary }} />
+                Historial de Eventos
+              </h3>
+
+              {timelineEvents.length > 0 ? (
+                <div className="relative">
+                  {/* Línea vertical del timeline */}
+                  <div
+                    className="absolute left-3 top-2 bottom-2 w-0.5"
+                    style={{ backgroundColor: theme.border }}
+                  />
+
+                  <div className="space-y-4">
+                    {timelineEvents.map((event, index) => {
+                      const isFirst = index === 0;
+
+                      if (event.type === 'whatsapp') {
+                        const log = event.data as WhatsAppLog;
+                        return (
+                          <div key={event.id} className="relative flex gap-3">
+                            <div
+                              className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+                              style={{
+                                backgroundColor: log.enviado ? '#22c55e' : '#ef4444',
+                                border: 'none'
+                              }}
+                            >
+                              <MessageCircle className="h-3 w-3" style={{ color: '#ffffff' }} />
+                            </div>
+                            <div className="flex-1 pb-4">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="font-medium text-sm"
+                                  style={{ color: log.enviado ? '#22c55e' : '#ef4444' }}
+                                >
+                                  WhatsApp {log.enviado ? 'enviado' : 'fallido'}
+                                </span>
+                                <span
+                                  className="px-1.5 py-0.5 text-xs rounded"
+                                  style={{ backgroundColor: '#22c55e20', color: '#16a34a' }}
+                                >
+                                  {tipoMensajeLabels[log.tipo_mensaje] || log.tipo_mensaje}
+                                </span>
+                              </div>
+                              {log.mensaje && (
+                                <p className="text-sm mt-1 italic" style={{ color: theme.textSecondary }}>
+                                  "{log.mensaje.substring(0, 100)}{log.mensaje.length > 100 ? '...' : ''}"
+                                </p>
+                              )}
+                              {log.error && (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <p className="text-sm" style={{ color: '#ef4444' }}>
+                                    {getFriendlyError(log.error)}
+                                  </p>
+                                  {user && ['admin', 'supervisor'].includes(user.rol) && (
+                                    <button
+                                      onClick={() => handleResendWhatsApp(log)}
+                                      disabled={resendingId === log.id}
+                                      className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                                      style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+                                      title="Reintentar envío"
+                                    >
+                                      <RefreshCw className={`h-3 w-3 ${resendingId === log.id ? 'animate-spin' : ''}`} />
+                                      {resendingId === log.id ? 'Enviando...' : 'Reenviar'}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: theme.textSecondary }}>
+                                <span>Tel: {log.telefono}</span>
+                                <span>•</span>
+                                <span>
+                                  {new Date(log.created_at).toLocaleDateString('es-AR', {
+                                    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const item = event.data as HistorialReclamo;
+                      const ActionIcon = accionIcons[item.accion.toLowerCase()] || AlertCircle;
+
+                      return (
+                        <div key={event.id} className="relative flex gap-3">
+                          <div
+                            className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
+                            style={{
+                              backgroundColor: isFirst ? theme.primary : theme.card,
+                              border: isFirst ? 'none' : `2px solid ${theme.border}`
+                            }}
+                          >
+                            <ActionIcon
+                              className="h-3 w-3"
+                              style={{ color: isFirst ? '#ffffff' : theme.textSecondary }}
+                            />
+                          </div>
+                          <div className="flex-1 pb-4">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="font-medium text-sm capitalize"
+                                style={{ color: isFirst ? theme.primary : theme.text }}
+                              >
+                                {item.accion}
+                              </span>
+                              {item.estado_nuevo && (
+                                <span
+                                  className="px-1.5 py-0.5 text-xs rounded"
+                                  style={{
+                                    backgroundColor: estadoConfig[item.estado_nuevo]?.bg || theme.backgroundSecondary,
+                                    color: estadoConfig[item.estado_nuevo]?.color || theme.text
+                                  }}
+                                >
+                                  {estadoConfig[item.estado_nuevo]?.label || item.estado_nuevo}
+                                </span>
+                              )}
+                            </div>
+                            {item.comentario && (
+                              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                                {item.comentario}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: theme.textSecondary }}>
+                              <span>{formatEmpleadoNombre(`${item.usuario.nombre} ${item.usuario.apellido}`)}</span>
+                              <span>•</span>
+                              <span>
+                                {new Date(item.created_at).toLocaleDateString('es-AR', {
+                                  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-center py-4" style={{ color: theme.textSecondary }}>
+                  Sin historial de eventos
+                </p>
+              )}
+            </div>
 
             {/* Resolución */}
             {reclamo.resolucion && (
@@ -828,229 +978,6 @@ export default function ReclamoDetalle() {
               </div>
             )}
 
-            {/* Formulario para agregar comentario */}
-            {reclamo.estado !== 'resuelto' && reclamo.estado !== 'rechazado' && (
-              <div
-                className="p-4 rounded-xl mt-6"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-              >
-                <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: theme.text }}>
-                  <MessageSquare className="h-4 w-4" style={{ color: theme.primary }} />
-                  Agregar comentario
-                </h3>
-                <div className="flex gap-2">
-                  <textarea
-                    value={nuevoComentario}
-                    onChange={(e) => setNuevoComentario(e.target.value)}
-                    placeholder="Escribe información adicional o una pregunta..."
-                    rows={2}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm resize-none focus:ring-2 focus:outline-none"
-                    style={{
-                      backgroundColor: theme.background,
-                      color: theme.text,
-                      border: `1px solid ${theme.border}`,
-                    }}
-                    disabled={enviandoComentario}
-                  />
-                  <button
-                    onClick={handleAgregarComentario}
-                    disabled={enviandoComentario || !nuevoComentario.trim()}
-                    className="self-end px-4 py-2 rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    style={{
-                      backgroundColor: theme.primary,
-                      color: '#ffffff',
-                    }}
-                  >
-                    <Send className="h-4 w-4" />
-                    {enviandoComentario ? 'Enviando...' : 'Enviar'}
-                  </button>
-                </div>
-                <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
-                  Tu comentario será visible para los empleados municipales
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Columna derecha: Timeline */}
-          <div className="lg:col-span-1">
-            <div
-              className="sticky top-24 p-4 rounded-xl"
-              style={{ backgroundColor: theme.backgroundSecondary }}
-            >
-              <h3 className="font-medium mb-4 flex items-center gap-2" style={{ color: theme.text }}>
-                <Clock className="h-4 w-4" style={{ color: theme.primary }} />
-                Historial de Eventos
-              </h3>
-
-              {timelineEvents.length > 0 ? (
-                <div className="relative">
-                  {/* Línea vertical del timeline */}
-                  <div
-                    className="absolute left-3 top-2 bottom-2 w-0.5"
-                    style={{ backgroundColor: theme.border }}
-                  />
-
-                  <div className="space-y-4">
-                    {timelineEvents.map((event, index) => {
-                      const isFirst = index === 0;
-
-                      if (event.type === 'whatsapp') {
-                        // Renderizar evento de WhatsApp
-                        const log = event.data as WhatsAppLog;
-                        return (
-                          <div key={event.id} className="relative flex gap-3">
-                            {/* Punto del timeline - verde para WhatsApp */}
-                            <div
-                              className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                              style={{
-                                backgroundColor: log.enviado ? '#22c55e' : '#ef4444',
-                                border: 'none'
-                              }}
-                            >
-                              <MessageCircle className="h-3 w-3" style={{ color: '#ffffff' }} />
-                            </div>
-
-                            {/* Contenido del evento WhatsApp */}
-                            <div className="flex-1 pb-4">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="font-medium text-sm"
-                                  style={{ color: log.enviado ? '#22c55e' : '#ef4444' }}
-                                >
-                                  WhatsApp {log.enviado ? 'enviado' : 'fallido'}
-                                </span>
-                                <span
-                                  className="px-1.5 py-0.5 text-xs rounded"
-                                  style={{
-                                    backgroundColor: '#22c55e20',
-                                    color: '#16a34a'
-                                  }}
-                                >
-                                  {tipoMensajeLabels[log.tipo_mensaje] || log.tipo_mensaje}
-                                </span>
-                              </div>
-
-                              {log.mensaje && (
-                                <p className="text-sm mt-1 italic" style={{ color: theme.textSecondary }}>
-                                  "{log.mensaje.substring(0, 100)}{log.mensaje.length > 100 ? '...' : ''}"
-                                </p>
-                              )}
-
-                              {log.error && (
-                                <div className="mt-1 flex items-center gap-2">
-                                  <p className="text-sm" style={{ color: '#ef4444' }}>
-                                    {getFriendlyError(log.error)}
-                                  </p>
-                                  {/* Botón de reenviar para admin/supervisor */}
-                                  {user && ['admin', 'supervisor'].includes(user.rol) && (
-                                    <button
-                                      onClick={() => handleResendWhatsApp(log)}
-                                      disabled={resendingId === log.id}
-                                      className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                                      style={{
-                                        backgroundColor: theme.primary,
-                                        color: '#ffffff'
-                                      }}
-                                      title="Reintentar envío"
-                                    >
-                                      <RefreshCw className={`h-3 w-3 ${resendingId === log.id ? 'animate-spin' : ''}`} />
-                                      {resendingId === log.id ? 'Enviando...' : 'Reenviar'}
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: theme.textSecondary }}>
-                                <span>Tel: {log.telefono}</span>
-                                <span>•</span>
-                                <span>
-                                  {new Date(log.created_at).toLocaleDateString('es-AR', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // Renderizar evento del historial normal
-                      const item = event.data as HistorialReclamo;
-                      const ActionIcon = accionIcons[item.accion.toLowerCase()] || AlertCircle;
-
-                      return (
-                        <div key={event.id} className="relative flex gap-3">
-                          {/* Punto del timeline */}
-                          <div
-                            className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                            style={{
-                              backgroundColor: isFirst ? theme.primary : theme.card,
-                              border: isFirst ? 'none' : `2px solid ${theme.border}`
-                            }}
-                          >
-                            <ActionIcon
-                              className="h-3 w-3"
-                              style={{ color: isFirst ? '#ffffff' : theme.textSecondary }}
-                            />
-                          </div>
-
-                          {/* Contenido del evento */}
-                          <div className="flex-1 pb-4">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="font-medium text-sm capitalize"
-                                style={{ color: isFirst ? theme.primary : theme.text }}
-                              >
-                                {item.accion}
-                              </span>
-                              {item.estado_nuevo && (
-                                <span
-                                  className="px-1.5 py-0.5 text-xs rounded"
-                                  style={{
-                                    backgroundColor: estadoConfig[item.estado_nuevo]?.bg || theme.backgroundSecondary,
-                                    color: estadoConfig[item.estado_nuevo]?.color || theme.text
-                                  }}
-                                >
-                                  {estadoConfig[item.estado_nuevo]?.label || item.estado_nuevo}
-                                </span>
-                              )}
-                            </div>
-
-                            {item.comentario && (
-                              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-                                {item.comentario}
-                              </p>
-                            )}
-
-                            <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: theme.textSecondary }}>
-                              <span>{formatEmpleadoNombre(`${item.usuario.nombre} ${item.usuario.apellido}`)}</span>
-                              <span>•</span>
-                              <span>
-                                {new Date(item.created_at).toLocaleDateString('es-AR', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <p className="text-sm text-center py-4" style={{ color: theme.textSecondary }}>
-                  Sin historial de eventos
-                </p>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

@@ -1400,6 +1400,9 @@ async def agregar_comentario(
     current_user: User = Depends(get_current_user)
 ):
     """Agrega un comentario a un reclamo (disponible para vecinos en sus propios reclamos)"""
+    from datetime import datetime
+    from services.push_service import notificar_comentario_vecino_a_dependencia
+
     result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
     reclamo = result.scalar_one_or_none()
     if not reclamo:
@@ -1409,6 +1412,9 @@ async def agregar_comentario(
     # vecinos solo en sus propios reclamos
     if current_user.rol == RolUsuario.VECINO and reclamo.creador_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para comentar en este reclamo")
+
+    # Actualizar updated_at del reclamo para que suba en la lista
+    reclamo.updated_at = datetime.utcnow()
 
     # Crear entrada en el historial
     historial = HistorialReclamo(
@@ -1423,12 +1429,21 @@ async def agregar_comentario(
     await db.commit()
     await db.refresh(historial)
 
-    # Enviar notificación push del comentario
-    await enviar_notificacion_push(
-        db, reclamo, 'nuevo_comentario',
-        comentario_texto=data.comentario[:100],
-        autor_nombre=f"{current_user.nombre} {current_user.apellido or ''}".strip()
-    )
+    autor_nombre = f"{current_user.nombre} {current_user.apellido or ''}".strip()
+
+    # Enviar notificación según quién comenta
+    if current_user.rol == RolUsuario.VECINO:
+        # Vecino comenta → notificar a la dependencia
+        await notificar_comentario_vecino_a_dependencia(
+            db, reclamo, data.comentario, autor_nombre
+        )
+    else:
+        # Admin/Supervisor comenta → notificar al vecino
+        await enviar_notificacion_push(
+            db, reclamo, 'nuevo_comentario',
+            comentario_texto=data.comentario[:100],
+            autor_nombre=autor_nombre
+        )
 
     return historial
 
