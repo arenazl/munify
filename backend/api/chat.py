@@ -2231,6 +2231,7 @@ REGLAS:
 1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. Para filtrar por municipio: verificá en el schema si la tabla tiene columna "municipio_id". Si NO la tiene, buscá "multi_tenant_note" que te indica qué tabla pivote usar.
 2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
 3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()
+4. **IMPORTANTE - GROUP BY**: MySQL tiene `only_full_group_by` activado. Cuando uses GROUP BY, TODAS las columnas en SELECT que NO sean funciones de agregación (COUNT, SUM, AVG, MAX, MIN) DEBEN estar en el GROUP BY. Si querés contar + mostrar detalles, usá una subquery o dos consultas separadas. Ejemplo INCORRECTO: `SELECT m.nombre, COUNT(r.id), r.estado FROM ... GROUP BY m.id`. Ejemplo CORRECTO: `SELECT m.id, m.nombre, COUNT(r.id) as cantidad FROM ... GROUP BY m.id, m.nombre`.
 
 IMPORTANTE - SQL MINIMALISTA:
 - Máximo 5-6 columnas (id, titulo, estado, categoria, fecha)
