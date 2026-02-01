@@ -11,35 +11,8 @@ import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
+import { ReclamoCard, estadoColors, estadoLabels } from '../components/ui/ReclamoCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
-
-const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  recibido: { bg: '#0891b2', text: '#ffffff' },
-  en_curso: { bg: '#f59e0b', text: '#ffffff' },
-  finalizado: { bg: '#10b981', text: '#ffffff' },
-  pospuesto: { bg: '#f97316', text: '#ffffff' },
-  rechazado: { bg: '#ef4444', text: '#ffffff' },
-  // Legacy
-  nuevo: { bg: '#6366f1', text: '#ffffff' },
-  asignado: { bg: '#3b82f6', text: '#ffffff' },
-  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
-  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
-  resuelto: { bg: '#10b981', text: '#ffffff' },
-};
-
-const estadoLabels: Record<EstadoReclamo, string> = {
-  recibido: 'Recibido',
-  en_curso: 'En Curso',
-  finalizado: 'Finalizado',
-  pospuesto: 'Pospuesto',
-  rechazado: 'Rechazado',
-  // Legacy
-  nuevo: 'Nuevo',
-  asignado: 'Asignado',
-  en_proceso: 'En Proceso',
-  pendiente_confirmacion: 'Pendiente',
-  resuelto: 'Resuelto',
-};
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
 const getCategoryImageUrl = (nombre: string): string | null => {
@@ -3853,173 +3826,20 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
           ))
         ) : (
-          filteredReclamos.map((r) => {
-            const estado = estadoColors[r.estado];
-            const categoryColor = r.categoria.color || DEFAULT_CATEGORY_COLOR;
-            const bgImage = getCategoryImageUrl(r.categoria.nombre);
-            // Si la animación terminó, siempre visible
+          filteredReclamos.map((r, index) => {
             const isVisible = animationDone || visibleCards.has(r.id);
             return (
-            <div
-              key={r.id}
-              onClick={() => openViewSheet(r)}
-              className={`group relative rounded-2xl cursor-pointer overflow-hidden abm-card-hover transition-all duration-500 ${
-                isVisible ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
-              }`}
-              style={{
-                backgroundColor: theme.card,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              {/* Imagen de fondo basada en la categoría */}
-              {bgImage && (
-                <div className="absolute inset-0">
-                  <img
-                    src={bgImage}
-                    alt=""
-                    className="w-full h-full object-cover opacity-10 group-hover:opacity-20 group-hover:scale-105 transition-all duration-700"
-                  />
-                  {/* Overlay con gradiente del color de la categoría */}
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.card}F8 0%, ${theme.card}F0 50%, ${categoryColor}20 100%)`,
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* Contenido principal */}
-              <div className="relative z-10 p-5">
-              {/* Header con gradiente */}
-              <div
-                className="flex items-center justify-between -mx-5 -mt-5 mb-4 px-4 py-3 rounded-t-xl"
-                style={{
-                  background: r.estado === 'asignado'
-                    ? 'linear-gradient(135deg, rgb(74 79 160 / 0%) 0%, rgba(59, 130, 246, 0.5) 100%)'
-                    : `linear-gradient(135deg, ${estado.bg} 0%, ${estado.bg}80 100%)`,
-                  borderBottom: r.estado === 'asignado'
-                    ? '1px solid rgb(59 130 246 / 0%)'
-                    : `1px solid ${estado.bg}`
-                }}
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: `${estado.text}15` }}
-                  >
-                    <FileText className="h-4 w-4" style={{ color: estado.text }} />
-                  </div>
-                  <span className="font-semibold text-sm line-clamp-1" style={{ color: estado.text }}>
-                    {r.titulo}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                  {/* Indicador de actividad reciente (comentario) */}
-                  {r.updated_at && new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000 && (
-                    <span
-                      className="w-7 h-7 rounded-full flex items-center justify-center animate-bounce"
-                      style={{
-                        backgroundColor: '#3b82f6',
-                        boxShadow: '0 0 12px #3b82f6, 0 0 24px #3b82f680'
-                      }}
-                      title="Actividad reciente"
-                    >
-                      <MessageCircle className="h-4 w-4" style={{ color: '#ffffff' }} />
-                    </span>
-                  )}
-                  <span
-                    className="px-3 py-1 text-xs font-semibold rounded-full shadow-sm flex items-center gap-1.5"
-                    style={{
-                      backgroundColor: theme.card,
-                      color: estado.text,
-                      boxShadow: `0 2px 4px ${estado.text}20`
-                    }}
-                  >
-                    {getEstadoIcon(r.estado)}
-                    {estadoLabels[r.estado]}
-                  </span>
-                </div>
-              </div>
-
-              {/* Badge de categoría destacado */}
-              <div className="flex items-center gap-2 mb-3">
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                  style={{
-                    backgroundColor: `${categoryColor}15`,
-                    border: `1px solid ${categoryColor}40`,
-                  }}
-                >
-                  <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: categoryColor }}
-                  >
-                    <span style={{ color: '#ffffff' }}>
-                      {getCategoryIcon(r.categoria.nombre)}
-                    </span>
-                  </div>
-                  <span className="text-xs font-semibold" style={{ color: categoryColor }}>
-                    {r.categoria.nombre}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {r.creador && !r.es_anonimo && (
-                    <span className="text-sm font-medium" style={{ color: theme.text }}>
-                      {r.creador.nombre} {r.creador.apellido?.charAt(0)}.
-                    </span>
-                  )}
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>#{r.id}</span>
-                </div>
-              </div>
-
-              {/* Contenido */}
-              <div className="flex items-center">
-                <p className="text-sm flex items-center flex-1 min-w-0" style={{ color: theme.textSecondary }}>
-                  <MapPin className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
-                  <span className="line-clamp-1">{r.direccion}</span>
-                </p>
-              </div>
-
-              <p className="text-sm mt-2 line-clamp-2" style={{ color: theme.textSecondary }}>
-                {r.descripcion}
-              </p>
-
-              <div
-                className="flex items-center justify-between mt-4 pt-4 text-xs"
-                style={{ borderTop: `1px solid ${theme.border}`, color: theme.textSecondary }}
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="flex items-center">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {new Date(r.created_at).toLocaleDateString()}
-                  </span>
-                  {/* Badge de reclamos similares */}
-                  {similaresCounts[r.id] > 0 && (
-                    <span
-                      className="flex items-center gap-1 px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        backgroundColor: '#f59e0b20',
-                        color: '#d97706',
-                        border: '1px solid #f59e0b40'
-                      }}
-                    >
-                      <Users className="h-3 w-3" />
-                      {similaresCounts[r.id]} {similaresCounts[r.id] === 1 ? 'vecino' : 'vecinos'}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {r.dependencia_asignada?.nombre && (
-                    <span style={{ color: theme.primary }} className="font-medium">{r.dependencia_asignada.nombre}</span>
-                  )}
-                  <Eye className="h-4 w-4" style={{ color: theme.primary }} />
-                </div>
-              </div>
-              </div>
-            </div>
-          );
-        })
+              <ReclamoCard
+                key={r.id}
+                reclamo={r}
+                onClick={() => openViewSheet(r)}
+                showCreador={true}
+                similaresCount={similaresCounts[r.id] || 0}
+                isVisible={isVisible}
+                animationDelay={index * 50}
+              />
+            );
+          })
         )}
       </ABMPage>
 

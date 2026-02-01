@@ -13,6 +13,47 @@ La guía `00_COMO_USAR.md` tiene el índice de todas las guías disponibles.
 
 ---
 
+## REGLAS BÁSICAS DE DESARROLLO (NO NEGOCIABLES)
+
+### 1. Componentes Compartidos - DRY (Don't Repeat Yourself)
+- **NUNCA** duplicar código de componentes visuales
+- Si un elemento visual (card, badge, lista) se usa en más de un lugar → crear componente compartido en `components/ui/`
+- Un `ReclamoCard` es un `ReclamoCard` → mismo componente, mismos colores, misma distribución
+- Las variaciones se manejan con props (ej: `showCreador`, `similaresCount`), NO duplicando código
+
+### 2. Colores y Estilos Consistentes
+- Los colores de estados (`estadoColors`) deben estar definidos en UN solo lugar
+- Si desktop y mobile muestran colores diferentes para lo mismo → está MAL
+- Exportar constantes de colores desde el componente compartido e importar donde se necesite
+
+### 3. Estructura de Componentes Compartidos
+```
+components/ui/
+├── ReclamoCard.tsx      ← Card de reclamo (vecino + supervisor)
+├── TramiteCard.tsx      ← Card de trámite
+├── EstadoBadge.tsx      ← Badge de estado con colores
+└── ...
+```
+
+### 4. Props para Variaciones, NO Duplicación
+```tsx
+// ✅ CORRECTO - Un componente con props
+<ReclamoCard
+  reclamo={r}
+  showCreador={true}        // Solo supervisor ve el creador
+  similaresCount={5}        // Solo supervisor ve similares
+/>
+
+// ❌ INCORRECTO - Duplicar componentes
+<ReclamoCardVecino ... />
+<ReclamoCardSupervisor ... />
+```
+
+### 5. Revisar antes de crear
+Antes de escribir un componente visual, BUSCAR si ya existe algo similar que pueda reutilizarse o extenderse.
+
+---
+
 ## ESTADO ACTUAL DE DESARROLLO (2025-02-01)
 
 ### Cambios Completados: Eliminación rol "empleado" y nuevo flujo de estados

@@ -1,41 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, ThumbsUp, ThumbsDown, AlertCircle } from 'lucide-react';
-import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
+import { ABMPage, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
+import { ReclamoCard, estadoColors, estadoLabels } from '../components/ui/ReclamoCard';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
-
-const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  recibido: { bg: '#0891b2', text: '#ffffff' },
-  en_curso: { bg: '#f59e0b', text: '#ffffff' },
-  finalizado: { bg: '#10b981', text: '#ffffff' },
-  pospuesto: { bg: '#f97316', text: '#ffffff' },
-  rechazado: { bg: '#ef4444', text: '#ffffff' },
-  // Legacy
-  nuevo: { bg: '#6366f1', text: '#ffffff' },
-  asignado: { bg: '#3b82f6', text: '#ffffff' },
-  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
-  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
-  resuelto: { bg: '#10b981', text: '#ffffff' },
-};
-
-const estadoLabels: Record<EstadoReclamo, string> = {
-  recibido: 'Recibido',
-  en_curso: 'En Curso',
-  finalizado: 'Finalizado',
-  pospuesto: 'Pospuesto',
-  rechazado: 'Rechazado',
-  // Legacy
-  nuevo: 'Nuevo',
-  asignado: 'Asignado',
-  en_proceso: 'En Proceso',
-  pendiente_confirmacion: 'Pendiente',
-  resuelto: 'Resuelto',
-};
 
 // Formatea el nombre del empleado en formato "L. Lopez"
 const formatEmpleadoNombre = (nombreCompleto: string): string => {
@@ -888,154 +860,13 @@ export default function MisReclamos() {
             )}
           </div>
         ) : (
-          filteredReclamos.map((r) => {
-            const estado = estadoColors[r.estado];
-            const tieneImagen = r.documentos && r.documentos.length > 0;
-            return (
-              <ABMCard key={r.id} onClick={() => openViewSheet(r)}>
-                <div className="flex gap-4">
-                  {/* Imagen miniatura o placeholder */}
-                  <div
-                    className="w-20 h-20 rounded-xl flex-shrink-0 overflow-hidden flex items-center justify-center"
-                    style={{ backgroundColor: tieneImagen ? 'transparent' : `${r.categoria?.color || theme.primary}15` }}
-                  >
-                    {tieneImagen ? (
-                      <img
-                        src={r.documentos[0].url}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <MapPin
-                        className="h-8 w-8"
-                        style={{ color: r.categoria?.color || theme.primary }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Contenido */}
-                  <div className="flex-1 min-w-0">
-                    {/* Línea 1: Título completo */}
-                    <p className="font-semibold line-clamp-2 leading-tight" style={{ color: theme.text }}>
-                      {r.titulo}
-                    </p>
-
-                    {/* Línea 2: Categoría + Fecha */}
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span
-                        className="text-xs font-medium px-2 py-0.5 rounded-md"
-                        style={{ backgroundColor: `${r.categoria?.color || theme.primary}15`, color: r.categoria?.color || theme.primary }}
-                      >
-                        {r.categoria.nombre}
-                      </span>
-                      <span className="text-xs flex items-center" style={{ color: theme.textSecondary }}>
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {new Date(r.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-
-                    {/* Línea 3: Dependencia asignada */}
-                    {r.dependencia_asignada?.nombre && (
-                      <div className="mt-1.5">
-                        <span
-                          className="text-xs font-medium px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-                          style={{
-                            backgroundColor: `${r.dependencia_asignada.color || theme.primary}20`,
-                            color: r.dependencia_asignada.color || theme.primary
-                          }}
-                        >
-                          <DynamicIcon name={r.dependencia_asignada.icono || 'Building2'} className="h-3 w-3" />
-                          {r.dependencia_asignada.nombre}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Línea 4: Descripción */}
-                    <p className="text-sm mt-2 line-clamp-2" style={{ color: theme.textSecondary }}>
-                      {r.descripcion}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Footer con dirección, #ID, estado y fechas */}
-                <div
-                  className="flex items-center justify-between mt-3 pt-3 text-xs"
-                  style={{ borderTop: `1px solid ${theme.border}` }}
-                >
-                  <span className="flex items-center truncate" style={{ color: theme.textSecondary }}>
-                    <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
-                    <span className="truncate">{r.direccion}</span>
-                  </span>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    {/* Última actualización */}
-                    {r.updated_at && (
-                      <span className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                        <Clock className="h-3 w-3" />
-                        {new Date(r.updated_at).toLocaleDateString()}
-                      </span>
-                    )}
-                    {/* Por vencer - basado en fecha_programada */}
-                    {r.fecha_programada && !['resuelto', 'rechazado'].includes(r.estado) && (() => {
-                      const hoy = new Date();
-                      hoy.setHours(0, 0, 0, 0);
-                      const fechaVenc = new Date(r.fecha_programada);
-                      fechaVenc.setHours(0, 0, 0, 0);
-                      const diffMs = fechaVenc.getTime() - hoy.getTime();
-                      const diffDias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-                      const diffHoras = Math.ceil(diffMs / (1000 * 60 * 60));
-
-                      let texto = '';
-                      let color = theme.textSecondary;
-
-                      if (diffDias < 0) {
-                        const diasVencidos = Math.abs(diffDias);
-                        if (diasVencidos >= 7) {
-                          texto = `Vencido (${Math.floor(diasVencidos / 7)}sem)`;
-                        } else {
-                          texto = `Vencido (${diasVencidos}d)`;
-                        }
-                        color = '#ef4444';
-                      } else if (diffDias === 0) {
-                        texto = 'Hoy';
-                        color = '#f59e0b';
-                      } else if (diffHoras <= 24) {
-                        texto = `${diffHoras}h`;
-                        color = '#f59e0b';
-                      } else if (diffDias === 1) {
-                        texto = 'Mañana';
-                        color = '#eab308';
-                      } else if (diffDias <= 7) {
-                        texto = `${diffDias}d`;
-                        color = diffDias <= 2 ? '#eab308' : theme.textSecondary;
-                      } else {
-                        texto = `${Math.floor(diffDias / 7)}sem`;
-                      }
-
-                      return (
-                        <span className="font-medium" style={{ color }}>
-                          {texto}
-                        </span>
-                      );
-                    })()}
-                    {/* #ID del reclamo */}
-                    <span
-                      className="font-mono text-[10px] px-1.5 py-0.5 rounded"
-                      style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-                    >
-                      #{r.id}
-                    </span>
-                    {/* Estado con color sólido */}
-                    <span
-                      className="px-2 py-0.5 text-[10px] font-semibold rounded-md"
-                      style={{ backgroundColor: estado.bg, color: estado.text }}
-                    >
-                      {estadoLabels[r.estado]}
-                    </span>
-                  </div>
-                </div>
-              </ABMCard>
-            );
-          })
+          filteredReclamos.map((r) => (
+            <ReclamoCard
+              key={r.id}
+              reclamo={r}
+              onClick={() => openViewSheet(r)}
+            />
+          ))
         )}
       </ABMPage>
 
