@@ -329,9 +329,6 @@ async def get_reclamos(
                 # Zona
                 func.lower(Zona.nombre).like(search_term),
                 func.lower(Zona.codigo).like(search_term),
-                # Empleado asignado
-                func.lower(Empleado.nombre).like(search_term),
-                func.lower(Empleado.apellido).like(search_term),
             )
         )
 
