@@ -497,6 +497,52 @@ async def get_conteo_estados(
 
     return result
 
+@router.get("/conteo-dependencias")
+async def get_conteo_dependencias(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """
+    Endpoint optimizado que devuelve el conteo de reclamos por dependencia.
+    Solo disponible para admin y supervisor.
+    """
+    from models.municipio_dependencia import MunicipioDependencia
+    from sqlalchemy import and_
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    # LEFT JOIN para incluir todas las dependencias activas, incluso sin reclamos
+    query = await db.execute(
+        select(
+            MunicipioDependencia.id,
+            MunicipioDependencia.nombre,
+            func.count(Reclamo.id).label('cantidad')
+        )
+        .select_from(MunicipioDependencia)
+        .outerjoin(Reclamo, and_(
+            Reclamo.municipio_dependencia_id == MunicipioDependencia.id,
+            Reclamo.municipio_id == municipio_id
+        ))
+        .where(and_(
+            MunicipioDependencia.activo == True,
+            MunicipioDependencia.municipio_id == municipio_id
+        ))
+        .group_by(MunicipioDependencia.id, MunicipioDependencia.nombre)
+        .order_by(func.count(Reclamo.id).desc())
+    )
+
+    result = [
+        {
+            "dependencia_id": dep_id,
+            "nombre": nombre,
+            "cantidad": count or 0
+        }
+        for dep_id, nombre, count in query.all()
+    ]
+
+    return result
+
 @router.get("/por-zona")
 async def get_por_zona(
     request: Request,

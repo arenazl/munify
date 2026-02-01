@@ -164,6 +164,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
+  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
   const [page, setPage] = useState(1);
@@ -171,6 +172,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const ITEMS_PER_PAGE = 50;
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
+  const [conteosDependencias, setConteosDependencias] = useState<Record<number, number>>({});
   const observerTarget = useRef<HTMLDivElement>(null);
   // Estado para animación staggered - iniciar como completado para evitar parpadeo
   const [visibleCards] = useState<Set<number>>(new Set());
@@ -336,7 +338,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       Promise.all([
         dashboardApi.getConteoEstados(),
         dashboardApi.getConteoCategorias(),
-      ]).then(([estadosRes, categoriasRes]) => {
+        dashboardApi.getConteoDependencias(),
+      ]).then(([estadosRes, categoriasRes, dependenciasRes]) => {
         const estadosMap: Record<string, number> = {};
         estadosRes.data.forEach((item: any) => {
           estadosMap[item.estado] = item.cantidad;
@@ -348,6 +351,12 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           categoriasMap[item.categoria_id] = item.cantidad;
         });
         setConteosCategorias(categoriasMap);
+
+        const dependenciasMap: Record<number, number> = {};
+        dependenciasRes.data.forEach((item: any) => {
+          dependenciasMap[item.dependencia_id] = item.cantidad;
+        });
+        setConteosDependencias(dependenciasMap);
       }).catch(error => {
         console.error('Error cargando conteos:', error);
       });
@@ -425,11 +434,11 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Cargar reclamos cuando cambia el filtro de estado, categoría o búsqueda (con debounce)
+  // Cargar reclamos cuando cambia el filtro de estado, categoría, dependencia o búsqueda (con debounce)
   useEffect(() => {
     fetchReclamos(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado, filtroCategoria, debouncedSearch]);
+  }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
 
   // Cargar más cuando cambia la página
   useEffect(() => {
@@ -845,6 +854,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       // Filtrar por dependencia del usuario si es modo "soloMiArea"
       if (soloMiArea && user?.dependencia?.id) {
         params.municipio_dependencia_id = user.dependencia.id;
+      }
+      // Filtrar por dependencia seleccionada en filtros (supervisor)
+      if (filtroDependencia) {
+        params.municipio_dependencia_id = filtroDependencia;
       }
 
       const reclamosRes = await reclamosApi.getAll(params);
@@ -1340,19 +1353,25 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const handlePosponer = async () => {
     if (!selectedReclamo || !motivoNoFinalizado) return;
+
+    // Actualización optimista
+    const reclamoActualizado = { ...selectedReclamo, estado: 'pospuesto' as const };
+    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
+    closeSheet();
+    toast.success('Reclamo pospuesto');
+
     setSaving(true);
     try {
-      // Cambiar a estado pospuesto con observación
       const comentario = `Trabajo pospuesto: ${motivoNoFinalizado}${resolucion ? `. ${resolucion}` : ''}`;
       await reclamosApi.cambiarEstado(selectedReclamo.id, 'pospuesto', comentario);
-      toast.success('Reclamo pospuesto');
-      fetchReclamos();
-      closeSheet();
+      fetchReclamos(true);
       // Reset estados
       setTipoFinalizacion('finalizado');
       setMotivoNoFinalizado('');
       setResolucion('');
     } catch (error) {
+      // Revertir cambio optimista si falla
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al posponer el reclamo');
       console.error('Error:', error);
     } finally {
@@ -3474,7 +3493,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {selectedReclamo.estado === 'pospuesto' && (
           <div className="flex gap-2">
             <button
-              onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(); closeSheet(); toast.success('Reclamo retomado'); })}
+              onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(true); closeSheet(); toast.success('Reclamo retomado'); })}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
                 backgroundColor: theme.primary,
@@ -3548,7 +3567,73 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin' || false}
         secondaryFilters={
           <div className="w-full flex flex-col gap-1">
-            {/* Categorías - botón Todas fijo + scroll horizontal */}
+            {/* Dependencias - solo para supervisor (fila 1) */}
+            {user?.rol === 'supervisor' && (
+              <div className="flex gap-1">
+                {/* Botón Todas fijo - outlined */}
+                <button
+                  onClick={() => {
+                    setFilterLoading('dep-all');
+                    setFiltroDependencia(null);
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                  style={{
+                    background: 'transparent',
+                    border: `1.5px solid ${filtroDependencia === null ? theme.primary : theme.border}`,
+                  }}
+                >
+                  <Building2 className={`h-3 w-3 ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }} />
+                  <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }}>
+                    Todas
+                  </span>
+                </button>
+
+                {/* Scroll de dependencias */}
+                <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+                  {dependenciasDisponibles.length === 0 ? (
+                    <FilterRowSkeleton count={4} height={28} widths={[80, 100, 90, 85]} />
+                  ) : (
+                    dependenciasDisponibles.map((dep) => {
+                      const isSelected = filtroDependencia === dep.id;
+                      const count = conteosDependencias[dep.id] || 0;
+                      const isLoadingThis = filterLoading === `dep-${dep.id}`;
+                      const depColor = '#6366f1'; // Color por defecto para dependencias
+                      return (
+                        <button
+                          key={dep.id}
+                          onClick={() => {
+                            setFilterLoading(`dep-${dep.id}`);
+                            setFiltroDependencia(isSelected ? null : dep.id);
+                          }}
+                          title={dep.nombre}
+                          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                          style={{
+                            background: isSelected ? depColor : theme.backgroundSecondary,
+                            border: `1px solid ${isSelected ? depColor : theme.border}`,
+                          }}
+                        >
+                          <Building2 className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : depColor }} />
+                          <span className={`text-[10px] font-medium whitespace-nowrap max-w-[100px] truncate ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                            {dep.nombre.split(' ').slice(0, 2).join(' ')}
+                          </span>
+                          <span
+                            className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                            style={{
+                              backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${depColor}30`,
+                              color: isSelected ? '#ffffff' : depColor,
+                            }}
+                          >
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Categorías - botón Todas fijo + scroll horizontal (fila 2) */}
             <div className="flex gap-1">
               {/* Botón Todas fijo - outlined */}
               <button
