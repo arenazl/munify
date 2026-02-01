@@ -397,7 +397,11 @@ export default function Layout() {
                 }}
               />
               <div
-                className="absolute left-full top-0 ml-2 w-56 rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden"
+                className={`absolute w-56 rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden ${
+                  isMobile
+                    ? 'left-0 top-full mt-2'
+                    : 'left-full top-0 ml-2'
+                }`}
                 style={{
                   backgroundColor: theme.card,
                   border: `1px solid ${theme.border}`,
