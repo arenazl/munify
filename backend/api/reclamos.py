@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
+from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
 import cloudinary
 import cloudinary.uploader
