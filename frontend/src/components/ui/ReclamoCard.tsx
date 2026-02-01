@@ -33,8 +33,9 @@ export const estadoLabels: Record<EstadoReclamo, string> = {
 };
 
 // Componente para iconos dinámicos
-function DynamicIcon({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) {
-  const IconComponent = (LucideIcons as Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>>)[name];
+export function DynamicIcon({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const IconComponent = (LucideIcons as any)[name];
   if (!IconComponent) {
     return <Building2 className={className} style={style} />;
   }

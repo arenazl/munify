@@ -430,8 +430,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         if (!latestFromServer || reclamos.length === 0) return;
 
         const currentFirst = reclamos[0];
-        const serverUpdated = new Date(latestFromServer.updated_at).getTime();
-        const localUpdated = new Date(currentFirst.updated_at).getTime();
+        const serverUpdated = new Date(latestFromServer.updated_at || latestFromServer.created_at).getTime();
+        const localUpdated = new Date(currentFirst.updated_at || currentFirst.created_at).getTime();
 
         // Hay cambios si: nuevo reclamo diferente O mismo reclamo pero actualizado
         const hasNewReclamo = latestFromServer.id !== currentFirst.id;

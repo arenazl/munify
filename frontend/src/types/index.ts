@@ -198,6 +198,7 @@ export interface Reclamo {
   creador: { id: number; nombre: string; apellido: string; email: string; telefono?: string };
   dependencia_asignada?: { id: number; dependencia_id: number; nombre?: string; color?: string; icono?: string };
   documentos: Documento[];
+  imagenes?: string[];
   // Confirmación del vecino (feedback después de finalizar)
   confirmado_vecino?: boolean | null;  // null = sin respuesta, true = solucionado, false = sigue problema
   fecha_confirmacion_vecino?: string;
