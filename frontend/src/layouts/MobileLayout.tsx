@@ -41,6 +41,9 @@ export default function MobileLayout() {
           if (found.logo_url) {
             localStorage.setItem('municipio_logo_url', found.logo_url);
           }
+          // Guardar coordenadas para filtrar direcciones
+          if (found.latitud) localStorage.setItem('municipio_lat', String(found.latitud));
+          if (found.longitud) localStorage.setItem('municipio_lon', String(found.longitud));
           // Limpiar query param de la URL
           searchParams.delete('municipio');
           setSearchParams(searchParams, { replace: true });

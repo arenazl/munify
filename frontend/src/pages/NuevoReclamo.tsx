@@ -317,6 +317,17 @@ export default function NuevoReclamo() {
     setPreviewUrls(urls);
   };
 
+  // Calcular distancia entre dos puntos (Haversine simplificado)
+  const calcularDistancia = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radio de la Tierra en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
   // Buscar direcciones con Nominatim (OpenStreetMap) - con fallback si no encuentra
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
@@ -328,18 +339,29 @@ export default function NuevoReclamo() {
     setSearchingAddress(true);
     try {
       // Obtener datos del municipio para limitar la búsqueda
-      const municipioLat = localStorage.getItem('municipio_lat');
-      const municipioLon = localStorage.getItem('municipio_lon');
+      // Primero intentar localStorage, luego el contexto
+      let municipioLat = localStorage.getItem('municipio_lat');
+      let municipioLon = localStorage.getItem('municipio_lon');
+
+      // Si no hay en localStorage, usar del contexto y guardarlas
+      if ((!municipioLat || !municipioLon) && municipioActual?.latitud && municipioActual?.longitud) {
+        municipioLat = String(municipioActual.latitud);
+        municipioLon = String(municipioActual.longitud);
+        localStorage.setItem('municipio_lat', municipioLat);
+        localStorage.setItem('municipio_lon', municipioLon);
+      }
+
       const municipioNombre = localStorage.getItem('municipio_nombre') || '';
       const municipioSimple = municipioNombre.replace('Municipalidad de ', '').replace('Municipio de ', '');
 
-      // Construir el viewbox si tenemos coordenadas del municipio (±0.2 grados ≈ 20km)
+      // Construir el viewbox si tenemos coordenadas del municipio (±0.3 grados ≈ 30km)
       let viewboxParam = '';
-      if (municipioLat && municipioLon) {
-        const lat = parseFloat(municipioLat);
-        const lon = parseFloat(municipioLon);
-        const delta = 0.2;
-        viewboxParam = `&viewbox=${lon - delta},${lat + delta},${lon + delta},${lat - delta}`;
+      const centroLat = municipioLat ? parseFloat(municipioLat) : null;
+      const centroLon = municipioLon ? parseFloat(municipioLon) : null;
+
+      if (centroLat && centroLon) {
+        const delta = 0.3; // ~30km para capturar más resultados
+        viewboxParam = `&viewbox=${centroLon - delta},${centroLat + delta},${centroLon + delta},${centroLat - delta}`;
       }
 
       // Construir query de búsqueda - NO agregar el nombre del municipio porque
@@ -349,8 +371,8 @@ export default function NuevoReclamo() {
 
       // Primero intentar con viewbox y bounded=1 (SOLO resultados dentro del municipio)
       let url = viewboxParam
-        ? `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=8&addressdetails=1${viewboxParam}&bounded=1`
-        : `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=8&addressdetails=1`;
+        ? `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=15&addressdetails=1${viewboxParam}&bounded=1`
+        : `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=15&addressdetails=1`;
 
       let response = await fetch(url, {
         headers: { 'Accept-Language': 'es' },
@@ -360,7 +382,7 @@ export default function NuevoReclamo() {
       // Si no hay resultados con bounded, intentar solo con viewbox (preferencia pero no estricto)
       if (data.length === 0 && viewboxParam) {
         console.log('[Address Search] Sin resultados con bounded, intentando viewbox sin bounded');
-        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1${viewboxParam}`;
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=15&addressdetails=1${viewboxParam}`;
         response = await fetch(url, {
           headers: { 'Accept-Language': 'es' },
         });
@@ -370,7 +392,7 @@ export default function NuevoReclamo() {
       // Si aún no hay resultados, buscar agregando el nombre del municipio
       if (data.length === 0 && municipioSimple) {
         console.log('[Address Search] Intentando con nombre del municipio');
-        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', ' + municipioSimple + ', Buenos Aires, Argentina')}&countrycodes=ar&limit=5&addressdetails=1`;
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', ' + municipioSimple + ', Buenos Aires, Argentina')}&countrycodes=ar&limit=15&addressdetails=1`;
         response = await fetch(url, {
           headers: { 'Accept-Language': 'es' },
         });
@@ -380,7 +402,7 @@ export default function NuevoReclamo() {
       // Si aún no hay resultados, probar búsqueda más simple (solo Argentina)
       if (data.length === 0) {
         console.log('[Address Search] Sin resultados, probando búsqueda simple');
-        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Argentina')}&countrycodes=ar&limit=8&addressdetails=1`;
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Argentina')}&countrycodes=ar&limit=15&addressdetails=1`;
         response = await fetch(url, {
           headers: { 'Accept-Language': 'es' },
         });
@@ -394,12 +416,23 @@ export default function NuevoReclamo() {
         const streetMatch = query.match(/^(.+?)\s+(\d+)/);
         if (streetMatch) {
           const street = streetMatch[1] + ' ' + streetMatch[2];
-          url = `https://nominatim.openstreetmap.org/search?format=json&street=${encodeURIComponent(street)}&state=Buenos%20Aires&country=Argentina&limit=8&addressdetails=1`;
+          url = `https://nominatim.openstreetmap.org/search?format=json&street=${encodeURIComponent(street)}&state=Buenos%20Aires&country=Argentina&limit=15&addressdetails=1`;
           response = await fetch(url, {
             headers: { 'Accept-Language': 'es' },
           });
           data = await response.json();
         }
+      }
+
+      // Ordenar resultados por distancia al centro del municipio (más cercanos primero)
+      if (data.length > 0 && centroLat && centroLon) {
+        data = data.map((item: any) => ({
+          ...item,
+          _distancia: calcularDistancia(centroLat, centroLon, parseFloat(item.lat), parseFloat(item.lon))
+        })).sort((a: any, b: any) => a._distancia - b._distancia);
+
+        // Limitar a 8 resultados después de ordenar
+        data = data.slice(0, 8);
       }
 
       setAddressSuggestions(data);
@@ -409,7 +442,7 @@ export default function NuevoReclamo() {
     } finally {
       setSearchingAddress(false);
     }
-  }, []);
+  }, [municipioActual]);
 
   // Debounce para la búsqueda de direcciones
   const handleAddressChange = (value: string) => {

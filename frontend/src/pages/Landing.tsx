@@ -94,6 +94,9 @@ export default function Landing() {
         if (found.logo_url) {
           localStorage.setItem('municipio_logo_url', found.logo_url);
         }
+        // Guardar coordenadas para filtrar direcciones
+        if (found.latitud) localStorage.setItem('municipio_lat', String(found.latitud));
+        if (found.longitud) localStorage.setItem('municipio_lon', String(found.longitud));
       }
     }
   }, [municipioFromUrl, municipios]);
@@ -193,6 +196,9 @@ export default function Landing() {
     if (municipio.logo_url) {
       localStorage.setItem('municipio_logo_url', municipio.logo_url);
     }
+    // Guardar coordenadas para filtrar direcciones por ubicación
+    if (municipio.latitud) localStorage.setItem('municipio_lat', String(municipio.latitud));
+    if (municipio.longitud) localStorage.setItem('municipio_lon', String(municipio.longitud));
     // En modo debug, mostrar usuarios de prueba
     setSelectedMunicipio(municipio);
     setDebugError('');
