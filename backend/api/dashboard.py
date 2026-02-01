@@ -508,18 +508,20 @@ async def get_conteo_dependencias(
     Solo disponible para admin y supervisor.
     """
     from models.municipio_dependencia import MunicipioDependencia
+    from models.dependencia import Dependencia
     from sqlalchemy import and_
 
     municipio_id = get_effective_municipio_id(request, current_user)
 
-    # LEFT JOIN para incluir todas las dependencias activas, incluso sin reclamos
+    # JOIN con Dependencia para obtener el nombre (MunicipioDependencia.nombre es una property)
     query = await db.execute(
         select(
             MunicipioDependencia.id,
-            MunicipioDependencia.nombre,
+            Dependencia.nombre,
             func.count(Reclamo.id).label('cantidad')
         )
         .select_from(MunicipioDependencia)
+        .join(Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
         .outerjoin(Reclamo, and_(
             Reclamo.municipio_dependencia_id == MunicipioDependencia.id,
             Reclamo.municipio_id == municipio_id
@@ -528,7 +530,7 @@ async def get_conteo_dependencias(
             MunicipioDependencia.activo == True,
             MunicipioDependencia.municipio_id == municipio_id
         ))
-        .group_by(MunicipioDependencia.id, MunicipioDependencia.nombre)
+        .group_by(MunicipioDependencia.id, Dependencia.nombre)
         .order_by(func.count(Reclamo.id).desc())
     )
 
