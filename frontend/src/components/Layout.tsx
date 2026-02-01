@@ -390,7 +390,7 @@ export default function Layout() {
           {userMenuOpen && (
             <>
               <div
-                className="fixed inset-0 z-[60]"
+                className={`fixed inset-0 z-[60] ${isMobile ? 'bg-black/60' : ''}`}
                 onClick={() => {
                   setUserMenuOpen(false);
                   // En móvil, también cerrar el sidebar
@@ -398,10 +398,10 @@ export default function Layout() {
                 }}
               />
               <div
-                className={`absolute w-56 rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden ${
+                className={`rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden ${
                   isMobile
-                    ? 'left-0 top-full mt-2'
-                    : 'left-full top-0 ml-2'
+                    ? 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs'
+                    : 'absolute left-full top-0 ml-2 w-56'
                 }`}
                 style={{
                   backgroundColor: theme.card,
