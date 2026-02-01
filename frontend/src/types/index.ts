@@ -1,5 +1,5 @@
 export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin';
-export type EstadoReclamo = 'nuevo' | 'recibido' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto' | 'rechazado';
+export type EstadoReclamo = 'nuevo' | 'recibido' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto' | 'finalizado' | 'pospuesto' | 'rechazado';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
 // Info de dependencia para usuarios de dependencia
@@ -198,6 +198,10 @@ export interface Reclamo {
   creador: { id: number; nombre: string; apellido: string; email: string; telefono?: string };
   dependencia_asignada?: { id: number; dependencia_id: number; nombre?: string; color?: string; icono?: string };
   documentos: Documento[];
+  // Confirmación del vecino (feedback después de finalizar)
+  confirmado_vecino?: boolean | null;  // null = sin respuesta, true = solucionado, false = sigue problema
+  fecha_confirmacion_vecino?: string;
+  comentario_confirmacion_vecino?: string;
 }
 
 export interface DisponibilidadEmpleado {

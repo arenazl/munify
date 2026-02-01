@@ -553,6 +553,45 @@ async def limpiar_asignaciones_categorias(
     return {"message": f"Se eliminaron {count} asignaciones de categorías", "eliminadas": count}
 
 
+# ============ ENDPOINT PÚBLICO ============
+
+@router.get("/public/dependencia-categoria/{municipio_id}/{categoria_id}")
+async def obtener_dependencia_por_categoria_public(
+    municipio_id: int,
+    categoria_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Endpoint PÚBLICO para obtener la dependencia encargada de una categoría.
+    No requiere autenticación. Usado por el wizard de nuevo reclamo para usuarios anónimos.
+    """
+    # Buscar asignación de categoría a dependencia
+    result = await db.execute(
+        select(MunicipioDependenciaCategoria)
+        .options(
+            selectinload(MunicipioDependenciaCategoria.municipio_dependencia)
+            .selectinload(MunicipioDependencia.dependencia)
+        )
+        .where(
+            MunicipioDependenciaCategoria.municipio_id == municipio_id,
+            MunicipioDependenciaCategoria.categoria_id == categoria_id
+        )
+    )
+    asignacion = result.scalar_one_or_none()
+
+    if not asignacion or not asignacion.municipio_dependencia or not asignacion.municipio_dependencia.dependencia:
+        return None
+
+    dep = asignacion.municipio_dependencia.dependencia
+    return {
+        "id": asignacion.municipio_dependencia.id,
+        "nombre": dep.nombre,
+        "codigo": dep.codigo,
+        "color": dep.color,
+        "icono": dep.icono
+    }
+
+
 # ============ ASIGNACIÓN DE TIPOS DE TRÁMITE ============
 
 @router.post("/municipio/{municipio_dependencia_id}/tipos-tramite")

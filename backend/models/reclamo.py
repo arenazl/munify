@@ -67,6 +67,12 @@ class Reclamo(Base):
     resolucion = Column(Text, nullable=True)
     fecha_resolucion = Column(DateTime(timezone=True), nullable=True)
 
+    # Confirmación del vecino (feedback después de finalizar)
+    # None = sin respuesta, True = solucionado, False = sigue el problema
+    confirmado_vecino = Column(Boolean, nullable=True, default=None)
+    fecha_confirmacion_vecino = Column(DateTime(timezone=True), nullable=True)
+    comentario_confirmacion_vecino = Column(Text, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

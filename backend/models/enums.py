@@ -12,8 +12,10 @@ class EstadoReclamo(str, enum.Enum):
     RECIBIDO = "recibido"  # Dependencia aceptó, tiene tiempo estimado de resolución
     ASIGNADO = "asignado"  # Legacy - mantener por compatibilidad
     EN_PROCESO = "en_proceso"
-    PENDIENTE_CONFIRMACION = "pendiente_confirmacion"  # Empleado terminó, espera confirmación del supervisor
-    RESUELTO = "resuelto"
+    PENDIENTE_CONFIRMACION = "pendiente_confirmacion"  # Legacy - mantener por compatibilidad
+    RESUELTO = "resuelto"  # Legacy - alias de FINALIZADO
+    FINALIZADO = "finalizado"  # Trabajo completado
+    POSPUESTO = "pospuesto"  # Trabajo diferido para más adelante
     RECHAZADO = "rechazado"
 
 class MotivoRechazo(str, enum.Enum):

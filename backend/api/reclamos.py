@@ -357,6 +357,7 @@ async def get_mis_reclamos(
 async def cambiar_estado_reclamo_drag(
     reclamo_id: int,
     nuevo_estado: str = Query(..., description="Nuevo estado del reclamo"),
+    comentario: Optional[str] = Query(None, description="Observación del cambio de estado"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
@@ -375,13 +376,17 @@ async def cambiar_estado_reclamo_drag(
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
     # Validar transiciones permitidas
+    # Flujo: nuevo → recibido → en_proceso → (finalizado | pospuesto | rechazado)
     transiciones_validas = {
-        EstadoReclamo.NUEVO: [EstadoReclamo.ASIGNADO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.ASIGNADO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.RESUELTO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.EN_PROCESO: [EstadoReclamo.RESUELTO, EstadoReclamo.PENDIENTE_CONFIRMACION, EstadoReclamo.ASIGNADO],
-        EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.RESUELTO, EstadoReclamo.EN_PROCESO],  # Supervisor confirma o devuelve
-        EstadoReclamo.RESUELTO: [EstadoReclamo.EN_PROCESO],
-        EstadoReclamo.RECHAZADO: [],
+        EstadoReclamo.NUEVO: [EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO, EstadoReclamo.RECHAZADO],
+        EstadoReclamo.RECIBIDO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.RECHAZADO],
+        EstadoReclamo.ASIGNADO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Legacy
+        EstadoReclamo.EN_PROCESO: [EstadoReclamo.FINALIZADO, EstadoReclamo.POSPUESTO, EstadoReclamo.RECHAZADO],
+        EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.FINALIZADO, EstadoReclamo.EN_PROCESO],  # Legacy
+        EstadoReclamo.RESUELTO: [EstadoReclamo.EN_PROCESO],  # Legacy
+        EstadoReclamo.FINALIZADO: [],  # Estado final
+        EstadoReclamo.POSPUESTO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Puede retomar
+        EstadoReclamo.RECHAZADO: [],  # Estado final
     }
 
     if estado_enum not in transiciones_validas.get(reclamo.estado, []):
@@ -398,8 +403,12 @@ async def cambiar_estado_reclamo_drag(
     estado_anterior = reclamo.estado
     reclamo.estado = estado_enum
 
-    if estado_enum == EstadoReclamo.RESUELTO:
+    # Manejar fechas según el estado
+    if estado_enum in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
         reclamo.fecha_resolucion = datetime.now(timezone.utc)
+
+    # Generar comentario para historial
+    comentario_historial = comentario if comentario else f"Estado cambiado de {estado_anterior.value} a {estado_enum.value}"
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
@@ -407,14 +416,14 @@ async def cambiar_estado_reclamo_drag(
         estado_anterior=estado_anterior,
         estado_nuevo=estado_enum,
         accion="cambio_estado",
-        comentario=f"Estado cambiado de {estado_anterior.value} a {estado_enum.value}"
+        comentario=comentario_historial
     )
     db.add(historial)
 
     await db.commit()
 
     # Notificaciones en background (no bloquean respuesta)
-    if estado_enum == EstadoReclamo.RESUELTO:
+    if estado_enum in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
         # await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
         asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_resuelto'))
     else:
@@ -709,6 +718,24 @@ async def create_reclamo(
     print(f"Categoría ID: {data.categoria_id}", flush=True)
     print(f"Municipio ID: {current_user.municipio_id}", flush=True)
     print(f"{'='*80}\n", flush=True)
+
+    # Validar que el usuario tenga un municipio válido
+    if not current_user.municipio_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tu cuenta no tiene un municipio asignado. Contactá al administrador."
+        )
+
+    # Verificar que el municipio existe
+    from models.municipio import Municipio
+    municipio_check = await db.execute(
+        select(Municipio).where(Municipio.id == current_user.municipio_id)
+    )
+    if not municipio_check.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail=f"El municipio asignado a tu cuenta (ID: {current_user.municipio_id}) no existe. Contactá al administrador."
+        )
 
     # Actualizar datos de contacto del usuario si se proporcionan
     if data.nombre_contacto or data.telefono_contacto or data.email_contacto:
@@ -1146,16 +1173,16 @@ async def resolver_reclamo(
         )
 
     else:
-        # Admin/Supervisor resuelve directamente
-        reclamo.estado = EstadoReclamo.RESUELTO
+        # Admin/Supervisor finaliza directamente
+        reclamo.estado = EstadoReclamo.FINALIZADO
         reclamo.fecha_resolucion = datetime.now(timezone.utc)
 
         historial = HistorialReclamo(
             reclamo_id=reclamo.id,
             usuario_id=current_user.id,
             estado_anterior=estado_anterior,
-            estado_nuevo=EstadoReclamo.RESUELTO,
-            accion="resuelto",
+            estado_nuevo=EstadoReclamo.FINALIZADO,
+            accion="finalizado",
             comentario=data.resolucion
         )
         db.add(historial)
@@ -1711,3 +1738,82 @@ def _get_razon_principal(detalles: dict, cat_score: int, zona_score: int, carga_
         razones.append("disponible")
 
     return ", ".join(razones).capitalize()
+
+
+# ============ CONFIRMACIÓN DEL VECINO ============
+
+class ConfirmacionVecinoRequest(BaseModel):
+    """Request para que el vecino confirme si el problema fue solucionado."""
+    solucionado: bool  # True = solucionado, False = sigue el problema
+    comentario: Optional[str] = None
+
+
+@router.post("/{reclamo_id}/confirmar-vecino")
+async def confirmar_reclamo_vecino(
+    reclamo_id: int,
+    data: ConfirmacionVecinoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Permite al vecino confirmar si el reclamo fue solucionado o sigue el problema.
+    Solo el creador del reclamo puede confirmar.
+    Solo se puede confirmar cuando el reclamo está en estado FINALIZADO o RESUELTO.
+    """
+    # Obtener reclamo
+    result = await db.execute(
+        select(Reclamo).where(Reclamo.id == reclamo_id)
+    )
+    reclamo = result.scalar_one_or_none()
+
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Verificar que el usuario es el creador
+    if reclamo.creador_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Solo el creador del reclamo puede confirmar")
+
+    # Verificar que el reclamo está en estado finalizado
+    if reclamo.estado not in [EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El reclamo debe estar finalizado para confirmar. Estado actual: {reclamo.estado.value}"
+        )
+
+    # Verificar que no fue confirmado antes
+    if reclamo.confirmado_vecino is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Este reclamo ya fue confirmado anteriormente"
+        )
+
+    # Guardar confirmación
+    from datetime import datetime
+    reclamo.confirmado_vecino = data.solucionado
+    reclamo.fecha_confirmacion_vecino = datetime.now()
+    reclamo.comentario_confirmacion_vecino = data.comentario
+
+    # Registrar en historial
+    accion = "confirmado_solucionado" if data.solucionado else "confirmado_sigue_problema"
+    comentario_historial = f"El vecino {'confirmó que el problema fue solucionado' if data.solucionado else 'indica que el problema sigue sin resolverse'}"
+    if data.comentario:
+        comentario_historial += f": {data.comentario}"
+
+    historial = HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=current_user.id,
+        estado_anterior=reclamo.estado,
+        estado_nuevo=reclamo.estado,  # No cambia el estado
+        accion=accion,
+        comentario=comentario_historial
+    )
+    db.add(historial)
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": "Gracias por tu confirmación" if data.solucionado else "Lamentamos que el problema persista. Tu feedback fue registrado.",
+        "confirmado_vecino": data.solucionado,
+        "fecha_confirmacion": reclamo.fecha_confirmacion_vecino.isoformat()
+    }

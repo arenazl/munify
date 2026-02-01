@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -20,6 +20,8 @@ const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
   en_proceso: { bg: '#f59e0b', text: '#ffffff' },
   pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
   resuelto: { bg: '#10b981', text: '#ffffff' },
+  finalizado: { bg: '#10b981', text: '#ffffff' },
+  pospuesto: { bg: '#f97316', text: '#ffffff' },
   rechazado: { bg: '#ef4444', text: '#ffffff' },
 };
 
@@ -27,9 +29,11 @@ const estadoLabels: Record<EstadoReclamo, string> = {
   nuevo: 'Nuevo',
   recibido: 'Recibido',
   asignado: 'Asignado',
-  en_proceso: 'En Proceso',
+  en_proceso: 'En Curso',
   pendiente_confirmacion: 'Pendiente Confirmación',
   resuelto: 'Resuelto',
+  finalizado: 'Finalizado',
+  pospuesto: 'Pospuesto',
   rechazado: 'Rechazado',
 };
 
@@ -49,9 +53,12 @@ const getCategoryImageUrl = (nombre: string): string | null => {
 const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
   switch (estado) {
     case 'nuevo': return <Sparkles className="h-3 w-3" />;
+    case 'recibido': return <CheckCircle2 className="h-3 w-3" />;
     case 'asignado': return <UserPlus className="h-3 w-3" />;
     case 'en_proceso': return <Play className="h-3 w-3" />;
     case 'resuelto': return <CheckCircle className="h-3 w-3" />;
+    case 'finalizado': return <CheckCircle className="h-3 w-3" />;
+    case 'pospuesto': return <Clock className="h-3 w-3" />;
     case 'rechazado': return <XCircle className="h-3 w-3" />;
     default: return null;
   }
@@ -276,7 +283,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
   const horaFin = calcularHoraFin(horaInicio, duracion);
   const [resolucion, setResolucion] = useState('');
-  const [tipoFinalizacion, setTipoFinalizacion] = useState<'resuelto' | 'no_finalizado'>('resuelto');
+  const [tipoFinalizacion, setTipoFinalizacion] = useState<'finalizado' | 'pospuesto'>('finalizado');
   const [motivoNoFinalizado, setMotivoNoFinalizado] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
   const [descripcionRechazo, setDescripcionRechazo] = useState('');
@@ -1280,21 +1287,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleResolver = async () => {
+  const handleFinalizar = async () => {
     if (!selectedReclamo || !resolucion) return;
 
     // Toast de advertencia para supervisores/admins
     if (user?.rol === 'supervisor' || user?.rol === 'admin') {
-      toast.warning('Atención: Estás resolviendo este reclamo directamente como supervisor.', {
+      toast.warning('Atención: Estás finalizando este reclamo directamente como supervisor.', {
         duration: 4000,
       });
     }
 
     // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'resuelto' as const, resolucion };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'finalizado' as const, resolucion };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
-    toast.success('Reclamo resuelto');
+    toast.success('Reclamo finalizado');
 
     setSaving(true);
     try {
@@ -1302,7 +1309,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       fetchReclamos();
     } catch (error) {
       setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
-      toast.error('Error al resolver reclamo');
+      toast.error('Error al finalizar reclamo');
       console.error('Error:', error);
     } finally {
       setSaving(false);
@@ -1334,22 +1341,22 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleNoFinalizado = async () => {
+  const handlePosponer = async () => {
     if (!selectedReclamo || !motivoNoFinalizado) return;
     setSaving(true);
     try {
-      // Volver a estado asignado con comentario
-      const comentario = `Trabajo no finalizado: ${motivoNoFinalizado}${resolucion ? `. ${resolucion}` : ''}`;
-      await reclamosApi.cambiarEstado(selectedReclamo.id, 'asignado', comentario);
-      toast.success('Reclamo vuelto a asignado para reprogramar');
+      // Cambiar a estado pospuesto con observación
+      const comentario = `Trabajo pospuesto: ${motivoNoFinalizado}${resolucion ? `. ${resolucion}` : ''}`;
+      await reclamosApi.cambiarEstado(selectedReclamo.id, 'pospuesto', comentario);
+      toast.success('Reclamo pospuesto');
       fetchReclamos();
       closeSheet();
       // Reset estados
-      setTipoFinalizacion('resuelto');
+      setTipoFinalizacion('finalizado');
       setMotivoNoFinalizado('');
       setResolucion('');
     } catch (error) {
-      toast.error('Error al procesar el reclamo');
+      toast.error('Error al posponer el reclamo');
       console.error('Error:', error);
     } finally {
       setSaving(false);
@@ -3098,39 +3105,39 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             title="Finalizar Trabajo"
             icon={<CheckCircle className="h-4 w-4" />}
             defaultOpen={true}
-            variant={tipoFinalizacion === 'resuelto' ? 'success' : 'warning'}
+            variant={tipoFinalizacion === 'finalizado' ? 'success' : 'warning'}
           >
             <div className="space-y-4">
               {/* Selector de tipo de finalización */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => setTipoFinalizacion('resuelto')}
+                  onClick={() => setTipoFinalizacion('finalizado')}
                   className="flex-1 p-3 rounded-xl text-sm font-medium transition-all"
                   style={{
-                    backgroundColor: tipoFinalizacion === 'resuelto' ? '#22c55e20' : theme.backgroundSecondary,
-                    border: `2px solid ${tipoFinalizacion === 'resuelto' ? '#22c55e' : 'transparent'}`,
-                    color: tipoFinalizacion === 'resuelto' ? '#22c55e' : theme.textSecondary,
+                    backgroundColor: tipoFinalizacion === 'finalizado' ? '#22c55e20' : theme.backgroundSecondary,
+                    border: `2px solid ${tipoFinalizacion === 'finalizado' ? '#22c55e' : 'transparent'}`,
+                    color: tipoFinalizacion === 'finalizado' ? '#22c55e' : theme.textSecondary,
                   }}
                 >
                   <CheckCircle className="h-5 w-5 mx-auto mb-1" />
-                  Trabajo Exitoso
+                  Finalizado
                 </button>
                 <button
-                  onClick={() => setTipoFinalizacion('no_finalizado')}
+                  onClick={() => setTipoFinalizacion('pospuesto')}
                   className="flex-1 p-3 rounded-xl text-sm font-medium transition-all"
                   style={{
-                    backgroundColor: tipoFinalizacion === 'no_finalizado' ? '#f59e0b20' : theme.backgroundSecondary,
-                    border: `2px solid ${tipoFinalizacion === 'no_finalizado' ? '#f59e0b' : 'transparent'}`,
-                    color: tipoFinalizacion === 'no_finalizado' ? '#f59e0b' : theme.textSecondary,
+                    backgroundColor: tipoFinalizacion === 'pospuesto' ? '#f59e0b20' : theme.backgroundSecondary,
+                    border: `2px solid ${tipoFinalizacion === 'pospuesto' ? '#f59e0b' : 'transparent'}`,
+                    color: tipoFinalizacion === 'pospuesto' ? '#f59e0b' : theme.textSecondary,
                   }}
                 >
                   <XCircle className="h-5 w-5 mx-auto mb-1" />
-                  No Finalizado
+                  Posponer
                 </button>
               </div>
 
               {/* Campos según tipo */}
-              {tipoFinalizacion === 'resuelto' ? (
+              {tipoFinalizacion === 'finalizado' ? (
                 <ABMTextarea
                   label=""
                   value={resolucion}
@@ -3165,11 +3172,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     label=""
                     value={resolucion}
                     onChange={(e) => setResolucion(e.target.value)}
-                    placeholder="Describe por qué no se pudo finalizar el trabajo..."
+                    placeholder="Describe por qué se pospone el trabajo..."
                     rows={2}
                   />
                   <p className="text-xs" style={{ color: theme.textSecondary }}>
-                    El reclamo volverá a estado "Asignado" para reprogramar el trabajo.
+                    El reclamo quedará en estado "Pospuesto" y podrá retomarse más adelante.
                   </p>
                 </>
               )}
@@ -3388,11 +3395,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </>
         )}
 
-        {/* Botón Finalizado/No Finalizar - para estado en_proceso */}
-        {canFinalizar && tipoFinalizacion === 'resuelto' && (
+        {/* Botón Finalizado/Posponer - para estado en_proceso */}
+        {canFinalizar && tipoFinalizacion === 'finalizado' && (
           <>
             <button
-              onClick={handleResolver}
+              onClick={handleFinalizar}
               disabled={saving || !resolucion}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
               style={{
@@ -3401,7 +3408,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
               }}
             >
-              {saving ? 'Finalizando...' : 'Finalizado'}
+              {saving ? 'Finalizando...' : 'Finalizar'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
@@ -3416,19 +3423,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             </button>
           </>
         )}
-        {canFinalizar && tipoFinalizacion === 'no_finalizado' && (
+        {canFinalizar && tipoFinalizacion === 'pospuesto' && (
           <>
             <button
-              onClick={handleNoFinalizado}
+              onClick={handlePosponer}
               disabled={saving || !motivoNoFinalizado}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: `${theme.primary}20`,
-                color: theme.primary,
-                border: `1px solid ${theme.primary}50`
+                backgroundColor: '#f59e0b20',
+                color: '#f59e0b',
+                border: '1px solid #f59e0b50'
               }}
             >
-              {saving ? 'Procesando...' : 'Volver a Asignado'}
+              {saving ? 'Posponiendo...' : 'Posponer'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
@@ -3445,16 +3452,43 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Estados finales - solo info */}
-        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'rechazado') && (
+        {(['resuelto', 'finalizado', 'rechazado'].includes(selectedReclamo.estado)) && (
           <div
             className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
             style={{
-              backgroundColor: selectedReclamo.estado === 'resuelto' ? '#16a34a20' : '#ef444420',
-              color: selectedReclamo.estado === 'resuelto' ? '#16a34a' : '#ef4444',
-              border: `1px solid ${selectedReclamo.estado === 'resuelto' ? '#16a34a50' : '#ef444450'}`
+              backgroundColor: selectedReclamo.estado === 'rechazado' ? '#ef444420' : '#16a34a20',
+              color: selectedReclamo.estado === 'rechazado' ? '#ef4444' : '#16a34a',
+              border: `1px solid ${selectedReclamo.estado === 'rechazado' ? '#ef444450' : '#16a34a50'}`
             }}
           >
-            {selectedReclamo.estado === 'resuelto' ? '✓ Resuelto' : '✗ Rechazado'}
+            {selectedReclamo.estado === 'rechazado' ? '✗ Rechazado' : '✓ Finalizado'}
+          </div>
+        )}
+
+        {/* Estado pospuesto - puede retomar */}
+        {selectedReclamo.estado === 'pospuesto' && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_proceso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(); closeSheet(); toast.success('Reclamo retomado'); })}
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: theme.primary,
+                color: '#ffffff',
+                boxShadow: `0 4px 14px ${theme.primary}40`
+              }}
+            >
+              Retomar
+            </button>
+            <div
+              className="px-4 py-2.5 rounded-xl font-medium text-center"
+              style={{
+                backgroundColor: '#f59e0b20',
+                color: '#f59e0b',
+                border: '1px solid #f59e0b50'
+              }}
+            >
+              Pospuesto
+            </div>
           </div>
         )}
       </div>
@@ -3606,13 +3640,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
               {/* Skeleton solo si no hay conteos cargados (carga inicial) */}
               {Object.keys(conteosEstados).length === 0 ? (
-                <FilterRowSkeleton count={5} height={26} widths={[45, 55, 65, 45, 55]} />
+                <FilterRowSkeleton count={6} height={26} widths={[45, 50, 45, 50, 45, 45]} />
               ) : (
                 [
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
-                  { key: 'asignado', label: 'Asig.', icon: UserPlus, color: estadoColors.asignado.bg, count: conteosEstados['asignado'] || 0 },
+                  { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: conteosEstados['recibido'] || 0 },
                   { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
-                  { key: 'resuelto', label: 'Resu.', icon: CheckCircle, color: estadoColors.resuelto.bg, count: conteosEstados['resuelto'] || 0 },
+                  { key: 'finalizado', label: 'Final.', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
+                  { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
                   { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
                 ].map((estado) => {
                   const Icon = estado.icon;

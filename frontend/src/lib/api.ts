@@ -294,6 +294,9 @@ export const reclamosApi = {
   }) => api.get('/reclamos/recurrentes', { params }),
   getCantidadSimilares: (reclamoId: number) =>
     api.get(`/reclamos/${reclamoId}/cantidad-similares`),
+  // Confirmación del vecino (feedback después de finalizar)
+  confirmarVecino: (id: number, data: { solucionado: boolean; comentario?: string }) =>
+    api.post(`/reclamos/${id}/confirmar-vecino`, data),
 };
 
 // Categorías
@@ -363,6 +366,9 @@ export const dependenciasApi = {
   // Dependencias del municipio actual
   getMunicipio: (params?: { activo?: boolean; tipo_gestion?: string; include_assignments?: boolean }) =>
     api.get('/dependencias/municipio', { params }),
+  // Endpoint público para obtener dependencia por categoría (sin autenticación)
+  getDependenciaByCategoria: (municipioId: number, categoriaId: number) =>
+    api.get(`/dependencias/public/dependencia-categoria/${municipioId}/${categoriaId}`),
   getOneMunicipio: (id: number) => api.get(`/dependencias/municipio/${id}`),
   habilitarDependencias: (dependenciaIds: number[]) =>
     api.post('/dependencias/municipio/habilitar', { dependencia_ids: dependenciaIds })

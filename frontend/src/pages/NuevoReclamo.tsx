@@ -347,18 +347,30 @@ export default function NuevoReclamo() {
       // Usamos viewbox para filtrar geográficamente y solo agregamos la provincia
       const searchQuery = `${query}, Buenos Aires, Argentina`;
 
-      // Primero intentar con viewbox (preferencia local pero no bounded)
-      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=8&addressdetails=1${viewboxParam}`;
+      // Primero intentar con viewbox y bounded=1 (SOLO resultados dentro del municipio)
+      let url = viewboxParam
+        ? `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=8&addressdetails=1${viewboxParam}&bounded=1`
+        : `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=8&addressdetails=1`;
 
       let response = await fetch(url, {
         headers: { 'Accept-Language': 'es' },
       });
       let data = await response.json();
 
-      // Si no hay resultados, buscar sin viewbox
+      // Si no hay resultados con bounded, intentar solo con viewbox (preferencia pero no estricto)
       if (data.length === 0 && viewboxParam) {
-        console.log('[Address Search] Sin resultados con viewbox, intentando sin restricción');
-        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1`;
+        console.log('[Address Search] Sin resultados con bounded, intentando viewbox sin bounded');
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ar&limit=5&addressdetails=1${viewboxParam}`;
+        response = await fetch(url, {
+          headers: { 'Accept-Language': 'es' },
+        });
+        data = await response.json();
+      }
+
+      // Si aún no hay resultados, buscar agregando el nombre del municipio
+      if (data.length === 0 && municipioSimple) {
+        console.log('[Address Search] Intentando con nombre del municipio');
+        url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', ' + municipioSimple + ', Buenos Aires, Argentina')}&countrycodes=ar&limit=5&addressdetails=1`;
         response = await fetch(url, {
           headers: { 'Accept-Language': 'es' },
         });
@@ -600,28 +612,26 @@ export default function NuevoReclamo() {
         return;
       }
 
+      // Obtener municipio_id del usuario o del localStorage
+      const municipioId = user?.municipio_id || parseInt(localStorage.getItem('municipio_id') || '0');
+      if (!municipioId) {
+        console.warn('No hay municipio_id disponible para buscar dependencia');
+        setDependenciaEncargada(null);
+        return;
+      }
+
       try {
-        // Obtener dependencias del municipio con sus asignaciones
-        const response = await dependenciasApi.getMunicipio({
-          activo: true,
-          include_assignments: true,
-          tipo_gestion: 'RECLAMO'
-        });
-
-        const deps = response.data;
-        // Buscar cuál dependencia tiene asignada esta categoría
+        // Usar endpoint público que no requiere autenticación
         const categoriaId = Number(formData.categoria_id);
-        const depEncargada = deps.find((dep: { categorias?: { id: number }[] }) =>
-          dep.categorias?.some((cat: { id: number }) => cat.id === categoriaId)
-        );
+        const response = await dependenciasApi.getDependenciaByCategoria(municipioId, categoriaId);
 
-        if (depEncargada) {
+        if (response.data) {
           setDependenciaEncargada({
-            id: depEncargada.id,
-            nombre: depEncargada.nombre,
-            codigo: depEncargada.codigo,
-            color: depEncargada.color,
-            icono: depEncargada.icono,
+            id: response.data.id,
+            nombre: response.data.nombre,
+            codigo: response.data.codigo,
+            color: response.data.color,
+            icono: response.data.icono,
           });
         } else {
           setDependenciaEncargada(null);
@@ -633,7 +643,7 @@ export default function NuevoReclamo() {
     };
 
     fetchDependencia();
-  }, [formData.categoria_id]);
+  }, [formData.categoria_id, user?.municipio_id]);
 
   // Scroll al final del chat cuando hay nuevos mensajes
   useEffect(() => {
@@ -1602,26 +1612,7 @@ Tono amigable, 3-4 oraciones máximo.`,
           )}
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-            Zona/Barrio
-          </label>
-          <select
-            value={formData.zona_id}
-            onChange={(e) => setFormData({ ...formData, zona_id: e.target.value })}
-            className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              color: theme.text,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            <option value="">Seleccionar zona</option>
-            {zonas.map((zona) => (
-              <option key={zona.id} value={zona.id}>{zona.nombre}</option>
-            ))}
-          </select>
-        </div>
+        {/* Zona/Barrio se detecta automáticamente de la dirección */}
 
         <div>
           <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
@@ -2135,12 +2126,6 @@ Tono amigable, 3-4 oraciones máximo.`,
         return {
           title: 'Tip: Usá el mapa',
           message: 'Podés hacer clic en el mapa para marcar la ubicación exacta. Esto ayuda al equipo a encontrar el problema más rápido.',
-        };
-      }
-      if (formData.direccion && formData.latitud && !formData.zona_id) {
-        return {
-          title: '¡Muy bien!',
-          message: 'Si conocés el barrio o zona, seleccionalo del listado. Esto agiliza la asignación del reclamo.',
         };
       }
       if (isUbicacionValid) {

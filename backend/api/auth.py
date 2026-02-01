@@ -10,6 +10,7 @@ from core.security import verify_password, get_password_hash, create_access_toke
 from core.config import settings
 from core.rate_limit import limiter, LIMITS
 from models.user import User
+from models.municipio import Municipio
 from models.municipio_dependencia import MunicipioDependencia
 from schemas.user import UserCreate, UserResponse, Token, DependenciaInfo
 
@@ -22,6 +23,17 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
     result = await db.execute(select(User).where(User.email == user_data.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="El email ya está registrado")
+
+    # Validar que el municipio existe si se proporciona
+    if user_data.municipio_id:
+        municipio_check = await db.execute(
+            select(Municipio).where(Municipio.id == user_data.municipio_id)
+        )
+        if not municipio_check.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail=f"El municipio seleccionado (ID: {user_data.municipio_id}) no existe. Por favor, vuelve a seleccionar tu municipio."
+            )
 
     # Crear usuario (rol vecino por defecto para registro público)
     user = User(

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown } from 'lucide-react';
+import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, ThumbsUp, ThumbsDown, AlertCircle } from 'lucide-react';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { reclamosApi, calificacionesApi } from '../lib/api';
@@ -16,6 +16,8 @@ const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
   en_proceso: { bg: '#fef3c7', text: '#92400e' },
   pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
   resuelto: { bg: '#d1fae5', text: '#065f46' },
+  finalizado: { bg: '#d1fae5', text: '#065f46' },
+  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
   rechazado: { bg: '#fee2e2', text: '#991b1b' },
 };
 
@@ -23,9 +25,11 @@ const estadoLabels: Record<EstadoReclamo, string> = {
   nuevo: 'Nuevo',
   recibido: 'Recibido',
   asignado: 'Asignado',
-  en_proceso: 'En Proceso',
+  en_proceso: 'En Curso',
   pendiente_confirmacion: 'Pendiente Confirmación',
   resuelto: 'Resuelto',
+  finalizado: 'Finalizado',
+  pospuesto: 'Pospuesto',
   rechazado: 'Rechazado',
 };
 
@@ -75,6 +79,10 @@ export default function MisReclamos() {
   const [enviandoCalificacion, setEnviandoCalificacion] = useState(false);
   const [calificacionExistente, setCalificacionExistente] = useState<CalificacionExistente | null>(null);
   const [loadingCalificacion, setLoadingCalificacion] = useState(false);
+
+  // Confirmación del vecino states
+  const [comentarioConfirmacion, setComentarioConfirmacion] = useState('');
+  const [enviandoConfirmacion, setEnviandoConfirmacion] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -167,6 +175,45 @@ export default function MisReclamos() {
     }
   };
 
+  // Confirmación del vecino (solucionado / sigue el problema)
+  const handleConfirmarVecino = async (solucionado: boolean) => {
+    if (!selectedReclamo) return;
+
+    setEnviandoConfirmacion(true);
+    try {
+      await reclamosApi.confirmarVecino(selectedReclamo.id, {
+        solucionado,
+        comentario: comentarioConfirmacion.trim() || undefined
+      });
+
+      // Actualizar el reclamo localmente
+      const updatedReclamo = {
+        ...selectedReclamo,
+        confirmado_vecino: solucionado,
+        fecha_confirmacion_vecino: new Date().toISOString(),
+        comentario_confirmacion_vecino: comentarioConfirmacion.trim() || undefined
+      };
+      setSelectedReclamo(updatedReclamo);
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? updatedReclamo : r));
+
+      toast.success(solucionado
+        ? '¡Gracias por confirmar! Nos alegra que el problema se haya solucionado.'
+        : 'Lamentamos que el problema persista. Tu feedback fue registrado.'
+      );
+      setComentarioConfirmacion('');
+    } catch (error: unknown) {
+      console.error('Error enviando confirmación:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { detail?: string } } };
+        toast.error(axiosError.response?.data?.detail || 'Error al enviar confirmación');
+      } else {
+        toast.error('Error al enviar confirmación');
+      }
+    } finally {
+      setEnviandoConfirmacion(false);
+    }
+  };
+
   const closeSheet = () => {
     setSheetMode('closed');
     setSelectedReclamo(null);
@@ -174,6 +221,7 @@ export default function MisReclamos() {
     setCalificacionExistente(null);
     setPuntuacion(0);
     setComentario('');
+    setComentarioConfirmacion('');
   };
 
   const renderStars = (rating: number, interactive = false) => {
@@ -317,8 +365,105 @@ export default function MisReclamos() {
           )}
         </div>
 
+        {/* Confirmación del vecino (solo para reclamos finalizados/resueltos sin confirmar) */}
+        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'finalizado') && (
+          <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
+            <h4 className="font-medium flex items-center mb-3">
+              <AlertCircle className="h-4 w-4 mr-2" />
+              ¿Se solucionó el problema?
+            </h4>
+
+            {selectedReclamo.confirmado_vecino !== null && selectedReclamo.confirmado_vecino !== undefined ? (
+              // Ya confirmado - mostrar resultado
+              <div
+                className="p-4 rounded-xl"
+                style={{
+                  backgroundColor: selectedReclamo.confirmado_vecino ? '#d1fae5' : '#fee2e2',
+                  border: `1px solid ${selectedReclamo.confirmado_vecino ? '#10b981' : '#ef4444'}30`
+                }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  {selectedReclamo.confirmado_vecino ? (
+                    <ThumbsUp className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <ThumbsDown className="h-5 w-5 text-red-600" />
+                  )}
+                  <span className="font-medium" style={{ color: selectedReclamo.confirmado_vecino ? '#065f46' : '#991b1b' }}>
+                    {selectedReclamo.confirmado_vecino ? 'Confirmaste que se solucionó' : 'Indicaste que sigue el problema'}
+                  </span>
+                </div>
+                {selectedReclamo.comentario_confirmacion_vecino && (
+                  <p className="text-sm italic mt-1" style={{ color: selectedReclamo.confirmado_vecino ? '#047857' : '#b91c1c' }}>
+                    "{selectedReclamo.comentario_confirmacion_vecino}"
+                  </p>
+                )}
+                {selectedReclamo.fecha_confirmacion_vecino && (
+                  <p className="text-xs mt-2" style={{ color: selectedReclamo.confirmado_vecino ? '#059669' : '#dc2626' }}>
+                    Confirmado el {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            ) : (
+              // Pendiente de confirmar
+              <div className="space-y-3">
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  Tu opinión nos ayuda a mejorar el servicio
+                </p>
+
+                {/* Campo de comentario opcional */}
+                <textarea
+                  value={comentarioConfirmacion}
+                  onChange={(e) => setComentarioConfirmacion(e.target.value)}
+                  placeholder="Comentario opcional..."
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1px solid ${theme.border}`,
+                    color: theme.text
+                  }}
+                />
+
+                {/* Botones de confirmación */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => handleConfirmarVecino(true)}
+                    disabled={enviandoConfirmacion}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                    style={{ backgroundColor: '#10b981', color: '#ffffff' }}
+                  >
+                    {enviandoConfirmacion ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <ThumbsUp className="h-5 w-5" />
+                        Solucionado
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleConfirmarVecino(false)}
+                    disabled={enviandoConfirmacion}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                    style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+                  >
+                    {enviandoConfirmacion ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <>
+                        <ThumbsDown className="h-5 w-5" />
+                        Sigue el problema
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Calificación (solo para reclamos resueltos) */}
-        {selectedReclamo.estado === 'resuelto' && (
+        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'finalizado') && (
           <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <h4 className="font-medium flex items-center mb-3">
               <Star className="h-4 w-4 mr-2" />
