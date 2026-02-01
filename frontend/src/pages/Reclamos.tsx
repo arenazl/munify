@@ -3567,37 +3567,50 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin' || false}
         secondaryFilters={
           <div className="w-full flex flex-col gap-1">
-            {/* Dependencias - solo para supervisor (fila 1) */}
+            {/* Dependencias - solo para supervisor (fila 1) - Destacada */}
             {user?.rol === 'supervisor' && (
-              <div className="flex gap-1">
-                {/* Botón Todas fijo - outlined */}
+              <div
+                className="flex items-center gap-2 p-2 rounded-lg mb-1"
+                style={{
+                  backgroundColor: `${theme.primary}08`,
+                  border: `1px solid ${theme.primary}25`,
+                }}
+              >
+                {/* Label */}
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
+                  <span className="text-xs font-semibold" style={{ color: theme.primary }}>
+                    Dependencia:
+                  </span>
+                </div>
+
+                {/* Botón Todas */}
                 <button
                   onClick={() => {
                     setFilterLoading('dep-all');
                     setFiltroDependencia(null);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0"
                   style={{
-                    background: 'transparent',
+                    background: filtroDependencia === null ? theme.primary : 'transparent',
                     border: `1.5px solid ${filtroDependencia === null ? theme.primary : theme.border}`,
                   }}
                 >
-                  <Building2 className={`h-3 w-3 ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }} />
-                  <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }}>
+                  <span className={`text-xs font-medium whitespace-nowrap ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? '#ffffff' : theme.textSecondary }}>
                     Todas
                   </span>
                 </button>
 
                 {/* Scroll de dependencias */}
-                <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide flex-1 min-w-0">
                   {dependenciasDisponibles.length === 0 ? (
-                    <FilterRowSkeleton count={4} height={28} widths={[80, 100, 90, 85]} />
+                    <FilterRowSkeleton count={4} height={32} widths={[120, 140, 130, 125]} />
                   ) : (
                     dependenciasDisponibles.map((dep) => {
                       const isSelected = filtroDependencia === dep.id;
                       const count = conteosDependencias[dep.id] || 0;
                       const isLoadingThis = filterLoading === `dep-${dep.id}`;
-                      const depColor = '#6366f1'; // Color por defecto para dependencias
+                      const depColor = theme.primary;
                       return (
                         <button
                           key={dep.id}
@@ -3606,20 +3619,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                             setFiltroDependencia(isSelected ? null : dep.id);
                           }}
                           title={dep.nombre}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all h-[32px] flex-shrink-0 hover:scale-105 active:scale-95"
                           style={{
                             background: isSelected ? depColor : theme.backgroundSecondary,
-                            border: `1px solid ${isSelected ? depColor : theme.border}`,
+                            border: `1.5px solid ${isSelected ? depColor : theme.border}`,
                           }}
                         >
-                          <Building2 className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : depColor }} />
-                          <span className={`text-[10px] font-medium whitespace-nowrap max-w-[100px] truncate ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                            {dep.nombre.split(' ').slice(0, 2).join(' ')}
+                          <span className={`text-xs font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                            {dep.nombre}
                           </span>
                           <span
-                            className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                             style={{
-                              backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${depColor}30`,
+                              backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : `${depColor}20`,
                               color: isSelected ? '#ffffff' : depColor,
                             }}
                           >
