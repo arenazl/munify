@@ -435,8 +435,16 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   }, [search]);
 
   // Cargar reclamos cuando cambia el filtro de estado, categoría, dependencia o búsqueda (con debounce)
+  // También polling cada 10 segundos para detectar actividad reciente (comentarios, cambios de estado)
   useEffect(() => {
     fetchReclamos(true);
+
+    // Polling cada 10 segundos para mantener la lista actualizada
+    const pollingInterval = setInterval(() => {
+      fetchReclamos(true);
+    }, 10000);
+
+    return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
 
@@ -2578,21 +2586,38 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       sortValue: (r: Reclamo) => r.estado,
       render: (r: Reclamo) => {
         const color = estadoColors[r.estado]?.bg || '#6366f1';
+        // Detectar actividad reciente: updated_at > created_at por más de 1 minuto
+        const tieneActividadReciente = r.updated_at &&
+          new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000;
         return (
-          <span
-            className="px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm"
-            style={{
-              backgroundColor: `${color}18`,
-              color: color,
-              border: `1px solid ${color}40`,
-            }}
-          >
+          <div className="flex items-center gap-2">
             <span
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: color }}
-            />
-            {estadoLabels[r.estado]}
-          </span>
+              className="px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm"
+              style={{
+                backgroundColor: `${color}18`,
+                color: color,
+                border: `1px solid ${color}40`,
+              }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              {estadoLabels[r.estado]}
+            </span>
+            {tieneActividadReciente && (
+              <span
+                className="w-6 h-6 rounded-full flex items-center justify-center animate-bounce"
+                style={{
+                  backgroundColor: '#3b82f6',
+                  boxShadow: '0 0 10px #3b82f6, 0 0 20px #3b82f680'
+                }}
+                title="Actividad reciente"
+              >
+                <MessageCircle className="h-3.5 w-3.5" style={{ color: '#ffffff' }} />
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -3893,11 +3918,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   {/* Indicador de actividad reciente (comentario) */}
                   {r.updated_at && new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000 && (
                     <span
-                      className="w-6 h-6 rounded-full flex items-center justify-center animate-pulse"
-                      style={{ backgroundColor: '#3b82f620' }}
+                      className="w-7 h-7 rounded-full flex items-center justify-center animate-bounce"
+                      style={{
+                        backgroundColor: '#3b82f6',
+                        boxShadow: '0 0 12px #3b82f6, 0 0 24px #3b82f680'
+                      }}
                       title="Actividad reciente"
                     >
-                      <MessageCircle className="h-3.5 w-3.5" style={{ color: '#3b82f6' }} />
+                      <MessageCircle className="h-4 w-4" style={{ color: '#ffffff' }} />
                     </span>
                   )}
                   <span

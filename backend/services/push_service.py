@@ -1,8 +1,9 @@
-"""Servicio para enviar Web Push Notifications"""
+"""Servicio para enviar Web Push Notifications y Notificaciones In-App"""
 from pywebpush import webpush, WebPushException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models import PushSubscription, User
+from models.notificacion import Notificacion
 from models.user import DEFAULT_NOTIFICATION_PREFERENCES
 from core.config import settings
 from typing import Optional, List
@@ -10,6 +11,48 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+async def crear_notificacion_db(
+    db: AsyncSession,
+    usuario_id: int,
+    titulo: str,
+    mensaje: str,
+    tipo: str = "info",
+    reclamo_id: Optional[int] = None
+) -> Optional[Notificacion]:
+    """
+    Crea una notificación en la base de datos para mostrar en la campanita.
+
+    Args:
+        db: Sesión de base de datos
+        usuario_id: ID del usuario que recibirá la notificación
+        titulo: Título de la notificación
+        mensaje: Mensaje/cuerpo de la notificación
+        tipo: Tipo de notificación ("info", "success", "warning", "error")
+        reclamo_id: ID del reclamo relacionado (opcional)
+
+    Returns:
+        Notificacion creada o None si hubo error
+    """
+    try:
+        notificacion = Notificacion(
+            usuario_id=usuario_id,
+            titulo=titulo,
+            mensaje=mensaje,
+            tipo=tipo,
+            reclamo_id=reclamo_id,
+            leida=False
+        )
+        db.add(notificacion)
+        await db.commit()
+        await db.refresh(notificacion)
+        logger.info(f"Notificación creada en BD para usuario {usuario_id}: {titulo}")
+        return notificacion
+    except Exception as e:
+        logger.error(f"Error creando notificación en BD: {e}")
+        await db.rollback()
+        return None
 
 
 async def check_user_notification_preference(
@@ -137,17 +180,30 @@ async def send_push_to_users(
 # ============================================
 
 async def notificar_reclamo_recibido(db: AsyncSession, reclamo) -> int:
-    """Notifica al vecino que su reclamo fue recibido"""
-    # Verificar preferencia del usuario
+    """Notifica al vecino que su reclamo fue recibido.
+    Crea notificación en BD + push al navegador."""
     if not await check_user_notification_preference(db, reclamo.creador_id, "reclamo_recibido"):
         logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación reclamo_recibido")
         return 0
 
+    titulo = "Reclamo Recibido"
+    mensaje = f"Tu reclamo #{reclamo.id} ha sido registrado exitosamente."
+
+    # Crear notificación en BD
+    await crear_notificacion_db(
+        db=db,
+        usuario_id=reclamo.creador_id,
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo="success",
+        reclamo_id=reclamo.id
+    )
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
-        title="Reclamo Recibido",
-        body=f"Tu reclamo #{reclamo.id} ha sido registrado exitosamente.",
+        title=titulo,
+        body=mensaje,
         url=f"/reclamos/{reclamo.id}",
         data={"tipo": "reclamo_recibido", "reclamo_id": reclamo.id}
     )
@@ -170,32 +226,60 @@ async def notificar_reclamo_asignado(db: AsyncSession, reclamo, empleado_nombre:
 
 
 async def notificar_cambio_estado(db: AsyncSession, reclamo, estado_anterior: str, estado_nuevo: str) -> int:
-    """Notifica al vecino el cambio de estado de su reclamo"""
+    """Notifica al vecino el cambio de estado de su reclamo.
+    Crea notificación en BD + push al navegador."""
     if not await check_user_notification_preference(db, reclamo.creador_id, "cambio_estado"):
         logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación cambio_estado")
         return 0
 
+    titulo = "Estado Actualizado"
+    mensaje = f"Tu reclamo #{reclamo.id} cambió de {estado_anterior} a {estado_nuevo}."
+
+    # Crear notificación en BD
+    await crear_notificacion_db(
+        db=db,
+        usuario_id=reclamo.creador_id,
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo="info",
+        reclamo_id=reclamo.id
+    )
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
-        title="Estado Actualizado",
-        body=f"Tu reclamo #{reclamo.id} cambió de {estado_anterior} a {estado_nuevo}.",
+        title=titulo,
+        body=mensaje,
         url=f"/reclamos/{reclamo.id}",
         data={"tipo": "cambio_estado", "reclamo_id": reclamo.id}
     )
 
 
 async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
-    """Notifica al vecino que su reclamo fue resuelto"""
+    """Notifica al vecino que su reclamo fue resuelto.
+    Crea notificación en BD + push al navegador."""
     if not await check_user_notification_preference(db, reclamo.creador_id, "reclamo_resuelto"):
         logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación reclamo_resuelto")
         return 0
 
+    titulo = "Reclamo Resuelto"
+    mensaje = f"Tu reclamo #{reclamo.id} ha sido resuelto. ¡Gracias por tu paciencia!"
+
+    # Crear notificación en BD
+    await crear_notificacion_db(
+        db=db,
+        usuario_id=reclamo.creador_id,
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo="success",
+        reclamo_id=reclamo.id
+    )
+
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
-        title="Reclamo Resuelto",
-        body=f"Tu reclamo #{reclamo.id} ha sido resuelto. ¡Gracias por tu paciencia!",
+        title=titulo,
+        body=mensaje,
         url=f"/reclamos/{reclamo.id}",
         data={"tipo": "reclamo_resuelto", "reclamo_id": reclamo.id}
     )
@@ -221,6 +305,7 @@ async def notificar_nuevo_comentario(db: AsyncSession, reclamo, comentario_texto
     """
     Notifica sobre un nuevo comentario en el reclamo.
     Envía al creador del reclamo (vecino) con el texto del comentario.
+    Crea notificación en BD para la campanita + envía push al navegador.
     """
     if not await check_user_notification_preference(db, reclamo.creador_id, "nuevo_comentario"):
         logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación nuevo_comentario")
@@ -229,11 +314,25 @@ async def notificar_nuevo_comentario(db: AsyncSession, reclamo, comentario_texto
     # Truncar comentario si es muy largo
     comentario_preview = comentario_texto[:80] + "..." if len(comentario_texto) > 80 else comentario_texto
 
+    titulo = f"Comentario de {autor_nombre}"
+    mensaje = f"Reclamo #{reclamo.id}: {comentario_preview}"
+
+    # Crear notificación en BD para la campanita
+    await crear_notificacion_db(
+        db=db,
+        usuario_id=reclamo.creador_id,
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo="info",
+        reclamo_id=reclamo.id
+    )
+
+    # Enviar push al navegador
     return await send_push_to_user(
         db=db,
         user_id=reclamo.creador_id,
-        title=f"💬 Comentario de {autor_nombre}",
-        body=f"Reclamo #{reclamo.id}: {comentario_preview}",
+        title=f"💬 {titulo}",
+        body=mensaje,
         url=f"/reclamos/{reclamo.id}",
         data={"tipo": "nuevo_comentario", "reclamo_id": reclamo.id}
     )
@@ -279,6 +378,7 @@ async def notificar_comentario_vecino_a_dependencia(
 ) -> int:
     """
     Notifica a todos los usuarios de la dependencia asignada cuando un vecino comenta.
+    Crea notificación en BD para la campanita + envía push al navegador.
     """
     from models import MunicipioDependencia
     from models.enums import RolUsuario
@@ -303,15 +403,28 @@ async def notificar_comentario_vecino_a_dependencia(
 
     # Truncar comentario
     comentario_preview = comentario[:60] + "..." if len(comentario) > 60 else comentario
+    titulo = f"Comentario de {vecino_nombre}"
+    mensaje = f"Reclamo #{reclamo.id}: {comentario_preview}"
 
     total_enviados = 0
     for usuario in usuarios_dependencia:
         if await check_user_notification_preference(db, usuario.id, "comentario_vecino"):
+            # Crear notificación en BD para la campanita
+            await crear_notificacion_db(
+                db=db,
+                usuario_id=usuario.id,
+                titulo=titulo,
+                mensaje=mensaje,
+                tipo="info",
+                reclamo_id=reclamo.id
+            )
+
+            # Enviar push al navegador
             enviados = await send_push_to_user(
                 db=db,
                 user_id=usuario.id,
-                title=f"💬 Comentario de {vecino_nombre}",
-                body=f"Reclamo #{reclamo.id}: {comentario_preview}",
+                title=f"💬 {titulo}",
+                body=mensaje,
                 url=f"/gestion/reclamos/{reclamo.id}",
                 data={"tipo": "comentario_vecino", "reclamo_id": reclamo.id}
             )
