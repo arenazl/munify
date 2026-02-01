@@ -79,16 +79,12 @@ export default function NotificationPreferences() {
     if (user?.rol === 'vecino') {
       return group === 'vecino';
     }
-    if (user?.rol === 'empleado') {
-      return ['vecino', 'empleado'].includes(group);
-    }
     // Admin y supervisor ven todo
     return true;
   });
 
   const groupLabels: Record<string, { label: string; color: string }> = {
     vecino: { label: 'Notificaciones de Reclamos', color: '#3b82f6' },
-    empleado: { label: 'Notificaciones para Empleados', color: '#f59e0b' },
     supervisor: { label: 'Notificaciones para Supervisores', color: '#8b5cf6' },
     otros: { label: 'Otras Notificaciones', color: '#6b7280' },
   };

@@ -16,7 +16,7 @@ interface DashboardConfig {
   componentes: ComponenteConfig[];
 }
 
-type RolTab = 'vecino' | 'empleado';
+type RolTab = 'vecino' | 'supervisor';
 
 export default function ConfigDashboard() {
   const { theme } = useTheme();
@@ -24,7 +24,7 @@ export default function ConfigDashboard() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [configVecino, setConfigVecino] = useState<DashboardConfig>({ componentes: [] });
-  const [configEmpleado, setConfigEmpleado] = useState<DashboardConfig>({ componentes: [] });
+  const [configSupervisor, setConfigSupervisor] = useState<DashboardConfig>({ componentes: [] });
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -34,13 +34,13 @@ export default function ConfigDashboard() {
   const loadConfigs = async () => {
     setLoading(true);
     try {
-      const [vecinoRes, empleadoRes] = await Promise.all([
+      const [vecinoRes, supervisorRes] = await Promise.all([
         configuracionApi.getDashboardConfig('vecino'),
-        configuracionApi.getDashboardConfig('empleado'),
+        configuracionApi.getDashboardConfig('supervisor'),
       ]);
 
       setConfigVecino(vecinoRes.data.config);
-      setConfigEmpleado(empleadoRes.data.config);
+      setConfigSupervisor(supervisorRes.data.config);
     } catch (error) {
       console.error('Error cargando configuración:', error);
       toast.error('Error al cargar la configuración');
@@ -50,7 +50,7 @@ export default function ConfigDashboard() {
   };
 
   const handleToggleVisibility = (rol: RolTab, componenteId: string) => {
-    const setConfig = rol === 'vecino' ? setConfigVecino : setConfigEmpleado;
+    const setConfig = rol === 'vecino' ? setConfigVecino : setConfigSupervisor;
     setConfig((prev) => ({
       ...prev,
       componentes: prev.componentes.map((c) =>
@@ -61,8 +61,8 @@ export default function ConfigDashboard() {
   };
 
   const handleMoveComponent = (rol: RolTab, index: number, direction: 'up' | 'down') => {
-    const setConfig = rol === 'vecino' ? setConfigVecino : setConfigEmpleado;
-    const config = rol === 'vecino' ? configVecino : configEmpleado;
+    const setConfig = rol === 'vecino' ? setConfigVecino : setConfigSupervisor;
+    const config = rol === 'vecino' ? configVecino : configSupervisor;
 
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     if (newIndex < 0 || newIndex >= config.componentes.length) return;
@@ -86,7 +86,7 @@ export default function ConfigDashboard() {
     try {
       await Promise.all([
         configuracionApi.updateDashboardConfig('vecino', configVecino),
-        configuracionApi.updateDashboardConfig('empleado', configEmpleado),
+        configuracionApi.updateDashboardConfig('supervisor', configSupervisor),
       ]);
       toast.success('Configuración guardada correctamente');
       setHasChanges(false);
@@ -105,7 +105,7 @@ export default function ConfigDashboard() {
     toast.success('Configuración restablecida');
   };
 
-  const currentConfig = activeTab === 'vecino' ? configVecino : configEmpleado;
+  const currentConfig = activeTab === 'vecino' ? configVecino : configSupervisor;
 
   if (loading) {
     return (
@@ -166,18 +166,18 @@ export default function ConfigDashboard() {
           Dashboard Vecino
         </button>
         <button
-          onClick={() => setActiveTab('empleado')}
+          onClick={() => setActiveTab('supervisor')}
           className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all ${
-            activeTab === 'empleado' ? 'scale-[1.02]' : 'opacity-70 hover:opacity-100'
+            activeTab === 'supervisor' ? 'scale-[1.02]' : 'opacity-70 hover:opacity-100'
           }`}
           style={{
-            backgroundColor: activeTab === 'empleado' ? theme.primary : theme.card,
-            color: activeTab === 'empleado' ? '#fff' : theme.text,
-            border: `1px solid ${activeTab === 'empleado' ? theme.primary : theme.border}`,
+            backgroundColor: activeTab === 'supervisor' ? theme.primary : theme.card,
+            color: activeTab === 'supervisor' ? '#fff' : theme.text,
+            border: `1px solid ${activeTab === 'supervisor' ? theme.primary : theme.border}`,
           }}
         >
           <Wrench className="h-5 w-5" />
-          Dashboard Empleado
+          Dashboard Supervisor
         </button>
       </div>
 
@@ -187,7 +187,7 @@ export default function ConfigDashboard() {
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
       >
         <h3 className="font-semibold mb-4" style={{ color: theme.text }}>
-          Componentes del Dashboard - {activeTab === 'vecino' ? 'Vecino' : 'Empleado'}
+          Componentes del Dashboard - {activeTab === 'vecino' ? 'Vecino' : 'Supervisor'}
         </h3>
         <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
           Activa o desactiva los componentes y ordénalos como prefieras.

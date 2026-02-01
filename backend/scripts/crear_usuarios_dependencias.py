@@ -144,7 +144,7 @@ async def main():
                     :password_hash,
                     :nombre,
                     'Área',
-                    'empleado',
+                    'supervisor',
                     true,
                     NOW()
                 )

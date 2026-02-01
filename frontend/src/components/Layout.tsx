@@ -18,7 +18,6 @@ const getMobileTabs = (userRole: string) => {
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
-  const isEmpleado = userRole === 'empleado';
 
   if (isAdminOrSupervisor) {
     // Admin/Supervisor: Reclamos es la acción principal (centro), Trámites al lado
@@ -28,17 +27,6 @@ const getMobileTabs = (userRole: string) => {
       { path: '/gestion/reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
       { path: '/gestion/tramites', icon: FileCheck, label: 'Trámites', end: false },
       { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: false },
-    ];
-  }
-
-  if (isEmpleado) {
-    // Empleado: Trabajos es la acción principal (centro)
-    return [
-      { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: true },
-      { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
-      { path: '/gestion/mis-trabajos', icon: ClipboardList, label: 'Trabajos', end: false },
-      { path: '/gestion/mi-rendimiento', icon: BarChart3, label: 'Stats', end: false },
-      { path: '/gestion/mi-historial', icon: History, label: 'Historial', end: false },
     ];
   }
 

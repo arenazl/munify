@@ -39,17 +39,6 @@ export default function Demo() {
       features: ['Crear reclamos', 'Iniciar trámites', 'Ver estado en tiempo real']
     },
     {
-      id: 'empleado',
-      name: 'Empleado Demo',
-      role: 'empleado',
-      email: 'empleado@chacabuco.demo.com',
-      label: 'Empleado',
-      description: 'Resuelve trabajos en campo con la app móvil',
-      icon: Wrench,
-      gradient: 'from-[#2aa198] to-[#56cecb]',
-      features: ['Tablero de tareas', 'Actualizar estados', 'Subir fotos']
-    },
-    {
       id: 'admin',
       name: 'Admin Demo',
       role: 'admin',

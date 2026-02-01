@@ -16,9 +16,8 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
-  const isEmpleado = userRole === 'empleado';
   const isVecino = userRole === 'vecino';
-  const isDependencia = hasDependencia && isEmpleado; // Un usuario de dependencia tiene rol empleado pero con dependencia asignada
+  const isDependencia = hasDependencia && isSupervisor; // Un usuario de dependencia tiene rol supervisor con dependencia asignada
 
   return [
     // === SECCIÓN DEPENDENCIA (usuarios de dependencia) ===
@@ -130,43 +129,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Configuración del sistema'
     },
 
-    // === SECCIÓN EMPLEADOS (solo si no es usuario de dependencia) ===
-    {
-      name: 'Tablero',
-      href: '/gestion/tablero',
-      icon: Wrench,
-      show: isEmpleado && !isDependencia,
-      description: 'Tablero de trabajo'
-    },
-    {
-      name: 'Mis Trabajos',
-      href: '/gestion/mis-trabajos',
-      icon: ClipboardList,
-      show: isEmpleado && !isDependencia,
-      description: 'Reclamos asignados a mí'
-    },
-    {
-      name: 'Mapa',
-      href: '/gestion/mapa',
-      icon: Map,
-      show: isEmpleado && !isDependencia,
-      description: 'Ver ubicaciones'
-    },
-    {
-      name: 'Mi Rendimiento',
-      href: '/gestion/mi-rendimiento',
-      icon: BarChart3,
-      show: isEmpleado && !isDependencia,
-      description: 'Estadísticas de mi trabajo'
-    },
-    {
-      name: 'Mi Historial',
-      href: '/gestion/mi-historial',
-      icon: History,
-      show: isEmpleado && !isDependencia,
-      description: 'Historial de mis trabajos'
-    },
-
     // === SECCIÓN VECINOS ===
     {
       name: 'Mi Panel',
@@ -230,7 +192,7 @@ export const isMobileDevice = (): boolean => {
  */
 export const getDefaultRoute = (role: string, hasDependencia?: boolean) => {
   // Usuarios de dependencia van a su dashboard de área
-  if (hasDependencia && role === 'empleado') {
+  if (hasDependencia && role === 'supervisor') {
     return '/gestion/mi-area';
   }
 
@@ -238,8 +200,6 @@ export const getDefaultRoute = (role: string, hasDependencia?: boolean) => {
     case 'admin':
     case 'supervisor':
       return '/gestion';
-    case 'empleado':
-      return '/gestion/mis-trabajos';
     case 'vecino':
       return '/gestion/mi-panel';
     default:

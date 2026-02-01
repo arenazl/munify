@@ -3507,8 +3507,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     <>
       <ABMPage
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
-        buttonLabel={soloMisTrabajos || soloMiArea || user?.rol === 'empleado' ? undefined : "Nuevo Reclamo"}
-        onAdd={soloMisTrabajos || soloMiArea || user?.rol === 'empleado' ? undefined : openWizard}
+        buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
+        onAdd={soloMisTrabajos || soloMiArea || false ? undefined : openWizard}
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -3548,7 +3548,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             </button>
           </div>
         }
-        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin' || user?.rol === 'empleado'}
+        stickyHeader={user?.rol === 'supervisor' || user?.rol === 'admin' || false}
         secondaryFilters={
           <div className="w-full flex flex-col gap-1">
             {/* Categorías - botón Todas fijo + scroll horizontal */}

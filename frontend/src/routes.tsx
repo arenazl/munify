@@ -133,13 +133,13 @@ export const router = createBrowserRouter([
       { path: 'mi-panel', element: <ProtectedRoute roles={['vecino']}><DashboardVecino /></ProtectedRoute> },
 
       // Dashboard Dependencia (para usuarios de dependencia)
-      { path: 'mi-area', element: <ProtectedRoute roles={['empleado']}><MiArea /></ProtectedRoute> },
+      { path: 'mi-area', element: <ProtectedRoute roles={['supervisor']}><MiArea /></ProtectedRoute> },
       // Reclamos del área (dependencia)
-      { path: 'reclamos-area', element: <ProtectedRoute roles={['empleado']}><Reclamos soloMiArea /></ProtectedRoute> },
+      { path: 'reclamos-area', element: <ProtectedRoute roles={['supervisor']}><Reclamos soloMiArea /></ProtectedRoute> },
       // Trámites del área (dependencia)
-      { path: 'tramites-area', element: <ProtectedRoute roles={['empleado']}><GestionTramites soloMiArea /></ProtectedRoute> },
+      { path: 'tramites-area', element: <ProtectedRoute roles={['supervisor']}><GestionTramites soloMiArea /></ProtectedRoute> },
       // Estadísticas del área (dependencia)
-      { path: 'estadisticas-area', element: <ProtectedRoute roles={['empleado']}><MiRendimiento /></ProtectedRoute> },
+      { path: 'estadisticas-area', element: <ProtectedRoute roles={['supervisor']}><MiRendimiento /></ProtectedRoute> },
 
       // Nuevo Reclamo (dentro del Layout para usuarios logueados)
       { path: 'crear-reclamo', element: <NuevoReclamo /> },
@@ -152,11 +152,11 @@ export const router = createBrowserRouter([
       { path: 'reclamos/:id', element: <ReclamoDetalle /> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
-      { path: 'mis-trabajos', element: <ProtectedRoute roles={['empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
+      { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)
-      { path: 'mi-rendimiento', element: <ProtectedRoute roles={['empleado']}><MiRendimiento /></ProtectedRoute> },
+      { path: 'mi-rendimiento', element: <ProtectedRoute roles={['supervisor']}><MiRendimiento /></ProtectedRoute> },
       // Mi Historial (auditoría de trabajos del empleado)
-      { path: 'mi-historial', element: <ProtectedRoute roles={['empleado']}><MiHistorial /></ProtectedRoute> },
+      { path: 'mi-historial', element: <ProtectedRoute roles={['supervisor']}><MiHistorial /></ProtectedRoute> },
 
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },
@@ -167,7 +167,7 @@ export const router = createBrowserRouter([
       // Tablero Empleado
       {
         path: 'tablero',
-        element: <ProtectedRoute roles={['admin', 'supervisor', 'empleado']}><Tablero /></ProtectedRoute>
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Tablero /></ProtectedRoute>
       },
 
       // Administración

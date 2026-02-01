@@ -93,7 +93,7 @@ export function ChatWidget() {
 
   // Determinar si puede usar el asistente con datos (gestores)
   // Automáticamente activado para supervisores/admins
-  const canUseDataAssistant = user && ['admin', 'supervisor', 'empleado', 'super_admin'].includes(user.rol);
+  const canUseDataAssistant = user && ['admin', 'supervisor', 'super_admin'].includes(user.rol);
   const [isMaximized, setIsMaximized] = useState(chatCache.isMaximized);
 
   const handleLinkClick = (url: string) => {

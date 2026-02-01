@@ -162,7 +162,7 @@ export default function Tablero() {
     setFechaHasta('');
   };
 
-  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor' || user?.rol === 'empleado';
+  const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
 
   if (loading) {
     return (

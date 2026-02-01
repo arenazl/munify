@@ -124,15 +124,11 @@ export default function Usuarios() {
 
   const rolColors: Record<RolUsuario, string> = {
     vecino: 'bg-gray-500',
-    empleado: 'bg-blue-500',
     supervisor: 'bg-yellow-500',
     admin: 'bg-purple-500',
   };
 
   const filteredUsuarios = usuarios.filter(u => {
-    // Excluir usuarios con rol empleado (se gestionan en Empleados)
-    if (u.rol === 'empleado') return false;
-
     const matchSearch =
       u.nombre.toLowerCase().includes(search.toLowerCase()) ||
       u.apellido.toLowerCase().includes(search.toLowerCase()) ||
