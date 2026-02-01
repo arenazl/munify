@@ -408,18 +408,59 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   }, [search]);
 
   // Cargar reclamos cuando cambia el filtro de estado, categoría, dependencia o búsqueda (con debounce)
-  // También polling cada 10 segundos para detectar actividad reciente (comentarios, cambios de estado)
   useEffect(() => {
     fetchReclamos(true);
-
-    // Polling cada 10 segundos para mantener la lista actualizada
-    const pollingInterval = setInterval(() => {
-      fetchReclamos(true);
-    }, 10000);
-
-    return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
+
+  // Polling inteligente: solo actualiza si hay cambios (sin mostrar loading)
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        // Construir params iguales a fetchReclamos pero solo pedimos 1 item para comparar
+        const params: Record<string, string | number> = { skip: 0, limit: 1 };
+        if (filtroEstado) params.estado = filtroEstado;
+        if (filtroCategoria) params.categoria_id = filtroCategoria;
+        if (soloMiArea && user?.dependencia?.id) params.municipio_dependencia_id = user.dependencia.id;
+        if (filtroDependencia) params.municipio_dependencia_id = filtroDependencia;
+
+        const res = await reclamosApi.getAll(params);
+        const latestFromServer = res.data[0];
+
+        if (!latestFromServer || reclamos.length === 0) return;
+
+        const currentFirst = reclamos[0];
+        const serverUpdated = new Date(latestFromServer.updated_at).getTime();
+        const localUpdated = new Date(currentFirst.updated_at).getTime();
+
+        // Hay cambios si: nuevo reclamo diferente O mismo reclamo pero actualizado
+        const hasNewReclamo = latestFromServer.id !== currentFirst.id;
+        const hasUpdate = latestFromServer.id === currentFirst.id && serverUpdated > localUpdated;
+
+        if (hasNewReclamo || hasUpdate) {
+          // Hacer fetch silencioso (sin loading spinner)
+          const fullParams: Record<string, string | number> = { skip: 0, limit: ITEMS_PER_PAGE };
+          if (filtroEstado) fullParams.estado = filtroEstado;
+          if (filtroCategoria) fullParams.categoria_id = filtroCategoria;
+          if (debouncedSearch?.trim()) fullParams.search = debouncedSearch.trim();
+          if (soloMiArea && user?.dependencia?.id) fullParams.municipio_dependencia_id = user.dependencia.id;
+          if (filtroDependencia) fullParams.municipio_dependencia_id = filtroDependencia;
+
+          const fullRes = await reclamosApi.getAll(fullParams);
+          setReclamos(fullRes.data);
+          setPage(1);
+          setHasMore(fullRes.data.length === ITEMS_PER_PAGE);
+        }
+      } catch (error) {
+        // Silencioso - no mostrar error al usuario durante polling
+        console.error('Polling check error:', error);
+      }
+    };
+
+    const pollingInterval = setInterval(checkForUpdates, 10000);
+    return () => clearInterval(pollingInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch, soloMiArea, user?.dependencia?.id, reclamos]);
 
   // Recargar conteos de categorías y estados cuando cambia el filtro de dependencia
   useEffect(() => {
