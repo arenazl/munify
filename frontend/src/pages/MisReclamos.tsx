@@ -10,17 +10,17 @@ import { Sheet } from '../components/ui/Sheet';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  recibido: { bg: '#cffafe', text: '#0e7490' },
-  en_curso: { bg: '#fef3c7', text: '#92400e' },
-  finalizado: { bg: '#d1fae5', text: '#065f46' },
-  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
-  rechazado: { bg: '#fee2e2', text: '#991b1b' },
+  recibido: { bg: '#0891b2', text: '#ffffff' },
+  en_curso: { bg: '#f59e0b', text: '#ffffff' },
+  finalizado: { bg: '#10b981', text: '#ffffff' },
+  pospuesto: { bg: '#f97316', text: '#ffffff' },
+  rechazado: { bg: '#ef4444', text: '#ffffff' },
   // Legacy
-  nuevo: { bg: '#e5e7eb', text: '#374151' },
-  asignado: { bg: '#dbeafe', text: '#1e40af' },
-  en_proceso: { bg: '#fef3c7', text: '#92400e' },
-  pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
-  resuelto: { bg: '#d1fae5', text: '#065f46' },
+  nuevo: { bg: '#6366f1', text: '#ffffff' },
+  asignado: { bg: '#3b82f6', text: '#ffffff' },
+  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
+  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
+  resuelto: { bg: '#10b981', text: '#ffffff' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
@@ -915,21 +915,13 @@ export default function MisReclamos() {
 
                   {/* Contenido */}
                   <div className="flex-1 min-w-0">
-                    {/* Línea 1: Título + Estado */}
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold line-clamp-1" style={{ color: theme.text }}>
-                        {r.titulo}
-                      </p>
-                      <span
-                        className="px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0"
-                        style={{ backgroundColor: estado.bg, color: estado.text }}
-                      >
-                        {estadoLabels[r.estado]}
-                      </span>
-                    </div>
+                    {/* Línea 1: Título completo */}
+                    <p className="font-semibold line-clamp-2 leading-tight" style={{ color: theme.text }}>
+                      {r.titulo}
+                    </p>
 
-                    {/* Línea 2: Categoría + Fecha + Empleado */}
-                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    {/* Línea 2: Categoría + Fecha */}
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span
                         className="text-xs font-medium px-2 py-0.5 rounded-md"
                         style={{ backgroundColor: `${r.categoria?.color || theme.primary}15`, color: r.categoria?.color || theme.primary }}
@@ -940,9 +932,13 @@ export default function MisReclamos() {
                         <Calendar className="h-3 w-3 mr-1" />
                         {new Date(r.created_at).toLocaleDateString()}
                       </span>
-                      {r.dependencia_asignada?.nombre && (
+                    </div>
+
+                    {/* Línea 3: Dependencia asignada */}
+                    {r.dependencia_asignada?.nombre && (
+                      <div className="mt-1.5">
                         <span
-                          className="text-xs font-medium px-2 py-0.5 rounded-md flex items-center gap-1"
+                          className="text-xs font-medium px-2 py-0.5 rounded-md inline-flex items-center gap-1"
                           style={{
                             backgroundColor: `${r.dependencia_asignada.color || theme.primary}20`,
                             color: r.dependencia_asignada.color || theme.primary
@@ -951,17 +947,17 @@ export default function MisReclamos() {
                           <DynamicIcon name={r.dependencia_asignada.icono || 'Building2'} className="h-3 w-3" />
                           {r.dependencia_asignada.nombre}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
-                    {/* Línea 3: Descripción */}
+                    {/* Línea 4: Descripción */}
                     <p className="text-sm mt-2 line-clamp-2" style={{ color: theme.textSecondary }}>
                       {r.descripcion}
                     </p>
                   </div>
                 </div>
 
-                {/* Footer con dirección y fechas */}
+                {/* Footer con dirección, #ID, estado y fechas */}
                 <div
                   className="flex items-center justify-between mt-3 pt-3 text-xs"
                   style={{ borderTop: `1px solid ${theme.border}` }}
@@ -970,7 +966,7 @@ export default function MisReclamos() {
                     <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
                     <span className="truncate">{r.direccion}</span>
                   </span>
-                  <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     {/* Última actualización */}
                     {r.updated_at && (
                       <span className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
@@ -1021,7 +1017,20 @@ export default function MisReclamos() {
                         </span>
                       );
                     })()}
-                    <Eye className="h-4 w-4" style={{ color: theme.primary }} />
+                    {/* #ID del reclamo */}
+                    <span
+                      className="font-mono text-[10px] px-1.5 py-0.5 rounded"
+                      style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+                    >
+                      #{r.id}
+                    </span>
+                    {/* Estado con color sólido */}
+                    <span
+                      className="px-2 py-0.5 text-[10px] font-semibold rounded-md"
+                      style={{ backgroundColor: estado.bg, color: estado.text }}
+                    >
+                      {estadoLabels[r.estado]}
+                    </span>
                   </div>
                 </div>
               </ABMCard>
