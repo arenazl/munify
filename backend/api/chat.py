@@ -1860,8 +1860,13 @@ def parse_query_analysis(response: str) -> dict:
 
 import os
 
-# Path al archivo JSON con el schema de la BD
-SCHEMA_JSON_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'APP_GUIDE', '12_DATABASE_SCHEMA.json')
+# Paths al archivo JSON con el schema de la BD (múltiples ubicaciones)
+# 1. backend/data/ - para Heroku (deployado junto con el backend)
+# 2. APP_GUIDE/ - para desarrollo local (en la raíz del proyecto)
+SCHEMA_JSON_PATHS = [
+    os.path.join(os.path.dirname(__file__), '..', 'data', '12_DATABASE_SCHEMA.json'),  # backend/data/
+    os.path.join(os.path.dirname(__file__), '..', '..', 'APP_GUIDE', '12_DATABASE_SCHEMA.json'),  # root/APP_GUIDE/
+]
 
 # Cache en memoria - se carga una sola vez al iniciar
 _SCHEMA_JSON_CACHE: dict | None = None
@@ -1875,16 +1880,19 @@ def load_schema_json(force_refresh: bool = False) -> dict | None:
     if _SCHEMA_JSON_CACHE is not None and not force_refresh:
         return _SCHEMA_JSON_CACHE
 
-    try:
-        if os.path.exists(SCHEMA_JSON_PATH):
-            with open(SCHEMA_JSON_PATH, 'r', encoding='utf-8') as f:
-                _SCHEMA_JSON_CACHE = json.load(f)
-                print(f"[SCHEMA] JSON cargado desde {SCHEMA_JSON_PATH}")
-                return _SCHEMA_JSON_CACHE
-        else:
-            print(f"[SCHEMA] No encontrado: {SCHEMA_JSON_PATH}")
-    except Exception as e:
-        print(f"[SCHEMA] Error loading JSON: {e}")
+    # Intentar cada path en orden
+    for schema_path in SCHEMA_JSON_PATHS:
+        try:
+            if os.path.exists(schema_path):
+                with open(schema_path, 'r', encoding='utf-8') as f:
+                    _SCHEMA_JSON_CACHE = json.load(f)
+                    print(f"[SCHEMA] JSON cargado desde {schema_path}")
+                    return _SCHEMA_JSON_CACHE
+        except Exception as e:
+            print(f"[SCHEMA] Error loading from {schema_path}: {e}")
+            continue
+
+    print(f"[SCHEMA] No encontrado en ningún path: {SCHEMA_JSON_PATHS}")
     return None
 
 
@@ -1983,14 +1991,20 @@ async def get_database_schema(db: AsyncSession = None, force_refresh: bool = Fal
     Obtiene el schema de las tablas desde el archivo JSON de documentación.
     Devuelve el JSON completo para que la IA tenga todo el contexto del dominio.
     """
-    try:
-        with open(SCHEMA_JSON_PATH, 'r', encoding='utf-8') as f:
-            content = f.read()
-            print(f"[SCHEMA] JSON completo cargado ({len(content)} chars)")
-            return content
-    except Exception as e:
-        print(f"[SCHEMA] Error: {e}, usando fallback")
-        return DATABASE_SCHEMA_FALLBACK
+    # Intentar cada path en orden
+    for schema_path in SCHEMA_JSON_PATHS:
+        try:
+            if os.path.exists(schema_path):
+                with open(schema_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    print(f"[SCHEMA] JSON completo cargado desde {schema_path} ({len(content)} chars)")
+                    return content
+        except Exception as e:
+            print(f"[SCHEMA] Error loading from {schema_path}: {e}")
+            continue
+
+    print(f"[SCHEMA] No encontrado en ningún path, usando fallback")
+    return DATABASE_SCHEMA_FALLBACK
 
 
 DATABASE_SCHEMA_FALLBACK = """
@@ -2826,7 +2840,7 @@ async def refresh_database_schema(
     schema = await get_database_schema()
     return {
         "message": "Schema recargado desde JSON (caches limpiados)",
-        "source": SCHEMA_JSON_PATH,
+        "source": str(SCHEMA_JSON_PATHS),
         "schema_preview": schema[:500] + "..."
     }
 
