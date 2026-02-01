@@ -216,17 +216,14 @@ export function ReclamoCard({
               </span>
             )}
 
-            {/* Indicador de actividad reciente */}
+            {/* Indicador de actividad reciente - sutil y orgánico */}
             {tieneActividadReciente && (
               <span
-                className="w-6 h-6 rounded-full flex items-center justify-center animate-bounce"
-                style={{
-                  backgroundColor: '#3b82f6',
-                  boxShadow: '0 0 10px #3b82f6, 0 0 20px #3b82f680'
-                }}
+                className="flex items-center gap-1 text-[10px] font-medium"
+                style={{ color: theme.primary }}
                 title="Actividad reciente"
               >
-                <MessageCircle className="h-3.5 w-3.5" style={{ color: '#ffffff' }} />
+                <MessageCircle className="h-3 w-3" />
               </span>
             )}
 
