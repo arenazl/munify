@@ -1363,37 +1363,45 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  // Búsqueda del servidor + filtro local para refinamiento en tiempo real
+  // Filtro local - siempre filtra cuando hay búsqueda
   const filteredReclamos = reclamos.filter(r => {
-    // Si no hay búsqueda o la búsqueda ya fue enviada al servidor, mostrar todos
-    if (!search || search.trim() === debouncedSearch) return true;
+    // Si no hay búsqueda, mostrar todos
+    if (!search || !search.trim()) return true;
 
-    // Filtro local para refinar mientras el usuario sigue escribiendo
-    const searchLower = search.trim().toLowerCase();
+    // Filtro local en todas las columnas visibles
+    const s = search.trim().toLowerCase();
     return (
       // ID
-      String(r.id).includes(searchLower) ||
+      String(r.id).includes(s) ||
       // Título y descripción
-      r.titulo?.toLowerCase().includes(searchLower) ||
-      r.descripcion?.toLowerCase().includes(searchLower) ||
+      r.titulo?.toLowerCase().includes(s) ||
+      r.descripcion?.toLowerCase().includes(s) ||
+      // Estado (buscar por nombre visible)
+      r.estado?.toLowerCase().includes(s) ||
+      estadoLabels[r.estado]?.toLowerCase().includes(s) ||
       // Ubicación
-      r.direccion?.toLowerCase().includes(searchLower) ||
-      r.referencia?.toLowerCase().includes(searchLower) ||
-      // Categoría y zona
-      r.categoria?.nombre?.toLowerCase().includes(searchLower) ||
-      r.zona?.nombre?.toLowerCase().includes(searchLower) ||
-      r.zona?.codigo?.toLowerCase().includes(searchLower) ||
+      r.direccion?.toLowerCase().includes(s) ||
+      r.referencia?.toLowerCase().includes(s) ||
+      // Categoría
+      r.categoria?.nombre?.toLowerCase().includes(s) ||
+      // Zona
+      r.zona?.nombre?.toLowerCase().includes(s) ||
+      r.zona?.codigo?.toLowerCase().includes(s) ||
       // Creador (nombre, apellido, email, teléfono)
-      r.creador?.nombre?.toLowerCase().includes(searchLower) ||
-      r.creador?.apellido?.toLowerCase().includes(searchLower) ||
-      `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`.toLowerCase().includes(searchLower) ||
-      r.creador?.email?.toLowerCase().includes(searchLower) ||
-      r.creador?.telefono?.includes(searchLower) ||
+      r.creador?.nombre?.toLowerCase().includes(s) ||
+      r.creador?.apellido?.toLowerCase().includes(s) ||
+      `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`.toLowerCase().includes(s) ||
+      r.creador?.email?.toLowerCase().includes(s) ||
+      r.creador?.telefono?.includes(s) ||
       // Dependencia asignada
-      r.dependencia_asignada?.nombre?.toLowerCase().includes(searchLower) ||
+      r.dependencia_asignada?.nombre?.toLowerCase().includes(s) ||
       // Resolución y rechazo
-      r.resolucion?.toLowerCase().includes(searchLower) ||
-      r.descripcion_rechazo?.toLowerCase().includes(searchLower)
+      r.resolucion?.toLowerCase().includes(s) ||
+      r.descripcion_rechazo?.toLowerCase().includes(s) ||
+      r.motivo_rechazo?.toLowerCase().includes(s) ||
+      // Fechas (formato dd/mm/yyyy)
+      (r.created_at && new Date(r.created_at).toLocaleDateString('es-AR').includes(s)) ||
+      (r.fecha_programada && new Date(r.fecha_programada).toLocaleDateString('es-AR').includes(s))
     );
   }).sort((a, b) => {
     if (ordenamiento === 'programado') {

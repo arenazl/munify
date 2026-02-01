@@ -582,14 +582,18 @@ export default function Tramites() {
       const servicio = servicios.find(s => s.id === t.servicio_id);
       if (servicio?.tipo_tramite_id !== filtroTipo) return false;
     }
-    // Filtro por búsqueda - buscar en todos los campos relevantes
-    if (!search) return true;
-    const s = search.toLowerCase();
+    // Filtro por búsqueda - buscar en todas las columnas visibles
+    if (!search || !search.trim()) return true;
+    const s = search.trim().toLowerCase();
     const servicio = servicios.find(sv => sv.id === t.servicio_id);
+    const tipoTramite = tiposTramite.find(tipo => tipo.id === servicio?.tipo_tramite_id);
     return (
       // Número de trámite e ID
       t.numero_tramite?.toLowerCase().includes(s) ||
       String(t.id).includes(s) ||
+      // Estado (nombre visible)
+      t.estado?.toLowerCase().includes(s) ||
+      estadoLabels[t.estado]?.toLowerCase().includes(s) ||
       // Asunto y descripción
       t.asunto?.toLowerCase().includes(s) ||
       t.descripcion?.toLowerCase().includes(s) ||
@@ -606,11 +610,14 @@ export default function Tramites() {
       t.empleado_asignado?.apellido?.toLowerCase().includes(s) ||
       `${t.empleado_asignado?.nombre || ''} ${t.empleado_asignado?.apellido || ''}`.toLowerCase().includes(s) ||
       t.empleado_asignado?.especialidad?.toLowerCase().includes(s) ||
-      // Servicio
+      // Servicio y tipo de trámite
       servicio?.nombre?.toLowerCase().includes(s) ||
+      tipoTramite?.nombre?.toLowerCase().includes(s) ||
       // Respuesta y observaciones
       t.respuesta?.toLowerCase().includes(s) ||
-      t.observaciones?.toLowerCase().includes(s)
+      t.observaciones?.toLowerCase().includes(s) ||
+      // Fechas (formato dd/mm/yyyy)
+      (t.created_at && new Date(t.created_at).toLocaleDateString('es-AR').includes(s))
     );
   }).sort((a, b) => {
     if (ordenamiento === 'reciente') {
