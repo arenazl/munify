@@ -350,7 +350,15 @@ export default function Layout() {
         {/* Usuario en el Sidebar */}
         <div className="relative z-10 px-3 py-3 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
           <button
-            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            onClick={() => {
+              if (isMobile) {
+                // En mobile: cerrar sidebar y mostrar modal
+                setSidebarOpen(false);
+                setTimeout(() => setUserMenuOpen(true), 150);
+              } else {
+                setUserMenuOpen(!userMenuOpen);
+              }
+            }}
             className="w-full flex items-center gap-2 p-2 rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{
               backgroundColor: `${theme.primary}15`,
@@ -386,23 +394,15 @@ export default function Layout() {
             )}
           </button>
 
-          {/* Dropdown menu del usuario */}
-          {userMenuOpen && (
+          {/* Dropdown menu del usuario - SOLO DESKTOP */}
+          {userMenuOpen && !isMobile && (
             <>
               <div
-                className={`fixed inset-0 z-[60] ${isMobile ? 'bg-black/60' : ''}`}
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  // En móvil, también cerrar el sidebar
-                  if (isMobile) setSidebarOpen(false);
-                }}
+                className="fixed inset-0 z-[60]"
+                onClick={() => setUserMenuOpen(false)}
               />
               <div
-                className={`rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden ${
-                  isMobile
-                    ? 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[85vw] max-w-xs'
-                    : 'absolute left-full top-0 ml-2 w-56'
-                }`}
+                className="absolute left-full top-0 ml-2 w-56 rounded-xl shadow-2xl z-[70] theme-dropdown-enter overflow-hidden"
                 style={{
                   backgroundColor: theme.card,
                   border: `1px solid ${theme.border}`,
@@ -1666,6 +1666,188 @@ export default function Layout() {
           </div>
         </div>
       </Sheet>
+
+      {/* Modal de usuario para MOBILE - Bottom Sheet elegante */}
+      {userMenuOpen && isMobile && (
+        <div className="fixed inset-0 z-[100]">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
+            onClick={() => setUserMenuOpen(false)}
+          />
+
+          {/* Bottom Sheet */}
+          <div
+            className="absolute bottom-0 left-0 right-0 rounded-t-3xl overflow-hidden animate-slide-up"
+            style={{
+              backgroundColor: theme.card,
+              maxHeight: '85vh',
+            }}
+          >
+            {/* Handle bar */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div
+                className="w-12 h-1.5 rounded-full"
+                style={{ backgroundColor: theme.border }}
+              />
+            </div>
+
+            {/* Header con avatar grande */}
+            <div className="px-6 pb-5 pt-2 text-center border-b" style={{ borderColor: theme.border }}>
+              <div
+                className="w-20 h-20 mx-auto rounded-full flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-lg"
+                style={{
+                  backgroundColor: theme.primary,
+                  boxShadow: `0 8px 32px ${theme.primary}40`,
+                }}
+              >
+                {user.nombre[0]}{user.apellido[0]}
+              </div>
+              <h2 className="text-xl font-bold" style={{ color: theme.text }}>
+                {user.nombre} {user.apellido}
+              </h2>
+              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                {user.email}
+              </p>
+              <span
+                className="inline-block px-3 py-1 mt-2 text-xs font-semibold rounded-full capitalize"
+                style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+              >
+                {user.dependencia ? user.dependencia.nombre : user.rol}
+              </span>
+            </div>
+
+            {/* Opciones */}
+            <div className="p-4 space-y-2">
+              {/* Mi Perfil */}
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  handleOpenProfile();
+                }}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-[0.98]"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                }}
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: `${theme.primary}20` }}
+                >
+                  <User className="h-6 w-6" style={{ color: theme.primary }} />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold" style={{ color: theme.text }}>Mi Perfil</p>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>Editar datos personales</p>
+                </div>
+                <ChevronDown className="h-5 w-5 -rotate-90 ml-auto" style={{ color: theme.textSecondary }} />
+              </button>
+
+              {/* Notificaciones */}
+              <div
+                className="w-full p-4 rounded-2xl"
+                style={{ backgroundColor: theme.backgroundSecondary }}
+              >
+                <div className="flex items-center gap-4">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ backgroundColor: pushSubscribed ? 'rgba(34, 197, 94, 0.15)' : `${theme.primary}20` }}
+                  >
+                    <BellRing className="h-6 w-6" style={{ color: pushSubscribed ? '#22c55e' : theme.primary }} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold" style={{ color: theme.text }}>Notificaciones</p>
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>
+                      {pushSubscribed ? 'Activadas en este dispositivo' : 'Recibir alertas push'}
+                    </p>
+                  </div>
+                  {pushSubscribed && (
+                    <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">
+                      Activas
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-3 pl-16">
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      handleTopBarPushSubscribe();
+                    }}
+                    disabled={pushSubscribed || pushSubscribing}
+                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
+                    style={{
+                      backgroundColor: pushSubscribed ? theme.border : theme.primary,
+                      color: pushSubscribed ? theme.textSecondary : '#ffffff',
+                      opacity: pushSubscribed ? 0.6 : 1
+                    }}
+                  >
+                    {pushSubscribing ? 'Activando...' : pushSubscribed ? 'Activado' : 'Activar'}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setUserMenuOpen(false);
+                      try {
+                        const token = localStorage.getItem('token');
+                        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                        const res = await fetch(`${apiUrl}/push/test`, {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          }
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          toast.success(data.message || 'Notificación enviada!');
+                        } else {
+                          toast.error('Error al enviar notificación');
+                        }
+                      } catch {
+                        toast.error('Error al enviar notificación');
+                      }
+                    }}
+                    disabled={!pushSubscribed}
+                    className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]"
+                    style={{
+                      backgroundColor: theme.border,
+                      color: pushSubscribed ? theme.text : theme.textSecondary,
+                      opacity: pushSubscribed ? 1 : 0.5
+                    }}
+                  >
+                    Probar
+                  </button>
+                </div>
+              </div>
+
+              {/* Cerrar sesión */}
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  logout();
+                }}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-[0.98] mt-2"
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                }}
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)' }}
+                >
+                  <LogOut className="h-6 w-6 text-red-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-red-500">Cerrar sesión</p>
+                  <p className="text-xs text-red-400">Salir de tu cuenta</p>
+                </div>
+              </button>
+            </div>
+
+            {/* Safe area bottom */}
+            <div className="h-6" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
