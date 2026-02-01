@@ -1259,18 +1259,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleIniciar = async () => {
     if (!selectedReclamo) return;
 
-    // Toast de advertencia para supervisores/admins
-    if (user?.rol === 'supervisor' || user?.rol === 'admin') {
-      toast.warning('Atención: Estás iniciando el trabajo como supervisor.', {
-        duration: 4000,
-      });
-    }
-
     // Actualización optimista: actualizar UI inmediatamente
     const reclamoActualizado = { ...selectedReclamo, estado: 'en_proceso' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
-    toast.success('Trabajo iniciado');
+    toast.success('Reclamo en proceso');
 
     setSaving(true);
     try {
@@ -1280,7 +1273,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     } catch (error) {
       // Revertir cambio optimista si falla
       setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
-      toast.error('Error al iniciar trabajo');
+      toast.error('Error al poner en proceso');
       console.error('Error:', error);
     } finally {
       setSaving(false);
@@ -3096,14 +3089,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {selectedReclamo.estado === 'asignado' && (
+        {(selectedReclamo.estado === 'recibido' || selectedReclamo.estado === 'asignado') && (
           <ABMInfoPanel
-            title="Iniciar Trabajo"
+            title="Poner En Proceso"
             icon={<Play className="h-4 w-4" />}
             variant="warning"
           >
             <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Marcar que el empleado ha comenzado a trabajar en este reclamo.
+              Marcar que se ha comenzado a trabajar en este reclamo.
             </p>
           </ABMInfoPanel>
         )}
@@ -3374,7 +3367,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </>
         )}
 
-        {/* Botón Iniciar - para estado recibido o asignado */}
+        {/* Botón En Curso - para estado recibido o asignado */}
         {canProcesar && (
           <>
             <button
@@ -3387,7 +3380,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 boxShadow: `0 4px 14px ${theme.primary}40`
               }}
             >
-              {saving ? 'Iniciando...' : 'Iniciar'}
+              {saving ? 'Procesando...' : 'En Curso'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
