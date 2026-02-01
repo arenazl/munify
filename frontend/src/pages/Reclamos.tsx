@@ -1124,8 +1124,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  // Aceptar reclamo que ya está asignado a mi dependencia
-  const handleAceptar = async () => {
+  // Recibir reclamo que ya está asignado a mi dependencia
+  const handleRecibir = async () => {
     if (!selectedReclamo || !selectedReclamo.dependencia_asignada) return;
 
     // Validar que se haya ingresado tiempo estimado
@@ -1149,7 +1149,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
-    toast.success('Reclamo aceptado correctamente');
+    toast.success('Reclamo recibido correctamente');
 
     setSaving(true);
     try {
@@ -1166,7 +1166,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       setTiempoEstimadoHoras(0);
     } catch (error) {
       setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
-      toast.error('Error al aceptar reclamo');
+      toast.error('Error al recibir reclamo');
       console.error('Error:', error);
     } finally {
       setSaving(false);
@@ -3303,16 +3303,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     const canAsignar = selectedReclamo.estado === 'nuevo';
     const canProcesar = selectedReclamo.estado === 'recibido' || selectedReclamo.estado === 'asignado';
     const canFinalizar = selectedReclamo.estado === 'en_proceso';
-    // Puede aceptar si ya tiene dependencia asignada y no quiere reasignar
-    const canAceptar = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
+    // Puede recibir si ya tiene dependencia asignada y no quiere reasignar
+    const canRecibir = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
 
     return (
       <div className="flex gap-2">
-        {/* Botón Aceptar - para estado nuevo con dependencia ya asignada */}
-        {canAceptar && (
+        {/* Botón Recibir - para estado nuevo con dependencia ya asignada */}
+        {canRecibir && (
           <>
             <button
-              onClick={handleAceptar}
+              onClick={handleRecibir}
               disabled={saving}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
               style={{
@@ -3321,7 +3321,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
               }}
             >
-              {saving ? 'Aceptando...' : 'Aceptar'}
+              {saving ? 'Recibiendo...' : 'Recibir'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
@@ -3338,7 +3338,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         )}
 
         {/* Botón Asignar/Reasignar - para estado nuevo sin dependencia o queriendo reasignar */}
-        {canAsignar && !canAceptar && (
+        {canAsignar && !canRecibir && (
           <>
             <button
               onClick={handleAsignar}
@@ -3366,7 +3366,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </>
         )}
 
-        {/* Botón Procesando - para estado recibido o asignado */}
+        {/* Botón Iniciar - para estado recibido o asignado */}
         {canProcesar && (
           <>
             <button
@@ -3379,7 +3379,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 boxShadow: `0 4px 14px ${theme.primary}40`
               }}
             >
-              {saving ? 'Iniciando...' : 'Procesando'}
+              {saving ? 'Iniciando...' : 'Iniciar'}
             </button>
             <button
               onClick={() => setMotivoRechazo('otro')}
