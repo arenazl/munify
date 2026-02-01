@@ -454,8 +454,10 @@ export const dashboardApi = {
   getMetricasAccion: () => api.get('/dashboard/metricas-accion'),
   getMetricasDetalle: () => api.get('/dashboard/metricas-detalle'),
   getRecurrentes: (dias?: number, minReclamos?: number) => api.get('/dashboard/recurrentes', { params: { dias: dias || 90, min_reclamos: minReclamos || 2 } }),
-  getConteoCategorias: (estado?: string) => api.get('/dashboard/conteo-categorias', { params: estado ? { estado } : {} }),
-  getConteoEstados: () => api.get('/dashboard/conteo-estados'),
+  getConteoCategorias: (params?: { estado?: string; dependencia_id?: number }) =>
+    api.get('/dashboard/conteo-categorias', { params: params || {} }),
+  getConteoEstados: (dependencia_id?: number) =>
+    api.get('/dashboard/conteo-estados', { params: dependencia_id ? { dependencia_id } : {} }),
   getConteoDependencias: () => api.get('/dashboard/conteo-dependencias'),
 };
 

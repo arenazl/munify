@@ -440,6 +440,32 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
 
+  // Recargar conteos de categorías y estados cuando cambia el filtro de dependencia
+  useEffect(() => {
+    if (!soloMisTrabajos) {
+      // Recargar conteos con el filtro de dependencia
+      Promise.all([
+        dashboardApi.getConteoEstados(filtroDependencia || undefined),
+        dashboardApi.getConteoCategorias({ dependencia_id: filtroDependencia || undefined }),
+      ]).then(([estadosRes, categoriasRes]) => {
+        const estadosMap: Record<string, number> = {};
+        estadosRes.data.forEach((item: any) => {
+          estadosMap[item.estado] = item.cantidad;
+        });
+        setConteosEstados(estadosMap);
+
+        const categoriasMap: Record<number, number> = {};
+        categoriasRes.data.forEach((item: any) => {
+          categoriasMap[item.categoria_id] = item.cantidad;
+        });
+        setConteosCategorias(categoriasMap);
+      }).catch(error => {
+        console.error('Error recargando conteos:', error);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroDependencia]);
+
   // Cargar más cuando cambia la página
   useEffect(() => {
     if (page > 1) {

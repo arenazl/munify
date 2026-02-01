@@ -411,6 +411,7 @@ async def get_por_categoria(
 async def get_conteo_categorias(
     request: Request,
     estado: Optional[str] = None,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
@@ -428,11 +429,8 @@ async def get_conteo_categorias(
     conditions = [Reclamo.municipio_id == municipio_id]
     if estado:
         conditions.append(Reclamo.estado == estado)
-
-    # TODO: Migrar filtro de empleado a dependencia cuando se implemente IA
-    # Por ahora, empleados ven todos los reclamos del municipio
-    # if current_user.rol == RolUsuario.EMPLEADO:
-    #     conditions.append(Reclamo.municipio_dependencia_id == current_user.dependencia_id)
+    if dependencia_id:
+        conditions.append(Reclamo.municipio_dependencia_id == dependencia_id)
 
     query = await db.execute(
         select(
@@ -460,6 +458,7 @@ async def get_conteo_categorias(
 @router.get("/conteo-estados")
 async def get_conteo_estados(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
 ):
@@ -474,8 +473,10 @@ async def get_conteo_estados(
     # Construir condiciones base
     conditions = [Reclamo.municipio_id == municipio_id]
 
-    # Filtrar por dependencia si es empleado
-    if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
+    # Filtrar por dependencia si se especifica o si es empleado
+    if dependencia_id:
+        conditions.append(Reclamo.municipio_dependencia_id == dependencia_id)
+    elif current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
         conditions.append(Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id)
 
     query = await db.execute(
