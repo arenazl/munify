@@ -1187,7 +1187,7 @@ async def send_user_reclamos(phone: str, db: AsyncSession):
         estado_emoji = {
             "nuevo": "🆕",
             "asignado": "👤",
-            "en_proceso": "🔧",
+            "en_curso": "🔧",
             "resuelto": "✅",
             "rechazado": "❌",
         }.get(r.estado.value, "❓")

@@ -101,7 +101,7 @@ async def get_empleados_disponibilidad(
     estados_pendientes_tramites = [
         EstadoSolicitud.INICIADO,
         EstadoSolicitud.EN_REVISION,
-        EstadoSolicitud.EN_PROCESO
+        EstadoSolicitud.EN_CURSO
     ]
     # Estados pendientes para reclamos (strings en minúscula)
     estados_pendientes_reclamos = ['pendiente', 'en_progreso', 'asignado']

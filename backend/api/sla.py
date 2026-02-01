@@ -272,7 +272,7 @@ async def get_sla_estado_reclamos(
 
     if solo_activos:
         query = query.where(
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
+            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO])
         )
 
     query = query.order_by(Reclamo.created_at.asc())

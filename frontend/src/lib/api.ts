@@ -592,7 +592,7 @@ export const chatApi = {
       pendientes: number;
       nuevos: number;
       asignados: number;
-      en_proceso: number;
+      en_curso: number;
       resueltos: number;
       hoy: number;
       esta_semana: number;
@@ -602,7 +602,7 @@ export const chatApi = {
       total: number;
       iniciados: number;
       en_revision: number;
-      en_proceso: number;
+      en_curso: number;
       aprobados: number;
       esta_semana: number;
     };

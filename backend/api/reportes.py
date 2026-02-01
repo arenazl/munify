@@ -73,12 +73,12 @@ async def generar_reporte_ejecutivo(
     )
     resueltos = result.scalar() or 0
 
-    # Pendientes (nuevo + asignado + en_proceso)
+    # Pendientes (nuevo + asignado + en_curso)
     result = await db.execute(
         select(func.count(Reclamo.id)).where(
             and_(
                 base_filter,
-                Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
+                Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO])
             )
         )
     )
@@ -101,7 +101,7 @@ async def generar_reporte_ejecutivo(
         estado_label = {
             EstadoReclamo.NUEVO: "Nuevo",
             EstadoReclamo.ASIGNADO: "Asignado",
-            EstadoReclamo.EN_PROCESO: "En Proceso",
+            EstadoReclamo.EN_CURSO: "En Proceso",
             EstadoReclamo.RESUELTO: "Resuelto",
             EstadoReclamo.RECHAZADO: "Rechazado",
         }.get(estado, str(estado))

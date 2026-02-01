@@ -58,7 +58,7 @@ interface Reclamo {
 interface Estadisticas {
   total: number;
   nuevos: number;
-  en_proceso: number;
+  en_curso: number;
   resueltos: number;
   por_zona?: { zona: string; cantidad: number }[];
   por_categoria?: { categoria: string; color: string; cantidad: number }[];
@@ -94,7 +94,7 @@ export default function HomePublic() {
   const navigate = useNavigate();
   const municipioFromUrl = useMunicipioFromUrl();
 
-  const [estadisticas, setEstadisticas] = useState<Estadisticas>({ total: 0, nuevos: 0, en_proceso: 0, resueltos: 0 });
+  const [estadisticas, setEstadisticas] = useState<Estadisticas>({ total: 0, nuevos: 0, en_curso: 0, resueltos: 0 });
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -251,7 +251,7 @@ export default function HomePublic() {
       'ASIGNADO': { color: '#3b82f6', label: 'Asignado' },
       'asignado': { color: '#3b82f6', label: 'Asignado' },
       'EN_PROCESO': { color: '#f59e0b', label: 'En Proceso' },
-      'en_proceso': { color: '#f59e0b', label: 'En Proceso' },
+      'en_curso': { color: '#f59e0b', label: 'En Proceso' },
       'RESUELTO': { color: '#10b981', label: 'Resuelto' },
       'resuelto': { color: '#10b981', label: 'Resuelto' },
       'RECHAZADO': { color: '#ef4444', label: 'Rechazado' },
@@ -531,7 +531,7 @@ export default function HomePublic() {
               </div>
               <div>
                 <p className="text-xl md:text-2xl font-bold" style={{ color: theme.text }}>
-                  {loading ? '-' : estadisticas.en_proceso}
+                  {loading ? '-' : estadisticas.en_curso}
                 </p>
                 <p className="text-[10px] md:text-xs" style={{ color: theme.textSecondary }}>En Proceso</p>
               </div>

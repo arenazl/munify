@@ -100,8 +100,8 @@ async def notificar_cambio_reclamo(
         )
         subject = f"Reclamo #{reclamo.id} asignado"
 
-    elif reclamo.estado == EstadoReclamo.EN_PROCESO:
-        html = EmailTemplates.reclamo_en_proceso(reclamo.titulo, reclamo.id)
+    elif reclamo.estado == EstadoReclamo.EN_CURSO:
+        html = EmailTemplates.reclamo_en_curso(reclamo.titulo, reclamo.id)
         subject = f"Reclamo #{reclamo.id} en proceso"
 
     elif reclamo.estado == EstadoReclamo.RESUELTO:
@@ -164,7 +164,7 @@ async def enviar_resumen_diario(
     result = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
+            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO])
         )
     )
     total_activos = result.scalar() or 0

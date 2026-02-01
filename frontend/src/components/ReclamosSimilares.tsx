@@ -32,7 +32,7 @@ interface ReclamosSimilaresProps {
 const estadoConfig: Record<string, { label: string; color: string; bg: string }> = {
   nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6' },
   asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe' },
-  en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7' },
+  en_curso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7' },
   resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5' },
   rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2' },
 };

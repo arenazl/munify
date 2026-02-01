@@ -14,7 +14,7 @@ import { publicoApi } from '../../lib/api';
 interface EstadisticasMunicipio {
   total: number;
   nuevos: number;
-  en_proceso: number;
+  en_curso: number;
   resueltos: number;
   por_zona: { zona: string; cantidad: number }[];
   por_categoria: { categoria: string; color: string; cantidad: number }[];
@@ -146,7 +146,7 @@ export default function MobileEstadisticas() {
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
                 <span className="text-sm" style={{ color: theme.text }}>En proceso</span>
               </div>
-              <span className="font-medium" style={{ color: theme.text }}>{stats.en_proceso}</span>
+              <span className="font-medium" style={{ color: theme.text }}>{stats.en_curso}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

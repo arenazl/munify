@@ -373,16 +373,16 @@ async def cambiar_estado_reclamo_drag(
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
     # Validar transiciones permitidas
-    # Flujo: nuevo → recibido → en_proceso → (finalizado | pospuesto | rechazado)
+    # Flujo: nuevo → recibido → en_curso → (finalizado | pospuesto | rechazado)
     transiciones_validas = {
         EstadoReclamo.NUEVO: [EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.RECIBIDO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.ASIGNADO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Legacy
-        EstadoReclamo.EN_PROCESO: [EstadoReclamo.FINALIZADO, EstadoReclamo.POSPUESTO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.FINALIZADO, EstadoReclamo.EN_PROCESO],  # Legacy
-        EstadoReclamo.RESUELTO: [EstadoReclamo.EN_PROCESO],  # Legacy
+        EstadoReclamo.RECIBIDO: [EstadoReclamo.EN_CURSO, EstadoReclamo.RECHAZADO],
+        EstadoReclamo.ASIGNADO: [EstadoReclamo.EN_CURSO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Legacy
+        EstadoReclamo.EN_CURSO: [EstadoReclamo.FINALIZADO, EstadoReclamo.POSPUESTO, EstadoReclamo.RECHAZADO],
+        EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.FINALIZADO, EstadoReclamo.EN_CURSO],  # Legacy
+        EstadoReclamo.RESUELTO: [EstadoReclamo.EN_CURSO],  # Legacy
         EstadoReclamo.FINALIZADO: [],  # Estado final
-        EstadoReclamo.POSPUESTO: [EstadoReclamo.EN_PROCESO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Puede retomar
+        EstadoReclamo.POSPUESTO: [EstadoReclamo.EN_CURSO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Puede retomar
         EstadoReclamo.RECHAZADO: [],  # Estado final
     }
 
@@ -473,7 +473,7 @@ async def get_reclamos_recurrentes(
         Reclamo.estado.in_([
             EstadoReclamo.NUEVO,
             EstadoReclamo.ASIGNADO,
-            EstadoReclamo.EN_PROCESO
+            EstadoReclamo.EN_CURSO
         ]),
         Reclamo.municipio_id == muni_id
     ).options(
@@ -572,7 +572,7 @@ async def buscar_reclamos_similares(
         Reclamo.estado.in_([
             EstadoReclamo.NUEVO,
             EstadoReclamo.ASIGNADO,
-            EstadoReclamo.EN_PROCESO
+            EstadoReclamo.EN_CURSO
         ]),
         Reclamo.municipio_id == current_user.municipio_id
     ).options(
@@ -635,7 +635,7 @@ async def get_mis_estadisticas(
     return {
         "total_asignados": 0,
         "resueltos": 0,
-        "en_proceso": 0,
+        "en_curso": 0,
         "pendientes": 0,
         "resueltos_este_mes": 0,
         "tiempo_promedio_resolucion": 0,
@@ -1049,15 +1049,15 @@ async def iniciar_reclamo(
             raise HTTPException(status_code=403, detail="No tienes permiso para iniciar este reclamo")
 
     estado_anterior = reclamo.estado
-    reclamo.estado = EstadoReclamo.EN_PROCESO
+    reclamo.estado = EstadoReclamo.EN_CURSO
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
         usuario_id=current_user.id,
         estado_anterior=estado_anterior,
-        estado_nuevo=EstadoReclamo.EN_PROCESO,
-        accion="en_proceso",
-        comentario="Trabajo iniciado"
+        estado_nuevo=EstadoReclamo.EN_CURSO,
+        accion="en_curso",
+        comentario="Trabajo en curso"
     )
     db.add(historial)
 
@@ -1112,7 +1112,7 @@ async def resolver_reclamo(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.EN_PROCESO:
+    if reclamo.estado != EstadoReclamo.EN_CURSO:
         raise HTTPException(status_code=400, detail="El reclamo debe estar en proceso para resolverlo")
 
     if current_user.rol == RolUsuario.EMPLEADO and current_user.municipio_dependencia_id:
@@ -1309,7 +1309,7 @@ async def devolver_reclamo(
 ):
     """
     Devolver un reclamo pendiente de confirmación al empleado.
-    Cambia el estado a EN_PROCESO y notifica al empleado.
+    Cambia el estado a EN_CURSO y notifica al empleado.
     """
     from services.notificacion_service import NotificacionService
 
@@ -1325,13 +1325,13 @@ async def devolver_reclamo(
         )
 
     estado_anterior = reclamo.estado
-    reclamo.estado = EstadoReclamo.EN_PROCESO
+    reclamo.estado = EstadoReclamo.EN_CURSO
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
         usuario_id=current_user.id,
         estado_anterior=estado_anterior,
-        estado_nuevo=EstadoReclamo.EN_PROCESO,
+        estado_nuevo=EstadoReclamo.EN_CURSO,
         accion="devuelto",
         comentario=f"Devuelto por supervisor: {motivo}"
     )

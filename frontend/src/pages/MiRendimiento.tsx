@@ -8,7 +8,7 @@ import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 interface EstadisticasEmpleado {
   total_asignados: number;
   resueltos: number;
-  en_proceso: number;
+  en_curso: number;
   pendientes: number;
   resueltos_este_mes: number;
   tiempo_promedio_resolucion: number; // en días
@@ -41,7 +41,7 @@ export default function MiRendimiento() {
       setStats({
         total_asignados: 0,
         resueltos: 0,
-        en_proceso: 0,
+        en_curso: 0,
         pendientes: 0,
         resueltos_este_mes: 0,
         tiempo_promedio_resolucion: 0,
@@ -131,7 +131,7 @@ export default function MiRendimiento() {
             </div>
             <div>
               <p className="text-2xl font-bold" style={{ color: theme.text }}>
-                {stats?.en_proceso || 0}
+                {stats?.en_curso || 0}
               </p>
               <p className="text-xs" style={{ color: theme.textSecondary }}>
                 En proceso

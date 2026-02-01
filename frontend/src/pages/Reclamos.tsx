@@ -14,27 +14,31 @@ import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  nuevo: { bg: '#6366f1', text: '#ffffff' },
   recibido: { bg: '#0891b2', text: '#ffffff' },
+  en_curso: { bg: '#f59e0b', text: '#ffffff' },
+  finalizado: { bg: '#10b981', text: '#ffffff' },
+  pospuesto: { bg: '#f97316', text: '#ffffff' },
+  rechazado: { bg: '#ef4444', text: '#ffffff' },
+  // Legacy
+  nuevo: { bg: '#6366f1', text: '#ffffff' },
   asignado: { bg: '#3b82f6', text: '#ffffff' },
   en_proceso: { bg: '#f59e0b', text: '#ffffff' },
   pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
   resuelto: { bg: '#10b981', text: '#ffffff' },
-  finalizado: { bg: '#10b981', text: '#ffffff' },
-  pospuesto: { bg: '#f97316', text: '#ffffff' },
-  rechazado: { bg: '#ef4444', text: '#ffffff' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  nuevo: 'Nuevo',
   recibido: 'Recibido',
-  asignado: 'Asignado',
-  en_proceso: 'En Curso',
-  pendiente_confirmacion: 'Pendiente Confirmación',
-  resuelto: 'Resuelto',
+  en_curso: 'En Curso',
   finalizado: 'Finalizado',
   pospuesto: 'Pospuesto',
   rechazado: 'Rechazado',
+  // Legacy
+  nuevo: 'Nuevo',
+  asignado: 'Asignado',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente',
+  resuelto: 'Resuelto',
 };
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
@@ -55,7 +59,7 @@ const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
     case 'nuevo': return <Sparkles className="h-3 w-3" />;
     case 'recibido': return <CheckCircle2 className="h-3 w-3" />;
     case 'asignado': return <UserPlus className="h-3 w-3" />;
-    case 'en_proceso': return <Play className="h-3 w-3" />;
+    case 'en_curso': return <Play className="h-3 w-3" />;
     case 'resuelto': return <CheckCircle className="h-3 w-3" />;
     case 'finalizado': return <CheckCircle className="h-3 w-3" />;
     case 'pospuesto': return <Clock className="h-3 w-3" />;
@@ -1260,7 +1264,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo) return;
 
     // Actualización optimista: actualizar UI inmediatamente
-    const reclamoActualizado = { ...selectedReclamo, estado: 'en_proceso' as const };
+    const reclamoActualizado = { ...selectedReclamo, estado: 'en_curso' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
     closeSheet();
     toast.success('Reclamo en proceso');
@@ -3101,7 +3105,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
-        {selectedReclamo.estado === 'en_proceso' && (
+        {selectedReclamo.estado === 'en_curso' && (
           <ABMCollapsible
             title="Finalizar Trabajo"
             icon={<CheckCircle className="h-4 w-4" />}
@@ -3303,7 +3307,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
     const canAsignar = selectedReclamo.estado === 'nuevo';
     const canProcesar = selectedReclamo.estado === 'recibido' || selectedReclamo.estado === 'asignado';
-    const canFinalizar = selectedReclamo.estado === 'en_proceso';
+    const canFinalizar = selectedReclamo.estado === 'en_curso';
     // Puede recibir si ya tiene dependencia asignada y no quiere reasignar
     const canRecibir = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
 
@@ -3470,7 +3474,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {selectedReclamo.estado === 'pospuesto' && (
           <div className="flex gap-2">
             <button
-              onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_proceso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(); closeSheet(); toast.success('Reclamo retomado'); })}
+              onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(); closeSheet(); toast.success('Reclamo retomado'); })}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
                 backgroundColor: theme.primary,
@@ -3646,7 +3650,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 [
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
                   { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: conteosEstados['recibido'] || 0 },
-                  { key: 'en_proceso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_proceso'] || 0 },
+                  { key: 'en_curso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_curso'] || 0 },
                   { key: 'finalizado', label: 'Final.', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
                   { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
                   { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },

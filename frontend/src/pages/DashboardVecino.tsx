@@ -40,7 +40,7 @@ interface MisEstadisticas {
   total: number;
   nuevos: number;
   asignados: number;
-  en_proceso: number;
+  en_curso: number;
   resueltos: number;
   rechazados: number;
 }
@@ -48,7 +48,7 @@ interface MisEstadisticas {
 interface EstadisticasPublicas {
   total_reclamos: number;
   resueltos: number;
-  en_proceso: number;
+  en_curso: number;
   nuevos: number;
   tasa_resolucion: number;
   tiempo_promedio_resolucion_dias: number;
@@ -180,27 +180,31 @@ const noticiasCarrusel = [
 ];
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  nuevo: { bg: '#e5e7eb', text: '#374151' },
   recibido: { bg: '#cffafe', text: '#0e7490' },
+  en_curso: { bg: '#fef3c7', text: '#92400e' },
+  finalizado: { bg: '#d1fae5', text: '#065f46' },
+  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
+  rechazado: { bg: '#fee2e2', text: '#991b1b' },
+  // Legacy
+  nuevo: { bg: '#e5e7eb', text: '#374151' },
   asignado: { bg: '#dbeafe', text: '#1e40af' },
   en_proceso: { bg: '#fef3c7', text: '#92400e' },
   pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
   resuelto: { bg: '#d1fae5', text: '#065f46' },
-  finalizado: { bg: '#d1fae5', text: '#065f46' },
-  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
-  rechazado: { bg: '#fee2e2', text: '#991b1b' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  nuevo: 'Nuevo',
   recibido: 'Recibido',
-  asignado: 'Asignado',
-  en_proceso: 'En Curso',
-  pendiente_confirmacion: 'Pendiente',
-  resuelto: 'Resuelto',
+  en_curso: 'En Curso',
   finalizado: 'Finalizado',
   pospuesto: 'Pospuesto',
   rechazado: 'Rechazado',
+  // Legacy
+  nuevo: 'Nuevo',
+  asignado: 'Asignado',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente',
+  resuelto: 'Resuelto',
 };
 
 export default function DashboardVecino() {
@@ -213,7 +217,7 @@ export default function DashboardVecino() {
     total: 0,
     nuevos: 0,
     asignados: 0,
-    en_proceso: 0,
+    en_curso: 0,
     resueltos: 0,
     rechazados: 0,
   });
@@ -242,7 +246,7 @@ export default function DashboardVecino() {
         total: reclamos.length,
         nuevos: reclamos.filter(r => r.estado === 'nuevo').length,
         asignados: reclamos.filter(r => r.estado === 'asignado').length,
-        en_proceso: reclamos.filter(r => r.estado === 'en_proceso').length,
+        en_curso: reclamos.filter(r => r.estado === 'en_curso').length,
         resueltos: reclamos.filter(r => r.estado === 'resuelto').length,
         rechazados: reclamos.filter(r => r.estado === 'rechazado').length,
       };
@@ -735,7 +739,7 @@ export default function DashboardVecino() {
                     <p className="text-[10px]" style={{ color: theme.textSecondary }}>Resueltos</p>
                   </div>
                   <div className="p-3 rounded-xl text-center" style={{ backgroundColor: '#f59e0b10' }}>
-                    <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{estadisticasPublicas.en_proceso}</p>
+                    <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{estadisticasPublicas.en_curso}</p>
                     <p className="text-[10px]" style={{ color: theme.textSecondary }}>En proceso</p>
                   </div>
                 </div>

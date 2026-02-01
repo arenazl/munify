@@ -83,15 +83,17 @@ const getFriendlyError = (error: string): string => {
 };
 
 const estadoConfig: Record<EstadoReclamo, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
-  nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
   recibido: { label: 'Recibido', color: '#0891b2', bg: '#cffafe', icon: CheckCircle },
-  asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
-  en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
-  pendiente_confirmacion: { label: 'Pendiente Confirmación', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
-  resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
+  en_curso: { label: 'En Curso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
   finalizado: { label: 'Finalizado', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
   pospuesto: { label: 'Pospuesto', color: '#ea580c', bg: '#ffedd5', icon: Clock },
   rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
+  // Legacy
+  nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
+  asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
+  en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
+  pendiente_confirmacion: { label: 'Pendiente', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
+  resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
 };
 
 const accionIcons: Record<string, typeof CheckCircle> = {

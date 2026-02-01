@@ -85,7 +85,7 @@ class ReclamoPublico(BaseModel):
 class EstadisticasPublicas(BaseModel):
     total_reclamos: int
     resueltos: int
-    en_proceso: int
+    en_curso: int
     nuevos: int
     tasa_resolucion: float
     tiempo_promedio_resolucion_dias: float
@@ -124,9 +124,9 @@ async def get_estadisticas_publicas(
 
     result = await db.execute(
         select(func.count(Reclamo.id))
-        .where(Reclamo.estado == EstadoReclamo.EN_PROCESO)
+        .where(Reclamo.estado == EstadoReclamo.EN_CURSO)
     )
-    en_proceso = result.scalar() or 0
+    en_curso = result.scalar() or 0
 
     result = await db.execute(
         select(func.count(Reclamo.id))
@@ -189,7 +189,7 @@ async def get_estadisticas_publicas(
     return EstadisticasPublicas(
         total_reclamos=total,
         resueltos=resueltos,
-        en_proceso=en_proceso,
+        en_curso=en_curso,
         nuevos=nuevos,
         tasa_resolucion=round(tasa_resolucion, 1),
         tiempo_promedio_resolucion_dias=round(tiempo_promedio, 1),
@@ -305,7 +305,7 @@ def _get_color_estado(estado: EstadoReclamo) -> str:
     colores = {
         EstadoReclamo.NUEVO: "#3b82f6",      # azul
         EstadoReclamo.ASIGNADO: "#f59e0b",   # naranja
-        EstadoReclamo.EN_PROCESO: "#8b5cf6", # violeta
+        EstadoReclamo.EN_CURSO: "#8b5cf6", # violeta
         EstadoReclamo.RESUELTO: "#10b981",   # verde
         EstadoReclamo.RECHAZADO: "#ef4444",  # rojo
     }
@@ -451,15 +451,15 @@ async def get_estadisticas_municipio(
     )
     nuevos = result.scalar() or 0
 
-    # En proceso (asignado + en_proceso)
+    # En proceso (asignado + en_curso)
     result = await db.execute(
         select(func.count(Reclamo.id))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO])
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO])
         )
     )
-    en_proceso = result.scalar() or 0
+    en_curso = result.scalar() or 0
 
     # Resueltos
     result = await db.execute(
@@ -502,7 +502,7 @@ async def get_estadisticas_municipio(
     return {
         "total": total,
         "nuevos": nuevos,
-        "en_proceso": en_proceso,
+        "en_curso": en_curso,
         "resueltos": resueltos,
         "por_zona": por_zona,
         "por_categoria": por_categoria

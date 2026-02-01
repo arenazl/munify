@@ -319,7 +319,7 @@ export default function Dashboard() {
   const estadoColors: Record<string, string> = {
     nuevo: '#6b7280',
     asignado: '#3b82f6',
-    en_proceso: '#f59e0b',
+    en_curso: '#f59e0b',
     resuelto: '#22c55e',
     rechazado: '#ef4444',
   };

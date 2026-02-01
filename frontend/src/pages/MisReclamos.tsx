@@ -10,27 +10,31 @@ import { Sheet } from '../components/ui/Sheet';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  nuevo: { bg: '#e5e7eb', text: '#374151' },
   recibido: { bg: '#cffafe', text: '#0e7490' },
+  en_curso: { bg: '#fef3c7', text: '#92400e' },
+  finalizado: { bg: '#d1fae5', text: '#065f46' },
+  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
+  rechazado: { bg: '#fee2e2', text: '#991b1b' },
+  // Legacy
+  nuevo: { bg: '#e5e7eb', text: '#374151' },
   asignado: { bg: '#dbeafe', text: '#1e40af' },
   en_proceso: { bg: '#fef3c7', text: '#92400e' },
   pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
   resuelto: { bg: '#d1fae5', text: '#065f46' },
-  finalizado: { bg: '#d1fae5', text: '#065f46' },
-  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
-  rechazado: { bg: '#fee2e2', text: '#991b1b' },
 };
 
 const estadoLabels: Record<EstadoReclamo, string> = {
-  nuevo: 'Nuevo',
   recibido: 'Recibido',
-  asignado: 'Asignado',
-  en_proceso: 'En Curso',
-  pendiente_confirmacion: 'Pendiente Confirmación',
-  resuelto: 'Resuelto',
+  en_curso: 'En Curso',
   finalizado: 'Finalizado',
   pospuesto: 'Pospuesto',
   rechazado: 'Rechazado',
+  // Legacy
+  nuevo: 'Nuevo',
+  asignado: 'Asignado',
+  en_proceso: 'En Proceso',
+  pendiente_confirmacion: 'Pendiente',
+  resuelto: 'Resuelto',
 };
 
 // Formatea el nombre del empleado en formato "L. Lopez"

@@ -36,7 +36,7 @@ const columnas: Columna[] = [
     badgeClass: 'badge-gradient-blue',
   },
   {
-    id: 'en_proceso',
+    id: 'en_curso',
     titulo: 'En Proceso',
     color: '#f59e0b',
     headerClass: 'column-header-orange',
@@ -222,7 +222,7 @@ export default function Tablero() {
           // Títulos cortos para mobile
           const tituloCorto = col.id === 'nuevo' ? 'Nuevos' :
                               col.id === 'asignado' ? 'Asig.' :
-                              col.id === 'en_proceso' ? 'Proceso' :
+                              col.id === 'en_curso' ? 'Proceso' :
                               col.id === 'pendiente_confirmacion' ? 'Conf.' : 'Resuel.';
           return (
             <button

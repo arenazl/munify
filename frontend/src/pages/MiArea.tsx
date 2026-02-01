@@ -13,14 +13,14 @@ interface EstadisticasDependencia {
   reclamos: {
     total: number;
     nuevos: number;
-    en_proceso: number;
+    en_curso: number;
     resueltos: number;
     pendientes: number;
   };
   tramites: {
     total: number;
     iniciados: number;
-    en_proceso: number;
+    en_curso: number;
     finalizados: number;
     pendientes: number;
   };
@@ -45,7 +45,7 @@ export default function MiArea() {
         const reclamosStats = {
           total: 0,
           nuevos: 0,
-          en_proceso: 0,
+          en_curso: 0,
           resueltos: 0,
           pendientes: 0,
         };
@@ -54,7 +54,7 @@ export default function MiArea() {
         conteoData.forEach((item) => {
           reclamosStats.total += item.cantidad;
           if (item.estado === 'nuevo') reclamosStats.nuevos = item.cantidad;
-          if (item.estado === 'en_proceso') reclamosStats.en_proceso = item.cantidad;
+          if (item.estado === 'en_curso') reclamosStats.en_curso = item.cantidad;
           if (item.estado === 'resuelto') reclamosStats.resueltos = item.cantidad;
         });
         reclamosStats.pendientes = reclamosStats.total - reclamosStats.resueltos;
@@ -64,7 +64,7 @@ export default function MiArea() {
           tramites: {
             total: 0,
             iniciados: 0,
-            en_proceso: 0,
+            en_curso: 0,
             finalizados: 0,
             pendientes: 0,
           },
@@ -121,7 +121,7 @@ export default function MiArea() {
         />
         <MiniStatCard
           label="En Proceso"
-          value={stats?.reclamos.en_proceso || 0}
+          value={stats?.reclamos.en_curso || 0}
           icon={<Timer className="h-4 w-4" />}
           color="#3b82f6"
           theme={theme}
@@ -239,7 +239,7 @@ export default function MiArea() {
                   <Clock className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-xs" style={{ color: theme.textSecondary }}>Proceso</span>
                 </div>
-                <span className="text-xl font-bold" style={{ color: theme.text }}>{stats?.reclamos.en_proceso || 0}</span>
+                <span className="text-xl font-bold" style={{ color: theme.text }}>{stats?.reclamos.en_curso || 0}</span>
               </div>
             </div>
 
@@ -295,7 +295,7 @@ export default function MiArea() {
           />
           <TramiteStatCard
             label="En Proceso"
-            value={stats?.tramites.en_proceso || 0}
+            value={stats?.tramites.en_curso || 0}
             icon={<Clock className="h-4 w-4" />}
             color="#3b82f6"
             theme={theme}

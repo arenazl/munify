@@ -25,7 +25,7 @@ interface KPIsData {
     pendientes: number;
     nuevos: number;
     asignados: number;
-    en_proceso: number;
+    en_curso: number;
     resueltos: number;
     hoy: number;
     esta_semana: number;
@@ -35,7 +35,7 @@ interface KPIsData {
     total: number;
     iniciados: number;
     en_revision: number;
-    en_proceso: number;
+    en_curso: number;
     aprobados: number;
     esta_semana: number;
   };
@@ -129,9 +129,9 @@ const AVAILABLE_KPIS = [
   { id: 'reclamos_hoy', label: 'Hoy', path: 'reclamos.hoy', defaultColor: '#3b82f6' },
   { id: 'reclamos_semana', label: 'Esta semana', path: 'reclamos.esta_semana', defaultColor: '#8b5cf6', hasTrend: true },
   { id: 'reclamos_resueltos', label: 'Resueltos', path: 'reclamos.resueltos', defaultColor: '#10b981' },
-  { id: 'reclamos_en_proceso', label: 'En proceso', path: 'reclamos.en_proceso', defaultColor: '#06b6d4' },
+  { id: 'reclamos_en_curso', label: 'En proceso', path: 'reclamos.en_curso', defaultColor: '#06b6d4' },
   { id: 'reclamos_total', label: 'Total reclamos', path: 'reclamos.total', defaultColor: '#64748b' },
-  { id: 'tramites_activos', label: 'Trámites activos', path: 'tramites.en_proceso', defaultColor: '#ec4899' },
+  { id: 'tramites_activos', label: 'Trámites activos', path: 'tramites.en_curso', defaultColor: '#ec4899' },
   { id: 'tramites_aprobados', label: 'Trámites aprobados', path: 'tramites.aprobados', defaultColor: '#10b981' },
   { id: 'empleados_activos', label: 'Empleados activos', path: 'empleados.activos', defaultColor: '#64748b' },
 ];

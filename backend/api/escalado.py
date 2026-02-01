@@ -186,7 +186,7 @@ async def ejecutar_escalado_automatico():
             # 3. Reclamos en proceso sin resolver
             fecha_limite_resolver = ahora - timedelta(hours=config.horas_sin_resolver)
             query_sin_resolver = select(Reclamo).where(
-                Reclamo.estado == EstadoReclamo.EN_PROCESO,
+                Reclamo.estado == EstadoReclamo.EN_CURSO,
                 Reclamo.updated_at <= fecha_limite_resolver
             )
             if config.categoria_id:

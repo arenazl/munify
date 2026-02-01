@@ -132,7 +132,7 @@ def get_dashboard_config_empleado() -> DashboardConfig:
                 config={
                     "cards": [
                         {"key": "asignados_hoy", "label": "Asignados Hoy", "icon": "Calendar", "color": "#3b82f6"},
-                        {"key": "en_proceso", "label": "En Proceso", "icon": "Wrench", "color": "#f59e0b"},
+                        {"key": "en_curso", "label": "En Proceso", "icon": "Wrench", "color": "#f59e0b"},
                         {"key": "completados_hoy", "label": "Completados Hoy", "icon": "CheckCircle", "color": "#10b981"},
                         {"key": "pendientes", "label": "Pendientes", "icon": "Clock", "color": "#8b5cf6"},
                     ],
@@ -292,14 +292,14 @@ async def get_mis_stats(
     estados = {estado.value: count for estado, count in query.all()}
 
     total = sum(estados.values())
-    pendientes = estados.get('nuevo', 0) + estados.get('ASIGNADO', 0) + estados.get('en_proceso', 0)
+    pendientes = estados.get('nuevo', 0) + estados.get('ASIGNADO', 0) + estados.get('en_curso', 0)
 
     return {
         "total": total,
         "pendientes": pendientes,
         "nuevos": estados.get('nuevo', 0),
         "asignados": estados.get('asignado', 0),
-        "en_proceso": estados.get('en_proceso', 0),
+        "en_curso": estados.get('en_curso', 0),
         "resueltos": estados.get('resuelto', 0),
         "rechazados": estados.get('rechazado', 0),
     }
@@ -317,7 +317,7 @@ async def get_empleado_stats(
     # Se migrará a dependencia_id cuando se implemente IA
     return {
         "asignados_hoy": 0,
-        "en_proceso": 0,
+        "en_curso": 0,
         "completados_hoy": 0,
         "pendientes": 0,
         "mensaje": "Pendiente migración a dependencias"
@@ -573,7 +573,7 @@ async def get_metricas_accion(
         .where(
             Reclamo.municipio_id == municipio_id,
             Reclamo.prioridad >= 4,
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
         )
     )
@@ -595,7 +595,7 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             Reclamo.fecha_programada != None,
             func.date(Reclamo.fecha_programada) < hoy
         )
@@ -607,7 +607,7 @@ async def get_metricas_accion(
         select(func.count(Reclamo.id))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
     )
@@ -715,7 +715,7 @@ async def get_metricas_detalle(
         .where(
             Reclamo.municipio_id == municipio_id,
             Reclamo.prioridad >= 4,
-            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
         )
         .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
@@ -743,7 +743,7 @@ async def get_metricas_detalle(
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
         .order_by(Reclamo.prioridad.desc())

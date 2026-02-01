@@ -309,7 +309,7 @@ interface FilterChipRowProps {
  * <FilterChipRow
  *   chips={[
  *     { key: 'iniciado', label: 'Nuevo', icon: <Clock />, count: 10, color: '#6366f1' },
- *     { key: 'en_proceso', label: 'Proceso', icon: <Play />, count: 5, color: '#f59e0b' },
+ *     { key: 'en_curso', label: 'Proceso', icon: <Play />, count: 5, color: '#f59e0b' },
  *   ]}
  *   activeKey={filtroEstado}
  *   onChipClick={(key) => setFiltroEstado(key)}

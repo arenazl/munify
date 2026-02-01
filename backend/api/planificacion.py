@@ -208,7 +208,7 @@ async def get_planificacion_semanal(
         .options(selectinload(Reclamo.categoria))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]),
+            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             or_(
                 # Reclamos con fecha_programada en el rango
                 and_(

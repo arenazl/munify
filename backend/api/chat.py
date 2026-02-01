@@ -1334,7 +1334,7 @@ async def get_estadisticas_reclamos(db: AsyncSession, municipio_id: int) -> dict
         sql_func.count(Reclamo.id).label('total'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.NUEVO, 1), else_=0)).label('nuevos'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.ASIGNADO, 1), else_=0)).label('asignados'),
-        sql_func.sum(case((Reclamo.estado == EstadoReclamo.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        sql_func.sum(case((Reclamo.estado == EstadoReclamo.EN_CURSO, 1), else_=0)).label('en_curso'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.PENDIENTE_CONFIRMACION, 1), else_=0)).label('pendiente_confirmacion'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.RECHAZADO, 1), else_=0)).label('rechazados'),
@@ -1347,7 +1347,7 @@ async def get_estadisticas_reclamos(db: AsyncSession, municipio_id: int) -> dict
         'total': row.total or 0,
         'nuevos': row.nuevos or 0,
         'asignados': row.asignados or 0,
-        'en_proceso': row.en_proceso or 0,
+        'en_curso': row.en_curso or 0,
         'pendiente_confirmacion': row.pendiente_confirmacion or 0,
         'resueltos': row.resueltos or 0,
         'rechazados': row.rechazados or 0,
@@ -1361,7 +1361,7 @@ async def get_estadisticas_tramites(db: AsyncSession, municipio_id: int) -> dict
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.INICIADO, 1), else_=0)).label('iniciados'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_REVISION, 1), else_=0)).label('en_revision'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.REQUIERE_DOCUMENTACION, 1), else_=0)).label('requiere_doc'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_CURSO, 1), else_=0)).label('en_curso'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.APROBADO, 1), else_=0)).label('aprobados'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.RECHAZADO, 1), else_=0)).label('rechazados'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.FINALIZADO, 1), else_=0)).label('finalizados'),
@@ -1375,7 +1375,7 @@ async def get_estadisticas_tramites(db: AsyncSession, municipio_id: int) -> dict
         'iniciados': row.iniciados or 0,
         'en_revision': row.en_revision or 0,
         'requiere_documentacion': row.requiere_doc or 0,
-        'en_proceso': row.en_proceso or 0,
+        'en_curso': row.en_curso or 0,
         'aprobados': row.aprobados or 0,
         'rechazados': row.rechazados or 0,
         'finalizados': row.finalizados or 0,
@@ -1448,7 +1448,7 @@ async def get_usuarios_con_reclamos(db: AsyncSession, municipio_id: int, limit: 
         UserModel.nombre,
         UserModel.apellido,
         sql_func.count(Reclamo.id).label('total_reclamos'),
-        sql_func.sum(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]), 1), else_=0)).label('activos'),
+        sql_func.sum(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]), 1), else_=0)).label('activos'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
     ).join(
         Reclamo, Reclamo.creador_id == UserModel.id
@@ -1534,7 +1534,7 @@ async def get_empleados_activos(db: AsyncSession, municipio_id: int) -> list:
             'nombre': f"{emp.nombre} {emp.apellido or ''}".strip(),
             'especialidad': emp.especialidad,
             'asignados': 0,
-            'en_proceso': 0,
+            'en_curso': 0,
             'pendiente_confirmacion': 0,
             'resueltos': 0,
             'activos': 0,
@@ -1638,7 +1638,7 @@ async def execute_dynamic_query(
         estado_map = {
             "nuevo": EstadoReclamo.NUEVO,
             "asignado": EstadoReclamo.ASIGNADO,
-            "en_proceso": EstadoReclamo.EN_PROCESO,
+            "en_curso": EstadoReclamo.EN_CURSO,
             "pendiente_confirmacion": EstadoReclamo.PENDIENTE_CONFIRMACION,
             "resuelto": EstadoReclamo.RESUELTO,
             "rechazado": EstadoReclamo.RECHAZADO
@@ -1763,7 +1763,7 @@ async def execute_dynamic_query(
         query = select(
             Categoria.nombre,
             sql_func.count(Reclamo.id).label('total'),
-            sql_func.count(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO]), 1))).label('pendientes'),
+            sql_func.count(case((Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]), 1))).label('pendientes'),
             sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).label('resueltos')
         ).join(
             Reclamo, Reclamo.categoria_id == Categoria.id
@@ -2004,7 +2004,7 @@ DATABASE_SCHEMA_FALLBACK = """
 - zona_id → zonas.id
 - creador_id → usuarios.id
 - empleado_id → empleados.id
-- estado: 'NUEVO', 'ASIGNADO', 'EN_PROCESO', 'PENDIENTE_CONFIRMACION', 'RESUELTO', 'RECHAZADO'
+- estado: 'NUEVO', 'ASIGNADO', 'EN_CURSO', 'PENDIENTE_CONFIRMACION', 'RESUELTO', 'RECHAZADO'
 
 ### categorias (NO tiene municipio_id - es catálogo genérico)
 - id, nombre, descripcion, icono, color, activo
@@ -2044,7 +2044,7 @@ DATABASE_SCHEMA_FALLBACK = """
 - tramite_id → tramites.id (el tipo de trámite)
 - solicitante_id → usuarios.id
 - empleado_id → empleados.id
-- estado: 'INICIADO', 'EN_REVISION', 'REQUIERE_DOCUMENTACION', 'EN_PROCESO', 'APROBADO', 'RECHAZADO', 'FINALIZADO'
+- estado: 'INICIADO', 'EN_REVISION', 'REQUIERE_DOCUMENTACION', 'EN_CURSO', 'APROBADO', 'RECHAZADO', 'FINALIZADO'
 
 ## Reglas de Filtrado Multi-Tenant
 
@@ -2363,7 +2363,7 @@ def build_asistente_prompt(
     ]) or "  Sin datos"
 
     empleados_list = "\n".join([
-        f"  - {e['nombre']} (ID:{e['id']}): {e['activos']} activos ({e['asignados']} asignados, {e['en_proceso']} en proceso, {e['pendiente_confirmacion']} pend.conf.), {e['resueltos']} resueltos, {e['total']} total histórico"
+        f"  - {e['nombre']} (ID:{e['id']}): {e['activos']} activos ({e['asignados']} asignados, {e['en_curso']} en proceso, {e['pendiente_confirmacion']} pend.conf.), {e['resueltos']} resueltos, {e['total']} total histórico"
         for e in empleados
     ]) or "  Sin empleados"
 
@@ -2373,7 +2373,7 @@ def build_asistente_prompt(
     ]) or "  Sin datos de usuarios"
 
     # Calcular pendientes
-    pendientes = stats_reclamos['nuevos'] + stats_reclamos['asignados'] + stats_reclamos['en_proceso'] + stats_reclamos['pendiente_confirmacion']
+    pendientes = stats_reclamos['nuevos'] + stats_reclamos['asignados'] + stats_reclamos['en_curso'] + stats_reclamos['pendiente_confirmacion']
 
     return f"""Sos el Asistente Municipal de Munify. Respondés consultas sobre datos del sistema.
 
@@ -2387,14 +2387,14 @@ DATOS DISPONIBLES:
 
 RECLAMOS:
 - Total: {stats_reclamos['total']}
-- Pendientes: {pendientes} (nuevos:{stats_reclamos['nuevos']}, asignados:{stats_reclamos['asignados']}, en_proceso:{stats_reclamos['en_proceso']})
+- Pendientes: {pendientes} (nuevos:{stats_reclamos['nuevos']}, asignados:{stats_reclamos['asignados']}, en_curso:{stats_reclamos['en_curso']})
 - Resueltos: {stats_reclamos['resueltos']}
 - Rechazados: {stats_reclamos['rechazados']}
 - Hoy: {stats_temporales['hoy']} | Esta semana: {stats_temporales['esta_semana']} | Este mes: {stats_temporales['este_mes']}
 
 TRÁMITES:
 - Total: {stats_tramites['total']}
-- Iniciados: {stats_tramites['iniciados']} | En revisión: {stats_tramites['en_revision']} | En proceso: {stats_tramites['en_proceso']}
+- Iniciados: {stats_tramites['iniciados']} | En revisión: {stats_tramites['en_revision']} | En proceso: {stats_tramites['en_curso']}
 - Aprobados: {stats_tramites['aprobados']} | Finalizados: {stats_tramites['finalizados']}
 
 RECLAMOS RECIENTES:
@@ -2436,7 +2436,7 @@ Respuesta:
 <div style="display:flex;flex-wrap:wrap;gap:8px">
 <div style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['nuevos']}</div><div style="font-size:13px;opacity:0.9">Nuevos</div></div>
 <div style="display:inline-block;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['asignados']}</div><div style="font-size:13px;opacity:0.9">Asignados</div></div>
-<div style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['en_proceso']}</div><div style="font-size:13px;opacity:0.9">En proceso</div></div>
+<div style="display:inline-block;background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:white;padding:16px 24px;border-radius:12px;min-width:100px;text-align:center"><div style="font-size:28px;font-weight:700">{stats_reclamos['en_curso']}</div><div style="font-size:13px;opacity:0.9">En proceso</div></div>
 </div>
 <a href="/tablero" style="display:inline-block;background:#2563eb;color:white;padding:8px 16px;border-radius:8px;text-decoration:none;font-size:14px;margin-top:12px">Ver tablero →</a>
 
@@ -3093,7 +3093,7 @@ async def get_kpis(
         sql_func.count(Reclamo.id).label('total'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.NUEVO, 1), else_=0)).label('nuevos'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.ASIGNADO, 1), else_=0)).label('asignados'),
-        sql_func.sum(case((Reclamo.estado == EstadoReclamo.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        sql_func.sum(case((Reclamo.estado == EstadoReclamo.EN_CURSO, 1), else_=0)).label('en_curso'),
         sql_func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
         sql_func.sum(case((sql_func.date(Reclamo.created_at) == hoy, 1), else_=0)).label('hoy'),
         sql_func.sum(case((sql_func.date(Reclamo.created_at) >= inicio_semana, 1), else_=0)).label('esta_semana'),
@@ -3103,14 +3103,14 @@ async def get_kpis(
     result = await db.execute(reclamos_query)
     r = result.first()
 
-    pendientes = (r.nuevos or 0) + (r.asignados or 0) + (r.en_proceso or 0)
+    pendientes = (r.nuevos or 0) + (r.asignados or 0) + (r.en_curso or 0)
 
     # ===== TRÁMITES =====
     tramites_query = select(
         sql_func.count(Solicitud.id).label('total'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.INICIADO, 1), else_=0)).label('iniciados'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_REVISION, 1), else_=0)).label('en_revision'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_CURSO, 1), else_=0)).label('en_curso'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.APROBADO, 1), else_=0)).label('aprobados'),
         sql_func.sum(case((sql_func.date(Solicitud.created_at) >= inicio_semana, 1), else_=0)).label('esta_semana'),
     ).where(Solicitud.municipio_id == municipio_id)
@@ -3149,7 +3149,7 @@ async def get_kpis(
             "pendientes": pendientes,
             "nuevos": r.nuevos or 0,
             "asignados": r.asignados or 0,
-            "en_proceso": r.en_proceso or 0,
+            "en_curso": r.en_curso or 0,
             "resueltos": r.resueltos or 0,
             "hoy": r.hoy or 0,
             "esta_semana": r.esta_semana or 0,
@@ -3159,7 +3159,7 @@ async def get_kpis(
             "total": t.total or 0,
             "iniciados": t.iniciados or 0,
             "en_revision": t.en_revision or 0,
-            "en_proceso": t.en_proceso or 0,
+            "en_curso": t.en_curso or 0,
             "aprobados": t.aprobados or 0,
             "esta_semana": t.esta_semana or 0,
         },

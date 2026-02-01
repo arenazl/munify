@@ -30,7 +30,7 @@ const estadoColors: Record<string, { bg: string; text: string }> = {
   nuevo: { bg: '#6366f1', text: '#ffffff' },
   recibido: { bg: '#0891b2', text: '#ffffff' },
   asignado: { bg: '#3b82f6', text: '#ffffff' },
-  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
+  en_curso: { bg: '#f59e0b', text: '#ffffff' },
   pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
   resuelto: { bg: '#10b981', text: '#ffffff' },
   finalizado: { bg: '#10b981', text: '#ffffff' },
@@ -42,7 +42,7 @@ const estadoLabels: Record<string, string> = {
   nuevo: 'Nuevo',
   recibido: 'Recibido',
   asignado: 'Asignado',
-  en_proceso: 'En Curso',
+  en_curso: 'En Curso',
   pendiente_confirmacion: 'Pendiente',
   resuelto: 'Resuelto',
   finalizado: 'Finalizado',
@@ -172,7 +172,7 @@ export default function MiHistorial() {
             options={[
               { value: '', label: 'Todos los estados' },
               { value: 'resuelto', label: 'Resueltos' },
-              { value: 'en_proceso', label: 'En Proceso' },
+              { value: 'en_curso', label: 'En Proceso' },
               { value: 'asignado', label: 'Asignados' },
             ]}
             placeholder="Estado"

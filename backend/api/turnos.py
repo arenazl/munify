@@ -321,7 +321,7 @@ async def get_planificacion_semanal(
             and_(
                 Reclamo.fecha_programada >= fecha_inicio,
                 Reclamo.fecha_programada <= fecha_fin,
-                Reclamo.estado.in_([EstadoReclamo.asignado, EstadoReclamo.en_proceso])
+                Reclamo.estado.in_([EstadoReclamo.asignado, EstadoReclamo.en_curso])
             )
         )
     )

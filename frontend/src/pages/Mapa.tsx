@@ -49,7 +49,7 @@ const createPinIcon = (color: string) => {
 const STATUS_COLORS: Record<string, string> = {
   nuevo: '#6366f1',
   asignado: '#3b82f6',
-  en_proceso: '#f59e0b',
+  en_curso: '#f59e0b',
   pendiente_confirmacion: '#8b5cf6',
   resuelto: '#10b981',
   rechazado: '#ef4444',
@@ -58,7 +58,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   nuevo: 'Nuevo',
   asignado: 'Asignado',
-  en_proceso: 'En Proceso',
+  en_curso: 'En Proceso',
   pendiente_confirmacion: 'Pend. Confirm.',
   resuelto: 'Resuelto',
   rechazado: 'Rechazado',

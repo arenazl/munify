@@ -94,7 +94,7 @@ async def get_heatmap_data(
         intensidad = 1.0
         if r.estado == EstadoReclamo.NUEVO:
             intensidad = 1.5
-        elif r.estado == EstadoReclamo.EN_PROCESO:
+        elif r.estado == EstadoReclamo.EN_CURSO:
             intensidad = 1.2
 
         # Ajustar por prioridad (1 = más urgente)
@@ -242,7 +242,7 @@ async def get_cobertura_zonas(
             func.count(Reclamo.id).label('total'),
             func.sum(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1), else_=0)).label('resueltos'),
             func.sum(case((Reclamo.estado == EstadoReclamo.NUEVO, 1), else_=0)).label('pendientes'),
-            func.sum(case((Reclamo.estado == EstadoReclamo.EN_PROCESO, 1), else_=0)).label('en_proceso'),
+            func.sum(case((Reclamo.estado == EstadoReclamo.EN_CURSO, 1), else_=0)).label('en_curso'),
             func.avg(Reclamo.prioridad).label('prioridad_promedio')
         )
         .select_from(Zona)
@@ -265,7 +265,7 @@ async def get_cobertura_zonas(
         total = int(zona.total or 0)
         resueltos = int(zona.resueltos or 0)
         pendientes = int(zona.pendientes or 0)
-        en_proceso = int(zona.en_proceso or 0)
+        en_curso = int(zona.en_curso or 0)
 
         # Tasa de resolución
         tasa_resolucion = (resueltos / total * 100) if total > 0 else 0.0
@@ -286,7 +286,7 @@ async def get_cobertura_zonas(
             "total_reclamos": total,
             "resueltos": resueltos,
             "pendientes": pendientes,
-            "en_proceso": en_proceso,
+            "en_curso": en_curso,
             "tasa_resolucion": round(tasa_resolucion, 1),
             "porcentaje_total": round(porcentaje_total, 1),
             "prioridad_promedio": round(zona.prioridad_promedio or 3, 1),
