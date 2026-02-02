@@ -67,10 +67,14 @@ export default function Layout() {
     telefono: '',
     dni: '',
     direccion: '',
+    nuevoEmail: '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingTheme, setSavingTheme] = useState(false);
   const [uploadingSidebarBg, setUploadingSidebarBg] = useState(false);
+  const [emailValidationOpen, setEmailValidationOpen] = useState(false);
+  const [emailValidationCode, setEmailValidationCode] = useState('');
+  const [pendingEmail, setPendingEmail] = useState('');
   const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
   const [pushSubscribed, setPushSubscribed] = useState(() => localStorage.getItem('pushActivated') === 'true');
@@ -151,6 +155,7 @@ export default function Layout() {
         telefono: user.telefono || '',
         dni: user.dni || '',
         direccion: user.direccion || '',
+        nuevoEmail: '',
       });
     }
   }, [profileSheetOpen, user]);
@@ -229,14 +234,49 @@ export default function Layout() {
   const handleSaveProfile = async () => {
     setSavingProfile(true);
     try {
-      await usersApi.updateMyProfile(profileData);
-      // Refrescar datos del usuario en el context
-      await refreshUser();
-      setProfileSheetOpen(false);
-    } catch (error) {
+      // Detectar si hay cambio de email
+      const hayNuevoEmail = profileData.nuevoEmail && profileData.nuevoEmail !== user?.email;
+
+      if (hayNuevoEmail) {
+        // Solicitar código de verificación
+        const response = await usersApi.requestEmailChange(profileData.nuevoEmail);
+        if (response.success) {
+          setPendingEmail(profileData.nuevoEmail);
+          setProfileSheetOpen(false);
+          setEmailValidationOpen(true);
+          toast.success('Código enviado a tu nuevo email');
+        }
+      } else {
+        // Actualizar solo los otros campos (sin email)
+        const { nuevoEmail, ...dataToUpdate } = profileData;
+        await usersApi.updateMyProfile(dataToUpdate);
+        await refreshUser();
+        setProfileSheetOpen(false);
+        toast.success('Perfil actualizado');
+      }
+    } catch (error: any) {
       console.error('Error al guardar perfil:', error);
+      toast.error(error.response?.data?.message || 'Error al guardar perfil');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleValidateEmail = async () => {
+    if (!emailValidationCode || !pendingEmail) return;
+
+    try {
+      const response = await usersApi.validateEmailChange(pendingEmail, emailValidationCode);
+      if (response.success) {
+        toast.success('Email actualizado exitosamente');
+        setEmailValidationOpen(false);
+        setEmailValidationCode('');
+        setPendingEmail('');
+        await refreshUser();
+      }
+    } catch (error: any) {
+      console.error('Error al validar email:', error);
+      toast.error(error.response?.data?.message || 'Código incorrecto');
     }
   };
 
@@ -1709,6 +1749,121 @@ export default function Layout() {
                 border: `1px solid ${theme.border}`,
               }}
             />
+          </div>
+
+          {/* Cambiar Email */}
+          <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              Cambiar Email
+            </label>
+            <div className="space-y-2">
+              <div
+                className="px-3 py-2 rounded-lg text-sm"
+                style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+              >
+                Email actual: <span className="font-medium" style={{ color: theme.text }}>{user.email}</span>
+              </div>
+              <input
+                type="email"
+                value={profileData.nuevoEmail}
+                onChange={(e) => setProfileData({ ...profileData, nuevoEmail: e.target.value })}
+                placeholder="Nuevo email"
+                className="w-full rounded-xl px-4 py-2.5 focus:ring-2 focus:outline-none transition-all duration-300"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+              />
+              {profileData.nuevoEmail && profileData.nuevoEmail !== user.email && (
+                <div
+                  className="text-xs px-3 py-2 rounded-lg flex items-center gap-2"
+                  style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}
+                >
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>Se enviará un código de verificación al nuevo email</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Sheet>
+
+      {/* Sheet de validación de email */}
+      <Sheet
+        open={emailValidationOpen}
+        onClose={() => {
+          setEmailValidationOpen(false);
+          setEmailValidationCode('');
+          setPendingEmail('');
+        }}
+        title="Validar nuevo email"
+        description="Ingresa el código que enviamos a tu nuevo email"
+        stickyFooter={
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => {
+                setEmailValidationOpen(false);
+                setEmailValidationCode('');
+                setPendingEmail('');
+              }}
+              className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+              style={{ border: `1px solid ${theme.border}`, color: theme.text }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleValidateEmail}
+              disabled={!emailValidationCode || emailValidationCode.length < 6}
+              className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+            >
+              Validar
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {/* Info del nuevo email */}
+          <div
+            className="px-4 py-3 rounded-xl"
+            style={{ backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}30` }}
+          >
+            <p className="text-sm font-medium mb-1" style={{ color: theme.text }}>
+              Nuevo email:
+            </p>
+            <p className="text-sm font-semibold" style={{ color: theme.primary }}>
+              {pendingEmail}
+            </p>
+          </div>
+
+          {/* Campo de código */}
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              Código de validación
+            </label>
+            <input
+              type="text"
+              value={emailValidationCode}
+              onChange={(e) => setEmailValidationCode(e.target.value.trim())}
+              placeholder="Ingresa el código de 6 dígitos"
+              maxLength={6}
+              className="w-full rounded-xl px-4 py-3 text-center text-2xl font-mono tracking-widest focus:ring-2 focus:outline-none transition-all duration-300"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `2px solid ${theme.border}`,
+              }}
+              autoFocus
+            />
+          </div>
+
+          {/* Instrucciones */}
+          <div
+            className="text-xs px-3 py-2 rounded-lg"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+          >
+            Revisa tu casilla de correo (incluida la carpeta de spam). El código expira en 15 minutos.
           </div>
         </div>
       </Sheet>

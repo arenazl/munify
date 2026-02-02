@@ -32,6 +32,7 @@ from .tramite import TipoTramite, Tramite, Solicitud, HistorialSolicitud, Estado
 from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
+from .email_validation import EmailValidation
 
 __all__ = [
     "Municipio",
@@ -91,7 +92,9 @@ __all__ = [
     # Push Notifications
     "PushSubscription",
     # Consultas guardadas / BI
-    "ConsultaGuardada"
+    "ConsultaGuardada",
+    # Email validation
+    "EmailValidation"
 ]
 
 # Direcciones (DEPRECATED - usar Dependencias)

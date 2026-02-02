@@ -440,6 +440,11 @@ export const usersApi = {
   getMyProfile: () => api.get('/users/me'),
   updateMyProfile: (data: { nombre?: string; apellido?: string; telefono?: string; dni?: string; direccion?: string }) =>
     api.put('/users/me', data),
+  // Cambio de email con validación
+  requestEmailChange: (nuevoEmail: string) =>
+    api.post('/users/me/request-email-change', { nuevo_email: nuevoEmail }).then(res => res.data),
+  validateEmailChange: (nuevoEmail: string, codigo: string) =>
+    api.post('/users/me/validate-email-change', { nuevo_email: nuevoEmail, codigo }).then(res => res.data),
 };
 
 // Dashboard

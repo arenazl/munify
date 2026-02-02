@@ -2,12 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from typing import List
+from datetime import datetime, timedelta
+import secrets
 
 from core.database import get_db
 from core.security import get_current_user, require_roles, get_password_hash
 from models.user import User
+from models.email_validation import EmailValidation
 from models.enums import RolUsuario
 from schemas.user import UserResponse, UserUpdate, UserCreate, UserProfileUpdate
+from services.email_service import email_service, EmailTemplates
 
 router = APIRouter()
 
@@ -49,6 +53,114 @@ async def update_my_profile(
     await db.commit()
     await db.refresh(current_user)
     return current_user
+
+@router.post("/me/request-email-change")
+async def request_email_change(
+    request_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Solicitar cambio de email - envía código de validación"""
+    nuevo_email = request_data.get("nuevo_email")
+
+    if not nuevo_email:
+        raise HTTPException(status_code=400, detail="Debe proporcionar un nuevo email")
+
+    if nuevo_email == current_user.email:
+        raise HTTPException(status_code=400, detail="El nuevo email es igual al actual")
+
+    # Verificar que el email no esté en uso
+    result = await db.execute(select(User).where(User.email == nuevo_email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Este email ya está registrado")
+
+    # Generar código de 6 dígitos
+    codigo = ''.join([str(secrets.randbelow(10)) for _ in range(6)])
+
+    # Crear registro de validación (expira en 15 minutos)
+    expires_at = datetime.utcnow() + timedelta(minutes=15)
+    validacion = EmailValidation(
+        usuario_id=current_user.id,
+        nuevo_email=nuevo_email,
+        codigo=codigo,
+        expires_at=expires_at
+    )
+    db.add(validacion)
+    await db.commit()
+
+    # Enviar email con el código
+    try:
+        html_content = EmailTemplates.validacion_email(
+            nombre=current_user.nombre,
+            codigo=codigo,
+            nuevo_email=nuevo_email
+        )
+        await email_service.send_email(
+            to_email=nuevo_email,
+            subject="Código de validación - Cambio de email",
+            html_content=html_content
+        )
+    except Exception as e:
+        print(f"Error enviando email de validación: {e}")
+        raise HTTPException(status_code=500, detail="Error al enviar el código de validación")
+
+    return {
+        "success": True,
+        "message": f"Código de validación enviado a {nuevo_email}"
+    }
+
+@router.post("/me/validate-email-change")
+async def validate_email_change(
+    validation_data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Validar código y cambiar email"""
+    nuevo_email = validation_data.get("nuevo_email")
+    codigo = validation_data.get("codigo")
+
+    if not nuevo_email or not codigo:
+        raise HTTPException(status_code=400, detail="Faltan datos requeridos")
+
+    # Buscar validación pendiente
+    result = await db.execute(
+        select(EmailValidation)
+        .where(EmailValidation.usuario_id == current_user.id)
+        .where(EmailValidation.nuevo_email == nuevo_email)
+        .where(EmailValidation.codigo == codigo)
+        .where(EmailValidation.usado == False)
+        .order_by(EmailValidation.created_at.desc())
+    )
+    validacion = result.scalar_one_or_none()
+
+    if not validacion:
+        raise HTTPException(status_code=400, detail="Código inválido")
+
+    # Verificar que no haya expirado
+    if datetime.utcnow() > validacion.expires_at:
+        raise HTTPException(status_code=400, detail="El código ha expirado")
+
+    # Verificar una última vez que el email no esté en uso
+    result = await db.execute(select(User).where(User.email == nuevo_email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Este email ya está registrado")
+
+    # Actualizar email del usuario
+    current_user.email = nuevo_email
+
+    # Marcar validación como usada
+    validacion.validado = True
+    validacion.usado = True
+    validacion.validated_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return {
+        "success": True,
+        "message": "Email actualizado exitosamente",
+        "nuevo_email": nuevo_email
+    }
 
 # ============================================
 # ENDPOINTS DE ADMINISTRACIÓN (admin/supervisor)

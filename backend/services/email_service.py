@@ -256,6 +256,29 @@ class EmailTemplates:
         """
         return EmailTemplates.base_template(content, "Resumen Diario - Reclamos")
 
+    @staticmethod
+    def validacion_email(nombre: str, codigo: str, nuevo_email: str) -> str:
+        content = f"""
+        <h2>🔐 Validación de Email</h2>
+        <p>Hola {nombre},</p>
+        <p>Recibimos una solicitud para cambiar el email de tu cuenta a <strong>{nuevo_email}</strong>.</p>
+
+        <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0; text-align: center;">
+            <p style="font-size: 14px; color: #666; margin-bottom: 10px;">Tu código de validación es:</p>
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 36px; font-weight: bold; letter-spacing: 8px; padding: 20px; border-radius: 8px; font-family: monospace;">
+                {codigo}
+            </div>
+            <p style="font-size: 12px; color: #999; margin-top: 10px;">Este código expira en 15 minutos</p>
+        </div>
+
+        <p>Si no solicitaste este cambio, por favor ignora este email. Tu email actual seguirá siendo el mismo.</p>
+
+        <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ffc107;">
+            <p style="margin: 0; font-size: 13px;"><strong>Importante:</strong> Nunca compartas este código con nadie. Nuestro equipo nunca te pedirá este código por teléfono o email.</p>
+        </div>
+        """
+        return EmailTemplates.base_template(content, "Validación de Email - Sistema Municipal")
+
 
 # Singleton
 email_service = EmailService()
