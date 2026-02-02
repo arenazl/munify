@@ -552,10 +552,21 @@ async def notificar_dependencia_reclamo_nuevo(
             if usuario.email:
                 try:
                     from services.email_service import email_service, EmailTemplates
+
+                    # Obtener nombre del creador
+                    creador_nombre = None
+                    if reclamo.creador_id:
+                        creador_result = await db.execute(select(User).where(User.id == reclamo.creador_id))
+                        creador = creador_result.scalar_one_or_none()
+                        if creador:
+                            creador_nombre = f"{creador.nombre} {creador.apellido}".strip() or creador.email
+
                     html_content = EmailTemplates.reclamo_creado(
                         reclamo.titulo,
                         reclamo.id,
-                        categoria_nombre or "Sin categoría"
+                        categoria_nombre or "Sin categoría",
+                        descripcion=reclamo.descripcion,
+                        creador_nombre=creador_nombre
                     )
                     await email_service.send_email(
                         to_email=usuario.email,

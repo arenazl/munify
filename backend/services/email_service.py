@@ -136,7 +136,19 @@ class EmailTemplates:
         """
 
     @staticmethod
-    def reclamo_creado(reclamo_titulo: str, reclamo_id: int, categoria: str) -> str:
+    def reclamo_creado(reclamo_titulo: str, reclamo_id: int, categoria: str, descripcion: str = None, creador_nombre: str = None) -> str:
+        descripcion_html = ""
+        if descripcion:
+            descripcion_preview = descripcion[:300] + "..." if len(descripcion) > 300 else descripcion
+            descripcion_html = f"""
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #667eea;">
+                <p style="margin: 0 0 5px 0; font-weight: bold; color: #667eea;">Descripción:</p>
+                <p style="margin: 0; font-size: 14px; color: #333;">{descripcion_preview}</p>
+            </div>
+            """
+
+        creador_html = f"<p><strong>Vecino:</strong> {creador_nombre}</p>" if creador_nombre else ""
+
         content = f"""
         <h2>✅ Reclamo Registrado</h2>
         <p>Su reclamo ha sido registrado exitosamente en nuestro sistema.</p>
@@ -145,8 +157,11 @@ class EmailTemplates:
             <p><strong>Número de reclamo:</strong> #{reclamo_id}</p>
             <p><strong>Título:</strong> {reclamo_titulo}</p>
             <p><strong>Categoría:</strong> {categoria}</p>
+            {creador_html}
             <p><strong>Estado:</strong> <span class="status status-nuevo">NUEVO</span></p>
         </div>
+
+        {descripcion_html}
 
         <p>Puede hacer seguimiento de su reclamo ingresando a nuestra plataforma.</p>
         <p>Le notificaremos cuando haya actualizaciones sobre su reclamo.</p>
