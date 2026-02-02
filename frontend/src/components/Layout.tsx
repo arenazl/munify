@@ -706,8 +706,17 @@ export default function Layout() {
             </h1>
           </div>
 
-          {/* Notificaciones */}
-          <div className="flex-shrink-0">
+          {/* Derecha: Selector de tema + Notificaciones */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Theme selector */}
+            <button
+              onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+              className="p-2 rounded-lg transition-colors"
+              style={{ color: theme.textSecondary }}
+              title="Tema"
+            >
+              <Palette className="h-5 w-5" strokeWidth={2.5} />
+            </button>
             <NotificacionesDropdown />
           </div>
         </header>
