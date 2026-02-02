@@ -667,6 +667,52 @@ export default function Layout() {
         </div>
       </div>
 
+      {/* Header sticky solo mobile */}
+      {isMobile && (
+        <header
+          className="fixed top-0 left-0 right-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-sm lg:hidden"
+          style={{
+            backgroundColor: `${theme.card}f0`,
+            borderBottom: `1px solid ${theme.border}`,
+          }}
+        >
+          {/* Hamburguesa */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: theme.textSecondary }}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+
+          {/* Centro: Logo + Nombre del municipio */}
+          <div className="flex-1 flex items-center justify-center gap-2 mx-2">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${theme.primary}20` }}
+            >
+              {municipioActual?.logo_url ? (
+                <img
+                  src={municipioActual.logo_url}
+                  alt={municipioActual.nombre}
+                  className="w-5 h-5 object-contain"
+                />
+              ) : (
+                <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
+              )}
+            </div>
+            <h1 className="text-sm font-semibold truncate" style={{ color: theme.text }}>
+              {municipioActual?.nombre?.replace('Municipalidad de ', '') || 'Municipio'}
+            </h1>
+          </div>
+
+          {/* Notificaciones */}
+          <div className="flex-shrink-0">
+            <NotificacionesDropdown />
+          </div>
+        </header>
+      )}
+
       {/* Main content - sin padding-top porque no hay header fijo */}
       <div className="lg:transition-[padding] lg:duration-300 main-content-area relative">
         {/* Imagen de fondo del contenido */}
@@ -697,20 +743,13 @@ export default function Layout() {
           className="px-3 sm:px-6 pb-3 sm:pb-6 relative"
           style={{
             color: theme.text,
+            paddingTop: isMobile ? '64px' : undefined, // Espacio para el header sticky mobile
             paddingBottom: isMobile ? '80px' : undefined, // Espacio para el bottom tab bar
             zIndex: 1,
           }}
         >
-          {/* Barra superior ultra-compacta - iconos a la derecha */}
-          <div className="flex items-center justify-end mt-4 mb-2">
-            {/* Hamburguesa - solo mobile, a la izquierda */}
-            <button
-              className="lg:hidden p-1 rounded transition-all mr-auto"
-              onClick={() => setSidebarOpen(true)}
-              style={{ color: theme.textSecondary }}
-            >
-              <Menu className="h-4 w-4" />
-            </button>
+          {/* Barra superior ultra-compacta - iconos a la derecha - SOLO DESKTOP */}
+          <div className="hidden lg:flex items-center justify-end mt-4 mb-2">
 
             {/* Iconos de acciones */}
             <div className="flex items-center">
