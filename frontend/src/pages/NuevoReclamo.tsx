@@ -51,6 +51,7 @@ import { WizardStepContent } from '../components/ui/WizardForm';
 import { ReclamosSimilares } from '../components/ReclamosSimilares';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
+import { VoiceInput } from '../components/ui/VoiceInput';
 
 // Iconos por categoría
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -1346,7 +1347,7 @@ Tono amigable, 3-4 oraciones máximo.`,
         )}
 
         {/* Input de chat */}
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <input
             ref={chatInputRef}
             type="text"
@@ -1355,21 +1356,30 @@ Tono amigable, 3-4 oraciones máximo.`,
             onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()}
             placeholder="Escribí tu problema aquí..."
             disabled={chatAnalyzing}
-            className="flex-1 px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+            className="flex-1 min-w-0 px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl focus:ring-2 focus:outline-none transition-all text-sm sm:text-base"
             style={{
               backgroundColor: theme.backgroundSecondary,
               color: theme.text,
               border: `1px solid ${theme.border}`,
             }}
           />
+          <div className="flex-shrink-0">
+            <VoiceInput
+              onTranscript={(text) => {
+                const newText = chatInput ? chatInput + ' ' + text : text;
+                setChatInput(newText);
+              }}
+              onError={(error) => toast.error(error)}
+            />
+          </div>
           <button
             onClick={handleChatSubmit}
             disabled={!chatInput.trim() || chatAnalyzing}
-            className="px-4 py-3 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+            className="flex-shrink-0 p-2.5 sm:px-4 sm:py-3 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
             style={{ backgroundColor: theme.primary, color: 'white' }}
           >
             {chatAnalyzing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5" />
             ) : (
               <Send className="h-5 w-5" />
             )}
@@ -1732,9 +1742,22 @@ Tono amigable, 3-4 oraciones máximo.`,
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
-            Descripción detallada <span className="text-red-500">*</span>
-          </label>
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <label className="block text-sm sm:text-base font-medium flex-1" style={{ color: theme.text }}>
+              Descripción detallada <span className="text-red-500">*</span>
+            </label>
+            <div className="flex-shrink-0">
+              <VoiceInput
+                onTranscript={(text) => {
+                  const newDescription = formData.descripcion
+                    ? formData.descripcion + ' ' + text
+                    : text;
+                  handleDescripcionChange(newDescription);
+                }}
+                onError={(error) => toast.error(error)}
+              />
+            </div>
+          </div>
           <textarea
             value={formData.descripcion}
             onChange={(e) => handleDescripcionChange(e.target.value)}
@@ -1742,7 +1765,7 @@ Tono amigable, 3-4 oraciones máximo.`,
             placeholder="Describe el problema con el mayor detalle posible..."
             rows={4}
             maxLength={2000}
-            className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all resize-none"
+            className="w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl focus:ring-2 focus:outline-none transition-all resize-none text-sm sm:text-base"
             style={{
               backgroundColor: theme.backgroundSecondary,
               color: theme.text,

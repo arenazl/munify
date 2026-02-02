@@ -306,7 +306,7 @@ async def notificar_nuevo_comentario(db: AsyncSession, reclamo, comentario_texto
     """
     Notifica sobre un nuevo comentario en el reclamo.
     Envía al creador del reclamo (vecino) con el texto del comentario.
-    Crea notificación en BD para la campanita + envía push al navegador.
+    Crea notificación en BD para la campanita + envía push al navegador + envía email.
     """
     if not await check_user_notification_preference(db, reclamo.creador_id, "nuevo_comentario"):
         logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación nuevo_comentario")
@@ -327,6 +327,27 @@ async def notificar_nuevo_comentario(db: AsyncSession, reclamo, comentario_texto
         tipo="info",
         reclamo_id=reclamo.id
     )
+
+    # Obtener email del vecino
+    result = await db.execute(select(User).where(User.id == reclamo.creador_id))
+    vecino = result.scalar_one_or_none()
+    if vecino and vecino.email:
+        try:
+            from services.email_service import email_service, EmailTemplates
+            html_content = EmailTemplates.nuevo_comentario(
+                reclamo.titulo,
+                reclamo.id,
+                autor_nombre,
+                comentario_texto
+            )
+            await email_service.send_email(
+                to_email=vecino.email,
+                subject=f"Nuevo comentario en reclamo #{reclamo.id}",
+                body_html=html_content
+            )
+            logger.info(f"Email de comentario enviado a {vecino.email}")
+        except Exception as e:
+            logger.error(f"Error enviando email de comentario: {e}")
 
     # Enviar push al navegador
     return await send_push_to_user(
@@ -379,7 +400,7 @@ async def notificar_comentario_vecino_a_dependencia(
 ) -> int:
     """
     Notifica a todos los usuarios de la dependencia asignada cuando un vecino comenta.
-    Crea notificación en BD para la campanita + envía push al navegador.
+    Crea notificación en BD para la campanita + envía push al navegador + envía email.
     """
     from models import MunicipioDependencia
     from models.enums import RolUsuario
@@ -420,6 +441,25 @@ async def notificar_comentario_vecino_a_dependencia(
                 reclamo_id=reclamo.id
             )
 
+            # Enviar email al supervisor
+            if usuario.email:
+                try:
+                    from services.email_service import email_service, EmailTemplates
+                    html_content = EmailTemplates.nuevo_comentario(
+                        reclamo.titulo,
+                        reclamo.id,
+                        vecino_nombre,
+                        comentario
+                    )
+                    await email_service.send_email(
+                        to_email=usuario.email,
+                        subject=f"Comentario de vecino en reclamo #{reclamo.id}",
+                        body_html=html_content
+                    )
+                    logger.info(f"Email de comentario enviado a supervisor {usuario.email}")
+                except Exception as e:
+                    logger.error(f"Error enviando email a supervisor: {e}")
+
             # Enviar push al navegador
             enviados = await send_push_to_user(
                 db=db,
@@ -458,7 +498,7 @@ async def notificar_dependencia_reclamo_nuevo(
 ) -> int:
     """
     Notifica a todos los usuarios de la dependencia asignada cuando llega un nuevo reclamo.
-    Crea notificación en BD para la campanita + envía push al navegador.
+    Crea notificación en BD para la campanita + envía push al navegador + envía email.
     """
     from models import MunicipioDependencia
     from models.enums import RolUsuario
@@ -507,6 +547,24 @@ async def notificar_dependencia_reclamo_nuevo(
                 tipo="info",
                 reclamo_id=reclamo.id
             )
+
+            # Enviar email al supervisor
+            if usuario.email:
+                try:
+                    from services.email_service import email_service, EmailTemplates
+                    html_content = EmailTemplates.reclamo_creado(
+                        reclamo.titulo,
+                        reclamo.id,
+                        categoria_nombre or "Sin categoría"
+                    )
+                    await email_service.send_email(
+                        to_email=usuario.email,
+                        subject=f"Nuevo reclamo #{reclamo.id} asignado a tu dependencia",
+                        body_html=html_content
+                    )
+                    logger.info(f"Email de reclamo nuevo enviado a supervisor {usuario.email}")
+                except Exception as e:
+                    logger.error(f"Error enviando email a supervisor: {e}")
 
             # Enviar push al navegador
             enviados = await send_push_to_user(

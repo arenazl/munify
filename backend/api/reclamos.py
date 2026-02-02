@@ -1601,8 +1601,8 @@ async def agregar_comentario(
     else:
         # Admin/Supervisor comenta → notificar al vecino
         await enviar_notificacion_push(
-            db, reclamo, 'nuevo_comentario',
-            comentario_texto=data.comentario[:100],
+            reclamo.id, 'nuevo_comentario',
+            comentario_texto=data.comentario,
             autor_nombre=autor_nombre
         )
 

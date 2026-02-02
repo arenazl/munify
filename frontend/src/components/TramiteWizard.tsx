@@ -41,6 +41,7 @@ import { tramitesApi, authApi, chatApi, clasificacionApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { WizardModal } from './ui/WizardModal';
+import { VoiceInput } from './ui/VoiceInput';
 import type { ServicioTramite, TipoTramite } from '../types';
 
 const servicioIcons: Record<string, React.ReactNode> = {
@@ -1177,14 +1178,26 @@ Tono amigable y conciso (2-3 oraciones máximo).`
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium" style={{ color: theme.text }}>Contanos más sobre tu trámite</label>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <label className="text-sm sm:text-base font-medium flex-1" style={{ color: theme.text }}>Contanos más sobre tu trámite</label>
+          <div className="flex-shrink-0">
+            <VoiceInput
+              onTranscript={(text) => {
+                const newObservaciones = formData.observaciones ?
+                                        formData.observaciones + ' ' + text : text;
+                setFormData(prev => ({ ...prev, observaciones: newObservaciones }));
+              }}
+              onError={(error) => toast.error(error)}
+            />
+          </div>
+        </div>
         <textarea
           placeholder="Ej: Quiero abrir un local de comidas en Av. San Martín, ya tengo el contrato de alquiler firmado..."
           value={formData.observaciones}
           onChange={(e) => setFormData(prev => ({ ...prev, observaciones: e.target.value }))}
           rows={3}
-          className="w-full px-4 py-3 rounded-xl resize-none"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text, fontSize: '15px' }}
+          className="w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl resize-none text-sm sm:text-base"
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
         />
 
         {/* IA contextual basada en lo que escribe el usuario */}

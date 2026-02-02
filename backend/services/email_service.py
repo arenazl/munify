@@ -279,6 +279,27 @@ class EmailTemplates:
         """
         return EmailTemplates.base_template(content, "Validación de Email - Sistema Municipal")
 
+    @staticmethod
+    def nuevo_comentario(reclamo_titulo: str, reclamo_id: int, autor_nombre: str, comentario: str) -> str:
+        # Truncar comentario si es muy largo
+        comentario_preview = comentario[:200] + "..." if len(comentario) > 200 else comentario
+        content = f"""
+        <h2>💬 Nuevo Comentario en tu Reclamo</h2>
+        <p><strong>{autor_nombre}</strong> ha dejado un comentario en tu reclamo.</p>
+
+        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p><strong>Número de reclamo:</strong> #{reclamo_id}</p>
+            <p><strong>Título:</strong> {reclamo_titulo}</p>
+        </div>
+
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #667eea;">
+            <p style="margin: 0; font-size: 14px; color: #333;">{comentario_preview}</p>
+        </div>
+
+        <p>Ingresá a la plataforma para ver el comentario completo y responder.</p>
+        """
+        return EmailTemplates.base_template(content, "Nuevo Comentario - Sistema Municipal")
+
 
 # Singleton
 email_service = EmailService()
