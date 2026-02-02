@@ -99,35 +99,41 @@ export default function MobileLayout() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
-      {/* Header mejorado con logo del municipio */}
+      {/* Header sticky con logo centrado */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between"
+        className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between backdrop-blur-sm"
         style={{
-          backgroundColor: theme.card,
+          backgroundColor: `${theme.card}f0`,
           borderBottom: `1px solid ${theme.border}`,
         }}
       >
-        <div className="flex items-center gap-3">
+        {/* Espacio izquierdo (para balance visual) */}
+        <div className="w-10"></div>
+
+        {/* Centro: Logo + Nombre del municipio */}
+        <div className="flex-1 flex items-center justify-center gap-2">
           <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center"
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: `${colorPrimario}20` }}
           >
-            <Building2 className="h-5 w-5" style={{ color: colorPrimario }} />
-          </div>
-          <div>
-            <h1 className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
-              {nombreMunicipio}
-            </h1>
-            {user && (
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Hola, {user.nombre}
-              </p>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={nombreMunicipio}
+                className="w-5 h-5 object-contain"
+              />
+            ) : (
+              <Building2 className="h-4 w-4" style={{ color: colorPrimario }} />
             )}
           </div>
+          <h1 className="text-sm font-semibold truncate" style={{ color: theme.text }}>
+            {nombreMunicipio}
+          </h1>
         </div>
 
+        {/* Derecha: Notificaciones + Logout */}
         {user && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <NotificacionesDropdown />
             <button
               onClick={handleLogout}
