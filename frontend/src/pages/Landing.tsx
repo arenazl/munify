@@ -284,7 +284,7 @@ export default function Landing() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-900 relative overflow-x-hidden">
       {/* Background con imagen y overlay */}
       <div className="absolute inset-0">
         <img
@@ -302,8 +302,8 @@ export default function Landing() {
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
-        <header className="px-4 py-6">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
+        <header className="px-4 sm:px-6 py-6">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
                 <Building2 className="h-6 w-6 text-white" />
@@ -326,9 +326,9 @@ export default function Landing() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 flex items-center px-4 py-8">
+        <main className="flex-1 flex items-center px-4 sm:px-6 py-8">
           <div className="max-w-6xl mx-auto w-full">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="grid lg:grid-cols-2 gap-6 lg:gap-12 items-center">
               {/* Left: Hero Text */}
               <div className="text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 mb-6">
@@ -349,7 +349,7 @@ export default function Landing() {
                 </p>
 
                 {/* Features */}
-                <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">
                   <div className="text-center lg:text-left">
                     <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-2 mx-auto lg:mx-0">
                       <Clock className="h-5 w-5 text-blue-400" />
@@ -682,8 +682,8 @@ export default function Landing() {
         </main>
 
         {/* Footer */}
-        <footer className="px-4 py-6 border-t border-white/5">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+        <footer className="px-4 sm:px-6 py-6 border-t border-white/5">
+          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs sm:text-sm text-slate-500">
             <p>Sistema de Reclamos Municipales v1.0</p>
             <div className="flex items-center gap-4">
               <a href="#" className="hover:text-white transition-colors">Ayuda</a>
