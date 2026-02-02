@@ -247,37 +247,78 @@ async def enviar_email_reclamo_creado(
 ):
     """
     Envía email al vecino confirmando la creación del reclamo.
+    Registra el intento en el historial del reclamo.
     """
-    try:
-        from services.email_service import email_service, EmailTemplates
+    # Crear nueva sesión para operaciones en background
+    from core.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as new_db:
+        try:
+            from services.email_service import email_service, EmailTemplates
 
-        # Solo enviar si el usuario tiene email
-        if not usuario.email:
-            print(f"[EMAIL] Usuario sin email, no se envía", flush=True)
-            return
+            # Solo enviar si el usuario tiene email
+            if not usuario.email:
+                print(f"[EMAIL] Usuario sin email, no se envía", flush=True)
+                # Registrar en historial
+                historial = HistorialReclamo(
+                    reclamo_id=reclamo.id,
+                    usuario_id=usuario.id,
+                    accion="email_fallido",
+                    comentario="❌ No se envió email de confirmación: usuario sin email configurado"
+                )
+                new_db.add(historial)
+                await new_db.commit()
+                return
 
-        # Generar HTML del email
-        html_content = EmailTemplates.reclamo_creado(
-            reclamo_titulo=reclamo.titulo,
-            reclamo_id=reclamo.id,
-            categoria=categoria_nombre or "Sin categoría"
-        )
+            # Generar HTML del email
+            html_content = EmailTemplates.reclamo_creado(
+                reclamo_titulo=reclamo.titulo,
+                reclamo_id=reclamo.id,
+                categoria=categoria_nombre or "Sin categoría"
+            )
 
-        # Enviar email
-        success = await email_service.send_email(
-            to_email=usuario.email,
-            subject=f"Reclamo #{reclamo.id} generado exitosamente",
-            body_html=html_content,
-            body_text=f"Su reclamo #{reclamo.id} '{reclamo.titulo}' fue generado exitosamente. Le notificaremos cuando haya actualizaciones."
-        )
+            # Enviar email
+            success = await email_service.send_email(
+                to_email=usuario.email,
+                subject=f"Reclamo #{reclamo.id} generado exitosamente",
+                body_html=html_content,
+                body_text=f"Su reclamo #{reclamo.id} '{reclamo.titulo}' fue generado exitosamente. Le notificaremos cuando haya actualizaciones."
+            )
 
-        if success:
-            print(f"[EMAIL] Email enviado a {usuario.email}", flush=True)
-        else:
-            print(f"[EMAIL] No se pudo enviar email (SMTP no configurado)", flush=True)
+            # Registrar resultado en historial
+            if success:
+                print(f"[EMAIL] Email enviado a {usuario.email}", flush=True)
+                historial = HistorialReclamo(
+                    reclamo_id=reclamo.id,
+                    usuario_id=usuario.id,
+                    accion="email_enviado",
+                    comentario=f"✅ Email de confirmación enviado a {usuario.email}"
+                )
+            else:
+                print(f"[EMAIL] No se pudo enviar email (SMTP no configurado)", flush=True)
+                historial = HistorialReclamo(
+                    reclamo_id=reclamo.id,
+                    usuario_id=usuario.id,
+                    accion="email_fallido",
+                    comentario=f"⚠️ No se pudo enviar email a {usuario.email} (SMTP no configurado o credenciales inválidas)"
+                )
 
-    except Exception as e:
-        print(f"[EMAIL] Error enviando email: {e}", flush=True)
+            new_db.add(historial)
+            await new_db.commit()
+
+        except Exception as e:
+            print(f"[EMAIL] Error enviando email: {e}", flush=True)
+            # Registrar error en historial
+            try:
+                historial = HistorialReclamo(
+                    reclamo_id=reclamo.id,
+                    usuario_id=usuario.id,
+                    accion="email_fallido",
+                    comentario=f"❌ Error al enviar email a {usuario.email}: {str(e)[:100]}"
+                )
+                new_db.add(historial)
+                await new_db.commit()
+            except:
+                pass  # Si falla el registro del error, no hacer nada
 
 
 def get_effective_municipio_id(request: Request, current_user: User) -> int:
