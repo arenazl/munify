@@ -268,11 +268,15 @@ export default function Layout() {
     try {
       const response = await usersApi.validateEmailChange(pendingEmail, emailValidationCode);
       if (response.success) {
-        toast.success('Email actualizado exitosamente');
+        toast.success('Email actualizado exitosamente. Volvé a iniciar sesión con tu nuevo email.');
         setEmailValidationOpen(false);
         setEmailValidationCode('');
         setPendingEmail('');
-        await refreshUser();
+
+        // Logout para forzar re-login con el nuevo email
+        setTimeout(() => {
+          logout();
+        }, 2000);
       }
     } catch (error: any) {
       console.error('Error al validar email:', error);
