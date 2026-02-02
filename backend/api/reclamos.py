@@ -185,8 +185,7 @@ async def enviar_notificacion_whatsapp(
 # ===========================================
 
 async def enviar_notificacion_push(
-    db: AsyncSession,
-    reclamo: Reclamo,
+    reclamo_id: int,
     tipo_notificacion: str,
     empleado_nombre: str = None,
     estado_anterior: str = None,
@@ -196,53 +195,82 @@ async def enviar_notificacion_push(
 ):
     """
     Envía notificación push al creador del reclamo.
+    Usa su propia sesión de DB para evitar problemas con tasks async.
     tipo_notificacion: 'reclamo_recibido', 'reclamo_asignado', 'cambio_estado', 'reclamo_resuelto', 'nuevo_comentario'
     """
-    try:
-        from services.push_service import (
-            notificar_reclamo_recibido,
-            notificar_reclamo_asignado,
-            notificar_cambio_estado,
-            notificar_reclamo_resuelto,
-            notificar_nuevo_comentario
-        )
+    from core.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as new_db:
+        try:
+            # Recargar el reclamo en la nueva sesión
+            result = await new_db.execute(
+                select(Reclamo).where(Reclamo.id == reclamo_id)
+            )
+            reclamo = result.scalar_one_or_none()
+            if not reclamo:
+                print(f"[PUSH] Reclamo #{reclamo_id} no encontrado", flush=True)
+                return
 
-        if tipo_notificacion == 'reclamo_recibido':
-            await notificar_reclamo_recibido(db, reclamo)
-        elif tipo_notificacion == 'reclamo_asignado' and empleado_nombre:
-            await notificar_reclamo_asignado(db, reclamo, empleado_nombre)
-        elif tipo_notificacion == 'cambio_estado' and estado_anterior and estado_nuevo:
-            await notificar_cambio_estado(db, reclamo, estado_anterior, estado_nuevo)
-        elif tipo_notificacion == 'reclamo_resuelto':
-            await notificar_reclamo_resuelto(db, reclamo)
-        elif tipo_notificacion == 'nuevo_comentario':
-            await notificar_nuevo_comentario(db, reclamo, comentario_texto, autor_nombre)
+            from services.push_service import (
+                notificar_reclamo_recibido,
+                notificar_reclamo_asignado,
+                notificar_cambio_estado,
+                notificar_reclamo_resuelto,
+                notificar_nuevo_comentario
+            )
 
-        print(f"[PUSH] Notificacion enviada: {tipo_notificacion}", flush=True)
-    except Exception as e:
-        print(f"[PUSH] Error enviando: {e}", flush=True)
+            if tipo_notificacion == 'reclamo_recibido':
+                await notificar_reclamo_recibido(new_db, reclamo)
+            elif tipo_notificacion == 'reclamo_asignado' and empleado_nombre:
+                await notificar_reclamo_asignado(new_db, reclamo, empleado_nombre)
+            elif tipo_notificacion == 'cambio_estado' and estado_anterior and estado_nuevo:
+                await notificar_cambio_estado(new_db, reclamo, estado_anterior, estado_nuevo)
+            elif tipo_notificacion == 'reclamo_resuelto':
+                await notificar_reclamo_resuelto(new_db, reclamo)
+            elif tipo_notificacion == 'nuevo_comentario':
+                await notificar_nuevo_comentario(new_db, reclamo, comentario_texto, autor_nombre)
+
+            print(f"[PUSH] Notificacion enviada: {tipo_notificacion}", flush=True)
+        except Exception as e:
+            print(f"[PUSH] Error enviando: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
 
 async def enviar_notificacion_dependencia(
-    db: AsyncSession,
-    reclamo: Reclamo,
+    reclamo_id: int,
+    municipio_dependencia_id: int,
     categoria_nombre: str = None
 ):
     """
     Envía notificación a los supervisores de la dependencia asignada.
+    Usa su propia sesión de DB para evitar problemas con tasks async.
     """
-    try:
-        from services.push_service import notificar_dependencia_reclamo_nuevo
-        count = await notificar_dependencia_reclamo_nuevo(db, reclamo, categoria_nombre)
-        print(f"[PUSH] Notificacion enviada a dependencia: {count} usuarios", flush=True)
-    except Exception as e:
-        print(f"[PUSH] Error notificando dependencia: {e}", flush=True)
+    from core.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as new_db:
+        try:
+            # Recargar el reclamo en la nueva sesión
+            result = await new_db.execute(
+                select(Reclamo).where(Reclamo.id == reclamo_id)
+            )
+            reclamo = result.scalar_one_or_none()
+            if not reclamo:
+                print(f"[PUSH] Reclamo #{reclamo_id} no encontrado", flush=True)
+                return
+
+            from services.push_service import notificar_dependencia_reclamo_nuevo
+            count = await notificar_dependencia_reclamo_nuevo(new_db, reclamo, categoria_nombre)
+            print(f"[PUSH] Notificacion enviada a dependencia: {count} usuarios", flush=True)
+        except Exception as e:
+            print(f"[PUSH] Error notificando dependencia: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
 
 
 async def enviar_email_reclamo_creado(
-    db: AsyncSession,
-    reclamo: Reclamo,
-    usuario: User,
+    reclamo_id: int,
+    usuario_id: int,
+    usuario_email: str,
+    reclamo_titulo: str,
     categoria_nombre: str = None
 ):
     """
@@ -256,12 +284,12 @@ async def enviar_email_reclamo_creado(
             from services.email_service import email_service, EmailTemplates
 
             # Solo enviar si el usuario tiene email
-            if not usuario.email:
+            if not usuario_email:
                 print(f"[EMAIL] Usuario sin email, no se envía", flush=True)
                 # Registrar en historial
                 historial = HistorialReclamo(
-                    reclamo_id=reclamo.id,
-                    usuario_id=usuario.id,
+                    reclamo_id=reclamo_id,
+                    usuario_id=usuario_id,
                     accion="email_fallido",
                     comentario="❌ No se envió email de confirmación: usuario sin email configurado"
                 )
@@ -271,35 +299,35 @@ async def enviar_email_reclamo_creado(
 
             # Generar HTML del email
             html_content = EmailTemplates.reclamo_creado(
-                reclamo_titulo=reclamo.titulo,
-                reclamo_id=reclamo.id,
+                reclamo_titulo=reclamo_titulo,
+                reclamo_id=reclamo_id,
                 categoria=categoria_nombre or "Sin categoría"
             )
 
             # Enviar email
             success = await email_service.send_email(
-                to_email=usuario.email,
-                subject=f"Reclamo #{reclamo.id} generado exitosamente",
+                to_email=usuario_email,
+                subject=f"Reclamo #{reclamo_id} generado exitosamente",
                 body_html=html_content,
-                body_text=f"Su reclamo #{reclamo.id} '{reclamo.titulo}' fue generado exitosamente. Le notificaremos cuando haya actualizaciones."
+                body_text=f"Su reclamo #{reclamo_id} '{reclamo_titulo}' fue generado exitosamente. Le notificaremos cuando haya actualizaciones."
             )
 
             # Registrar resultado en historial
             if success:
-                print(f"[EMAIL] Email enviado a {usuario.email}", flush=True)
+                print(f"[EMAIL] Email enviado a {usuario_email}", flush=True)
                 historial = HistorialReclamo(
-                    reclamo_id=reclamo.id,
-                    usuario_id=usuario.id,
+                    reclamo_id=reclamo_id,
+                    usuario_id=usuario_id,
                     accion="email_enviado",
-                    comentario=f"✅ Email de confirmación enviado a {usuario.email}"
+                    comentario=f"✅ Email de confirmación enviado a {usuario_email}"
                 )
             else:
                 print(f"[EMAIL] No se pudo enviar email (SMTP no configurado)", flush=True)
                 historial = HistorialReclamo(
-                    reclamo_id=reclamo.id,
-                    usuario_id=usuario.id,
+                    reclamo_id=reclamo_id,
+                    usuario_id=usuario_id,
                     accion="email_fallido",
-                    comentario=f"⚠️ No se pudo enviar email a {usuario.email} (SMTP no configurado o credenciales inválidas)"
+                    comentario=f"⚠️ No se pudo enviar email a {usuario_email} (SMTP no configurado o credenciales inválidas)"
                 )
 
             new_db.add(historial)
@@ -310,10 +338,10 @@ async def enviar_email_reclamo_creado(
             # Registrar error en historial
             try:
                 historial = HistorialReclamo(
-                    reclamo_id=reclamo.id,
-                    usuario_id=usuario.id,
+                    reclamo_id=reclamo_id,
+                    usuario_id=usuario_id,
                     accion="email_fallido",
-                    comentario=f"❌ Error al enviar email a {usuario.email}: {str(e)[:100]}"
+                    comentario=f"❌ Error al enviar email a {usuario_email}: {str(e)[:100]}"
                 )
                 new_db.add(historial)
                 await new_db.commit()
@@ -945,15 +973,26 @@ async def create_reclamo(
     # await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
 
     # 1. Notificar al vecino (push + in-app)
-    asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_recibido'))
+    asyncio.create_task(enviar_notificacion_push(
+        reclamo_id=reclamo.id,
+        tipo_notificacion='reclamo_recibido'
+    ))
 
     # 2. Notificar a la dependencia asignada (push + in-app)
     if reclamo.municipio_dependencia_id:
-        asyncio.create_task(enviar_notificacion_dependencia(db, reclamo, categoria_nombre))
+        asyncio.create_task(enviar_notificacion_dependencia(
+            reclamo_id=reclamo.id,
+            municipio_dependencia_id=reclamo.municipio_dependencia_id,
+            categoria_nombre=categoria_nombre
+        ))
 
     # 3. Enviar email al vecino
     asyncio.create_task(enviar_email_reclamo_creado(
-        db, reclamo, current_user, categoria_nombre
+        reclamo_id=reclamo.id,
+        usuario_id=current_user.id,
+        usuario_email=current_user.email,
+        reclamo_titulo=reclamo.titulo,
+        categoria_nombre=categoria_nombre
     ))
 
     # Recargar con relaciones
