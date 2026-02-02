@@ -47,6 +47,13 @@ export default function Login() {
     setMunicipioNombre(nombre);
     setMunicipioCodigo(codigo);
     setMunicipioColor(color || '#3b82f6');
+
+    // Pre-llenar email si viene desde el botón de supervisor
+    const prefilledEmail = localStorage.getItem('prefill_email');
+    if (prefilledEmail) {
+      setEmail(prefilledEmail);
+      localStorage.removeItem('prefill_email'); // Limpiar después de usar
+    }
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

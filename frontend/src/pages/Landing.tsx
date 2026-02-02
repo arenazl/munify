@@ -465,18 +465,14 @@ export default function Landing() {
                       {/* Botón fijo para Supervisor (arenazl@gmail.com) */}
                       <div className="mt-4">
                         <button
-                          onClick={() => quickLogin('arenazl@gmail.com', 'Arena2024!')}
-                          disabled={debugLoading}
-                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50"
+                          onClick={() => {
+                            localStorage.setItem('prefill_email', 'arenazl@gmail.com');
+                            navigate('/login');
+                          }}
+                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all shadow-lg shadow-orange-500/25"
                         >
-                          {debugLoading ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <>
-                              <Users className="h-5 w-5" />
-                              Acceso Supervisor
-                            </>
-                          )}
+                          <Users className="h-5 w-5" />
+                          Acceso Supervisor
                         </button>
                       </div>
 
