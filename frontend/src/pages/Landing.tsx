@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, Wrench, User, AlertCircle, LogIn } from 'lucide-react';
+import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
@@ -259,7 +259,6 @@ export default function Landing() {
   const rolConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
     admin: { icon: Shield, color: 'from-red-500 to-rose-600', label: 'Administrador' },
     supervisor: { icon: Users, color: 'from-orange-500 to-amber-600', label: 'Supervisor' },
-    empleado: { icon: Wrench, color: 'from-green-500 to-emerald-600', label: 'Empleado' },
     vecino: { icon: User, color: 'from-blue-500 to-indigo-600', label: 'Vecino' },
   };
 
@@ -465,14 +464,18 @@ export default function Landing() {
                       {/* Botón fijo para Supervisor (arenazl@gmail.com) */}
                       <div className="mt-4">
                         <button
-                          onClick={() => {
-                            localStorage.setItem('prefill_email', 'arenazl@gmail.com');
-                            navigate('/login');
-                          }}
-                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all shadow-lg shadow-orange-500/25"
+                          onClick={() => quickLogin('arenazl@gmail.com', 'supervisor123')}
+                          disabled={debugLoading}
+                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50"
                         >
-                          <Users className="h-5 w-5" />
-                          Acceso Supervisor
+                          {debugLoading ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <>
+                              <Users className="h-5 w-5" />
+                              Acceso Supervisor
+                            </>
+                          )}
                         </button>
                       </div>
 
