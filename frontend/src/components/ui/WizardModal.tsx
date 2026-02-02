@@ -176,8 +176,12 @@ export function WizardModal({
     }
     @media (max-width: 768px) {
       .wizard-embedded-content {
-        height: 100vh;
+        height: auto;
+        min-height: calc(100vh - 144px);
         border-radius: 0;
+      }
+      .wizard-content-area > div {
+        padding-bottom: 100px !important;
       }
     }
     .wizard-main-layout {
@@ -204,9 +208,11 @@ export function WizardModal({
     }
     @media (max-width: 768px) {
       .wizard-footer {
-        position: sticky;
-        bottom: 0;
-        z-index: 20;
+        position: fixed;
+        bottom: 65px;
+        left: 0;
+        right: 0;
+        z-index: 40;
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
       }
     }
