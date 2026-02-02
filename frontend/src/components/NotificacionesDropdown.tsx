@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Clock, AlertTriangle, FileText, User } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 import { notificacionesApi } from '../lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -25,6 +27,8 @@ interface NotificacionesDropdownProps {
 
 export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarHoverColor, sidebarBgHover, sidebarWidth }: NotificacionesDropdownProps = {}) {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -92,6 +96,24 @@ export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarH
       setUnreadCount(Math.max(0, unreadCount - 1));
     } catch (error) {
       console.error('Error marking as read:', error);
+    }
+  };
+
+  const handleNotificationClick = async (notif: Notificacion) => {
+    // Marcar como leída si no lo está
+    if (!notif.leida) {
+      await markAsRead(notif.id);
+    }
+
+    // Cerrar dropdown
+    setIsOpen(false);
+
+    // Navegar al reclamo si tiene reclamo_id
+    if (notif.reclamo_id) {
+      // URL varía según el rol del usuario
+      const isGestion = user?.rol === 'supervisor' || user?.rol === 'admin';
+      const basePath = isGestion ? '/gestion/reclamos' : '/reclamos';
+      navigate(`${basePath}/${notif.reclamo_id}`);
     }
   };
 

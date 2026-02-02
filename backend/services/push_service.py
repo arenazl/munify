@@ -2,6 +2,7 @@
 from pywebpush import webpush, WebPushException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from models import PushSubscription, User
 from models.notificacion import Notificacion
 from models.user import DEFAULT_NOTIFICATION_PREFERENCES
@@ -186,8 +187,8 @@ async def notificar_reclamo_recibido(db: AsyncSession, reclamo) -> int:
         logger.info(f"Usuario {reclamo.creador_id} tiene deshabilitada la notificación reclamo_recibido")
         return 0
 
-    titulo = "Reclamo Recibido"
-    mensaje = f"Tu reclamo #{reclamo.id} ha sido registrado exitosamente."
+    titulo = f"Reclamo #{reclamo.id} Generado"
+    mensaje = f"Su reclamo #{reclamo.id} fue generado exitosamente y será atendido a la brevedad."
 
     # Crear notificación en BD
     await crear_notificacion_db(
@@ -448,6 +449,78 @@ async def notificar_supervisor_reclamo_nuevo(db: AsyncSession, supervisor_user_i
         url=f"/reclamos/{reclamo.id}",
         data={"tipo": "reclamo_nuevo_supervisor", "reclamo_id": reclamo.id}
     )
+
+
+async def notificar_dependencia_reclamo_nuevo(
+    db: AsyncSession,
+    reclamo,
+    categoria_nombre: str = None
+) -> int:
+    """
+    Notifica a todos los usuarios de la dependencia asignada cuando llega un nuevo reclamo.
+    Crea notificación en BD para la campanita + envía push al navegador.
+    """
+    from models import MunicipioDependencia
+    from models.enums import RolUsuario
+
+    if not reclamo.municipio_dependencia_id:
+        logger.info(f"Reclamo #{reclamo.id} no tiene dependencia asignada, no se envía notificación")
+        return 0
+
+    # Buscar usuarios de la dependencia (supervisores)
+    result = await db.execute(
+        select(User).where(
+            User.municipio_dependencia_id == reclamo.municipio_dependencia_id,
+            User.rol == RolUsuario.SUPERVISOR,
+            User.activo == True
+        )
+    )
+    usuarios_dependencia = result.scalars().all()
+
+    if not usuarios_dependencia:
+        logger.info(f"No hay usuarios en la dependencia {reclamo.municipio_dependencia_id}")
+        return 0
+
+    # Obtener nombre de la dependencia
+    dep_result = await db.execute(
+        select(MunicipioDependencia).where(
+            MunicipioDependencia.id == reclamo.municipio_dependencia_id
+        ).options(selectinload(MunicipioDependencia.dependencia))
+    )
+    muni_dep = dep_result.scalar_one_or_none()
+    dep_nombre = muni_dep.dependencia.nombre if muni_dep and muni_dep.dependencia else "tu dependencia"
+
+    # Preparar mensaje
+    titulo = "Nuevo Reclamo Asignado"
+    cat_info = f" - {categoria_nombre}" if categoria_nombre else ""
+    mensaje = f"Reclamo #{reclamo.id}{cat_info} fue asignado a {dep_nombre}."
+
+    total_enviados = 0
+    for usuario in usuarios_dependencia:
+        if await check_user_notification_preference(db, usuario.id, "reclamo_nuevo_supervisor"):
+            # Crear notificación en BD para la campanita
+            await crear_notificacion_db(
+                db=db,
+                usuario_id=usuario.id,
+                titulo=titulo,
+                mensaje=mensaje,
+                tipo="info",
+                reclamo_id=reclamo.id
+            )
+
+            # Enviar push al navegador
+            enviados = await send_push_to_user(
+                db=db,
+                user_id=usuario.id,
+                title=f"📋 {titulo}",
+                body=mensaje,
+                url=f"/gestion/reclamos/{reclamo.id}",
+                data={"tipo": "reclamo_nuevo_supervisor", "reclamo_id": reclamo.id}
+            )
+            total_enviados += enviados
+
+    logger.info(f"Notificación de reclamo nuevo enviada a {len(usuarios_dependencia)} usuarios ({total_enviados} push)")
+    return total_enviados
 
 
 async def notificar_supervisor_pendiente_confirmacion(db: AsyncSession, supervisor_user_id: int, reclamo) -> int:

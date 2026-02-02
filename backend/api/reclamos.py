@@ -223,6 +223,63 @@ async def enviar_notificacion_push(
         print(f"[PUSH] Error enviando: {e}", flush=True)
 
 
+async def enviar_notificacion_dependencia(
+    db: AsyncSession,
+    reclamo: Reclamo,
+    categoria_nombre: str = None
+):
+    """
+    Envía notificación a los supervisores de la dependencia asignada.
+    """
+    try:
+        from services.push_service import notificar_dependencia_reclamo_nuevo
+        count = await notificar_dependencia_reclamo_nuevo(db, reclamo, categoria_nombre)
+        print(f"[PUSH] Notificacion enviada a dependencia: {count} usuarios", flush=True)
+    except Exception as e:
+        print(f"[PUSH] Error notificando dependencia: {e}", flush=True)
+
+
+async def enviar_email_reclamo_creado(
+    db: AsyncSession,
+    reclamo: Reclamo,
+    usuario: User,
+    categoria_nombre: str = None
+):
+    """
+    Envía email al vecino confirmando la creación del reclamo.
+    """
+    try:
+        from services.email_service import email_service, EmailTemplates
+
+        # Solo enviar si el usuario tiene email
+        if not usuario.email:
+            print(f"[EMAIL] Usuario sin email, no se envía", flush=True)
+            return
+
+        # Generar HTML del email
+        html_content = EmailTemplates.reclamo_creado(
+            reclamo_titulo=reclamo.titulo,
+            reclamo_id=reclamo.id,
+            categoria=categoria_nombre or "Sin categoría"
+        )
+
+        # Enviar email
+        success = await email_service.send_email(
+            to_email=usuario.email,
+            subject=f"Reclamo #{reclamo.id} generado exitosamente",
+            body_html=html_content,
+            body_text=f"Su reclamo #{reclamo.id} '{reclamo.titulo}' fue generado exitosamente. Le notificaremos cuando haya actualizaciones."
+        )
+
+        if success:
+            print(f"[EMAIL] Email enviado a {usuario.email}", flush=True)
+        else:
+            print(f"[EMAIL] No se pudo enviar email (SMTP no configurado)", flush=True)
+
+    except Exception as e:
+        print(f"[EMAIL] Error enviando email: {e}", flush=True)
+
+
 def get_effective_municipio_id(request: Request, current_user: User) -> int:
     """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
     if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
@@ -830,9 +887,33 @@ async def create_reclamo(
         # No fallar si hay error en gamificación
         pass
 
+    # Obtener nombre de categoría para las notificaciones
+    categoria_nombre = None
+    try:
+        from models.categoria import Categoria
+        cat_result = await db.execute(
+            select(Categoria).where(Categoria.id == data.categoria_id)
+        )
+        cat = cat_result.scalar_one_or_none()
+        if cat:
+            categoria_nombre = cat.nombre
+    except Exception as e:
+        print(f"⚠️ Error obteniendo categoría: {e}", flush=True)
+
     # Notificaciones en background (no bloquean respuesta)
     # await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
+
+    # 1. Notificar al vecino (push + in-app)
     asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_recibido'))
+
+    # 2. Notificar a la dependencia asignada (push + in-app)
+    if reclamo.municipio_dependencia_id:
+        asyncio.create_task(enviar_notificacion_dependencia(db, reclamo, categoria_nombre))
+
+    # 3. Enviar email al vecino
+    asyncio.create_task(enviar_email_reclamo_creado(
+        db, reclamo, current_user, categoria_nombre
+    ))
 
     # Recargar con relaciones
     print(f"🔄 Recargando reclamo con relaciones...", flush=True)
