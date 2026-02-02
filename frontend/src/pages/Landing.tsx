@@ -451,54 +451,61 @@ export default function Landing() {
                         Crear Cuenta
                       </button>
 
-                      {/* Divider - Accesos Rápidos */}
-                      <div className="relative flex items-center gap-3 my-4">
-                        <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-slate-500 text-xs">ACCESOS RÁPIDOS</span>
-                        <div className="flex-1 h-px bg-white/10" />
-                      </div>
+                      {/* Accesos Rápidos - Usuarios Demo */}
+                      {demoUsers.length > 0 && (
+                        <>
+                          <div className="relative flex items-center gap-3 my-4">
+                            <div className="flex-1 h-px bg-white/10" />
+                            <span className="text-slate-500 text-xs">ACCESOS RÁPIDOS</span>
+                            <div className="flex-1 h-px bg-white/10" />
+                          </div>
 
-                      {/* Grid: Vecino y Supervisor */}
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        {/* Botón Vecino */}
-                        <button
-                          onClick={() => quickLogin('vecino@test.com', 'vecino123')}
-                          disabled={debugLoading}
-                          className="relative overflow-hidden bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
-                        >
-                          {debugLoading ? (
-                            <div className="flex items-center justify-center">
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 flex-shrink-0" />
-                              <div className="text-left min-w-0">
-                                <div className="font-semibold truncate">Vecino</div>
-                                <div className="text-[10px] opacity-80 font-mono truncate">vecino@test.com</div>
-                              </div>
-                            </div>
-                          )}
-                        </button>
+                          <div className="grid grid-cols-2 gap-3 mb-4">
+                            {demoUsers.map((user, index) => {
+                              const config = rolConfig[user.rol] || rolConfig.vecino;
+                              const Icon = config.icon;
+                              return (
+                                <button
+                                  key={`${user.rol}-${index}`}
+                                  type="button"
+                                  onClick={() => quickLogin(user.email, 'demo123')}
+                                  disabled={debugLoading}
+                                  className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                                >
+                                  {debugLoading ? (
+                                    <div className="flex items-center justify-center">
+                                      <Loader2 className="h-5 w-5 animate-spin" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <Icon className="h-4 w-4 flex-shrink-0" />
+                                      <div className="text-left min-w-0">
+                                        <div className="font-semibold truncate">{config.label}</div>
+                                        <div className="text-[10px] opacity-80 font-mono truncate">{user.email}</div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
 
-                        {/* Botón Supervisor */}
+                      {/* Botón fijo para Supervisor arenazl */}
+                      <div className="mb-4">
                         <button
                           onClick={() => quickLogin('arenazl@gmail.com', 'supervisor123')}
                           disabled={debugLoading}
-                          className="relative overflow-hidden bg-gradient-to-r from-orange-500 to-amber-600 text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg"
+                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50"
                         >
                           {debugLoading ? (
-                            <div className="flex items-center justify-center">
-                              <Loader2 className="h-5 w-5 animate-spin" />
-                            </div>
+                            <Loader2 className="h-5 w-5 animate-spin" />
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 flex-shrink-0" />
-                              <div className="text-left min-w-0">
-                                <div className="font-semibold truncate">Supervisor</div>
-                                <div className="text-[10px] opacity-80 font-mono truncate">arenazl@gmail.com</div>
-                              </div>
-                            </div>
+                            <>
+                              <Users className="h-5 w-5" />
+                              Supervisor Principal
+                            </>
                           )}
                         </button>
                       </div>
