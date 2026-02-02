@@ -139,9 +139,14 @@ export function ReclamoCard({
               >
                 {r.categoria?.nombre || 'Sin categoría'}
               </span>
-              <span className="text-xs flex items-center" style={{ color: theme.textSecondary }}>
-                <Calendar className="h-3 w-3 mr-1" />
-                {new Date(r.created_at).toLocaleDateString()}
+              <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <div className="flex flex-col leading-tight">
+                  <span>{new Date(r.created_at).toLocaleDateString('es-AR')}</span>
+                  <span className="text-[9px] opacity-70">
+                    {new Date(r.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
               </span>
               {/* Nombre del creador (solo supervisor) */}
               {showCreador && r.creador && !r.es_anonimo && (
@@ -190,8 +195,13 @@ export function ReclamoCard({
             {/* Última actualización */}
             {r.updated_at && r.updated_at !== r.created_at && (
               <span className="flex items-center gap-1 hidden sm:flex" style={{ color: theme.textSecondary }}>
-                <Clock className="h-3 w-3" />
-                {new Date(r.updated_at).toLocaleDateString()}
+                <Clock className="h-3 w-3 flex-shrink-0" />
+                <div className="flex flex-col leading-tight text-[10px]">
+                  <span>{new Date(r.updated_at).toLocaleDateString('es-AR')}</span>
+                  <span className="text-[8px] opacity-70">
+                    {new Date(r.updated_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
               </span>
             )}
 

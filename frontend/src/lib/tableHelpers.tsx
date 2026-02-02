@@ -41,32 +41,52 @@ export function renderEmpleado<T extends WithEmpleado>(
 }
 
 /**
- * Renderiza fechas en formato de 2 líneas:
+ * Renderiza fechas en formato de 3 líneas:
  * - Línea 1: fecha de creación (gris)
- * - Línea 2: fecha de actualización (color acento)
+ * - Línea 2: hora de creación (gris, chiquito)
+ * - Línea 3: fecha de actualización (color acento) con hora
  */
 export function renderFechas<T extends WithFechas>(
   item: T,
   secondaryColor: string,
   primaryColor: string
 ): React.ReactNode {
-  const creacion = new Date(item.created_at).toLocaleDateString('es-AR', {
+  const fechaCreacion = new Date(item.created_at);
+  const creacion = fechaCreacion.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
     year: '2-digit',
   });
-  const actualizacion = item.updated_at
-    ? new Date(item.updated_at).toLocaleDateString('es-AR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-      })
-    : null;
+  const horaCreacion = fechaCreacion.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  let actualizacion: string | null = null;
+  let horaActualizacion: string | null = null;
+  if (item.updated_at) {
+    const fechaActualizacion = new Date(item.updated_at);
+    actualizacion = fechaActualizacion.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit',
+    });
+    horaActualizacion = fechaActualizacion.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
 
   return (
     <div className="flex flex-col text-[10px] leading-tight">
       <span style={{ color: secondaryColor }}>{creacion}</span>
-      {actualizacion && <span style={{ color: primaryColor }}>{actualizacion}</span>}
+      <span className="text-[8px] opacity-70" style={{ color: secondaryColor }}>{horaCreacion}</span>
+      {actualizacion && (
+        <>
+          <span style={{ color: primaryColor }}>{actualizacion}</span>
+          <span className="text-[8px] opacity-70" style={{ color: primaryColor }}>{horaActualizacion}</span>
+        </>
+      )}
     </div>
   );
 }
@@ -162,6 +182,7 @@ export function renderVencimientoCalculado(
 
 /**
  * Renderiza fechas con fecha de vencimiento calculada en la segunda línea
+ * Incluye hora en renglón chiquito
  */
 export function renderFechasConVencimiento(
   fechaCreacion: string,
@@ -169,10 +190,15 @@ export function renderFechasConVencimiento(
   secondaryColor: string,
   primaryColor: string
 ): React.ReactNode {
-  const creacion = new Date(fechaCreacion).toLocaleDateString('es-AR', {
+  const fechaCreacionObj = new Date(fechaCreacion);
+  const creacion = fechaCreacionObj.toLocaleDateString('es-AR', {
     day: '2-digit',
     month: '2-digit',
     year: '2-digit',
+  });
+  const horaCreacion = fechaCreacionObj.toLocaleTimeString('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
   });
 
   let vencimiento: string | null = null;
@@ -189,6 +215,7 @@ export function renderFechasConVencimiento(
   return (
     <div className="flex flex-col text-[10px] leading-tight">
       <span style={{ color: secondaryColor }}>{creacion}</span>
+      <span className="text-[8px] opacity-70" style={{ color: secondaryColor }}>{horaCreacion}</span>
       {vencimiento && <span style={{ color: primaryColor }}>{vencimiento}</span>}
     </div>
   );
