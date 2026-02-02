@@ -409,10 +409,10 @@ async def notificar_comentario_vecino_a_dependencia(
         logger.info(f"Reclamo #{reclamo.id} no tiene dependencia asignada, no se envía notificación")
         return 0
 
-    # Buscar usuarios de la dependencia (supervisores)
+    # Buscar TODOS los supervisores del municipio (no solo de la dependencia específica)
     result = await db.execute(
         select(User).where(
-            User.municipio_dependencia_id == reclamo.municipio_dependencia_id,
+            User.municipio_id == reclamo.municipio_id,
             User.rol == RolUsuario.SUPERVISOR,
             User.activo == True
         )
@@ -420,7 +420,7 @@ async def notificar_comentario_vecino_a_dependencia(
     usuarios_dependencia = result.scalars().all()
 
     if not usuarios_dependencia:
-        logger.info(f"No hay usuarios en la dependencia {reclamo.municipio_dependencia_id}")
+        logger.info(f"No hay supervisores en el municipio {reclamo.municipio_id}")
         return 0
 
     # Truncar comentario
@@ -507,10 +507,10 @@ async def notificar_dependencia_reclamo_nuevo(
         logger.info(f"Reclamo #{reclamo.id} no tiene dependencia asignada, no se envía notificación")
         return 0
 
-    # Buscar usuarios de la dependencia (supervisores)
+    # Buscar TODOS los supervisores del municipio (no solo de la dependencia específica)
     result = await db.execute(
         select(User).where(
-            User.municipio_dependencia_id == reclamo.municipio_dependencia_id,
+            User.municipio_id == reclamo.municipio_id,
             User.rol == RolUsuario.SUPERVISOR,
             User.activo == True
         )
@@ -518,7 +518,7 @@ async def notificar_dependencia_reclamo_nuevo(
     usuarios_dependencia = result.scalars().all()
 
     if not usuarios_dependencia:
-        logger.info(f"No hay usuarios en la dependencia {reclamo.municipio_dependencia_id}")
+        logger.info(f"No hay supervisores en el municipio {reclamo.municipio_id}")
         return 0
 
     # Obtener nombre de la dependencia
