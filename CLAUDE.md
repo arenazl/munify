@@ -11,6 +11,24 @@ La guía `00_COMO_USAR.md` tiene el índice de todas las guías disponibles.
 3. Ser proactivo
 4. Mantener las guías actualizadas cuando haya cambios
 
+## MIGRACIONES DE BASE DE DATOS
+**SIEMPRE ejecutar los cambios de schema de base de datos automáticamente.**
+- NO preguntar si ejecutar migraciones
+- Ejecutar directamente usando SQLAlchemy/Alembic con código Python
+- Usar `async with engine.begin()` para commits automáticos
+- Ejemplo:
+```python
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import text
+from core.config import settings
+
+async def migrate():
+    engine = create_async_engine(settings.DATABASE_URL)
+    async with engine.begin() as conn:
+        await conn.execute(text("ALTER TABLE..."))
+    await engine.dispose()
+```
+
 ---
 
 ## REGLAS BÁSICAS DE DESARROLLO (NO NEGOCIABLES)
