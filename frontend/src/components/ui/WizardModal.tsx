@@ -171,18 +171,44 @@ export function WizardModal({
       flex-direction: column;
       border-radius: 16px;
       overflow: hidden;
+      height: calc(100vh - 80px);
       min-height: 500px;
+    }
+    @media (max-width: 768px) {
+      .wizard-embedded-content {
+        height: 100vh;
+        border-radius: 0;
+      }
     }
     .wizard-main-layout {
       display: flex;
       flex: 1;
       overflow: hidden;
+      min-height: 0;
     }
     .wizard-content-area {
       flex: 1;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      min-height: 0;
+    }
+    .wizard-footer {
+      flex-shrink: 0;
+      padding: 16px 20px;
+      border-top: 1px solid ${theme.border};
+      background-color: ${theme.backgroundSecondary};
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    @media (max-width: 768px) {
+      .wizard-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+      }
     }
     .wizard-ai-panel {
       width: 320px;
@@ -465,20 +491,7 @@ export function WizardModal({
       </div>
 
       {/* Footer - Sticky en mobile */}
-      <div
-        style={{
-          padding: '16px 20px',
-          borderTop: `1px solid ${theme.border}`,
-          backgroundColor: theme.backgroundSecondary,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-          position: 'sticky',
-          bottom: 0,
-          zIndex: 10,
-        }}
-      >
+      <div className="wizard-footer">
         <button
           onClick={handlePrev}
           disabled={currentStep === 0}

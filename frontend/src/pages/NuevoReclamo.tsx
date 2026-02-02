@@ -2488,7 +2488,7 @@ Tono amigable, 3-4 oraciones máximo.`,
     || 'Mi Municipio';
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: theme.background }}>
+    <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: theme.background }}>
       {/* Header sticky con municipio */}
       <StickyPageHeader
         icon={<Building2 className="h-5 w-5" />}
