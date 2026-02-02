@@ -16,9 +16,9 @@ class HistorialReclamo(Base):
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     usuario = relationship("User")
 
-    # Cambio de estado
+    # Cambio de estado (opcional para acciones que no son cambios de estado, como emails)
     estado_anterior = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), nullable=True)
-    estado_nuevo = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    estado_nuevo = Column(Enum(EstadoReclamo, values_callable=lambda x: [e.value for e in x]), nullable=True)
 
     # Descripción de la acción
     accion = Column(String(100), nullable=False)  # "creado", "asignado", "en_proceso", etc.
