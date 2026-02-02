@@ -1236,60 +1236,12 @@ export default function Layout() {
                 >
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: '#3b82f615' }}
-                  >
-                    <FileCheck className="h-6 w-6" style={{ color: '#3b82f6' }} />
-                  </div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#3b82f6' }}>
-                    Trámite
-                  </span>
-                </button>
-
-                {/* Mapa */}
-                <button
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    navigate('/gestion/mapa');
-                  }}
-                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1.5px solid ${theme.border}`,
-                    minWidth: '80px'
-                  }}
-                >
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
                     style={{ backgroundColor: '#10b98115' }}
                   >
-                    <Map className="h-6 w-6" style={{ color: '#10b981' }} />
+                    <FileCheck className="h-6 w-6" style={{ color: '#10b981' }} />
                   </div>
                   <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#10b981' }}>
-                    Mapa
-                  </span>
-                </button>
-
-                {/* Ayuda */}
-                <button
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    // Podría abrir un modal de ayuda
-                  }}
-                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1.5px solid ${theme.border}`,
-                    minWidth: '80px'
-                  }}
-                >
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: '#8b5cf615' }}
-                  >
-                    <HelpCircle className="h-6 w-6" style={{ color: '#8b5cf6' }} />
-                  </div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#8b5cf6' }}>
-                    Ayuda
+                    Trámite
                   </span>
                 </button>
               </div>
