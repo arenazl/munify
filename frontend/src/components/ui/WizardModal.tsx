@@ -464,7 +464,7 @@ export function WizardModal({
         )}
       </div>
 
-      {/* Footer */}
+      {/* Footer - Sticky en mobile */}
       <div
         style={{
           padding: '16px 20px',
@@ -474,6 +474,9 @@ export function WizardModal({
           alignItems: 'center',
           justifyContent: 'space-between',
           flexShrink: 0,
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 10,
         }}
       >
         <button

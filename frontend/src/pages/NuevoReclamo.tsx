@@ -36,7 +36,8 @@ import {
   Bot,
   Sparkles,
   Clock,
-  Search
+  Search,
+  Crosshair
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, publicoApi, clasificacionApi, authApi, chatApi, dependenciasApi } from '../lib/api';
@@ -182,6 +183,7 @@ export default function NuevoReclamo() {
   }>>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchingAddress, setSearchingAddress] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [userInputNumber, setUserInputNumber] = useState<string>('');
 
@@ -508,6 +510,88 @@ export default function NuevoReclamo() {
     });
     setShowSuggestions(false);
     setAddressSuggestions([]);
+  };
+
+  // Obtener ubicación actual del usuario
+  const getCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      toast.error('Tu navegador no soporta geolocalización');
+      return;
+    }
+
+    setGettingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      });
+
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+
+      // Hacer reverse geocoding con Nominatim
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1&accept-language=es`,
+        {
+          headers: {
+            'User-Agent': 'MunicipalidadReclamosApp/1.0',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Error al obtener la dirección');
+      }
+
+      const data = await response.json();
+      const addr = data.address;
+
+      // Construir dirección limpia
+      let direccion = '';
+      if (addr) {
+        const parts: string[] = [];
+        if (addr.road) {
+          const numero = addr.house_number || '';
+          parts.push(numero ? `${addr.road} ${numero}` : addr.road);
+        }
+        const locality = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
+        if (locality) {
+          parts.push(locality);
+        }
+        if (addr.state && !addr.state.toLowerCase().includes('buenos aires')) {
+          parts.push(addr.state);
+        }
+        direccion = parts.join(', ');
+      }
+
+      if (!direccion) {
+        direccion = data.display_name.split(', ').slice(0, 4).join(', ');
+      }
+
+      setFormData({
+        ...formData,
+        direccion,
+        latitud: lat,
+        longitud: lon,
+      });
+
+      toast.success('Ubicación detectada');
+    } catch (error: any) {
+      if (error.code === 1) {
+        toast.error('Permiso de ubicación denegado. Activalo en la configuración del navegador.');
+      } else if (error.code === 2) {
+        toast.error('No se pudo obtener tu ubicación. Intentá de nuevo.');
+      } else if (error.code === 3) {
+        toast.error('Tiempo de espera agotado. Intentá de nuevo.');
+      } else {
+        toast.error('Error al obtener la ubicación');
+      }
+    } finally {
+      setGettingLocation(false);
+    }
   };
 
   // Cerrar sugerencias al hacer click afuera
@@ -1605,18 +1689,31 @@ Tono amigable, 3-4 oraciones máximo.`,
               onBlur={() => handleFieldBlur('direccion')}
               placeholder="Escribí para buscar direcciones..."
               maxLength={120}
-              className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:outline-none transition-all"
+              className="w-full px-4 py-3 pr-24 rounded-xl focus:ring-2 focus:outline-none transition-all"
               style={{
                 backgroundColor: theme.backgroundSecondary,
                 color: theme.text,
                 border: `1px solid ${fieldsTouched.direccion && !direccionValidation.isValid ? '#ef4444' : theme.border}`,
               }}
             />
-            {searchingAddress && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+              {(searchingAddress || gettingLocation) && (
                 <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.textSecondary }} />
-              </div>
-            )}
+              )}
+              <button
+                type="button"
+                onClick={getCurrentLocation}
+                disabled={gettingLocation}
+                className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                style={{
+                  backgroundColor: `${theme.primary}15`,
+                  color: theme.primary,
+                }}
+                title="Usar mi ubicación actual"
+              >
+                <Crosshair className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           {fieldsTouched.direccion && !direccionValidation.isValid && (
             <p className="mt-1 text-xs text-red-500">{direccionValidation.error}</p>
