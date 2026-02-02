@@ -98,7 +98,7 @@ async def request_email_change(
         await email_service.send_email(
             to_email=nuevo_email,
             subject="Código de validación - Cambio de email",
-            html_content=html_content
+            body_html=html_content
         )
     except Exception as e:
         print(f"Error enviando email de validación: {e}")
