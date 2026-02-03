@@ -271,7 +271,9 @@ async def enviar_email_reclamo_creado(
     usuario_id: int,
     usuario_email: str,
     reclamo_titulo: str,
-    categoria_nombre: str = None
+    categoria_nombre: str = None,
+    reclamo_descripcion: str = None,
+    creador_nombre: str = None
 ):
     """
     Envía email al vecino confirmando la creación del reclamo.
@@ -301,7 +303,9 @@ async def enviar_email_reclamo_creado(
             html_content = EmailTemplates.reclamo_creado(
                 reclamo_titulo=reclamo_titulo,
                 reclamo_id=reclamo_id,
-                categoria=categoria_nombre or "Sin categoría"
+                categoria=categoria_nombre or "Sin categoría",
+                descripcion=reclamo_descripcion,
+                creador_nombre=creador_nombre
             )
 
             # Enviar email
@@ -992,7 +996,9 @@ async def create_reclamo(
         usuario_id=current_user.id,
         usuario_email=current_user.email,
         reclamo_titulo=reclamo.titulo,
-        categoria_nombre=categoria_nombre
+        categoria_nombre=categoria_nombre,
+        reclamo_descripcion=reclamo.descripcion,
+        creador_nombre=f"{current_user.nombre} {current_user.apellido}".strip()
     ))
 
     # Recargar con relaciones

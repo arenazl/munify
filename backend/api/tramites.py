@@ -93,11 +93,13 @@ async def enviar_email_solicitud_creada(
             return
 
         # Generar HTML del email
+        solicitante_nombre = f"{usuario.nombre} {usuario.apellido}".strip() if usuario else solicitud.nombre_solicitante
         html_content = EmailTemplates.solicitud_creada(
             numero_tramite=solicitud.numero_tramite,
             tramite_nombre=tramite_nombre or "Trámite",
             asunto=solicitud.asunto or "Sin asunto",
-            descripcion=solicitud.descripcion
+            descripcion=solicitud.descripcion,
+            solicitante_nombre=solicitante_nombre
         )
 
         # Enviar email
