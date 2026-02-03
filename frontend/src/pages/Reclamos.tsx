@@ -1228,9 +1228,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       return;
     }
 
-    // Validar comentario obligatorio
-    if (!comentarioAsignacion.trim()) {
-      toast.error('Ingresá un comentario');
+    // Validar descripción obligatoria
+    if (!descripcionInicio.trim()) {
+      toast.error('Ingresá una descripción del trabajo');
       return;
     }
 
@@ -1251,11 +1251,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         dependencia_id: selectedReclamo.dependencia_asignada.id,
         tiempo_estimado_dias: tiempoEstimadoDias,
         tiempo_estimado_horas: tiempoEstimadoHoras,
-        comentario: comentarioAsignacion.trim(),
+        comentario: descripcionInicio.trim(),
       });
       fetchReclamos();
       // Limpiar campos
-      setComentarioAsignacion('');
+      setDescripcionInicio('');
       setTiempoEstimadoDias(1);
       setTiempoEstimadoHoras(0);
     } catch (error) {
@@ -1269,6 +1269,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const handleAsignar = async () => {
     if (!selectedReclamo || !dependenciaSeleccionada) return;
+
+    // Validar descripción obligatoria
+    if (!descripcionInicio.trim()) {
+      toast.error('Ingresá una descripción del trabajo');
+      return;
+    }
 
     // Encontrar la dependencia seleccionada para la actualización optimista
     const dependenciaData = dependenciasDisponibles.find(d => d.id === Number(dependenciaSeleccionada));
@@ -1298,9 +1304,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         fecha_programada: fechaProgramada || undefined,
         hora_inicio: horaInicio || undefined,
         hora_fin: horaFin || undefined,
-        comentario: comentarioAsignacion || undefined
+        comentario: descripcionInicio.trim()
       });
       fetchReclamos();
+      setDescripcionInicio('');
     } catch (error) {
       setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al asignar reclamo');
@@ -3237,31 +3244,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {(selectedReclamo.estado === 'recibido' || selectedReclamo.estado === 'asignado') && (
-          <ABMInfoPanel
-            title="Descripción del trabajo"
-            icon={<FileText className="h-4 w-4" />}
-            variant="warning"
-          >
-            <div className="space-y-2">
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                Describí qué trabajo se va a realizar para resolver este reclamo.
-              </p>
-              <ABMTextarea
-                value={descripcionInicio}
-                onChange={(e) => setDescripcionInicio(e.target.value)}
-                placeholder="Ej: Se enviará cuadrilla para reparar el bache. Trabajo estimado de 2 horas."
-                rows={3}
-              />
-              {!descripcionInicio.trim() && (
-                <p className="text-xs" style={{ color: '#f59e0b' }}>
-                  * Campo obligatorio para poner en curso
-                </p>
-              )}
-            </div>
-          </ABMInfoPanel>
-        )}
-
         {selectedReclamo.estado === 'en_curso' && (
           <ABMCollapsible
             title="Finalizar Trabajo"
@@ -3468,19 +3450,46 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     // Puede recibir si ya tiene dependencia asignada y no quiere reasignar
     const canRecibir = canAsignar && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada;
 
+    // Estados finales no necesitan descripción
+    const esEstadoFinal = selectedReclamo.estado === 'finalizado' || selectedReclamo.estado === 'rechazado' || selectedReclamo.estado === 'resuelto';
+
     return (
-      <div className="flex gap-2">
+      <div className="space-y-3">
+        {/* Campo de descripción obligatorio - siempre visible excepto estados finales */}
+        {!esEstadoFinal && (
+          <div>
+            <textarea
+              value={descripcionInicio}
+              onChange={(e) => setDescripcionInicio(e.target.value)}
+              placeholder="Descripción del trabajo a realizar (obligatorio)..."
+              rows={2}
+              className="w-full px-3 py-2 rounded-xl text-sm resize-none transition-colors"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                border: `1px solid ${descripcionInicio.trim() ? theme.primary : theme.border}`,
+                color: theme.text,
+              }}
+            />
+            {!descripcionInicio.trim() && (
+              <p className="text-xs mt-1" style={{ color: '#f59e0b' }}>
+                * Obligatorio para cambiar de estado
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex gap-2">
         {/* Botón Recibir - para estado nuevo con dependencia ya asignada */}
         {canRecibir && (
           <>
             <button
               onClick={handleRecibir}
-              disabled={saving}
+              disabled={saving || !descripcionInicio.trim()}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
               style={{
-                backgroundColor: '#16a34a',
-                color: '#ffffff',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
+                backgroundColor: descripcionInicio.trim() ? '#16a34a' : theme.border,
+                color: descripcionInicio.trim() ? '#ffffff' : theme.textSecondary,
+                boxShadow: descripcionInicio.trim() ? '0 4px 14px rgba(22, 163, 74, 0.4)' : 'none'
               }}
             >
               {saving ? 'Recibiendo...' : 'Recibir'}
@@ -3504,12 +3513,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <>
             <button
               onClick={handleAsignar}
-              disabled={saving || !dependenciaSeleccionada || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
+              disabled={saving || !dependenciaSeleccionada || !descripcionInicio.trim() || !!(disponibilidad && horaFin > disponibilidad.hora_fin_jornada.slice(0, 5))}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
               style={{
-                backgroundColor: theme.primary,
-                color: '#ffffff',
-                boxShadow: `0 4px 14px ${theme.primary}40`
+                backgroundColor: (dependenciaSeleccionada && descripcionInicio.trim()) ? theme.primary : theme.border,
+                color: (dependenciaSeleccionada && descripcionInicio.trim()) ? '#ffffff' : theme.textSecondary,
+                boxShadow: (dependenciaSeleccionada && descripcionInicio.trim()) ? `0 4px 14px ${theme.primary}40` : 'none'
               }}
             >
               {saving ? 'Asignando...' : selectedReclamo.dependencia_asignada ? 'Reasignar' : 'Asignar'}
@@ -3653,6 +3662,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             </div>
           </div>
         )}
+        </div>
       </div>
     );
   };
