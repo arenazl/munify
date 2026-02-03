@@ -11,7 +11,7 @@ import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
-import { ReclamoCard, estadoColors, estadoLabels } from '../components/ui/ReclamoCard';
+import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
@@ -189,6 +189,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // Action states for view
   const [dependenciaSeleccionada, setDependenciaSeleccionada] = useState<string>('');
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
+  const [descripcionInicio, setDescripcionInicio] = useState('');
   const [fechaProgramada, setFechaProgramada] = useState('');
   const [horaInicio, setHoraInicio] = useState('09:00');
   const [duracion, setDuracion] = useState('1');  // en horas (string para el select)
@@ -413,32 +414,59 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
 
-  // Polling inteligente: solo actualiza si hay cambios (sin mostrar loading)
+  // Polling inteligente: detecta cambios en CUALQUIER reclamo visible (sin mostrar loading)
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
-        // Construir params iguales a fetchReclamos pero solo pedimos 1 item para comparar
-        const params: Record<string, string | number> = { skip: 0, limit: 1 };
+        if (reclamos.length === 0) return;
+
+        // Pedir los mismos reclamos que tenemos en pantalla para comparar
+        const params: Record<string, string | number> = { skip: 0, limit: reclamos.length };
         if (filtroEstado) params.estado = filtroEstado;
         if (filtroCategoria) params.categoria_id = filtroCategoria;
         if (soloMiArea && user?.dependencia?.id) params.municipio_dependencia_id = user.dependencia.id;
         if (filtroDependencia) params.municipio_dependencia_id = filtroDependencia;
+        if (debouncedSearch?.trim()) params.search = debouncedSearch.trim();
 
         const res = await reclamosApi.getAll(params);
-        const latestFromServer = res.data[0];
+        const serverReclamos = res.data;
 
-        if (!latestFromServer || reclamos.length === 0) return;
+        if (serverReclamos.length === 0) return;
 
-        const currentFirst = reclamos[0];
-        const serverUpdated = new Date(latestFromServer.updated_at || latestFromServer.created_at).getTime();
-        const localUpdated = new Date(currentFirst.updated_at || currentFirst.created_at).getTime();
+        // Crear mapa de reclamos locales para comparación rápida
+        const localMap = new Map(reclamos.map(r => [r.id, r]));
 
-        // Hay cambios si: nuevo reclamo diferente O mismo reclamo pero actualizado
-        const hasNewReclamo = latestFromServer.id !== currentFirst.id;
-        const hasUpdate = latestFromServer.id === currentFirst.id && serverUpdated > localUpdated;
+        // Detectar cambios: nuevo reclamo, estado diferente, o updated_at más reciente
+        let hasChanges = false;
 
-        if (hasNewReclamo || hasUpdate) {
-          // Hacer fetch silencioso (sin loading spinner)
+        // Verificar si hay un nuevo reclamo que no teníamos
+        if (serverReclamos[0]?.id !== reclamos[0]?.id) {
+          hasChanges = true;
+        }
+
+        // Verificar cambios en reclamos existentes (estado o updated_at)
+        if (!hasChanges) {
+          for (const serverReclamo of serverReclamos) {
+            const localReclamo = localMap.get(serverReclamo.id);
+            if (localReclamo) {
+              // Comparar estado
+              if (serverReclamo.estado !== localReclamo.estado) {
+                hasChanges = true;
+                break;
+              }
+              // Comparar updated_at
+              const serverUpdated = new Date(serverReclamo.updated_at || serverReclamo.created_at).getTime();
+              const localUpdated = new Date(localReclamo.updated_at || localReclamo.created_at).getTime();
+              if (serverUpdated > localUpdated) {
+                hasChanges = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (hasChanges) {
+          // Hacer fetch completo silencioso (sin loading spinner)
           const fullParams: Record<string, string | number> = { skip: 0, limit: ITEMS_PER_PAGE };
           if (filtroEstado) fullParams.estado = filtroEstado;
           if (filtroCategoria) fullParams.categoria_id = filtroCategoria;
@@ -1103,6 +1131,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setSelectedReclamo(reclamo);
     setDependenciaSeleccionada(''); // TODO: Migrar a dependencia_asignada
     setComentarioAsignacion('');
+    setDescripcionInicio('');
     setResolucion('');
     setMotivoRechazo('');
     setDescripcionRechazo('');
@@ -1324,6 +1353,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleIniciar = async () => {
     if (!selectedReclamo) return;
 
+    // Validar que se haya ingresado descripción
+    if (!descripcionInicio.trim()) {
+      toast.error('Ingresá una descripción del trabajo a realizar');
+      return;
+    }
+
     // Actualización optimista: actualizar UI inmediatamente
     const reclamoActualizado = { ...selectedReclamo, estado: 'en_curso' as const };
     setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
@@ -1332,7 +1367,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
     setSaving(true);
     try {
-      await reclamosApi.iniciar(selectedReclamo.id);
+      await reclamosApi.iniciar(selectedReclamo.id, descripcionInicio.trim());
       // Refrescar en background para sincronizar datos completos
       fetchReclamos();
     } catch (error) {
@@ -2786,12 +2821,35 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {selectedReclamo.dependencia_asignada?.nombre && (
           <ABMInfoPanel
             title="Asignado a"
-            icon={<Building2 className="h-4 w-4" />}
+            icon={
+              <div
+                className="w-6 h-6 rounded flex items-center justify-center"
+                style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
+              >
+                <DynamicIcon
+                  name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
+                  className="h-3.5 w-3.5"
+                  style={{ color: '#ffffff' }}
+                />
+              </div>
+            }
             variant="info"
           >
             <ABMField
               label="Dependencia"
               value={selectedReclamo.dependencia_asignada.nombre}
+              icon={
+                <div
+                  className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: selectedReclamo.dependencia_asignada.color || theme.primary }}
+                >
+                  <DynamicIcon
+                    name={selectedReclamo.dependencia_asignada.icono || 'Building2'}
+                    className="h-3 w-3"
+                    style={{ color: '#ffffff' }}
+                  />
+                </div>
+              }
             />
             {/* Mostrar tiempo estimado si ya fue recibido */}
             {selectedReclamo.estado === 'recibido' && selectedReclamo.fecha_estimada_resolucion && (
@@ -3181,13 +3239,26 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
         {(selectedReclamo.estado === 'recibido' || selectedReclamo.estado === 'asignado') && (
           <ABMInfoPanel
-            title="Poner En Proceso"
-            icon={<Play className="h-4 w-4" />}
+            title="Descripción del trabajo"
+            icon={<FileText className="h-4 w-4" />}
             variant="warning"
           >
-            <p className="text-sm" style={{ color: theme.textSecondary }}>
-              Marcar que se ha comenzado a trabajar en este reclamo.
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm" style={{ color: theme.textSecondary }}>
+                Describí qué trabajo se va a realizar para resolver este reclamo.
+              </p>
+              <ABMTextarea
+                value={descripcionInicio}
+                onChange={(e) => setDescripcionInicio(e.target.value)}
+                placeholder="Ej: Se enviará cuadrilla para reparar el bache. Trabajo estimado de 2 horas."
+                rows={3}
+              />
+              {!descripcionInicio.trim() && (
+                <p className="text-xs" style={{ color: '#f59e0b' }}>
+                  * Campo obligatorio para poner en curso
+                </p>
+              )}
+            </div>
           </ABMInfoPanel>
         )}
 
@@ -3462,12 +3533,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <>
             <button
               onClick={handleIniciar}
-              disabled={saving}
+              disabled={saving || !descripcionInicio.trim()}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
               style={{
-                backgroundColor: theme.primary,
-                color: '#ffffff',
-                boxShadow: `0 4px 14px ${theme.primary}40`
+                backgroundColor: descripcionInicio.trim() ? theme.primary : theme.border,
+                color: descripcionInicio.trim() ? '#ffffff' : theme.textSecondary,
+                boxShadow: descripcionInicio.trim() ? `0 4px 14px ${theme.primary}40` : 'none'
               }}
             >
               {saving ? 'Procesando...' : 'En Curso'}

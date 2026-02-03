@@ -1198,6 +1198,7 @@ async def asignar_reclamo(
 @router.post("/{reclamo_id}/iniciar", response_model=ReclamoResponse)
 async def iniciar_reclamo(
     reclamo_id: int,
+    descripcion: str = Query(..., min_length=1, description="Descripción del inicio del trabajo"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -1224,7 +1225,7 @@ async def iniciar_reclamo(
         estado_anterior=estado_anterior,
         estado_nuevo=EstadoReclamo.EN_CURSO,
         accion="en_curso",
-        comentario="Trabajo en curso"
+        comentario=descripcion
     )
     db.add(historial)
 

@@ -4,13 +4,14 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown, ClipboardList, Building2
+  RefreshCw, Send, ChevronDown, ClipboardList
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, whatsappApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { DynamicIcon } from '../components/ui/ReclamoCard';
 import type { Reclamo, HistorialReclamo, EstadoReclamo } from '../types';
 
 interface WhatsAppLog {
@@ -551,10 +552,23 @@ export default function ReclamoDetalle() {
             {reclamo.dependencia_asignada?.nombre && (
               <div
                 className="p-4 rounded-xl"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${theme.border}`,
+                  borderLeft: `4px solid ${reclamo.dependencia_asignada.color || theme.primary}`
+                }}
               >
                 <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5" style={{ color: theme.primary }} />
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: reclamo.dependencia_asignada.color || theme.primary }}
+                  >
+                    <DynamicIcon
+                      name={reclamo.dependencia_asignada.icono || 'Building2'}
+                      className="h-5 w-5"
+                      style={{ color: '#ffffff' }}
+                    />
+                  </div>
                   <div>
                     <p className="text-sm font-medium" style={{ color: theme.textSecondary }}>Asignado a</p>
                     <p className="font-medium" style={{ color: theme.text }}>
