@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
-import { User, Mail, Lock, ArrowRight } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, MapPin } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 
 export default function Register() {
@@ -14,8 +14,23 @@ export default function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState({ nombre: false, email: false, password: false });
+  const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
   const { register } = useAuth();
   const navigate = useNavigate();
+
+  // Verificar que hay municipio seleccionado
+  useEffect(() => {
+    const municipioId = localStorage.getItem('municipio_id');
+    const nombre = localStorage.getItem('municipio_nombre');
+
+    if (!municipioId) {
+      // Redirigir a demo si no hay municipio
+      navigate('/demo', { replace: true });
+      return;
+    }
+
+    setMunicipioNombre(nombre);
+  }, [navigate]);
 
   // Validaciones
   const nombreValidation = validationSchemas.register.nombre(formData.nombre);
@@ -74,6 +89,20 @@ export default function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
       <div className="max-w-sm w-full">
+        {/* Municipio seleccionado */}
+        {municipioNombre && (
+          <div className="flex items-center justify-center gap-2 mb-6 px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+            <MapPin className="h-4 w-4 text-blue-400" />
+            <span className="text-sm text-blue-300">{municipioNombre}</span>
+            <button
+              onClick={() => navigate('/demo')}
+              className="ml-2 text-xs text-slate-400 hover:text-white underline"
+            >
+              Cambiar
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-600/20 mb-4">

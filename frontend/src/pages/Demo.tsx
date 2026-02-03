@@ -1,249 +1,226 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Shield, Users, Wrench, User, MapPinned, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
-import { API_URL } from '../lib/api';
+import { Loader2, MapPin, UserPlus, LogIn, Check, Building2 } from 'lucide-react';
+import { municipiosApi } from '../lib/api';
 import munifyLogo from '../assets/munify_logo.png';
+
+interface Municipio {
+  id: number;
+  nombre: string;
+  codigo: string;
+  color_primario?: string;
+  logo_url?: string;
+}
 
 export default function Demo() {
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [loadingRole, setLoadingRole] = useState<string | null>(null);
+  const [municipios, setMunicipios] = useState<Municipio[]>([]);
+  const [selectedMunicipio, setSelectedMunicipio] = useState<Municipio | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Configuración visual por rol - usando colores Munify
-  // Orden: Supervisor, Vecino, Empleado Técnico, Empleado Administrativo
-  const demoProfiles = [
-    {
-      id: 'supervisor',
-      name: 'Supervisor Demo',
-      role: 'supervisor',
-      email: 'supervisor@chacabuco.demo.com',
-      label: 'Supervisor',
-      description: 'Coordina equipos y monitorea métricas',
-      icon: Users,
-      gradient: 'from-[#0088cc] to-[#2aa198]',
-      features: ['Asignar trabajos', 'Ver reportes', 'Gestionar equipos']
-    },
-    {
-      id: 'vecino',
-      name: 'Vecino Demo',
-      role: 'vecino',
-      email: 'vecino@chacabuco.demo.com',
-      label: 'Vecino',
-      description: 'Crea reclamos, hace trámites y sigue el estado',
-      icon: User,
-      gradient: 'from-[#0088cc] to-[#56b4e9]',
-      features: ['Crear reclamos', 'Iniciar trámites', 'Ver estado en tiempo real']
-    },
-    {
-      id: 'admin',
-      name: 'Admin Demo',
-      role: 'admin',
-      email: 'admin@chacabuco.demo.com',
-      label: 'Administrador',
-      description: 'Gestiona configuración y usuarios',
-      icon: Shield,
-      gradient: 'from-[#006699] to-[#0088cc]',
-      features: ['Gestión completa', 'Configuración', 'Reportes avanzados']
-    }
-  ];
+  // Cargar municipios al montar
+  useEffect(() => {
+    const fetchMunicipios = async () => {
+      try {
+        const response = await municipiosApi.getAll();
+        setMunicipios(response.data);
+      } catch (err) {
+        console.error('Error cargando municipios:', err);
+        setError('No se pudieron cargar los municipios');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMunicipios();
+  }, []);
 
-  // Login con perfil demo
-  const loginWithProfile = async (email: string, role: string) => {
-    setLoading(true);
-    setLoadingRole(email);
-    setError('');
-
-    try {
-      console.log('[Demo] Iniciando login con email:', email);
-
-      // Setear información del municipio ANTES del login
-      localStorage.setItem('municipio_codigo', 'chacabuco');
-      localStorage.setItem('municipio_id', '7');
-      localStorage.setItem('municipio_actual_id', '7');
-      localStorage.setItem('municipio_nombre', 'Chacabuco');
-      localStorage.setItem('municipio_color', '#0088cc');
-
-      // Hacer login directamente con el email específico
-      console.log('[Demo] Ejecutando login...');
-      await login(email, 'demo123');
-
-      // Obtener usuario y navegar
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      console.log('[Demo] Usuario autenticado:', user);
-
-      const defaultRoute = getDefaultRoute(user.rol, !!user.dependencia);
-      console.log('[Demo] Navegando a:', defaultRoute);
-
-      navigate(defaultRoute, { replace: true });
-    } catch (err: unknown) {
-      console.error('[Demo] Error en login:', err);
-      const error = err as { response?: { data?: { detail?: string } }, message?: string };
-      setError(error.response?.data?.detail || error.message || 'Error al iniciar sesión');
-    } finally {
-      setLoading(false);
-      setLoadingRole(null);
-    }
+  // Guardar municipio seleccionado en localStorage
+  const saveMunicipioToStorage = (municipio: Municipio) => {
+    localStorage.setItem('municipio_id', String(municipio.id));
+    localStorage.setItem('municipio_actual_id', String(municipio.id));
+    localStorage.setItem('municipio_codigo', municipio.codigo);
+    localStorage.setItem('municipio_nombre', municipio.nombre);
+    localStorage.setItem('municipio_color', municipio.color_primario || '#0088cc');
   };
 
-  const continueAsGuest = () => {
-    localStorage.setItem('municipio_codigo', 'chacabuco');
-    localStorage.setItem('municipio_id', '1');
-    localStorage.setItem('municipio_nombre', 'Chacabuco');
-    localStorage.setItem('municipio_color', '#0088cc');
+  const handleSelectMunicipio = (municipio: Municipio) => {
+    setSelectedMunicipio(municipio);
+    saveMunicipioToStorage(municipio);
+  };
+
+  const handleEntrarAnonimo = () => {
+    if (!selectedMunicipio) return;
     navigate('/home');
   };
 
+  const handleCrearCuenta = () => {
+    if (!selectedMunicipio) return;
+    navigate('/register');
+  };
+
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-      {/* Header - Glassmorphism como la landing */}
-      <header className="fixed top-0 left-0 right-0 z-50" style={{
-        backdropFilter: 'blur(20px) saturate(180%)',
-        background: 'rgba(255, 255, 255, 0.7)',
-        borderBottom: '1px solid rgba(226, 232, 240, 0.5)',
-      }}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col">
+      {/* Header minimalista */}
+      <header className="flex-shrink-0 px-6 py-5">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={munifyLogo} alt="Munify" className="h-10 w-auto" />
-            <span className="text-2xl font-bold text-slate-800">Munify</span>
+            <img src={munifyLogo} alt="Munify" className="h-9 w-auto" />
+            <span className="text-xl font-bold text-slate-800">Munify</span>
           </div>
-          <div className="flex items-center gap-3">
-            <a
-              href="https://munify.com.ar"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden md:block text-slate-600 hover:text-slate-900 font-medium transition-colors"
-            >
-              Ver Landing
-            </a>
-            <button
-              onClick={() => navigate('/login')}
-              className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg"
-              style={{ background: 'linear-gradient(135deg, #0088cc 0%, #2aa198 100%)' }}
-            >
-              Iniciar Sesión
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/login')}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 font-medium text-sm transition-colors"
+          >
+            <LogIn className="h-4 w-4" />
+            Ya tengo cuenta
+          </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="pt-24 pb-16 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          {/* Hero */}
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <img src={munifyLogo} alt="Munify" className="h-20 w-auto" />
-              <h1 className="text-5xl md:text-6xl font-bold text-slate-800">Munify</h1>
-            </div>
-            <p className="text-xl md:text-2xl text-slate-500 max-w-2xl mx-auto">
-              Conectando al gobierno con las necesidades del vecino
+      {/* Main content */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+        <div className="w-full max-w-2xl">
+          {/* Título */}
+          <div className="text-center mb-10">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">
+              Elegir municipio
+            </h1>
+            <p className="text-slate-500 text-lg">
+              Seleccioná tu municipio para continuar
             </p>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="max-w-md mx-auto mb-8 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm text-center">
               {error}
             </div>
           )}
 
-          {/* Botones principales */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <button
-              onClick={continueAsGuest}
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-200 rounded-xl text-slate-700 font-semibold hover:border-[#0088cc] hover:text-[#0088cc] transition-all disabled:opacity-50"
-            >
-              <MapPinned className="h-5 w-5" />
-              Entrar como Invitado
-            </button>
-            <button
-              onClick={() => navigate('/register')}
-              disabled={loading}
-              className="flex items-center gap-2 px-6 py-3 bg-slate-100 rounded-xl text-slate-600 font-semibold hover:bg-slate-200 transition-all disabled:opacity-50"
-            >
-              Crear Cuenta
-            </button>
-          </div>
+          {/* Loading */}
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
+            </div>
+          ) : (
+            <>
+              {/* Grid de municipios */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+                {municipios.map((municipio) => {
+                  const isSelected = selectedMunicipio?.id === municipio.id;
+                  const primaryColor = municipio.color_primario || '#0088cc';
 
-          {/* Divider */}
-          <div className="relative flex items-center gap-4 mb-10">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-slate-400 text-sm font-medium px-4">PERFILES DE DEMOSTRACIÓN</span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
+                  return (
+                    <button
+                      key={municipio.id}
+                      onClick={() => handleSelectMunicipio(municipio)}
+                      className={`
+                        relative group p-5 rounded-2xl border-2 text-left transition-all duration-200
+                        ${isSelected
+                          ? 'border-transparent shadow-lg scale-[1.02]'
+                          : 'border-slate-200 hover:border-slate-300 hover:shadow-md bg-white'
+                        }
+                      `}
+                      style={isSelected ? {
+                        background: `linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}08 100%)`,
+                        borderColor: primaryColor,
+                      } : undefined}
+                    >
+                      {/* Check indicator */}
+                      {isSelected && (
+                        <div
+                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
+                          style={{ backgroundColor: primaryColor }}
+                        >
+                          <Check className="h-3.5 w-3.5 text-white" />
+                        </div>
+                      )}
 
-          {/* Profile Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {demoProfiles.map((profile) => {
-              const Icon = profile.icon;
-              const isLoading = loadingRole === profile.email;
+                      {/* Content */}
+                      <div className="flex items-center gap-4">
+                        {/* Logo o icono */}
+                        <div
+                          className={`
+                            w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
+                            ${isSelected ? 'bg-white/80' : 'bg-slate-100'}
+                          `}
+                        >
+                          {municipio.logo_url ? (
+                            <img
+                              src={municipio.logo_url}
+                              alt={municipio.nombre}
+                              className="w-8 h-8 object-contain"
+                            />
+                          ) : (
+                            <Building2
+                              className="h-6 w-6"
+                              style={{ color: isSelected ? primaryColor : '#64748b' }}
+                            />
+                          )}
+                        </div>
 
-              return (
-                <button
-                  key={profile.id}
-                  onClick={() => loginWithProfile(profile.email, profile.role)}
-                  disabled={loading}
-                  className="group relative bg-white border border-slate-200 rounded-2xl p-5 text-left transition-all hover:shadow-xl hover:shadow-slate-200/60 hover:border-[#0088cc]/30 hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:hover:translate-y-0"
-                >
-                  <div className="relative">
-                    {/* Icon & Badge */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${profile.gradient} flex items-center justify-center shadow-lg`}>
-                        {isLoading ? (
-                          <Loader2 className="h-6 w-6 text-white animate-spin" />
-                        ) : (
-                          <Icon className="h-6 w-6 text-white" />
-                        )}
+                        {/* Texto */}
+                        <div className="min-w-0">
+                          <h3 className={`font-semibold truncate ${isSelected ? 'text-slate-800' : 'text-slate-700'}`}>
+                            {municipio.nombre}
+                          </h3>
+                          <p className="text-sm text-slate-500 truncate">
+                            {municipio.codigo}
+                          </p>
+                        </div>
                       </div>
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
-                        {profile.label}
-                      </span>
-                    </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-                    {/* Name & Description */}
-                    <h3 className="text-lg font-bold text-slate-800 mb-1">{profile.name}</h3>
-                    <p className="text-sm text-slate-500 mb-4">{profile.description}</p>
-
-                    {/* Features */}
-                    <ul className="space-y-1.5">
-                      {profile.features.map((feature, idx) => (
-                        <li key={idx} className="flex items-center gap-2 text-xs text-slate-500">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-[#2aa198]" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-
-                    {/* Hover arrow */}
-                    <div className={`absolute -bottom-1 -right-1 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br ${profile.gradient} opacity-0 group-hover:opacity-100 transition-all shadow-lg`}>
-                      <ArrowRight className="h-4 w-4 text-white" />
-                    </div>
-                  </div>
+              {/* Botones de acción */}
+              <div className={`
+                flex flex-col sm:flex-row items-center justify-center gap-4
+                transition-all duration-300
+                ${selectedMunicipio ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-2 pointer-events-none'}
+              `}>
+                <button
+                  onClick={handleEntrarAnonimo}
+                  disabled={!selectedMunicipio}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold text-lg hover:border-slate-300 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <MapPin className="h-5 w-5" />
+                  Entrar anónimo
                 </button>
-              );
-            })}
-          </div>
 
-          {/* Info */}
-          <p className="text-center text-slate-400 text-sm mt-10">
-            Los perfiles de demo tienen datos precargados para explorar todas las funcionalidades
-          </p>
+                <button
+                  onClick={handleCrearCuenta}
+                  disabled={!selectedMunicipio}
+                  className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 text-white font-semibold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: selectedMunicipio
+                      ? `linear-gradient(135deg, ${selectedMunicipio.color_primario || '#0088cc'} 0%, ${selectedMunicipio.color_primario || '#0088cc'}dd 100%)`
+                      : 'linear-gradient(135deg, #0088cc 0%, #0088ccdd 100%)'
+                  }}
+                >
+                  <UserPlus className="h-5 w-5" />
+                  Crear cuenta
+                </button>
+              </div>
+
+              {/* Texto de ayuda */}
+              {selectedMunicipio && (
+                <p className="text-center text-slate-400 text-sm mt-8 animate-in fade-in duration-300">
+                  Vas a ingresar a <span className="font-medium text-slate-600">{selectedMunicipio.nombre}</span>
+                </p>
+              )}
+            </>
+          )}
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 py-6 px-4">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
-          <span>Munify - Sistema de Gestión Municipal Inteligente</span>
-          <a href="https://munify.com.ar" target="_blank" rel="noopener noreferrer" className="hover:text-[#0088cc] transition-colors">
-            Más información
-          </a>
-        </div>
+      <footer className="flex-shrink-0 py-6 px-6">
+        <p className="text-center text-slate-400 text-sm">
+          Munify - Conectando al gobierno con las necesidades del vecino
+        </p>
       </footer>
     </div>
   );
