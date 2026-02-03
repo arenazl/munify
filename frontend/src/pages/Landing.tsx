@@ -451,8 +451,8 @@ export default function Landing() {
                         Crear Cuenta
                       </button>
 
-                      {/* Accesos Rápidos - Usuarios Demo */}
-                      {demoUsers.length > 0 && (
+                      {/* Accesos Rápidos - Solo Admin (sin vecinos ni supervisores) */}
+                      {demoUsers.filter(u => u.rol === 'admin').length > 0 && (
                         <>
                           <div className="relative flex items-center gap-3 my-4">
                             <div className="flex-1 h-px bg-white/10" />
@@ -461,7 +461,7 @@ export default function Landing() {
                           </div>
 
                           <div className="grid grid-cols-2 gap-3 mb-4">
-                            {demoUsers.map((user, index) => {
+                            {demoUsers.filter(u => u.rol === 'admin').map((user, index) => {
                               const config = rolConfig[user.rol] || rolConfig.vecino;
                               const Icon = config.icon;
                               return (
@@ -491,24 +491,6 @@ export default function Landing() {
                           </div>
                         </>
                       )}
-
-                      {/* Botón fijo para Supervisor arenazl */}
-                      <div className="mb-4">
-                        <button
-                          onClick={() => quickLogin('arenazl@gmail.com', 'supervisor123')}
-                          disabled={debugLoading}
-                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl hover:from-orange-600 hover:to-amber-700 transition-all shadow-lg shadow-orange-500/25 disabled:opacity-50"
-                        >
-                          {debugLoading ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <>
-                              <Users className="h-5 w-5" />
-                              Supervisor Principal
-                            </>
-                          )}
-                        </button>
-                      </div>
 
                       {/* Sección de dependencias con reclamos */}
                       {dependenciaUsers.length > 0 && (
