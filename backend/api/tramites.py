@@ -40,6 +40,100 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+# ==================== HELPERS PARA NOTIFICACIONES DE TRÁMITES ====================
+
+async def enviar_notificacion_solicitud(
+    db: AsyncSession,
+    solicitud: Solicitud,
+    tramite_nombre: str = None
+):
+    """
+    Envía notificación push al vecino que creó la solicitud.
+    """
+    try:
+        from services.push_service import notificar_solicitud_recibida
+        count = await notificar_solicitud_recibida(db, solicitud, tramite_nombre)
+        print(f"[PUSH] Notificación de solicitud enviada al vecino: {count}", flush=True)
+    except Exception as e:
+        print(f"[PUSH] Error enviando notificación de solicitud: {e}", flush=True)
+
+
+async def enviar_notificacion_supervisores_solicitud(
+    db: AsyncSession,
+    solicitud: Solicitud,
+    tramite_nombre: str = None
+):
+    """
+    Envía notificación a los supervisores del municipio.
+    """
+    try:
+        from services.push_service import notificar_dependencia_solicitud_nueva
+        count = await notificar_dependencia_solicitud_nueva(db, solicitud, tramite_nombre)
+        print(f"[PUSH] Notificación de solicitud enviada a supervisores: {count}", flush=True)
+    except Exception as e:
+        print(f"[PUSH] Error notificando supervisores: {e}", flush=True)
+
+
+async def enviar_email_solicitud_creada(
+    db: AsyncSession,
+    solicitud: Solicitud,
+    usuario: User,
+    tramite_nombre: str = None
+):
+    """
+    Envía email al vecino confirmando la creación de la solicitud.
+    """
+    try:
+        from services.email_service import email_service, EmailTemplates
+
+        # Solo enviar si el usuario tiene email
+        email_destino = usuario.email if usuario else solicitud.email_solicitante
+        if not email_destino:
+            print(f"[EMAIL] Usuario sin email, no se envía", flush=True)
+            return
+
+        # Generar HTML del email
+        html_content = EmailTemplates.solicitud_creada(
+            numero_tramite=solicitud.numero_tramite,
+            tramite_nombre=tramite_nombre or "Trámite",
+            asunto=solicitud.asunto or "Sin asunto",
+            descripcion=solicitud.descripcion
+        )
+
+        # Enviar email
+        success = await email_service.send_email(
+            to_email=email_destino,
+            subject=f"Trámite #{solicitud.numero_tramite} generado exitosamente",
+            body_html=html_content,
+            body_text=f"Su trámite #{solicitud.numero_tramite} fue generado exitosamente. Le notificaremos cuando haya actualizaciones."
+        )
+
+        if success:
+            print(f"[EMAIL] Email enviado a {email_destino}", flush=True)
+        else:
+            print(f"[EMAIL] No se pudo enviar email (SMTP no configurado)", flush=True)
+
+    except Exception as e:
+        print(f"[EMAIL] Error enviando email: {e}", flush=True)
+
+
+async def enviar_notificacion_cambio_estado_solicitud(
+    db: AsyncSession,
+    solicitud: Solicitud,
+    estado_anterior: str,
+    estado_nuevo: str
+):
+    """
+    Envía notificación al vecino cuando cambia el estado de su solicitud.
+    """
+    try:
+        from services.push_service import notificar_cambio_estado_solicitud
+        count = await notificar_cambio_estado_solicitud(db, solicitud, estado_anterior, estado_nuevo)
+        print(f"[PUSH] Notificación de cambio de estado enviada: {count}", flush=True)
+    except Exception as e:
+        print(f"[PUSH] Error enviando notificación de cambio de estado: {e}", flush=True)
+
+
 # ==================== TIPOS DE TRAMITE (Categorías) ====================
 
 @router.get("/tipos", response_model=List[TipoTramiteResponse])
@@ -882,7 +976,7 @@ async def crear_solicitud(
     solicitud = Solicitud(
         municipio_id=municipio_id,
         numero_tramite=numero_tramite,
-        estado=EstadoSolicitud.INICIADO,
+        estado=EstadoSolicitud.RECIBIDO,
         **solicitud_dict
     )
 
@@ -910,7 +1004,7 @@ async def crear_solicitud(
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
         usuario_id=current_user.id if current_user else None,
-        estado_nuevo=EstadoSolicitud.INICIADO,
+        estado_nuevo=EstadoSolicitud.RECIBIDO,
         accion="Solicitud creada",
         comentario=f"Trámite: {tramite.nombre}"
     )
@@ -919,41 +1013,21 @@ async def crear_solicitud(
 
     await db.refresh(solicitud, ["tramite"])
 
-    # Notificaciones
-    try:
-        if current_user:
-            variables = {
-                "numero_tramite": solicitud.numero_tramite,
-                "tramite": tramite.nombre,
-                "asunto": solicitud.asunto or "Sin asunto",
-                "nombre": solicitud.nombre_solicitante or "Vecino",
-            }
-            plantilla = get_plantilla("tramite_creado")
-            if plantilla:
-                push_config = plantilla.get("push", {})
-                titulo = formatear_mensaje(push_config.get("titulo", "Solicitud Registrada"), variables)
-                cuerpo = formatear_mensaje(push_config.get("cuerpo", ""), variables)
+    # Notificaciones en background (igual que reclamos)
+    import asyncio
 
-                notif = Notificacion(
-                    usuario_id=current_user.id,
-                    titulo=titulo,
-                    mensaje=cuerpo,
-                    tipo="tramite"
-                )
-                db.add(notif)
-                await db.commit()
+    # 1. Notificar al vecino (push + in-app)
+    if current_user:
+        asyncio.create_task(enviar_notificacion_solicitud(db, solicitud, tramite.nombre))
 
-        # Notificar supervisores
-        await NotificacionService.notificar_supervisores(
-            db=db,
-            municipio_id=municipio_id,
-            titulo=f"Nueva Solicitud: {solicitud.numero_tramite}",
-            mensaje=f"Nueva solicitud de {tramite.nombre}: {solicitud.asunto or 'Sin asunto'}",
-            tipo="tramite",
-            enviar_whatsapp=False
-        )
-    except Exception as e:
-        logger.error(f"Error enviando notificaciones: {e}")
+    # 2. Notificar a los supervisores del municipio (push + in-app + email)
+    asyncio.create_task(enviar_notificacion_supervisores_solicitud(db, solicitud, tramite.nombre))
+
+    # 3. Enviar email al vecino
+    if current_user:
+        asyncio.create_task(enviar_email_solicitud_creada(
+            db, solicitud, current_user, tramite.nombre
+        ))
 
     return solicitud
 
@@ -984,7 +1058,9 @@ async def actualizar_solicitud(
     # Si cambió el estado
     cambio_estado = solicitud_data.estado and solicitud_data.estado != estado_anterior
     if cambio_estado:
-        if solicitud_data.estado in [EstadoSolicitud.APROBADO, EstadoSolicitud.RECHAZADO, EstadoSolicitud.FINALIZADO]:
+        # Estados finales que registran fecha de resolución
+        estados_finales = [EstadoSolicitud.FINALIZADO, EstadoSolicitud.RECHAZADO]
+        if solicitud_data.estado in estados_finales:
             solicitud.fecha_resolucion = datetime.utcnow()
 
         historial = HistorialSolicitud(
@@ -1000,39 +1076,15 @@ async def actualizar_solicitud(
     await db.commit()
     await db.refresh(solicitud)
 
-    # Notificaciones por cambio de estado
-    if cambio_estado and solicitud.solicitante_id:
-        try:
-            variables = {
-                "numero_tramite": solicitud.numero_tramite,
-                "tramite": solicitud.tramite.nombre if solicitud.tramite else "Trámite",
-                "estado_nuevo": solicitud_data.estado.value.replace("_", " ").title(),
-                "nombre": solicitud.nombre_solicitante or "Vecino",
-            }
-
-            if solicitud_data.estado == EstadoSolicitud.APROBADO:
-                tipo_notif = "tramite_aprobado"
-            elif solicitud_data.estado == EstadoSolicitud.RECHAZADO:
-                tipo_notif = "tramite_rechazado"
-            else:
-                tipo_notif = "tramite_cambio_estado"
-
-            plantilla = get_plantilla(tipo_notif)
-            if plantilla:
-                push_config = plantilla.get("push", {})
-                titulo = formatear_mensaje(push_config.get("titulo", "Estado Actualizado"), variables)
-                cuerpo = formatear_mensaje(push_config.get("cuerpo", ""), variables)
-
-                notif = Notificacion(
-                    usuario_id=solicitud.solicitante_id,
-                    titulo=titulo,
-                    mensaje=cuerpo,
-                    tipo="tramite"
-                )
-                db.add(notif)
-                await db.commit()
-        except Exception as e:
-            logger.error(f"Error notificación cambio estado: {e}")
+    # Notificaciones por cambio de estado (igual que reclamos)
+    if cambio_estado:
+        import asyncio
+        asyncio.create_task(enviar_notificacion_cambio_estado_solicitud(
+            db,
+            solicitud,
+            estado_anterior.value if hasattr(estado_anterior, 'value') else str(estado_anterior),
+            solicitud_data.estado.value
+        ))
 
     return solicitud
 
@@ -1119,7 +1171,7 @@ async def asignar_solicitud(
 
     solicitud.empleado_id = asignacion.empleado_id
 
-    if solicitud.estado == EstadoSolicitud.INICIADO:
+    if solicitud.estado == EstadoSolicitud.RECIBIDO:
         solicitud.estado = EstadoSolicitud.EN_REVISION
 
     accion = "Empleado asignado" if not empleado_anterior_id else "Empleado reasignado"

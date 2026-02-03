@@ -1358,13 +1358,11 @@ async def get_estadisticas_tramites(db: AsyncSession, municipio_id: int) -> dict
     """Obtiene estadísticas de trámites/solicitudes del municipio"""
     query = select(
         sql_func.count(Solicitud.id).label('total'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.INICIADO, 1), else_=0)).label('iniciados'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_REVISION, 1), else_=0)).label('en_revision'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.REQUIERE_DOCUMENTACION, 1), else_=0)).label('requiere_doc'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.RECIBIDO, 1), else_=0)).label('recibidos'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_CURSO, 1), else_=0)).label('en_curso'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.APROBADO, 1), else_=0)).label('aprobados'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.RECHAZADO, 1), else_=0)).label('rechazados'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.FINALIZADO, 1), else_=0)).label('finalizados'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.POSPUESTO, 1), else_=0)).label('pospuestos'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.RECHAZADO, 1), else_=0)).label('rechazados'),
     ).where(Solicitud.municipio_id == municipio_id)
 
     result = await db.execute(query)
@@ -1372,13 +1370,11 @@ async def get_estadisticas_tramites(db: AsyncSession, municipio_id: int) -> dict
 
     return {
         'total': row.total or 0,
-        'iniciados': row.iniciados or 0,
-        'en_revision': row.en_revision or 0,
-        'requiere_documentacion': row.requiere_doc or 0,
+        'recibidos': row.recibidos or 0,
         'en_curso': row.en_curso or 0,
-        'aprobados': row.aprobados or 0,
-        'rechazados': row.rechazados or 0,
         'finalizados': row.finalizados or 0,
+        'pospuestos': row.pospuestos or 0,
+        'rechazados': row.rechazados or 0,
     }
 
 
@@ -3123,10 +3119,9 @@ async def get_kpis(
     # ===== TRÁMITES =====
     tramites_query = select(
         sql_func.count(Solicitud.id).label('total'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.INICIADO, 1), else_=0)).label('iniciados'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_REVISION, 1), else_=0)).label('en_revision'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.RECIBIDO, 1), else_=0)).label('recibidos'),
         sql_func.sum(case((Solicitud.estado == EstadoSolicitud.EN_CURSO, 1), else_=0)).label('en_curso'),
-        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.APROBADO, 1), else_=0)).label('aprobados'),
+        sql_func.sum(case((Solicitud.estado == EstadoSolicitud.FINALIZADO, 1), else_=0)).label('finalizados'),
         sql_func.sum(case((sql_func.date(Solicitud.created_at) >= inicio_semana, 1), else_=0)).label('esta_semana'),
     ).where(Solicitud.municipio_id == municipio_id)
 

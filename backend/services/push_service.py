@@ -20,7 +20,8 @@ async def crear_notificacion_db(
     titulo: str,
     mensaje: str,
     tipo: str = "info",
-    reclamo_id: Optional[int] = None
+    reclamo_id: Optional[int] = None,
+    solicitud_id: Optional[int] = None
 ) -> Optional[Notificacion]:
     """
     Crea una notificación en la base de datos para mostrar en la campanita.
@@ -32,6 +33,7 @@ async def crear_notificacion_db(
         mensaje: Mensaje/cuerpo de la notificación
         tipo: Tipo de notificación ("info", "success", "warning", "error")
         reclamo_id: ID del reclamo relacionado (opcional)
+        solicitud_id: ID de la solicitud/trámite relacionado (opcional)
 
     Returns:
         Notificacion creada o None si hubo error
@@ -43,6 +45,7 @@ async def crear_notificacion_db(
             mensaje=mensaje,
             tipo=tipo,
             reclamo_id=reclamo_id,
+            solicitud_id=solicitud_id,
             leida=False
         )
         db.add(notificacion)
@@ -628,4 +631,220 @@ async def notificar_sla_vencido(db: AsyncSession, supervisor_user_ids: List[int]
         body=f"El reclamo #{reclamo.id} ha superado el tiempo de SLA.",
         url=f"/reclamos/{reclamo.id}",
         data={"tipo": "sla_vencido", "reclamo_id": reclamo.id}
+    )
+
+
+# ============================================
+# Funciones específicas para eventos de TRÁMITES/SOLICITUDES
+# ============================================
+
+async def notificar_solicitud_recibida(db: AsyncSession, solicitud, tramite_nombre: str = None) -> int:
+    """Notifica al vecino que su solicitud fue recibida.
+    Crea notificación en BD + push al navegador."""
+    if not solicitud.solicitante_id:
+        logger.info(f"Solicitud #{solicitud.id} no tiene solicitante_id, no se envía notificación")
+        return 0
+
+    if not await check_user_notification_preference(db, solicitud.solicitante_id, "tramite_creado"):
+        logger.info(f"Usuario {solicitud.solicitante_id} tiene deshabilitada la notificación tramite_creado")
+        return 0
+
+    tramite_info = f" ({tramite_nombre})" if tramite_nombre else ""
+    titulo = f"Trámite #{solicitud.numero_tramite} Generado"
+    mensaje = f"Su trámite{tramite_info} fue generado exitosamente y será procesado a la brevedad."
+
+    # Crear notificación en BD
+    await crear_notificacion_db(
+        db=db,
+        usuario_id=solicitud.solicitante_id,
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo="success",
+        solicitud_id=solicitud.id
+    )
+
+    return await send_push_to_user(
+        db=db,
+        user_id=solicitud.solicitante_id,
+        title=titulo,
+        body=mensaje,
+        url=f"/tramites/{solicitud.id}",
+        data={"tipo": "tramite_creado", "solicitud_id": solicitud.id}
+    )
+
+
+async def notificar_dependencia_solicitud_nueva(
+    db: AsyncSession,
+    solicitud,
+    tramite_nombre: str = None
+) -> int:
+    """
+    Notifica a todos los supervisores del municipio cuando llega una nueva solicitud.
+    Crea notificación en BD para la campanita + envía push al navegador + envía email.
+    """
+    from models.enums import RolUsuario
+
+    if not solicitud.municipio_id:
+        logger.info(f"Solicitud #{solicitud.id} no tiene municipio_id, no se envía notificación")
+        return 0
+
+    # Buscar todos los supervisores del municipio
+    result = await db.execute(
+        select(User).where(
+            User.municipio_id == solicitud.municipio_id,
+            User.rol == RolUsuario.SUPERVISOR,
+            User.activo == True
+        )
+    )
+    supervisores = result.scalars().all()
+
+    if not supervisores:
+        logger.info(f"No hay supervisores en el municipio {solicitud.municipio_id}")
+        return 0
+
+    # Preparar mensaje
+    titulo = "Nuevo Trámite Recibido"
+    tramite_info = f" - {tramite_nombre}" if tramite_nombre else ""
+    mensaje = f"Trámite #{solicitud.numero_tramite}{tramite_info}: {solicitud.asunto or 'Sin asunto'}"
+
+    total_enviados = 0
+    for usuario in supervisores:
+        if await check_user_notification_preference(db, usuario.id, "tramite_nuevo_supervisor"):
+            # Crear notificación en BD para la campanita
+            await crear_notificacion_db(
+                db=db,
+                usuario_id=usuario.id,
+                titulo=titulo,
+                mensaje=mensaje,
+                tipo="info",
+                solicitud_id=solicitud.id
+            )
+
+            # Enviar email al supervisor
+            if usuario.email:
+                try:
+                    from services.email_service import email_service, EmailTemplates
+
+                    # Obtener nombre del solicitante
+                    solicitante_nombre = None
+                    if solicitud.nombre_solicitante:
+                        solicitante_nombre = f"{solicitud.nombre_solicitante} {solicitud.apellido_solicitante or ''}".strip()
+                    elif solicitud.solicitante_id:
+                        sol_result = await db.execute(select(User).where(User.id == solicitud.solicitante_id))
+                        solicitante = sol_result.scalar_one_or_none()
+                        if solicitante:
+                            solicitante_nombre = f"{solicitante.nombre} {solicitante.apellido}".strip() or solicitante.email
+
+                    html_content = EmailTemplates.solicitud_creada(
+                        numero_tramite=solicitud.numero_tramite,
+                        tramite_nombre=tramite_nombre or "Trámite",
+                        asunto=solicitud.asunto or "Sin asunto",
+                        descripcion=solicitud.descripcion,
+                        solicitante_nombre=solicitante_nombre
+                    )
+                    await email_service.send_email(
+                        to_email=usuario.email,
+                        subject=f"Nuevo trámite #{solicitud.numero_tramite} recibido",
+                        body_html=html_content
+                    )
+                    logger.info(f"Email de trámite nuevo enviado a supervisor {usuario.email}")
+                except Exception as e:
+                    logger.error(f"Error enviando email a supervisor: {e}")
+
+            # Enviar push al navegador
+            enviados = await send_push_to_user(
+                db=db,
+                user_id=usuario.id,
+                title=f"📄 {titulo}",
+                body=mensaje,
+                url=f"/gestion/tramites/{solicitud.id}",
+                data={"tipo": "tramite_nuevo_supervisor", "solicitud_id": solicitud.id}
+            )
+            total_enviados += enviados
+
+    logger.info(f"Notificación de trámite nuevo enviada a {len(supervisores)} supervisores ({total_enviados} push)")
+    return total_enviados
+
+
+async def notificar_cambio_estado_solicitud(
+    db: AsyncSession,
+    solicitud,
+    estado_anterior: str,
+    estado_nuevo: str
+) -> int:
+    """Notifica al vecino el cambio de estado de su solicitud.
+    Crea notificación en BD + push al navegador."""
+    if not solicitud.solicitante_id:
+        logger.info(f"Solicitud #{solicitud.id} no tiene solicitante_id, no se envía notificación")
+        return 0
+
+    if not await check_user_notification_preference(db, solicitud.solicitante_id, "tramite_cambio_estado"):
+        logger.info(f"Usuario {solicitud.solicitante_id} tiene deshabilitada la notificación tramite_cambio_estado")
+        return 0
+
+    # Determinar título según el estado
+    estado_labels = {
+        "recibido": "Recibido",
+        "en_curso": "En Proceso",
+        "finalizado": "Finalizado",
+        "pospuesto": "Pospuesto",
+        "rechazado": "Rechazado"
+    }
+    estado_label = estado_labels.get(estado_nuevo, estado_nuevo.replace("_", " ").title())
+
+    if estado_nuevo == "finalizado":
+        titulo = "Trámite Finalizado"
+        mensaje = f"Su trámite #{solicitud.numero_tramite} ha sido completado exitosamente."
+        tipo = "success"
+    elif estado_nuevo == "rechazado":
+        titulo = "Trámite Rechazado"
+        mensaje = f"Su trámite #{solicitud.numero_tramite} ha sido rechazado."
+        tipo = "error"
+    elif estado_nuevo == "en_curso":
+        titulo = "Trámite en Proceso"
+        mensaje = f"Su trámite #{solicitud.numero_tramite} está siendo procesado."
+        tipo = "info"
+    else:
+        titulo = "Estado Actualizado"
+        mensaje = f"Su trámite #{solicitud.numero_tramite} cambió a {estado_label}."
+        tipo = "info"
+
+    # Crear notificación en BD
+    await crear_notificacion_db(
+        db=db,
+        usuario_id=solicitud.solicitante_id,
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo=tipo,
+        solicitud_id=solicitud.id
+    )
+
+    # Enviar email si es un estado importante
+    if estado_nuevo in ["finalizado", "rechazado"]:
+        result = await db.execute(select(User).where(User.id == solicitud.solicitante_id))
+        vecino = result.scalar_one_or_none()
+        if vecino and vecino.email:
+            try:
+                from services.email_service import email_service, EmailTemplates
+                html_content = EmailTemplates.solicitud_cambio_estado(
+                    numero_tramite=solicitud.numero_tramite,
+                    estado_nuevo=estado_label,
+                    mensaje=mensaje
+                )
+                await email_service.send_email(
+                    to_email=vecino.email,
+                    subject=f"Trámite #{solicitud.numero_tramite} - {titulo}",
+                    body_html=html_content
+                )
+                logger.info(f"Email de cambio de estado enviado a {vecino.email}")
+            except Exception as e:
+                logger.error(f"Error enviando email de cambio de estado: {e}")
+
+    return await send_push_to_user(
+        db=db,
+        user_id=solicitud.solicitante_id,
+        title=titulo,
+        body=mensaje,
+        url=f"/tramites/{solicitud.id}",
+        data={"tipo": "tramite_cambio_estado", "solicitud_id": solicitud.id}
     )

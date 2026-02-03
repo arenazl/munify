@@ -15,6 +15,7 @@ interface Notificacion {
   leida: boolean;
   created_at: string;
   reclamo_id?: number;
+  solicitud_id?: number;
 }
 
 interface NotificacionesDropdownProps {
@@ -108,12 +109,18 @@ export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarH
     // Cerrar dropdown
     setIsOpen(false);
 
+    // URL varía según el rol del usuario
+    const isGestion = user?.rol === 'supervisor' || user?.rol === 'admin';
+
     // Navegar al reclamo si tiene reclamo_id
     if (notif.reclamo_id) {
-      // URL varía según el rol del usuario
-      const isGestion = user?.rol === 'supervisor' || user?.rol === 'admin';
       const basePath = isGestion ? '/gestion/reclamos' : '/reclamos';
       navigate(`${basePath}/${notif.reclamo_id}`);
+    }
+    // Navegar al trámite si tiene solicitud_id
+    else if (notif.solicitud_id) {
+      const basePath = isGestion ? '/gestion/tramites' : '/tramites';
+      navigate(`${basePath}/${notif.solicitud_id}`);
     }
   };
 

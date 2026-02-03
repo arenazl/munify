@@ -6,14 +6,20 @@ import enum
 
 
 class EstadoSolicitud(str, enum.Enum):
-    """Estados de una solicitud de trámite"""
+    """Estados de una solicitud de trámite - alineados con reclamos"""
+    # Estados activos (en orden de flujo)
+    RECIBIDO = "recibido"           # Solicitud recibida
+    EN_CURSO = "en_curso"           # En proceso
+    FINALIZADO = "finalizado"       # Completado exitosamente
+    POSPUESTO = "pospuesto"         # Diferido
+    RECHAZADO = "rechazado"         # Rechazado
+
+    # Estados legacy (para compatibilidad con datos existentes)
     INICIADO = "INICIADO"
     EN_REVISION = "EN_REVISION"
     REQUIERE_DOCUMENTACION = "REQUIERE_DOCUMENTACION"
     EN_PROCESO = "EN_PROCESO"
     APROBADO = "APROBADO"
-    RECHAZADO = "RECHAZADO"
-    FINALIZADO = "FINALIZADO"
 
 
 class TipoTramite(Base):
@@ -169,7 +175,7 @@ class Solicitud(Base):
     descripcion = Column(Text, nullable=True)
 
     # Estado
-    estado = Column(Enum(EstadoSolicitud, values_callable=lambda x: [e.value for e in x]), default=EstadoSolicitud.INICIADO, nullable=False, index=True)
+    estado = Column(Enum(EstadoSolicitud, values_callable=lambda x: [e.value for e in x]), default=EstadoSolicitud.RECIBIDO, nullable=False, index=True)
 
     # Solicitante (usuario registrado o anónimo)
     solicitante_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)

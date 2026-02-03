@@ -20,6 +20,10 @@ class Notificacion(Base):
     reclamo_id = Column(Integer, ForeignKey("reclamos.id"), nullable=True)
     reclamo = relationship("Reclamo")
 
+    # Referencia opcional a una solicitud de trámite
+    solicitud_id = Column(Integer, ForeignKey("solicitudes.id"), nullable=True)
+    solicitud = relationship("Solicitud")
+
     # Estado
     leida = Column(Boolean, default=False)
 

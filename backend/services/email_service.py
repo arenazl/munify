@@ -315,6 +315,133 @@ class EmailTemplates:
         """
         return EmailTemplates.base_template(content, "Nuevo Comentario - Sistema Municipal")
 
+    # ============================================
+    # Templates para TRÁMITES/SOLICITUDES
+    # ============================================
+
+    @staticmethod
+    def solicitud_creada(
+        numero_tramite: str,
+        tramite_nombre: str,
+        asunto: str,
+        descripcion: str = None,
+        solicitante_nombre: str = None
+    ) -> str:
+        descripcion_html = ""
+        if descripcion:
+            descripcion_preview = descripcion[:300] + "..." if len(descripcion) > 300 else descripcion
+            descripcion_html = f"""
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #667eea;">
+                <p style="margin: 0 0 5px 0; font-weight: bold; color: #667eea;">Descripción:</p>
+                <p style="margin: 0; font-size: 14px; color: #333;">{descripcion_preview}</p>
+            </div>
+            """
+
+        solicitante_html = f"<p><strong>Solicitante:</strong> {solicitante_nombre}</p>" if solicitante_nombre else ""
+
+        content = f"""
+        <h2>📄 Trámite Registrado</h2>
+        <p>Su trámite ha sido registrado exitosamente en nuestro sistema.</p>
+
+        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p><strong>Número de trámite:</strong> #{numero_tramite}</p>
+            <p><strong>Tipo:</strong> {tramite_nombre}</p>
+            <p><strong>Asunto:</strong> {asunto}</p>
+            {solicitante_html}
+            <p><strong>Estado:</strong> <span class="status status-nuevo">RECIBIDO</span></p>
+        </div>
+
+        {descripcion_html}
+
+        <p>Puede hacer seguimiento de su trámite ingresando a nuestra plataforma.</p>
+        <p>Le notificaremos cuando haya actualizaciones sobre su trámite.</p>
+        """
+        return EmailTemplates.base_template(content, "Trámite Registrado - Sistema Municipal")
+
+    @staticmethod
+    def solicitud_cambio_estado(numero_tramite: str, estado_nuevo: str, mensaje: str) -> str:
+        # Determinar color según estado
+        estado_class = "status-proceso"
+        emoji = "📋"
+        if estado_nuevo.lower() in ["finalizado", "aprobado"]:
+            estado_class = "status-resuelto"
+            emoji = "🎉"
+        elif estado_nuevo.lower() == "rechazado":
+            estado_class = "status-nuevo"  # rojo
+            emoji = "❌"
+        elif estado_nuevo.lower() == "en proceso":
+            emoji = "🔄"
+
+        content = f"""
+        <h2>{emoji} Estado de Trámite Actualizado</h2>
+
+        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p><strong>Número de trámite:</strong> #{numero_tramite}</p>
+            <p><strong>Nuevo estado:</strong> <span class="status {estado_class}">{estado_nuevo.upper()}</span></p>
+        </div>
+
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #667eea;">
+            <p style="margin: 0; font-size: 14px; color: #333;">{mensaje}</p>
+        </div>
+
+        <p>Puede hacer seguimiento de su trámite ingresando a nuestra plataforma.</p>
+        """
+        return EmailTemplates.base_template(content, "Actualización de Trámite - Sistema Municipal")
+
+    @staticmethod
+    def solicitud_finalizada(numero_tramite: str, tramite_nombre: str, respuesta: str = None) -> str:
+        respuesta_html = ""
+        if respuesta:
+            respuesta_html = f"""
+            <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #388e3c;">
+                <p style="margin: 0 0 5px 0; font-weight: bold; color: #388e3c;">Resolución:</p>
+                <p style="margin: 0; font-size: 14px; color: #333;">{respuesta}</p>
+            </div>
+            """
+
+        content = f"""
+        <h2>🎉 Trámite Finalizado</h2>
+        <p>Nos complace informarle que su trámite ha sido completado exitosamente.</p>
+
+        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p><strong>Número de trámite:</strong> #{numero_tramite}</p>
+            <p><strong>Tipo:</strong> {tramite_nombre}</p>
+            <p><strong>Estado:</strong> <span class="status status-resuelto">FINALIZADO</span></p>
+        </div>
+
+        {respuesta_html}
+
+        <p>Gracias por utilizar nuestro sistema de trámites.</p>
+        """
+        return EmailTemplates.base_template(content, "Trámite Finalizado - Sistema Municipal")
+
+    @staticmethod
+    def solicitud_rechazada(numero_tramite: str, tramite_nombre: str, motivo: str = None) -> str:
+        motivo_html = ""
+        if motivo:
+            motivo_html = f"""
+            <div style="background: #ffebee; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ef4444;">
+                <p style="margin: 0 0 5px 0; font-weight: bold; color: #ef4444;">Motivo del rechazo:</p>
+                <p style="margin: 0; font-size: 14px; color: #333;">{motivo}</p>
+            </div>
+            """
+
+        content = f"""
+        <h2>❌ Trámite Rechazado</h2>
+        <p>Lamentamos informarle que su trámite ha sido rechazado.</p>
+
+        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <p><strong>Número de trámite:</strong> #{numero_tramite}</p>
+            <p><strong>Tipo:</strong> {tramite_nombre}</p>
+            <p><strong>Estado:</strong> <span style="background: #ffebee; color: #ef4444; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold;">RECHAZADO</span></p>
+        </div>
+
+        {motivo_html}
+
+        <p>Si tiene dudas o desea más información, puede contactarse con nosotros.</p>
+        """
+        return EmailTemplates.base_template(content, "Trámite Rechazado - Sistema Municipal")
+
 
 # Singleton
 email_service = EmailService()

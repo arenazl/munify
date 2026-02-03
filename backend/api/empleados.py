@@ -97,10 +97,9 @@ async def get_empleados_disponibilidad(
     result = await db.execute(query)
     empleados = result.scalars().all()
 
-    # Estados pendientes para trámites (solicitudes) - Enum con mayúsculas
+    # Estados pendientes para trámites (solicitudes)
     estados_pendientes_tramites = [
-        EstadoSolicitud.INICIADO,
-        EstadoSolicitud.EN_REVISION,
+        EstadoSolicitud.RECIBIDO,
         EstadoSolicitud.EN_CURSO
     ]
     # Estados pendientes para reclamos (strings en minúscula)
