@@ -25,6 +25,8 @@ interface Dependencia {
   longitud: number | null;
   activo: boolean;
   orden: number;
+  color?: string;
+  icono?: string;
 }
 
 interface MunicipioDependencia {
@@ -36,6 +38,8 @@ interface MunicipioDependencia {
   tipo_gestion: string;
   activo: boolean;
   orden: number;
+  color?: string;
+  icono?: string;
   categorias_count: number;
   tipos_tramite_count: number;
   // Campos locales (pueden venir del detalle)
@@ -698,13 +702,18 @@ export default function DependenciasConfig() {
           const muniDep = dep as MunicipioDependencia;
           const catDep = dep as Dependencia;
 
+          const depColor = isCatalogoItem ? catDep.color : muniDep.color;
+          const isExpanded = expandedDep === dep.id;
+
           return (
             <div
               key={dep.id}
               className="rounded-xl overflow-hidden transition-shadow"
               style={{
                 backgroundColor: theme.backgroundSecondary,
-                border: `1px solid ${expandedDep === dep.id ? theme.primary : theme.border}`,
+                border: `2px solid ${isExpanded ? (depColor || theme.primary) : theme.border}`,
+                borderLeftWidth: '4px',
+                borderLeftColor: depColor || theme.primary,
               }}
             >
               {/* Header de dependencia */}
@@ -715,13 +724,13 @@ export default function DependenciasConfig() {
                 >
                   <div
                     className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: theme.primary + '20' }}
+                    style={{ backgroundColor: (isCatalogoItem ? catDep.color : muniDep.color) || theme.primary }}
                   >
-                    {isCatalogoItem ? (
-                      <BookOpen className="h-5 w-5" style={{ color: theme.primary }} />
-                    ) : (
-                      <Building2 className="h-5 w-5" style={{ color: theme.primary }} />
-                    )}
+                    <DynamicIcon
+                      name={(isCatalogoItem ? catDep.icono : muniDep.icono) || 'Building2'}
+                      size={20}
+                      color="#fff"
+                    />
                   </div>
                   <div className="min-w-0 flex-1">
                     <h3 className="font-semibold truncate" style={{ color: theme.text }}>{dep.nombre}</h3>
@@ -943,17 +952,15 @@ export default function DependenciasConfig() {
                         </div>
                       </div>
                       <div
-                        className={`w-12 h-6 rounded-full p-1 transition-colors ${isHabilitada ? 'justify-end' : 'justify-start'}`}
+                        className="relative w-12 h-6 rounded-full transition-colors flex-shrink-0"
                         style={{
                           backgroundColor: isHabilitada ? (cat.color || theme.primary) : theme.border,
-                          display: 'flex',
-                          alignItems: 'center',
                         }}
                         title={isHabilitada ? 'Categoría habilitada' : 'Categoría deshabilitada'}
                       >
                         <div
-                          className="w-4 h-4 rounded-full bg-white shadow transition-transform"
-                          style={{ transform: isHabilitada ? 'translateX(24px)' : 'translateX(0)' }}
+                          className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-200"
+                          style={{ left: isHabilitada ? '28px' : '4px' }}
                         />
                       </div>
                     </div>
@@ -1029,17 +1036,15 @@ export default function DependenciasConfig() {
                             </h4>
                           </div>
                           <div
-                            className={`w-10 h-5 rounded-full p-0.5 transition-colors ml-2 flex-shrink-0`}
+                            className="relative w-10 h-5 rounded-full transition-colors ml-2 flex-shrink-0"
                             style={{
                               backgroundColor: isHabilitado ? (tipo.color || theme.primary) : theme.border,
-                              display: 'flex',
-                              alignItems: 'center',
                             }}
                             title={isHabilitado ? 'Trámite habilitado' : 'Trámite deshabilitado'}
                           >
                             <div
-                              className="w-4 h-4 rounded-full bg-white shadow transition-transform"
-                              style={{ transform: isHabilitado ? 'translateX(20px)' : 'translateX(0)' }}
+                              className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-200"
+                              style={{ left: isHabilitado ? '22px' : '2px' }}
                             />
                           </div>
                         </div>
