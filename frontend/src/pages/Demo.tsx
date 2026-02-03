@@ -19,11 +19,11 @@ export default function Demo() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Cargar municipios al montar
+  // Cargar municipios al montar (endpoint público, sin auth)
   useEffect(() => {
     const fetchMunicipios = async () => {
       try {
-        const response = await municipiosApi.getAll();
+        const response = await municipiosApi.getPublic();
         setMunicipios(response.data);
       } catch (err) {
         console.error('Error cargando municipios:', err);

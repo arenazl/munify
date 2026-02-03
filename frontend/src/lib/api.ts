@@ -492,6 +492,7 @@ export const configuracionApi = {
 // Municipios
 export const municipiosApi = {
   getAll: () => api.get('/municipios'),
+  getPublic: () => api.get('/municipios/public'),
   getOne: (id: number) => api.get(`/municipios/${id}`),
   updateBranding: (id: number, formData: FormData) =>
     api.post(`/municipios/${id}/branding`, formData, {
