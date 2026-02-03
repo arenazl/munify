@@ -920,8 +920,8 @@ export default function DependenciasConfig() {
                       key={cat.id}
                       className="flex items-center justify-between p-4 rounded-xl transition-all cursor-pointer hover:shadow-md"
                       style={{
-                        backgroundColor: theme.backgroundSecondary,
-                        border: `2px solid ${isHabilitada ? theme.primary : theme.border}`,
+                        backgroundColor: isHabilitada ? `${cat.color || theme.primary}10` : theme.backgroundSecondary,
+                        border: `2px solid ${isHabilitada ? (cat.color || theme.primary) : theme.border}`,
                         opacity: saving ? 0.7 : 1,
                       }}
                       onClick={() => !saving && toggleCategoriaHabilitada(cat.id)}
@@ -945,10 +945,11 @@ export default function DependenciasConfig() {
                       <div
                         className={`w-12 h-6 rounded-full p-1 transition-colors ${isHabilitada ? 'justify-end' : 'justify-start'}`}
                         style={{
-                          backgroundColor: isHabilitada ? theme.primary : theme.border,
+                          backgroundColor: isHabilitada ? (cat.color || theme.primary) : theme.border,
                           display: 'flex',
                           alignItems: 'center',
                         }}
+                        title={isHabilitada ? 'Categoría habilitada' : 'Categoría deshabilitada'}
                       >
                         <div
                           className="w-4 h-4 rounded-full bg-white shadow transition-transform"
@@ -1016,8 +1017,8 @@ export default function DependenciasConfig() {
                           key={tramite.id}
                           className="flex items-center justify-between p-3 rounded-lg transition-all cursor-pointer hover:shadow-sm"
                           style={{
-                            backgroundColor: theme.backgroundSecondary,
-                            border: `1px solid ${isHabilitado ? theme.primary : theme.border}`,
+                            backgroundColor: isHabilitado ? `${tipo.color || theme.primary}10` : theme.backgroundSecondary,
+                            border: `1px solid ${isHabilitado ? (tipo.color || theme.primary) : theme.border}`,
                             opacity: saving ? 0.7 : 1,
                           }}
                           onClick={() => !saving && toggleTramiteHabilitado(tramite.id)}
@@ -1030,10 +1031,11 @@ export default function DependenciasConfig() {
                           <div
                             className={`w-10 h-5 rounded-full p-0.5 transition-colors ml-2 flex-shrink-0`}
                             style={{
-                              backgroundColor: isHabilitado ? theme.primary : theme.border,
+                              backgroundColor: isHabilitado ? (tipo.color || theme.primary) : theme.border,
                               display: 'flex',
                               alignItems: 'center',
                             }}
+                            title={isHabilitado ? 'Trámite habilitado' : 'Trámite deshabilitado'}
                           >
                             <div
                               className="w-4 h-4 rounded-full bg-white shadow transition-transform"

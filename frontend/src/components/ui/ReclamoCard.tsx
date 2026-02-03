@@ -90,6 +90,9 @@ export function ReclamoCard({
 
   const vencimiento = calcularVencimiento();
 
+  // Color del borde: dependencia > categoría > default
+  const borderColor = r.dependencia_asignada?.color || r.categoria?.color || theme.border;
+
   return (
     <div
       onClick={onClick}
@@ -98,7 +101,9 @@ export function ReclamoCard({
       }`}
       style={{
         backgroundColor: theme.card,
-        border: `1px solid ${theme.border}`,
+        border: `2px solid ${borderColor}40`,
+        borderLeftWidth: '4px',
+        borderLeftColor: borderColor,
         transitionDelay: `${animationDelay}ms`,
       }}
     >
