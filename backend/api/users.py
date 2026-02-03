@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 from typing import List
+from models.municipio_dependencia import MunicipioDependencia
 from datetime import datetime, timedelta
 import secrets
 
@@ -52,8 +53,13 @@ async def update_my_profile(
         setattr(current_user, key, value)
 
     await db.commit()
-    await db.refresh(current_user)
-    return current_user
+    # Recargar con la relación
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
+        .where(User.id == current_user.id)
+    )
+    return result.scalar_one()
 
 @router.post("/me/request-email-change")
 async def request_email_change(
@@ -176,7 +182,7 @@ async def get_users(
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
         select(User)
-        .options(selectinload(User.dependencia))
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
         .where(User.municipio_id == municipio_id)
         .order_by(User.created_at.desc())
     )
@@ -192,7 +198,7 @@ async def get_user(
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
         select(User)
-        .options(selectinload(User.dependencia))
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
         .where(User.id == user_id)
         .where(User.municipio_id == municipio_id)
     )
@@ -232,7 +238,7 @@ async def create_user(
     # Recargar con la relación
     result = await db.execute(
         select(User)
-        .options(selectinload(User.dependencia))
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
         .where(User.id == user.id)
     )
     return result.scalar_one()
@@ -247,7 +253,7 @@ async def update_user(
     # Multi-tenant: filtrar por municipio_id del usuario actual
     result = await db.execute(
         select(User)
-        .options(selectinload(User.dependencia))
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
         .where(User.id == user_id)
         .where(User.municipio_id == current_user.municipio_id)
     )
@@ -263,7 +269,7 @@ async def update_user(
     # Recargar con la relación
     result = await db.execute(
         select(User)
-        .options(selectinload(User.dependencia))
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
         .where(User.id == user_id)
     )
     return result.scalar_one()

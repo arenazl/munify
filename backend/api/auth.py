@@ -50,8 +50,13 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
     )
     db.add(user)
     await db.commit()
-    await db.refresh(user)
-    return user
+    # Recargar con la relación (aunque vecino no tiene dependencia, por consistencia)
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
+        .where(User.id == user.id)
+    )
+    return result.scalar_one()
 
 @router.post("/login", response_model=Token)
 # @limiter.limit(LIMITS["auth"])  # Temporalmente deshabilitado para debug
