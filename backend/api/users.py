@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
+from sqlalchemy.orm import selectinload
 from typing import List
 from datetime import datetime, timedelta
 import secrets
@@ -175,6 +176,7 @@ async def get_users(
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
         select(User)
+        .options(selectinload(User.dependencia))
         .where(User.municipio_id == municipio_id)
         .order_by(User.created_at.desc())
     )
@@ -190,6 +192,7 @@ async def get_user(
     municipio_id = get_effective_municipio_id(request, current_user)
     result = await db.execute(
         select(User)
+        .options(selectinload(User.dependencia))
         .where(User.id == user_id)
         .where(User.municipio_id == municipio_id)
     )
@@ -226,8 +229,13 @@ async def create_user(
     )
     db.add(user)
     await db.commit()
-    await db.refresh(user)
-    return user
+    # Recargar con la relación
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.dependencia))
+        .where(User.id == user.id)
+    )
+    return result.scalar_one()
 
 @router.put("/{user_id}", response_model=UserResponse)
 async def update_user(
@@ -239,6 +247,7 @@ async def update_user(
     # Multi-tenant: filtrar por municipio_id del usuario actual
     result = await db.execute(
         select(User)
+        .options(selectinload(User.dependencia))
         .where(User.id == user_id)
         .where(User.municipio_id == current_user.municipio_id)
     )
@@ -251,8 +260,13 @@ async def update_user(
         setattr(user, key, value)
 
     await db.commit()
-    await db.refresh(user)
-    return user
+    # Recargar con la relación
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.dependencia))
+        .where(User.id == user_id)
+    )
+    return result.scalar_one()
 
 @router.delete("/{user_id}")
 async def delete_user(
