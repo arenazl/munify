@@ -451,46 +451,53 @@ export default function Landing() {
                         Crear Cuenta
                       </button>
 
-                      {/* Accesos Rápidos - Solo Admin (sin vecinos ni supervisores) */}
-                      {demoUsers.filter(u => u.rol === 'admin').length > 0 && (
-                        <>
-                          <div className="relative flex items-center gap-3 my-4">
-                            <div className="flex-1 h-px bg-white/10" />
-                            <span className="text-slate-500 text-xs">ACCESOS RÁPIDOS</span>
-                            <div className="flex-1 h-px bg-white/10" />
-                          </div>
+                      {/* Accesos Rápidos - Admin, Supervisor y Vecino (uno de cada) */}
+                      {demoUsers.length > 0 && (() => {
+                        // Obtener un usuario de cada rol (sin duplicados)
+                        const uniqueByRole = ['admin', 'supervisor', 'vecino']
+                          .map(rol => demoUsers.find(u => u.rol === rol))
+                          .filter(Boolean) as typeof demoUsers;
 
-                          <div className="grid grid-cols-2 gap-3 mb-4">
-                            {demoUsers.filter(u => u.rol === 'admin').map((user, index) => {
-                              const config = rolConfig[user.rol] || rolConfig.vecino;
-                              const Icon = config.icon;
-                              return (
-                                <button
-                                  key={`${user.rol}-${index}`}
-                                  type="button"
-                                  onClick={() => quickLogin(user.email, 'demo123')}
-                                  disabled={debugLoading}
-                                  className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
-                                >
-                                  {debugLoading ? (
-                                    <div className="flex items-center justify-center">
-                                      <Loader2 className="h-5 w-5 animate-spin" />
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2">
-                                      <Icon className="h-4 w-4 flex-shrink-0" />
-                                      <div className="text-left min-w-0">
-                                        <div className="font-semibold truncate">{config.label}</div>
-                                        <div className="text-[10px] opacity-80 font-mono truncate">{user.email}</div>
+                        return uniqueByRole.length > 0 ? (
+                          <>
+                            <div className="relative flex items-center gap-3 my-4">
+                              <div className="flex-1 h-px bg-white/10" />
+                              <span className="text-slate-500 text-xs">ACCESOS RÁPIDOS</span>
+                              <div className="flex-1 h-px bg-white/10" />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                              {uniqueByRole.map((user, index) => {
+                                const config = rolConfig[user.rol] || rolConfig.vecino;
+                                const Icon = config.icon;
+                                return (
+                                  <button
+                                    key={`${user.rol}-${index}`}
+                                    type="button"
+                                    onClick={() => quickLogin(user.email, 'demo123')}
+                                    disabled={debugLoading}
+                                    className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                                  >
+                                    {debugLoading ? (
+                                      <div className="flex items-center justify-center">
+                                        <Loader2 className="h-5 w-5 animate-spin" />
                                       </div>
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
+                                    ) : (
+                                      <div className="flex items-center gap-2">
+                                        <Icon className="h-4 w-4 flex-shrink-0" />
+                                        <div className="text-left min-w-0">
+                                          <div className="font-semibold truncate">{config.label}</div>
+                                          <div className="text-[10px] opacity-80 font-mono truncate">{user.email}</div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        ) : null;
+                      })()}
 
                       {/* Sección de dependencias con reclamos */}
                       {dependenciaUsers.length > 0 && (
