@@ -120,6 +120,7 @@ class Tramite(Base):
     # Relaciones
     solicitudes = relationship("Solicitud", back_populates="tramite")
     municipios_habilitados = relationship("MunicipioTramite", back_populates="tramite")
+    documentos = relationship("TramiteDoc", back_populates="tramite", order_by="TramiteDoc.orden")
 
 
 class MunicipioTramite(Base):

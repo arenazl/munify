@@ -30,6 +30,7 @@ from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .noticia import Noticia
 from .tramite import TipoTramite, Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud, MunicipioTipoTramite, MunicipioTramite
 from .documento_solicitud import DocumentoSolicitud
+from .tramite_doc import TramiteDoc
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
@@ -89,6 +90,7 @@ __all__ = [
     "MunicipioTipoTramite",
     "MunicipioTramite",
     "DocumentoSolicitud",
+    "TramiteDoc",
     # Push Notifications
     "PushSubscription",
     # Consultas guardadas / BI
