@@ -1061,8 +1061,8 @@ Tono amigable y conciso (2-3 oraciones máximo).`
             <div
               ref={tramitesScrollRef}
               onScroll={handleTramitesScroll}
-              className="flex gap-2 overflow-x-auto pb-2"
-              style={{ scrollbarWidth: 'thin' }}
+              className="grid gap-2 pb-2"
+              style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))' }}
             >
               {serviciosDelRubro.map((s) => {
                 const isSelected = formData.servicio_id === String(s.id);
@@ -1073,11 +1073,10 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                     key={s.id}
                     data-tramite-id={String(s.id)}
                     onClick={() => setFormData(prev => ({ ...prev, servicio_id: String(s.id) }))}
-                    className={`relative flex-shrink-0 p-2 rounded-xl border-2 text-center transition-all hover:scale-105 ${isSelected ? 'border-current' : 'border-transparent'}`}
+                    className={`relative p-2 rounded-xl border-2 text-center transition-all hover:scale-105 ${isSelected ? 'border-current' : 'border-transparent'}`}
                     style={{
                       backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary,
-                      borderColor: isSelected ? color : theme.border,
-                      width: '85px'
+                      borderColor: isSelected ? color : theme.border
                     }}
                   >
                     <div className="w-7 h-7 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
