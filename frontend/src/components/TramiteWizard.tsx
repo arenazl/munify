@@ -272,6 +272,12 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   // Validación facial
   const [facialValidated, setFacialValidated] = useState(false);
   const [facialValidating, setFacialValidating] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Buscar direcciones con Nominatim (OpenStreetMap)
   const searchAddress = useCallback(async (query: string) => {
@@ -625,6 +631,14 @@ Tono amigable, 2-3 oraciones máximo.`,
     // Reset validación facial
     setFacialValidated(false);
     setFacialValidating(false);
+    setCameraActive(false);
+    setCapturedPhoto(null);
+    setCameraError(null);
+    // Detener cámara si está activa
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
   };
 
   // Scroll al final del chat cuando hay nuevos mensajes
@@ -1324,48 +1338,166 @@ Tono amigable y conciso (2-3 oraciones máximo).`
     </div>
   );
 
-  // Step Facial: Validación facial (solo si el trámite lo requiere)
-  const handleFacialValidation = async () => {
-    setFacialValidating(true);
+  // Step Facial: Validación facial con cámara real
+  const startCamera = async () => {
+    setCameraError(null);
     try {
-      // Simular validación facial - en producción conectar con API real
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setFacialValidated(true);
-      toast.success('Identidad verificada correctamente');
-    } catch {
-      toast.error('Error al validar identidad');
-    } finally {
-      setFacialValidating(false);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+      setCameraActive(true);
+    } catch (err) {
+      console.error('Error accessing camera:', err);
+      setCameraError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
     }
   };
 
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        // Espejo horizontal para selfie
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0);
+        const photoData = canvas.toDataURL('image/jpeg', 0.8);
+        setCapturedPhoto(photoData);
+        stopCamera();
+      }
+    }
+  };
+
+  const retakePhoto = () => {
+    setCapturedPhoto(null);
+    startCamera();
+  };
+
+  const confirmPhoto = () => {
+    setFacialValidating(true);
+    // Simular procesamiento de la foto (en producción enviar a API de validación)
+    setTimeout(() => {
+      setFacialValidated(true);
+      setFacialValidating(false);
+      toast.success('Identidad verificada correctamente');
+    }, 1500);
+  };
+
   const wizardStepFacial = (
-    <div className="space-y-6 py-4">
-      <div className="text-center">
-        <div
-          className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
-          style={{ backgroundColor: facialValidated ? '#10b98120' : `${theme.primary}20` }}
-        >
-          {facialValidated ? (
+    <div className="space-y-4 py-2">
+      {/* Canvas oculto para captura */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {facialValidated ? (
+        // Foto validada exitosamente
+        <div className="text-center">
+          <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: '#10b98120' }}>
             <CheckCircle2 className="h-10 w-10" style={{ color: '#10b981' }} />
-          ) : (
-            <ScanFace className="h-10 w-10" style={{ color: theme.primary }} />
+          </div>
+          <h3 className="text-lg font-semibold mb-2" style={{ color: theme.text }}>Identidad Verificada</h3>
+          <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+            Tu identidad ha sido verificada correctamente. Podés continuar con el trámite.
+          </p>
+          {capturedPhoto && (
+            <div className="mx-auto w-32 h-32 rounded-full overflow-hidden border-4" style={{ borderColor: '#10b981' }}>
+              <img src={capturedPhoto} alt="Foto capturada" className="w-full h-full object-cover" />
+            </div>
           )}
         </div>
-        <h3 className="text-lg font-semibold mb-2" style={{ color: theme.text }}>
-          {facialValidated ? 'Identidad Verificada' : 'Verificación de Identidad'}
-        </h3>
-        <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
-          {facialValidated
-            ? 'Tu identidad ha sido verificada correctamente. Podés continuar con el trámite.'
-            : 'Este trámite requiere verificar tu identidad mediante reconocimiento facial para garantizar la seguridad del proceso.'
-          }
-        </p>
-      </div>
+      ) : capturedPhoto ? (
+        // Foto capturada, confirmar o reintentar
+        <div className="text-center space-y-4">
+          <h3 className="text-lg font-semibold" style={{ color: theme.text }}>¿La foto se ve bien?</h3>
+          <div className="mx-auto w-48 h-48 rounded-2xl overflow-hidden border-2" style={{ borderColor: theme.primary }}>
+            <img src={capturedPhoto} alt="Foto capturada" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={retakePhoto}
+              className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+            >
+              <Camera className="h-4 w-4" />
+              Tomar otra
+            </button>
+            <button
+              onClick={confirmPhoto}
+              disabled={facialValidating}
+              className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all"
+              style={{ backgroundColor: theme.primary, color: 'white', opacity: facialValidating ? 0.7 : 1 }}
+            >
+              {facialValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {facialValidating ? 'Verificando...' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      ) : cameraActive ? (
+        // Cámara activa, mostrar preview
+        <div className="text-center space-y-4">
+          <h3 className="text-lg font-semibold" style={{ color: theme.text }}>Mirá a la cámara</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>Asegurate de tener buena iluminación y que tu rostro se vea claramente.</p>
+          <div className="mx-auto w-64 h-64 rounded-2xl overflow-hidden bg-black relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }}
+            />
+            <div className="absolute inset-0 border-4 rounded-2xl pointer-events-none" style={{ borderColor: `${theme.primary}50` }} />
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={stopCamera}
+              className="px-4 py-3 rounded-xl font-medium transition-all"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={capturePhoto}
+              className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: theme.primary, color: 'white' }}
+            >
+              <Camera className="h-5 w-5" />
+              Capturar Foto
+            </button>
+          </div>
+        </div>
+      ) : (
+        // Estado inicial - botón para iniciar cámara
+        <div className="text-center space-y-4">
+          <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
+            <ScanFace className="h-10 w-10" style={{ color: theme.primary }} />
+          </div>
+          <h3 className="text-lg font-semibold" style={{ color: theme.text }}>Verificación de Identidad</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            Este trámite requiere verificar tu identidad mediante una foto de tu rostro.
+          </p>
 
-      {!facialValidated && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+          {cameraError && (
+            <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+              {cameraError}
+            </div>
+          )}
+
+          <div className="p-4 rounded-xl text-left" style={{ backgroundColor: theme.backgroundSecondary }}>
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
               <div className="text-sm" style={{ color: theme.textSecondary }}>
@@ -1374,44 +1506,19 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                   <li>Se activará tu cámara frontal</li>
                   <li>Mirá directamente a la cámara</li>
                   <li>Asegurate de tener buena iluminación</li>
-                  <li>El proceso tarda solo unos segundos</li>
                 </ul>
               </div>
             </div>
           </div>
 
           <button
-            onClick={handleFacialValidation}
-            disabled={facialValidating}
+            onClick={startCamera}
             className="w-full py-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{
-              backgroundColor: theme.primary,
-              color: 'white',
-              opacity: facialValidating ? 0.7 : 1
-            }}
+            style={{ backgroundColor: theme.primary, color: 'white' }}
           >
-            {facialValidating ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Verificando identidad...
-              </>
-            ) : (
-              <>
-                <Camera className="h-5 w-5" />
-                Iniciar Verificación
-              </>
-            )}
+            <Camera className="h-5 w-5" />
+            Activar Cámara
           </button>
-        </div>
-      )}
-
-      {facialValidated && (
-        <div className="p-4 rounded-xl flex items-center gap-3" style={{ backgroundColor: '#10b98120', border: '1px solid #10b98130' }}>
-          <ShieldCheck className="h-6 w-6 flex-shrink-0" style={{ color: '#10b981' }} />
-          <div>
-            <p className="font-medium text-sm" style={{ color: theme.text }}>Verificación exitosa</p>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>Hacé clic en "Siguiente" para continuar</p>
-          </div>
         </div>
       )}
     </div>
