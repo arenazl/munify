@@ -453,9 +453,6 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
 
   const selectedServicio = servicios.find(s => s.id === Number(formData.servicio_id));
 
-  // DEBUG: Ver si llega el campo requiere_validacion_facial
-  console.log('[DEBUG] selectedServicio:', selectedServicio?.nombre, 'requiere_validacion_facial:', selectedServicio?.requiere_validacion_facial);
-
   // Auto-cargar tip de IA cuando se selecciona un trámite
   useEffect(() => {
     const fetchAITip = async () => {
