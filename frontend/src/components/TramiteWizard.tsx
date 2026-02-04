@@ -1039,8 +1039,8 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                   borderColor: isSelected ? rubro.color : theme.border,
                 }}
               >
-                <div className="w-10 h-10 rounded-full mx-auto mb-1.5 flex items-center justify-center" style={{ backgroundColor: isSelected ? rubro.color : `${rubro.color}30`, color: isSelected ? 'white' : rubro.color }}>
-                  {getServicioIcon(rubro.icono)}
+                <div className="w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? rubro.color : `${rubro.color}30`, color: isSelected ? 'white' : rubro.color }}>
+                  <span className="scale-90">{getServicioIcon(rubro.icono)}</span>
                 </div>
                 <span className="text-xs font-medium block text-center line-clamp-2 leading-tight" style={{ color: theme.text }}>{rubro.nombre}</span>
                 {isSelected && (
