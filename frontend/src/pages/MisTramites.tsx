@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard } from '../components/ui/ABMPage';
+import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { TramiteWizard } from '../components/TramiteWizard';
 import type { Tramite, EstadoTramite, ServicioTramite, TipoTramite } from '../types';
@@ -420,69 +420,139 @@ export default function MisTramites() {
     );
   };
 
-  // Estado para mostrar/ocultar dropdown de filtros
-  const [showFiltroDropdown, setShowFiltroDropdown] = useState(false);
-  const filtroButtonRef = useRef<HTMLDivElement>(null);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
-
-  // Actualizar posición del dropdown cuando se abre
-  useEffect(() => {
-    if (showFiltroDropdown && filtroButtonRef.current) {
-      const rect = filtroButtonRef.current.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        right: window.innerWidth - rect.right,
-      });
-    }
-  }, [showFiltroDropdown]);
-
-  // Componente de filtros extra
-  const renderExtraFilters = () => (
-    <div className="flex gap-2">
-      {/* Botón ordenar por fecha/estado */}
-      <button
-        onClick={() => setOrdenarPor(ordenarPor === 'fecha' ? 'estado' : 'fecha')}
-        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95"
-        style={{
-          backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-          color: theme.text,
-          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-        }}
-        title={ordenarPor === 'fecha' ? 'Ordenado por fecha' : 'Ordenado por estado'}
-      >
-        <ArrowUpDown className="h-4 w-4" />
-        <span className="hidden sm:inline">{ordenarPor === 'fecha' ? 'Fecha' : 'Estado'}</span>
-      </button>
-
-      {/* Botón filtrar por estado - moderno con dropdown */}
-      <div className="relative" ref={filtroButtonRef}>
+  // Barra de filtros secundarios (como MisReclamos)
+  const renderSecondaryFilters = () => (
+    <div className="flex items-center gap-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+      {/* Ordenamiento */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         <button
-          onClick={() => setShowFiltroDropdown(!showFiltroDropdown)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 active:scale-95"
+          onClick={() => setOrdenarPor('fecha')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
           style={{
-            backgroundColor: filtroEstado !== 'todos' ? `${theme.primary}` : theme.card,
-            border: `1px solid ${filtroEstado !== 'todos' ? theme.primary : theme.border}`,
-            color: filtroEstado !== 'todos' ? '#ffffff' : theme.text,
-            boxShadow: filtroEstado !== 'todos' ? `0 4px 12px ${theme.primary}40` : '0 1px 2px rgba(0,0,0,0.05)',
+            backgroundColor: ordenarPor === 'fecha' ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `1px solid ${ordenarPor === 'fecha' ? theme.primary : theme.border}`,
+            color: ordenarPor === 'fecha' ? theme.primary : theme.textSecondary,
           }}
         >
-          <Filter className="h-4 w-4" />
-          <span className="hidden sm:inline">
-            {filtroEstado === 'todos' ? 'Filtrar' : (estadoConfig[filtroEstado]?.label || filtroEstado)}
-          </span>
-          {filtroEstado !== 'todos' && (
-            <span
-              className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold sm:hidden"
-              style={{ backgroundColor: 'rgba(255,255,255,0.3)' }}
-            >
-              1
-            </span>
-          )}
+          <ArrowUpDown className="h-3 w-3" />
+          Más recientes
         </button>
+        <button
+          onClick={() => setOrdenarPor('estado')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          style={{
+            backgroundColor: ordenarPor === 'estado' ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `1px solid ${ordenarPor === 'estado' ? theme.primary : theme.border}`,
+            color: ordenarPor === 'estado' ? theme.primary : theme.textSecondary,
+          }}
+        >
+          <Filter className="h-3 w-3" />
+          Por estado
+        </button>
+      </div>
+
+      {/* Separador */}
+      <div className="h-5 w-px flex-shrink-0" style={{ backgroundColor: theme.border }} />
+
+      {/* Filtros de estado - chips */}
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <button
+          onClick={() => setFiltroEstado('todos')}
+          className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
+          style={{
+            backgroundColor: filtroEstado === 'todos' ? theme.primary : theme.backgroundSecondary,
+            border: `1px solid ${filtroEstado === 'todos' ? theme.primary : theme.border}`,
+            color: filtroEstado === 'todos' ? '#ffffff' : theme.textSecondary,
+          }}
+        >
+          Todos
+        </button>
+        {estadosUnicos.map(estado => {
+          const config = estadoConfig[estado];
+          if (!config) return null;
+          const isSelected = filtroEstado === estado;
+          return (
+            <button
+              key={estado}
+              onClick={() => setFiltroEstado(estado)}
+              className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: isSelected ? config.bg : theme.backgroundSecondary,
+                border: `1px solid ${isSelected ? config.color : theme.border}`,
+                color: isSelected ? config.color : theme.textSecondary,
+              }}
+            >
+              {config.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
+
+  // Columnas para la vista de tabla
+  const tableColumns: ABMTableColumn<Tramite>[] = [
+    {
+      key: 'numero_tramite',
+      header: 'Número',
+      render: (t) => (
+        <span className="font-mono text-sm" style={{ color: theme.text }}>
+          {t.numero_tramite}
+        </span>
+      ),
+    },
+    {
+      key: 'asunto',
+      header: 'Asunto',
+      render: (t) => (
+        <div className="min-w-0">
+          <p className="font-medium truncate" style={{ color: theme.text }}>{t.asunto}</p>
+          {t.servicio && (
+            <p className="text-xs truncate" style={{ color: theme.textSecondary }}>{t.servicio.nombre}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      render: (t) => {
+        const config = estadoConfig[t.estado] || { icon: HelpCircle, color: '#6b7280', label: t.estado, bg: '#f3f4f6' };
+        const IconEstado = config.icon;
+        return (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full"
+            style={{ backgroundColor: config.bg, color: config.color }}
+          >
+            <IconEstado className="h-3 w-3" />
+            {config.label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'created_at',
+      header: 'Fecha',
+      render: (t) => (
+        <span className="text-sm" style={{ color: theme.textSecondary }}>
+          {new Date(t.created_at).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: 'acciones',
+      header: '',
+      render: (t) => (
+        <button
+          onClick={(e) => { e.stopPropagation(); openViewSheet(t); }}
+          className="p-2 rounded-lg transition-all hover:scale-110"
+          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+        >
+          <Eye className="h-4 w-4" />
+        </button>
+      ),
+    },
+  ];
 
   return (
     <>
@@ -497,7 +567,16 @@ export default function MisTramites() {
         isEmpty={filteredTramites.length === 0 && !search && filtroEstado === 'todos'}
         emptyMessage=""
         defaultViewMode="cards"
-        extraFilters={renderExtraFilters()}
+        stickyHeader={true}
+        secondaryFilters={renderSecondaryFilters()}
+        tableView={
+          <ABMTable
+            data={filteredTramites}
+            columns={tableColumns}
+            keyExtractor={(t) => t.id}
+            onRowClick={(t) => openViewSheet(t)}
+          />
+        }
       >
         {filteredTramites.length === 0 && !search && filtroEstado === 'todos' ? (
           renderEmptyState()
@@ -686,105 +765,6 @@ export default function MisTramites() {
       >
         {renderViewContent()}
       </Sheet>
-
-      {/* Dropdown de filtros (fixed position para evitar overflow:hidden) */}
-      {showFiltroDropdown && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-[9998]"
-            onClick={() => setShowFiltroDropdown(false)}
-          />
-          {/* Menu */}
-          <div
-            className="fixed z-[9999] min-w-[220px] rounded-xl overflow-hidden shadow-xl"
-            style={{
-              top: dropdownPosition.top,
-              right: dropdownPosition.right,
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-              animation: 'fadeInDown 0.2s ease-out',
-            }}
-          >
-            <div className="p-2">
-              <p className="text-xs font-medium px-2 py-1.5 mb-1" style={{ color: theme.textSecondary }}>
-                Filtrar por estado
-              </p>
-
-              {/* Opción Todos */}
-              <button
-                onClick={() => { setFiltroEstado('todos'); setShowFiltroDropdown(false); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:scale-[1.02]"
-                style={{
-                  backgroundColor: filtroEstado === 'todos' ? `${theme.primary}15` : 'transparent',
-                }}
-              >
-                <div
-                  className="w-3 h-3 rounded-full border-2"
-                  style={{
-                    borderColor: filtroEstado === 'todos' ? theme.primary : theme.border,
-                    backgroundColor: filtroEstado === 'todos' ? theme.primary : 'transparent',
-                  }}
-                />
-                <span
-                  className="text-sm font-medium"
-                  style={{ color: filtroEstado === 'todos' ? theme.primary : theme.text }}
-                >
-                  Todos los estados
-                </span>
-              </button>
-
-              <div className="h-px my-1" style={{ backgroundColor: theme.border }} />
-
-              {/* Estados disponibles */}
-              {estadosUnicos.map(estado => {
-                const config = estadoConfig[estado];
-                if (!config) return null;
-                const isSelected = filtroEstado === estado;
-                const IconEstado = config.icon;
-                return (
-                  <button
-                    key={estado}
-                    onClick={() => { setFiltroEstado(estado); setShowFiltroDropdown(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all hover:scale-[1.02]"
-                    style={{
-                      backgroundColor: isSelected ? `${config.color}15` : 'transparent',
-                    }}
-                  >
-                    <div
-                      className="w-6 h-6 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: config.bg }}
-                    >
-                      <IconEstado className="h-3.5 w-3.5" style={{ color: config.color }} />
-                    </div>
-                    <span
-                      className="text-sm font-medium flex-1"
-                      style={{ color: isSelected ? config.color : theme.text }}
-                    >
-                      {config.label}
-                    </span>
-                    {isSelected && (
-                      <CheckCircle2 className="h-4 w-4" style={{ color: config.color }} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <style>{`
-            @keyframes fadeInDown {
-              from {
-                opacity: 0;
-                transform: translateY(-8px);
-              }
-              to {
-                opacity: 1;
-                transform: translateY(0);
-              }
-            }
-          `}</style>
-        </>
-      )}
 
       {/* Wizard para crear nuevo trámite */}
       <TramiteWizard
