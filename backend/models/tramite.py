@@ -102,6 +102,9 @@ class Tramite(Base):
     es_pago = Column(Boolean, default=False)
     palabras_clave = Column(Text, nullable=True)  # CSV de palabras clave para búsqueda IA
 
+    # Validación facial requerida para iniciar el trámite
+    requiere_validacion_facial = Column(Boolean, default=False)
+
     # Requisitos y documentación (valores por defecto, municipios pueden personalizar)
     requisitos = Column(Text, nullable=True)
     documentos_requeridos = Column(Text, nullable=True)
