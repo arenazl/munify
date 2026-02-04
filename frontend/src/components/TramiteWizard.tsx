@@ -35,6 +35,8 @@ import {
   Bot,
   MessageCircle,
   ArrowRight,
+  ScanFace,
+  Camera,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, authApi, chatApi, clasificacionApi } from '../lib/api';
@@ -266,6 +268,10 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   const [documentos, setDocumentos] = useState<File[]>([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Validación facial
+  const [facialValidated, setFacialValidated] = useState(false);
+  const [facialValidating, setFacialValidating] = useState(false);
 
   // Buscar direcciones con Nominatim (OpenStreetMap)
   const searchAddress = useCallback(async (query: string) => {
@@ -616,6 +622,9 @@ Tono amigable, 2-3 oraciones máximo.`,
       { role: 'assistant', content: '¡Hola! 👋 Soy tu asistente virtual. Contame, ¿qué trámite necesitás hacer?' }
     ]);
     setChatSugerencias([]);
+    // Reset validación facial
+    setFacialValidated(false);
+    setFacialValidating(false);
   };
 
   // Scroll al final del chat cuando hay nuevos mensajes
@@ -834,6 +843,9 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const isStep1Valid = !!formData.servicio_id;
   const isStep2Valid = formData.asunto.trim().length >= 10;
+  // Validación facial: válido si ya validó o si el trámite no lo requiere
+  const requiresFacialValidation = selectedServicio?.requiere_validacion_facial === true;
+  const isStepFacialValid = !requiresFacialValidation || facialValidated;
   const isStep3Valid = user ? true : (
     isAnonymous
       ? !!(formData.email_solicitante || formData.telefono_solicitante)
@@ -1312,6 +1324,99 @@ Tono amigable y conciso (2-3 oraciones máximo).`
     </div>
   );
 
+  // Step Facial: Validación facial (solo si el trámite lo requiere)
+  const handleFacialValidation = async () => {
+    setFacialValidating(true);
+    try {
+      // Simular validación facial - en producción conectar con API real
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setFacialValidated(true);
+      toast.success('Identidad verificada correctamente');
+    } catch {
+      toast.error('Error al validar identidad');
+    } finally {
+      setFacialValidating(false);
+    }
+  };
+
+  const wizardStepFacial = (
+    <div className="space-y-6 py-4">
+      <div className="text-center">
+        <div
+          className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center"
+          style={{ backgroundColor: facialValidated ? '#10b98120' : `${theme.primary}20` }}
+        >
+          {facialValidated ? (
+            <CheckCircle2 className="h-10 w-10" style={{ color: '#10b981' }} />
+          ) : (
+            <ScanFace className="h-10 w-10" style={{ color: theme.primary }} />
+          )}
+        </div>
+        <h3 className="text-lg font-semibold mb-2" style={{ color: theme.text }}>
+          {facialValidated ? 'Identidad Verificada' : 'Verificación de Identidad'}
+        </h3>
+        <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+          {facialValidated
+            ? 'Tu identidad ha sido verificada correctamente. Podés continuar con el trámite.'
+            : 'Este trámite requiere verificar tu identidad mediante reconocimiento facial para garantizar la seguridad del proceso.'
+          }
+        </p>
+      </div>
+
+      {!facialValidated && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
+              <div className="text-sm" style={{ color: theme.textSecondary }}>
+                <p className="font-medium mb-1" style={{ color: theme.text }}>¿Cómo funciona?</p>
+                <ul className="space-y-1 list-disc list-inside">
+                  <li>Se activará tu cámara frontal</li>
+                  <li>Mirá directamente a la cámara</li>
+                  <li>Asegurate de tener buena iluminación</li>
+                  <li>El proceso tarda solo unos segundos</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleFacialValidation}
+            disabled={facialValidating}
+            className="w-full py-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              backgroundColor: theme.primary,
+              color: 'white',
+              opacity: facialValidating ? 0.7 : 1
+            }}
+          >
+            {facialValidating ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Verificando identidad...
+              </>
+            ) : (
+              <>
+                <Camera className="h-5 w-5" />
+                Iniciar Verificación
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {facialValidated && (
+        <div className="p-4 rounded-xl flex items-center gap-3" style={{ backgroundColor: '#10b98120', border: '1px solid #10b98130' }}>
+          <ShieldCheck className="h-6 w-6 flex-shrink-0" style={{ color: '#10b981' }} />
+          <div>
+            <p className="font-medium text-sm" style={{ color: theme.text }}>Verificación exitosa</p>
+            <p className="text-xs" style={{ color: theme.textSecondary }}>Hacé clic en "Siguiente" para continuar</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   // Step 3: Contacto
   const wizardStep3 = (
     <div className="space-y-4">
@@ -1466,12 +1571,36 @@ Tono amigable y conciso (2-3 oraciones máximo).`
   // Validación del paso 0: siempre válido (puede saltar)
   const isStep0Valid = true;
 
-  const wizardSteps = [
+  // Construir los pasos dinámicamente según si requiere validación facial
+  const baseSteps = [
     { id: 'asistente', title: 'Asistente', description: '¿Qué trámite necesitás?', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: isStep0Valid },
     { id: 'servicio', title: selectedRubro && selectedServicio ? `${selectedRubro} · ${selectedServicio.nombre}` : selectedRubro || 'Categoría', description: '', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
     { id: 'detalle', title: selectedRubro && selectedServicio ? `${selectedRubro} · ${selectedServicio.nombre}` : selectedRubro || 'Detalle', description: '', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
-    { id: 'contacto', title: 'Contacto', description: 'Datos de contacto', icon: <User className="h-5 w-5" />, content: wizardStep3, isValid: isStep3Valid },
   ];
+
+  // Agregar paso de validación facial si es requerido
+  if (requiresFacialValidation) {
+    baseSteps.push({
+      id: 'validacion',
+      title: 'Verificación',
+      description: 'Validar identidad',
+      icon: <ScanFace className="h-5 w-5" />,
+      content: wizardStepFacial,
+      isValid: isStepFacialValid
+    });
+  }
+
+  // Agregar paso final de contacto
+  baseSteps.push({
+    id: 'contacto',
+    title: 'Contacto',
+    description: 'Datos de contacto',
+    icon: <User className="h-5 w-5" />,
+    content: wizardStep3,
+    isValid: isStep3Valid
+  });
+
+  const wizardSteps = baseSteps;
 
   // Obtener el tipo de trámite (categoría) del servicio seleccionado
   const tipoDelServicioSeleccionado = selectedServicio

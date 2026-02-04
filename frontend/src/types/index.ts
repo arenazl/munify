@@ -411,4 +411,6 @@ export interface ServicioTramite {
   codigo?: string;
   // Campos de Tramite
   tipo_tramite_id?: number;
+  // Validación facial
+  requiere_validacion_facial?: boolean;
 }
