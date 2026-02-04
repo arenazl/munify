@@ -1471,8 +1471,8 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const wizardSteps = [
     { id: 'asistente', title: 'Asistente', description: '¿Qué trámite necesitás?', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: isStep0Valid },
-    { id: 'servicio', title: selectedRubro || 'Categoría', description: selectedServicio ? selectedServicio.nombre : 'Selecciona el trámite', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
-    { id: 'detalle', title: selectedRubro || 'Detalle', description: selectedServicio?.nombre || 'Describe tu solicitud', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
+    { id: 'servicio', title: selectedRubro && selectedServicio ? `${selectedRubro} · ${selectedServicio.nombre}` : selectedRubro || 'Categoría', description: '', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
+    { id: 'detalle', title: selectedRubro && selectedServicio ? `${selectedRubro} · ${selectedServicio.nombre}` : selectedRubro || 'Detalle', description: '', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
     { id: 'contacto', title: 'Contacto', description: 'Datos de contacto', icon: <User className="h-5 w-5" />, content: wizardStep3, isValid: isStep3Valid },
   ];
 
