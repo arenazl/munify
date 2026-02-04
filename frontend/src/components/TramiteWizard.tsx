@@ -1054,7 +1054,7 @@ Tono amigable y conciso (2-3 oraciones máximo).`
         </div>
       </div>
 
-      <div style={{ height: '120px' }}>
+      <div style={{ height: '100px' }}>
         {selectedRubro ? (
           <div>
             <p className="text-xs font-medium mb-2" style={{ color: theme.text }}>Trámites de {selectedRubro}:</p>
@@ -1073,22 +1073,20 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                     key={s.id}
                     data-tramite-id={String(s.id)}
                     onClick={() => setFormData(prev => ({ ...prev, servicio_id: String(s.id) }))}
-                    className="relative flex-shrink-0 p-2 rounded-xl border-2 text-center transition-all hover:scale-105"
+                    className={`relative flex-shrink-0 p-2 rounded-xl border-2 text-center transition-all hover:scale-105 ${isSelected ? 'border-current' : 'border-transparent'}`}
                     style={{
                       backgroundColor: isSelected ? `${color}20` : theme.backgroundSecondary,
                       borderColor: isSelected ? color : theme.border,
-                      width: '100px',
-                      minHeight: '95px'
+                      width: '85px'
                     }}
                   >
-                    <div className="w-9 h-9 rounded-full mx-auto mb-1.5 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
-                      {getServicioIcon(s.icono)}
+                    <div className="w-7 h-7 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
+                      <span className="scale-75">{getServicioIcon(s.icono)}</span>
                     </div>
-                    <span className="text-[10px] font-medium block line-clamp-2 leading-tight" style={{ color: theme.text }}>{s.nombre}</span>
-                    <div className="text-[9px] mt-1" style={{ color: theme.textSecondary }}>{s.tiempo_estimado_dias}d · {s.costo ? `$${(s.costo/1000).toFixed(0)}k` : 'Gratis'}</div>
+                    <span className="text-[10px] font-medium block text-center line-clamp-2 leading-tight" style={{ color: theme.text }}>{s.nombre}</span>
                     {isSelected && (
-                      <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
-                        <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                      <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
+                        <CheckCircle2 className="h-2 w-2 text-white" />
                       </div>
                     )}
                   </button>
