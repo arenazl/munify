@@ -740,6 +740,53 @@ export default function ReclamoDetalle() {
               )}
             </div>
 
+            {/* Sección para agregar comentario - visible para vecinos en estados no finales */}
+            {user?.rol === 'vecino' && !['finalizado', 'resuelto', 'rechazado'].includes(reclamo.estado) && (
+              <div
+                className="p-4 rounded-xl"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <h3 className="font-medium mb-3 flex items-center gap-2" style={{ color: theme.text }}>
+                  <MessageSquare className="h-4 w-4" style={{ color: theme.primary }} />
+                  Agregar Comentario
+                </h3>
+                <p className="text-sm mb-3" style={{ color: theme.textSecondary }}>
+                  ¿Tenés información adicional sobre este reclamo? Escribí tu comentario y se notificará a la dependencia encargada.
+                </p>
+                <div className="flex gap-2">
+                  <textarea
+                    value={nuevoComentario}
+                    onChange={(e) => setNuevoComentario(e.target.value)}
+                    placeholder="Escribí tu comentario aquí..."
+                    rows={2}
+                    className="flex-1 px-3 py-2 rounded-lg resize-none focus:ring-2 focus:outline-none text-sm"
+                    style={{
+                      backgroundColor: theme.card,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  />
+                  <button
+                    onClick={handleAgregarComentario}
+                    disabled={enviandoComentario || !nuevoComentario.trim()}
+                    className="self-end px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+                    style={{
+                      backgroundColor: `${theme.primary}20`,
+                      border: `2px solid ${theme.primary}`,
+                      color: theme.primary,
+                    }}
+                  >
+                    {enviandoComentario ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    <span className="hidden sm:inline">{enviandoComentario ? 'Enviando...' : 'Enviar'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Resolución */}
             {reclamo.resolucion && (
               <div
