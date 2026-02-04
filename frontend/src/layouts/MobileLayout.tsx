@@ -92,19 +92,21 @@ export default function MobileLayout() {
   const tabs = [
     { path: '/app', icon: Home, label: 'Inicio', end: true },
     { path: '/app/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
-    { path: '/app/nuevo', icon: Plus, label: 'Nuevo', end: false, isMain: true },
+    { path: '/app/nuevo', icon: Plus, label: 'Crear', end: false, isMain: true },
     { path: '/app/logros', icon: Trophy, label: 'Logros', end: false },
     { path: '/app/perfil', icon: User, label: 'Perfil', end: false },
   ];
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
-      {/* Header sticky con logo centrado */}
+      {/* Header sticky con glassmorphism */}
       <header
-        className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between backdrop-blur-sm"
+        className="fixed top-0 left-0 right-0 z-50 px-4 py-3 flex items-center justify-between"
         style={{
-          backgroundColor: `${theme.card}f0`,
-          borderBottom: `1px solid ${theme.border}`,
+          backgroundColor: `${theme.card}e8`,
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          borderBottom: `1px solid ${theme.border}40`,
         }}
       >
         {/* Espacio izquierdo (para balance visual) */}
@@ -113,8 +115,11 @@ export default function MobileLayout() {
         {/* Centro: Logo + Nombre del municipio */}
         <div className="flex-1 flex items-center justify-center gap-2">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${colorPrimario}20` }}
+            className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${colorPrimario}25, ${colorPrimario}10)`,
+              border: `1px solid ${colorPrimario}30`,
+            }}
           >
             {logoUrl ? (
               <img
@@ -137,7 +142,7 @@ export default function MobileLayout() {
             <NotificacionesDropdown />
             <button
               onClick={handleLogout}
-              className="p-2 rounded-lg transition-colors hover:bg-red-500/10"
+              className="p-2 rounded-xl transition-all active:scale-95 hover:bg-red-500/10"
               style={{ color: theme.textSecondary }}
             >
               <LogOut className="h-5 w-5" />
@@ -147,77 +152,98 @@ export default function MobileLayout() {
       </header>
 
       {/* Main Content */}
-      <main style={{ paddingTop: '64px', paddingBottom: '80px', minHeight: '100vh' }}>
+      <main style={{ paddingTop: '64px', paddingBottom: '100px', minHeight: '100vh' }}>
         <Outlet />
       </main>
 
-      {/* Bottom Tab Bar - 5 tabs con botón central destacado */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-50 pb-safe"
-        style={{
-          backgroundColor: theme.card,
-          borderTop: `1px solid ${theme.border}`,
-        }}
-      >
-        <div className="flex items-center justify-around py-1">
-          {tabs.map((tab) => (
-            <NavLink
-              key={tab.path}
-              to={tab.path}
-              end={tab.end}
-              className="flex flex-col items-center py-1 px-2 min-w-0"
-            >
-              {({ isActive }) => (
-                <>
-                  {tab.isMain ? (
-                    // Botón central destacado para "Nuevo"
-                    <div
-                      className="w-10 h-10 -mt-3 rounded-full flex items-center justify-center shadow-lg"
-                      style={{
-                        backgroundColor: theme.primary,
-                        boxShadow: `0 4px 12px ${theme.primary}50`,
-                      }}
-                    >
-                      <tab.icon className="h-5 w-5 text-white" />
-                    </div>
-                  ) : (
-                    <div
-                      className="p-2 rounded-xl transition-all"
-                      style={{
-                        backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
-                      }}
-                    >
-                      <tab.icon
-                        className="h-5 w-5"
-                        style={{ color: isActive ? theme.primary : theme.textSecondary }}
-                      />
-                    </div>
-                  )}
-                  <span
-                    className="text-[10px] mt-0.5 font-medium"
+      {/* Bottom Tab Bar - Diseño moderno con isla flotante */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 px-3 pb-2">
+        <div
+          className="mx-auto max-w-md rounded-2xl px-1 py-1.5 flex items-center justify-around"
+          style={{
+            backgroundColor: `${theme.card}f5`,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: `0 -4px 32px rgba(0,0,0,0.12), 0 0 0 1px ${theme.border}30`,
+          }}
+        >
+          {tabs.map((tab) => {
+            // Para el botón central (Crear)
+            if (tab.isMain) {
+              return (
+                <NavLink
+                  key={tab.path}
+                  to={tab.path}
+                  className="relative -mt-5 flex flex-col items-center"
+                >
+                  {/* Glow effect behind */}
+                  <div
+                    className="absolute w-16 h-16 rounded-2xl blur-xl opacity-40"
+                    style={{ backgroundColor: theme.primary }}
+                  />
+                  {/* Botón flotante con gradiente */}
+                  <div
+                    className="relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all active:scale-90 hover:scale-105"
                     style={{
-                      color: tab.isMain
-                        ? theme.primary
-                        : isActive
-                          ? theme.primary
-                          : theme.textSecondary
+                      background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}cc)`,
+                      boxShadow: `0 4px 20px ${theme.primary}50`,
                     }}
+                  >
+                    <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
+                  </div>
+                  <span
+                    className="text-[10px] mt-1 font-semibold"
+                    style={{ color: theme.primary }}
                   >
                     {tab.label}
                   </span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
+                </NavLink>
+              );
+            }
 
-      {/* Safe area padding for iOS */}
-      <style>{`
-        .pb-safe {
-          padding-bottom: env(safe-area-inset-bottom, 8px);
-        }
-      `}</style>
+            // Tabs normales
+            return (
+              <NavLink
+                key={tab.path}
+                to={tab.path}
+                end={tab.end}
+                className="flex flex-col items-center py-1 px-2 min-w-0"
+              >
+                {({ isActive }) => (
+                  <>
+                    <div
+                      className="p-2 rounded-xl transition-all duration-200"
+                      style={{
+                        backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
+                        transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                      }}
+                    >
+                      <tab.icon
+                        className="h-5 w-5 transition-all"
+                        style={{
+                          color: isActive ? theme.primary : theme.textSecondary,
+                          strokeWidth: isActive ? 2.5 : 2,
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="text-[10px] mt-0.5 font-medium transition-colors"
+                      style={{
+                        color: isActive ? theme.primary : theme.textSecondary
+                      }}
+                    >
+                      {tab.label}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </div>
+
+        {/* Safe area for iOS */}
+        <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
+      </nav>
     </div>
   );
 }

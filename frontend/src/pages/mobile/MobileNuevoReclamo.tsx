@@ -1,166 +1,202 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
-import { MessageSquare, FileText, X, ChevronRight } from 'lucide-react';
+import { MessageSquare, FileText, X, Sparkles, MapPin, HelpCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 export default function MobileNuevoReclamo() {
   const { theme } = useTheme();
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
 
   useEffect(() => {
-    // Animación de entrada
+    // Animación de entrada escalonada
     requestAnimationFrame(() => {
       setIsVisible(true);
+      setTimeout(() => setShowOptions(true), 150);
     });
   }, []);
 
   const handleClose = () => {
-    setIsVisible(false);
+    setShowOptions(false);
+    setTimeout(() => setIsVisible(false), 100);
     setTimeout(() => {
       navigate('/app');
-    }, 300);
+    }, 400);
   };
 
   const handleOption = (path: string) => {
-    setIsVisible(false);
+    setShowOptions(false);
+    setTimeout(() => setIsVisible(false), 100);
     setTimeout(() => {
       navigate(path);
-    }, 200);
+    }, 300);
   };
+
+  const options = [
+    {
+      id: 'reclamo',
+      icon: MessageSquare,
+      label: 'Reclamo',
+      subtitle: 'Reportar problema',
+      path: '/gestion/crear-reclamo',
+      color: theme.primary,
+      delay: 0,
+    },
+    {
+      id: 'tramite',
+      icon: FileText,
+      label: 'Trámite',
+      subtitle: 'Gestión municipal',
+      path: '/gestion/tramites/nuevo',
+      color: '#10b981',
+      delay: 50,
+    },
+    {
+      id: 'consulta',
+      icon: HelpCircle,
+      label: 'Consulta',
+      subtitle: 'Asistente IA',
+      path: '/app/consulta',
+      color: '#8b5cf6',
+      delay: 100,
+    },
+  ];
 
   const modalContent = (
     <>
       <style>{`
-        @keyframes slideUp {
-          from {
-            transform: translateY(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
+        @keyframes backdropFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        @keyframes fadeIn {
+        @keyframes scaleIn {
           from {
             opacity: 0;
+            transform: scale(0.3) translateY(20px);
           }
           to {
             opacity: 1;
+            transform: scale(1) translateY(0);
           }
         }
-        .modal-backdrop {
-          animation: fadeIn 0.3s ease-out;
+        @keyframes floatUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
-        .modal-content {
-          animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
-        .modal-backdrop.closing {
-          animation: fadeIn 0.3s ease-out reverse;
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
-        .modal-content.closing {
-          animation: slideUp 0.3s ease-in reverse;
+        .option-card {
+          animation: floatUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          opacity: 0;
+        }
+        .close-btn {
+          animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          animation-delay: 0.2s;
+          opacity: 0;
+        }
+        .backdrop-blur {
+          animation: backdropFade 0.3s ease-out forwards;
+        }
+        .backdrop-blur.closing {
+          animation: backdropFade 0.2s ease-in reverse forwards;
+        }
+        .shimmer-effect {
+          background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+          background-size: 200% 100%;
+          animation: shimmer 2s infinite;
         }
       `}</style>
 
-      {/* Backdrop */}
+      {/* Backdrop con blur */}
       <div
-        className={`fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm modal-backdrop ${!isVisible ? 'closing' : ''}`}
+        className={`fixed inset-0 z-[60] backdrop-blur ${!isVisible ? 'closing' : ''}`}
+        style={{
+          background: `radial-gradient(circle at 50% 100%, ${theme.primary}30 0%, rgba(0,0,0,0.85) 70%)`,
+        }}
         onClick={handleClose}
       />
 
-      {/* Modal */}
-      <div className="fixed inset-x-0 bottom-0 z-[70] flex items-end justify-center">
+      {/* Contenido central */}
+      <div className="fixed inset-0 z-[70] flex flex-col items-center justify-end pb-28 px-6">
+        {/* Título animado */}
         <div
-          className={`w-full max-w-lg rounded-t-3xl modal-content ${!isVisible ? 'closing' : ''}`}
-          style={{
-            backgroundColor: theme.card,
-            boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.3)',
-          }}
-          onClick={(e) => e.stopPropagation()}
+          className={`mb-8 text-center transition-all duration-500 ${showOptions ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: theme.border }}>
-            <div>
-              <h2 className="text-lg font-bold" style={{ color: theme.text }}>
-                ¿Qué querés crear?
-              </h2>
-              <p className="text-sm" style={{ color: theme.textSecondary }}>
-                Elegí una opción
-              </p>
-            </div>
-            <button
-              onClick={handleClose}
-              className="p-2 rounded-full transition-all hover:scale-110 active:scale-95"
-              style={{ backgroundColor: `${theme.textSecondary}15` }}
-            >
-              <X className="h-5 w-5" style={{ color: theme.textSecondary }} />
-            </button>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Sparkles className="h-5 w-5 text-amber-400" />
+            <span className="text-sm font-medium text-amber-400">Crear nuevo</span>
           </div>
-
-          {/* Opciones */}
-          <div className="p-4 space-y-3 pb-safe">
-            {/* Nuevo Reclamo */}
-            <button
-              onClick={() => handleOption('/gestion/crear-reclamo')}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-[0.98] hover:scale-[1.02]"
-              style={{
-                backgroundColor: `${theme.primary}15`,
-                border: `2px solid ${theme.primary}30`,
-              }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  backgroundColor: theme.primary,
-                  boxShadow: `0 4px 14px ${theme.primary}40`,
-                }}
-              >
-                <MessageSquare className="h-7 w-7 text-white" />
-              </div>
-              <div className="flex-1 text-left">
-                <h3 className="text-base font-semibold" style={{ color: theme.text }}>
-                  Nuevo Reclamo
-                </h3>
-                <p className="text-sm" style={{ color: theme.textSecondary }}>
-                  Reportá un problema en tu zona
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5" style={{ color: theme.primary }} />
-            </button>
-
-            {/* Nuevo Trámite */}
-            <button
-              onClick={() => handleOption('/gestion/tramites/nuevo')}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl transition-all active:scale-[0.98] hover:scale-[1.02]"
-              style={{
-                backgroundColor: '#10b98115',
-                border: '2px solid #10b98130',
-              }}
-            >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  backgroundColor: '#10b981',
-                  boxShadow: '0 4px 14px #10b98140',
-                }}
-              >
-                <FileText className="h-7 w-7 text-white" />
-              </div>
-              <div className="flex-1 text-left">
-                <h3 className="text-base font-semibold" style={{ color: theme.text }}>
-                  Nuevo Trámite
-                </h3>
-                <p className="text-sm" style={{ color: theme.textSecondary }}>
-                  Iniciá un trámite municipal
-                </p>
-              </div>
-              <ChevronRight className="h-5 w-5" style={{ color: '#10b981' }} />
-            </button>
-          </div>
+          <h2 className="text-2xl font-bold text-white">
+            ¿Qué necesitás?
+          </h2>
         </div>
+
+        {/* Grid de opciones - diseño moderno */}
+        <div className="w-full max-w-sm grid grid-cols-3 gap-3">
+          {options.map((option, index) => (
+            <button
+              key={option.id}
+              onClick={() => handleOption(option.path)}
+              className="option-card flex flex-col items-center p-4 rounded-3xl transition-all active:scale-95 hover:scale-105 relative overflow-hidden group"
+              style={{
+                animationDelay: showOptions ? `${option.delay}ms` : '0ms',
+                background: `linear-gradient(145deg, ${option.color}25, ${option.color}10)`,
+                border: `1px solid ${option.color}40`,
+                boxShadow: `0 8px 32px ${option.color}30, inset 0 1px 0 rgba(255,255,255,0.1)`,
+              }}
+            >
+              {/* Shimmer effect on hover */}
+              <div className="absolute inset-0 shimmer-effect opacity-0 group-hover:opacity-100 transition-opacity" />
+
+              {/* Icono con glow */}
+              <div
+                className="relative w-14 h-14 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+                style={{
+                  background: `linear-gradient(135deg, ${option.color}, ${option.color}dd)`,
+                  boxShadow: `0 4px 20px ${option.color}60`,
+                }}
+              >
+                <option.icon className="h-7 w-7 text-white" />
+              </div>
+
+              {/* Label */}
+              <span className="text-sm font-semibold text-white">
+                {option.label}
+              </span>
+              <span className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                {option.subtitle}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Botón cerrar - moderno flotante */}
+        <button
+          onClick={handleClose}
+          className="close-btn mt-8 w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90 hover:scale-110"
+          style={{
+            background: 'linear-gradient(145deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))',
+            border: '1px solid rgba(255,255,255,0.2)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+          }}
+        >
+          <X className="h-6 w-6 text-white" />
+        </button>
       </div>
     </>
   );
