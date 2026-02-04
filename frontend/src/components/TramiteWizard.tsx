@@ -1494,6 +1494,19 @@ Tono amigable y conciso (2-3 oraciones máximo).`
         {selectedServicio && tipoDelServicioSeleccionado && (
           <div className="space-y-3">
 
+            {/* Nombre del trámite específico */}
+            <div className="flex items-center gap-2">
+              <div
+                className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${selectedServicio.color || tipoDelServicioSeleccionado.color || theme.primary}20` }}
+              >
+                <span style={{ color: selectedServicio.color || tipoDelServicioSeleccionado.color || theme.primary }} className="scale-75">
+                  {getServicioIcon(selectedServicio.icono)}
+                </span>
+              </div>
+              <span className="font-medium text-sm truncate" style={{ color: theme.text }}>{selectedServicio.nombre}</span>
+            </div>
+
             {/* Tiempo y costo - compacto en una línea */}
             <div className="flex items-center gap-3 py-2 px-3 rounded-lg" style={{ backgroundColor: theme.card }}>
               <div className="flex items-center gap-1.5">
