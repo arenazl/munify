@@ -3499,9 +3499,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setMotivoRechazo('otro')}
               className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: '#ef444415',
-                border: '1px solid #ef444450',
-                color: '#ef4444'
+                backgroundColor: `${estadoColors.rechazado.bg}20`,
+                border: `2px solid ${estadoColors.rechazado.bg}`,
+                color: estadoColors.rechazado.bg
               }}
             >
               Rechazar
@@ -3528,9 +3528,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setMotivoRechazo('otro')}
               className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: '#ef444415',
-                border: '1px solid #ef444450',
-                color: '#ef4444'
+                backgroundColor: `${estadoColors.rechazado.bg}20`,
+                border: `2px solid ${estadoColors.rechazado.bg}`,
+                color: estadoColors.rechazado.bg
               }}
             >
               Rechazar
@@ -3544,11 +3544,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleIniciar}
               disabled={saving || !descripcionInicio.trim()}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
               style={{
-                backgroundColor: descripcionInicio.trim() ? theme.primary : theme.border,
-                color: descripcionInicio.trim() ? '#ffffff' : theme.textSecondary,
-                boxShadow: descripcionInicio.trim() ? `0 4px 14px ${theme.primary}40` : 'none'
+                backgroundColor: descripcionInicio.trim() ? `${estadoColors.en_curso.bg}20` : 'transparent',
+                border: `2px solid ${descripcionInicio.trim() ? estadoColors.en_curso.bg : theme.border}`,
+                color: descripcionInicio.trim() ? estadoColors.en_curso.bg : theme.textSecondary,
               }}
             >
               {saving ? 'Procesando...' : 'En Curso'}
@@ -3557,9 +3557,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setMotivoRechazo('otro')}
               className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: '#ef444415',
-                border: '1px solid #ef444450',
-                color: '#ef4444'
+                backgroundColor: `${estadoColors.rechazado.bg}20`,
+                border: `2px solid ${estadoColors.rechazado.bg}`,
+                color: estadoColors.rechazado.bg
               }}
             >
               Rechazar
@@ -3573,11 +3573,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <button
               onClick={handleFinalizar}
               disabled={saving || !resolucion}
-              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg"
+              className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: '#16a34a',
-                color: '#ffffff',
-                boxShadow: '0 4px 14px rgba(22, 163, 74, 0.4)'
+                backgroundColor: `${estadoColors.finalizado.bg}20`,
+                border: `2px solid ${estadoColors.finalizado.bg}`,
+                color: estadoColors.finalizado.bg,
               }}
             >
               {saving ? 'Finalizando...' : 'Finalizar'}
@@ -3586,9 +3586,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setMotivoRechazo('otro')}
               className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: '#ef444415',
-                border: '1px solid #ef444450',
-                color: '#ef4444'
+                backgroundColor: `${estadoColors.rechazado.bg}20`,
+                border: `2px solid ${estadoColors.rechazado.bg}`,
+                color: estadoColors.rechazado.bg
               }}
             >
               Rechazar
@@ -3602,9 +3602,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               disabled={saving || !motivoNoFinalizado}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed"
               style={{
-                backgroundColor: '#f59e0b20',
-                color: '#f59e0b',
-                border: '1px solid #f59e0b50'
+                backgroundColor: `${estadoColors.pospuesto.bg}20`,
+                border: `2px solid ${estadoColors.pospuesto.bg}`,
+                color: estadoColors.pospuesto.bg
               }}
             >
               {saving ? 'Posponiendo...' : 'Posponer'}
@@ -3613,9 +3613,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => setMotivoRechazo('otro')}
               className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: '#ef444415',
-                border: '1px solid #ef444450',
-                color: '#ef4444'
+                backgroundColor: `${estadoColors.rechazado.bg}20`,
+                border: `2px solid ${estadoColors.rechazado.bg}`,
+                color: estadoColors.rechazado.bg
               }}
             >
               Rechazar
@@ -3628,9 +3628,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <div
             className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
             style={{
-              backgroundColor: selectedReclamo.estado === 'rechazado' ? '#ef444420' : '#16a34a20',
-              color: selectedReclamo.estado === 'rechazado' ? '#ef4444' : '#16a34a',
-              border: `1px solid ${selectedReclamo.estado === 'rechazado' ? '#ef444450' : '#16a34a50'}`
+              backgroundColor: selectedReclamo.estado === 'rechazado' ? `${estadoColors.rechazado.bg}20` : `${estadoColors.finalizado.bg}20`,
+              color: selectedReclamo.estado === 'rechazado' ? estadoColors.rechazado.bg : estadoColors.finalizado.bg,
+              border: `2px solid ${selectedReclamo.estado === 'rechazado' ? estadoColors.rechazado.bg : estadoColors.finalizado.bg}`
             }}
           >
             {selectedReclamo.estado === 'rechazado' ? '✗ Rechazado' : '✓ Finalizado'}
@@ -3644,9 +3644,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               onClick={() => reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', 'Retomando trabajo pospuesto').then(() => { fetchReclamos(true); closeSheet(); toast.success('Reclamo retomado'); })}
               className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: theme.primary,
-                color: '#ffffff',
-                boxShadow: `0 4px 14px ${theme.primary}40`
+                backgroundColor: `${estadoColors.en_curso.bg}20`,
+                border: `2px solid ${estadoColors.en_curso.bg}`,
+                color: estadoColors.en_curso.bg
               }}
             >
               Retomar
@@ -3654,9 +3654,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <div
               className="px-4 py-2.5 rounded-xl font-medium text-center"
               style={{
-                backgroundColor: '#f59e0b20',
-                color: '#f59e0b',
-                border: '1px solid #f59e0b50'
+                backgroundColor: `${estadoColors.pospuesto.bg}20`,
+                border: `2px solid ${estadoColors.pospuesto.bg}`,
+                color: estadoColors.pospuesto.bg
               }}
             >
               Pospuesto
