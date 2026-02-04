@@ -1107,7 +1107,7 @@ Tono amigable y conciso (2-3 oraciones máximo).`
           ) : (
             <Sparkles className="h-5 w-5 flex-shrink-0" style={{ color: theme.primary }} />
           )}
-          <p className="text-xs line-clamp-2" style={{ color: theme.textSecondary }}>
+          <p className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
             {aiLoading
               ? 'Analizando el trámite...'
               : aiResponse
