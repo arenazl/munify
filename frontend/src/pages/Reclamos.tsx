@@ -11,6 +11,7 @@ import { WizardModal } from '../components/ui/WizardModal';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
@@ -3668,7 +3669,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   };
 
   return (
-    <>
+    <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
       <ABMPage
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
         buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
@@ -4013,6 +4014,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         } : undefined}
       />
 
-    </>
+    </PullToRefresh>
   );
 }

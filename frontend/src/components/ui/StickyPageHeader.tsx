@@ -1,5 +1,5 @@
-import { ReactNode, useState } from 'react';
-import { Search, Plus, ArrowLeft } from 'lucide-react';
+import { ReactNode, useState, useEffect, useRef, useCallback } from 'react';
+import { Search, Plus, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -26,6 +26,8 @@ interface StickyPageHeaderProps {
   filterPanel?: ReactNode;
   /** Contenido custom (si se usa, ignora icon/title/search/actions) */
   children?: ReactNode;
+  /** Callback para pull-to-refresh (solo mobile). Si se pasa, habilita el gesto. */
+  onRefresh?: () => Promise<void>;
 }
 
 /**
@@ -64,9 +66,78 @@ export function StickyPageHeader({
   onButtonClick,
   filterPanel,
   children,
+  onRefresh,
 }: StickyPageHeaderProps) {
   const { theme } = useTheme();
   const [searchFocused, setSearchFocused] = useState(false);
+
+  // Pull-to-refresh state
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStartY = useRef(0);
+  const isPulling = useRef(false);
+
+  const PULL_THRESHOLD = 80; // Distancia mínima para activar refresh
+
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    if (!onRefresh || refreshing) return;
+    // Solo activar si estamos en el top del scroll
+    if (window.scrollY === 0) {
+      touchStartY.current = e.touches[0].clientY;
+      isPulling.current = true;
+    }
+  }, [onRefresh, refreshing]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isPulling.current || !onRefresh || refreshing) return;
+
+    const currentY = e.touches[0].clientY;
+    const distance = currentY - touchStartY.current;
+
+    if (distance > 0 && window.scrollY === 0) {
+      // Aplicar resistencia al pull
+      const resistance = Math.min(distance * 0.4, PULL_THRESHOLD + 20);
+      setPullDistance(resistance);
+
+      // Prevenir scroll normal cuando estamos pulling
+      if (distance > 10) {
+        e.preventDefault();
+      }
+    }
+  }, [onRefresh, refreshing]);
+
+  const handleTouchEnd = useCallback(async () => {
+    if (!isPulling.current || !onRefresh) return;
+    isPulling.current = false;
+
+    if (pullDistance >= PULL_THRESHOLD && !refreshing) {
+      setRefreshing(true);
+      setPullDistance(PULL_THRESHOLD); // Mantener en posición de loading
+
+      try {
+        await onRefresh();
+      } finally {
+        setRefreshing(false);
+        setPullDistance(0);
+      }
+    } else {
+      setPullDistance(0);
+    }
+  }, [pullDistance, refreshing, onRefresh]);
+
+  useEffect(() => {
+    if (!onRefresh) return;
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [onRefresh, handleTouchStart, handleTouchMove, handleTouchEnd]);
 
   // Modo custom: si hay children, renderizar como antes
   const useCustomMode = !!children;
@@ -74,10 +145,37 @@ export function StickyPageHeader({
   // Usar position sticky - se queda fijo cuando llega al top
   return (
     <>
+      {/* Pull-to-refresh indicator */}
+      {onRefresh && (pullDistance > 0 || refreshing) && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-50 flex items-center justify-center transition-all duration-200"
+          style={{
+            top: Math.min(pullDistance, PULL_THRESHOLD) - 10,
+            opacity: Math.min(pullDistance / PULL_THRESHOLD, 1),
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center shadow-lg"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <RefreshCw
+              className={`h-5 w-5 transition-transform ${refreshing ? 'animate-spin' : ''}`}
+              style={{
+                color: pullDistance >= PULL_THRESHOLD ? theme.primary : theme.textSecondary,
+                transform: refreshing ? undefined : `rotate(${pullDistance * 3}deg)`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Header sticky - se pega al top cuando scrolleas */}
       <div
-        className="sticky z-30 top-0 pt-1 pb-3"
-        style={{ backgroundColor: theme.background }}
+        className="sticky z-30 top-0 pt-1 pb-3 transition-transform"
+        style={{
+          backgroundColor: theme.background,
+          transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+        }}
       >
         {/* Parte 1: Header principal */}
         <div
