@@ -1083,7 +1083,7 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                     <div className="w-7 h-7 rounded-full mx-auto mb-1 flex items-center justify-center" style={{ backgroundColor: isSelected ? color : `${color}30`, color: isSelected ? 'white' : color }}>
                       <span className="scale-75">{getServicioIcon(s.icono)}</span>
                     </div>
-                    <span className="text-[10px] font-medium block text-center line-clamp-2 leading-tight" style={{ color: theme.text }}>{s.nombre}</span>
+                    <span className="text-[10px] font-medium block text-center truncate" style={{ color: theme.text }}>{s.nombre}</span>
                     {isSelected && (
                       <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center" style={{ backgroundColor: color }}>
                         <CheckCircle2 className="h-2 w-2 text-white" />
