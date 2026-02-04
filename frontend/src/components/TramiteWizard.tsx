@@ -1481,13 +1481,13 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const wizardAIPanel = (
     <div className="h-full flex flex-col">
-      {/* Header con icono IA y nombre del trámite */}
+      {/* Header con nombre del trámite y Asistente */}
       <div className="flex items-center gap-2 mb-3 min-w-0">
         <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
           <Sparkles className="h-3 w-3" style={{ color: theme.primary }} />
         </div>
         <span className="font-medium text-sm truncate" style={{ color: theme.text }}>
-          {selectedServicio ? selectedServicio.nombre : 'Asistente'}
+          {selectedServicio ? `${selectedServicio.nombre} · Asistente` : 'Asistente'}
         </span>
       </div>
 
