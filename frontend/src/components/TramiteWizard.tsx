@@ -1481,31 +1481,20 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const wizardAIPanel = (
     <div className="h-full flex flex-col">
-      {/* Header con icono IA */}
-      <div className="flex items-center gap-2 mb-3">
+      {/* Header con icono IA y nombre del trámite */}
+      <div className="flex items-center gap-2 mb-3 min-w-0">
         <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
           <Sparkles className="h-3 w-3" style={{ color: theme.primary }} />
         </div>
-        <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente</span>
+        <span className="font-medium text-sm truncate" style={{ color: theme.text }}>
+          {selectedServicio ? selectedServicio.nombre : 'Asistente'}
+        </span>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto">
         {/* Info dinámica del servicio seleccionado */}
         {selectedServicio && tipoDelServicioSeleccionado && (
           <div className="space-y-3">
-
-            {/* Nombre del trámite específico */}
-            <div className="flex items-center gap-2">
-              <div
-                className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${selectedServicio.color || tipoDelServicioSeleccionado.color || theme.primary}20` }}
-              >
-                <span style={{ color: selectedServicio.color || tipoDelServicioSeleccionado.color || theme.primary }} className="scale-75">
-                  {getServicioIcon(selectedServicio.icono)}
-                </span>
-              </div>
-              <span className="font-medium text-sm truncate" style={{ color: theme.text }}>{selectedServicio.nombre}</span>
-            </div>
 
             {/* Tiempo y costo - compacto en una línea */}
             <div className="flex items-center gap-3 py-2 px-3 rounded-lg" style={{ backgroundColor: theme.card }}>
