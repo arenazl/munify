@@ -490,23 +490,7 @@ export default function DashboardVecino() {
             <TrendingUp className="w-3.5 h-3.5" style={{ color: theme.primary }} />
             Explora
           </h3>
-          <div className="grid grid-cols-4 gap-2">
-            <QuickAccessCard
-              theme={theme}
-              icon={<ClipboardList className="h-5 w-5" />}
-              label="Reclamos"
-              color="#3b82f6"
-              onClick={() => navigate('/gestion/mis-reclamos')}
-              compact
-            />
-            <QuickAccessCard
-              theme={theme}
-              icon={<FileText className="h-5 w-5" />}
-              label="Trámites"
-              color="#06b6d4"
-              onClick={() => navigate('/gestion/mis-tramites')}
-              compact
-            />
+          <div className="grid grid-cols-2 gap-2">
             <QuickAccessCard
               theme={theme}
               icon={<Map className="h-5 w-5" />}
@@ -979,6 +963,213 @@ export default function DashboardVecino() {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Gestiones Carousel - Carrusel horizontal para Reclamos y Trámites
+function GestionesCarousel({
+  theme,
+  navigate,
+  reclamosRecientes,
+  reclamosPendientes,
+  estadoColors,
+  estadoLabels,
+}: {
+  theme: ReturnType<typeof useTheme>['theme'];
+  navigate: ReturnType<typeof useNavigate>;
+  reclamosRecientes: Reclamo[];
+  reclamosPendientes: number;
+  estadoColors: Record<EstadoReclamo, { bg: string; text: string }>;
+  estadoLabels: Record<EstadoReclamo, string>;
+}) {
+  const [activeTab, setActiveTab] = useState<'reclamos' | 'tramites'>('reclamos');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Touch handling para swipe
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 50;
+
+    if (diff > threshold) {
+      // Swipe left -> go to tramites
+      setActiveTab('tramites');
+    } else if (diff < -threshold) {
+      // Swipe right -> go to reclamos
+      setActiveTab('reclamos');
+    }
+  };
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      {/* Tabs Header */}
+      <div className="flex items-center p-1 m-3 mb-0 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+        <button
+          onClick={() => setActiveTab('reclamos')}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all"
+          style={{
+            backgroundColor: activeTab === 'reclamos' ? theme.card : 'transparent',
+            color: activeTab === 'reclamos' ? theme.primary : theme.textSecondary,
+            boxShadow: activeTab === 'reclamos' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+          }}
+        >
+          <Megaphone className="h-4 w-4" />
+          Reclamos
+        </button>
+        <button
+          onClick={() => setActiveTab('tramites')}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all"
+          style={{
+            backgroundColor: activeTab === 'tramites' ? theme.card : 'transparent',
+            color: activeTab === 'tramites' ? '#8b5cf6' : theme.textSecondary,
+            boxShadow: activeTab === 'tramites' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+          }}
+        >
+          <FileCheck className="h-4 w-4" />
+          Trámites
+        </button>
+      </div>
+
+      {/* Carousel Content */}
+      <div
+        ref={containerRef}
+        className="relative overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div
+          className="flex transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(${activeTab === 'reclamos' ? '0%' : '-50%'})`, width: '200%' }}
+        >
+          {/* Panel Reclamos */}
+          <div className="w-1/2 flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3">
+              <h2 className="font-semibold flex items-center gap-2 text-sm" style={{ color: theme.text }}>
+                Tus Reclamos
+              </h2>
+              <button
+                onClick={() => navigate('/gestion/mis-reclamos')}
+                className="text-xs flex items-center gap-1 font-medium"
+                style={{ color: theme.primary }}
+              >
+                Ver todos <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            {reclamosPendientes > 0 ? (
+              <div>
+                {reclamosRecientes.slice(0, 3).map((reclamo, idx) => {
+                  const estado = estadoColors[reclamo.estado];
+                  return (
+                    <div
+                      key={reclamo.id}
+                      onClick={() => navigate('/gestion/mis-reclamos')}
+                      className="flex items-center gap-3 p-3 cursor-pointer transition-colors hover:bg-black/5"
+                      style={{ borderTop: `1px solid ${theme.border}` }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[10px] font-mono" style={{ color: theme.textSecondary }}>#{reclamo.id}</span>
+                          <span
+                            className="px-1.5 py-0.5 text-[9px] font-medium rounded-full"
+                            style={{ backgroundColor: estado.bg, color: estado.text }}
+                          >
+                            {estadoLabels[reclamo.estado]}
+                          </span>
+                        </div>
+                        <p className="font-medium text-xs truncate" style={{ color: theme.text }}>{reclamo.titulo}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-6 text-center">
+                <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: `${theme.primary}10` }}>
+                  <CheckCircle className="h-6 w-6" style={{ color: theme.primary }} />
+                </div>
+                <p className="text-sm font-medium" style={{ color: theme.text }}>Sin reclamos vigentes</p>
+                <p className="text-xs mt-1 mb-3" style={{ color: theme.textSecondary }}>Todos tus reclamos fueron resueltos</p>
+                <button
+                  onClick={() => navigate('/gestion/crear-reclamo')}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                >
+                  Crear reclamo
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Panel Trámites */}
+          <div className="w-1/2 flex-shrink-0">
+            <div className="flex items-center justify-between px-4 py-3">
+              <h2 className="font-semibold flex items-center gap-2 text-sm" style={{ color: theme.text }}>
+                Tus Trámites
+              </h2>
+              <button
+                onClick={() => navigate('/gestion/mis-tramites')}
+                className="text-xs flex items-center gap-1 font-medium"
+                style={{ color: '#8b5cf6' }}
+              >
+                Ver todos <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Por ahora siempre muestra vacío - se conectará con API de trámites */}
+            <div className="p-6 text-center">
+              <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: '#8b5cf610' }}>
+                <FileText className="h-6 w-6" style={{ color: '#8b5cf6' }} />
+              </div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>Sin trámites vigentes</p>
+              <p className="text-xs mt-1 mb-3" style={{ color: theme.textSecondary }}>No tenés trámites en curso</p>
+              <button
+                onClick={() => navigate('/gestion/crear-tramite')}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                style={{ backgroundColor: '#8b5cf615', color: '#8b5cf6' }}
+              >
+                Iniciar trámite
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Dots indicator */}
+      <div className="flex justify-center gap-2 pb-4">
+        <button
+          onClick={() => setActiveTab('reclamos')}
+          className="w-2 h-2 rounded-full transition-all"
+          style={{
+            backgroundColor: activeTab === 'reclamos' ? theme.primary : theme.border,
+            transform: activeTab === 'reclamos' ? 'scale(1.3)' : 'scale(1)',
+          }}
+        />
+        <button
+          onClick={() => setActiveTab('tramites')}
+          className="w-2 h-2 rounded-full transition-all"
+          style={{
+            backgroundColor: activeTab === 'tramites' ? '#8b5cf6' : theme.border,
+            transform: activeTab === 'tramites' ? 'scale(1.3)' : 'scale(1)',
+          }}
+        />
       </div>
     </div>
   );

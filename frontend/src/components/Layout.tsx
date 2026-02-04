@@ -340,8 +340,9 @@ export default function Layout() {
 
         {/* Header del Sidebar: Logo + Municipio */}
         <div className="relative z-10 px-3 py-4 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
-          <div
-            className="flex items-center gap-2"
+          <button
+            onClick={() => navigate('/gestion')}
+            className="flex items-center gap-2 w-full transition-all hover:opacity-80 active:scale-95"
             style={{
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
@@ -376,7 +377,7 @@ export default function Layout() {
               )}
               {/* Super Admin (sin municipio_id): no mostrar nada */}
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Usuario en el Sidebar */}

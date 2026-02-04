@@ -97,7 +97,71 @@ switch(estado) {
 
 ---
 
-## ESTADO ACTUAL DE DESARROLLO (2025-02-01)
+## ESTADO ACTUAL DE DESARROLLO (2025-02-04)
+
+### NUEVA FUNCIONALIDAD: Sistema de "Sumarse" a Reclamos Duplicados
+
+Se implementó un sistema que permite que múltiples vecinos se unan a un mismo reclamo existente en lugar de crear duplicados. Esto incluye:
+
+#### Backend Cambios:
+- **Nuevo Modelo:** `ReclamoPersona` - Tabla intermedia que vincula múltiples usuarios con un reclamo
+  - Archivo: `backend/models/reclamo_persona.py`
+  - Tabla: `reclamo_personas` (FK: reclamo_id, usuario_id, es_creador_original)
+
+- **Nuevo Endpoint:** `POST /reclamos/{id}/sumarse`
+  - Valida que el usuario no sea creador original
+  - Evita duplicados con UniqueConstraint
+  - Crea entrada en historial con acción "persona_sumada"
+
+- **Funciones de Notificación:**
+  - `notificar_persona_sumada()` - Notifica cuando alguien se suma
+  - `notificar_comentario_a_personas_sumadas()` - Notifica a TODOS los sumados cuando hay comentario
+
+- **Actualizaciones a Modelos:**
+  - `Reclamo.personas` - relación a ReclamoPersona
+  - `User.reclamos_unidos` - relación a ReclamoPersona
+
+- **Actualización de Endpoint:** `POST /reclamos/{id}/comentario`
+  - Retorna datos del usuario que comenta (nombre, apellido, id)
+  - Notifica a todos los sumados + supervisores
+
+#### Frontend Cambios:
+- **Componente `ReclamosSimilares.tsx`:**
+  - Nuevo prop: `onSumarse?: (id: number) => Promise<void>`
+  - Botón "Sumarme" junto a "Ver detalles" en cada similar
+  - Estados de loading mientras se suma
+
+- **Página `NuevoReclamo.tsx`:**
+  - Handler para `onSumarse` que llamaa la API
+  - Navega a detalle del reclamo después de sumarse
+
+- **API `frontend/src/lib/api.ts`:**
+  - Nuevo método: `reclamosApi.sumarse(id)`
+
+- **Tipos TypeScript:**
+  - Nueva interfaz: `ReclamoPersona` con campos id, nombre, apellido, email, created_at, es_creador_original
+  - Campo opcional en `Reclamo.personas: ReclamoPersona[]`
+
+- **Visualización de Historial:**
+  - Comentarios mostrados con badge azul "💬 Comentario"
+  - Acciones de sumarse mostradas con badge verde "✓ Persona sumada"
+  - Comentarios tienen estilo diferenciado con borde azul
+
+#### Migraciones de Datos:
+- Script `backend/scripts/migrate_creadores_to_reclamo_personas.py`
+  - Inserta todos los creadores existentes como `es_creador_original=true`
+  - Ejecutado automáticamente
+
+#### Flujo de Usuario:
+1. Usuario intenta crear reclamo similar → Se muestran similares
+2. Usuario hace click en "Sumarme" → POST /reclamos/{id}/sumarse
+3. Se crea ReclamoPersona + entrada en historial
+4. Se notifica a otros sumados
+5. Usuario es redirigido al detalle del reclamo
+
+---
+
+## ESTADO ANTERIOR (2025-02-01)
 
 ### Cambios Completados: Eliminación rol "empleado" y nuevo flujo de estados
 

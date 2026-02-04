@@ -1613,7 +1613,24 @@ async def agregar_comentario(
             autor_nombre=autor_nombre
         )
 
-    return historial
+    # Notificar a TODOS los sumados (personas que se unieron al reclamo)
+    # El creador original ya fue notificado si es un supervisor
+    # Pero también notificamos a otros vecinos sumados
+    from services.notificacion_service import notificar_comentario_a_personas_sumadas
+    await notificar_comentario_a_personas_sumadas(db, reclamo_id, current_user)
+
+    # Retornar historial con datos del usuario que comenta
+    return {
+        "id": historial.id,
+        "comentario": historial.comentario,
+        "usuario": {
+            "id": current_user.id,
+            "nombre": current_user.nombre,
+            "apellido": current_user.apellido
+        },
+        "created_at": historial.created_at,
+        "accion": historial.accion
+    }
 
 
 # Tipos de archivo permitidos y tamaño máximo
@@ -1997,4 +2014,83 @@ async def confirmar_reclamo_vecino(
         "message": "Gracias por tu confirmación" if data.solucionado else "Lamentamos que el problema persista. Tu feedback fue registrado.",
         "confirmado_vecino": data.solucionado,
         "fecha_confirmacion": reclamo.fecha_confirmacion_vecino.isoformat()
+    }
+
+
+# ===========================================
+# SISTEMA DE "SUMARSE" A RECLAMOS DUPLICADOS
+# ===========================================
+
+@router.post("/{reclamo_id}/sumarse")
+async def sumarse_a_reclamo(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Usuario actual (vecino) se suma a un reclamo existente.
+    Permite que múltiples usuarios se unan a un mismo reclamo en lugar de crear duplicados.
+    """
+    # Solo vecinos pueden sumarse
+    if current_user.rol != RolUsuario.VECINO:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo los vecinos pueden sumarse a reclamos"
+        )
+
+    # Validar que el reclamo existe
+    reclamo = await db.get(Reclamo, reclamo_id)
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Validar que el usuario no sea el creador original
+    if reclamo.creador_id == current_user.id:
+        raise HTTPException(
+            status_code=400,
+            detail="Ya eres el creador de este reclamo"
+        )
+
+    # Validar que no se haya sumado ya
+    from models.reclamo_persona import ReclamoPersona
+    result = await db.execute(
+        select(ReclamoPersona).where(
+            (ReclamoPersona.reclamo_id == reclamo_id) &
+            (ReclamoPersona.usuario_id == current_user.id)
+        )
+    )
+    if result.scalar():
+        raise HTTPException(
+            status_code=400,
+            detail="Ya te has sumado a este reclamo"
+        )
+
+    # Crear registro en reclamo_personas
+    nueva_persona = ReclamoPersona(
+        reclamo_id=reclamo_id,
+        usuario_id=current_user.id,
+        es_creador_original=False
+    )
+    db.add(nueva_persona)
+
+    # Agregar entrada en historial
+    historial = HistorialReclamo(
+        reclamo_id=reclamo_id,
+        usuario_id=current_user.id,
+        accion="persona_sumada",
+        comentario=f"{current_user.nombre} {current_user.apellido} se sumó al reclamo"
+    )
+    db.add(historial)
+
+    # Actualizar updated_at del reclamo
+    reclamo.updated_at = func.now()
+
+    await db.commit()
+
+    # TODO: Enviar notificación a todos los que se sumaron
+    # await notificar_persona_sumada(reclamo_id, current_user, db)
+
+    return {
+        "success": True,
+        "message": "Te has sumado al reclamo exitosamente",
+        "reclamo_id": reclamo_id
     }

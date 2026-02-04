@@ -81,3 +81,4 @@ class Reclamo(Base):
     historial = relationship("HistorialReclamo", back_populates="reclamo", order_by="HistorialReclamo.created_at.desc()")
     documentos = relationship("Documento", back_populates="reclamo")
     calificacion = relationship("Calificacion", back_populates="reclamo", uselist=False)
+    personas = relationship("ReclamoPersona", back_populates="reclamo", cascade="all, delete-orphan")

@@ -134,6 +134,19 @@ class DocumentoSimple(BaseModel):
     class Config:
         from_attributes = True
 
+
+class PersonaSumada(BaseModel):
+    """Persona que se sumó a un reclamo"""
+    id: int
+    nombre: str
+    apellido: str
+    email: str
+    created_at: datetime
+    es_creador_original: bool
+
+    class Config:
+        from_attributes = True
+
 class ReclamoResponse(BaseModel):
     id: int
     titulo: str

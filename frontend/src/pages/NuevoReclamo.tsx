@@ -2545,6 +2545,26 @@ Tono amigable, 3-4 oraciones máximo.`,
             const route = isMobile ? `/app/reclamo/${id}` : `/gestion/reclamos/${id}`;
             window.open(route, '_blank');
           }}
+          onSumarse={async (reclamoId) => {
+            try {
+              setSubmitting(true);
+              await reclamosApi.sumarse(reclamoId);
+              toast.success('¡Te has sumado al reclamo!');
+
+              // Esperar un momento y navegar
+              await new Promise(resolve => setTimeout(resolve, 500));
+              const isMobile = window.location.pathname.startsWith('/app');
+              const route = isMobile
+                ? `/app/reclamo/${reclamoId}`
+                : `/gestion/reclamos/${reclamoId}`;
+              navigate(route);
+            } catch (error) {
+              const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+              toast.error(`Error al sumarte: ${errorMsg}`);
+            } finally {
+              setSubmitting(false);
+            }
+          }}
         />
       )}
     </div>

@@ -29,14 +29,25 @@ import { Sheet } from '../components/ui/Sheet';
 import { TramiteWizard } from '../components/TramiteWizard';
 import type { Tramite, EstadoTramite, ServicioTramite, TipoTramite } from '../types';
 
-const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; color: string; label: string; bg: string }> = {
-  iniciado: { icon: Clock, color: '#6366f1', label: 'Iniciado', bg: '#eef2ff' },
-  en_revision: { icon: FileCheck, color: '#3b82f6', label: 'En Revisión', bg: '#dbeafe' },
-  requiere_documentacion: { icon: AlertCircle, color: '#f59e0b', label: 'Requiere Doc.', bg: '#fef3c7' },
-  en_proceso: { icon: RefreshCw, color: '#8b5cf6', label: 'En Proceso', bg: '#ede9fe' },
-  aprobado: { icon: CheckCircle2, color: '#10b981', label: 'Aprobado', bg: '#d1fae5' },
-  rechazado: { icon: XCircle, color: '#ef4444', label: 'Rechazado', bg: '#fee2e2' },
-  finalizado: { icon: CheckCircle2, color: '#059669', label: 'Finalizado', bg: '#d1fae5' },
+// Colores sólidos para estados (similar a ReclamoCard)
+export const estadoColors: Record<EstadoTramite, { bg: string; text: string }> = {
+  iniciado: { bg: '#6366f1', text: '#ffffff' },      // Indigo
+  en_revision: { bg: '#3b82f6', text: '#ffffff' },   // Blue
+  requiere_documentacion: { bg: '#f59e0b', text: '#ffffff' }, // Amber
+  en_proceso: { bg: '#8b5cf6', text: '#ffffff' },    // Purple
+  aprobado: { bg: '#10b981', text: '#ffffff' },      // Emerald
+  rechazado: { bg: '#ef4444', text: '#ffffff' },     // Red
+  finalizado: { bg: '#059669', text: '#ffffff' },    // Green
+};
+
+const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; label: string }> = {
+  iniciado: { icon: Clock, label: 'Iniciado' },
+  en_revision: { icon: FileCheck, label: 'En Revisión' },
+  requiere_documentacion: { icon: AlertCircle, label: 'Requiere Doc.' },
+  en_proceso: { icon: RefreshCw, label: 'En Proceso' },
+  aprobado: { icon: CheckCircle2, label: 'Aprobado' },
+  rechazado: { icon: XCircle, label: 'Rechazado' },
+  finalizado: { icon: CheckCircle2, label: 'Finalizado' },
 };
 
 export default function MisTramites() {
@@ -282,12 +293,8 @@ export default function MisTramites() {
   const renderViewContent = () => {
     if (!selectedTramite) return null;
 
-    const config = estadoConfig[selectedTramite.estado] || {
-      icon: HelpCircle,
-      color: '#6b7280',
-      label: selectedTramite.estado || 'Desconocido',
-      bg: '#f3f4f6'
-    };
+    const config = estadoConfig[selectedTramite.estado] || { icon: HelpCircle, label: selectedTramite.estado || 'Desconocido' };
+    const colors = estadoColors[selectedTramite.estado] || { bg: '#6b7280', text: '#ffffff' };
     const IconEstado = config.icon;
 
     return (
@@ -296,7 +303,7 @@ export default function MisTramites() {
         <div className="flex items-center justify-between">
           <span
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full"
-            style={{ backgroundColor: config.bg, color: config.color }}
+            style={{ backgroundColor: colors.bg, color: colors.text }}
           >
             <IconEstado className="h-4 w-4" />
             {config.label}
@@ -469,7 +476,8 @@ export default function MisTramites() {
         </button>
         {estadosUnicos.map(estado => {
           const config = estadoConfig[estado];
-          if (!config) return null;
+          const colors = estadoColors[estado];
+          if (!config || !colors) return null;
           const isSelected = filtroEstado === estado;
           return (
             <button
@@ -477,9 +485,9 @@ export default function MisTramites() {
               onClick={() => setFiltroEstado(estado)}
               className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
-                backgroundColor: isSelected ? config.bg : theme.backgroundSecondary,
-                border: `1px solid ${isSelected ? config.color : theme.border}`,
-                color: isSelected ? config.color : theme.textSecondary,
+                backgroundColor: isSelected ? colors.bg : theme.backgroundSecondary,
+                border: `1px solid ${isSelected ? colors.bg : theme.border}`,
+                color: isSelected ? colors.text : theme.textSecondary,
               }}
             >
               {config.label}
@@ -517,12 +525,13 @@ export default function MisTramites() {
       key: 'estado',
       header: 'Estado',
       render: (t) => {
-        const config = estadoConfig[t.estado] || { icon: HelpCircle, color: '#6b7280', label: t.estado, bg: '#f3f4f6' };
+        const config = estadoConfig[t.estado] || { icon: HelpCircle, label: t.estado };
+        const colors = estadoColors[t.estado] || { bg: '#6b7280', text: '#ffffff' };
         const IconEstado = config.icon;
         return (
           <span
             className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full"
-            style={{ backgroundColor: config.bg, color: config.color }}
+            style={{ backgroundColor: colors.bg, color: colors.text }}
           >
             <IconEstado className="h-3 w-3" />
             {config.label}
@@ -595,12 +604,8 @@ export default function MisTramites() {
           </div>
         ) : (
           filteredTramites.map((t) => {
-            const config = estadoConfig[t.estado] || {
-              icon: HelpCircle,
-              color: '#6b7280',
-              label: t.estado || 'Desconocido',
-              bg: '#f3f4f6'
-            };
+            const config = estadoConfig[t.estado] || { icon: HelpCircle, label: t.estado || 'Desconocido' };
+            const colors = estadoColors[t.estado] || { bg: '#6b7280', text: '#ffffff' };
             const IconEstado = config.icon;
             const servicioColor = t.servicio?.color || theme.primary;
 
@@ -627,7 +632,7 @@ export default function MisTramites() {
                       </p>
                       <span
                         className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0"
-                        style={{ backgroundColor: config.bg, color: config.color }}
+                        style={{ backgroundColor: colors.bg, color: colors.text }}
                       >
                         <IconEstado className="h-3 w-3" />
                         {config.label}
@@ -780,12 +785,8 @@ export default function MisTramites() {
 
 // Componente para mostrar detalle del trámite (usado en consulta pública)
 function TramiteDetailCard({ tramite, theme }: { tramite: Tramite; theme: ReturnType<typeof useTheme>['theme'] }) {
-  const config = estadoConfig[tramite.estado] || {
-    icon: HelpCircle,
-    color: '#6b7280',
-    label: tramite.estado || 'Desconocido',
-    bg: '#f3f4f6'
-  };
+  const config = estadoConfig[tramite.estado] || { icon: HelpCircle, label: tramite.estado || 'Desconocido' };
+  const colors = estadoColors[tramite.estado] || { bg: '#6b7280', text: '#ffffff' };
   const IconEstado = config.icon;
 
   return (
@@ -811,7 +812,7 @@ function TramiteDetailCard({ tramite, theme }: { tramite: Tramite; theme: Return
         </div>
         <span
           className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full"
-          style={{ backgroundColor: config.bg, color: config.color }}
+          style={{ backgroundColor: colors.bg, color: colors.text }}
         >
           <IconEstado className="h-3 w-3" />
           {config.label}
@@ -864,7 +865,7 @@ function TramiteDetailCard({ tramite, theme }: { tramite: Tramite; theme: Return
           })}
         </span>
         {tramite.fecha_resolucion && (
-          <span className="text-xs" style={{ color: config.color }}>
+          <span className="text-xs" style={{ color: colors.bg }}>
             <CheckCircle2 className="h-3 w-3 inline mr-1" />
             Resuelto {new Date(tramite.fecha_resolucion).toLocaleDateString('es-AR')}
           </span>

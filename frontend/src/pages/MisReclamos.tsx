@@ -508,6 +508,9 @@ export default function MisReclamos() {
               <div className="space-y-4">
                 {historial.map((h, index) => {
                   const estadoColor = h.estado_nuevo ? estadoColors[h.estado_nuevo]?.bg : theme.primary;
+                  const isComentario = h.accion === 'comentario';
+                  const isPersonaSumada = h.accion === 'persona_sumada';
+
                   return (
                     <div key={h.id} className="relative flex items-start gap-3 pl-6">
                       {/* Punto del timeline */}
@@ -515,21 +518,23 @@ export default function MisReclamos() {
                         className="absolute left-0 w-[14px] h-[14px] rounded-full border-2 flex-shrink-0"
                         style={{
                           backgroundColor: theme.card,
-                          borderColor: estadoColor,
+                          borderColor: isComentario ? '#3b82f6' : isPersonaSumada ? '#10b981' : estadoColor,
                         }}
                         title={h.estado_nuevo ? estadoLabels[h.estado_nuevo] : h.accion}
                       >
                         {index === 0 && (
                           <div
                             className="absolute inset-1 rounded-full"
-                            style={{ backgroundColor: estadoColor }}
+                            style={{
+                              backgroundColor: isComentario ? '#3b82f6' : isPersonaSumada ? '#10b981' : estadoColor
+                            }}
                           />
                         )}
                       </div>
                       {/* Contenido */}
                       <div className="flex-1 min-w-0 pb-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {h.estado_nuevo && (
+                          {h.estado_nuevo && !isComentario && !isPersonaSumada && (
                             <span
                               className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
                               style={{
@@ -540,15 +545,39 @@ export default function MisReclamos() {
                               {estadoLabels[h.estado_nuevo]}
                             </span>
                           )}
+                          {isComentario && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#dbeafe', color: '#2563eb' }}>
+                              💬 Comentario
+                            </span>
+                          )}
+                          {isPersonaSumada && (
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#d1fae5', color: '#10b981' }}>
+                              ✓ Persona sumada
+                            </span>
+                          )}
                           <span className="text-xs" style={{ color: theme.textSecondary }}>
                             {new Date(h.created_at).toLocaleDateString()} {new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                         <p className="text-sm mt-1" style={{ color: theme.text }}>
-                          <span className="font-medium">{h.usuario.nombre}</span>
-                          {' '}{h.accion}
+                          <span className="font-medium">{h.usuario.nombre} {h.usuario.apellido}</span>
+                          {!isComentario && !isPersonaSumada && <span>{' '}{h.accion}</span>}
+                          {isComentario && <span> comentó</span>}
+                          {isPersonaSumada && <span> se sumó al reclamo</span>}
                         </p>
-                        {h.comentario && (
+                        {h.comentario && isComentario && (
+                          <p
+                            className="text-sm mt-2 p-3 rounded-lg"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              color: theme.text,
+                              borderLeft: `3px solid #3b82f6`
+                            }}
+                          >
+                            {h.comentario}
+                          </p>
+                        )}
+                        {h.comentario && !isComentario && !isPersonaSumada && (
                           <p
                             className="text-xs mt-1 p-2 rounded-lg"
                             style={{

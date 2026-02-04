@@ -203,6 +203,17 @@ export interface Reclamo {
   confirmado_vecino?: boolean | null;  // null = sin respuesta, true = solucionado, false = sigue problema
   fecha_confirmacion_vecino?: string;
   comentario_confirmacion_vecino?: string;
+  // Sistema de sumarse a reclamos
+  personas?: ReclamoPersona[];
+}
+
+export interface ReclamoPersona {
+  id: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  created_at: string;
+  es_creador_original: boolean;
 }
 
 export interface DisponibilidadEmpleado {

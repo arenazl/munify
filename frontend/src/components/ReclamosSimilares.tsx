@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AlertTriangle, MapPin, Calendar, Eye, X } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -27,6 +27,7 @@ interface ReclamosSimilaresProps {
   onClose: () => void;
   onContinueAnyway: () => void;
   onViewSimilar: (id: number) => void;
+  onSumarse?: (id: number) => Promise<void>;
 }
 
 const estadoConfig: Record<string, { label: string; color: string; bg: string }> = {
@@ -44,10 +45,12 @@ export function ReclamosSimilares({
   onClose,
   onContinueAnyway,
   onViewSimilar,
+  onSumarse,
 }: ReclamosSimilaresProps) {
   const { theme } = useTheme();
   const [similares, setSimilares] = useState<ReclamoSimilar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState<number | null>(null);
 
   useEffect(() => {
     if (!categoriaId) {
@@ -203,10 +206,44 @@ export function ReclamosSimilares({
                   </div>
                 </div>
 
-                {/* Botón ver detalles */}
-                <div className="mt-3 flex items-center gap-2 text-sm font-medium" style={{ color: theme.primary }}>
-                  <Eye className="h-4 w-4" />
-                  <span>Ver detalles</span>
+                {/* Botones de acción */}
+                <div className="mt-4 flex items-center gap-2">
+                  <button
+                    onClick={() => onViewSimilar(reclamo.id)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                    style={{
+                      backgroundColor: theme.primary,
+                      color: '#ffffff',
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Ver detalles</span>
+                  </button>
+                  {onSumarse && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSubmitting(reclamo.id);
+                        onSumarse(reclamo.id)
+                          .catch(() => {
+                            // Error already handled by parent
+                          })
+                          .finally(() => {
+                            setSubmitting(null);
+                          });
+                      }}
+                      disabled={submitting === reclamo.id}
+                      className="flex-1 flex items-center justify-center px-4 py-2 rounded-lg font-medium transition-colors text-sm"
+                      style={{
+                        backgroundColor: submitting === reclamo.id ? theme.textSecondary : '#10b981',
+                        color: '#ffffff',
+                        opacity: submitting === reclamo.id ? 0.6 : 1,
+                        cursor: submitting === reclamo.id ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {submitting === reclamo.id ? 'Sumándote...' : 'Sumarme'}
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -297,6 +297,8 @@ export const reclamosApi = {
   // Confirmación del vecino (feedback después de finalizar)
   confirmarVecino: (id: number, data: { solucionado: boolean; comentario?: string }) =>
     api.post(`/reclamos/${id}/confirmar-vecino`, data),
+  // Sistema de "sumarse" a reclamos duplicados
+  sumarse: (id: number) => api.post(`/reclamos/${id}/sumarse`),
 };
 
 // Categorías

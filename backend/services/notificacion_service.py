@@ -551,3 +551,124 @@ class NotificacionService:
             enviar_whatsapp=enviar_whatsapp,
             **variables_extra
         )
+
+
+# ============================================
+# NOTIFICACIONES PARA SISTEMA DE "SUMARSE"
+# ============================================
+
+async def crear_notificacion_inapp(
+    db: AsyncSession,
+    usuario_id: int,
+    titulo: str,
+    mensaje: str,
+    tipo: str,
+    reclamo_id: Optional[int] = None
+):
+    """
+    Crea una notificación in-app para un usuario.
+    """
+    try:
+        notificacion = Notificacion(
+            usuario_id=usuario_id,
+            titulo=titulo,
+            mensaje=mensaje,
+            tipo=tipo,
+            reclamo_id=reclamo_id
+        )
+        db.add(notificacion)
+        await db.commit()
+        logger.info(f"Notificación creada para usuario {usuario_id}: {tipo}")
+    except Exception as e:
+        logger.error(f"Error al crear notificación: {e}")
+        await db.rollback()
+
+
+async def notificar_persona_sumada(
+    db: AsyncSession,
+    reclamo_id: int,
+    nueva_persona: User
+):
+    """
+    Notifica a todas las personas sumadas a un reclamo que alguien nuevo se unió.
+    """
+    from models.reclamo_persona import ReclamoPersona
+
+    try:
+        # Obtener todas las personas del reclamo (excepto la nueva)
+        result = await db.execute(
+            select(User).join(ReclamoPersona).where(
+                (ReclamoPersona.reclamo_id == reclamo_id) &
+                (ReclamoPersona.usuario_id != nueva_persona.id)
+            )
+        )
+        usuarios = result.scalars().all()
+
+        for usuario in usuarios:
+            await crear_notificacion_inapp(
+                db=db,
+                usuario_id=usuario.id,
+                titulo="Alguien se sumó al reclamo",
+                mensaje=f"{nueva_persona.nombre} {nueva_persona.apellido} se sumó al reclamo que compartiste.",
+                tipo="persona_sumada_reclamo",
+                reclamo_id=reclamo_id
+            )
+        logger.info(f"Notificaciones enviadas a {len(usuarios)} usuarios sumados")
+    except Exception as e:
+        logger.error(f"Error al notificar personas sumadas: {e}")
+
+
+async def notificar_comentario_a_personas_sumadas(
+    db: AsyncSession,
+    reclamo_id: int,
+    usuario_comentador: User
+):
+    """
+    Notifica a TODAS las personas sumadas a un reclamo cuando alguien comenta.
+    También notifica a los supervisores de la dependencia asignada.
+    """
+    from models.reclamo_persona import ReclamoPersona
+    from models.reclamo import Reclamo
+
+    try:
+        # Obtener el reclamo para saber qué dependencia notificar
+        reclamo = await db.get(Reclamo, reclamo_id)
+        if not reclamo:
+            return
+
+        # Obtener todas las personas del reclamo (excepto quien comenta)
+        result = await db.execute(
+            select(User).join(ReclamoPersona).where(
+                (ReclamoPersona.reclamo_id == reclamo_id) &
+                (ReclamoPersona.usuario_id != usuario_comentador.id)
+            )
+        )
+        usuarios = result.scalars().all()
+
+        # También notificar a los supervisores de la dependencia asignada
+        if reclamo.municipio_dependencia_id:
+            result_supervisores = await db.execute(
+                select(User).where(
+                    (User.municipio_id == reclamo.municipio_id) &
+                    (User.rol == RolUsuario.SUPERVISOR) &
+                    (User.activo == True)
+                )
+            )
+            supervisores = result_supervisores.scalars().all()
+            usuarios.extend(supervisores)
+
+        # Eliminar duplicados manteniendo orden de inserción
+        usuarios_unicos = {u.id: u for u in usuarios}.values()
+
+        for usuario in usuarios_unicos:
+            await crear_notificacion_inapp(
+                db=db,
+                usuario_id=usuario.id,
+                titulo="Nuevo comentario en reclamo",
+                mensaje=f"{usuario_comentador.nombre} comentó en el reclamo.",
+                tipo="comentario_reclamo",
+                reclamo_id=reclamo_id
+            )
+        logger.info(f"Notificaciones de comentario enviadas a {len(usuarios_unicos)} usuarios")
+    except Exception as e:
+        logger.error(f"Error al notificar comentarios: {e}")
