@@ -3883,7 +3883,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 [
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
                   { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: conteosEstados['recibido'] || 0 },
-                  { key: 'en_curso', label: 'Proc.', icon: Play, color: estadoColors.en_proceso.bg, count: conteosEstados['en_curso'] || 0 },
+                  { key: 'en_curso', label: 'Curso', icon: Play, color: estadoColors.en_curso.bg, count: conteosEstados['en_curso'] || 0 },
                   { key: 'finalizado', label: 'Final.', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
                   { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
                   { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
