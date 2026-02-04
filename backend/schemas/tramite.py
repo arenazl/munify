@@ -118,6 +118,7 @@ class TramiteBase(BaseModel):
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
     url_externa: Optional[str] = None
+    requiere_validacion_facial: bool = False
     activo: bool = True
     orden: int = 0
 
@@ -155,6 +156,7 @@ class TramiteSimple(BaseModel):
     icono: Optional[str] = None
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
+    requiere_validacion_facial: bool = False
     tipo_tramite_id: Optional[int] = None
     tipo_tramite: Optional[TipoTramiteSimple] = None
 
