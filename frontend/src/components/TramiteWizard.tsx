@@ -273,6 +273,7 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   const [facialValidated, setFacialValidated] = useState(false);
   const [facialValidating, setFacialValidating] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -632,6 +633,7 @@ Tono amigable, 2-3 oraciones máximo.`,
     setFacialValidated(false);
     setFacialValidating(false);
     setCameraActive(false);
+    setCameraReady(false);
     setCapturedPhoto(null);
     setCameraError(null);
     // Detener cámara si está activa
@@ -1341,6 +1343,7 @@ Tono amigable y conciso (2-3 oraciones máximo).`
   // Step Facial: Validación facial con cámara real
   const startCamera = async () => {
     setCameraError(null);
+    setCameraReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
@@ -1348,11 +1351,25 @@ Tono amigable y conciso (2-3 oraciones máximo).`
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // Esperar a que el video esté listo
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setCameraReady(true);
+        };
       }
       setCameraActive(true);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error accessing camera:', err);
-      setCameraError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
+      const error = err as Error;
+      if (error.name === 'NotFoundError') {
+        setCameraError('No se encontró ninguna cámara en este dispositivo.');
+      } else if (error.name === 'NotReadableError') {
+        setCameraError('La cámara está siendo usada por otra aplicación. Cerrá otras apps y volvé a intentar.');
+      } else if (error.name === 'NotAllowedError') {
+        setCameraError('Permiso de cámara denegado. Habilitá el acceso en la configuración del navegador.');
+      } else {
+        setCameraError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
+      }
     }
   };
 
@@ -1362,24 +1379,34 @@ Tono amigable y conciso (2-3 oraciones máximo).`
       streamRef.current = null;
     }
     setCameraActive(false);
+    setCameraReady(false);
   };
 
   const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Espejo horizontal para selfie
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0);
-        const photoData = canvas.toDataURL('image/jpeg', 0.8);
-        setCapturedPhoto(photoData);
-        stopCamera();
-      }
+    if (!cameraReady || !videoRef.current || !canvasRef.current) {
+      console.warn('Camera not ready for capture');
+      return;
+    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    // Verificar que el video tenga dimensiones
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn('Video dimensions not available');
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      // Espejo horizontal para selfie
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0);
+      const photoData = canvas.toDataURL('image/jpeg', 0.8);
+      setCapturedPhoto(photoData);
+      stopCamera();
     }
   };
 
@@ -1461,6 +1488,11 @@ Tono amigable y conciso (2-3 oraciones máximo).`
               style={{ transform: 'scaleX(-1)' }}
             />
             <div className="absolute inset-0 border-4 rounded-2xl pointer-events-none" style={{ borderColor: `${theme.primary}50` }} />
+            {!cameraReady && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              </div>
+            )}
           </div>
           <div className="flex gap-3 justify-center">
             <button
@@ -1472,11 +1504,12 @@ Tono amigable y conciso (2-3 oraciones máximo).`
             </button>
             <button
               onClick={capturePhoto}
+              disabled={!cameraReady}
               className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
-              style={{ backgroundColor: theme.primary, color: 'white' }}
+              style={{ backgroundColor: theme.primary, color: 'white', opacity: cameraReady ? 1 : 0.5 }}
             >
-              <Camera className="h-5 w-5" />
-              Capturar Foto
+              {cameraReady ? <Camera className="h-5 w-5" /> : <Loader2 className="h-5 w-5 animate-spin" />}
+              {cameraReady ? 'Capturar Foto' : 'Cargando...'}
             </button>
           </div>
         </div>
