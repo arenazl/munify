@@ -1483,24 +1483,12 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const wizardAIPanel = (
     <div className="h-full flex flex-col">
-      {/* Header con icono IA y categoría */}
+      {/* Header con icono IA */}
       <div className="flex items-center gap-2 mb-3">
         <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
           <Sparkles className="h-3 w-3" style={{ color: theme.primary }} />
         </div>
-        {tipoDelServicioSeleccionado ? (
-          <>
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: tipoDelServicioSeleccionado.color || theme.primary }}
-            >
-              <span className="text-white scale-75">{getServicioIcon(tipoDelServicioSeleccionado.icono)}</span>
-            </div>
-            <span className="font-medium text-sm" style={{ color: theme.text }}>{tipoDelServicioSeleccionado.nombre}</span>
-          </>
-        ) : (
-          <span className="font-medium text-sm" style={{ color: theme.textSecondary }}>Seleccioná un trámite</span>
-        )}
+        <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente</span>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto">
@@ -1558,9 +1546,9 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                 </div>
                 <ul className="space-y-1 ml-1">
                   {selectedServicio.documentos_requeridos.split(/[|,]/).map((doc, idx) => (
-                    <li key={idx} className="flex items-start gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
-                      <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                      <span>{doc.trim()}</span>
+                    <li key={idx} className="flex items-center gap-1.5 text-[11px] min-w-0" style={{ color: theme.textSecondary }}>
+                      <CheckCircle2 className="h-3 w-3 flex-shrink-0" style={{ color: '#10b981' }} />
+                      <span className="truncate">{doc.trim()}</span>
                     </li>
                   ))}
                 </ul>
@@ -1581,9 +1569,9 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                     if (!texto) return null;
 
                     return (
-                      <li key={idx} className="flex items-start gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
-                        <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#3b82f6' }} />
-                        <span className="leading-relaxed">{texto}</span>
+                      <li key={idx} className="flex items-center gap-1.5 text-[11px] min-w-0" style={{ color: theme.textSecondary }}>
+                        <CheckCircle2 className="h-3 w-3 flex-shrink-0" style={{ color: '#3b82f6' }} />
+                        <span className="truncate">{texto}</span>
                       </li>
                     );
                   })}
