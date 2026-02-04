@@ -292,10 +292,11 @@ def generar_html_cards(datos: list[dict], descripcion: str = "", highlight: bool
     """
     Genera HTML de tarjetas directamente desde los datos JSON.
 
-    Prioridad para el título de la tarjeta:
-    1. Campo con alias 'header' (explícito)
-    2. Campos comunes: nombre, titulo, asunto, nombre_completo
-    3. Primer campo que no sea 'id'
+    AGRUPACIÓN INTELIGENTE AUTOMÁTICA:
+    - Analiza TODOS los campos para detectar cuál tiene valores repetidos
+    - El campo con MENOS valores únicos (pero que se repite) es el agrupador (padre)
+    - El campo con MÁS valores únicos es el detalle (hijo)
+    - Funciona para cualquier relación padre-hijo sin necesidad de alias especiales
 
     Args:
         datos: Lista de diccionarios con los datos a mostrar
@@ -307,72 +308,179 @@ def generar_html_cards(datos: list[dict], descripcion: str = "", highlight: bool
     if not datos:
         return "<p style='color:var(--text-secondary)'>No hay datos para mostrar.</p>"
 
-    # Campos que típicamente son buenos títulos (en orden de prioridad)
-    CAMPOS_TITULO = ['header', 'nombre', 'titulo', 'asunto', 'nombre_completo', 'title', 'name']
+    # SVG pequeño para items (circle con dot)
+    item_icon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline-block;vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="4"/></svg>'
 
-    cards_html = []
+    # SVG de Lucide "file-text" inline
+    icon_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>'
 
-    for registro in datos:
-        if not registro:
-            continue
+    # SVG de Lucide "folder" para grupos
+    folder_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>'
 
-        # Buscar el mejor campo para título
-        header_key = None
-        header_value = None
+    # ============================================================
+    # PASO 1: Análisis inteligente de campos para detectar agrupamiento
+    # ============================================================
+    primer_registro = datos[0] if datos else {}
+    campos = list(primer_registro.keys())
 
-        # Primero buscar en campos prioritarios
-        for campo_titulo in CAMPOS_TITULO:
-            for key in registro.keys():
-                if key.lower() == campo_titulo:
-                    header_key = key
-                    header_value = registro[key]
-                    break
-            if header_key:
-                break
+    # Filtrar campos que no son IDs numéricos
+    campos_texto = [c for c in campos if not (c.lower().endswith('_id') or c.lower() == 'id')]
 
-        # Si no encontramos campo prioritario, usar el primero que no sea 'id'
-        if header_key is None:
-            for key, value in registro.items():
-                if key.lower() != 'id':
-                    header_key = key
-                    header_value = value
-                    break
+    # Analizar cada campo: contar valores únicos
+    analisis_campos = {}
+    for campo in campos_texto:
+        valores = [r.get(campo) for r in datos if r]
+        valores_unicos = set(valores)
+        analisis_campos[campo] = {
+            'total': len(valores),
+            'unicos': len(valores_unicos),
+            'repeticion': len(valores) - len(valores_unicos),  # Cuántos se repiten
+            'ratio': len(valores_unicos) / len(valores) if valores else 1
+        }
 
-        # Armar lista de otros campos (excluyendo el usado como header)
-        otros_campos = [(k, v) for k, v in registro.items() if k != header_key]
+    # Detectar si hay patrón de agrupamiento:
+    # - Un campo tiene POCAS variaciones (padre/agrupador)
+    # - Otro campo tiene MUCHAS variaciones (hijo/detalle)
+    campo_agrupador = None
+    campo_detalle = None
 
-        # Formatear el título
-        titulo = str(header_value) if header_value is not None else "Sin título"
-        if highlight:
-            titulo = highlight_keywords(titulo)
+    if len(datos) > 1 and len(campos_texto) >= 2:
+        # Ordenar campos por ratio de unicidad (menor ratio = más repetición = mejor agrupador)
+        campos_ordenados = sorted(
+            [(c, a) for c, a in analisis_campos.items()],
+            key=lambda x: x[1]['ratio']
+        )
 
-        # SVG pequeño para items (circle con dot - lucide "dot")
-        item_icon = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline-block;vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="4"/></svg>'
+        # El campo con menor ratio (más repetición) es candidato a agrupador
+        candidato_agrupador = campos_ordenados[0]
+        # El campo con mayor ratio (más variación) es candidato a detalle
+        candidato_detalle = campos_ordenados[-1]
 
-        # Generar items de la card
-        items_html = []
-        for key, value in otros_campos:
-            # Formatear el nombre del campo (quitar underscores, capitalizar)
-            campo_nombre = key.replace('_', ' ').title()
-            # Formatear el valor
-            valor_str = str(value) if value is not None else "-"
+        # Solo agrupar si:
+        # 1. El agrupador tiene repeticiones reales (ratio < 1)
+        # 2. Hay suficiente diferencia entre agrupador y detalle
+        # 3. No son el mismo campo
+        if (candidato_agrupador[1]['ratio'] < 0.8 and
+            candidato_agrupador[0] != candidato_detalle[0] and
+            candidato_agrupador[1]['unicos'] < len(datos)):
+            campo_agrupador = candidato_agrupador[0]
+            campo_detalle = candidato_detalle[0]
+
+    # ============================================================
+    # PASO 2: Generar cards (agrupadas o individuales)
+    # ============================================================
+
+    if campo_agrupador and campo_detalle:
+        # MODO AGRUPADO: una card por cada valor único del agrupador
+        grupos = {}
+        for registro in datos:
+            if not registro:
+                continue
+            grupo_key = registro.get(campo_agrupador)
+            if grupo_key not in grupos:
+                grupos[grupo_key] = []
+            grupos[grupo_key].append(registro)
+
+        cards_html = []
+        for grupo_header, registros in grupos.items():
+            # Título del grupo
+            titulo = str(grupo_header) if grupo_header is not None else "Sin título"
             if highlight:
-                valor_str = highlight_keywords(valor_str)
-            items_html.append(
-                f'<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">'
-                f'{item_icon}<strong>{campo_nombre}:</strong> {valor_str}</div>'
-            )
+                titulo = highlight_keywords(titulo)
 
-        items_content = "\n    ".join(items_html) if items_html else ""
+            # Generar lista de items del grupo
+            items_html = []
+            for reg in registros:
+                # Mostrar el campo detalle como item principal
+                valor = reg.get(campo_detalle, "-")
+                valor_str = str(valor) if valor is not None else "-"
+                if highlight:
+                    valor_str = highlight_keywords(valor_str)
 
-        # SVG de Lucide "file-text" inline con currentColor
-        icon_svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:6px"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>'
+                # Si hay más campos (además de agrupador y detalle), mostrarlos como sub-info
+                otros_campos = [(k, v) for k, v in reg.items()
+                               if k != campo_agrupador and k != campo_detalle
+                               and not k.lower().endswith('_id') and k.lower() != 'id']
 
-        card_html = f'''<div style="flex:1;min-width:280px;max-width:400px;background:var(--bg-card);border:1px solid var(--border-color);padding:16px;border-radius:12px;margin-bottom:8px">
+                if otros_campos:
+                    # Item con sub-detalles
+                    sub_info = ' · '.join([f"{k.replace('_', ' ').title()}: {v}" for k, v in otros_campos[:2]])
+                    items_html.append(
+                        f'<div style="font-size:13px;color:var(--text-primary);margin-bottom:6px;padding-left:4px">'
+                        f'{item_icon}<strong>{valor_str}</strong>'
+                        f'<span style="color:var(--text-secondary);font-size:11px;margin-left:8px">{sub_info}</span></div>'
+                    )
+                else:
+                    items_html.append(
+                        f'<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;padding-left:4px">'
+                        f'{item_icon}{valor_str}</div>'
+                    )
+
+            items_content = "\n    ".join(items_html) if items_html else ""
+            cantidad = len(registros)
+            badge = f'<span style="font-size:11px;background:var(--color-primary);color:white;padding:2px 8px;border-radius:10px;margin-left:8px">{cantidad}</span>'
+
+            card_html = f'''<div style="flex:1;min-width:280px;max-width:400px;background:var(--bg-card);border:1px solid var(--border-color);padding:16px;border-radius:12px;margin-bottom:8px">
+    <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:10px;display:flex;align-items:center">{folder_svg}{titulo}{badge}</div>
+    {items_content}
+  </div>'''
+            cards_html.append(card_html)
+
+    else:
+        # MODO INDIVIDUAL: una card por registro (sin agrupamiento)
+        # Campos que típicamente son buenos títulos
+        CAMPOS_TITULO = ['header', 'nombre', 'titulo', 'asunto', 'nombre_completo', 'title', 'name']
+
+        cards_html = []
+
+        for registro in datos:
+            if not registro:
+                continue
+
+            # Buscar el mejor campo para título
+            h_key = None
+            h_value = None
+
+            for campo_titulo in CAMPOS_TITULO:
+                for key in registro.keys():
+                    if key.lower() == campo_titulo:
+                        h_key = key
+                        h_value = registro[key]
+                        break
+                if h_key:
+                    break
+
+            if h_key is None:
+                for key, value in registro.items():
+                    if key.lower() != 'id' and not key.lower().endswith('_id'):
+                        h_key = key
+                        h_value = value
+                        break
+
+            otros_campos = [(k, v) for k, v in registro.items() if k != h_key]
+
+            titulo = str(h_value) if h_value is not None else "Sin título"
+            if highlight:
+                titulo = highlight_keywords(titulo)
+
+            items_html = []
+            for key, value in otros_campos:
+                campo_nombre = key.replace('_', ' ').title()
+                valor_str = str(value) if value is not None else "-"
+                if highlight:
+                    valor_str = highlight_keywords(valor_str)
+                items_html.append(
+                    f'<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">'
+                    f'{item_icon}<strong>{campo_nombre}:</strong> {valor_str}</div>'
+                )
+
+            items_content = "\n    ".join(items_html) if items_html else ""
+
+            card_html = f'''<div style="flex:1;min-width:280px;max-width:400px;background:var(--bg-card);border:1px solid var(--border-color);padding:16px;border-radius:12px;margin-bottom:8px">
     <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:8px">{icon_svg}{titulo}</div>
     {items_content}
   </div>'''
-        cards_html.append(card_html)
+            cards_html.append(card_html)
 
     # Contenedor flex para las cards
     html = f'''<div style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0">
