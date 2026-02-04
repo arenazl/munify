@@ -1574,26 +1574,20 @@ Tono amigable y conciso (2-3 oraciones máximo).`
                   <Info className="h-3.5 w-3.5" style={{ color: '#3b82f6' }} />
                   <span className="font-medium text-xs" style={{ color: theme.text }}>Información del trámite</span>
                 </div>
-                <div className="space-y-2 ml-1">
+                <ul className="space-y-1.5 ml-1">
                   {selectedServicio.requisitos.split(/\s*->\s*/).map((paso, idx) => {
-                    // Extraer el número del paso si existe (ej: "1. Texto")
-                    const match = paso.trim().match(/^(\d+)\.\s*(.+)$/);
-                    const numero = match ? match[1] : String(idx + 1);
-                    const texto = match ? match[2] : paso.trim();
+                    // Quitar el número del paso si existe (ej: "1. Texto" -> "Texto")
+                    const texto = paso.trim().replace(/^\d+\.\s*/, '');
+                    if (!texto) return null;
 
                     return (
-                      <div key={idx} className="flex items-start gap-2 text-[11px]" style={{ color: theme.textSecondary }}>
-                        <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold"
-                          style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}
-                        >
-                          {numero}
-                        </div>
-                        <span className="pt-0.5 leading-relaxed">{texto}</span>
-                      </div>
+                      <li key={idx} className="flex items-start gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
+                        <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: '#3b82f6' }} />
+                        <span className="leading-relaxed">{texto}</span>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               </div>
             )}
           </div>
