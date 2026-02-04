@@ -1481,6 +1481,14 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const wizardAIPanel = (
     <div className="h-full flex flex-col">
+      {/* Header con icono IA */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
+          <Sparkles className="h-3 w-3" style={{ color: theme.primary }} />
+        </div>
+        <span className="font-medium text-sm" style={{ color: theme.text }}>Asistente</span>
+      </div>
+
       <div className="flex-1 space-y-3 overflow-y-auto">
         {/* Info dinámica del servicio seleccionado */}
         {selectedServicio && tipoDelServicioSeleccionado && (
