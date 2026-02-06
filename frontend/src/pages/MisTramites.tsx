@@ -87,7 +87,11 @@ export default function MisTramites() {
 
   const loadTramites = async () => {
     try {
-      const res = await tramitesApi.getAll();
+      // Vecinos usan getMisSolicitudes, admin/supervisor usan getAll
+      const isVecino = user?.rol === 'vecino';
+      const res = isVecino
+        ? await tramitesApi.getMisSolicitudes()
+        : await tramitesApi.getAll();
       setTramites(res.data);
     } catch (error) {
       console.error('Error cargando trámites:', error);

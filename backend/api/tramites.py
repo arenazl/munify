@@ -885,6 +885,38 @@ async def listar_solicitudes(
     return result.scalars().all()
 
 
+@router.get("/solicitudes/mis-solicitudes", response_model=List[SolicitudResponse])
+async def listar_mis_solicitudes(
+    estado: Optional[EstadoSolicitud] = Query(None, description="Filtrar por estado"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Lista las solicitudes del usuario actual (vecino). No requiere municipio_id."""
+    # Obtener municipio del usuario
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario no tiene municipio asignado")
+
+    query = select(Solicitud).where(
+        Solicitud.municipio_id == current_user.municipio_id,
+        Solicitud.solicitante_id == current_user.id
+    )
+
+    if estado:
+        query = query.where(Solicitud.estado == estado)
+
+    query = query.options(
+        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
+        selectinload(Solicitud.solicitante)
+    )
+    query = query.order_by(Solicitud.created_at.desc())
+    query = query.offset(skip).limit(limit)
+
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
 @router.get("/solicitudes/consultar/{numero_tramite}", response_model=SolicitudResponse)
 async def consultar_solicitud_por_numero(
     numero_tramite: str,
