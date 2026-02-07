@@ -2110,7 +2110,7 @@ Tono amigable, 3-4 oraciones máximo.`,
           })}
         </div>
 
-        <p className="text-center text-sm" style={{ color: theme.textSecondary }}
+        <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
           Si preferís, podés continuar y crear tu propio reclamo
         </p>
       </div>
