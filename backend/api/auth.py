@@ -180,25 +180,41 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
     # Verificar el token de Google
     try:
         async with httpx.AsyncClient() as client:
-            # Usar el endpoint de tokeninfo de Google para verificar
+            google_data = None
+
+            # Intentar primero como access_token (nuevo flujo con useGoogleLogin)
             response = await client.get(
-                f"https://oauth2.googleapis.com/tokeninfo?id_token={data.credential}"
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {data.credential}"}
             )
 
-            if response.status_code != 200:
-                raise HTTPException(status_code=401, detail="Token de Google inválido")
+            if response.status_code == 200:
+                google_data = response.json()
+                email = google_data.get("email")
+                email_verified = google_data.get("email_verified", False)
+                nombre = google_data.get("given_name", "")
+                apellido = google_data.get("family_name", "")
+                picture = google_data.get("picture", "")
+            else:
+                # Fallback: intentar como id_token (flujo anterior con GoogleLogin)
+                response = await client.get(
+                    f"https://oauth2.googleapis.com/tokeninfo?id_token={data.credential}"
+                )
 
-            google_data = response.json()
+                if response.status_code != 200:
+                    raise HTTPException(status_code=401, detail="Token de Google inválido")
 
-            # Verificar que el token es para nuestra app
-            if google_data.get("aud") != settings.GOOGLE_CLIENT_ID:
-                raise HTTPException(status_code=401, detail="Token no válido para esta aplicación")
+                google_data = response.json()
 
-            email = google_data.get("email")
-            email_verified = google_data.get("email_verified") == "true"
-            nombre = google_data.get("given_name", "")
-            apellido = google_data.get("family_name", "")
-            picture = google_data.get("picture", "")
+                # Verificar que el token es para nuestra app (solo para id_token)
+                if google_data.get("aud") != settings.GOOGLE_CLIENT_ID:
+                    raise HTTPException(status_code=401, detail="Token no válido para esta aplicación")
+
+                email = google_data.get("email")
+                email_verified = google_data.get("email_verified") == "true"
+                nombre = google_data.get("given_name", "")
+                apellido = google_data.get("family_name", "")
+                picture = google_data.get("picture", "")
 
             if not email or not email_verified:
                 raise HTTPException(status_code=400, detail="Email no verificado por Google")
