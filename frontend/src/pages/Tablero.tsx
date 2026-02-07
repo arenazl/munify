@@ -431,24 +431,26 @@ export default function Tablero() {
                                   {reclamo.titulo}
                                 </Link>
                                 <p
-                                  className="text-xs md:text-sm mt-1 truncate flex items-center gap-1"
+                                  className="text-xs md:text-sm mt-1 flex items-start gap-1"
                                   style={{ color: theme.textSecondary }}
                                 >
-                                  <span className="inline-block w-1 h-1 rounded-full" style={{ backgroundColor: col.color }}></span>
-                                  {reclamo.direccion}
+                                  <span className="inline-block w-1 h-1 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: col.color }}></span>
+                                  <span className="line-clamp-2">{reclamo.direccion}</span>
                                 </p>
 
-                                <div className="flex items-center justify-between mt-3 gap-2 pt-2 border-t" style={{ borderColor: `${col.color}20` }}>
-                                  <span className="text-xs font-medium" style={{ color: theme.textSecondary }}>
+                                <div className="mt-3 pt-2 border-t space-y-2" style={{ borderColor: `${col.color}20` }}>
+                                  {/* Fecha */}
+                                  <span className="text-xs font-medium block" style={{ color: theme.textSecondary }}>
                                     {new Date(reclamo.created_at).toLocaleDateString('es-AR', {
                                       day: '2-digit',
-                                      month: 'short'
+                                      month: 'short',
+                                      year: 'numeric'
                                     })}
                                   </span>
                                   {/* Si tiene dependencia asignada mostrar su nombre, sino la categoría */}
                                   {reclamo.dependencia_asignada ? (
                                     <span
-                                      className="text-xs px-2 py-1 rounded-full text-white truncate max-w-[120px] font-medium"
+                                      className="text-xs px-2 py-1 rounded-full text-white inline-block font-medium"
                                       style={{
                                         background: `linear-gradient(135deg, ${reclamo.dependencia_asignada.color || col.color}, ${reclamo.dependencia_asignada.color || col.color}dd)`
                                       }}
@@ -458,7 +460,7 @@ export default function Tablero() {
                                     </span>
                                   ) : (
                                     <span
-                                      className="text-xs px-2 py-1 rounded-full text-white truncate max-w-[120px] font-medium"
+                                      className="text-xs px-2 py-1 rounded-full text-white inline-block font-medium"
                                       style={{
                                         background: `linear-gradient(135deg, ${reclamo.categoria?.color || '#6b7280'}, ${reclamo.categoria?.color || '#6b7280'}dd)`
                                       }}
