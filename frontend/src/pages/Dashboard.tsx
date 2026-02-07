@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users } from 'lucide-react';
+import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays } from 'lucide-react';
 import { dashboardApi, analyticsApi, reclamosApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -95,10 +95,11 @@ interface MetricasDetalle {
 }
 
 export default function Dashboard() {
-  console.log('🚀 Dashboard v156 - BUILD OK');
+  console.log('🚀 Dashboard v158 - TRAMITES DEBUG');
   const { theme } = useTheme();
   const { municipioActual } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [tramitesStats, setTramitesStats] = useState<DashboardStats | null>(null);
   const [porCategoria, setPorCategoria] = useState<{ categoria: string; cantidad: number }[]>([]);
   const [porZona, setPorZona] = useState<{ zona: string; cantidad: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,8 +137,17 @@ export default function Dashboard() {
       try {
         // Paso 1: Cargar datos básicos primero (más rápido)
         try {
-          const statsRes = await dashboardApi.getStats();
+          const [statsRes, tramitesRes] = await Promise.all([
+            dashboardApi.getStats(),
+            dashboardApi.getTramitesStats().catch((err) => {
+              console.error('Error cargando tramites stats:', err);
+              return { data: null };
+            }),
+          ]);
+          console.log('📊 Stats:', statsRes.data);
+          console.log('📋 Tramites Stats:', tramitesRes.data);
           setStats(statsRes.data);
+          setTramitesStats(tramitesRes.data);
           setLoading(false);
         } catch (error) {
           console.error('Error cargando stats:', error);
@@ -277,7 +287,8 @@ export default function Dashboard() {
 
   if (!stats) return null;
 
-  const cards = [
+  // Cards de Reclamos
+  const reclamosCards = [
     {
       title: 'Total Reclamos',
       value: stats.total,
@@ -315,6 +326,46 @@ export default function Dashboard() {
       trendUp: false,
     },
   ];
+
+  // Cards de Trámites
+  const tramitesCards = tramitesStats ? [
+    {
+      title: 'Total Trámites',
+      value: tramitesStats.total,
+      icon: FileCheck,
+      iconBg: '#06b6d430',
+      iconColor: '#06b6d4',
+      trend: '+8%',
+      trendUp: true,
+    },
+    {
+      title: 'Nuevos Hoy',
+      value: tramitesStats.hoy,
+      icon: CalendarDays,
+      iconBg: '#ec489930',
+      iconColor: '#ec4899',
+      trend: '+3',
+      trendUp: true,
+    },
+    {
+      title: 'Esta Semana',
+      value: tramitesStats.semana,
+      icon: TrendingUp,
+      iconBg: '#14b8a630',
+      iconColor: '#14b8a6',
+      trend: '+5%',
+      trendUp: true,
+    },
+    {
+      title: 'Tiempo Promedio',
+      value: `${tramitesStats.tiempo_promedio_dias}d`,
+      icon: Clock,
+      iconBg: '#a855f730',
+      iconColor: '#a855f7',
+      trend: '-1d',
+      trendUp: false,
+    },
+  ] : [];
 
   const estadoColors: Record<string, string> = {
     nuevo: '#6b7280',
@@ -450,69 +501,131 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats cards - Glassmorphism */}
-      {/* Grid dinámico que se adapta a la cantidad de cards */}
-      <div className={`grid gap-3 md:gap-4 ${
-        cards.length === 1 ? 'grid-cols-1' :
-        cards.length === 2 ? 'grid-cols-1 sm:grid-cols-2' :
-        cards.length === 3 ? 'grid-cols-2 lg:grid-cols-3' :
-        cards.length === 4 ? 'grid-cols-2 lg:grid-cols-4' :
-        cards.length === 5 ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5' :
-        'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-      }`}>
-        {cards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={card.title}
-              className="group relative rounded-2xl p-3 md:p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
-              style={{
-                backgroundColor: theme.card,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              {/* Gradient overlay on hover */}
-              <div
-                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
-              />
-              {/* Glow effect */}
-              <div
-                className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
-                style={{ backgroundColor: card.iconColor }}
-              />
-              <div className="relative flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
-                    {card.title}
-                  </p>
-                  <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
-                  <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
-                    <span
-                      className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
-                      style={{
-                        backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
-                        color: card.trendUp ? '#22c55e' : '#ef4444'
-                      }}
-                    >
-                      {card.trend}
-                    </span>
-                    <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>vs mes ant.</span>
-                  </div>
-                </div>
+      {/* Stats cards - Dos filas: Reclamos y Trámites */}
+      <div className="space-y-4">
+        {/* Fila Reclamos */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <ClipboardList className="h-4 w-4" style={{ color: theme.primary }} />
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Reclamos</span>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {reclamosCards.map((card) => {
+              const Icon = card.icon;
+              return (
                 <div
-                  className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                  key={card.title}
+                  className="group relative rounded-2xl p-3 md:p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
                   style={{
-                    backgroundColor: card.iconBg,
-                    boxShadow: `0 8px 32px ${card.iconColor}30`
+                    backgroundColor: theme.card,
+                    border: `1px solid ${theme.border}`,
                   }}
                 >
-                  <Icon className="h-5 w-5 md:h-7 md:w-7" style={{ color: card.iconColor }} />
+                  <div
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                    style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
+                  />
+                  <div
+                    className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
+                    style={{ backgroundColor: card.iconColor }}
+                  />
+                  <div className="relative flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
+                        {card.title}
+                      </p>
+                      <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
+                      <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
+                        <span
+                          className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
+                          style={{
+                            backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
+                            color: card.trendUp ? '#22c55e' : '#ef4444'
+                          }}
+                        >
+                          {card.trend}
+                        </span>
+                        <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>vs mes ant.</span>
+                      </div>
+                    </div>
+                    <div
+                      className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                      style={{
+                        backgroundColor: card.iconBg,
+                        boxShadow: `0 8px 32px ${card.iconColor}30`
+                      }}
+                    >
+                      <Icon className="h-5 w-5 md:h-7 md:w-7" style={{ color: card.iconColor }} />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Fila Trámites */}
+        {tramitesCards.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <FileCheck className="h-4 w-4" style={{ color: '#06b6d4' }} />
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Trámites</span>
             </div>
-          );
-        })}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+              {tramitesCards.map((card) => {
+                const Icon = card.icon;
+                return (
+                  <div
+                    key={card.title}
+                    className="group relative rounded-2xl p-3 md:p-5 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl cursor-pointer overflow-hidden"
+                    style={{
+                      backgroundColor: theme.card,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    <div
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                      style={{ background: `linear-gradient(135deg, ${card.iconColor}10 0%, transparent 50%)` }}
+                    />
+                    <div
+                      className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-500"
+                      style={{ backgroundColor: card.iconColor }}
+                    />
+                    <div className="relative flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-[10px] md:text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
+                          {card.title}
+                        </p>
+                        <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
+                        <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
+                          <span
+                            className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
+                              color: card.trendUp ? '#22c55e' : '#ef4444'
+                            }}
+                          >
+                            {card.trend}
+                          </span>
+                          <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>vs mes ant.</span>
+                        </div>
+                      </div>
+                      <div
+                        className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                        style={{
+                          backgroundColor: card.iconBg,
+                          boxShadow: `0 8px 32px ${card.iconColor}30`
+                        }}
+                      >
+                        <Icon className="h-5 w-5 md:h-7 md:w-7" style={{ color: card.iconColor }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Fila 1: Estado, Mapa de Calor y Top Categorías */}
