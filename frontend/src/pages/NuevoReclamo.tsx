@@ -2567,6 +2567,7 @@ Tono amigable, 3-4 oraciones máximo.`,
       )}
 
       {/* Modal de reclamos similares */}
+      {showSimilaresAlert && console.log('Renderizando ReclamosSimilares con:', similaresCargadosData)}
       {showSimilaresAlert && (
         <ReclamosSimilares
           similares={similaresCargadosData}

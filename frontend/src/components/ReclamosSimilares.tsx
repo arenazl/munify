@@ -57,10 +57,15 @@ export function ReclamosSimilares({
     return date.toLocaleDateString();
   };
 
+  console.log('ReclamosSimilares render, similares:', similares);
+
   // Si no hay similares, no mostrar nada
   if (similares.length === 0) {
+    console.log('ReclamosSimilares: No hay similares, retornando null');
     return null;
   }
+
+  console.log('ReclamosSimilares: Mostrando modal con', similares.length, 'similares');
 
   return (
     <div
