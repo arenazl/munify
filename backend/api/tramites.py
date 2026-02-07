@@ -939,7 +939,7 @@ async def consultar_solicitud_por_numero(
     return solicitud
 
 
-@router.get("/solicitudes/{solicitud_id}", response_model=SolicitudResponse)
+@router.get("/solicitudes/detalle/{solicitud_id}", response_model=SolicitudResponse)
 async def obtener_solicitud(
     solicitud_id: int,
     current_user: User = Depends(get_current_user_optional),
@@ -1066,7 +1066,7 @@ async def crear_solicitud(
     return solicitud
 
 
-@router.put("/solicitudes/{solicitud_id}", response_model=SolicitudResponse)
+@router.put("/solicitudes/detalle/{solicitud_id}", response_model=SolicitudResponse)
 async def actualizar_solicitud(
     solicitud_id: int,
     solicitud_data: SolicitudUpdate,

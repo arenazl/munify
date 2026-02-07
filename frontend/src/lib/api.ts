@@ -1040,14 +1040,14 @@ export const tramitesApi = {
     return api.get('/tramites/solicitudes', { params: { ...params, municipio_id: municipioId } });
   },
   getMisSolicitudes: () => api.get('/tramites/solicitudes/mis-solicitudes'),
-  getSolicitud: (id: number) => api.get(`/tramites/solicitudes/${id}`),
+  getSolicitud: (id: number) => api.get(`/tramites/solicitudes/detalle/${id}`),
   consultarSolicitud: (numeroTramite: string) => api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),
   createSolicitud: (data: Record<string, unknown>) => {
     const municipioId = localStorage.getItem('municipio_id');
     return api.post('/tramites/solicitudes', data, { params: { municipio_id: municipioId } });
   },
   updateSolicitud: (id: number, data: { estado?: string; empleado_id?: number; prioridad?: number; respuesta?: string; observaciones?: string }) =>
-    api.put(`/tramites/solicitudes/${id}`, data),
+    api.put(`/tramites/solicitudes/detalle/${id}`, data),
   asignarSolicitud: (id: number, data: { empleado_id: number; comentario?: string }) =>
     api.post(`/tramites/solicitudes/${id}/asignar`, data),
   getHistorialSolicitud: (id: number) => api.get(`/tramites/solicitudes/${id}/historial`),
@@ -1090,7 +1090,7 @@ export const tramitesApi = {
     const municipioId = localStorage.getItem('municipio_id');
     return api.get('/tramites/gestion/solicitudes', { params: { ...params, municipio_id: municipioId } });
   },
-  getOne: (id: number) => api.get(`/tramites/solicitudes/${id}`),
+  getOne: (id: number) => api.get(`/tramites/solicitudes/detalle/${id}`),
   create: (data: Record<string, unknown>) => {
     const municipioId = localStorage.getItem('municipio_id');
     // Mapear servicio_id -> tramite_id para compatibilidad
@@ -1101,7 +1101,7 @@ export const tramitesApi = {
     }
     return api.post('/tramites/solicitudes', mappedData, { params: { municipio_id: municipioId } });
   },
-  update: (id: number, data: Record<string, unknown>) => api.put(`/tramites/solicitudes/${id}`, data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tramites/solicitudes/detalle/${id}`, data),
   asignar: (id: number, data: { empleado_id: number; comentario?: string }) =>
     api.post(`/tramites/solicitudes/${id}/asignar`, data),
   getHistorial: (id: number) => api.get(`/tramites/solicitudes/${id}/historial`),
