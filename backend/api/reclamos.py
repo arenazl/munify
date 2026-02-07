@@ -2045,7 +2045,17 @@ async def sumarse_a_reclamo(
     # Validar que el reclamo existe
     reclamo = await db.get(Reclamo, reclamo_id)
     if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+        # Log para debugging
+        import logging
+        logging.error(f"Sumarse: Reclamo {reclamo_id} no encontrado. Usuario: {current_user.id}, Municipio: {current_user.municipio_id}")
+        raise HTTPException(status_code=404, detail=f"Reclamo {reclamo_id} no encontrado")
+
+    # Validar que el reclamo pertenece al mismo municipio
+    if reclamo.municipio_id != current_user.municipio_id:
+        raise HTTPException(
+            status_code=403,
+            detail="No puedes sumarte a reclamos de otro municipio"
+        )
 
     # Validar que el usuario no sea el creador original
     if reclamo.creador_id == current_user.id:
