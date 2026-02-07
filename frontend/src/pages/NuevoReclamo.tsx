@@ -119,6 +119,7 @@ export default function NuevoReclamo() {
   const [showSimilaresAlert, setShowSimilaresAlert] = useState(false);
   const [ignorarSimilares, setIgnorarSimilares] = useState(false);
   const [similaresCargados, setSimilaresCargados] = useState(false);
+  const [haySimilares, setHaySimilares] = useState(false);
   const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
   // Dependencia encargada basada en la categoría seleccionada
@@ -243,6 +244,7 @@ export default function NuevoReclamo() {
       // Solo buscar si tenemos categoría Y coordenadas Y usuario logueado
       if (!formData.categoria_id || !formData.latitud || !formData.longitud || !user) {
         setSimilaresCargados(false);
+        setHaySimilares(false);
         return;
       }
 
@@ -256,8 +258,12 @@ export default function NuevoReclamo() {
           limit: 5,
         });
 
-        // Si hay similares, mostrar la alerta automáticamente
-        if (response.data.length > 0 && !ignorarSimilares) {
+        // Guardar si hay similares
+        const tieneSimilares = response.data.length > 0;
+        setHaySimilares(tieneSimilares);
+
+        // Si hay similares y no los hemos ignorado, mostrar la alerta
+        if (tieneSimilares && !ignorarSimilares) {
           setShowSimilaresAlert(true);
         }
         setSimilaresCargados(true);
@@ -958,11 +964,14 @@ Tono amigable, 3-4 oraciones máximo.`,
   };
 
   const handleSubmit = async () => {
-    // Si hay alerta de similares mostrándose, no hacer nada (esperar decisión del usuario)
-    if (showSimilaresAlert) {
+    // Si hay similares y no los hemos ignorado, mostrar el modal
+    if (haySimilares && !ignorarSimilares) {
+      setShowSimilaresAlert(true);
       return;
     }
 
+    // Asegurarse de cerrar el modal si estaba abierto
+    setShowSimilaresAlert(false);
     setSubmitting(true);
     try {
       console.log('Creando reclamo...', formData);
