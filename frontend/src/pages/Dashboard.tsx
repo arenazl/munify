@@ -920,7 +920,7 @@ export default function Dashboard() {
       <>
       {/* Fila 3: Distancias y Zonas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Distancias de Empleados */}
+        {/* Reclamos por Categoría */}
         <div
           className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
@@ -929,33 +929,28 @@ export default function Dashboard() {
             boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
           }}
         >
-          <div className="flex items-center gap-2 mb-4">
-            <Route className="h-5 w-5" style={{ color: '#8b5cf6' }} />
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              Distancia Recorrida por Empleado
-            </h2>
-          </div>
+          <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
+            Reclamos por Categoría
+          </h2>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={distancias} layout="vertical">
+              <BarChart data={porCategoria.slice(0, 6)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} horizontal={false} />
-                <XAxis type="number" stroke={chartColors.text} fontSize={12} unit=" km" />
-                <YAxis dataKey="empleado_nombre" type="category" stroke={chartColors.text} fontSize={11} width={100} />
+                <XAxis type="number" stroke={chartColors.text} fontSize={12} />
+                <YAxis dataKey="categoria" type="category" stroke={chartColors.text} fontSize={11} width={120} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="distancia_total_km" name="Distancia (km)" fill="url(#barGradient)" radius={[0, 4, 4, 0]} barSize={16} />
+                <Bar dataKey="cantidad" name="Reclamos" fill="url(#barGradient)" radius={[0, 4, 4, 0]} barSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-          {distanciasResumen && (
-            <div className="mt-2 pt-2 border-t flex justify-between text-xs" style={{ borderColor: theme.border }}>
-              <span style={{ color: theme.textSecondary }}>
-                Total: <strong>{distanciasResumen.distancia_total_km} km</strong>
-              </span>
-              <span style={{ color: theme.textSecondary }}>
-                Promedio/reclamo: <strong>{distanciasResumen.distancia_promedio_por_reclamo_km} km</strong>
-              </span>
-            </div>
-          )}
+          <div className="mt-2 pt-2 border-t flex justify-between text-xs" style={{ borderColor: theme.border }}>
+            <span style={{ color: theme.textSecondary }}>
+              Total categorías: <strong>{porCategoria.length}</strong>
+            </span>
+            <span style={{ color: theme.textSecondary }}>
+              Total reclamos: <strong>{porCategoria.reduce((acc, curr) => acc + curr.cantidad, 0)}</strong>
+            </span>
+          </div>
         </div>
 
         {/* Reclamos por Zona */}
@@ -1018,7 +1013,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Rendimiento de Empleados */}
+        {/* Tendencia de Reclamos */}
         <div
           className="rounded-2xl p-6 backdrop-blur-sm"
           style={{
@@ -1028,28 +1023,24 @@ export default function Dashboard() {
           }}
         >
           <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-            Rendimiento de Empleados (Ultimas 4 semanas)
+            Tendencia de Reclamos (Últimos 7 días)
           </h2>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={rendimientoEmpleados}>
+              <LineChart data={tendencias}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
-                <XAxis dataKey="semana" stroke={chartColors.text} fontSize={12} />
+                <XAxis dataKey="fecha" stroke={chartColors.text} fontSize={12} />
                 <YAxis stroke={chartColors.text} fontSize={12} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                {empleadosNames.map((nombre, index) => (
-                  <Line
-                    key={`empleado-${index}-${nombre}`}
-                    type="monotone"
-                    dataKey={nombre}
-                    name={nombre}
-                    stroke={lineColors[index % lineColors.length]}
-                    strokeWidth={2}
-                    dot={{ fill: lineColors[index % lineColors.length], strokeWidth: 2, r: 3 }}
-                    activeDot={{ r: 5 }}
-                  />
-                ))}
+                <Line
+                  type="monotone"
+                  dataKey="cantidad"
+                  name="Reclamos"
+                  stroke={theme.primary}
+                  strokeWidth={2}
+                  dot={{ fill: theme.primary, strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
