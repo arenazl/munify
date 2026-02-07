@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 import cloudinary
 import cloudinary.uploader
 import asyncio
+import logging
 
 from core.database import get_db
 from core.security import get_current_user, get_current_user_optional, require_roles
@@ -2045,8 +2046,6 @@ async def sumarse_a_reclamo(
     # Validar que el reclamo existe
     reclamo = await db.get(Reclamo, reclamo_id)
     if not reclamo:
-        # Log para debugging
-        import logging
         logging.error(f"Sumarse: Reclamo {reclamo_id} no encontrado. Usuario: {current_user.id}, Municipio: {current_user.municipio_id}")
         raise HTTPException(status_code=404, detail=f"Reclamo {reclamo_id} no encontrado")
 
