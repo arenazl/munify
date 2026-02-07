@@ -64,8 +64,8 @@ export function ReclamosSimilares({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      className="fixed inset-0 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 10000 }}
     >
       <div
         className="w-full max-w-2xl rounded-lg shadow-xl max-h-[80vh] overflow-y-auto"

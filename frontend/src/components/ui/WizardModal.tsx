@@ -119,9 +119,6 @@ export function WizardModal({
   const isLastStep = currentStep === steps.length - 1;
   const canProceed = currentStepData?.isValid !== false;
 
-  // DEBUG
-  console.log('WizardModal state:', { currentStep, isLastStep, canProceed, loading, stepsLength: steps.length });
-
   // Para modo embedded, siempre renderizar
   if (!shouldRender && !embedded) return null;
 
@@ -540,16 +537,7 @@ export function WizardModal({
 
         <button
           className="wizard-primary-btn"
-          onClick={() => {
-            console.log('Button clicked! isLastStep:', isLastStep);
-            if (isLastStep) {
-              console.log('Calling onComplete...');
-              onComplete();
-            } else {
-              console.log('Calling handleNext...');
-              handleNext();
-            }
-          }}
+          onClick={isLastStep ? onComplete : handleNext}
           disabled={loading || !canProceed}
           style={{
             display: 'flex',
