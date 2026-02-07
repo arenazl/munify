@@ -672,7 +672,7 @@ export default function Planificacion() {
                           className={`p-2 min-h-[100px] transition-colors ${snapshot.isDraggingOver ? 'ring-2 ring-inset ring-blue-500' : ''}`}
                           style={{
                             backgroundColor: ausencia
-                              ? '#fef2f2'
+                              ? '#ef444415'
                               : getCargaColor(tareasDelDia.length),
                           }}
                         >
@@ -680,7 +680,7 @@ export default function Planificacion() {
                           {ausencia && (
                             <div
                               className="text-xs px-2 py-1 rounded mb-2 flex items-center gap-1"
-                              style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}
+                              style={{ backgroundColor: '#ef444430', color: '#ef4444' }}
                             >
                               <AlertTriangle className="w-3 h-3" />
                               {ausencia.tipo}
@@ -814,8 +814,8 @@ export default function Planificacion() {
                         className={`p-3 rounded-lg max-w-[200px] ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-500' : ''}`}
                         style={{
                           ...provided.draggableProps.style,
-                          backgroundColor: '#fef2f2',
-                          border: '1px solid #fecaca',
+                          backgroundColor: theme.backgroundSecondary,
+                          border: `1px solid ${theme.border}`,
                         }}
                       >
                         <div className="flex items-start gap-2">
@@ -867,7 +867,7 @@ export default function Planificacion() {
           <span className="text-xs" style={{ color: theme.textSecondary }}>Alta (5+)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca' }} />
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }} />
           <span className="text-xs" style={{ color: theme.textSecondary }}>Ausencia</span>
         </div>
       </div>
