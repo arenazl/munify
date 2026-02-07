@@ -2021,9 +2021,13 @@ async def confirmar_reclamo_vecino(
 # SISTEMA DE "SUMARSE" A RECLAMOS DUPLICADOS
 # ===========================================
 
+class SumarseRequest(BaseModel):
+    comentario: Optional[str] = None
+
 @router.post("/{reclamo_id}/sumarse")
 async def sumarse_a_reclamo(
     reclamo_id: int,
+    data: Optional[SumarseRequest] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -2073,11 +2077,15 @@ async def sumarse_a_reclamo(
     db.add(nueva_persona)
 
     # Agregar entrada en historial
+    comentario_historial = f"{current_user.nombre} {current_user.apellido} se sumó al reclamo"
+    if data and data.comentario:
+        comentario_historial += f": {data.comentario}"
+
     historial = HistorialReclamo(
         reclamo_id=reclamo_id,
         usuario_id=current_user.id,
         accion="persona_sumada",
-        comentario=f"{current_user.nombre} {current_user.apellido} se sumó al reclamo"
+        comentario=comentario_historial
     )
     db.add(historial)
 

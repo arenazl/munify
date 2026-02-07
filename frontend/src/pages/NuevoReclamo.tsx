@@ -40,7 +40,9 @@ import {
   Crosshair,
   AlertTriangle,
   Eye,
-  Users
+  Users,
+  ChevronDown,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, publicoApi, clasificacionApi, authApi, chatApi, dependenciasApi } from '../lib/api';
@@ -132,6 +134,8 @@ export default function NuevoReclamo() {
     creador: { nombre: string; apellido: string };
     distancia_metros: number | null;
   }>>([]);
+  const [similarExpandido, setSimilarExpandido] = useState<number | null>(null);
+  const [comentarioSumarse, setComentarioSumarse] = useState('');
   const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
   // Dependencia encargada basada en la categoría seleccionada
@@ -1965,75 +1969,148 @@ Tono amigable, 3-4 oraciones máximo.`,
         </div>
 
         <div className="space-y-3">
-          {similaresCargadosData.map((reclamo) => (
-            <div
-              key={reclamo.id}
-              className="p-4 rounded-xl border"
-              style={{ backgroundColor: theme.backgroundSecondary, borderColor: theme.border }}
-            >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h3 className="font-semibold" style={{ color: theme.text }}>
-                  {reclamo.titulo}
-                </h3>
-                <span
-                  className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap"
-                  style={{
-                    backgroundColor: reclamo.estado === 'nuevo' ? '#f3f4f6' : reclamo.estado === 'en_curso' ? '#fef3c7' : '#d1fae5',
-                    color: reclamo.estado === 'nuevo' ? '#6b7280' : reclamo.estado === 'en_curso' ? '#d97706' : '#059669',
-                  }}
-                >
-                  {reclamo.estado === 'nuevo' ? 'Nuevo' : reclamo.estado === 'en_curso' ? 'En Proceso' : reclamo.estado}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-sm mb-3" style={{ color: theme.textSecondary }}>
-                <MapPin className="h-4 w-4" />
-                <span>{reclamo.direccion}</span>
-                {reclamo.distancia_metros && (
-                  <span className="text-xs">({reclamo.distancia_metros}m)</span>
-                )}
-              </div>
-              <div className="flex gap-2">
+          {similaresCargadosData.map((reclamo) => {
+            const isExpanded = similarExpandido === reclamo.id;
+            return (
+              <div
+                key={reclamo.id}
+                className="rounded-xl border overflow-hidden"
+                style={{ backgroundColor: theme.backgroundSecondary, borderColor: theme.border }}
+              >
+                {/* Header clickeable para expandir */}
                 <button
                   onClick={() => {
-                    const isMobile = window.location.pathname.startsWith('/app');
-                    const route = isMobile ? `/app/reclamo/${reclamo.id}` : `/gestion/reclamos/${reclamo.id}`;
-                    window.open(route, '_blank');
+                    setSimilarExpandido(isExpanded ? null : reclamo.id);
+                    setComentarioSumarse('');
                   }}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                  className="w-full p-4 flex items-start justify-between gap-3 text-left"
                 >
-                  <Eye className="h-4 w-4" />
-                  Ver detalles
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold truncate" style={{ color: theme.text }}>
+                        {reclamo.titulo}
+                      </h3>
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap flex-shrink-0"
+                        style={{
+                          backgroundColor: reclamo.estado === 'nuevo' ? '#f3f4f6' : reclamo.estado === 'en_curso' ? '#fef3c7' : '#d1fae5',
+                          color: reclamo.estado === 'nuevo' ? '#6b7280' : reclamo.estado === 'en_curso' ? '#d97706' : '#059669',
+                        }}
+                      >
+                        {reclamo.estado === 'nuevo' ? 'Nuevo' : reclamo.estado === 'en_curso' ? 'En Proceso' : reclamo.estado}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
+                      <MapPin className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">{reclamo.direccion}</span>
+                      {reclamo.distancia_metros && (
+                        <span className="text-xs flex-shrink-0">({reclamo.distancia_metros}m)</span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`h-5 w-5 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                    style={{ color: theme.textSecondary }}
+                  />
                 </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      setSubmitting(true);
-                      await reclamosApi.sumarse(reclamo.id);
-                      toast.success('¡Te has sumado al reclamo!');
-                      await new Promise(resolve => setTimeout(resolve, 500));
-                      const isMobile = window.location.pathname.startsWith('/app');
-                      const route = isMobile ? `/app/reclamo/${reclamo.id}` : `/gestion/reclamos/${reclamo.id}`;
-                      navigate(route);
-                    } catch (error) {
-                      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-                      toast.error(errorMsg);
-                    } finally {
-                      setSubmitting(false);
-                    }
-                  }}
-                  disabled={submitting}
-                  className="flex-1 flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-                  style={{ backgroundColor: '#10b981', color: 'white', opacity: submitting ? 0.6 : 1 }}
-                >
-                  {submitting ? 'Sumándote...' : 'Sumarme'}
-                </button>
+
+                {/* Contenido expandido */}
+                {isExpanded && (
+                  <div className="px-4 pb-4 space-y-3 border-t" style={{ borderColor: theme.border }}>
+                    {/* Descripción */}
+                    <div className="pt-3">
+                      <p className="text-sm" style={{ color: theme.text }}>
+                        {reclamo.descripcion}
+                      </p>
+                    </div>
+
+                    {/* Info adicional */}
+                    <div className="flex flex-wrap gap-3 text-xs" style={{ color: theme.textSecondary }}>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>{new Date(reclamo.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {reclamo.creador && (
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          <span>{reclamo.creador.nombre} {reclamo.creador.apellido}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Campo de comentario */}
+                    <div>
+                      <label className="block text-xs mb-1" style={{ color: theme.textSecondary }}>
+                        Comentario (opcional)
+                      </label>
+                      <textarea
+                        value={comentarioSumarse}
+                        onChange={(e) => setComentarioSumarse(e.target.value)}
+                        placeholder="Agregá un comentario sobre tu situación..."
+                        className="w-full p-2 rounded-lg text-sm resize-none"
+                        rows={2}
+                        style={{
+                          backgroundColor: theme.background,
+                          color: theme.text,
+                          border: `1px solid ${theme.border}`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Botón Sumarme */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          setSubmitting(true);
+                          await reclamosApi.sumarse(reclamo.id, comentarioSumarse || undefined);
+                          toast.success('¡Te has sumado al reclamo!');
+                          await new Promise(resolve => setTimeout(resolve, 500));
+                          const isMobile = window.location.pathname.startsWith('/app');
+                          const route = isMobile ? `/app/reclamo/${reclamo.id}` : `/gestion/reclamos/${reclamo.id}`;
+                          navigate(route);
+                        } catch (error) {
+                          console.error('Error al sumarse:', error);
+                          const axiosError = error as { response?: { status?: number; data?: { detail?: string } } };
+                          if (axiosError.response?.status === 404) {
+                            toast.error('Reclamo no encontrado');
+                          } else if (axiosError.response?.status === 400) {
+                            toast.error(axiosError.response.data?.detail || 'Ya te has sumado a este reclamo');
+                          } else {
+                            toast.error('Error al sumarte al reclamo');
+                          }
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }}
+                      disabled={submitting}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        opacity: submitting ? 0.6 : 1,
+                        cursor: submitting ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Sumándote...
+                        </>
+                      ) : (
+                        <>
+                          <Users className="h-4 w-4" />
+                          Sumarme a este reclamo
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+        <p className="text-center text-sm" style={{ color: theme.textSecondary }}
           Si preferís, podés continuar y crear tu propio reclamo
         </p>
       </div>
