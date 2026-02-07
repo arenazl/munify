@@ -590,10 +590,10 @@ export function WizardModal({
   const modalContent = (
     <>
       <style>{cssStyles}</style>
-      {/* Backdrop - sin onClick para evitar cierres accidentales */}
-      <div className="wizard-modal-backdrop" />
-      {/* Modal Container - sin onClick para evitar cierres accidentales */}
-      <div className="wizard-modal-container">
+      {/* Backdrop - click para cerrar */}
+      <div className="wizard-modal-backdrop" onClick={onClose} />
+      {/* Modal Container - click fuera para cerrar */}
+      <div className="wizard-modal-container" onClick={onClose}>
         {wizardInnerContent}
       </div>
     </>

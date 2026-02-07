@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileText,
   User,
@@ -105,7 +105,12 @@ export default function Tramites() {
   const { theme } = useTheme();
   const { user, register, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const dataLoadedRef = useRef(false);
+
+  // Detectar si venimos de la ruta de creación directa
+  const isCrearTramiteRoute = location.pathname === '/gestion/crear-tramite' ||
+                              location.pathname === '/app/tramites/nuevo';
 
   // Estado principal
   const [tramites, setTramites] = useState<Tramite[]>([]);
@@ -287,6 +292,13 @@ export default function Tramites() {
     }
   }, [filtroEstado, isSupervisorOrAdmin]);
 
+  // Abrir wizard automáticamente si venimos de la ruta de creación
+  useEffect(() => {
+    if (isCrearTramiteRoute && !loading && servicios.length > 0) {
+      setWizardOpen(true);
+    }
+  }, [isCrearTramiteRoute, loading, servicios.length]);
+
   // Usar tipos de trámite como rubros (categorías)
   interface Rubro {
     id: number;
@@ -370,6 +382,10 @@ export default function Tramites() {
     setWizardOpen(false);
     setDescripcionInput('');
     setServicioSugerido(null);
+    // Si venimos de la ruta de creación, navegar hacia atrás
+    if (isCrearTramiteRoute) {
+      navigate(-1);
+    }
   };
 
   // Buscar servicio sugerido basado en palabras clave

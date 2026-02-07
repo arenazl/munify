@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FolderOpen,
   MapPin,
@@ -98,7 +98,11 @@ export default function NuevoReclamo() {
   const { theme } = useTheme();
   const { user, isLoading: authLoading, register, login, municipioActual } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Detectar si venimos de la ruta de creación directa (modal mode)
+  const isCrearReclamoRoute = location.pathname === '/gestion/crear-reclamo';
 
   const [currentStep, setCurrentStep] = useState(0);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -2507,11 +2511,12 @@ Tono amigable, 3-4 oraciones máximo.`,
         }
       />
 
-      <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 pt-2 pb-4 w-full">
+      {/* Si venimos de la ruta de creación, mostrar como modal. Si no, embedded en la página */}
+      {isCrearReclamoRoute ? (
         <WizardModal
           open={true}
           onClose={() => navigate(-1)}
-          title=""
+          title="Nuevo Reclamo"
           steps={steps}
           currentStep={currentStep}
           onStepChange={handleStepChange}
@@ -2519,9 +2524,25 @@ Tono amigable, 3-4 oraciones máximo.`,
           loading={submitting || registering}
           completeLabel="Enviar Reclamo"
           aiPanel={wizardAIPanel}
-          embedded={true}
+          embedded={false}
         />
-      </div>
+      ) : (
+        <div className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 pt-2 pb-4 w-full">
+          <WizardModal
+            open={true}
+            onClose={() => navigate(-1)}
+            title=""
+            steps={steps}
+            currentStep={currentStep}
+            onStepChange={handleStepChange}
+            onComplete={handleSubmit}
+            loading={submitting || registering}
+            completeLabel="Enviar Reclamo"
+            aiPanel={wizardAIPanel}
+            embedded={true}
+          />
+        </div>
+      )}
 
       {/* Modal de reclamos similares */}
       {showSimilaresAlert && (
