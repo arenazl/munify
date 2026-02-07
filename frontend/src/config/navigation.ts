@@ -178,8 +178,8 @@ export const isMobileDevice = (): boolean => {
   const userAgent = navigator.userAgent || navigator.vendor;
   const mobileRegex = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i;
 
-  // También detectar por ancho de pantalla (menos de 768px se considera mobile)
-  const isSmallScreen = window.innerWidth < 768;
+  // También detectar por ancho de pantalla (menos de 1024px se considera mobile/tablet)
+  const isSmallScreen = window.innerWidth < 1024;
 
   return mobileRegex.test(userAgent) || isSmallScreen;
 };
