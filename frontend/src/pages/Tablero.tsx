@@ -20,16 +20,8 @@ interface Columna {
 
 const columnas: Columna[] = [
   {
-    id: 'nuevo',
-    titulo: 'Nuevos',
-    color: '#ef4444',
-    headerClass: 'column-header-red',
-    cardClass: 'card-gradient-red',
-    badgeClass: 'badge-gradient-red',
-  },
-  {
-    id: 'asignado',
-    titulo: 'Asignados',
+    id: 'recibido',
+    titulo: 'Recibidos',
     color: '#3b82f6',
     headerClass: 'column-header-blue',
     cardClass: 'card-gradient-blue',
@@ -37,27 +29,35 @@ const columnas: Columna[] = [
   },
   {
     id: 'en_curso',
-    titulo: 'En Proceso',
+    titulo: 'En Curso',
     color: '#f59e0b',
     headerClass: 'column-header-orange',
     cardClass: 'card-gradient-orange',
     badgeClass: 'badge-gradient-orange',
   },
   {
-    id: 'pendiente_confirmacion',
-    titulo: 'Pend. Confirmación',
+    id: 'pospuesto',
+    titulo: 'Pospuestos',
     color: '#8b5cf6',
     headerClass: 'column-header-purple',
     cardClass: 'card-gradient-purple',
     badgeClass: 'badge-gradient-purple',
   },
   {
-    id: 'resuelto',
-    titulo: 'Resueltos',
+    id: 'finalizado',
+    titulo: 'Finalizados',
     color: '#22c55e',
     headerClass: 'column-header-green',
     cardClass: 'card-gradient-green',
     badgeClass: 'badge-gradient-green',
+  },
+  {
+    id: 'rechazado',
+    titulo: 'Rechazados',
+    color: '#ef4444',
+    headerClass: 'column-header-red',
+    cardClass: 'card-gradient-red',
+    badgeClass: 'badge-gradient-red',
   },
 ];
 
@@ -220,10 +220,10 @@ export default function Tablero() {
           const count = getReclamosPorEstado(col.id).length;
           const isActive = activeColumnIndex === index;
           // Títulos cortos para mobile
-          const tituloCorto = col.id === 'nuevo' ? 'Nuevos' :
-                              col.id === 'asignado' ? 'Asig.' :
-                              col.id === 'en_curso' ? 'Proceso' :
-                              col.id === 'pendiente_confirmacion' ? 'Conf.' : 'Resuel.';
+          const tituloCorto = col.id === 'recibido' ? 'Recib.' :
+                              col.id === 'en_curso' ? 'Curso' :
+                              col.id === 'pospuesto' ? 'Posp.' :
+                              col.id === 'finalizado' ? 'Final.' : 'Rech.';
           return (
             <button
               key={col.id}
