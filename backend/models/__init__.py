@@ -13,6 +13,7 @@ from .empleado_horario import EmpleadoHorario
 from .empleado_metrica import EmpleadoMetrica
 from .empleado_capacitacion import EmpleadoCapacitacion
 from .reclamo import Reclamo
+from .reclamo_persona import ReclamoPersona
 from .historial import HistorialReclamo
 from .documento import Documento
 from .configuracion import Configuracion
@@ -52,6 +53,7 @@ __all__ = [
     "TipoAusencia",
     "DiaSemana",
     "Reclamo",
+    "ReclamoPersona",
     "HistorialReclamo",
     "Documento",
     "Configuracion",
