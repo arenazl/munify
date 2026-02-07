@@ -450,9 +450,11 @@ export default function Tablero() {
                                   {/* Si tiene dependencia asignada mostrar su nombre, sino la categoría */}
                                   {reclamo.dependencia_asignada ? (
                                     <span
-                                      className="text-xs px-2 py-1 rounded-full text-white inline-block font-medium"
+                                      className="text-xs px-2 py-1 rounded-full inline-block font-medium"
                                       style={{
-                                        background: `linear-gradient(135deg, ${reclamo.dependencia_asignada.color || col.color}, ${reclamo.dependencia_asignada.color || col.color}dd)`
+                                        border: `1px solid ${reclamo.dependencia_asignada.color || col.color}`,
+                                        color: reclamo.dependencia_asignada.color || col.color,
+                                        backgroundColor: 'transparent'
                                       }}
                                       title={reclamo.dependencia_asignada.nombre}
                                     >
@@ -460,9 +462,11 @@ export default function Tablero() {
                                     </span>
                                   ) : (
                                     <span
-                                      className="text-xs px-2 py-1 rounded-full text-white inline-block font-medium"
+                                      className="text-xs px-2 py-1 rounded-full inline-block font-medium"
                                       style={{
-                                        background: `linear-gradient(135deg, ${reclamo.categoria?.color || '#6b7280'}, ${reclamo.categoria?.color || '#6b7280'}dd)`
+                                        border: `1px solid ${reclamo.categoria?.color || '#6b7280'}`,
+                                        color: reclamo.categoria?.color || '#6b7280',
+                                        backgroundColor: 'transparent'
                                       }}
                                       title={reclamo.categoria?.nombre}
                                     >
