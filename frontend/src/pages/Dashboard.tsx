@@ -95,7 +95,7 @@ interface MetricasDetalle {
 }
 
 export default function Dashboard() {
-  console.log('🚀 Dashboard v158 - TRAMITES DEBUG');
+  console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
   const { theme } = useTheme();
   const { municipioActual } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -327,11 +327,11 @@ export default function Dashboard() {
     },
   ];
 
-  // Cards de Trámites
-  const tramitesCards = tramitesStats ? [
+  // Cards de Trámites (siempre se muestran, con 0 si no hay datos)
+  const tramitesCards = [
     {
       title: 'Total Trámites',
-      value: tramitesStats.total,
+      value: tramitesStats?.total ?? 0,
       icon: FileCheck,
       iconBg: '#06b6d430',
       iconColor: '#06b6d4',
@@ -340,7 +340,7 @@ export default function Dashboard() {
     },
     {
       title: 'Nuevos Hoy',
-      value: tramitesStats.hoy,
+      value: tramitesStats?.hoy ?? 0,
       icon: CalendarDays,
       iconBg: '#ec489930',
       iconColor: '#ec4899',
@@ -349,7 +349,7 @@ export default function Dashboard() {
     },
     {
       title: 'Esta Semana',
-      value: tramitesStats.semana,
+      value: tramitesStats?.semana ?? 0,
       icon: TrendingUp,
       iconBg: '#14b8a630',
       iconColor: '#14b8a6',
@@ -358,14 +358,14 @@ export default function Dashboard() {
     },
     {
       title: 'Tiempo Promedio',
-      value: `${tramitesStats.tiempo_promedio_dias}d`,
+      value: `${tramitesStats?.tiempo_promedio_dias ?? 0}d`,
       icon: Clock,
       iconBg: '#a855f730',
       iconColor: '#a855f7',
       trend: '-1d',
       trendUp: false,
     },
-  ] : [];
+  ];
 
   const estadoColors: Record<string, string> = {
     nuevo: '#6b7280',
@@ -565,8 +565,7 @@ export default function Dashboard() {
         </div>
 
         {/* Fila Trámites */}
-        {tramitesCards.length > 0 && (
-          <div>
+        <div>
             <div className="flex items-center gap-2 mb-3">
               <FileCheck className="h-4 w-4" style={{ color: '#06b6d4' }} />
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Trámites</span>
@@ -625,7 +624,6 @@ export default function Dashboard() {
               })}
             </div>
           </div>
-        )}
       </div>
 
       {/* Fila 1: Estado, Mapa de Calor y Top Categorías */}

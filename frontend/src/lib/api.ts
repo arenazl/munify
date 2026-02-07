@@ -453,6 +453,7 @@ export const usersApi = {
 export const dashboardApi = {
   getConfig: () => api.get('/dashboard/config'),
   getStats: () => api.get('/dashboard/stats'),
+  getTramitesStats: () => api.get('/dashboard/tramites-stats'),
   getMisStats: () => api.get('/dashboard/mis-stats'),
   getEmpleadoStats: () => api.get('/dashboard/empleado-stats'),
   getPorCategoria: () => api.get('/dashboard/por-categoria'),
