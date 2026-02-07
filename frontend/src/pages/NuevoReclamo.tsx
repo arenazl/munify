@@ -2065,9 +2065,7 @@ Tono amigable, 3-4 oraciones máximo.`,
                           await reclamosApi.sumarse(reclamo.id, comentarioSumarse || undefined);
                           toast.success('¡Te has sumado al reclamo!');
                           await new Promise(resolve => setTimeout(resolve, 500));
-                          const isMobile = window.location.pathname.startsWith('/app');
-                          const route = isMobile ? `/app/reclamo/${reclamo.id}` : `/gestion/reclamos/${reclamo.id}`;
-                          navigate(route);
+                          navigate('/gestion/mis-reclamos');
                         } catch (error) {
                           console.error('Error al sumarse:', error);
                           const axiosError = error as { response?: { status?: number; data?: { detail?: string } } };
