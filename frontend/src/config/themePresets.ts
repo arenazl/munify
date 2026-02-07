@@ -284,6 +284,30 @@ export const themePresets: ThemePreset[] = [
       vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
     }),
   },
+
+  // 13. MindfulSpace - Neumorphic pastel (tema claro)
+  {
+    id: 'mindful',
+    name: 'MindfulSpace',
+    palette: ['#E8EEF5', '#c5ccd6', '#34d399', '#22d3ee'],
+    variants: generateVariants(['#E8EEF5', '#c5ccd6', '#34d399', '#22d3ee'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
+
+  // 14. Sales CRM - Profesional azul/verde (tema claro)
+  {
+    id: 'salescrm',
+    name: 'Sales CRM',
+    palette: ['#f1f5f9', '#1e3a5f', '#2563eb', '#16a34a'],
+    variants: generateVariants(['#f1f5f9', '#1e3a5f', '#2563eb', '#16a34a'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
 ];
 
 // Helper para obtener un tema por ID y variante
