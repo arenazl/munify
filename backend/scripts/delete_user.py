@@ -39,9 +39,12 @@ async def delete_user(email: str):
         except Exception as e:
             print(f"Nota: {e}")
 
-        # Eliminar el usuario
-        await conn.execute(text("DELETE FROM usuarios WHERE id = :id"), {"id": user_id})
-        print(f"Usuario {email} eliminado exitosamente")
+        # Cambiar rol a vecino (Google actualizara el nombre al loguearse)
+        await conn.execute(
+            text("UPDATE usuarios SET rol = 'vecino' WHERE id = :id"),
+            {"id": user_id}
+        )
+        print(f"Usuario {email} cambiado a rol vecino exitosamente")
 
     await engine.dispose()
 

@@ -230,6 +230,18 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
         # Usuario existente - actualizar datos de Google si es necesario
         if not user.activo:
             raise HTTPException(status_code=400, detail="Usuario inactivo")
+
+        # Actualizar nombre/apellido desde Google si cambio
+        updated = False
+        if nombre and user.nombre != nombre:
+            user.nombre = nombre
+            updated = True
+        if apellido and user.apellido != apellido:
+            user.apellido = apellido
+            updated = True
+        if updated:
+            await db.commit()
+            await db.refresh(user)
     else:
         # Nuevo usuario - crear cuenta
         # Validar municipio si se proporciona
