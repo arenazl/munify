@@ -14,9 +14,9 @@ async def delete_user(email: str):
     engine = create_async_engine(settings.DATABASE_URL)
 
     async with engine.begin() as conn:
-        # Buscar el usuario
+        # Buscar el usuario (tabla usuarios)
         result = await conn.execute(
-            text("SELECT id, email, nombre, apellido, rol FROM users WHERE email = :email"),
+            text("SELECT id, email, nombre, apellido, rol FROM usuarios WHERE email = :email"),
             {"email": email}
         )
         user = result.fetchone()
@@ -33,7 +33,7 @@ async def delete_user(email: str):
         await conn.execute(text("DELETE FROM notificaciones WHERE user_id = :id"), {"id": user_id})
 
         # Eliminar el usuario
-        await conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": user_id})
+        await conn.execute(text("DELETE FROM usuarios WHERE id = :id"), {"id": user_id})
         print(f"Usuario {email} eliminado exitosamente")
 
     await engine.dispose()
