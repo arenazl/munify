@@ -37,7 +37,10 @@ import {
   Sparkles,
   Clock,
   Search,
-  Crosshair
+  Crosshair,
+  AlertTriangle,
+  Eye,
+  Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, publicoApi, clasificacionApi, authApi, chatApi, dependenciasApi } from '../lib/api';
@@ -49,7 +52,6 @@ import { getDefaultRoute } from '../config/navigation';
 import { MapPicker } from '../components/ui/MapPicker';
 import { WizardModal, WizardStep } from '../components/ui/WizardModal';
 import { WizardStepContent } from '../components/ui/WizardForm';
-import { ReclamosSimilares } from '../components/ReclamosSimilares';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { VoiceInput } from '../components/ui/VoiceInput';
@@ -116,8 +118,6 @@ export default function NuevoReclamo() {
   const [suggestedCategorias, setSuggestedCategorias] = useState<Array<{categoria: Categoria, confianza: number}>>([]);
   const [showSuggestion, setShowSuggestion] = useState(false);
   const [searchCategoria, setSearchCategoria] = useState('');
-  const [showSimilaresAlert, setShowSimilaresAlert] = useState(false);
-  const [ignorarSimilares, setIgnorarSimilares] = useState(false);
   const [similaresCargados, setSimilaresCargados] = useState(false);
   const [haySimilares, setHaySimilares] = useState(false);
   const [similaresCargadosData, setSimilaresCargadosData] = useState<Array<{
@@ -272,13 +272,7 @@ export default function NuevoReclamo() {
 
         // Guardar datos y si hay similares
         setSimilaresCargadosData(response.data);
-        const tieneSimilares = response.data.length > 0;
-        setHaySimilares(tieneSimilares);
-
-        // Si hay similares y no los hemos ignorado, mostrar la alerta
-        if (tieneSimilares && !ignorarSimilares) {
-          setShowSimilaresAlert(true);
-        }
+        setHaySimilares(response.data.length > 0);
         setSimilaresCargados(true);
       } catch (err) {
         console.error('Error buscando similares:', err);
@@ -286,7 +280,7 @@ export default function NuevoReclamo() {
     };
 
     buscarSimilares();
-  }, [formData.categoria_id, formData.latitud, formData.longitud, user, ignorarSimilares]);
+  }, [formData.categoria_id, formData.latitud, formData.longitud, user]);
 
   // Auto-detectar zona basada en coordenadas
   useEffect(() => {
@@ -977,14 +971,6 @@ Tono amigable, 3-4 oraciones máximo.`,
   };
 
   const handleSubmit = async () => {
-    // Si hay similares y no los hemos ignorado, mostrar el modal
-    if (haySimilares && !ignorarSimilares) {
-      setShowSimilaresAlert(true);
-      return;
-    }
-
-    // Asegurarse de cerrar el modal si estaba abierto
-    setShowSimilaresAlert(false);
     setSubmitting(true);
     try {
       console.log('Creando reclamo...', formData);
@@ -1959,6 +1945,101 @@ Tono amigable, 3-4 oraciones máximo.`,
     </WizardStepContent>
   );
 
+  // Contenido del paso de Similares (solo si hay similares)
+  const SimilaresStepContent = (
+    <WizardStepContent title="Encontramos reclamos similares">
+      <div className="space-y-4">
+        <div
+          className="flex items-center gap-3 p-4 rounded-xl"
+          style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b30' }}
+        >
+          <AlertTriangle className="h-6 w-6" style={{ color: '#d97706' }} />
+          <div>
+            <p className="font-medium" style={{ color: '#92400e' }}>
+              Ya hay {similaresCargadosData.length} {similaresCargadosData.length === 1 ? 'reclamo similar' : 'reclamos similares'} en la zona
+            </p>
+            <p className="text-sm" style={{ color: '#a16207' }}>
+              Podés sumarte a uno existente o continuar creando uno nuevo
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {similaresCargadosData.map((reclamo) => (
+            <div
+              key={reclamo.id}
+              className="p-4 rounded-xl border"
+              style={{ backgroundColor: theme.backgroundSecondary, borderColor: theme.border }}
+            >
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="font-semibold" style={{ color: theme.text }}>
+                  {reclamo.titulo}
+                </h3>
+                <span
+                  className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap"
+                  style={{
+                    backgroundColor: reclamo.estado === 'nuevo' ? '#f3f4f6' : reclamo.estado === 'en_curso' ? '#fef3c7' : '#d1fae5',
+                    color: reclamo.estado === 'nuevo' ? '#6b7280' : reclamo.estado === 'en_curso' ? '#d97706' : '#059669',
+                  }}
+                >
+                  {reclamo.estado === 'nuevo' ? 'Nuevo' : reclamo.estado === 'en_curso' ? 'En Proceso' : reclamo.estado}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm mb-3" style={{ color: theme.textSecondary }}>
+                <MapPin className="h-4 w-4" />
+                <span>{reclamo.direccion}</span>
+                {reclamo.distancia_metros && (
+                  <span className="text-xs">({reclamo.distancia_metros}m)</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const isMobile = window.location.pathname.startsWith('/app');
+                    const route = isMobile ? `/app/reclamo/${reclamo.id}` : `/gestion/reclamos/${reclamo.id}`;
+                    window.open(route, '_blank');
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                >
+                  <Eye className="h-4 w-4" />
+                  Ver detalles
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setSubmitting(true);
+                      await reclamosApi.sumarse(reclamo.id);
+                      toast.success('¡Te has sumado al reclamo!');
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                      const isMobile = window.location.pathname.startsWith('/app');
+                      const route = isMobile ? `/app/reclamo/${reclamo.id}` : `/gestion/reclamos/${reclamo.id}`;
+                      navigate(route);
+                    } catch (error) {
+                      const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+                      toast.error(errorMsg);
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  disabled={submitting}
+                  className="flex-1 flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                  style={{ backgroundColor: '#10b981', color: 'white', opacity: submitting ? 0.6 : 1 }}
+                >
+                  {submitting ? 'Sumándote...' : 'Sumarme'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+          Si preferís, podés continuar y crear tu propio reclamo
+        </p>
+      </div>
+    </WizardStepContent>
+  );
+
   // Contenido del paso de Confirmar
   const ConfirmarStepContent = (
     <WizardStepContent title="Confirmá los datos">
@@ -2186,16 +2267,37 @@ Tono amigable, 3-4 oraciones máximo.`,
     isValid: isRegisterValid,
   };
 
-  // Flujo para público: Chat -> Categoría -> Ubicación -> Detalles -> [Registro si no logueado] -> Confirmar
+  // Paso de similares (solo si hay similares)
+  const similaresStep: WizardStep = {
+    id: 'similares',
+    title: 'Similares',
+    description: 'Reclamos parecidos en la zona',
+    icon: <Users className="h-5 w-5" />,
+    content: SimilaresStepContent,
+    isValid: true, // Siempre válido, el usuario decide si continúa o se suma
+  };
+
+  // Flujo: Chat -> Categoría -> Ubicación -> Detalles -> [Similares si hay] -> [Registro si no logueado] -> Confirmar
   let steps: WizardStep[];
-  if (showOnlyRegister) {
-    steps = [...baseSteps.slice(0, 4), registerStep, baseSteps[4]];
+  const stepsBeforeConfirm = baseSteps.slice(0, 4); // Chat, Categoría, Ubicación, Detalles
+  const confirmStep = baseSteps[4]; // Confirmar
+
+  if (haySimilares && showOnlyRegister) {
+    // Con similares y sin usuario: agregar similares Y registro antes de confirmar
+    steps = [...stepsBeforeConfirm, similaresStep, registerStep, confirmStep];
+  } else if (haySimilares) {
+    // Con similares y con usuario: solo agregar similares
+    steps = [...stepsBeforeConfirm, similaresStep, confirmStep];
+  } else if (showOnlyRegister) {
+    // Sin similares y sin usuario: solo agregar registro
+    steps = [...stepsBeforeConfirm, registerStep, confirmStep];
   } else {
+    // Sin similares y con usuario: flujo base
     steps = baseSteps;
   }
 
-  // Índice del paso de registro (si existe)
-  const registerStepIndex = showOnlyRegister ? 4 : -1;
+  // Índice del paso de registro (si existe) - depende de si hay similares
+  const registerStepIndex = showOnlyRegister ? (haySimilares ? 5 : 4) : -1;
 
   // Manejar el cambio de step y posible registro/login
   const handleStepChange = (newStep: number) => {
@@ -2566,48 +2668,6 @@ Tono amigable, 3-4 oraciones máximo.`,
         </div>
       )}
 
-      {/* Modal de reclamos similares */}
-      {showSimilaresAlert && (
-        <ReclamosSimilares
-          similares={similaresCargadosData}
-          onClose={() => {
-            setShowSimilaresAlert(false);
-            setIgnorarSimilares(false);
-          }}
-          onContinueAnyway={() => {
-            setShowSimilaresAlert(false);
-            setIgnorarSimilares(true);
-            // Llamar a handleSubmit nuevamente ahora que ignorarSimilares es true
-            setTimeout(() => handleSubmit(), 100);
-          }}
-          onViewSimilar={(id) => {
-            // Navegar al detalle del reclamo similar
-            const isMobile = window.location.pathname.startsWith('/app');
-            const route = isMobile ? `/app/reclamo/${id}` : `/gestion/reclamos/${id}`;
-            window.open(route, '_blank');
-          }}
-          onSumarse={async (reclamoId) => {
-            try {
-              setSubmitting(true);
-              await reclamosApi.sumarse(reclamoId);
-              toast.success('¡Te has sumado al reclamo!');
-
-              // Esperar un momento y navegar
-              await new Promise(resolve => setTimeout(resolve, 500));
-              const isMobile = window.location.pathname.startsWith('/app');
-              const route = isMobile
-                ? `/app/reclamo/${reclamoId}`
-                : `/gestion/reclamos/${reclamoId}`;
-              navigate(route);
-            } catch (error) {
-              const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
-              toast.error(`Error al sumarte: ${errorMsg}`);
-            } finally {
-              setSubmitting(false);
-            }
-          }}
-        />
-      )}
     </div>
   );
 }
