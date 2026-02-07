@@ -28,9 +28,16 @@ async def delete_user(email: str):
         user_id = user[0]
         print(f"Usuario encontrado: ID={user_id}, {user[2]} {user[3]}, rol={user[4]}")
 
-        # Eliminar registros relacionados
-        await conn.execute(text("DELETE FROM push_subscriptions WHERE user_id = :id"), {"id": user_id})
-        await conn.execute(text("DELETE FROM notificaciones WHERE user_id = :id"), {"id": user_id})
+        # Eliminar registros relacionados (ignorar errores si tablas no existen)
+        try:
+            await conn.execute(text("DELETE FROM push_subscriptions WHERE user_id = :id"), {"id": user_id})
+        except Exception as e:
+            print(f"Nota: {e}")
+
+        try:
+            await conn.execute(text("DELETE FROM notificaciones WHERE usuario_id = :id"), {"id": user_id})
+        except Exception as e:
+            print(f"Nota: {e}")
 
         # Eliminar el usuario
         await conn.execute(text("DELETE FROM usuarios WHERE id = :id"), {"id": user_id})
