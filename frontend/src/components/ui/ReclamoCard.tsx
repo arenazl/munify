@@ -163,18 +163,12 @@ export function ReclamoCard({
 
             {/* Línea 3: Dependencia asignada */}
             {r.dependencia_asignada?.nombre && (
-              <div className="mt-1.5">
-                <span
-                  className="text-xs font-medium px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-                  style={{
-                    backgroundColor: `${r.dependencia_asignada.color || theme.primary}20`,
-                    color: r.dependencia_asignada.color || theme.primary
-                  }}
-                >
-                  <DynamicIcon name={r.dependencia_asignada.icono || 'Building2'} className="h-3 w-3" />
-                  {r.dependencia_asignada.nombre}
-                </span>
-              </div>
+              <p
+                className="text-xs mt-1.5 truncate"
+                style={{ color: r.dependencia_asignada.color || theme.primary }}
+              >
+                {r.dependencia_asignada.nombre}
+              </p>
             )}
 
             {/* Línea 4: Descripción */}
