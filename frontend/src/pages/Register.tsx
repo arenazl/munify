@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { User, Mail, Lock, ArrowRight, MapPin } from 'lucide-react';
@@ -15,8 +16,43 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [touched, setTouched] = useState({ nombre: false, email: false, password: false });
   const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
-  const { register } = useAuth();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) {
+      setError('No se recibió respuesta de Google');
+      return;
+    }
+
+    setGoogleLoading(true);
+    setError('');
+
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+
+      // Verificar si el usuario venía de querer crear un reclamo
+      const pendingReclamo = localStorage.getItem('pending_reclamo');
+      if (pendingReclamo) {
+        localStorage.removeItem('pending_reclamo');
+        navigate('/nuevo-reclamo');
+      } else {
+        // Ir al onboarding para configurar PWA y notificaciones
+        const onboardingCompleted = localStorage.getItem('onboarding_completed');
+        if (onboardingCompleted === 'true') {
+          navigate(getDefaultRoute('vecino'));
+        } else {
+          navigate('/onboarding');
+        }
+      }
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Error al iniciar sesión con Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   // Verificar que hay municipio seleccionado
   useEffect(() => {
@@ -114,6 +150,35 @@ export default function Register() {
           <p className="mt-2 text-sm text-slate-400">
             Solo necesitamos 3 datos para empezar
           </p>
+        </div>
+
+        {/* Google Sign-In */}
+        <div className="mb-6">
+          <div className="flex justify-center">
+            {googleLoading ? (
+              <div className="flex items-center justify-center gap-2 py-3 px-6 bg-white/10 rounded-xl">
+                <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="text-white text-sm">Conectando con Google...</span>
+              </div>
+            ) : (
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Error al conectar con Google')}
+                theme="filled_black"
+                size="large"
+                text="continue_with"
+                shape="rectangular"
+                width={320}
+              />
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="relative flex items-center gap-3 mt-6">
+            <div className="flex-1 h-px bg-slate-700" />
+            <span className="text-slate-500 text-xs">O registrate con email</span>
+            <div className="flex-1 h-px bg-slate-700" />
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

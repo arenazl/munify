@@ -230,6 +230,13 @@ export const authApi = {
       municipio_id: municipioId ? parseInt(municipioId) : null
     });
   },
+  google: (credential: string) => {
+    const municipioId = localStorage.getItem('municipio_id');
+    return api.post('/auth/google', {
+      credential,
+      municipio_id: municipioId ? parseInt(municipioId) : null
+    });
+  },
   me: () => api.get('/auth/me'),
   checkEmail: (email: string) => api.get<{ exists: boolean }>('/auth/check-email', { params: { email } }),
 };

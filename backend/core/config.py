@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = ""
     VAPID_EMAIL: str = "mailto:admin@municipio.gob.ar"
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Retorna lista de origenes CORS permitidos"""

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRoute } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck } from 'lucide-react';
@@ -11,9 +12,31 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
+
+  const handleGoogleSuccess = async (credentialResponse: { credential?: string }) => {
+    if (!credentialResponse.credential) {
+      setError('No se recibió respuesta de Google');
+      return;
+    }
+
+    setGoogleLoading(true);
+    setError('');
+
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      navigate(getDefaultRoute(user.rol, !!user.dependencia));
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setError(error.response?.data?.detail || 'Error al iniciar sesión con Google');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   // Validaciones
   const emailValidation = validationSchemas.login.email(email);
@@ -272,6 +295,33 @@ export default function Login() {
                   )}
                 </button>
               </form>
+
+              {/* Divider - Google */}
+              <div className="relative flex items-center gap-3 my-6">
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="text-slate-500 text-xs">O</span>
+                <div className="flex-1 h-px bg-white/10" />
+              </div>
+
+              {/* Google Sign-In */}
+              <div className="flex justify-center">
+                {googleLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-3 px-6 bg-white/10 rounded-xl">
+                    <Loader2 className="h-5 w-5 animate-spin text-white" />
+                    <span className="text-white text-sm">Conectando con Google...</span>
+                  </div>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() => setError('Error al conectar con Google')}
+                    theme="filled_black"
+                    size="large"
+                    text="continue_with"
+                    shape="rectangular"
+                    width={300}
+                  />
+                )}
+              </div>
 
               {/* Divider */}
               <div className="relative flex items-center gap-3 my-6">

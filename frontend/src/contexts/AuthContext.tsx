@@ -50,6 +50,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   register: (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -225,6 +226,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (credential: string) => {
+    const response = await authApi.google(credential);
+    const { access_token, user } = response.data;
+
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(user));
+    setUser(user);
+
+    // Cargar municipio del usuario
+    if (user.municipio_id) {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL;
+        const res = await fetch(`${apiUrl}/municipios/${user.municipio_id}`, {
+          headers: { Authorization: `Bearer ${access_token}` }
+        });
+        if (res.ok) {
+          const muni = await res.json();
+          localStorage.setItem('municipio_actual_id', String(muni.id));
+          localStorage.setItem('municipio_id', String(muni.id));
+          localStorage.setItem('municipio_nombre', muni.nombre);
+          localStorage.setItem('municipio_codigo', muni.codigo);
+          localStorage.setItem('municipio_color', muni.color_primario || '#3b82f6');
+          if (muni.latitud) localStorage.setItem('municipio_lat', String(muni.latitud));
+          if (muni.longitud) localStorage.setItem('municipio_lon', String(muni.longitud));
+          setMunicipioActualState(muni);
+        }
+      } catch (e) {
+        console.error('Error cargando municipio:', e);
+      }
+    }
+
+    // Auto-suscribir a push notifications
+    if (isPushSupported()) {
+      try {
+        await subscribeToPush();
+        console.log('Push notifications activadas automáticamente');
+      } catch (e) {
+        console.log('No se pudo activar push automáticamente:', e);
+      }
+    }
+  };
+
   const register = async (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => {
     await authApi.register(data);
     // Auto-login después del registro
@@ -256,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       login,
+      loginWithGoogle,
       register,
       logout,
       refreshUser,
