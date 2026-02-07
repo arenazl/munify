@@ -308,6 +308,18 @@ export const themePresets: ThemePreset[] = [
       vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
     }),
   },
+
+  // 15. AI Writer - Minimal neutral + AI black + blue accent (tema claro)
+  {
+    id: 'aiwriter',
+    name: 'AI Writer',
+    palette: ['#F5F5F5', '#E5E5E5', '#18181B', '#3B82F6'],
+    variants: generateVariants(['#F5F5F5', '#E5E5E5', '#18181B', '#3B82F6'], {
+      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Fondo neutral, sidebar AI black, acento blue
+      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },  // Fondo gris, sidebar AI black
+      vibrante: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar blue, acento black
+    }),
+  },
 ];
 
 // Helper para obtener un tema por ID y variante
