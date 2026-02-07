@@ -180,8 +180,17 @@ export default function Tramites() {
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
   const [loadingFilters, setLoadingFilters] = useState(true);
 
+  // Verificar si el usuario es supervisor/admin (para mostrar panel de gestión)
+  const isSupervisorOrAdmin = user?.rol === 'supervisor' || user?.rol === 'admin';
+
   // Cargar conteos de filtros (tipos + estados) con endpoints optimizados (COUNT en DB)
+  // Solo para supervisores/admins - vecinos no necesitan estos datos
   useEffect(() => {
+    if (!isSupervisorOrAdmin) {
+      setLoadingFilters(false);
+      return;
+    }
+
     const fetchConteos = async () => {
       try {
         const [conteosTiposRes, conteosEstadosRes] = await Promise.all([
@@ -214,23 +223,35 @@ export default function Tramites() {
       }
     };
     fetchConteos();
-  }, []);
+  }, [isSupervisorOrAdmin]);
 
   // Cargar datos principales
+  // Supervisores: cargan tramites de gestión + empleados
+  // Vecinos: solo cargan servicios (para el wizard)
   useEffect(() => {
     const fetchData = async () => {
       if (dataLoadedRef.current) return;
       dataLoadedRef.current = true;
 
       try {
-        const [tramitesRes, serviciosRes, empleadosRes] = await Promise.all([
-          tramitesApi.getGestionTodos().catch(() => ({ data: [] })),
-          tramitesApi.getServicios().catch((e) => { console.error('Error getServicios:', e); return { data: [] }; }),
-          empleadosApi.getAll(true).catch(() => ({ data: [] })),
-        ]);
-        setTramites(tramitesRes.data);
-        setServicios(serviciosRes.data);
-        setEmpleados(empleadosRes.data);
+        if (isSupervisorOrAdmin) {
+          // Supervisor/Admin: cargar datos de gestión
+          const [tramitesRes, serviciosRes, empleadosRes] = await Promise.all([
+            tramitesApi.getGestionTodos().catch(() => ({ data: [] })),
+            tramitesApi.getServicios().catch((e) => { console.error('Error getServicios:', e); return { data: [] }; }),
+            empleadosApi.getAll(true).catch(() => ({ data: [] })),
+          ]);
+          setTramites(tramitesRes.data);
+          setServicios(serviciosRes.data);
+          setEmpleados(empleadosRes.data);
+        } else {
+          // Vecino: solo cargar servicios para el wizard
+          const serviciosRes = await tramitesApi.getServicios().catch((e) => {
+            console.error('Error getServicios:', e);
+            return { data: [] };
+          });
+          setServicios(serviciosRes.data);
+        }
       } catch (error) {
         console.error('Error cargando datos:', error);
         toast.error('Error al cargar datos');
@@ -239,10 +260,12 @@ export default function Tramites() {
       }
     };
     fetchData();
-  }, []);
+  }, [isSupervisorOrAdmin]);
 
-  // Refetch tramites cuando cambia filtro
+  // Refetch tramites cuando cambia filtro (solo para supervisores/admins)
   const fetchTramites = async () => {
+    if (!isSupervisorOrAdmin) return;
+
     try {
       const params: Record<string, unknown> = {};
       if (filtroEstado) params.estado = filtroEstado;
@@ -259,10 +282,10 @@ export default function Tramites() {
   };
 
   useEffect(() => {
-    if (dataLoadedRef.current) {
+    if (dataLoadedRef.current && isSupervisorOrAdmin) {
       fetchTramites();
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, isSupervisorOrAdmin]);
 
   // Usar tipos de trámite como rubros (categorías)
   interface Rubro {
