@@ -977,11 +977,19 @@ Tono amigable, 3-4 oraciones máximo.`,
   };
 
   const handleSubmit = async () => {
+    console.log('=== handleSubmit called ===');
+    console.log('haySimilares:', haySimilares);
+    console.log('ignorarSimilares:', ignorarSimilares);
+    console.log('similaresCargadosData:', similaresCargadosData);
+
     // Si hay similares y no los hemos ignorado, mostrar el modal
     if (haySimilares && !ignorarSimilares) {
+      console.log('Mostrando modal de similares...');
       setShowSimilaresAlert(true);
       return;
     }
+
+    console.log('Procediendo a crear reclamo...');
 
     // Asegurarse de cerrar el modal si estaba abierto
     setShowSimilaresAlert(false);
