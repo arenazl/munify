@@ -120,6 +120,18 @@ export default function NuevoReclamo() {
   const [ignorarSimilares, setIgnorarSimilares] = useState(false);
   const [similaresCargados, setSimilaresCargados] = useState(false);
   const [haySimilares, setHaySimilares] = useState(false);
+  const [similaresCargadosData, setSimilaresCargadosData] = useState<Array<{
+    id: number;
+    titulo: string;
+    descripcion: string;
+    direccion: string;
+    estado: string;
+    categoria: string;
+    zona: string;
+    created_at: string;
+    creador: { nombre: string; apellido: string };
+    distancia_metros: number | null;
+  }>>([]);
   const dataLoadedRef = useRef(false); // Prevenir carga múltiple de datos
 
   // Dependencia encargada basada en la categoría seleccionada
@@ -258,7 +270,8 @@ export default function NuevoReclamo() {
           limit: 5,
         });
 
-        // Guardar si hay similares
+        // Guardar datos y si hay similares
+        setSimilaresCargadosData(response.data);
         const tieneSimilares = response.data.length > 0;
         setHaySimilares(tieneSimilares);
 
@@ -2556,9 +2569,7 @@ Tono amigable, 3-4 oraciones máximo.`,
       {/* Modal de reclamos similares */}
       {showSimilaresAlert && (
         <ReclamosSimilares
-          categoriaId={formData.categoria_id ? Number(formData.categoria_id) : null}
-          latitud={formData.latitud}
-          longitud={formData.longitud}
+          similares={similaresCargadosData}
           onClose={() => {
             setShowSimilaresAlert(false);
             setIgnorarSimilares(false);

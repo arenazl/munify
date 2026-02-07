@@ -1,10 +1,8 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, MapPin, Calendar, Eye, X } from 'lucide-react';
-import { reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { toast } from 'sonner';
 
-interface ReclamoSimilar {
+export interface ReclamoSimilar {
   id: number;
   titulo: string;
   descripcion: string;
@@ -21,9 +19,7 @@ interface ReclamoSimilar {
 }
 
 interface ReclamosSimilaresProps {
-  categoriaId: number | null;
-  latitud: number | null;
-  longitud: number | null;
+  similares: ReclamoSimilar[];
   onClose: () => void;
   onContinueAnyway: () => void;
   onViewSimilar: (id: number) => void;
@@ -39,47 +35,14 @@ const estadoConfig: Record<string, { label: string; color: string; bg: string }>
 };
 
 export function ReclamosSimilares({
-  categoriaId,
-  latitud,
-  longitud,
+  similares,
   onClose,
   onContinueAnyway,
   onViewSimilar,
   onSumarse,
 }: ReclamosSimilaresProps) {
   const { theme } = useTheme();
-  const [similares, setSimilares] = useState<ReclamoSimilar[]>([]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!categoriaId) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchSimilares = async () => {
-      try {
-        setLoading(true);
-        const response = await reclamosApi.getSimilares({
-          categoria_id: categoriaId,
-          latitud: latitud || undefined,
-          longitud: longitud || undefined,
-          radio_metros: 100,
-          dias_atras: 30,
-          limit: 5,
-        });
-        setSimilares(response.data);
-      } catch (err) {
-        console.error('Error buscando reclamos similares:', err);
-        toast.error('Error al buscar reclamos similares');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSimilares();
-  }, [categoriaId, latitud, longitud]);
 
   const formatFecha = (fecha: string) => {
     const date = new Date(fecha);
@@ -94,12 +57,9 @@ export function ReclamosSimilares({
     return date.toLocaleDateString();
   };
 
-  if (loading) {
-    return null; // No mostrar nada mientras carga
-  }
-
+  // Si no hay similares, no mostrar nada
   if (similares.length === 0) {
-    return null; // No hay similares, no mostrar alerta
+    return null;
   }
 
   return (
