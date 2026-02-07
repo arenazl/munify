@@ -705,7 +705,8 @@ async def buscar_reclamos_similares(
             EstadoReclamo.ASIGNADO,
             EstadoReclamo.EN_CURSO
         ]),
-        Reclamo.municipio_id == current_user.municipio_id
+        Reclamo.municipio_id == current_user.municipio_id,
+        Reclamo.creador_id != current_user.id  # Excluir reclamos propios
     ).options(
         selectinload(Reclamo.categoria),
         selectinload(Reclamo.zona),
