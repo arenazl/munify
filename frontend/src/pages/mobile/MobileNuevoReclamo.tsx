@@ -121,11 +121,11 @@ export default function MobileNuevoReclamo() {
         }
       `}</style>
 
-      {/* Backdrop con blur */}
+      {/* Backdrop semi-transparente - permite ver el contenido de fondo */}
       <div
-        className={`fixed inset-0 z-[60] backdrop-blur ${!isVisible ? 'closing' : ''}`}
+        className={`fixed inset-0 z-[60] backdrop-blur-sm ${!isVisible ? 'closing' : ''}`}
         style={{
-          background: `radial-gradient(circle at 50% 100%, ${theme.primary}30 0%, rgba(0,0,0,0.85) 70%)`,
+          background: `radial-gradient(circle at 50% 100%, ${theme.primary}20 0%, rgba(0,0,0,0.5) 70%)`,
         }}
         onClick={handleClose}
       />

@@ -1267,10 +1267,18 @@ export default function Layout() {
 
                 // Botón especial de crear - sobresale del footer
                 if (isCreateButton) {
+                  const isVecino = user?.rol === 'vecino';
                   return (
                     <button
                       key="create-menu"
-                      onClick={() => setCreateMenuOpen(!createMenuOpen)}
+                      onClick={() => {
+                        // Vecinos van directo al menú bonito de MobileNuevoReclamo
+                        if (isVecino) {
+                          navigate('/app/nuevo');
+                        } else {
+                          setCreateMenuOpen(!createMenuOpen);
+                        }
+                      }}
                       className="flex flex-col items-center min-w-0 flex-1 relative -mt-5"
                     >
                       <div
