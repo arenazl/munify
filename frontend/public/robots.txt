@@ -1,10 +1,24 @@
-# Munify - Robots.txt
+# Robots.txt para Munify - Sistema de Gestión Municipal
+# https://app.munify.com.ar
+
 User-agent: *
 Allow: /
-
-# Sitemap
-Sitemap: https://munify.com.ar/sitemap.xml
+Allow: /bienvenido
+Allow: /login
+Allow: /register
+Allow: /publico
 
 # Bloquear rutas privadas
+Disallow: /dashboard
+Disallow: /mis-reclamos
+Disallow: /mis-tramites
+Disallow: /perfil
+Disallow: /onboarding
 Disallow: /gestion/
 Disallow: /api/
+
+# Sitemap
+Sitemap: https://app.munify.com.ar/sitemap.xml
+
+# Crawl-delay para ser amigables con el servidor
+Crawl-delay: 1
