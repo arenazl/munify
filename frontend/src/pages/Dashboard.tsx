@@ -136,7 +136,7 @@ export default function Dashboard() {
 
   // Callback para navegar al mapa cuando se hace click en una categoría del heatmap
   const handleCategoryClick = useCallback((categoryKey: string, categoryLabel: string) => {
-    navigate(`/mapa?categoria=${encodeURIComponent(categoryKey)}`);
+    navigate(`/gestion/mapa?categoria=${encodeURIComponent(categoryKey)}`);
   }, [navigate]);
 
   useEffect(() => {
