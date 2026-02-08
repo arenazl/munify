@@ -991,18 +991,24 @@ async def crear_solicitud(
     if not tramite:
         raise HTTPException(status_code=404, detail="Trámite no encontrado o no disponible")
 
-    # Generar número de solicitud único
+    # Generar número de solicitud único (buscar el máximo existente)
     year = datetime.now().year
+    prefix = f"SOL-{year}-"
     result = await db.execute(
-        select(func.count(Solicitud.id)).where(
+        select(func.max(Solicitud.numero_tramite)).where(
             and_(
                 Solicitud.municipio_id == municipio_id,
-                func.extract('year', Solicitud.created_at) == year
+                Solicitud.numero_tramite.like(f"{prefix}%")
             )
         )
     )
-    count = result.scalar() or 0
-    numero_tramite = f"SOL-{year}-{str(count + 1).zfill(5)}"
+    max_numero = result.scalar()
+    if max_numero:
+        # Extraer el número secuencial de SOL-2026-00443
+        seq = int(max_numero.split('-')[-1])
+        numero_tramite = f"{prefix}{str(seq + 1).zfill(5)}"
+    else:
+        numero_tramite = f"{prefix}00001"
 
     # Preparar datos
     solicitud_dict = solicitud_data.model_dump()
