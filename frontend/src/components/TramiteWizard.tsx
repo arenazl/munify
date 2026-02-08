@@ -276,9 +276,29 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   const [cameraReady, setCameraReady] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [pendingStream, setPendingStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // useEffect para asignar stream al video cuando ambos estén disponibles
+  useEffect(() => {
+    if (pendingStream && videoRef.current && cameraActive) {
+      const video = videoRef.current;
+      video.srcObject = pendingStream;
+      streamRef.current = pendingStream;
+
+      video.onloadedmetadata = () => {
+        video.play().then(() => {
+          setCameraReady(true);
+          setPendingStream(null);
+        }).catch(err => {
+          console.error('Error playing video:', err);
+          setCameraError('No se pudo iniciar la reproducción del video.');
+        });
+      };
+    }
+  }, [pendingStream, cameraActive]);
 
   // Buscar direcciones con Nominatim (OpenStreetMap)
   const searchAddress = useCallback(async (query: string) => {
@@ -636,6 +656,7 @@ Tono amigable, 2-3 oraciones máximo.`,
     setCameraReady(false);
     setCapturedPhoto(null);
     setCameraError(null);
+    setPendingStream(null);
     // Detener cámara si está activa
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -1344,20 +1365,17 @@ Tono amigable y conciso (2-3 oraciones máximo).`
   const startCamera = async () => {
     setCameraError(null);
     setCameraReady(false);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        // Esperar a que el video esté listo
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-          setCameraReady(true);
-        };
-      }
+
+      // Primero activamos la cámara para que el video element se renderice
       setCameraActive(true);
+      // Luego guardamos el stream pendiente, el useEffect lo asignará cuando el video esté listo
+      setPendingStream(stream);
+
     } catch (err: unknown) {
       console.error('Error accessing camera:', err);
       const error = err as Error;
@@ -1373,14 +1391,16 @@ Tono amigable y conciso (2-3 oraciones máximo).`
     }
   };
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    // Clear pendingStream state - the stream itself is either moved to streamRef or will be garbage collected
+    setPendingStream(null);
     setCameraActive(false);
     setCameraReady(false);
-  };
+  }, []);
 
   const capturePhoto = () => {
     if (!cameraReady || !videoRef.current || !canvasRef.current) {
