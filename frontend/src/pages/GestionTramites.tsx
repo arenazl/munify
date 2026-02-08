@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi } from '../lib/api';
-import { renderEmpleado, renderFechasConVencimiento, renderVencimientoCalculado } from '../lib/tableHelpers';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
@@ -399,7 +398,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     setNuevoEstado('');
     setRespuesta(tramite.respuesta || '');
     setObservaciones(tramite.observaciones || '');
-    setEmpleadoSeleccionado(tramite.empleado_id || '');
+    setEmpleadoSeleccionado(tramite.municipio_dependencia_id || '');
     setSugerenciaIA(null);
     setHistorial([]);
     setShowHistorial(false);
@@ -470,7 +469,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     setAsignando(true);
     try {
       await tramitesApi.asignar(selectedTramite.id, {
-        empleado_id: Number(empleadoSeleccionado),
+        municipio_dependencia_id: Number(empleadoSeleccionado),
         comentario: sugerenciaIA?.mensaje || undefined,
       });
       toast.success('Dependencia asignada correctamente');
@@ -782,7 +781,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                   <CalendarDays className="h-3 w-3 mr-1" />
                   {new Date(t.created_at).toLocaleDateString()}
                 </span>
-                {!t.empleado_id && (
+                {!t.municipio_dependencia_id && (
                   <span
                     className="px-2 py-0.5 rounded-full text-xs"
                     style={{ backgroundColor: '#ef444420', color: '#ef4444' }}
@@ -792,9 +791,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {t.empleado_asignado && (
-                  <span style={{ color: theme.primary }} className="font-medium">
-                    {t.empleado_asignado.nombre}
+                {t.dependencia_asignada && (
+                  <span style={{ color: t.dependencia_asignada.color || theme.primary }} className="font-medium">
+                    {t.dependencia_asignada.nombre}
                   </span>
                 )}
                 <Eye className="h-4 w-4" style={{ color: theme.primary }} />
@@ -1171,10 +1170,21 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           ),
         },
         {
-          key: 'empleado',
+          key: 'dependencia',
           header: 'Dependencia',
-          sortValue: (t) => t.empleado_asignado ? `${t.empleado_asignado.nombre || ''} ${t.empleado_asignado.apellido || ''}`.trim() : '',
-          render: (t) => renderEmpleado(t, theme.text),
+          sortValue: (t) => t.dependencia_asignada?.nombre || '',
+          render: (t) => {
+            if (!t.dependencia_asignada?.nombre) return null;
+            return (
+              <span
+                className="text-xs truncate max-w-[80px] block"
+                style={{ color: t.dependencia_asignada.color || theme.text }}
+                title={t.dependencia_asignada.nombre}
+              >
+                {t.dependencia_asignada.nombre}
+              </span>
+            );
+          },
         },
         {
           key: 'estado',
@@ -1526,21 +1536,21 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     )}
                   </div>
 
-                  {/* Empleado actual */}
-                  {selectedTramite.empleado_asignado && (
+                  {/* Dependencia actual */}
+                  {selectedTramite.dependencia_asignada && (
                     <div className="flex items-center gap-2 mb-3">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
-                        style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                        style={{ backgroundColor: `${selectedTramite.dependencia_asignada.color || theme.primary}20`, color: selectedTramite.dependencia_asignada.color || theme.primary }}
                       >
-                        {selectedTramite.empleado_asignado.nombre?.[0]}{selectedTramite.empleado_asignado.apellido?.[0]}
+                        {selectedTramite.dependencia_asignada.nombre?.[0]}
                       </div>
                       <div>
                         <p className="text-sm font-medium" style={{ color: theme.text }}>
-                          {selectedTramite.empleado_asignado.nombre} {selectedTramite.empleado_asignado.apellido}
+                          {selectedTramite.dependencia_asignada.nombre}
                         </p>
                         <p className="text-xs" style={{ color: theme.textSecondary }}>
-                          {tramiteCerrado ? 'Responsable del trámite' : 'Actualmente asignado'}
+                          {tramiteCerrado ? 'Dependencia responsable' : 'Actualmente asignado'}
                         </p>
                       </div>
                     </div>

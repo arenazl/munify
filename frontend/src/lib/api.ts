@@ -1054,9 +1054,9 @@ export const tramitesApi = {
     const municipioId = localStorage.getItem('municipio_id');
     return api.post('/tramites/solicitudes', data, { params: { municipio_id: municipioId } });
   },
-  updateSolicitud: (id: number, data: { estado?: string; empleado_id?: number; prioridad?: number; respuesta?: string; observaciones?: string }) =>
+  updateSolicitud: (id: number, data: { estado?: string; municipio_dependencia_id?: number; prioridad?: number; respuesta?: string; observaciones?: string }) =>
     api.put(`/tramites/solicitudes/detalle/${id}`, data),
-  asignarSolicitud: (id: number, data: { empleado_id: number; comentario?: string }) =>
+  asignarSolicitud: (id: number, data: { municipio_dependencia_id: number; comentario?: string }) =>
     api.post(`/tramites/solicitudes/${id}/asignar`, data),
   getHistorialSolicitud: (id: number) => api.get(`/tramites/solicitudes/${id}/historial`),
 
@@ -1066,7 +1066,7 @@ export const tramitesApi = {
   getGestionSolicitudes: (params?: {
     estado?: string;
     tramite_id?: number;
-    empleado_id?: number;
+    municipio_dependencia_id?: number;
     sin_asignar?: boolean;
     search?: string;
     skip?: number;
@@ -1110,7 +1110,7 @@ export const tramitesApi = {
     return api.post('/tramites/solicitudes', mappedData, { params: { municipio_id: municipioId } });
   },
   update: (id: number, data: Record<string, unknown>) => api.put(`/tramites/solicitudes/detalle/${id}`, data),
-  asignar: (id: number, data: { empleado_id: number; comentario?: string }) =>
+  asignar: (id: number, data: { municipio_dependencia_id: number; comentario?: string }) =>
     api.post(`/tramites/solicitudes/${id}/asignar`, data),
   getHistorial: (id: number) => api.get(`/tramites/solicitudes/${id}/historial`),
   consultar: (numeroTramite: string) => api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),

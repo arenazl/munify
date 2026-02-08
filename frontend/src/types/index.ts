@@ -336,12 +336,13 @@ export interface Tramite {
   email_solicitante?: string;
   telefono_solicitante?: string;
   direccion_solicitante?: string;
-  empleado_id?: number;
-  empleado_asignado?: {
+  municipio_dependencia_id?: number;
+  dependencia_asignada?: {
     id: number;
-    nombre: string;
-    apellido?: string;
-    especialidad?: string;
+    dependencia_id: number;
+    nombre?: string;
+    color?: string;
+    icono?: string;
   };
   prioridad?: number;
   respuesta?: string;
@@ -369,12 +370,13 @@ export interface Solicitud {
   email_solicitante?: string;
   telefono_solicitante?: string;
   direccion_solicitante?: string;
-  empleado_id?: number;
-  empleado_asignado?: {
+  municipio_dependencia_id?: number;
+  dependencia_asignada?: {
     id: number;
-    nombre: string;
-    apellido?: string;
-    especialidad?: string;
+    dependencia_id: number;
+    nombre?: string;
+    color?: string;
+    icono?: string;
   };
   prioridad: number;
   respuesta?: string;

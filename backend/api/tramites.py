@@ -1166,12 +1166,16 @@ async def asignar_solicitud(
     current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
     db: AsyncSession = Depends(get_db)
 ):
-    """Asigna un empleado a una solicitud"""
+    """Asigna una dependencia a una solicitud de trámite"""
+    from models.municipio_dependencia import MunicipioDependencia
+    from models.dependencia import Dependencia
+
     result = await db.execute(
         select(Solicitud)
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
-            selectinload(Solicitud.solicitante)
+            selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia)
         )
         .where(Solicitud.id == solicitud_id)
     )
@@ -1180,47 +1184,39 @@ async def asignar_solicitud(
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
 
-    # Verificar empleado (debe ser administrativo para trámites)
+    # Verificar que la dependencia existe y pertenece al mismo municipio
     result = await db.execute(
-        select(Empleado).where(
+        select(MunicipioDependencia)
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(
             and_(
-                Empleado.id == asignacion.empleado_id,
-                Empleado.municipio_id == solicitud.municipio_id,
-                Empleado.activo == True,
-                Empleado.tipo == "administrativo"  # Solo administrativos para trámites
+                MunicipioDependencia.id == asignacion.municipio_dependencia_id,
+                MunicipioDependencia.municipio_id == solicitud.municipio_id,
+                MunicipioDependencia.activo == True
             )
         )
     )
-    empleado = result.scalar_one_or_none()
+    municipio_dependencia = result.scalar_one_or_none()
 
-    if not empleado:
-        # Verificar si existe pero es del tipo incorrecto
-        result_check = await db.execute(
-            select(Empleado).where(Empleado.id == asignacion.empleado_id)
-        )
-        emp_check = result_check.scalar_one_or_none()
-        if emp_check and emp_check.tipo != "administrativo":
-            raise HTTPException(
-                status_code=400,
-                detail=f"El empleado {emp_check.nombre} es de tipo '{emp_check.tipo}'. Los trámites solo pueden ser asignados a empleados administrativos."
-            )
-        raise HTTPException(status_code=404, detail="Empleado no encontrado o no disponible")
+    if not municipio_dependencia:
+        raise HTTPException(status_code=404, detail="Dependencia no encontrada o no disponible")
 
-    empleado_anterior_id = solicitud.empleado_id
+    dependencia_anterior_id = solicitud.municipio_dependencia_id
     estado_anterior = solicitud.estado
 
-    solicitud.empleado_id = asignacion.empleado_id
+    solicitud.municipio_dependencia_id = asignacion.municipio_dependencia_id
 
     if solicitud.estado == EstadoSolicitud.RECIBIDO:
         solicitud.estado = EstadoSolicitud.EN_REVISION
 
-    accion = "Empleado asignado" if not empleado_anterior_id else "Empleado reasignado"
+    dependencia_nombre = municipio_dependencia.dependencia.nombre if municipio_dependencia.dependencia else "Dependencia"
+    accion = "Dependencia asignada" if not dependencia_anterior_id else "Dependencia reasignada"
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
         usuario_id=current_user.id,
         estado_anterior=estado_anterior,
         estado_nuevo=solicitud.estado,
-        accion=f"{accion}: {empleado.nombre} {empleado.apellido or ''}",
+        accion=f"{accion}: {dependencia_nombre}",
         comentario=asignacion.comentario
     )
     db.add(historial)
@@ -1347,7 +1343,7 @@ async def listar_solicitudes_gestion(
     estado: Optional[EstadoSolicitud] = Query(None),
     tramite_id: Optional[int] = Query(None),
     tipo_tramite_id: Optional[int] = Query(None, description="Filtrar por tipo/categoría de trámite"),
-    empleado_id: Optional[int] = Query(None),
+    municipio_dependencia_id: Optional[int] = Query(None, description="Filtrar por dependencia asignada"),
     sin_asignar: bool = Query(False),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
@@ -1370,9 +1366,9 @@ async def listar_solicitudes_gestion(
             Tramite.tipo_tramite_id == tipo_tramite_id
         )
 
-    # TODO: Filtro por dependencia cuando se implemente IA
-    # if empleado_id:
-    #     query = query.where(Solicitud.municipio_dependencia_id == empleado_id)
+    # Filtro por dependencia asignada
+    if municipio_dependencia_id:
+        query = query.where(Solicitud.municipio_dependencia_id == municipio_dependencia_id)
 
     if sin_asignar:
         query = query.where(Solicitud.municipio_dependencia_id == None)
@@ -1392,9 +1388,10 @@ async def listar_solicitudes_gestion(
     #     query = query.where(Solicitud.municipio_dependencia_id == current_user.dependencia_id)
 
     # Optimización: solo cargar relaciones necesarias para la lista
+    from models.municipio_dependencia import MunicipioDependencia
     query = query.options(
-        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite)
-        # No cargar solicitante completo, ya tenemos nombre_solicitante, apellido_solicitante, etc.
+        selectinload(Solicitud.tramite).selectinload(Tramite.tipo_tramite),
+        selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia)
     )
     query = query.order_by(Solicitud.created_at.desc(), Solicitud.prioridad)
     query = query.offset(skip).limit(limit)

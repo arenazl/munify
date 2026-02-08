@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 from models.tramite import EstadoSolicitud
+from schemas.reclamo import DependenciaAsignadaSimple
 
 
 # ==================== Tipo Tramite (Categorías) ====================
@@ -199,14 +200,14 @@ class SolicitudCreate(BaseModel):
 
 class SolicitudUpdate(BaseModel):
     estado: Optional[EstadoSolicitud] = None
-    empleado_id: Optional[int] = None
+    municipio_dependencia_id: Optional[int] = None
     prioridad: Optional[int] = None
     respuesta: Optional[str] = None
     observaciones: Optional[str] = None
 
 
 class SolicitudAsignar(BaseModel):
-    empleado_id: int
+    municipio_dependencia_id: int
     comentario: Optional[str] = None
 
 
@@ -247,8 +248,8 @@ class SolicitudResponse(BaseModel):
     email_solicitante: Optional[str] = None
     telefono_solicitante: Optional[str] = None
     direccion_solicitante: Optional[str] = None
-    empleado_id: Optional[int] = None
-    empleado_asignado: Optional[EmpleadoSimple] = None
+    municipio_dependencia_id: Optional[int] = None
+    dependencia_asignada: Optional[DependenciaAsignadaSimple] = None
     prioridad: int = 3
     respuesta: Optional[str] = None
     observaciones: Optional[str] = None
@@ -278,8 +279,8 @@ class SolicitudGestionResponse(BaseModel):
     email_solicitante: Optional[str] = None
     telefono_solicitante: Optional[str] = None
     direccion_solicitante: Optional[str] = None
-    empleado_id: Optional[int] = None
-    empleado_asignado: Optional[EmpleadoSimple] = None
+    municipio_dependencia_id: Optional[int] = None
+    dependencia_asignada: Optional[DependenciaAsignadaSimple] = None
     prioridad: int = 3
     respuesta: Optional[str] = None
     observaciones: Optional[str] = None

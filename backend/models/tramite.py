@@ -196,6 +196,10 @@ class Solicitud(Base):
     # Prioridad (1=urgente, 5=baja)
     prioridad = Column(Integer, default=3)
 
+    # Dependencia asignada
+    municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
+    dependencia_asignada = relationship("MunicipioDependencia", back_populates="solicitudes")
+
     # Resolución
     respuesta = Column(Text, nullable=True)
     observaciones = Column(Text, nullable=True)

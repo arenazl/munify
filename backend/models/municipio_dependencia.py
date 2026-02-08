@@ -65,7 +65,7 @@ class MunicipioDependencia(Base):
 
     # Reclamos y solicitudes asignadas a esta dependencia en este municipio
     reclamos = relationship("Reclamo", back_populates="dependencia_asignada")
-    # solicitudes = relationship("Solicitud", back_populates="dependencia_asignada")  # TODO: cuando se agregue a solicitudes
+    solicitudes = relationship("Solicitud", back_populates="municipio_dependencia")
 
     def __repr__(self):
         return f"<MunicipioDependencia {self.municipio_id}-{self.dependencia_id}>"

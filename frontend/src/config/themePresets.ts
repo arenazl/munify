@@ -320,6 +320,30 @@ export const themePresets: ThemePreset[] = [
       vibrante: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar blue, acento black
     }),
   },
+
+  // 16. Generative Art - Canvas neutral oscuro con acentos vibrantes (Web3/NFT/AI Art)
+  {
+    id: 'generative',
+    name: 'Generative Art',
+    palette: ['#121212', '#1A1A1A', '#8B5CF6', '#EC4899'],
+    variants: generateVariants(['#121212', '#1A1A1A', '#8B5CF6', '#EC4899'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Fondo canvas, sidebar charcoal, acento purple
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },  // Fondo charcoal, sidebar canvas, acento pink
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar purple, acento neon pink
+    }),
+  },
+
+  // 17. AI Image Gen - Dark mode creativo con acentos vibrantes (AI art generation)
+  {
+    id: 'aimagegen',
+    name: 'AI Image Gen',
+    palette: ['#0F0F0F', '#1C1C1E', '#06B6D4', '#F59E0B'],
+    variants: generateVariants(['#0F0F0F', '#1C1C1E', '#06B6D4', '#F59E0B'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Fondo deep black, sidebar dark, acento cyan
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },  // Fondo dark, sidebar black, acento amber
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar cyan, acento amber vibrante
+    }),
+  },
 ];
 
 // Helper para obtener un tema por ID y variante
