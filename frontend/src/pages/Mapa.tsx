@@ -246,15 +246,8 @@ export default function Mapa() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: theme.primary }}></div>
-      </div>
-    );
-  }
-
   // Primero filtrar por categoría si viene de la URL
+  // IMPORTANTE: Los hooks deben estar ANTES de cualquier early return
   const reclamosPorCategoria = useMemo(() => {
     if (!filtroCategoria) return reclamos;
     return reclamos.filter(r => {
@@ -264,10 +257,12 @@ export default function Mapa() {
   }, [reclamos, filtroCategoria]);
 
   // Contar reclamos por estado (sobre los ya filtrados por categoría)
-  const conteosPorEstado = reclamosPorCategoria.reduce((acc, r) => {
-    acc[r.estado] = (acc[r.estado] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const conteosPorEstado = useMemo(() => {
+    return reclamosPorCategoria.reduce((acc, r) => {
+      acc[r.estado] = (acc[r.estado] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [reclamosPorCategoria]);
 
   // Filtrar reclamos según el estado seleccionado (después de filtrar por categoría)
   const reclamosFiltrados = useMemo(() => {
@@ -276,6 +271,14 @@ export default function Mapa() {
     }
     return reclamosPorCategoria;
   }, [reclamosPorCategoria, filtroEstado]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: theme.primary }}></div>
+      </div>
+    );
+  }
 
   // Limpiar filtro de categoría
   const clearCategoriaFilter = () => {
