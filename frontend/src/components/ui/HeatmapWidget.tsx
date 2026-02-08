@@ -157,14 +157,14 @@ function HeatLayer({ data }: { data: HeatmapPoint[] }) {
       point.intensidad || 1,
     ]);
 
-    // Crear capa de calor con gradiente personalizado (muy transparente para ver etiquetas)
+    // Crear capa de calor con gradiente personalizado
     try {
       const heat = L.heatLayer(heatData, {
-        radius: 8,
-        blur: 0,
+        radius: 20,
+        blur: 15,
         maxZoom: 17,
         max: 3,
-        minOpacity: 0.15,
+        minOpacity: 0.4,
         gradient: {
           0.0: '#3b82f6',
           0.25: '#22d3ee',
