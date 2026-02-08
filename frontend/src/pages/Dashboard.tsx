@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays } from 'lucide-react';
 import { dashboardApi, analyticsApi, reclamosApi } from '../lib/api';
 import { DashboardStats } from '../types';
@@ -98,6 +99,7 @@ export default function Dashboard() {
   console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
   const { theme } = useTheme();
   const { municipioActual } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tramitesStats, setTramitesStats] = useState<DashboardStats | null>(null);
   const [porCategoria, setPorCategoria] = useState<{ categoria: string; cantidad: number }[]>([]);
@@ -131,6 +133,11 @@ export default function Dashboard() {
     total_empleados: number;
   } | null>(null);
   const [metricasDetalle, setMetricasDetalle] = useState<MetricasDetalle | null>(null);
+
+  // Callback para navegar al mapa cuando se hace click en una categoría del heatmap
+  const handleCategoryClick = useCallback((categoryKey: string, categoryLabel: string) => {
+    navigate(`/mapa?categoria=${encodeURIComponent(categoryKey)}`);
+  }, [navigate]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -695,7 +702,13 @@ export default function Dashboard() {
               Mapa de Calor - Concentracion de Reclamos
             </h2>
           </div>
-          <HeatmapWidget data={heatmapData} height="256px" title="Mapa de Calor - Concentracion de Reclamos" loading={loadingHeatmap} />
+          <HeatmapWidget
+            data={heatmapData}
+            height="256px"
+            title="Mapa de Calor - Concentracion de Reclamos"
+            loading={loadingHeatmap}
+            onCategoryClick={handleCategoryClick}
+          />
           <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
             {heatmapData.length} puntos en los ultimos 90 dias
           </p>

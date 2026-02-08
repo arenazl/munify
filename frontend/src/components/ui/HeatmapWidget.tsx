@@ -41,6 +41,8 @@ interface HeatmapWidgetProps {
   expandable?: boolean;
   title?: string;
   loading?: boolean;
+  /** Callback cuando se hace click en una categoría - si está definido, redirige en lugar de filtrar */
+  onCategoryClick?: (categoryKey: string, categoryLabel: string) => void;
 }
 
 const DEFAULT_COLOR = '#64748b'; // Gris para categorías sin color
@@ -323,6 +325,7 @@ export default function HeatmapWidget({
   expandable = true,
   title = 'Mapa de Calor',
   loading = false,
+  onCategoryClick,
 }: HeatmapWidgetProps) {
   const { currentPresetId } = useTheme();
   // Detectar si el tema es claro (solo sand y arctic son claros)
@@ -343,6 +346,12 @@ export default function HeatmapWidget({
 
   // Seleccionar solo UNA categoría (filtro exclusivo)
   const selectFilter = useCallback((key: string) => {
+    // Si hay callback de redirección, usarlo en lugar de filtrar
+    if (onCategoryClick) {
+      const cat = UNIQUE_CATEGORIES.find(c => c.key === key);
+      onCategoryClick(key, cat?.label || key);
+      return;
+    }
     setActiveFilters(prev => {
       // Si ya está seleccionada solo esta, no hacer nada
       if (prev.size === 1 && prev.has(key)) return prev;
@@ -354,7 +363,7 @@ export default function HeatmapWidget({
     setMapRendering(true);
     // Incrementar versión para forzar recreación del mapa
     setMapVersion(v => v + 1);
-  }, []);
+  }, [onCategoryClick]);
 
   // Mostrar todas las categorías
   const showAll = useCallback(() => {

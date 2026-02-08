@@ -386,6 +386,97 @@ async def get_stats(
         "tiempo_promedio_dias": round(tiempo_promedio, 1)
     }
 
+
+@router.get("/tramites-stats")
+async def get_tramites_stats(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(["admin", "supervisor"]))
+):
+    """Estadísticas de trámites/solicitudes para el dashboard"""
+    from models.tramite import Solicitud, EstadoSolicitud
+    from sqlalchemy import or_
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    # Si no hay municipio_id, intentar obtener del usuario directamente
+    if not municipio_id and current_user.municipio_id:
+        municipio_id = current_user.municipio_id
+
+    # Log para debug
+    print(f"[tramites-stats] municipio_id={municipio_id}, user={current_user.email}, header={request.headers.get('X-Municipio-ID')}")
+
+    # Si aún no hay municipio_id, retornar 0s
+    if not municipio_id:
+        return {
+            "total": 0,
+            "por_estado": {},
+            "hoy": 0,
+            "semana": 0,
+            "tiempo_promedio_dias": 0
+        }
+
+    # Total de solicitudes por estado
+    estados_query = await db.execute(
+        select(Solicitud.estado, func.count(Solicitud.id))
+        .where(Solicitud.municipio_id == municipio_id)
+        .group_by(Solicitud.estado)
+    )
+    estados = {estado.value if hasattr(estado, 'value') else str(estado): count for estado, count in estados_query.all()}
+
+    # Total general
+    total = sum(estados.values())
+
+    # Solicitudes de hoy
+    hoy = datetime.utcnow().date()
+    hoy_query = await db.execute(
+        select(func.count(Solicitud.id))
+        .where(
+            Solicitud.municipio_id == municipio_id,
+            func.date(Solicitud.created_at) == hoy
+        )
+    )
+    hoy_count = hoy_query.scalar() or 0
+
+    # Solicitudes de esta semana
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+    semana_query = await db.execute(
+        select(func.count(Solicitud.id))
+        .where(
+            Solicitud.municipio_id == municipio_id,
+            func.date(Solicitud.created_at) >= inicio_semana
+        )
+    )
+    semana_count = semana_query.scalar() or 0
+
+    # Tiempo promedio de resolución (en días) - incluir estados legacy FINALIZADO
+    resueltos_query = await db.execute(
+        select(
+            func.avg(
+                func.datediff(Solicitud.fecha_resolucion, Solicitud.created_at)
+            )
+        ).where(
+            Solicitud.municipio_id == municipio_id,
+            or_(
+                Solicitud.estado == EstadoSolicitud.FINALIZADO,
+                Solicitud.estado == "FINALIZADO"  # Estado legacy en mayúsculas
+            ),
+            Solicitud.fecha_resolucion.isnot(None)
+        )
+    )
+    tiempo_promedio = resueltos_query.scalar() or 0
+
+    print(f"[tramites-stats] total={total}, hoy={hoy_count}, semana={semana_count}, estados={estados}")
+
+    return {
+        "total": total,
+        "por_estado": estados,
+        "hoy": hoy_count,
+        "semana": semana_count,
+        "tiempo_promedio_dias": round(tiempo_promedio, 1)
+    }
+
+
 @router.get("/por-categoria")
 async def get_por_categoria(
     request: Request,

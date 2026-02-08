@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
-import { X, MapPin, Calendar, User, Tag, Clock, Navigation, ExternalLink, Map as MapIcon } from 'lucide-react';
+import { X, MapPin, Calendar, User, Tag, Clock, Navigation, Map as MapIcon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 // URLs de tiles para tema claro y oscuro
@@ -64,6 +64,45 @@ const STATUS_LABELS: Record<string, string> = {
   rechazado: 'Rechazado',
 };
 
+// Categorías con colores (sincronizado con HeatmapWidget)
+const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
+  baches: { label: 'Baches', color: '#ef4444' },
+  iluminacion: { label: 'Iluminación', color: '#f59e0b' },
+  recoleccion: { label: 'Recolección', color: '#10b981' },
+  espacios: { label: 'Espacios Verdes', color: '#22c55e' },
+  agua: { label: 'Agua y Cloacas', color: '#3b82f6' },
+  semaforos: { label: 'Señalización', color: '#f97316' },
+  zoonosis: { label: 'Zoonosis', color: '#8b5cf6' },
+  veredas: { label: 'Veredas', color: '#78716c' },
+  ruidos: { label: 'Ruidos', color: '#ec4899' },
+  limpieza: { label: 'Limpieza', color: '#14b8a6' },
+  seguridad: { label: 'Seguridad', color: '#dc2626' },
+  obras: { label: 'Obras', color: '#eab308' },
+  salud: { label: 'Salud', color: '#be185d' },
+  transporte: { label: 'Transporte', color: '#0ea5e9' },
+  otros: { label: 'Otros', color: '#64748b' },
+};
+
+// Mapear categoría real a key de filtro
+function getCategoryKey(categoria: string): string {
+  const cat = categoria.toLowerCase();
+  if (cat.includes('bache') || cat.includes('calzada')) return 'baches';
+  if (cat.includes('iluminacion') || cat.includes('iluminación')) return 'iluminacion';
+  if (cat.includes('recoleccion') || cat.includes('recolección') || cat.includes('residuo')) return 'recoleccion';
+  if (cat.includes('espacio') || cat.includes('verde')) return 'espacios';
+  if (cat.includes('agua') || cat.includes('cloaca')) return 'agua';
+  if (cat.includes('semaforo') || cat.includes('semáforo') || cat.includes('señal') || cat.includes('senal')) return 'semaforos';
+  if (cat.includes('zoonosis') || cat.includes('animal')) return 'zoonosis';
+  if (cat.includes('vereda') || cat.includes('baldio') || cat.includes('baldío')) return 'veredas';
+  if (cat.includes('ruido')) return 'ruidos';
+  if (cat.includes('limpieza')) return 'limpieza';
+  if (cat.includes('seguridad')) return 'seguridad';
+  if (cat.includes('obra')) return 'obras';
+  if (cat.includes('salud')) return 'salud';
+  if (cat.includes('transporte') || cat.includes('parada')) return 'transporte';
+  return 'otros';
+}
+
 // Componente para ajustar el mapa a los bounds de los markers
 function FitBoundsToMarkers({ reclamos }: { reclamos: Reclamo[] }) {
   const map = useMap();
@@ -98,11 +137,12 @@ function FitBoundsToMarkers({ reclamos }: { reclamos: Reclamo[] }) {
 
 export default function Mapa() {
   const { theme, currentPresetId } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Detectar si el tema es claro (solo sand y arctic son claros)
   const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
   const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
 
-  const navigate = useNavigate();
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -110,6 +150,8 @@ export default function Mapa() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Filtros de estado - null = todos, string = solo ese estado
   const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
+  // Filtro de categoría desde URL
+  const filtroCategoria = searchParams.get('categoria');
 
   useEffect(() => {
     const fetchReclamosEnLotes = async () => {
@@ -212,16 +254,33 @@ export default function Mapa() {
     );
   }
 
-  // Contar reclamos por estado
-  const conteosPorEstado = reclamos.reduce((acc, r) => {
+  // Primero filtrar por categoría si viene de la URL
+  const reclamosPorCategoria = useMemo(() => {
+    if (!filtroCategoria) return reclamos;
+    return reclamos.filter(r => {
+      const catKey = getCategoryKey(r.categoria?.nombre || 'Otros');
+      return catKey === filtroCategoria;
+    });
+  }, [reclamos, filtroCategoria]);
+
+  // Contar reclamos por estado (sobre los ya filtrados por categoría)
+  const conteosPorEstado = reclamosPorCategoria.reduce((acc, r) => {
     acc[r.estado] = (acc[r.estado] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  // Filtrar reclamos según el estado seleccionado
-  const reclamosFiltrados = filtroEstado
-    ? reclamos.filter(r => r.estado === filtroEstado)
-    : reclamos;
+  // Filtrar reclamos según el estado seleccionado (después de filtrar por categoría)
+  const reclamosFiltrados = useMemo(() => {
+    if (filtroEstado) {
+      return reclamosPorCategoria.filter(r => r.estado === filtroEstado);
+    }
+    return reclamosPorCategoria;
+  }, [reclamosPorCategoria, filtroEstado]);
+
+  // Limpiar filtro de categoría
+  const clearCategoriaFilter = () => {
+    setSearchParams({});
+  };
 
   // Toggle filtro: si ya está seleccionado, deseleccionar (mostrar todos)
   const toggleFiltro = (estado: string) => {
@@ -229,8 +288,33 @@ export default function Mapa() {
   };
 
   // Panel de filtros por estado
+  const categoryConfig = filtroCategoria ? CATEGORY_CONFIG[filtroCategoria] : null;
+
   const filterPanel = (
     <div className="flex items-center gap-2 flex-wrap">
+      {/* Badge de categoría activa (si hay filtro desde URL) */}
+      {filtroCategoria && categoryConfig && (
+        <button
+          onClick={clearCategoriaFilter}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all group"
+          style={{
+            backgroundColor: `${categoryConfig.color}20`,
+            color: categoryConfig.color,
+            border: `1px solid ${categoryConfig.color}`,
+          }}
+        >
+          <div
+            className="w-2.5 h-2.5 rounded-full"
+            style={{ backgroundColor: categoryConfig.color }}
+          />
+          <span className="text-xs font-medium">{categoryConfig.label}</span>
+          <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+        </button>
+      )}
+      {/* Separador si hay filtro de categoría */}
+      {filtroCategoria && (
+        <div className="h-4 w-px" style={{ backgroundColor: theme.border }} />
+      )}
       {/* Botón "Todos" */}
       <button
         onClick={() => setFiltroEstado(null)}
@@ -242,7 +326,7 @@ export default function Mapa() {
         }}
       >
         <span className="text-xs font-medium">Todos</span>
-        <span className="text-xs font-bold">({reclamos.length})</span>
+        <span className="text-xs font-bold">({reclamosPorCategoria.length})</span>
       </button>
       {/* Botones por estado */}
       {Object.entries(STATUS_COLORS).map(([estado, color]) => {
@@ -495,20 +579,6 @@ export default function Mapa() {
                 )}
               </div>
 
-              {/* Footer con acciones */}
-              <div
-                className="p-4"
-                style={{ borderTop: `1px solid ${theme.border}` }}
-              >
-                <button
-                  onClick={() => navigate(`/reclamos/${selected.id}`)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg transition-colors text-white font-medium hover:opacity-90"
-                  style={{ backgroundColor: theme.primary }}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Ver detalle completo
-                </button>
-              </div>
             </div>
           )}
         </div>
@@ -517,7 +587,11 @@ export default function Mapa() {
       {/* Lista de reclamos con ubicación */}
       <div className="rounded-lg shadow p-6" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
         <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-          {filtroEstado ? `${STATUS_LABELS[filtroEstado]} (${reclamosFiltrados.length})` : `Reclamos con ubicación (${reclamos.length})`}
+          {filtroCategoria && categoryConfig
+            ? `${categoryConfig.label}${filtroEstado ? ` - ${STATUS_LABELS[filtroEstado]}` : ''} (${reclamosFiltrados.length})`
+            : filtroEstado
+              ? `${STATUS_LABELS[filtroEstado]} (${reclamosFiltrados.length})`
+              : `Reclamos con ubicación (${reclamos.length})`}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {reclamosFiltrados.slice(0, 9).map((reclamo) => (
