@@ -464,7 +464,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   const handleAsignarEmpleado = async () => {
     if (!selectedTramite || !empleadoSeleccionado) {
-      toast.error('Selecciona un empleado');
+      toast.error('Selecciona una dependencia');
       return;
     }
     setAsignando(true);
@@ -473,12 +473,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         empleado_id: Number(empleadoSeleccionado),
         comentario: sugerenciaIA?.mensaje || undefined,
       });
-      toast.success('Empleado asignado correctamente');
+      toast.success('Dependencia asignada correctamente');
       closeSheet();
       await recargarDespuesDeAccion();
     } catch (error) {
       console.error('Error asignando empleado:', error);
-      toast.error('Error al asignar empleado');
+      toast.error('Error al asignar dependencia');
     } finally {
       setAsignando(false);
     }
@@ -1172,7 +1172,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         },
         {
           key: 'empleado',
-          header: 'Empleado',
+          header: 'Dependencia',
           sortValue: (t) => t.empleado_asignado ? `${t.empleado_asignado.nombre || ''} ${t.empleado_asignado.apellido || ''}`.trim() : '',
           render: (t) => renderEmpleado(t, theme.text),
         },
@@ -1504,7 +1504,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium" style={{ color: theme.text }}>
-                      Empleado Asignado
+                      Dependencia Asignada
                     </h3>
                     {!tramiteCerrado && (
                       <button
@@ -1602,7 +1602,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                             <span className="truncate">
                               {empleadoSeleccionadoData
                                 ? `${empleadoSeleccionadoData.nombre} ${empleadoSeleccionadoData.apellido || ''}`
-                                : 'Seleccionar empleado...'}
+                                : 'Seleccionar dependencia...'}
                             </span>
                             <ChevronDown
                               className={`h-4 w-4 transition-transform ${showEmpleadosDropdown ? 'rotate-180' : ''}`}
@@ -1627,7 +1627,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                               ) : empleadosDisponibilidad.length === 0 ? (
                                 <div className="p-4 text-center">
                                   <p className="text-sm" style={{ color: theme.textSecondary }}>
-                                    No hay empleados administrativos
+                                    No hay dependencias disponibles
                                   </p>
                                 </div>
                               ) : (
