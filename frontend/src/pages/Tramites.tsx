@@ -185,6 +185,16 @@ export default function Tramites() {
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
   const [loadingFilters, setLoadingFilters] = useState(true);
 
+  // Filtro por dependencia
+  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
+  const [conteosDependencias, setConteosDependencias] = useState<Record<number, number>>({});
+  const [dependenciasDisponibles, setDependenciasDisponibles] = useState<Array<{
+    id: number;
+    nombre: string;
+    color?: string;
+    icono?: string;
+  }>>([]);
+
   // Verificar si el usuario es supervisor/admin (para mostrar panel de gestión)
   const isSupervisorOrAdmin = user?.rol === 'supervisor' || user?.rol === 'admin';
 
@@ -291,6 +301,38 @@ export default function Tramites() {
       fetchTramites();
     }
   }, [filtroEstado, isSupervisorOrAdmin]);
+
+  // Calcular dependencias y conteos desde los trámites cargados
+  useEffect(() => {
+    if (tramites.length === 0) return;
+
+    const depsMap = new Map<number, { id: number; nombre: string; color?: string; icono?: string; count: number }>();
+
+    tramites.forEach(t => {
+      if (t.dependencia_asignada?.id) {
+        const dep = t.dependencia_asignada;
+        const existing = depsMap.get(dep.id);
+        if (existing) {
+          existing.count++;
+        } else {
+          depsMap.set(dep.id, {
+            id: dep.id,
+            nombre: dep.nombre || 'Sin nombre',
+            color: dep.color,
+            icono: dep.icono,
+            count: 1
+          });
+        }
+      }
+    });
+
+    const deps = Array.from(depsMap.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    setDependenciasDisponibles(deps.map(d => ({ id: d.id, nombre: d.nombre, color: d.color, icono: d.icono })));
+
+    const conteos: Record<number, number> = {};
+    deps.forEach(d => { conteos[d.id] = d.count; });
+    setConteosDependencias(conteos);
+  }, [tramites]);
 
   // Abrir wizard automáticamente si venimos de la ruta de creación
   useEffect(() => {
@@ -620,6 +662,10 @@ export default function Tramites() {
     if (filtroTipo) {
       const servicio = servicios.find(s => s.id === t.servicio_id);
       if (servicio?.tipo_tramite_id !== filtroTipo) return false;
+    }
+    // Filtro por dependencia
+    if (filtroDependencia) {
+      if (t.dependencia_asignada?.id !== filtroDependencia) return false;
     }
     // Filtro por búsqueda - buscar en todas las columnas visibles
     if (!search || !search.trim()) return true;
@@ -1587,6 +1633,66 @@ export default function Tramites() {
               )}
               </div>
             </div>
+
+            {/* Dependencias - solo si hay dependencias disponibles */}
+            {dependenciasDisponibles.length > 0 && (
+            <div className="flex gap-1">
+              {/* Botón Todos fijo */}
+              <button
+                onClick={() => setFiltroDependencia(null)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
+                style={{
+                  background: 'transparent',
+                  border: `1.5px solid ${filtroDependencia === null ? theme.primary : theme.border}`,
+                }}
+              >
+                <Users className="h-3 w-3" style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }} />
+                <span className="text-[10px] font-medium whitespace-nowrap" style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }}>
+                  Todas
+                </span>
+              </button>
+
+              {/* Scroll de dependencias */}
+              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+                {dependenciasDisponibles.map((dep) => {
+                  const isSelected = filtroDependencia === dep.id;
+                  const depColor = dep.color || '#6b7280';
+                  const count = conteosDependencias[dep.id] || 0;
+                  return (
+                    <button
+                      key={dep.id}
+                      onClick={() => setFiltroDependencia(isSelected ? null : dep.id)}
+                      title={dep.nombre}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
+                      style={{
+                        background: isSelected ? depColor : `${depColor}15`,
+                        border: `1px solid ${isSelected ? depColor : `${depColor}40`}`,
+                      }}
+                    >
+                      <span className="[&>svg]:h-3 [&>svg]:w-3" style={{ color: isSelected ? '#ffffff' : depColor }}>
+                        {getServicioIcon(dep.icono)}
+                      </span>
+                      <span
+                        className="text-[10px] font-medium whitespace-nowrap max-w-[80px] truncate"
+                        style={{ color: isSelected ? '#ffffff' : theme.text }}
+                      >
+                        {dep.nombre.replace('Dirección de ', '').replace('Secretaría de ', '').split(' ')[0]}
+                      </span>
+                      <span
+                        className="text-[9px] font-bold px-1 rounded-full"
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${depColor}30`,
+                          color: isSelected ? '#ffffff' : depColor,
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            )}
 
             {/* Estados - botón Todos fijo + scroll horizontal */}
             <div className="flex gap-1">
