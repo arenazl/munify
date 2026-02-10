@@ -371,7 +371,7 @@ export default function Login() {
                     <button
                       key={`${user.rol}-${index}`}
                       type="button"
-                      onClick={() => quickLogin(user.email, '123456')}
+                      onClick={() => quickLogin(user.email, 'demo123')}
                       disabled={loading}
                       className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
                     >
@@ -411,7 +411,7 @@ export default function Login() {
                         <button
                           key={`dep-rec-${index}`}
                           type="button"
-                          onClick={() => quickLogin(dep.email, '123456')}
+                          onClick={() => quickLogin(dep.email, 'demo1234')}
                           disabled={loading}
                           className="w-full relative overflow-hidden text-white py-2 px-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-md"
                           style={{
@@ -439,7 +439,7 @@ export default function Login() {
                         <button
                           key={`dep-tram-${index}`}
                           type="button"
-                          onClick={() => quickLogin(dep.email, '123456')}
+                          onClick={() => quickLogin(dep.email, 'demo1234')}
                           disabled={loading}
                           className="w-full relative overflow-hidden text-white py-2 px-2.5 rounded-lg text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-md"
                           style={{

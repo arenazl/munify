@@ -448,7 +448,7 @@ export default function Tramites() {
   // Sheet functions
   const openViewSheet = async (tramite: Tramite) => {
     setSelectedTramite(tramite);
-    setEmpleadoSeleccionado(tramite.empleado_id?.toString() || '');
+    setEmpleadoSeleccionado(tramite.municipio_dependencia_id?.toString() || '');
     setComentarioAsignacion('');
     setSugerenciaEmpleado(null);
     setSheetMode('view');
@@ -537,7 +537,7 @@ export default function Tramites() {
     setSaving(true);
     try {
       await tramitesApi.asignar(selectedTramite.id, {
-        empleado_id: Number(empleadoSeleccionado),
+        municipio_dependencia_id: Number(empleadoSeleccionado),
         comentario: comentarioAsignacion || undefined,
       });
       toast.success('Trámite asignado correctamente');
@@ -644,11 +644,8 @@ export default function Tramites() {
       t.email_solicitante?.toLowerCase().includes(s) ||
       t.telefono_solicitante?.includes(s) ||
       t.direccion_solicitante?.toLowerCase().includes(s) ||
-      // Empleado asignado (nombre, apellido, especialidad)
-      t.empleado_asignado?.nombre?.toLowerCase().includes(s) ||
-      t.empleado_asignado?.apellido?.toLowerCase().includes(s) ||
-      `${t.empleado_asignado?.nombre || ''} ${t.empleado_asignado?.apellido || ''}`.toLowerCase().includes(s) ||
-      t.empleado_asignado?.especialidad?.toLowerCase().includes(s) ||
+      // Dependencia asignada
+      t.dependencia_asignada?.nombre?.toLowerCase().includes(s) ||
       // Servicio y tipo de trámite
       servicio?.nombre?.toLowerCase().includes(s) ||
       tipoTramite?.nombre?.toLowerCase().includes(s) ||
@@ -1224,16 +1221,16 @@ export default function Tramites() {
           )}
         </ABMInfoPanel>
 
-        {/* Empleado asignado */}
-        {selectedTramite.empleado_asignado && (
+        {/* Dependencia asignada */}
+        {selectedTramite.dependencia_asignada && (
           <ABMInfoPanel
-            title="Empleado Asignado"
+            title="Dependencia Asignada"
             icon={<Users className="h-4 w-4" />}
             variant="info"
           >
             <ABMField
               label="Nombre"
-              value={`${selectedTramite.empleado_asignado.nombre || ''} ${selectedTramite.empleado_asignado.apellido || ''}`.trim() || 'Sin nombre'}
+              value={selectedTramite.dependencia_asignada.nombre || 'Sin nombre'}
             />
           </ABMInfoPanel>
         )}
@@ -1863,8 +1860,8 @@ export default function Tramites() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {tramite.empleado_asignado && (
-                        <span style={{ color: theme.primary }} className="font-medium">{tramite.empleado_asignado.nombre}</span>
+                      {tramite.dependencia_asignada && (
+                        <span style={{ color: theme.primary }} className="font-medium">{tramite.dependencia_asignada.nombre}</span>
                       )}
                       <Eye className="h-4 w-4" style={{ color: theme.primary }} />
                     </div>
