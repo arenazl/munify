@@ -283,20 +283,35 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
 
   // useEffect para asignar stream al video cuando ambos estén disponibles
   useEffect(() => {
+    console.log('[Camera Debug] useEffect triggered:', {
+      hasPendingStream: !!pendingStream,
+      hasVideoRef: !!videoRef.current,
+      cameraActive
+    });
+
     if (pendingStream && videoRef.current && cameraActive) {
+      console.log('[Camera Debug] Assigning stream to video element');
       const video = videoRef.current;
       video.srcObject = pendingStream;
       streamRef.current = pendingStream;
 
       video.onloadedmetadata = () => {
+        console.log('[Camera Debug] Video metadata loaded, attempting play...');
         video.play().then(() => {
+          console.log('[Camera Debug] Video playing successfully!');
           setCameraReady(true);
           setPendingStream(null);
         }).catch(err => {
-          console.error('Error playing video:', err);
+          console.error('[Camera Debug] Error playing video:', err);
           setCameraError('No se pudo iniciar la reproducción del video.');
         });
       };
+
+      video.onerror = (e) => {
+        console.error('[Camera Debug] Video element error:', e);
+      };
+    } else if (pendingStream && cameraActive && !videoRef.current) {
+      console.warn('[Camera Debug] Stream ready but videoRef is null - video element not mounted yet');
     }
   }, [pendingStream, cameraActive]);
 
@@ -1363,18 +1378,29 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   // Step Facial: Validación facial con cámara real
   const startCamera = async () => {
+    console.log('[Camera Debug] startCamera called');
     setCameraError(null);
     setCameraReady(false);
 
     try {
+      console.log('[Camera Debug] Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+      });
+
+      const tracks = stream.getVideoTracks();
+      console.log('[Camera Debug] Stream obtained!', {
+        trackCount: tracks.length,
+        trackLabel: tracks[0]?.label,
+        trackEnabled: tracks[0]?.enabled,
+        trackReadyState: tracks[0]?.readyState
       });
 
       // Primero activamos la cámara para que el video element se renderice
       setCameraActive(true);
       // Luego guardamos el stream pendiente, el useEffect lo asignará cuando el video esté listo
       setPendingStream(stream);
+      console.log('[Camera Debug] States updated: cameraActive=true, pendingStream set');
 
     } catch (err: unknown) {
       console.error('Error accessing camera:', err);
