@@ -281,39 +281,15 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Callback ref para el video - se ejecuta cuando el video se monta en el DOM
-  const videoCallbackRef = useCallback((videoElement: HTMLVideoElement | null) => {
-    videoRef.current = videoElement;
-
-    // Si hay un stream pendiente y el video acaba de montarse, asignarlo
-    if (videoElement && streamRef.current && !videoElement.srcObject) {
-      console.log('Video mounted, assigning stream via callback ref');
-      videoElement.srcObject = streamRef.current;
-
-      videoElement.onloadedmetadata = () => {
-        videoElement.play().then(() => {
-          console.log('Video playing successfully');
-          setCameraReady(true);
-          setPendingStream(null);
-        }).catch(err => {
-          console.error('Error playing video:', err);
-          setCameraError('No se pudo iniciar la reproducción del video.');
-        });
-      };
-    }
-  }, []);
-
-  // useEffect para asignar stream al video cuando el stream llega después del video
+  // useEffect para asignar stream al video cuando ambos estén disponibles
   useEffect(() => {
     if (pendingStream && videoRef.current && cameraActive) {
-      console.log('useEffect: assigning pendingStream to video');
       const video = videoRef.current;
       video.srcObject = pendingStream;
       streamRef.current = pendingStream;
 
       video.onloadedmetadata = () => {
         video.play().then(() => {
-          console.log('Video playing successfully via useEffect');
           setCameraReady(true);
           setPendingStream(null);
         }).catch(err => {
@@ -1391,18 +1367,14 @@ Tono amigable y conciso (2-3 oraciones máximo).`
     setCameraReady(false);
 
     try {
-      console.log('Requesting camera access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
       });
-      console.log('Camera stream obtained:', stream.getVideoTracks().length, 'video tracks');
 
-      // Guardar stream en ref ANTES de activar la cámara
-      // Así cuando el video se monte, ya tendrá el stream disponible
-      streamRef.current = stream;
-      setPendingStream(stream);
-      // Activar cámara para que el video element se renderice
+      // Primero activamos la cámara para que el video element se renderice
       setCameraActive(true);
+      // Luego guardamos el stream pendiente, el useEffect lo asignará cuando el video esté listo
+      setPendingStream(stream);
 
     } catch (err: unknown) {
       console.error('Error accessing camera:', err);
@@ -1533,7 +1505,7 @@ Tono amigable y conciso (2-3 oraciones máximo).`
           <p className="text-sm" style={{ color: theme.textSecondary }}>Asegurate de tener buena iluminación y que tu rostro se vea claramente.</p>
           <div className="mx-auto w-64 h-64 rounded-2xl overflow-hidden bg-black relative">
             <video
-              ref={videoCallbackRef}
+              ref={videoRef}
               autoPlay
               playsInline
               muted
