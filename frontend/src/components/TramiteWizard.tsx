@@ -1379,14 +1379,19 @@ Tono amigable y conciso (2-3 oraciones máximo).`
     } catch (err: unknown) {
       console.error('Error accessing camera:', err);
       const error = err as Error;
-      if (error.name === 'NotFoundError') {
+      console.error('Error name:', error.name, 'Error message:', error.message);
+      if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
         setCameraError('No se encontró ninguna cámara en este dispositivo.');
-      } else if (error.name === 'NotReadableError') {
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
         setCameraError('La cámara está siendo usada por otra aplicación. Cerrá otras apps y volvé a intentar.');
-      } else if (error.name === 'NotAllowedError') {
+      } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setCameraError('Permiso de cámara denegado. Habilitá el acceso en la configuración del navegador.');
+      } else if (error.name === 'OverconstrainedError') {
+        setCameraError('La cámara no soporta la configuración solicitada. Intentá con otra cámara.');
+      } else if (error.name === 'TypeError') {
+        setCameraError('Error de configuración de cámara. Recargá la página e intentá de nuevo.');
       } else {
-        setCameraError('No se pudo acceder a la cámara. Verificá los permisos del navegador.');
+        setCameraError(`Error de cámara: ${error.name} - ${error.message}`);
       }
     }
   };
