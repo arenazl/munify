@@ -448,8 +448,9 @@ export default function PanelBI() {
     a.click();
   };
 
-  // Procesar HTML del backend para adaptar colores
+  // Procesar HTML del backend para adaptar colores y fuentes
   const processHtml = (html: string): string => {
+    const fontFamily = 'font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;';
     return html
       .replace(/background:#f8f9fa/g, `background:${theme.card}`)
       .replace(/background: #f8f9fa/g, `background:${theme.card}`)
@@ -459,7 +460,10 @@ export default function PanelBI() {
       .replace(/border:1px solid #e2e8f0/g, `border:1px solid ${theme.border}`)
       .replace(/color:#2563eb/g, `color:${theme.primary}`)
       .replace(/<div style="padding:12px 14px">/g, `<div style="padding:12px 14px;color:${theme.text}">`)
-      .replace(/<p style="margin:8px 0">/g, `<p style="margin:8px 0;color:${theme.text}">`);
+      .replace(/<p style="margin:8px 0">/g, `<p style="margin:8px 0;color:${theme.text}">`)
+      // Fix fuentes serif: agregar font-family sans-serif a todos los elementos con style
+      .replace(/<div style="/g, `<div style="${fontFamily}`)
+      .replace(/<span style="/g, `<span style="${fontFamily}`);
   };
 
   // Render del filterPanel para StickyPageHeader
@@ -786,8 +790,8 @@ export default function PanelBI() {
                 style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
               >
                 <div
-                  className="prose max-w-none"
-                  style={{ color: theme.text }}
+                  className="max-w-none [&_*]:font-sans"
+                  style={{ color: theme.text, fontFamily: 'inherit' }}
                   dangerouslySetInnerHTML={{ __html: processHtml(response) }}
                 />
               </div>
