@@ -1150,62 +1150,78 @@ async def chat_landing(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Endpoint PÚBLICO para chat desde la landing page.
-    Usa sesiones en memoria para mantener contexto sin reenviar el system prompt.
+    Endpoint PÚBLICO para chat de VENTAS desde la landing page.
+    NO pregunta por municipio - responde genéricamente sobre Munify.
+    Usa la info de munify_info.md como contexto.
     """
     storage = get_landing_storage()
+
+    # Cargar información de Munify para el system prompt
+    munify_info = get_munify_info()
+
+    # System prompt para chat de ventas genérico
+    system_prompt = f"""Sos el asistente de ventas de Munify. Tu objetivo es ayudar a potenciales clientes (municipios o ciudadanos) a entender qué ofrece la plataforma.
+
+REGLAS IMPORTANTES:
+1. NUNCA preguntes de qué municipio es el usuario - este es un chat de ventas genérico
+2. Respondé de forma amigable y concisa
+3. Si preguntan por trámites o reclamos, explicá los TIPOS que existen en la plataforma (no específicos de un municipio)
+4. Si muestran interés, invitalos a solicitar una demo o contactar por WhatsApp
+5. Usá HTML simple para formatear (p, strong, ul, li) - NO uses markdown
+6. Mantené las respuestas cortas (máximo 3-4 párrafos)
+
+INFORMACIÓN DE MUNIFY:
+{munify_info}
+
+CONTACTO:
+- WhatsApp: +54 9 11 6022-3474
+- Email: ventas@gestionmunicipal.com
+- Demo: https://app.munify.com.ar/demo
+"""
 
     # Verificar si ya existe sesión
     existing_session = None
     if request.session_id:
         existing_session = await storage.get_session(request.session_id)
-        print(f"[LANDING CHAT] session_id: {request.session_id}, existe: {existing_session is not None}")
 
     if existing_session:
-        municipio_id = existing_session.get("context", {}).get("municipio_id")
-        print(f"[LANDING CHAT] Sesión existente, municipio_id en contexto: {municipio_id}")
+        session_id = request.session_id
+        history = await storage.get_messages(session_id)
     else:
-        municipio_id = request.municipio_id
-        print(f"[LANDING CHAT] Sin sesión, municipio_id del request: {municipio_id}")
+        # Nueva sesión
+        session_id = await storage.create_session(system_prompt, {"tipo": "ventas"})
+        history = []
 
-    municipio_nombre = None
+    # Respuesta según el mensaje
+    mensaje_lower = request.message.lower().strip()
+    saludos = ['hola', 'buenas', 'buen dia', 'buen día', 'buenos dias', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'que tal', 'qué tal', 'como estas', 'cómo estás']
+    es_saludo = any(s in mensaje_lower for s in saludos) and len(mensaje_lower) < 30
 
-    # Si no hay municipio, intentar detectar del mensaje con IA
-    if not municipio_id:
-        print(f"[LANDING CHAT] No hay municipio, intentando detectar de mensaje: '{request.message}'")
-        municipios = await get_municipios_activos(db)
-        print(f"[LANDING CHAT] Municipios activos: {len(municipios) if municipios else 0}")
-        if municipios:
-            detected = await detectar_municipio_con_ia(request.message, municipios)
-            print(f"[LANDING CHAT] Resultado detección IA: {detected}")
-            if detected:
-                municipio_id = detected["id"]
-                municipio_nombre = detected.get("nombre")
-                print(f"[LANDING CHAT] Municipio detectado: {municipio_id} - {municipio_nombre}")
+    if es_saludo and not history:
+        # Primer saludo - respuesta directa sin IA
+        response = '<p style="margin:8px 0">¡Hola! 👋 Soy el asistente de <strong>Munify</strong>.</p><p style="margin:8px 0">Estoy acá para ayudarte con cualquier consulta sobre la plataforma. ¿Qué te gustaría saber?</p>'
+    else:
+        # Usar IA para responder
+        context = chat_service.build_chat_messages(
+            system_prompt=system_prompt,
+            message=request.message,
+            history=history
+        )
+        response = await chat_service.chat(context, max_tokens=2000)
 
-    # Si no se detectó municipio, responder amablemente y preguntar
-    if not municipio_id:
-        # Crear sesión sin municipio para mantener el contexto
-        if not existing_session:
-            session_id = await storage.create_session("", {"municipio_id": None, "esperando_municipio": True})
-        else:
-            session_id = request.session_id
-
-        # Respuesta amigable según el mensaje
-        mensaje_lower = request.message.lower().strip()
-        saludos = ['hola', 'buenas', 'buen dia', 'buen día', 'buenos dias', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'que tal', 'qué tal', 'como estas', 'cómo estás']
-
-        es_saludo = any(s in mensaje_lower for s in saludos)
-
-        if es_saludo:
-            response = '<p style="margin:8px 0">¡Hola! 👋 Bienvenido a <strong>Munify</strong>, tu plataforma para conectar con tu municipio.</p><p style="margin:8px 0">Para poder ayudarte mejor, <strong>¿de qué municipio sos?</strong></p>'
-        else:
-            response = '<p style="margin:8px 0">¡Hola! Soy el asistente de <strong>Munify</strong>. Para darte información sobre trámites y servicios, necesito saber <strong>¿de qué municipio sos?</strong></p>'
-
-        # Guardar en historial
-        await storage.add_message(session_id, "user", request.message)
+    # Guardar mensajes en la sesión
+    await storage.add_message(session_id, "user", request.message)
+    if response:
         await storage.add_message(session_id, "assistant", response)
 
+    # Después de 3-4 interacciones, recordar el contacto
+    mensajes_usuario = len([m for m in history if m.get("role") == "user"]) + 1
+    if mensajes_usuario >= 3:
+        ya_mostro_contacto = any("whatsapp" in m.get("content", "").lower() for m in history if m.get("role") == "assistant")
+        if not ya_mostro_contacto and response:
+            response += '<p style="margin:12px 0;padding:10px;background:#f0f9ff;border-radius:8px;border-left:4px solid #2563eb">📞 Si querés hablar con una persona, contactanos por <strong>WhatsApp al +54 9 11 6022-3474</strong></p>'
+
+    if response:
         return LandingChatResponse(
             response=response,
             session_id=session_id,
@@ -1213,99 +1229,11 @@ async def chat_landing(
             municipio_nombre=None
         )
 
-    # Obtener datos del municipio
-    municipio = await db.get(Municipio, municipio_id)
-    telefono_contacto = municipio.telefono if municipio else None
-
-    # Obtener categorías y trámites del municipio
-    categorias = await get_categorias_municipio(db, municipio_id)
-    tramites = await get_tramites_municipio(db, municipio_id)
-    system_prompt = build_system_prompt(categorias, tramites, telefono_contacto)
-
-    # Si ya existe sesión, verificar si necesitamos actualizar el municipio
-    municipio_recien_detectado = False
-    if existing_session:
-        session_id = request.session_id
-        history = await storage.get_messages(session_id)
-        old_municipio_id = existing_session.get("context", {}).get("municipio_id")
-
-        # Si la sesión no tenía municipio y ahora sí, actualizar
-        if not old_municipio_id and municipio_id:
-            await storage.update_session(session_id, system_prompt=system_prompt, context={"municipio_id": municipio_id, "esperando_municipio": False})
-            municipio_recien_detectado = True
-            print(f"[LANDING CHAT] Sesión actualizada con municipio {municipio_id}")
-    else:
-        # Nueva sesión: crear con datos del municipio
-        session_id = await storage.create_session(system_prompt, {"municipio_id": municipio_id})
-        history = []
-
-    # Si acabamos de detectar el municipio, dar bienvenida directa (sin IA)
-    if municipio_recien_detectado:
-        municipio_nombre = municipio.nombre if municipio else "tu municipio"
-        response = f'<p style="margin:8px 0">¡Genial! Veo que sos de <strong>{municipio_nombre}</strong>. 🏘️</p><p style="margin:8px 0">¿En qué te puedo ayudar? Podés preguntarme sobre <strong>trámites</strong>, <strong>reclamos</strong>, o cualquier duda sobre los servicios municipales.</p>'
-
-        await storage.add_message(session_id, "user", request.message)
-        await storage.add_message(session_id, "assistant", response)
-
-        return LandingChatResponse(
-            response=response,
-            session_id=session_id,
-            municipio_id=municipio_id,
-            municipio_nombre=municipio_nombre
-        )
-
-    # Detectar si el usuario pide un listado directo (sin pasar por IA)
-    intencion = detectar_intencion_listado(request.message)
-
-    if intencion:
-        # Obtener datos frescos de la BD para el listado
-        if intencion == 'tramites':
-            tramites_data = await get_tramites_municipio(db, municipio_id)
-            response = generar_html_tramites(tramites_data)
-            print(f"[LANDING CHAT] Listado directo de trámites: {len(tramites_data)} tipos")
-        else:  # categorias
-            categorias_data = await get_categorias_municipio(db, municipio_id)
-            response = generar_html_categorias(categorias_data)
-            print(f"[LANDING CHAT] Listado directo de categorías: {len(categorias_data)} categorías")
-    else:
-        # Conversación normal: usar IA
-        context = chat_service.build_chat_messages(
-            system_prompt=system_prompt,
-            message=request.message,
-            history=history
-        )
-        response = await chat_service.chat(context, max_tokens=3000)
-
-    # Guardar mensajes en la sesión
-    await storage.add_message(session_id, "user", request.message)
-    if response:
-        await storage.add_message(session_id, "assistant", response)
-
-    # Después de 3-4 interacciones, agregar el teléfono de contacto
-    mensajes_usuario = len([m for m in history if m.get("role") == "user"]) + 1  # +1 por el mensaje actual
-    if mensajes_usuario >= 3 and telefono_contacto:
-        # Solo agregar si no lo agregamos antes
-        ya_mostro_telefono = any("contactanos al" in m.get("content", "").lower() for m in history if m.get("role") == "assistant")
-        if not ya_mostro_telefono:
-            response += f'<p style="margin:12px 0;padding:10px;background:#f0f9ff;border-radius:8px;border-left:4px solid #2563eb">📞 Si preferís, también podés contactarnos directamente al <strong>{telefono_contacto}</strong></p>'
-
-    # Obtener nombre del municipio si no lo tenemos
-    if not municipio_nombre and municipio:
-        municipio_nombre = municipio.nombre
-
-    if response:
-        return LandingChatResponse(
-            response=response,
-            session_id=session_id,
-            municipio_id=municipio_id,
-            municipio_nombre=municipio_nombre
-        )
-
     return LandingChatResponse(
         response="Disculpá, no pude procesar tu consulta. Contactanos por WhatsApp al +54 9 11 6022-3474.",
         session_id=session_id,
-        municipio_id=municipio_id,
-        municipio_nombre=municipio_nombre
+        municipio_id=None,
+        municipio_nombre=None
     )
 
 
