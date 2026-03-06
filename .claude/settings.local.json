@@ -33,7 +33,10 @@
       "Bash(find:*)",
       "WebFetch(domain:gestion-municipal-landing.netlify.app)",
       "WebFetch(domain:screenrec.com)",
-      "WebFetch(domain:reclamos-mun-api-aedc8e147cbe.herokuapp.com)"
+      "WebFetch(domain:reclamos-mun-api-aedc8e147cbe.herokuapp.com)",
+      "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
+      "WebFetch(domain:app.munify.com.ar)",
+      "WebFetch(domain:munify.com.ar)"
     ],
     "deny": [],
     "ask": []

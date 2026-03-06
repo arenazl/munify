@@ -294,6 +294,8 @@ export interface TramiteCatalogo {
   tiempo_estimado_dias: number;
   costo?: number;
   url_externa?: string;
+  requiere_validacion_dni?: boolean;
+  requiere_validacion_facial?: boolean;
   activo: boolean;
   orden: number;
   created_at: string;
@@ -424,6 +426,7 @@ export interface ServicioTramite {
   codigo?: string;
   // Campos de Tramite
   tipo_tramite_id?: number;
-  // Validación facial
+  // Validación de identidad
+  requiere_validacion_dni?: boolean;
   requiere_validacion_facial?: boolean;
 }

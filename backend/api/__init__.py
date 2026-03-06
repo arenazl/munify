@@ -31,6 +31,7 @@ from .cuadrillas import router as cuadrillas_router
 from .planificacion import router as planificacion_router
 from .direcciones import router as direcciones_router
 from .dependencias import router as dependencias_router
+from .validacion_identidad import router as validacion_identidad_router
 
 api_router = APIRouter()
 
@@ -65,6 +66,7 @@ api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadri
 api_router.include_router(planificacion_router, prefix="/planificacion", tags=["Planificación"])
 api_router.include_router(direcciones_router, prefix="/direcciones", tags=["Direcciones"])
 api_router.include_router(dependencias_router, tags=["Dependencias"])  # Ya tiene prefix /dependencias
+api_router.include_router(validacion_identidad_router)  # Ya tiene prefix /validacion-identidad
 
 # WebSockets
 from .ws import router as ws_router

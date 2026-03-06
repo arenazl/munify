@@ -57,7 +57,29 @@ httpx==0.25.2
 cloudinary==1.36.0
 ```
 
-### 2.2 Configuración de FastAPI
+### 2.2 Inicio del Servidor (Auto-port)
+
+Usar el script `start.sh` desde la raíz del proyecto para levantar ambos servidores:
+
+```bash
+bash start.sh
+```
+
+El script:
+1. Busca puertos libres automáticamente (backend desde 8000, frontend desde 5173)
+2. Si un puerto está ocupado, prueba el siguiente (+1, +2, ...) hasta 10 intentos
+3. Pasa la URL del backend al frontend via `VITE_API_URL` para que se conecten correctamente
+4. Al cerrar (Ctrl+C), mata ambos procesos
+
+**Puertos por defecto:**
+- Backend: `8000` (configurable via `PORT` en `.env`)
+- Frontend: `5173`
+
+**Inicio individual (sin auto-port sync):**
+- Backend: `cd backend && python run.py` (tiene auto-port propio)
+- Frontend: `cd frontend && npm run dev` (Vite tiene `strictPort: false`)
+
+### 2.3 Configuración de FastAPI
 
 ```python
 # main.py
@@ -89,7 +111,7 @@ app.include_router(documents.router, prefix="/api/documents", tags=["Documents"]
 app.include_router(providers.router, prefix="/api/providers", tags=["Providers"])
 ```
 
-### 2.3 Configuración de Base de Datos
+### 2.4 Configuración de Base de Datos
 
 ```python
 # core/database.py
@@ -121,7 +143,7 @@ async def get_db():
             await session.close()
 ```
 
-### 2.4 Configuración de Seguridad
+### 2.5 Configuración de Seguridad
 
 ```python
 # core/security.py
@@ -148,7 +170,7 @@ def create_access_token(data: dict) -> str:
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 ```
 
-### 2.5 Modelo Base
+### 2.6 Modelo Base
 
 ```python
 # models/base.py
@@ -165,7 +187,7 @@ class BaseModel(Base):
     is_active = Column(Boolean, default=True)
 ```
 
-### 2.6 Archivos de Heroku
+### 2.7 Archivos de Heroku
 
 ```procfile
 # Procfile

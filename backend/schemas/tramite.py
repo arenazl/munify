@@ -119,6 +119,7 @@ class TramiteBase(BaseModel):
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
     url_externa: Optional[str] = None
+    requiere_validacion_dni: bool = False
     requiere_validacion_facial: bool = False
     activo: bool = True
     orden: int = 0
@@ -137,6 +138,8 @@ class TramiteUpdate(BaseModel):
     tiempo_estimado_dias: Optional[int] = None
     costo: Optional[float] = None
     url_externa: Optional[str] = None
+    requiere_validacion_dni: Optional[bool] = None
+    requiere_validacion_facial: Optional[bool] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
 
@@ -157,6 +160,7 @@ class TramiteSimple(BaseModel):
     icono: Optional[str] = None
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
+    requiere_validacion_dni: bool = False
     requiere_validacion_facial: bool = False
     tipo_tramite_id: Optional[int] = None
     tipo_tramite: Optional[TipoTramiteSimple] = None

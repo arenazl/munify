@@ -269,7 +269,13 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Validación facial
+  // Validación de DNI (fotos frente/dorso)
+  const [dniStep, setDniStep] = useState<'idle' | 'front' | 'back' | 'done'>('idle');
+  const [dniFrontPhoto, setDniFrontPhoto] = useState<string | null>(null);
+  const [dniBackPhoto, setDniBackPhoto] = useState<string | null>(null);
+  const [dniValidated, setDniValidated] = useState(false);
+
+  // Validación facial (selfie)
   const [facialValidated, setFacialValidated] = useState(false);
   const [facialValidating, setFacialValidating] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
@@ -280,6 +286,9 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Modo de cámara: 'selfie' (frontal espejada) o 'dni' (trasera sin espejo)
+  const [cameraMode, setCameraMode] = useState<'selfie' | 'dni'>('selfie');
 
   // useEffect para asignar stream al video cuando ambos estén disponibles
   useEffect(() => {
@@ -664,6 +673,11 @@ Tono amigable, 2-3 oraciones máximo.`,
       { role: 'assistant', content: '¡Hola! 👋 Soy tu asistente virtual. Contame, ¿qué trámite necesitás hacer?' }
     ]);
     setChatSugerencias([]);
+    // Reset validación de DNI
+    setDniStep('idle');
+    setDniFrontPhoto(null);
+    setDniBackPhoto(null);
+    setDniValidated(false);
     // Reset validación facial
     setFacialValidated(false);
     setFacialValidating(false);
@@ -672,6 +686,7 @@ Tono amigable, 2-3 oraciones máximo.`,
     setCapturedPhoto(null);
     setCameraError(null);
     setPendingStream(null);
+    setCameraMode('selfie');
     // Detener cámara si está activa
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -895,6 +910,9 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const isStep1Valid = !!formData.servicio_id;
   const isStep2Valid = formData.asunto.trim().length >= 10;
+  // Validación DNI: válido si ya validó o si el trámite no lo requiere
+  const requiresDniValidation = selectedServicio?.requiere_validacion_dni === true;
+  const isStepDniValid = !requiresDniValidation || dniValidated;
   // Validación facial: válido si ya validó o si el trámite no lo requiere
   const requiresFacialValidation = selectedServicio?.requiere_validacion_facial === true;
   const isStepFacialValid = !requiresFacialValidation || facialValidated;
@@ -1377,15 +1395,19 @@ Tono amigable y conciso (2-3 oraciones máximo).`
   );
 
   // Step Facial: Validación facial con cámara real
-  const startCamera = async () => {
-    console.log('[Camera Debug] startCamera called');
+  // startCamera ahora acepta un modo: 'selfie' (frontal) o 'dni' (trasera para documentos)
+  const startCamera = async (mode: 'selfie' | 'dni' = 'selfie') => {
+    console.log('[Camera Debug] startCamera called, mode:', mode);
     setCameraError(null);
     setCameraReady(false);
+    setCameraMode(mode);
 
     try {
       console.log('[Camera Debug] Requesting getUserMedia...');
+      // Para selfie usamos cámara frontal, para DNI usamos cámara trasera (environment)
+      const facingMode = mode === 'selfie' ? 'user' : 'environment';
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+        video: { facingMode, width: { ideal: 640 }, height: { ideal: 480 } }
       });
 
       const tracks = stream.getVideoTracks();
@@ -1451,9 +1473,11 @@ Tono amigable y conciso (2-3 oraciones máximo).`
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Espejo horizontal para selfie
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
+      // Solo espejo horizontal para selfie, no para DNI
+      if (cameraMode === 'selfie') {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
       ctx.drawImage(video, 0, 0);
       const photoData = canvas.toDataURL('image/jpeg', 0.8);
       setCapturedPhoto(photoData);
@@ -1463,18 +1487,284 @@ Tono amigable y conciso (2-3 oraciones máximo).`
 
   const retakePhoto = () => {
     setCapturedPhoto(null);
-    startCamera();
+    startCamera(cameraMode);
   };
 
+  // Confirmar foto de DNI (frente o dorso)
+  const confirmDniPhoto = () => {
+    if (!capturedPhoto) return;
+
+    if (dniStep === 'front') {
+      setDniFrontPhoto(capturedPhoto);
+      setCapturedPhoto(null);
+      setDniStep('back');
+      // Iniciar cámara para dorso
+      setTimeout(() => startCamera('dni'), 300);
+    } else if (dniStep === 'back') {
+      setDniBackPhoto(capturedPhoto);
+      setCapturedPhoto(null);
+      setDniStep('done');
+      setDniValidated(true);
+      toast.success('DNI capturado correctamente');
+
+      // =====================================================================
+      // TODO: INTEGRAR CON BACKEND PARA VALIDACIÓN REAL
+      // =====================================================================
+      // Cuando se tengan las credenciales de Nosis, descomentar y adaptar:
+      //
+      // try {
+      //   const response = await fetch('/api/validacion-identidad/dni', {
+      //     method: 'POST',
+      //     headers: { 'Content-Type': 'application/json' },
+      //     body: JSON.stringify({
+      //       dni_front_image: dniFrontPhoto,  // Ya es base64
+      //       dni_back_image: capturedPhoto,   // Ya es base64
+      //     }),
+      //   });
+      //   const result = await response.json();
+      //   if (result.status === 'validated') {
+      //     setDniValidated(true);
+      //     toast.success('DNI validado correctamente');
+      //   } else {
+      //     toast.error(result.message || 'Error validando DNI');
+      //     resetDniCapture();
+      //   }
+      // } catch (error) {
+      //   toast.error('Error de conexión');
+      //   resetDniCapture();
+      // }
+      // =====================================================================
+    }
+  };
+
+  // Confirmar selfie (validación facial)
   const confirmPhoto = () => {
     setFacialValidating(true);
-    // Simular procesamiento de la foto (en producción enviar a API de validación)
+
+    // =====================================================================
+    // TODO: INTEGRAR CON BACKEND PARA VALIDACIÓN REAL
+    // =====================================================================
+    // Actualmente simula la validación. Cuando se tengan las credenciales
+    // de Nosis, descomentar y adaptar:
+    //
+    // try {
+    //   const response = await fetch('/api/validacion-identidad/facial', {
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify({
+    //       selfie_image: capturedPhoto,  // Ya es base64
+    //       dni_front_image: dniFrontPhoto,  // Para comparación
+    //     }),
+    //   });
+    //   const result = await response.json();
+    //   if (result.status === 'validated') {
+    //     setFacialValidated(true);
+    //     toast.success('Identidad verificada correctamente');
+    //   } else {
+    //     toast.error(result.message || 'Error en validación facial');
+    //     setCapturedPhoto(null);
+    //   }
+    // } catch (error) {
+    //   toast.error('Error de conexión');
+    // } finally {
+    //   setFacialValidating(false);
+    // }
+    // =====================================================================
+
+    // SIMULACIÓN TEMPORAL (quitar cuando se integre con backend real)
     setTimeout(() => {
       setFacialValidated(true);
       setFacialValidating(false);
       toast.success('Identidad verificada correctamente');
     }, 1500);
   };
+
+  // Iniciar captura de DNI
+  const startDniCapture = () => {
+    setDniStep('front');
+    startCamera('dni');
+  };
+
+  // Reiniciar captura de DNI
+  const resetDniCapture = () => {
+    setDniFrontPhoto(null);
+    setDniBackPhoto(null);
+    setDniStep('idle');
+    setDniValidated(false);
+    setCapturedPhoto(null);
+  };
+
+  // Paso de validación de DNI (fotos frente y dorso)
+  const wizardStepDni = (
+    <div className="space-y-4 py-2">
+      {/* Canvas oculto para captura */}
+      <canvas ref={canvasRef} className="hidden" />
+
+      {dniValidated ? (
+        // DNI validado exitosamente
+        <div className="text-center">
+          <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: '#10b98120' }}>
+            <CheckCircle2 className="h-10 w-10" style={{ color: '#10b981' }} />
+          </div>
+          <h3 className="text-lg font-semibold mb-2" style={{ color: theme.text }}>DNI Capturado</h3>
+          <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+            Las fotos de tu DNI fueron capturadas correctamente.
+          </p>
+          <div className="flex gap-4 justify-center">
+            {dniFrontPhoto && (
+              <div className="text-center">
+                <p className="text-xs mb-1" style={{ color: theme.textSecondary }}>Frente</p>
+                <div className="w-24 h-16 rounded-lg overflow-hidden border-2" style={{ borderColor: '#10b981' }}>
+                  <img src={dniFrontPhoto} alt="DNI Frente" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            )}
+            {dniBackPhoto && (
+              <div className="text-center">
+                <p className="text-xs mb-1" style={{ color: theme.textSecondary }}>Dorso</p>
+                <div className="w-24 h-16 rounded-lg overflow-hidden border-2" style={{ borderColor: '#10b981' }}>
+                  <img src={dniBackPhoto} alt="DNI Dorso" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={resetDniCapture}
+            className="mt-4 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+          >
+            Volver a capturar
+          </button>
+        </div>
+      ) : capturedPhoto && (dniStep === 'front' || dniStep === 'back') ? (
+        // Foto capturada, confirmar o reintentar
+        <div className="text-center space-y-4">
+          <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
+            ¿Se ve bien el {dniStep === 'front' ? 'frente' : 'dorso'} del DNI?
+          </h3>
+          <div className="mx-auto w-64 h-40 rounded-2xl overflow-hidden border-2" style={{ borderColor: theme.primary }}>
+            <img src={capturedPhoto} alt="DNI capturado" className="w-full h-full object-cover" />
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={retakePhoto}
+              className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+            >
+              <Camera className="h-4 w-4" />
+              Tomar otra
+            </button>
+            <button
+              onClick={confirmDniPhoto}
+              className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all"
+              style={{ backgroundColor: theme.primary, color: 'white' }}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Confirmar
+            </button>
+          </div>
+        </div>
+      ) : cameraActive ? (
+        // Cámara activa para DNI
+        <div className="text-center space-y-4">
+          <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
+            Foto del {dniStep === 'front' ? 'FRENTE' : 'DORSO'} del DNI
+          </h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            {dniStep === 'front'
+              ? 'Capturá el frente de tu DNI donde está tu foto y datos personales.'
+              : 'Ahora capturá el dorso de tu DNI donde está el código de barras.'}
+          </p>
+
+          {/* Progreso */}
+          <div className="flex justify-center gap-2">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dniStep === 'front' ? theme.primary : '#10b981' }} />
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dniStep === 'back' ? theme.primary : theme.border }} />
+          </div>
+
+          <div className="mx-auto w-72 h-44 rounded-2xl overflow-hidden bg-black relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
+            {/* Marco guía para DNI */}
+            <div className="absolute inset-4 border-2 border-dashed rounded-xl pointer-events-none" style={{ borderColor: 'rgba(255,255,255,0.5)' }} />
+            {!cameraReady && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => { stopCamera(); setDniStep('idle'); }}
+              className="px-4 py-3 rounded-xl font-medium transition-all"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={capturePhoto}
+              disabled={!cameraReady}
+              className="px-6 py-3 rounded-xl font-medium flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: theme.primary, color: 'white', opacity: cameraReady ? 1 : 0.5 }}
+            >
+              {cameraReady ? <Camera className="h-5 w-5" /> : <Loader2 className="h-5 w-5 animate-spin" />}
+              {cameraReady ? 'Capturar' : 'Cargando...'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        // Estado inicial - explicación y botón para iniciar
+        <div className="text-center space-y-4">
+          <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20` }}>
+            <CreditCard className="h-10 w-10" style={{ color: theme.primary }} />
+          </div>
+          <h3 className="text-lg font-semibold" style={{ color: theme.text }}>Validación de DNI</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            Para continuar necesitamos verificar tu identidad con fotos de tu DNI.
+          </p>
+
+          {cameraError && (
+            <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+              {cameraError}
+            </div>
+          )}
+
+          <div className="p-4 rounded-xl text-left" style={{ backgroundColor: theme.backgroundSecondary }}>
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
+              <div className="text-sm" style={{ color: theme.textSecondary }}>
+                <p className="font-medium mb-2" style={{ color: theme.text }}>Vas a necesitar:</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: theme.primary, color: 'white' }}>1</div>
+                    <span>Foto del <strong>frente</strong> del DNI</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: theme.primary, color: 'white' }}>2</div>
+                    <span>Foto del <strong>dorso</strong> del DNI</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={startDniCapture}
+            className="w-full py-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95"
+            style={{ backgroundColor: theme.primary, color: 'white' }}
+          >
+            <Camera className="h-5 w-5" />
+            Comenzar Captura
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   const wizardStepFacial = (
     <div className="space-y-4 py-2">
@@ -1596,7 +1886,7 @@ Tono amigable y conciso (2-3 oraciones máximo).`
           </div>
 
           <button
-            onClick={startCamera}
+            onClick={() => startCamera('selfie')}
             className="w-full py-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
             style={{ backgroundColor: theme.primary, color: 'white' }}
           >
@@ -1762,17 +2052,29 @@ Tono amigable y conciso (2-3 oraciones máximo).`
   // Validación del paso 0: siempre válido (puede saltar)
   const isStep0Valid = true;
 
-  // Construir los pasos dinámicamente según si requiere validación facial
+  // Construir los pasos dinámicamente según validaciones requeridas
   const baseSteps = [
     { id: 'asistente', title: 'Asistente', description: '¿Qué trámite necesitás?', icon: <MessageCircle className="h-5 w-5" />, content: wizardStep0, isValid: isStep0Valid },
     { id: 'servicio', title: selectedRubro && selectedServicio ? `${selectedRubro} · ${selectedServicio.nombre}` : selectedRubro || 'Categoría', description: '', icon: <FolderOpen className="h-5 w-5" />, content: wizardStep1, isValid: isStep1Valid },
     { id: 'detalle', title: selectedRubro && selectedServicio ? `${selectedRubro} · ${selectedServicio.nombre}` : selectedRubro || 'Detalle', description: '', icon: <FileText className="h-5 w-5" />, content: wizardStep2, isValid: isStep2Valid },
   ];
 
+  // Agregar paso de validación de DNI si es requerido
+  if (requiresDniValidation) {
+    baseSteps.push({
+      id: 'validacion-dni',
+      title: 'DNI',
+      description: 'Capturar documento',
+      icon: <CreditCard className="h-5 w-5" />,
+      content: wizardStepDni,
+      isValid: isStepDniValid
+    });
+  }
+
   // Agregar paso de validación facial si es requerido
   if (requiresFacialValidation) {
     baseSteps.push({
-      id: 'validacion',
+      id: 'validacion-facial',
       title: 'Verificación',
       description: 'Validar identidad',
       icon: <ScanFace className="h-5 w-5" />,

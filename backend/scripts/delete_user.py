@@ -39,12 +39,12 @@ async def delete_user(email: str):
         except Exception as e:
             print(f"Nota: {e}")
 
-        # Cambiar rol a vecino (Google actualizara el nombre al loguearse)
+        # Cambiar rol a vecino y quitar dependencia (Google actualizara el nombre al loguearse)
         await conn.execute(
-            text("UPDATE usuarios SET rol = 'vecino' WHERE id = :id"),
+            text("UPDATE usuarios SET rol = 'vecino', municipio_dependencia_id = NULL WHERE id = :id"),
             {"id": user_id}
         )
-        print(f"Usuario {email} cambiado a rol vecino exitosamente")
+        print(f"Usuario {email} cambiado a rol vecino (sin dependencia) exitosamente")
 
     await engine.dispose()
 

@@ -102,8 +102,9 @@ class Tramite(Base):
     es_pago = Column(Boolean, default=False)
     palabras_clave = Column(Text, nullable=True)  # CSV de palabras clave para búsqueda IA
 
-    # Validación facial requerida para iniciar el trámite
-    requiere_validacion_facial = Column(Boolean, default=False)
+    # Validación de identidad requerida para iniciar el trámite
+    requiere_validacion_dni = Column(Boolean, default=False)  # Fotos DNI frente/dorso
+    requiere_validacion_facial = Column(Boolean, default=False)  # Selfie/reconocimiento facial
 
     # Requisitos y documentación (valores por defecto, municipios pueden personalizar)
     requisitos = Column(Text, nullable=True)

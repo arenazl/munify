@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Edit, Clock, DollarSign, FileText, Plus, ChevronRight, EyeOff, RotateCcw, ChevronDown, BookOpen } from 'lucide-react';
+import { Edit, Clock, DollarSign, FileText, Plus, ChevronRight, EyeOff, RotateCcw, ChevronDown, BookOpen, CreditCard, ScanFace } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../lib/api';
@@ -96,7 +96,9 @@ export default function TramitesCatalogo() {
     tiempo_estimado_dias: 15,
     costo: '',
     orden: 0,
-    activo: true
+    activo: true,
+    requiere_validacion_dni: false,
+    requiere_validacion_facial: false
   });
 
   useEffect(() => {
@@ -138,7 +140,9 @@ export default function TramitesCatalogo() {
         tiempo_estimado_dias: tramite.tiempo_estimado_dias,
         costo: tramite.costo?.toString() || '',
         orden: tramite.orden,
-        activo: tramite.activo
+        activo: tramite.activo,
+        requiere_validacion_dni: tramite.requiere_validacion_dni || false,
+        requiere_validacion_facial: tramite.requiere_validacion_facial || false
       });
       setSelectedTramite(tramite);
     } else {
@@ -156,7 +160,9 @@ export default function TramitesCatalogo() {
         tiempo_estimado_dias: 15,
         costo: '',
         orden: tramites.filter(t => t.tipo_tramite_id === tipoId).length,
-        activo: true
+        activo: true,
+        requiere_validacion_dni: false,
+        requiere_validacion_facial: false
       });
       setSelectedTramite(null);
     }
@@ -743,6 +749,51 @@ export default function TramitesCatalogo() {
             placeholder="Lista de documentos necesarios..."
             rows={3}
           />
+
+          {/* Validación de Identidad */}
+          <div
+            className="p-4 rounded-xl space-y-3"
+            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <ScanFace className="h-5 w-5" style={{ color: theme.primary }} />
+              <span className="font-medium" style={{ color: theme.text }}>Validación de Identidad</span>
+            </div>
+
+            <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.requiere_validacion_dni}
+                onChange={(e) => setFormData({ ...formData, requiere_validacion_dni: e.target.checked })}
+                className="w-5 h-5 rounded"
+                style={{ accentColor: theme.primary }}
+              />
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                <div>
+                  <span className="text-sm font-medium" style={{ color: theme.text }}>Validar DNI</span>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>Solicitar foto del frente y dorso del DNI</p>
+                </div>
+              </div>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-black/5 transition-colors">
+              <input
+                type="checkbox"
+                checked={formData.requiere_validacion_facial}
+                onChange={(e) => setFormData({ ...formData, requiere_validacion_facial: e.target.checked })}
+                className="w-5 h-5 rounded"
+                style={{ accentColor: theme.primary }}
+              />
+              <div className="flex items-center gap-2">
+                <ScanFace className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                <div>
+                  <span className="text-sm font-medium" style={{ color: theme.text }}>Validar Rostro</span>
+                  <p className="text-xs" style={{ color: theme.textSecondary }}>Solicitar selfie para validación facial</p>
+                </div>
+              </div>
+            </label>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <ABMInput
