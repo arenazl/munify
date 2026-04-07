@@ -445,17 +445,15 @@ async def crear_municipio(
     """
     Crea un nuevo municipio (solo super admin).
     Automáticamente crea:
-    - 12 categorías de reclamos por defecto
-    - 6 tipos de trámites con trámites específicos
+    - 10 categorías de reclamo + 10 categorías de trámite por defecto
+      (ver services/categorias_seed.py)
     - Barrios del municipio buscados con IA + Nominatim
-    - Usuarios demo (admin, supervisor, empleado, vecino)
-    - Empleados y cuadrillas
-    - Reclamos de ejemplo en distintos estados
+    - Usuarios demo (admin, supervisor, vecino) si seed_municipio_completo lo permite
+
+    Trámites concretos arrancan vacíos: el admin del municipio los carga
+    desde /gestion/tramites-config (refactor 2026-04 trámites per-municipio).
     """
-    from services.tramites_default import crear_tipos_tramites_default
     from services.barrios_auto import cargar_barrios_municipio
-    from services.seed_municipio import seed_municipio_completo
-    from models.barrio import Barrio
 
     # Solo super admin (sin municipio_id) puede crear municipios
     if current_user.municipio_id is not None:
@@ -471,45 +469,47 @@ async def crear_municipio(
     db.add(municipio)
     await db.flush()
 
-    # 1. Crear categorías de reclamos por defecto
+    # 1. Sembrar categorías default (10 reclamo + 10 trámite per-municipio)
+    #    El admin del municipio puede luego renombrar/agregar/eliminar libremente.
     await crear_categorias_default(db, municipio.id)
 
-    # 2. Crear tipos de trámites y trámites por defecto
-    await crear_tipos_tramites_default(db, municipio.id)
-
-    # 3. Cargar barrios automáticamente con IA + Nominatim
-    barrios = []
+    # 2. Cargar barrios automáticamente con IA + Nominatim (best-effort)
+    barrios_creados = 0
     try:
         barrios_creados = await cargar_barrios_municipio(
             db=db,
             municipio_id=municipio.id,
             nombre_municipio=municipio.nombre,
-            provincia="Buenos Aires"
+            provincia="Buenos Aires",
         )
         print(f"[MUNICIPIO] {barrios_creados} barrios creados para {municipio.nombre}")
-
-        # Obtener lista de barrios para el seed
-        result = await db.execute(
-            select(Barrio).where(Barrio.municipio_id == municipio.id)
-        )
-        barrios = result.scalars().all()
     except Exception as e:
         print(f"[MUNICIPIO] Error cargando barrios para {municipio.nombre}: {e}")
 
-    # 4. Generar seed completo (usuarios, empleados, cuadrilla, reclamos)
-    seed_info = None
-    try:
-        seed_info = await seed_municipio_completo(
-            db=db,
-            municipio_id=municipio.id,
-            codigo=municipio.codigo,
-            barrios=barrios
-        )
-        print(f"[MUNICIPIO] Seed creado: {seed_info}")
-    except Exception as e:
-        print(f"[MUNICIPIO] Error en seed: {e}")
-        import traceback
-        traceback.print_exc()
+    # 3. Crear usuarios demo (admin y vecino) for the new municipality
+    from core.security import get_password_hash
+    from models.user import User
+    from models.enums import RolUsuario
+
+    admin_demo = User(
+        email=f"admin@{municipio.codigo}.demo.com",
+        nombre="Admin",
+        apellido="Demo",
+        password_hash=get_password_hash("123456"),
+        rol=RolUsuario.ADMIN,
+        municipio_id=municipio.id,
+        activo=True
+    )
+    vecino_demo = User(
+        email=f"vecino@{municipio.codigo}.demo.com",
+        nombre="Vecino",
+        apellido="Demo",
+        password_hash=get_password_hash("123456"),
+        rol=RolUsuario.VECINO,
+        municipio_id=municipio.id,
+        activo=True
+    )
+    db.add_all([admin_demo, vecino_demo])
 
     await db.commit()
     await db.refresh(municipio)
@@ -517,9 +517,14 @@ async def crear_municipio(
     # Construir respuesta
     response_data = {
         **municipio.__dict__,
-        "seed_info": seed_info
+        "seed_info": {
+            "categorias_reclamo": 10,
+            "categorias_tramite": 10,
+            "barrios": barrios_creados,
+            "tramites": 0,
+            "mensaje": "Categorias sembradas. Cargá tus tramites en /gestion/tramites-config",
+        },
     }
-    # Remover _sa_instance_state de SQLAlchemy
     response_data.pop("_sa_instance_state", None)
 
     return response_data

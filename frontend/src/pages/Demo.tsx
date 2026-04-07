@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, MapPin, UserPlus, LogIn, Check, Building2 } from 'lucide-react';
+import { Loader2, MapPin, UserPlus, LogIn, Check, Building2, Shield, User } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import munifyLogo from '../assets/munify_logo.png';
 
 interface Municipio {
@@ -14,6 +15,7 @@ interface Municipio {
 
 export default function Demo() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [selectedMunicipio, setSelectedMunicipio] = useState<Municipio | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,18 @@ export default function Demo() {
   const handleCrearCuenta = () => {
     if (!selectedMunicipio) return;
     navigate('/register');
+  };
+
+  const handleQuickLogin = async (role: 'admin' | 'vecino') => {
+    if (!selectedMunicipio) return;
+    try {
+      await login(`${role}@demo.com`, '123456');
+      if (role === 'admin') navigate('/gestion');
+      else navigate('/home');
+    } catch (err) {
+      console.error('Error auto-login:', err);
+      setError('Error ingresando con la cuenta comodín');
+    }
   };
 
   return (
@@ -177,32 +191,54 @@ export default function Demo() {
 
               {/* Botones de acción */}
               <div className={`
-                flex flex-col sm:flex-row items-center justify-center gap-4
+                flex flex-col items-center justify-center gap-4
                 transition-all duration-300
                 ${selectedMunicipio ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-2 pointer-events-none'}
               `}>
-                <button
-                  onClick={handleEntrarAnonimo}
-                  disabled={!selectedMunicipio}
-                  className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold text-lg hover:border-slate-300 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <MapPin className="h-5 w-5" />
-                  Entrar anónimo
-                </button>
+                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                  <button
+                    onClick={handleEntrarAnonimo}
+                    disabled={!selectedMunicipio}
+                    className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold text-lg hover:border-slate-300 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <MapPin className="h-5 w-5" />
+                    Entrar anónimo
+                  </button>
 
-                <button
-                  onClick={handleCrearCuenta}
-                  disabled={!selectedMunicipio}
-                  className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 text-white font-semibold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: selectedMunicipio
-                      ? `linear-gradient(135deg, ${selectedMunicipio.color_primario || '#0088cc'} 0%, ${selectedMunicipio.color_primario || '#0088cc'}dd 100%)`
-                      : 'linear-gradient(135deg, #0088cc 0%, #0088ccdd 100%)'
-                  }}
-                >
-                  <UserPlus className="h-5 w-5" />
-                  Crear cuenta
-                </button>
+                  <button
+                    onClick={handleCrearCuenta}
+                    disabled={!selectedMunicipio}
+                    className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 text-white font-semibold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      background: selectedMunicipio
+                        ? `linear-gradient(135deg, ${selectedMunicipio.color_primario || '#0088cc'} 0%, ${selectedMunicipio.color_primario || '#0088cc'}dd 100%)`
+                        : 'linear-gradient(135deg, #0088cc 0%, #0088ccdd 100%)'
+                    }}
+                  >
+                    <UserPlus className="h-5 w-5" />
+                    Crear cuenta
+                  </button>
+                </div>
+
+                <div className="mt-4 border-t pt-6 w-full max-w-md">
+                  <p className="text-center text-sm text-slate-500 mb-3 font-medium">✨ Cuentas Comodín (Pruebas)</p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button
+                      onClick={() => handleQuickLogin('vecino')}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-medium text-sm transition-colors border border-indigo-200"
+                    >
+                      <User className="h-4 w-4" />
+                      Como Vecino
+                    </button>
+                    <button
+                      onClick={() => handleQuickLogin('admin')}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl font-medium text-sm transition-colors border border-rose-200"
+                    >
+                      <Shield className="h-4 w-4" />
+                      Como Admin
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Texto de ayuda */}

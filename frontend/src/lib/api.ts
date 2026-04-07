@@ -220,10 +220,15 @@ export default api;
 
 // Auth
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post('/auth/login', new URLSearchParams({ username: email, password }), {
+  login: (email: string, password: string) => {
+    const municipioId = localStorage.getItem('municipio_id') || localStorage.getItem('municipio_actual_id');
+    const params = new URLSearchParams({ username: email, password });
+    if (municipioId) params.append('client_id', municipioId);
+    
+    return api.post('/auth/login', params, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    }),
+    });
+  },
   register: (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => {
     const municipioId = localStorage.getItem('municipio_id');
     return api.post('/auth/register', {

@@ -78,10 +78,7 @@ class Municipio(Base):
         cascade="all, delete-orphan",
     )
 
-    # Relaciones con direcciones (DEPRECATED - usar dependencias_habilitadas)
-    direcciones = relationship("Direccion", back_populates="municipio", cascade="all, delete-orphan")
-
-    # Relaciones con dependencias (nuevo modelo desacoplado)
+    # Relaciones con dependencias (modelo desacoplado del municipio)
     dependencias_habilitadas = relationship("MunicipioDependencia", back_populates="municipio")
 
     # Consultas guardadas / BI

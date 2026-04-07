@@ -7,12 +7,15 @@ import {
 interface NavigationOptions {
   userRole: string;
   hasDependencia?: boolean;
+  /** Si el usuario admin no tiene municipio_id es superadmin (cross-municipio). */
+  isSuperAdmin?: boolean;
 }
 
 export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => {
   // Soportar ambas firmas: getNavigation('admin') o getNavigation({ userRole: 'admin', hasDependencia: true })
   const userRole = typeof userRoleOrOptions === 'string' ? userRoleOrOptions : userRoleOrOptions.userRole;
   const hasDependencia = typeof userRoleOrOptions === 'object' ? userRoleOrOptions.hasDependencia : false;
+  const isSuperAdmin = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.isSuperAdmin : false;
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
@@ -143,6 +146,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: FileText,
       show: isAdminOrSupervisor,
       description: 'ABM de trámites con documentos requeridos'
+    },
+    // === Solo SUPERADMIN (admin sin municipio asignado) ===
+    {
+      name: 'Municipios',
+      href: '/gestion/municipios',
+      icon: Building2,
+      show: isSuperAdmin,
+      description: 'Alta y gestión de municipios (cross-tenant)'
     },
     {
       name: 'Ajustes',

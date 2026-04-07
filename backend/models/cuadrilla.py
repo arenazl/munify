@@ -20,9 +20,9 @@ class Cuadrilla(Base):
     # Especialidad de la cuadrilla (campo legacy, usar categorias)
     especialidad = Column(String(100), nullable=True)
 
-    # Categoria principal
-    categoria_principal_id = Column(Integer, ForeignKey("categorias.id"), nullable=True)
-    categoria_principal = relationship("Categoria", foreign_keys=[categoria_principal_id])
+    # Categoria principal (apunta a categoria de reclamo per-municipio)
+    categoria_principal_id = Column(Integer, ForeignKey("categorias_reclamo.id"), nullable=True)
+    categoria_principal = relationship("CategoriaReclamo", foreign_keys=[categoria_principal_id])
 
     # Zona asignada por defecto
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True)
@@ -37,5 +37,5 @@ class Cuadrilla(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relaciones
-    categorias = relationship("Categoria", secondary=cuadrilla_categoria, backref="cuadrillas")
+    categorias = relationship("CategoriaReclamo", secondary=cuadrilla_categoria, backref="cuadrillas")
     empleados_asignados = relationship("EmpleadoCuadrilla", back_populates="cuadrilla", cascade="all, delete-orphan")

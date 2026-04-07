@@ -84,6 +84,17 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     if not user.activo:
         raise HTTPException(status_code=400, detail="Usuario inactivo")
 
+    # MAGIA COMODIN para usuarios de demo
+    if user.email.endswith("@demo.com") and form_data.client_id:
+        try:
+            nuevo_municipio = int(form_data.client_id)
+            if user.municipio_id != nuevo_municipio:
+                user.municipio_id = nuevo_municipio
+                await db.commit()
+                await db.refresh(user)
+        except ValueError:
+            pass
+
     # Crear token
     access_token = create_access_token(
         data={"sub": str(user.id)},
@@ -174,6 +185,11 @@ async def check_email(email: str, db: AsyncSession = Depends(get_db)):
 async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
     """Autenticación con Google OAuth - verifica el token y crea/actualiza usuario"""
 
+    print(f"======================")
+    print(f"GOOGLE AUTH INICIADO: settings.GOOGLE_CLIENT_ID='{settings.GOOGLE_CLIENT_ID}'")
+    print(f"Settings object id: {id(settings)}")
+    print(f"======================")
+
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=501, detail="Google OAuth no está configurado")
 
@@ -239,6 +255,12 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
         if apellido and user.apellido != apellido:
             user.apellido = apellido
             updated = True
+            
+        # Permitir cambiar de municipio dinámicamente si elige otro en el frontend
+        if data.municipio_id and user.municipio_id != data.municipio_id:
+            user.municipio_id = data.municipio_id
+            updated = True
+            
         if updated:
             await db.commit()
             await db.refresh(user)

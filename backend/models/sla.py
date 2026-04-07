@@ -15,8 +15,8 @@ class SLAConfig(Base):
     municipio = relationship("Municipio")
 
     # Puede ser por categoría específica o general (categoria_id = null)
-    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=True)
-    categoria = relationship("Categoria")
+    categoria_id = Column(Integer, ForeignKey("categorias_reclamo.id"), nullable=True)
+    categoria = relationship("CategoriaReclamo")
 
     # Puede ser por prioridad específica o todas (prioridad = null)
     prioridad = Column(Integer, nullable=True)  # 1-5, null = todas

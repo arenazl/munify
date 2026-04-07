@@ -6,6 +6,6 @@ cuadrilla_categoria = Table(
     'cuadrilla_categorias',
     Base.metadata,
     Column('cuadrilla_id', Integer, ForeignKey('cuadrillas.id'), primary_key=True),
-    Column('categoria_id', Integer, ForeignKey('categorias.id'), primary_key=True),
+    Column('categoria_id', Integer, ForeignKey('categorias_reclamo.id'), primary_key=True),
     Column('es_principal', Boolean, default=False)  # Indica si es la categoría principal
 )

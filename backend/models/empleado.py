@@ -24,9 +24,9 @@ class Empleado(Base):
     # Especialidad del empleado (campo legacy, usar categorias)
     especialidad = Column(String(100), nullable=True)
 
-    # Categoria principal
-    categoria_principal_id = Column(Integer, ForeignKey("categorias.id"), nullable=True)
-    categoria_principal = relationship("Categoria", foreign_keys=[categoria_principal_id])
+    # Categoria principal (categoria de reclamo per-municipio)
+    categoria_principal_id = Column(Integer, ForeignKey("categorias_reclamo.id"), nullable=True)
+    categoria_principal = relationship("CategoriaReclamo", foreign_keys=[categoria_principal_id])
 
     # Zona asignada por defecto
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True)
@@ -46,7 +46,7 @@ class Empleado(Base):
 
     # Relaciones
     miembros = relationship("User", back_populates="empleado")
-    categorias = relationship("Categoria", secondary=empleado_categoria, backref="empleados")
+    categorias = relationship("CategoriaReclamo", secondary=empleado_categoria, backref="empleados")
 
     # Nuevas relaciones
     cuadrillas_asignadas = relationship("EmpleadoCuadrilla", back_populates="empleado", cascade="all, delete-orphan")

@@ -286,7 +286,12 @@ export default function Layout() {
 
   if (!user) return null;
 
-  const navigation = getNavigation({ userRole: user.rol, hasDependencia: !!user.dependencia });
+  const navigation = getNavigation({
+    userRole: user.rol,
+    hasDependencia: !!user.dependencia,
+    // Superadmin = admin sin municipio_id (gestiona todos los municipios)
+    isSuperAdmin: user.rol === 'admin' && !user.municipio_id,
+  });
   const mobileTabs = getMobileTabs(user.rol);
 
   // Anchos dinámicos con medidas relativas para mejor responsividad

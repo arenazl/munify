@@ -6,6 +6,6 @@ empleado_categoria = Table(
     'empleado_categorias',
     Base.metadata,
     Column('empleado_id', Integer, ForeignKey('empleados.id'), primary_key=True),
-    Column('categoria_id', Integer, ForeignKey('categorias.id'), primary_key=True),
+    Column('categoria_id', Integer, ForeignKey('categorias_reclamo.id'), primary_key=True),
     Column('es_principal', Boolean, default=False)  # Indica si es la categoria principal
 )

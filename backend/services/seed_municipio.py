@@ -116,23 +116,19 @@ async def crear_reclamos_demo(
     Crea reclamos de ejemplo para el municipio.
     Returns: cantidad de reclamos creados
     """
-    from models.categoria import Categoria, MunicipioCategoria
+    from models.categoria_reclamo import CategoriaReclamo
 
-    # Obtener categorías habilitadas del municipio
+    # Obtener categorías de reclamo del municipio (per-municipio)
     result = await db.execute(
-        select(MunicipioCategoria, Categoria)
-        .join(Categoria)
-        .where(MunicipioCategoria.municipio_id == municipio_id)
+        select(CategoriaReclamo).where(CategoriaReclamo.municipio_id == municipio_id)
     )
-    categorias_rows = result.all()
+    categorias = result.scalars().all()
 
-    if not categorias_rows:
+    if not categorias:
         return 0
 
-    # Crear mapa de categorías por nombre (parcial)
-    categorias_map = {}
-    for mc, cat in categorias_rows:
-        categorias_map[cat.nombre.lower()] = cat.id
+    # Mapa nombre lower → id para hacer matching parcial
+    categorias_map = {c.nombre.lower(): c.id for c in categorias}
 
     reclamos_creados = 0
     estados = [EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO, EstadoReclamo.RESUELTO]

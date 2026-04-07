@@ -24,8 +24,8 @@ class ConfiguracionEscalado(Base):
     horas_sin_resolver = Column(Integer, default=72)     # Horas en proceso sin resolver -> escalar
 
     # Aplicable a (null = todas)
-    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=True)
-    categoria = relationship("Categoria")
+    categoria_id = Column(Integer, ForeignKey("categorias_reclamo.id"), nullable=True)
+    categoria = relationship("CategoriaReclamo")
 
     prioridad_minima = Column(Integer, nullable=True)  # Solo reclamos con prioridad >= X
 
