@@ -1,7 +1,8 @@
 from .municipio import Municipio  # IMPORTANTE: Municipio debe ir primero por las relaciones FK
 from .barrio import Barrio  # Barrios del municipio (cargados via IA)
 from .user import User
-from .categoria import Categoria, MunicipioCategoria
+from .categoria_reclamo import CategoriaReclamo
+from .categoria_tramite import CategoriaTramite
 from .zona import Zona
 from .cuadrilla_categoria import cuadrilla_categoria
 from .cuadrilla import Cuadrilla  # Debe ir antes de Reclamo por la relación FK
@@ -29,9 +30,9 @@ from .gamificacion import (
 )
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .noticia import Noticia
-from .tramite import TipoTramite, Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud, MunicipioTipoTramite, MunicipioTramite
+from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
+from .tramite_documento_requerido import TramiteDocumentoRequerido
 from .documento_solicitud import DocumentoSolicitud
-from .tramite_doc import TramiteDoc
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
@@ -40,8 +41,8 @@ __all__ = [
     "Municipio",
     "Barrio",
     "User",
-    "Categoria",
-    "MunicipioCategoria",
+    "CategoriaReclamo",
+    "CategoriaTramite",
     "Zona",
     "Cuadrilla",
     "Empleado",
@@ -84,15 +85,12 @@ __all__ = [
     # Noticias
     "Noticia",
     # Tramites
-    "TipoTramite",
     "Tramite",
     "Solicitud",
     "HistorialSolicitud",
     "EstadoSolicitud",
-    "MunicipioTipoTramite",
-    "MunicipioTramite",
+    "TramiteDocumentoRequerido",
     "DocumentoSolicitud",
-    "TramiteDoc",
     # Push Notifications
     "PushSubscription",
     # Consultas guardadas / BI
@@ -101,28 +99,16 @@ __all__ = [
     "EmailValidation"
 ]
 
-# Direcciones (DEPRECATED - usar Dependencias)
-from .direccion import Direccion
-from .direccion_categoria import DireccionCategoria
-from .direccion_tipo_tramite import DireccionTipoTramite
-
-# Dependencias (nuevo modelo desacoplado del municipio)
+# Dependencias (modelo desacoplado del municipio)
 from .dependencia import Dependencia, TipoGestionDependencia
 from .municipio_dependencia import MunicipioDependencia
 from .municipio_dependencia_categoria import MunicipioDependenciaCategoria
-from .municipio_dependencia_tipo_tramite import MunicipioDependenciaTipoTramite
 from .municipio_dependencia_tramite import MunicipioDependenciaTramite
 
 __all__ += [
-    # Direcciones (DEPRECATED)
-    "Direccion",
-    "DireccionCategoria",
-    "DireccionTipoTramite",
-    # Dependencias (nuevo modelo)
     "Dependencia",
     "TipoGestionDependencia",
     "MunicipioDependencia",
     "MunicipioDependenciaCategoria",
-    "MunicipioDependenciaTipoTramite",
     "MunicipioDependenciaTramite",
 ]

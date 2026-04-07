@@ -27,7 +27,7 @@ class MunicipioDependenciaCategoria(Base):
     # Claves foráneas
     municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
     dependencia_id = Column(Integer, ForeignKey("dependencias.id"), nullable=False, index=True)
-    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False, index=True)
+    categoria_id = Column(Integer, ForeignKey("categorias_reclamo.id"), nullable=False, index=True)
 
     # FK a la tabla pivot (opcional, para facilitar joins)
     municipio_dependencia_id = Column(
@@ -49,7 +49,7 @@ class MunicipioDependenciaCategoria(Base):
     # Relaciones
     municipio = relationship("Municipio")
     dependencia = relationship("Dependencia")
-    categoria = relationship("Categoria")
+    categoria = relationship("CategoriaReclamo")
     municipio_dependencia = relationship(
         "MunicipioDependencia",
         back_populates="categorias_asignadas"

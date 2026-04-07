@@ -2,31 +2,32 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-class CategoriaCreate(BaseModel):
+
+class CategoriaTramiteCreate(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
     icono: Optional[str] = None
     color: Optional[str] = None
-    tiempo_resolucion_estimado: int = 48
-    prioridad_default: int = 3
+    orden: int = 0
 
-class CategoriaUpdate(BaseModel):
+
+class CategoriaTramiteUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     icono: Optional[str] = None
     color: Optional[str] = None
-    tiempo_resolucion_estimado: Optional[int] = None
-    prioridad_default: Optional[int] = None
+    orden: Optional[int] = None
     activo: Optional[bool] = None
 
-class CategoriaResponse(BaseModel):
+
+class CategoriaTramiteResponse(BaseModel):
     id: int
+    municipio_id: int
     nombre: str
-    descripcion: Optional[str]
-    icono: Optional[str]
-    color: Optional[str]
-    tiempo_resolucion_estimado: int
-    prioridad_default: int
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    color: Optional[str] = None
+    orden: int
     activo: bool
     created_at: datetime
 

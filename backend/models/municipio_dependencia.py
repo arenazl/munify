@@ -46,14 +46,9 @@ class MunicipioDependencia(Base):
     municipio = relationship("Municipio", back_populates="dependencias_habilitadas")
     dependencia = relationship("Dependencia", back_populates="municipios_habilitados")
 
-    # Relaciones con asignaciones
+    # Relaciones con asignaciones (categorías de reclamo + trámites)
     categorias_asignadas = relationship(
         "MunicipioDependenciaCategoria",
-        back_populates="municipio_dependencia",
-        cascade="all, delete-orphan"
-    )
-    tipos_tramite_asignados = relationship(
-        "MunicipioDependenciaTipoTramite",
         back_populates="municipio_dependencia",
         cascade="all, delete-orphan"
     )

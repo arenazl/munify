@@ -30,7 +30,6 @@ class DependenciaCreate(BaseModel):
 
 
 class DependenciaUpdate(BaseModel):
-    """Schema para actualizar una dependencia"""
     nombre: Optional[str] = None
     codigo: Optional[str] = None
     descripcion: Optional[str] = None
@@ -50,7 +49,6 @@ class DependenciaUpdate(BaseModel):
 
 
 class DependenciaResponse(BaseModel):
-    """Schema de respuesta para una dependencia"""
     id: int
     nombre: str
     codigo: Optional[str] = None
@@ -75,13 +73,11 @@ class DependenciaResponse(BaseModel):
         from_attributes = True
 
 
-# ============ Schemas para MunicipioDependencia (Instancia por Municipio) ============
+# ============ Schemas para MunicipioDependencia ============
 
 class MunicipioDependenciaCreate(BaseModel):
-    """Schema para habilitar una dependencia en un municipio"""
     dependencia_id: int
     orden: int = 0
-    # Personalizaciones locales (opcionales)
     direccion_local: Optional[str] = None
     localidad_local: Optional[str] = None
     telefono_local: Optional[str] = None
@@ -92,7 +88,6 @@ class MunicipioDependenciaCreate(BaseModel):
 
 
 class MunicipioDependenciaUpdate(BaseModel):
-    """Schema para actualizar una dependencia habilitada"""
     activo: Optional[bool] = None
     orden: Optional[int] = None
     direccion_local: Optional[str] = None
@@ -105,18 +100,6 @@ class MunicipioDependenciaUpdate(BaseModel):
 
 
 class CategoriaSimple(BaseModel):
-    """Schema simplificado de categoría"""
-    id: int
-    nombre: str
-    icono: Optional[str] = None
-    color: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
-class TipoTramiteSimple(BaseModel):
-    """Schema simplificado de tipo de trámite"""
     id: int
     nombre: str
     icono: Optional[str] = None
@@ -127,15 +110,12 @@ class TipoTramiteSimple(BaseModel):
 
 
 class MunicipioDependenciaResponse(BaseModel):
-    """Schema de respuesta para una dependencia habilitada en un municipio"""
     id: int
     municipio_id: int
     dependencia_id: int
     activo: bool
     orden: int
-    # Datos de la dependencia template
     dependencia: DependenciaResponse
-    # Personalizaciones locales
     direccion_local: Optional[str] = None
     localidad_local: Optional[str] = None
     telefono_local: Optional[str] = None
@@ -143,14 +123,10 @@ class MunicipioDependenciaResponse(BaseModel):
     horario_atencion_local: Optional[str] = None
     latitud_local: Optional[float] = None
     longitud_local: Optional[float] = None
-    # Valores efectivos (calculados)
     direccion_efectiva: Optional[str] = None
     telefono_efectivo: Optional[str] = None
     email_efectivo: Optional[str] = None
-    # Asignaciones
     categorias_asignadas: Optional[List[CategoriaSimple]] = None
-    tipos_tramite_asignados: Optional[List[TipoTramiteSimple]] = None
-    # Timestamps
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -158,27 +134,33 @@ class MunicipioDependenciaResponse(BaseModel):
         from_attributes = True
 
 
+class TramiteSimple(BaseModel):
+    id: int
+    nombre: str
+    categoria_tramite_id: int
+    icono: Optional[str] = None
+    color: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class MunicipioDependenciaListResponse(BaseModel):
-    """Schema simplificado para listados"""
+    """Schema simplificado para listados de dependencias de un municipio."""
     id: int
     municipio_id: int
     dependencia_id: int
-    nombre: str  # del template
+    nombre: str
     codigo: Optional[str] = None
     tipo_gestion: str
     activo: bool
     orden: int
-    # Visualización
     color: Optional[str] = "#6366f1"
     icono: Optional[str] = "Building2"
-    # Contadores
     categorias_count: int = 0
-    tipos_tramite_count: int = 0
     tramites_count: int = 0
-    # Asignaciones completas (opcional, con include_assignments=true)
     categorias: Optional[List[CategoriaSimple]] = None
-    tipos_tramite: Optional[List[TipoTramiteSimple]] = None
-    tramites: Optional[List["TramiteSimple"]] = None
+    tramites: Optional[List[TramiteSimple]] = None
 
     class Config:
         from_attributes = True
@@ -187,34 +169,16 @@ class MunicipioDependenciaListResponse(BaseModel):
 # ============ Schemas para Asignaciones ============
 
 class AsignarCategoriasRequest(BaseModel):
-    """Request para asignar categorías a una dependencia en un municipio"""
+    """Request para asignar categorías de reclamo a una dependencia."""
     categoria_ids: List[int]
 
 
-class AsignarTiposTramiteRequest(BaseModel):
-    """Request para asignar tipos de trámite a una dependencia en un municipio"""
-    tipo_tramite_ids: List[int]
-
-
 class AsignarTramitesRequest(BaseModel):
-    """Request para asignar trámites específicos a una dependencia en un municipio"""
+    """Request para asignar trámites específicos a una dependencia."""
     tramite_ids: List[int]
 
 
-class TramiteSimple(BaseModel):
-    """Schema simplificado de trámite"""
-    id: int
-    nombre: str
-    tipo_tramite_id: int
-    icono: Optional[str] = None
-    color: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
 class MuniDepCategoriaResponse(BaseModel):
-    """Respuesta para una asignación dependencia-categoría"""
     id: int
     municipio_id: int
     dependencia_id: int
@@ -228,33 +192,8 @@ class MuniDepCategoriaResponse(BaseModel):
         from_attributes = True
 
 
-class MuniDepTipoTramiteResponse(BaseModel):
-    """Respuesta para una asignación dependencia-tipo trámite"""
-    id: int
-    municipio_id: int
-    dependencia_id: int
-    tipo_tramite_id: int
-    tipo_tramite: TipoTramiteSimple
-    activo: bool
-
-    class Config:
-        from_attributes = True
-
-
-# ============ Schemas para Bulk Operations ============
+# ============ Bulk operations ============
 
 class HabilitarDependenciasRequest(BaseModel):
-    """Request para habilitar múltiples dependencias a la vez"""
+    """Request para habilitar múltiples dependencias a la vez."""
     dependencia_ids: List[int]
-
-
-class AsignacionMasivaRequest(BaseModel):
-    """Request para asignar categorías y tipos de trámite a una dependencia"""
-    municipio_dependencia_id: int
-    categoria_ids: Optional[List[int]] = None
-    tipo_tramite_ids: Optional[List[int]] = None
-
-
-# Resolver forward references
-MunicipioDependenciaListResponse.model_rebuild()
-MunicipioDependenciaResponse.model_rebuild()

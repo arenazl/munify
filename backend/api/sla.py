@@ -11,7 +11,7 @@ from core.security import require_roles
 from models.user import User
 from models.sla import SLAConfig, SLAViolacion
 from models.reclamo import Reclamo
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.enums import EstadoReclamo
 
 router = APIRouter()

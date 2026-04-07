@@ -5,117 +5,51 @@ from models.tramite import EstadoSolicitud
 from schemas.reclamo import DependenciaAsignadaSimple
 
 
-# ==================== Tipo Tramite (Categorías) ====================
+# ==================== TramiteDocumentoRequerido (sub-tabla) ====================
 
-class TipoTramiteBase(BaseModel):
+class TramiteDocumentoRequeridoBase(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
-    codigo: Optional[str] = None
-    icono: Optional[str] = None
-    color: Optional[str] = None
-    activo: bool = True
+    obligatorio: bool = True
     orden: int = 0
 
 
-class TipoTramiteCreate(TipoTramiteBase):
+class TramiteDocumentoRequeridoCreate(TramiteDocumentoRequeridoBase):
     pass
 
 
-class TipoTramiteUpdate(BaseModel):
+class TramiteDocumentoRequeridoUpdate(BaseModel):
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
-    codigo: Optional[str] = None
-    icono: Optional[str] = None
-    color: Optional[str] = None
-    activo: Optional[bool] = None
+    obligatorio: Optional[bool] = None
     orden: Optional[int] = None
 
 
-class TipoTramiteResponse(TipoTramiteBase):
+class TramiteDocumentoRequeridoResponse(TramiteDocumentoRequeridoBase):
     id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# ==================== Municipio-TipoTramite (Tabla intermedia) ====================
-
-class MunicipioTipoTramiteCreate(BaseModel):
-    tipo_tramite_id: int
-    activo: bool = True
-    orden: int = 0
-
-
-class MunicipioTipoTramiteResponse(BaseModel):
-    id: int
-    municipio_id: int
-    tipo_tramite_id: int
-    activo: bool
-    orden: int
-    created_at: datetime
-    tipo_tramite: Optional[TipoTramiteResponse] = None
-
-    class Config:
-        from_attributes = True
-
-
-# ==================== Municipio-Tramite (Tabla intermedia) ====================
-
-class MunicipioTramiteCreate(BaseModel):
     tramite_id: int
-    activo: bool = True
-    orden: int = 0
-    tiempo_estimado_dias: Optional[int] = None
-    costo: Optional[float] = None
-    requisitos: Optional[str] = None
-    documentos_requeridos: Optional[str] = None
-
-
-class MunicipioTramiteResponse(BaseModel):
-    id: int
-    municipio_id: int
-    tramite_id: int
-    activo: bool
-    orden: int
-    tiempo_estimado_dias: Optional[int] = None
-    costo: Optional[float] = None
-    requisitos: Optional[str] = None
-    documentos_requeridos: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-# ==================== Detección de duplicados ====================
+# ==================== Tramite (per-municipio) ====================
 
-class DuplicadoSugerido(BaseModel):
+class CategoriaTramiteSimple(BaseModel):
     id: int
     nombre: str
-    descripcion: Optional[str] = None
-    similitud: float  # 0-100
+    icono: Optional[str] = None
+    color: Optional[str] = None
 
+    class Config:
+        from_attributes = True
 
-class CheckDuplicadosRequest(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
-
-
-class CheckDuplicadosResponse(BaseModel):
-    hay_duplicados: bool
-    duplicados: List[DuplicadoSugerido] = []
-    mensaje: Optional[str] = None
-
-
-# ==================== Tramite (Trámites específicos) ====================
 
 class TramiteBase(BaseModel):
     nombre: str
     descripcion: Optional[str] = None
     icono: Optional[str] = None
-    requisitos: Optional[str] = None
-    documentos_requeridos: Optional[str] = None
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
     url_externa: Optional[str] = None
@@ -126,15 +60,15 @@ class TramiteBase(BaseModel):
 
 
 class TramiteCreate(TramiteBase):
-    tipo_tramite_id: int
+    categoria_tramite_id: int
+    documentos_requeridos: List[TramiteDocumentoRequeridoCreate] = []
 
 
 class TramiteUpdate(BaseModel):
+    categoria_tramite_id: Optional[int] = None
     nombre: Optional[str] = None
     descripcion: Optional[str] = None
     icono: Optional[str] = None
-    requisitos: Optional[str] = None
-    documentos_requeridos: Optional[str] = None
     tiempo_estimado_dias: Optional[int] = None
     costo: Optional[float] = None
     url_externa: Optional[str] = None
@@ -142,16 +76,6 @@ class TramiteUpdate(BaseModel):
     requiere_validacion_facial: Optional[bool] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
-
-
-class TipoTramiteSimple(BaseModel):
-    id: int
-    nombre: str
-    icono: Optional[str] = None
-    color: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class TramiteSimple(BaseModel):
@@ -162,8 +86,8 @@ class TramiteSimple(BaseModel):
     costo: Optional[float] = None
     requiere_validacion_dni: bool = False
     requiere_validacion_facial: bool = False
-    tipo_tramite_id: Optional[int] = None
-    tipo_tramite: Optional[TipoTramiteSimple] = None
+    categoria_tramite_id: Optional[int] = None
+    categoria_tramite: Optional[CategoriaTramiteSimple] = None
 
     class Config:
         from_attributes = True
@@ -171,29 +95,24 @@ class TramiteSimple(BaseModel):
 
 class TramiteResponse(TramiteBase):
     id: int
-    tipo_tramite_id: int
-    tipo_tramite: Optional[TipoTramiteSimple] = None
+    municipio_id: int
+    categoria_tramite_id: int
+    categoria_tramite: Optional[CategoriaTramiteSimple] = None
+    documentos_requeridos: List[TramiteDocumentoRequeridoResponse] = []
     created_at: datetime
 
     class Config:
         from_attributes = True
 
 
-class TipoTramiteConTramites(TipoTramiteResponse):
-    tramites: List[TramiteSimple] = []
-
-    class Config:
-        from_attributes = True
-
-
-# ==================== Solicitud (Pedidos diarios) ====================
+# ==================== Solicitud (instancia del trámite) ====================
 
 class SolicitudCreate(BaseModel):
     tramite_id: int
     asunto: str
     descripcion: Optional[str] = None
     observaciones: Optional[str] = None
-    # Datos del solicitante (para usuarios no logueados)
+    # Datos del solicitante (para anónimos)
     nombre_solicitante: Optional[str] = None
     apellido_solicitante: Optional[str] = None
     dni_solicitante: Optional[str] = None
@@ -213,15 +132,6 @@ class SolicitudUpdate(BaseModel):
 class SolicitudAsignar(BaseModel):
     municipio_dependencia_id: int
     comentario: Optional[str] = None
-
-
-class EmpleadoSimple(BaseModel):
-    id: int
-    nombre: str
-    apellido: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class SolicitanteSimple(BaseModel):
@@ -266,7 +176,7 @@ class SolicitudResponse(BaseModel):
 
 
 class SolicitudGestionResponse(BaseModel):
-    """Response optimizado para lista de gestión - sin cargar relación solicitante"""
+    """Response optimizado para lista de gestión - sin cargar solicitante."""
     id: int
     municipio_id: int
     numero_tramite: str
@@ -276,7 +186,6 @@ class SolicitudGestionResponse(BaseModel):
     tramite_id: Optional[int] = None
     tramite: Optional[TramiteSimple] = None
     solicitante_id: Optional[int] = None
-    # Datos desnormalizados del solicitante (no la relación)
     nombre_solicitante: Optional[str] = None
     apellido_solicitante: Optional[str] = None
     dni_solicitante: Optional[str] = None
@@ -310,3 +219,30 @@ class HistorialSolicitudResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ==================== Verificación de documentos ====================
+
+class DocumentoSolicitudChecklistItem(BaseModel):
+    """Item del checklist combinado: requerido + documento subido (si hay)."""
+    requerido_id: Optional[int] = None
+    nombre: str
+    descripcion: Optional[str] = None
+    obligatorio: bool = True
+    orden: int = 0
+    # Documento asociado (si fue subido)
+    documento_id: Optional[int] = None
+    documento_url: Optional[str] = None
+    documento_nombre: Optional[str] = None
+    verificado: bool = False
+    verificado_por_id: Optional[int] = None
+    verificado_por_nombre: Optional[str] = None
+    fecha_verificacion: Optional[datetime] = None
+
+
+class ChecklistDocumentosResponse(BaseModel):
+    solicitud_id: int
+    items: List[DocumentoSolicitudChecklistItem]
+    todos_verificados: bool
+    total_obligatorios: int
+    total_obligatorios_verificados: int

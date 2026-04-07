@@ -12,7 +12,7 @@ from core.database import get_db
 from core.security import require_roles
 from models.user import User
 from models.reclamo import Reclamo
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.zona import Zona
 from models.empleado import Empleado
 from models.enums import EstadoReclamo

@@ -10,7 +10,7 @@ from models.empleado import Empleado
 from models.empleado_horario import EmpleadoHorario
 from models.tramite import Solicitud, EstadoSolicitud
 from models.reclamo import Reclamo
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.user import User
 from schemas.empleado import EmpleadoCreate, EmpleadoUpdate, EmpleadoResponse, EmpleadoDisponibilidad, HorarioSimple
 
@@ -231,16 +231,13 @@ async def create_empleado(
 
     empleado = Empleado(**empleado_data)
 
-    # Agregar categorias si se proporcionan (solo habilitadas para el municipio)
-    from models.categoria import MunicipioCategoria
+    # Agregar categorias si se proporcionan (solo del municipio del usuario)
     if categoria_ids:
         result = await db.execute(
-            select(Categoria)
-            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
-            .where(
+            select(Categoria).where(
                 Categoria.id.in_(categoria_ids),
-                MunicipioCategoria.municipio_id == current_user.municipio_id,
-                MunicipioCategoria.activo == True
+                Categoria.municipio_id == current_user.municipio_id,
+                Categoria.activo == True,
             )
         )
         categorias = result.scalars().all()
@@ -296,14 +293,11 @@ async def update_empleado(
         categoria_ids = update_data.pop('categoria_ids')
         if categoria_ids is not None:
             if categoria_ids:
-                from models.categoria import MunicipioCategoria
                 result = await db.execute(
-                    select(Categoria)
-                    .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
-                    .where(
+                    select(Categoria).where(
                         Categoria.id.in_(categoria_ids),
-                        MunicipioCategoria.municipio_id == current_user.municipio_id,
-                        MunicipioCategoria.activo == True
+                        Categoria.municipio_id == current_user.municipio_id,
+                        Categoria.activo == True,
                     )
                 )
                 categorias = result.scalars().all()

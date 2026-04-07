@@ -44,6 +44,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { WizardModal } from './ui/WizardModal';
 import { VoiceInput } from './ui/VoiceInput';
+import { MapPicker } from './ui/MapPicker';
 import type { ServicioTramite, TipoTramite } from '../types';
 
 const servicioIcons: Record<string, React.ReactNode> = {
@@ -193,6 +194,8 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
     observaciones: '',
     barrio: '',
     direccion: '',
+    latitud: null as number | null,
+    longitud: null as number | null,
     nombre_solicitante: '',
     apellido_solicitante: '',
     email_solicitante: '',
@@ -360,7 +363,7 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
     searchTimeoutRef.current = setTimeout(() => searchAddress(value), 300);
   };
 
-  const selectAddressSuggestion = (suggestion: { display_name: string }) => {
+  const selectAddressSuggestion = (suggestion: { display_name: string; lat?: string; lon?: string }) => {
     // Extraer número de calle de lo que escribió el usuario
     const userInput = formData.direccion;
     const numberMatch = userInput.match(/\d+/);
@@ -380,7 +383,12 @@ export function TramiteWizard({ open, onClose, servicios, tipos = [], onSuccess,
       }
     }
 
-    setFormData(prev => ({ ...prev, direccion: finalAddress }));
+    setFormData(prev => ({
+      ...prev,
+      direccion: finalAddress,
+      latitud: suggestion.lat ? parseFloat(suggestion.lat) : null,
+      longitud: suggestion.lon ? parseFloat(suggestion.lon) : null,
+    }));
     setShowSuggestions(false);
     setAddressSuggestions([]);
   };
@@ -658,6 +666,8 @@ Tono amigable, 2-3 oraciones máximo.`,
       observaciones: '',
       barrio: '',
       direccion: '',
+      latitud: null,
+      longitud: null,
       nombre_solicitante: '',
       apellido_solicitante: '',
       email_solicitante: '',
@@ -1254,22 +1264,22 @@ Tono amigable y conciso (2-3 oraciones máximo).`
             ))}
           </div>
         )}
+
+        {/* Mapa para seleccionar/confirmar ubicación */}
+        <div className="mt-2">
+          <label className="block text-xs mb-1" style={{ color: theme.textSecondary }}>
+            Ubicación en el mapa (opcional)
+          </label>
+          <MapPicker
+            value={formData.latitud && formData.longitud ? { lat: formData.latitud, lng: formData.longitud } : null}
+            onChange={(coords) => setFormData(prev => ({ ...prev, latitud: coords.lat, longitud: coords.lng }))}
+            height="200px"
+          />
+        </div>
       </div>
 
       <div className="space-y-2">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <label className="text-sm sm:text-base font-medium flex-1" style={{ color: theme.text }}>Contanos más sobre tu trámite</label>
-          <div className="flex-shrink-0">
-            <VoiceInput
-              onTranscript={(text) => {
-                const newObservaciones = formData.observaciones ?
-                                        formData.observaciones + ' ' + text : text;
-                setFormData(prev => ({ ...prev, observaciones: newObservaciones }));
-              }}
-              onError={(error) => toast.error(error)}
-            />
-          </div>
-        </div>
+        <label className="text-sm sm:text-base font-medium" style={{ color: theme.text }}>Contanos más sobre tu trámite</label>
         <textarea
           placeholder="Ej: Quiero abrir un local de comidas en Av. San Martín, ya tengo el contrato de alquiler firmado..."
           value={formData.observaciones}
@@ -1278,6 +1288,16 @@ Tono amigable y conciso (2-3 oraciones máximo).`
           className="w-full px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl resize-none text-sm sm:text-base"
           style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
         />
+        <div className="flex justify-end">
+          <VoiceInput
+            onTranscript={(text) => {
+              const newObservaciones = formData.observaciones ?
+                                      formData.observaciones + ' ' + text : text;
+              setFormData(prev => ({ ...prev, observaciones: newObservaciones }));
+            }}
+            onError={(error) => toast.error(error)}
+          />
+        </div>
 
         {/* IA contextual basada en lo que escribe el usuario */}
         {contextualAiLoading && (

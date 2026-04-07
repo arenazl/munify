@@ -61,10 +61,22 @@ class Municipio(Base):
     whatsapp_config = relationship("WhatsAppConfig", back_populates="municipio", uselist=False)
     solicitudes = relationship("Solicitud", back_populates="municipio")
 
-    # Relaciones con catálogos genéricos (muchos a muchos via tablas intermedias)
-    categorias_habilitadas = relationship("MunicipioCategoria", back_populates="municipio")
-    tipos_tramites_habilitados = relationship("MunicipioTipoTramite", back_populates="municipio")
-    tramites_habilitados = relationship("MunicipioTramite", back_populates="municipio")
+    # Categorías y trámites per-municipio (CRUD propio, sin catálogo global)
+    categorias_reclamo = relationship(
+        "CategoriaReclamo",
+        back_populates="municipio",
+        cascade="all, delete-orphan",
+    )
+    categorias_tramite = relationship(
+        "CategoriaTramite",
+        back_populates="municipio",
+        cascade="all, delete-orphan",
+    )
+    tramites = relationship(
+        "Tramite",
+        back_populates="municipio",
+        cascade="all, delete-orphan",
+    )
 
     # Relaciones con direcciones (DEPRECATED - usar dependencias_habilitadas)
     direcciones = relationship("Direccion", back_populates="municipio", cascade="all, delete-orphan")

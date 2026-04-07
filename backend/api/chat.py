@@ -13,10 +13,11 @@ from datetime import datetime, timedelta
 
 from core.security import get_current_user, require_roles
 from core.database import get_db
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
+from models.categoria_tramite import CategoriaTramite
 from models.user import User
 from models.reclamo import Reclamo
-from models.tramite import Solicitud, TipoTramite, Tramite, EstadoSolicitud, MunicipioTipoTramite, MunicipioTramite
+from models.tramite import Solicitud, Tramite, EstadoSolicitud
 from models.empleado import Empleado
 from models.zona import Zona
 from models.municipio import Municipio
@@ -930,63 +931,52 @@ CUANDO PIDAN VER TRÁMITES (mostrar HTML completo):
 
 
 async def get_categorias_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
-    """Obtiene las categorías activas del municipio via tabla intermedia"""
-    from models.categoria import MunicipioCategoria
-
+    """Obtiene las categorías de reclamo activas del municipio."""
     query = (
         select(Categoria)
-        .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
         .where(
-            MunicipioCategoria.municipio_id == municipio_id,
-            MunicipioCategoria.activo == True,
-            Categoria.activo == True
+            Categoria.municipio_id == municipio_id,
+            Categoria.activo == True,
         )
-        .order_by(Categoria.nombre)
+        .order_by(Categoria.orden, Categoria.nombre)
     )
-
     result = await db.execute(query)
     categorias = result.scalars().all()
-
     return [{"id": c.id, "nombre": c.nombre, "icono": c.icono or "folder"} for c in categorias]
 
 
 async def get_tramites_municipio(db: AsyncSession, municipio_id: int) -> list[dict]:
-    """Obtiene los trámites activos del municipio, agrupados por tipo"""
-    # Obtener trámites habilitados para el municipio (misma lógica que el endpoint de trámites)
+    """Obtiene los trámites activos del municipio agrupados por categoría de trámite."""
     query = (
         select(Tramite)
-        .join(MunicipioTramite, Tramite.id == MunicipioTramite.tramite_id)
-        .options(selectinload(Tramite.tipo_tramite))
+        .options(selectinload(Tramite.categoria_tramite))
         .where(
-            MunicipioTramite.municipio_id == municipio_id,
-            MunicipioTramite.activo == True,
-            Tramite.activo == True
+            Tramite.municipio_id == municipio_id,
+            Tramite.activo == True,
         )
-        .order_by(Tramite.nombre)
+        .order_by(Tramite.orden, Tramite.nombre)
     )
-
     result = await db.execute(query)
     tramites = result.scalars().all()
 
-    # Agrupar por tipo de trámite
-    tipos_dict = {}
+    categorias_dict = {}
     for tramite in tramites:
-        tipo = tramite.tipo_tramite
-        if tipo:
-            if tipo.id not in tipos_dict:
-                tipos_dict[tipo.id] = {
-                    "id": tipo.id,
-                    "nombre": tipo.nombre,
-                    "icono": tipo.icono or "file-text",
-                    "subtipos": []
+        cat = tramite.categoria_tramite
+        if cat:
+            if cat.id not in categorias_dict:
+                categorias_dict[cat.id] = {
+                    "id": cat.id,
+                    "nombre": cat.nombre,
+                    "icono": cat.icono or "file-text",
+                    "subtipos": [],
                 }
-            tipos_dict[tipo.id]["subtipos"].append({
+            categorias_dict[cat.id]["subtipos"].append({
                 "id": tramite.id,
                 "nombre": tramite.nombre,
-                "icono": tramite.icono or "file"
+                "icono": tramite.icono or "file",
             })
 
-    return list(tipos_dict.values())
+    return list(categorias_dict.values())
 
 
 @router.post("", response_model=ChatResponse)
@@ -1526,18 +1516,14 @@ async def get_tramites_recientes(db: AsyncSession, municipio_id: int, limit: int
 
 
 async def get_reclamos_por_categoria(db: AsyncSession, municipio_id: int) -> list:
-    """Obtiene cantidad de reclamos agrupados por categoría"""
-    from models.categoria import MunicipioCategoria
-
+    """Obtiene cantidad de reclamos agrupados por categoría (per-municipio)."""
     query = select(
         Categoria.nombre,
         sql_func.count(Reclamo.id).label('cantidad')
     ).join(
         Reclamo, Reclamo.categoria_id == Categoria.id
-    ).join(
-        MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id
     ).where(
-        MunicipioCategoria.municipio_id == municipio_id
+        Categoria.municipio_id == municipio_id
     ).group_by(Categoria.nombre).order_by(sql_func.count(Reclamo.id).desc())
 
     result = await db.execute(query)
@@ -1790,8 +1776,6 @@ async def execute_dynamic_query(
         }
 
     elif query_name == "categorias_ranking":
-        from models.categoria import MunicipioCategoria
-
         query = select(
             Categoria.nombre,
             sql_func.count(Reclamo.id).label('total'),
@@ -1799,10 +1783,8 @@ async def execute_dynamic_query(
             sql_func.count(case((Reclamo.estado == EstadoReclamo.RESUELTO, 1))).label('resueltos')
         ).join(
             Reclamo, Reclamo.categoria_id == Categoria.id
-        ).join(
-            MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id
         ).where(
-            MunicipioCategoria.municipio_id == municipio_id
+            Categoria.municipio_id == municipio_id
         ).group_by(Categoria.nombre).order_by(sql_func.count(Reclamo.id).desc()).limit(limit)
 
         result = await db.execute(query)
@@ -2005,13 +1987,14 @@ def schema_json_to_text() -> str | None:
     # Reglas de filtrado multi-tenant
     lines.append("## Reglas de Filtrado Multi-Tenant\n")
     lines.append("Tablas con municipio_id directo: reclamos, empleados, zonas, usuarios, solicitudes")
-    lines.append("Tablas SIN municipio_id (catálogos genéricos): categorias, tramites, tipos_tramites")
+    lines.append("Todas las tablas son per-municipio: categorias_reclamo, categorias_tramite, tramites")
     lines.append("")
     lines.append("**IMPORTANTE para trámites:**")
-    lines.append("- `tipos_tramites` = categorías de trámites")
-    lines.append("- `tramites` tiene `tipo_tramite_id` → tipos_tramites.id")
-    lines.append("- `solicitudes` = trámites cargados/iniciados, tiene `tramite_id` → tramites.id")
-    lines.append("- `municipio_tramites` tiene `tramite_id`, NO tiene `categoria_id` ni `tipo_tramite_id`")
+    lines.append("- `categorias_tramite` (per-municipio) = categorías de trámites")
+    lines.append("- `tramites` (per-municipio) tiene `categoria_tramite_id` → categorias_tramite.id")
+    lines.append("- `tramite_documentos_requeridos` = sub-tabla con docs que se piden por trámite")
+    lines.append("- `solicitudes` = trámites cargados por vecinos, tiene `tramite_id` → tramites.id")
+    lines.append("- `documentos_solicitudes` tiene campos `verificado`, `verificado_por_id`, `tramite_documento_requerido_id`")
     lines.append("")
 
     _SCHEMA_TEXT_CACHE = "\n".join(lines)
@@ -2040,79 +2023,78 @@ async def get_database_schema(db: AsyncSession = None, force_refresh: bool = Fal
 
 
 DATABASE_SCHEMA_FALLBACK = """
-# Esquema de Base de Datos - Referencia Rápida
+# Esquema de Base de Datos - Referencia Rápida (modelo per-municipio)
 
 ## Tablas Principales
 
-### reclamos (con municipio_id)
+### reclamos (per-municipio)
 - id, municipio_id, titulo, descripcion, estado, prioridad, direccion, created_at
-- categoria_id → categorias.id
+- categoria_id → categorias_reclamo.id
 - zona_id → zonas.id
 - creador_id → usuarios.id
-- empleado_id → empleados.id
-- estado: 'NUEVO', 'ASIGNADO', 'EN_CURSO', 'PENDIENTE_CONFIRMACION', 'RESUELTO', 'RECHAZADO'
+- estado: 'NUEVO', 'ASIGNADO', 'EN_CURSO', 'RESUELTO', 'RECHAZADO'
 
-### categorias (NO tiene municipio_id - es catálogo genérico)
-- id, nombre, descripcion, icono, color, activo
+### categorias_reclamo (per-municipio)
+- id, municipio_id, nombre, descripcion, icono, color, orden, activo
+- Cada municipio tiene sus propias categorías de reclamo (sin catálogo global).
 
-### municipio_categorias (tabla intermedia para habilitar categorías por municipio)
-- id, municipio_id, categoria_id
-
-### empleados (con municipio_id)
-- id, municipio_id, nombre, apellido, especialidad, telefono, activo
+### empleados (per-municipio)
+- id, municipio_id, nombre, apellido, especialidad, activo
 - zona_id → zonas.id
-- categoria_principal_id → categorias.id
 
-### zonas (con municipio_id)
+### zonas (per-municipio)
 - id, municipio_id, nombre, codigo, descripcion, activo
 
-### usuarios (con municipio_id)
+### usuarios (per-municipio)
 - id, municipio_id, email, nombre, apellido, rol, activo
-- rol: 'vecino', 'empleado', 'supervisor', 'admin'
+- rol: 'vecino', 'supervisor', 'admin'
 
-## Tablas de Trámites (IMPORTANTE)
+## Tablas de Trámites (per-municipio)
 
-### tipos_tramites (NO tiene municipio_id - es catálogo genérico)
-- id, nombre, descripcion, codigo, icono, color, activo
-- Es la CATEGORÍA de trámites (ej: "Habilitaciones", "Permisos")
+### categorias_tramite (per-municipio)
+- id, municipio_id, nombre, descripcion, icono, color, orden, activo
+- Reemplaza al viejo `tipos_tramites` (catálogo global eliminado).
 
-### tramites (NO tiene municipio_id - es catálogo genérico)
-- id, tipo_tramite_id, nombre, descripcion, requisitos, tiempo_estimado_dias, costo, activo
-- tipo_tramite_id → tipos_tramites.id
-- Es el trámite específico dentro de una categoría
+### tramites (per-municipio)
+- id, municipio_id, categoria_tramite_id, nombre, descripcion, tiempo_estimado_dias, costo, activo
+- categoria_tramite_id → categorias_tramite.id
 
-### municipio_tramites (tabla intermedia para habilitar trámites por municipio)
-- id, municipio_id, tramite_id
-- IMPORTANTE: tiene tramite_id, NO tiene categoria_id ni tipo_tramite_id
+### tramite_documentos_requeridos
+- id, tramite_id, nombre, descripcion, obligatorio, orden
+- Sub-tabla del trámite: lista de docs que el ciudadano debe presentar.
 
-### solicitudes (con municipio_id - son los trámites "cargados"/iniciados)
+### solicitudes (per-municipio - son los trámites iniciados por vecinos)
 - id, municipio_id, numero_tramite, asunto, descripcion, estado, created_at
-- tramite_id → tramites.id (el tipo de trámite)
+- tramite_id → tramites.id
 - solicitante_id → usuarios.id
-- empleado_id → empleados.id
-- estado: 'INICIADO', 'EN_REVISION', 'REQUIERE_DOCUMENTACION', 'EN_CURSO', 'APROBADO', 'RECHAZADO', 'FINALIZADO'
+- municipio_dependencia_id → municipio_dependencias.id
+- estado: 'recibido', 'en_curso', 'finalizado', 'pospuesto', 'rechazado'
 
-## Reglas de Filtrado Multi-Tenant
+### documentos_solicitudes
+- id, solicitud_id, usuario_id, url, tipo, tipo_documento
+- tramite_documento_requerido_id → tramite_documentos_requeridos.id (opcional)
+- verificado, verificado_por_id, fecha_verificacion (lo tilda el supervisor)
 
-Tablas con municipio_id directo: reclamos, empleados, zonas, usuarios, solicitudes
-Tablas SIN municipio_id (requieren JOIN): categorias, tramites, tipos_tramites
+## Reglas
 
-## Ejemplos de JOINs correctos para trámites
+Todas las tablas filtran por `municipio_id` directamente. No hay catálogo global ni
+tablas intermedias del tipo `municipio_xxx`.
 
-Para contar solicitudes por tipo de trámite:
-SELECT tt.nombre, COUNT(s.id) as cantidad
-FROM tipos_tramites tt
-JOIN tramites t ON t.tipo_tramite_id = tt.id
+## Ejemplos de queries
+
+Para contar solicitudes por categoría de trámite:
+SELECT ct.nombre, COUNT(s.id)
+FROM categorias_tramite ct
+JOIN tramites t ON t.categoria_tramite_id = ct.id
 JOIN solicitudes s ON s.tramite_id = t.id
 WHERE s.municipio_id = {municipio_id}
-GROUP BY tt.id
+GROUP BY ct.id
 
-Para listar trámites con su tipo:
-SELECT t.id, t.nombre, tt.nombre as tipo
+Para listar trámites con su categoría:
+SELECT t.id, t.nombre, ct.nombre AS categoria
 FROM tramites t
-JOIN tipos_tramites tt ON t.tipo_tramite_id = tt.id
-JOIN municipio_tramites mt ON mt.tramite_id = t.id
-WHERE mt.municipio_id = {municipio_id}
+JOIN categorias_tramite ct ON t.categoria_tramite_id = ct.id
+WHERE t.municipio_id = {municipio_id} AND t.activo = 1
 """
 
 FORBIDDEN_SQL_PATTERNS = [
@@ -2881,61 +2863,39 @@ async def refresh_database_schema(
 # ==================== VALIDACIÓN DE DUPLICADOS CON IA ====================
 
 async def get_entidades_existentes(db: AsyncSession, municipio_id: int, tipo: str) -> list[dict]:
-    """Obtiene las entidades existentes según el tipo"""
-    from models.categoria import MunicipioCategoria
-
+    """Obtiene las entidades existentes según el tipo (todas per-municipio)."""
     if tipo == "categoria":
-        query = (
-            select(Categoria)
-            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
-            .where(
-                MunicipioCategoria.municipio_id == municipio_id,
-                MunicipioCategoria.activo == True,
-                Categoria.activo == True
-            )
+        query = select(Categoria).where(
+            Categoria.municipio_id == municipio_id,
+            Categoria.activo == True,
         )
         result = await db.execute(query)
-        items = result.scalars().all()
-        return [{"nombre": c.nombre, "descripcion": c.descripcion or ""} for c in items]
+        return [{"nombre": c.nombre, "descripcion": c.descripcion or ""} for c in result.scalars().all()]
 
     elif tipo == "zona":
         query = select(Zona).where(
             Zona.municipio_id == municipio_id,
-            Zona.activo == True
+            Zona.activo == True,
         )
         result = await db.execute(query)
-        items = result.scalars().all()
-        return [{"nombre": z.nombre, "descripcion": z.descripcion or ""} for z in items]
+        return [{"nombre": z.nombre, "descripcion": z.descripcion or ""} for z in result.scalars().all()]
 
-    elif tipo == "tipo_tramite":
-        # TipoTramite es catálogo genérico, se relaciona vía MunicipioTipoTramite
-        query = (
-            select(TipoTramite)
-            .join(MunicipioTipoTramite, MunicipioTipoTramite.tipo_tramite_id == TipoTramite.id)
-            .where(
-                MunicipioTipoTramite.municipio_id == municipio_id,
-                MunicipioTipoTramite.activo == True,
-                TipoTramite.activo == True
-            )
+    elif tipo in ("categoria_tramite", "tipo_tramite"):
+        # categoria_tramite reemplaza al viejo tipo_tramite
+        query = select(CategoriaTramite).where(
+            CategoriaTramite.municipio_id == municipio_id,
+            CategoriaTramite.activo == True,
         )
         result = await db.execute(query)
-        items = result.scalars().all()
-        return [{"nombre": t.nombre, "descripcion": t.descripcion or ""} for t in items]
+        return [{"nombre": c.nombre, "descripcion": c.descripcion or ""} for c in result.scalars().all()]
 
     elif tipo == "tramite":
-        # Tramite es catálogo genérico, se relaciona vía MunicipioTramite
-        query = (
-            select(Tramite)
-            .join(MunicipioTramite, MunicipioTramite.tramite_id == Tramite.id)
-            .where(
-                MunicipioTramite.municipio_id == municipio_id,
-                MunicipioTramite.activo == True,
-                Tramite.activo == True
-            )
+        query = select(Tramite).where(
+            Tramite.municipio_id == municipio_id,
+            Tramite.activo == True,
         )
         result = await db.execute(query)
-        items = result.scalars().all()
-        return [{"nombre": t.nombre, "descripcion": t.descripcion or ""} for t in items]
+        return [{"nombre": t.nombre, "descripcion": t.descripcion or ""} for t in result.scalars().all()]
 
     return []
 

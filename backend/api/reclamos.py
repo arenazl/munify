@@ -395,7 +395,7 @@ async def get_reclamos(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from models.categoria import Categoria
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
     from models.zona import Zona
     from sqlalchemy import or_, cast, String
     from sqlalchemy.orm import joinedload
@@ -965,7 +965,7 @@ async def create_reclamo(
     # Obtener nombre de categoría para las notificaciones
     categoria_nombre = None
     try:
-        from models.categoria import Categoria
+        from models.categoria_reclamo import CategoriaReclamo as Categoria
         cat_result = await db.execute(
             select(Categoria).where(Categoria.id == data.categoria_id)
         )
@@ -1756,7 +1756,7 @@ async def get_sugerencia_asignacion(
         }
     from datetime import date as date_type, time as time_type, timedelta, datetime as datetime_type
     from models.empleado import Empleado
-    from models.categoria import Categoria
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
     from models.empleado_categoria import empleado_categoria
     import math
 

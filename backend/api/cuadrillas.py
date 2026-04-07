@@ -8,7 +8,7 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.cuadrilla import Cuadrilla
 from models.empleado_cuadrilla import EmpleadoCuadrilla
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.user import User
 from schemas.cuadrilla import CuadrillaCreate, CuadrillaUpdate, CuadrillaResponse
 

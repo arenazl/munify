@@ -22,7 +22,8 @@ WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID
 WHATSAPP_ACCESS_TOKEN = settings.WHATSAPP_ACCESS_TOKEN
 WHATSAPP_BUSINESS_ACCOUNT_ID = settings.WHATSAPP_BUSINESS_ACCOUNT_ID
 WHATSAPP_WEBHOOK_VERIFY_TOKEN = settings.WHATSAPP_WEBHOOK_VERIFY_TOKEN
-from models import User, Reclamo, Categoria, Zona, Notificacion, Empleado
+from models import User, Reclamo, Zona, Notificacion, Empleado
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.enums import EstadoReclamo, RolUsuario
 from models.whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from schemas.whatsapp import (

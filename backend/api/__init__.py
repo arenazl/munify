@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 from .auth import router as auth_router
 from .users import router as users_router
-from .categorias import router as categorias_router
+from .categorias_reclamo import router as categorias_reclamo_router
+from .categorias_tramite import router as categorias_tramite_router
 from .zonas import router as zonas_router
 from .empleados import router as empleados_router
 from .reclamos import router as reclamos_router
@@ -29,7 +30,6 @@ from .push import router as push_router
 from .empleados_gestion import router as empleados_gestion_router
 from .cuadrillas import router as cuadrillas_router
 from .planificacion import router as planificacion_router
-from .direcciones import router as direcciones_router
 from .dependencias import router as dependencias_router
 from .validacion_identidad import router as validacion_identidad_router
 
@@ -38,7 +38,8 @@ api_router = APIRouter()
 api_router.include_router(municipios_router, prefix="/municipios", tags=["Municipios"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Autenticación"])
 api_router.include_router(users_router, prefix="/users", tags=["Usuarios"])
-api_router.include_router(categorias_router, prefix="/categorias", tags=["Categorías"])
+api_router.include_router(categorias_reclamo_router, prefix="/categorias-reclamo", tags=["Categorías Reclamo"])
+api_router.include_router(categorias_tramite_router, prefix="/categorias-tramite", tags=["Categorías Trámite"])
 api_router.include_router(zonas_router, prefix="/zonas", tags=["Zonas"])
 api_router.include_router(empleados_router, prefix="/empleados", tags=["Empleados"])
 api_router.include_router(empleados_gestion_router, prefix="/empleados-gestion", tags=["Gestion Empleados"])
@@ -64,7 +65,6 @@ api_router.include_router(tramites_router, prefix="/tramites", tags=["Trámites"
 api_router.include_router(push_router, tags=["Push Notifications"])
 api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
 api_router.include_router(planificacion_router, prefix="/planificacion", tags=["Planificación"])
-api_router.include_router(direcciones_router, prefix="/direcciones", tags=["Direcciones"])
 api_router.include_router(dependencias_router, tags=["Dependencias"])  # Ya tiene prefix /dependencias
 api_router.include_router(validacion_identidad_router)  # Ya tiene prefix /validacion-identidad
 

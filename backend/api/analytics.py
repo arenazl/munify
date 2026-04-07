@@ -17,7 +17,7 @@ from core.security import require_roles
 from models.reclamo import Reclamo
 from models.user import User
 from models.zona import Zona
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.empleado import Empleado
 from models.configuracion import Configuracion
 from models.municipio import Municipio

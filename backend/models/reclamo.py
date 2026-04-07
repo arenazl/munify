@@ -28,9 +28,9 @@ class Reclamo(Base):
     longitud = Column(Float, nullable=True)
     referencia = Column(String(255), nullable=True)  # "Frente a la plaza", etc.
 
-    # Categoría del reclamo
-    categoria_id = Column(Integer, ForeignKey("categorias.id"), nullable=False)
-    categoria = relationship("Categoria", back_populates="reclamos")
+    # Categoría del reclamo (per-municipio)
+    categoria_id = Column(Integer, ForeignKey("categorias_reclamo.id"), nullable=False)
+    categoria = relationship("CategoriaReclamo", back_populates="reclamos")
 
     # Zona geográfica (legacy - usar barrio_id preferentemente)
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True)

@@ -14,7 +14,7 @@ from models.gamificacion import (
 )
 from models.reclamo import Reclamo
 from models.user import User
-from models.categoria import Categoria
+from models.categoria_reclamo import CategoriaReclamo as Categoria
 
 
 class GamificacionService:

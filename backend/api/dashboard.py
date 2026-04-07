@@ -483,7 +483,7 @@ async def get_por_categoria(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    from models.categoria import Categoria
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
     municipio_id = get_effective_municipio_id(request, current_user)
 
     query = await db.execute(
@@ -511,7 +511,7 @@ async def get_conteo_categorias(
     sin traer todos los datos. Mucho más eficiente que traer todos los reclamos.
     Para empleados: solo cuenta reclamos asignados a él o su cuadrilla.
     """
-    from models.categoria import Categoria
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
     from sqlalchemy import and_, or_
 
     municipio_id = get_effective_municipio_id(request, current_user)
@@ -824,7 +824,7 @@ async def get_metricas_detalle(
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     """Métricas con detalle de reclamos para cada tarjeta"""
-    from models.categoria import Categoria
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
     from models.zona import Zona
     from sqlalchemy.orm import selectinload
 
@@ -923,7 +923,7 @@ async def get_recurrentes(
 ):
     """Reclamos que se repiten en la misma dirección"""
     from models.zona import Zona
-    from models.categoria import Categoria
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
 
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)

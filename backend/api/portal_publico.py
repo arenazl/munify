@@ -11,7 +11,9 @@ import httpx
 from core.database import get_db
 from core.rate_limit import limiter, LIMITS
 from core.config import settings
-from models import Reclamo, Categoria, Zona
+from models import Reclamo, Zona
+from models.categoria_reclamo import CategoriaReclamo as Categoria
+from models.categoria_tramite import CategoriaTramite
 from models.municipio import Municipio
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
@@ -484,13 +486,11 @@ async def get_estadisticas_municipio(
         for nombre, cantidad in result.all()
     ]
 
-    # Por categoría (solo del municipio via tabla intermedia)
-    from models.categoria import MunicipioCategoria
+    # Por categoría (per-municipio)
     result = await db.execute(
         select(Categoria.nombre, Categoria.color, func.count(Reclamo.id))
         .join(Reclamo, and_(Reclamo.categoria_id == Categoria.id, Reclamo.municipio_id == municipio_id))
-        .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
-        .where(MunicipioCategoria.municipio_id == municipio_id)
+        .where(Categoria.municipio_id == municipio_id)
         .group_by(Categoria.id, Categoria.nombre, Categoria.color)
         .order_by(func.count(Reclamo.id).desc())
     )
@@ -515,23 +515,18 @@ async def get_categorias_publicas(
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener lista de categorías - SIN AUTENTICACIÓN"""
-    from models.categoria import MunicipioCategoria
-
     if municipio_id:
-        # Obtener categorías habilitadas para el municipio
         query = (
             select(Categoria)
-            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
             .where(
-                MunicipioCategoria.municipio_id == municipio_id,
-                MunicipioCategoria.activo == True,
-                Categoria.activo == True
+                Categoria.municipio_id == municipio_id,
+                Categoria.activo == True,
             )
-            .order_by(Categoria.nombre)
+            .order_by(Categoria.orden, Categoria.nombre)
         )
     else:
-        # Sin municipio, devolver todas las activas del catálogo
-        query = select(Categoria).where(Categoria.activo == True).order_by(Categoria.nombre)
+        # Sin municipio_id no hay catálogo global, devolver vacío
+        query = select(Categoria).where(False)
 
     result = await db.execute(query)
     categorias = result.scalars().all()
@@ -664,15 +659,11 @@ async def clasificar_reclamo_endpoint(
     if not data.texto or len(data.texto) < 5:
         raise HTTPException(status_code=400, detail="El texto debe tener al menos 5 caracteres")
 
-    # Obtener categorías del municipio via tabla intermedia
-    from models.categoria import MunicipioCategoria
+    # Categorías per-municipio
     result = await db.execute(
-        select(Categoria)
-        .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
-        .where(
+        select(Categoria).where(
+            Categoria.municipio_id == data.municipio_id,
             Categoria.activo == True,
-            MunicipioCategoria.municipio_id == data.municipio_id,
-            MunicipioCategoria.activo == True
         )
     )
     categorias_db = result.scalars().all()
@@ -740,19 +731,16 @@ async def chat_publico(
             response="El asistente no está disponible en este momento. Por favor intentá más tarde."
         )
 
-    # Obtener categorías del municipio si se especifica (via tabla intermedia)
-    from models.categoria import MunicipioCategoria
+    # Categorías per-municipio
     categorias = []
     if data.municipio_id:
         result = await db.execute(
             select(Categoria)
-            .join(MunicipioCategoria, MunicipioCategoria.categoria_id == Categoria.id)
             .where(
-                MunicipioCategoria.municipio_id == data.municipio_id,
-                MunicipioCategoria.activo == True,
-                Categoria.activo == True
+                Categoria.municipio_id == data.municipio_id,
+                Categoria.activo == True,
             )
-            .order_by(Categoria.nombre)
+            .order_by(Categoria.orden, Categoria.nombre)
         )
         categorias = [{"id": c.id, "nombre": c.nombre} for c in result.scalars().all()]
 
@@ -813,103 +801,112 @@ class TramitePublicoResponse(BaseModel):
     id: int
     nombre: str
     descripcion: Optional[str]
-    tipo_tramite: str
-    tipo_tramite_id: int
+    categoria: str
+    categoria_tramite_id: int
     icono: Optional[str]
     tiempo_estimado_dias: int
     costo: Optional[float]
-    requisitos: Optional[str]
-    documentos_requeridos: Optional[str]
+    documentos_requeridos: List[dict] = []
 
 
 @router.get("/tramites")
 async def get_tramites_publicos(
     municipio_id: int = Query(..., description="ID del municipio"),
-    tipo_tramite_id: Optional[int] = Query(None, description="Filtrar por tipo de trámite"),
-    db: AsyncSession = Depends(get_db)
+    categoria_tramite_id: Optional[int] = Query(None, description="Filtrar por categoría de trámite"),
+    db: AsyncSession = Depends(get_db),
 ):
     """
-    Obtener trámites habilitados de un municipio con requisitos - SIN AUTENTICACIÓN
-    Incluye requisitos y documentos requeridos para el wizard de la landing.
+    Obtener trámites de un municipio con sus documentos requeridos.
+    SIN AUTENTICACIÓN. Usado por la landing/wizard.
     """
-    from models.tramite import Tramite, TipoTramite, MunicipioTramite
+    from models.tramite import Tramite
 
-    # Obtener trámites habilitados para el municipio con sus personalizaciones
     query = (
-        select(Tramite, MunicipioTramite, TipoTramite)
-        .join(MunicipioTramite, MunicipioTramite.tramite_id == Tramite.id)
-        .join(TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id)
-        .where(
-            MunicipioTramite.municipio_id == municipio_id,
-            MunicipioTramite.activo == True,
-            Tramite.activo == True
+        select(Tramite)
+        .options(
+            selectinload(Tramite.categoria_tramite),
+            selectinload(Tramite.documentos_requeridos),
         )
-        .order_by(TipoTramite.orden, Tramite.orden)
+        .where(
+            Tramite.municipio_id == municipio_id,
+            Tramite.activo == True,
+        )
+        .order_by(Tramite.orden, Tramite.nombre)
     )
 
-    if tipo_tramite_id:
-        query = query.where(Tramite.tipo_tramite_id == tipo_tramite_id)
+    if categoria_tramite_id:
+        query = query.where(Tramite.categoria_tramite_id == categoria_tramite_id)
 
     result = await db.execute(query)
-    rows = result.all()
+    tramites = result.scalars().all()
 
-    tramites = []
-    for tramite, mun_tramite, tipo in rows:
-        # Usar valores del municipio si existen, sino los genéricos
-        tramites.append({
-            "id": tramite.id,
-            "nombre": tramite.nombre,
-            "descripcion": tramite.descripcion,
-            "tipo_tramite": tipo.nombre,
-            "tipo_tramite_id": tipo.id,
-            "icono": tramite.icono or tipo.icono,
-            "tiempo_estimado_dias": mun_tramite.tiempo_estimado_dias or tramite.tiempo_estimado_dias or 15,
-            "costo": mun_tramite.costo or tramite.costo,
-            "requisitos": mun_tramite.requisitos or tramite.requisitos,
-            "documentos_requeridos": mun_tramite.documentos_requeridos or tramite.documentos_requeridos
-        })
-
-    return tramites
+    return [
+        {
+            "id": t.id,
+            "nombre": t.nombre,
+            "descripcion": t.descripcion,
+            "categoria": t.categoria_tramite.nombre if t.categoria_tramite else None,
+            "categoria_tramite_id": t.categoria_tramite_id,
+            "icono": t.icono or (t.categoria_tramite.icono if t.categoria_tramite else None),
+            "tiempo_estimado_dias": t.tiempo_estimado_dias or 15,
+            "costo": t.costo,
+            "documentos_requeridos": [
+                {
+                    "id": d.id,
+                    "nombre": d.nombre,
+                    "descripcion": d.descripcion,
+                    "obligatorio": d.obligatorio,
+                    "orden": d.orden,
+                }
+                for d in t.documentos_requeridos
+            ],
+        }
+        for t in tramites
+    ]
 
 
 @router.get("/tramites/{tramite_id}")
 async def get_tramite_detalle_publico(
     tramite_id: int,
     municipio_id: int = Query(..., description="ID del municipio"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    """
-    Obtener detalle de un trámite específico con requisitos - SIN AUTENTICACIÓN
-    """
-    from models.tramite import Tramite, TipoTramite, MunicipioTramite
+    """Detalle público de un trámite específico."""
+    from models.tramite import Tramite
 
     result = await db.execute(
-        select(Tramite, MunicipioTramite, TipoTramite)
-        .join(MunicipioTramite, MunicipioTramite.tramite_id == Tramite.id)
-        .join(TipoTramite, Tramite.tipo_tramite_id == TipoTramite.id)
+        select(Tramite)
+        .options(
+            selectinload(Tramite.categoria_tramite),
+            selectinload(Tramite.documentos_requeridos),
+        )
         .where(
             Tramite.id == tramite_id,
-            MunicipioTramite.municipio_id == municipio_id,
-            MunicipioTramite.activo == True
+            Tramite.municipio_id == municipio_id,
         )
     )
-    row = result.first()
-
-    if not row:
+    t = result.scalar_one_or_none()
+    if not t:
         raise HTTPException(status_code=404, detail="Trámite no encontrado para este municipio")
 
-    tramite, mun_tramite, tipo = row
-
     return {
-        "id": tramite.id,
-        "nombre": tramite.nombre,
-        "descripcion": tramite.descripcion,
-        "tipo_tramite": tipo.nombre,
-        "tipo_tramite_id": tipo.id,
-        "icono": tramite.icono or tipo.icono,
-        "tiempo_estimado_dias": mun_tramite.tiempo_estimado_dias or tramite.tiempo_estimado_dias or 15,
-        "costo": mun_tramite.costo or tramite.costo,
-        "requisitos": mun_tramite.requisitos or tramite.requisitos,
-        "documentos_requeridos": mun_tramite.documentos_requeridos or tramite.documentos_requeridos,
-        "url_externa": tramite.url_externa
+        "id": t.id,
+        "nombre": t.nombre,
+        "descripcion": t.descripcion,
+        "categoria": t.categoria_tramite.nombre if t.categoria_tramite else None,
+        "categoria_tramite_id": t.categoria_tramite_id,
+        "icono": t.icono or (t.categoria_tramite.icono if t.categoria_tramite else None),
+        "tiempo_estimado_dias": t.tiempo_estimado_dias or 15,
+        "costo": t.costo,
+        "url_externa": t.url_externa,
+        "documentos_requeridos": [
+            {
+                "id": d.id,
+                "nombre": d.nombre,
+                "descripcion": d.descripcion,
+                "obligatorio": d.obligatorio,
+                "orden": d.orden,
+            }
+            for d in t.documentos_requeridos
+        ],
     }

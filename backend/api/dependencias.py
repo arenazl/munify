@@ -22,14 +22,11 @@ from models import (
     Dependencia,
     MunicipioDependencia,
     MunicipioDependenciaCategoria,
-    MunicipioDependenciaTipoTramite,
     MunicipioDependenciaTramite,
-    Categoria,
-    TipoTramite,
     Tramite,
-    MunicipioTramite,
-    MunicipioTipoTramite,
 )
+from models.categoria_reclamo import CategoriaReclamo as Categoria
+from models.categoria_tramite import CategoriaTramite
 from models.dependencia import TipoGestionDependencia
 from schemas.dependencia import (
     DependenciaCreate,
@@ -40,7 +37,6 @@ from schemas.dependencia import (
     MunicipioDependenciaResponse,
     MunicipioDependenciaListResponse,
     AsignarCategoriasRequest,
-    AsignarTiposTramiteRequest,
     AsignarTramitesRequest,
     HabilitarDependenciasRequest,
 )
@@ -190,11 +186,9 @@ async def listar_dependencias_municipio(
                 selectinload(MunicipioDependencia.dependencia),
                 selectinload(MunicipioDependencia.categorias_asignadas)
                     .selectinload(MunicipioDependenciaCategoria.categoria),
-                selectinload(MunicipioDependencia.tipos_tramite_asignados)
-                    .selectinload(MunicipioDependenciaTipoTramite.tipo_tramite),
                 selectinload(MunicipioDependencia.tramites_asignados)
                     .selectinload(MunicipioDependenciaTramite.tramite)
-                    .selectinload(Tramite.tipo_tramite),
+                    .selectinload(Tramite.categoria_tramite),
             )
         )
     else:
@@ -203,7 +197,6 @@ async def listar_dependencias_municipio(
             .options(
                 selectinload(MunicipioDependencia.dependencia),
                 selectinload(MunicipioDependencia.categorias_asignadas),
-                selectinload(MunicipioDependencia.tipos_tramite_asignados),
                 selectinload(MunicipioDependencia.tramites_asignados),
             )
         )
@@ -252,7 +245,6 @@ async def listar_dependencias_municipio(
             color=getattr(dep, 'color', None) or "#6366f1",
             icono=getattr(dep, 'icono', None) or "Building2",
             categorias_count=len(md.categorias_asignadas or []),
-            tipos_tramite_count=len(md.tipos_tramite_asignados or []),
             tramites_count=len(md.tramites_asignados or []),
         )
 
@@ -262,17 +254,13 @@ async def listar_dependencias_municipio(
                 {"id": a.categoria.id, "nombre": a.categoria.nombre, "icono": a.categoria.icono, "color": a.categoria.color}
                 for a in (md.categorias_asignadas or []) if a.categoria
             ]
-            item.tipos_tramite = [
-                {"id": a.tipo_tramite.id, "nombre": a.tipo_tramite.nombre, "icono": a.tipo_tramite.icono, "color": a.tipo_tramite.color}
-                for a in (md.tipos_tramite_asignados or []) if a.tipo_tramite
-            ]
             item.tramites = [
                 {
                     "id": a.tramite.id,
                     "nombre": a.tramite.nombre,
-                    "tipo_tramite_id": a.tramite.tipo_tramite_id,
+                    "categoria_tramite_id": a.tramite.categoria_tramite_id,
                     "icono": a.tramite.icono,
-                    "color": a.tramite.tipo_tramite.color if a.tramite.tipo_tramite else None
+                    "color": a.tramite.categoria_tramite.color if a.tramite.categoria_tramite else None
                 }
                 for a in (md.tramites_asignados or []) if a.tramite
             ]
@@ -294,7 +282,7 @@ async def obtener_dependencia_municipio(
         .options(
             selectinload(MunicipioDependencia.dependencia),
             selectinload(MunicipioDependencia.categorias_asignadas).selectinload(MunicipioDependenciaCategoria.categoria),
-            selectinload(MunicipioDependencia.tipos_tramite_asignados).selectinload(MunicipioDependenciaTipoTramite.tipo_tramite),
+            selectinload(MunicipioDependencia.tramites_asignados).selectinload(MunicipioDependenciaTramite.tramite),
         )
         .where(MunicipioDependencia.id == municipio_dependencia_id)
     )
@@ -592,153 +580,6 @@ async def obtener_dependencia_por_categoria_public(
     }
 
 
-# ============ ASIGNACIÓN DE TIPOS DE TRÁMITE ============
-
-@router.post("/municipio/{municipio_dependencia_id}/tipos-tramite")
-async def asignar_tipos_tramite(
-    municipio_dependencia_id: int,
-    data: AsignarTiposTramiteRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Asigna tipos de trámite a una dependencia.
-    Reemplaza las asignaciones existentes.
-    También habilita automáticamente los tipos y trámites en las tablas municipio_tipos_tramites y municipio_tramites.
-    """
-    if current_user.rol not in ["admin", "supervisor"]:
-        raise HTTPException(status_code=403, detail="No tiene permisos")
-
-    result = await db.execute(
-        select(MunicipioDependencia)
-        .where(MunicipioDependencia.id == municipio_dependencia_id)
-    )
-    md = result.scalar_one_or_none()
-
-    if not md:
-        raise HTTPException(status_code=404, detail="Dependencia no encontrada")
-
-    if md.municipio_id != current_user.municipio_id:
-        raise HTTPException(status_code=403, detail="No tiene acceso")
-
-    municipio_id = md.municipio_id
-    dependencia_id = md.dependencia_id
-
-    # Eliminar asignaciones existentes
-    await db.execute(
-        delete(MunicipioDependenciaTipoTramite).where(
-            MunicipioDependenciaTipoTramite.municipio_dependencia_id == municipio_dependencia_id
-        )
-    )
-
-    tipos_habilitados = 0
-    tramites_habilitados = 0
-
-    # Crear nuevas asignaciones y habilitar tipos/trámites
-    for tt_id in data.tipo_tramite_ids:
-        # Asignar tipo a la dependencia
-        asignacion = MunicipioDependenciaTipoTramite(
-            municipio_id=municipio_id,
-            dependencia_id=dependencia_id,
-            tipo_tramite_id=tt_id,
-            municipio_dependencia_id=municipio_dependencia_id,
-            activo=True,
-        )
-        db.add(asignacion)
-
-        # Habilitar el tipo en municipio_tipos_tramites si no existe
-        result = await db.execute(
-            select(MunicipioTipoTramite).where(
-                MunicipioTipoTramite.municipio_id == municipio_id,
-                MunicipioTipoTramite.tipo_tramite_id == tt_id
-            )
-        )
-        tipo_existente = result.scalar_one_or_none()
-        if not tipo_existente:
-            mtt = MunicipioTipoTramite(
-                municipio_id=municipio_id,
-                tipo_tramite_id=tt_id,
-                activo=True,
-                orden=0
-            )
-            db.add(mtt)
-            tipos_habilitados += 1
-        elif not tipo_existente.activo:
-            tipo_existente.activo = True
-            tipos_habilitados += 1
-
-        # Obtener trámites de este tipo y habilitarlos
-        result = await db.execute(
-            select(Tramite).where(
-                Tramite.tipo_tramite_id == tt_id,
-                Tramite.activo == True
-            )
-        )
-        tramites_del_tipo = result.scalars().all()
-
-        for tramite in tramites_del_tipo:
-            # Habilitar en municipio_tramites si no existe
-            result = await db.execute(
-                select(MunicipioTramite).where(
-                    MunicipioTramite.municipio_id == municipio_id,
-                    MunicipioTramite.tramite_id == tramite.id
-                )
-            )
-            tramite_existente = result.scalar_one_or_none()
-            if not tramite_existente:
-                mt = MunicipioTramite(
-                    municipio_id=municipio_id,
-                    tramite_id=tramite.id,
-                    activo=True,
-                    orden=tramite.orden or 0
-                )
-                db.add(mt)
-                tramites_habilitados += 1
-            elif not tramite_existente.activo:
-                tramite_existente.activo = True
-                tramites_habilitados += 1
-
-    await db.commit()
-
-    logger.info(f"[Dependencias] Asignados {len(data.tipo_tramite_ids)} tipos de trámite a dependencia {municipio_dependencia_id}. Habilitados: {tipos_habilitados} tipos, {tramites_habilitados} trámites")
-
-    return {
-        "message": f"Asignados {len(data.tipo_tramite_ids)} tipos de trámite",
-        "tipos_habilitados": tipos_habilitados,
-        "tramites_habilitados": tramites_habilitados
-    }
-
-
-@router.get("/municipio/{municipio_dependencia_id}/tipos-tramite")
-async def listar_tipos_tramite_asignados(
-    municipio_dependencia_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Lista los tipos de trámite asignados a una dependencia."""
-    result = await db.execute(
-        select(MunicipioDependenciaTipoTramite)
-        .options(selectinload(MunicipioDependenciaTipoTramite.tipo_tramite))
-        .where(MunicipioDependenciaTipoTramite.municipio_dependencia_id == municipio_dependencia_id)
-    )
-    asignaciones = result.scalars().all()
-
-    return [
-        {
-            "id": a.id,
-            "tipo_tramite_id": a.tipo_tramite_id,
-            "tipo_tramite": {
-                "id": a.tipo_tramite.id,
-                "nombre": a.tipo_tramite.nombre,
-                "icono": a.tipo_tramite.icono,
-                "color": a.tipo_tramite.color,
-            },
-            "activo": a.activo,
-        }
-        for a in asignaciones
-    ]
-
-
 # ============ ASIGNACIÓN DE TRÁMITES ESPECÍFICOS ============
 
 @router.post("/municipio/{municipio_dependencia_id}/tramites")
@@ -801,7 +642,7 @@ async def listar_tramites_asignados(
         select(MunicipioDependenciaTramite)
         .options(
             selectinload(MunicipioDependenciaTramite.tramite)
-            .selectinload(Tramite.tipo_tramite)
+            .selectinload(Tramite.categoria_tramite)
         )
         .where(MunicipioDependenciaTramite.municipio_dependencia_id == municipio_dependencia_id)
         .where(MunicipioDependenciaTramite.activo == True)
@@ -815,43 +656,14 @@ async def listar_tramites_asignados(
             "tramite": {
                 "id": a.tramite.id,
                 "nombre": a.tramite.nombre,
-                "tipo_tramite_id": a.tramite.tipo_tramite_id,
+                "categoria_tramite_id": a.tramite.categoria_tramite_id,
                 "icono": a.tramite.icono,
-                "color": a.tramite.tipo_tramite.color if a.tramite.tipo_tramite else None,
+                "color": a.tramite.categoria_tramite.color if a.tramite.categoria_tramite else None,
             } if a.tramite else None,
             "activo": a.activo,
         }
         for a in asignaciones
     ]
-
-
-@router.delete("/municipio/tipos-tramite/limpiar")
-async def limpiar_asignaciones_tipos_tramite(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Elimina TODAS las asignaciones de tipos de trámite a dependencias del municipio actual."""
-    if current_user.rol not in ["admin", "supervisor"]:
-        raise HTTPException(status_code=403, detail="No tiene permisos")
-
-    municipio_id = current_user.municipio_id
-    if not municipio_id:
-        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
-
-    result = await db.execute(
-        select(MunicipioDependenciaTipoTramite)
-        .where(MunicipioDependenciaTipoTramite.municipio_id == municipio_id)
-    )
-    count = len(result.scalars().all())
-
-    await db.execute(
-        delete(MunicipioDependenciaTipoTramite)
-        .where(MunicipioDependenciaTipoTramite.municipio_id == municipio_id)
-    )
-    await db.commit()
-
-    logger.info(f"[Dependencias] Limpiadas {count} asignaciones de tipos de trámite para municipio {municipio_id}")
-    return {"message": f"Se eliminaron {count} asignaciones de tipos de trámite", "eliminadas": count}
 
 
 # ============ AUTO-ASIGNACIÓN CON IA ============
@@ -879,13 +691,13 @@ class AutoAsignarCategoriasRequest(BaseModel):
     dependencias: List[DependenciaSimple]
 
 
-class TipoTramiteSimple(BaseModel):
+class CategoriaTramiteSimple(BaseModel):
     id: int
     nombre: str
 
 
-class AutoAsignarTiposTramiteRequest(BaseModel):
-    tipos_tramite: List[TipoTramiteSimple]
+class AutoAsignarCategoriasTramiteRequest(BaseModel):
+    categorias_tramite: List[CategoriaTramiteSimple]
     dependencias: List[DependenciaSimple]
 
 
@@ -1010,15 +822,16 @@ async def auto_asignar_categorias_ia(
     return {"message": f"Se asignaron {total_asignadas} categorías automáticamente", "asignaciones": asignaciones_resultado, "total": total_asignadas}
 
 
-@router.post("/municipio/tipos-tramite/auto-asignar")
-async def auto_asignar_tipos_tramite_ia(
-    data: AutoAsignarTiposTramiteRequest,
+@router.post("/municipio/categorias-tramite/auto-asignar")
+async def auto_asignar_categorias_tramite_ia(
+    data: AutoAsignarCategoriasTramiteRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Usa IA para asignar tipos de trámite a dependencias automáticamente.
-    También habilita automáticamente los tipos y trámites en municipio_tipos_tramites y municipio_tramites.
+    Usa IA para asignar categorías de trámite a dependencias.
+    Para cada categoría asignada, todos sus trámites quedan vinculados a la
+    misma dependencia automáticamente (vía MunicipioDependenciaTramite).
     """
     if current_user.rol not in ["admin", "supervisor"]:
         raise HTTPException(status_code=403, detail="No tiene permisos")
@@ -1027,90 +840,72 @@ async def auto_asignar_tipos_tramite_ia(
     if not municipio_id:
         raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
 
-    if not data.tipos_tramite or not data.dependencias:
-        raise HTTPException(status_code=400, detail="Se requieren tipos de trámite y dependencias")
+    if not data.categorias_tramite or not data.dependencias:
+        raise HTTPException(status_code=400, detail="Se requieren categorías de trámite y dependencias")
 
     if not settings.GROQ_API_KEY and not settings.GEMINI_API_KEY:
         raise HTTPException(status_code=503, detail="Servicio de IA no configurado")
 
-    tipos_dict = [{"id": t.id, "nombre": t.nombre} for t in data.tipos_tramite]
-    dependencias_dict = [{"id": d.id, "nombre": d.nombre, "descripcion": d.descripcion} for d in data.dependencias]
+    cats_dict = [{"id": c.id, "nombre": c.nombre} for c in data.categorias_tramite]
+    deps_dict = [{"id": d.id, "nombre": d.nombre, "descripcion": d.descripcion} for d in data.dependencias]
 
-    asignaciones_ia = await asignar_con_ia(tipos_dict, dependencias_dict, "tipos_tramite")
+    asignaciones_ia = await asignar_con_ia(cats_dict, deps_dict, "categorias_tramite")
 
     if not asignaciones_ia:
         raise HTTPException(status_code=500, detail="La IA no pudo generar asignaciones")
 
-    await db.execute(delete(MunicipioDependenciaTipoTramite).where(MunicipioDependenciaTipoTramite.municipio_id == municipio_id))
+    # Limpiar asignaciones previas de trámites del municipio
+    md_q = await db.execute(
+        select(MunicipioDependencia).where(MunicipioDependencia.municipio_id == municipio_id)
+    )
+    muni_deps = {md.dependencia_id: md for md in md_q.scalars().all()}
 
-    result = await db.execute(select(MunicipioDependencia).where(MunicipioDependencia.municipio_id == municipio_id))
-    muni_deps = {md.dependencia_id: md for md in result.scalars().all()}
+    for md in muni_deps.values():
+        await db.execute(
+            delete(MunicipioDependenciaTramite).where(
+                MunicipioDependenciaTramite.municipio_dependencia_id == md.id
+            )
+        )
 
-    total_asignadas = 0
-    tipos_habilitados = 0
-    tramites_habilitados = 0
+    total_categorias = 0
+    total_tramites = 0
     asignaciones_resultado = {}
-    tipos_procesados = set()
 
-    for dep_id_str, tipo_ids in asignaciones_ia.items():
+    for dep_id_str, cat_ids in asignaciones_ia.items():
         try:
             dep_id = int(dep_id_str)
             md = muni_deps.get(dep_id)
             if not md:
                 continue
-            for tipo_id in tipo_ids:
-                tipo_id = int(tipo_id)
-                db.add(MunicipioDependenciaTipoTramite(municipio_id=municipio_id, dependencia_id=dep_id, tipo_tramite_id=tipo_id, municipio_dependencia_id=md.id, activo=True))
-                total_asignadas += 1
 
-                # Habilitar tipo y trámites solo una vez por tipo
-                if tipo_id not in tipos_procesados:
-                    tipos_procesados.add(tipo_id)
-
-                    # Habilitar el tipo en municipio_tipos_tramites
-                    result = await db.execute(
-                        select(MunicipioTipoTramite).where(
-                            MunicipioTipoTramite.municipio_id == municipio_id,
-                            MunicipioTipoTramite.tipo_tramite_id == tipo_id
-                        )
+            for cat_id in cat_ids:
+                cat_id = int(cat_id)
+                # Trámites de esta categoría en este municipio
+                tramites_q = await db.execute(
+                    select(Tramite).where(
+                        Tramite.categoria_tramite_id == cat_id,
+                        Tramite.municipio_id == municipio_id,
+                        Tramite.activo == True,
                     )
-                    tipo_existente = result.scalar_one_or_none()
-                    if not tipo_existente:
-                        db.add(MunicipioTipoTramite(municipio_id=municipio_id, tipo_tramite_id=tipo_id, activo=True, orden=0))
-                        tipos_habilitados += 1
-                    elif not tipo_existente.activo:
-                        tipo_existente.activo = True
-                        tipos_habilitados += 1
+                )
+                for tramite in tramites_q.scalars().all():
+                    db.add(MunicipioDependenciaTramite(
+                        municipio_dependencia_id=md.id,
+                        tramite_id=tramite.id,
+                        activo=True,
+                    ))
+                    total_tramites += 1
+                total_categorias += 1
 
-                    # Habilitar trámites de este tipo
-                    result = await db.execute(
-                        select(Tramite).where(Tramite.tipo_tramite_id == tipo_id, Tramite.activo == True)
-                    )
-                    for tramite in result.scalars().all():
-                        result2 = await db.execute(
-                            select(MunicipioTramite).where(
-                                MunicipioTramite.municipio_id == municipio_id,
-                                MunicipioTramite.tramite_id == tramite.id
-                            )
-                        )
-                        tramite_existente = result2.scalar_one_or_none()
-                        if not tramite_existente:
-                            db.add(MunicipioTramite(municipio_id=municipio_id, tramite_id=tramite.id, activo=True, orden=tramite.orden or 0))
-                            tramites_habilitados += 1
-                        elif not tramite_existente.activo:
-                            tramite_existente.activo = True
-                            tramites_habilitados += 1
-
-            asignaciones_resultado[dep_id] = tipo_ids
+            asignaciones_resultado[dep_id] = cat_ids
         except (ValueError, TypeError) as e:
             logger.warning(f"[IA] Error procesando asignación: {e}")
 
     await db.commit()
-    logger.info(f"[IA] Auto-asignación de {total_asignadas} tipos de trámite para municipio {municipio_id}. Habilitados: {tipos_habilitados} tipos, {tramites_habilitados} trámites")
+    logger.info(f"[IA] Auto-asignación: {total_categorias} categorías → {total_tramites} trámites para municipio {municipio_id}")
     return {
-        "message": f"Se asignaron {total_asignadas} tipos de trámite automáticamente",
+        "message": f"Se asignaron {total_categorias} categorías de trámite ({total_tramites} trámites) automáticamente",
         "asignaciones": asignaciones_resultado,
-        "total": total_asignadas,
-        "tipos_habilitados": tipos_habilitados,
-        "tramites_habilitados": tramites_habilitados
+        "total_categorias": total_categorias,
+        "total_tramites": total_tramites,
     }
