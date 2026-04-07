@@ -17,6 +17,9 @@ import Tablero from './pages/Tablero';
 import Empleados from './pages/Empleados';
 import Usuarios from './pages/Usuarios';
 import Categorias from './pages/Categorias';
+import CategoriasReclamoConfig from './pages/CategoriasReclamoConfig';
+import CategoriasTramiteConfig from './pages/CategoriasTramiteConfig';
+import TramitesConfig from './pages/TramitesConfig';
 import Zonas from './pages/Zonas';
 // import Configuracion from './pages/Configuracion';  // Redirige a Ajustes
 import Exportar from './pages/Exportar';
@@ -26,8 +29,6 @@ import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
 import Tramites from './pages/Tramites';
-import TiposTramite from './pages/TiposTramite';
-import TramitesCatalogo from './pages/TramitesCatalogo';
 import MisTramites from './pages/MisTramites';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -43,8 +44,6 @@ import GestionHorarios from './pages/GestionHorarios';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import Demo from './pages/Demo';
-import Direcciones from './pages/Direcciones';
-import DireccionesConfig from './pages/DireccionesConfig';
 import DependenciasConfig from './pages/DependenciasConfig';
 import AsignacionDependencias from './pages/AsignacionDependencias';
 import Municipios from './pages/Municipios';
@@ -188,14 +187,6 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute roles={['admin', 'supervisor']}><Zonas /></ProtectedRoute>
       },
       {
-        path: 'direcciones',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><Direcciones /></ProtectedRoute>
-      },
-      {
-        path: 'direcciones/config',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><DireccionesConfig /></ProtectedRoute>
-      },
-      {
         path: 'dependencias',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><DependenciasConfig /></ProtectedRoute>
       },
@@ -203,13 +194,19 @@ export const router = createBrowserRouter([
         path: 'asignacion-dependencias',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><AsignacionDependencias /></ProtectedRoute>
       },
+      // ABM de categorías per-municipio (reclamo y trámite)
       {
-        path: 'tipos-tramite',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><TiposTramite /></ProtectedRoute>
+        path: 'categorias-reclamo',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><CategoriasReclamoConfig /></ProtectedRoute>
       },
       {
-        path: 'tramites-catalogo',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><TramitesCatalogo /></ProtectedRoute>
+        path: 'categorias-tramite',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><CategoriasTramiteConfig /></ProtectedRoute>
+      },
+      // ABM de trámites per-municipio
+      {
+        path: 'tramites-config',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><TramitesConfig /></ProtectedRoute>
       },
       {
         path: 'configuracion',

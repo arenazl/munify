@@ -29,16 +29,46 @@ export interface User {
   created_at: string;
 }
 
-export interface Categoria {
+// =====================================================================
+// CATEGORÍAS (per-municipio, sin catálogo global)
+// =====================================================================
+
+export interface CategoriaReclamo {
   id: number;
+  municipio_id: number;
   nombre: string;
   descripcion?: string;
   icono?: string;
   color?: string;
   tiempo_resolucion_estimado: number;
   prioridad_default: number;
+  orden: number;
   activo: boolean;
   created_at: string;
+}
+
+export interface CategoriaTramite {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  orden: number;
+  activo: boolean;
+  created_at: string;
+}
+
+// Alias temporal usado en código que aún se refiere genéricamente a "Categoria"
+// (sólo para reclamos — el dominio histórico). El frontend nuevo debería usar
+// CategoriaReclamo o CategoriaTramite explícitamente.
+export type Categoria = CategoriaReclamo;
+
+export interface CategoriaSimple {
+  id: number;
+  nombre: string;
+  color?: string;
+  icono?: string;
 }
 
 export interface Zona {
@@ -52,72 +82,9 @@ export interface Zona {
   created_at: string;
 }
 
-// Dirección organizativa municipal (unidad que gestiona reclamos/trámites)
-export type TipoGestion = 'reclamos' | 'tramites' | 'ambos';
-
-export interface DireccionCategoria {
-  id: number;
-  categoria_id: number;
-  categoria: CategoriaSimple;
-  tiempo_resolucion_estimado?: number;
-  prioridad_default?: number;
-  activo: boolean;
-}
-
-export interface DireccionTipoTramite {
-  id: number;
-  tipo_tramite_id: number;
-  tipo_tramite: {
-    id: number;
-    nombre: string;
-    icono?: string;
-    color?: string;
-  };
-  activo: boolean;
-}
-
-export interface Direccion {
-  id: number;
-  nombre: string;
-  codigo?: string;
-  descripcion?: string;
-  direccion?: string;  // "Av. San Martin 1234"
-  localidad?: string;
-  codigo_postal?: string;
-  latitud?: number;
-  longitud?: number;
-  tipo_gestion: TipoGestion;
-  activo: boolean;
-  created_at?: string;
-  categorias_asignadas?: DireccionCategoria[];
-  tipos_tramite_asignados?: DireccionTipoTramite[];
-}
-
-// Para el drag & drop de asignaciones
-export interface CategoriaDisponible {
-  id: number;
-  nombre: string;
-  icono?: string;
-  color?: string;
-  descripcion?: string;
-  direcciones_asignadas: number[];
-}
-
-export interface TipoTramiteDisponible {
-  id: number;
-  nombre: string;
-  icono?: string;
-  color?: string;
-  descripcion?: string;
-  direcciones_asignadas: number[];
-}
-
-export interface CategoriaSimple {
-  id: number;
-  nombre: string;
-  color?: string;
-  icono?: string;
-}
+// =====================================================================
+// EMPLEADOS
+// =====================================================================
 
 export type TipoEmpleado = 'operario' | 'administrativo';
 
@@ -160,6 +127,10 @@ export interface EmpleadoDisponibilidad {
   horario_texto: string;
 }
 
+// =====================================================================
+// RECLAMOS
+// =====================================================================
+
 export interface Documento {
   id: number;
   nombre_original: string;
@@ -186,7 +157,6 @@ export interface Reclamo {
   fecha_programada?: string;
   hora_inicio?: string;
   hora_fin?: string;
-  // Tiempo estimado de resolución
   tiempo_estimado_dias?: number;
   tiempo_estimado_horas?: number;
   fecha_estimada_resolucion?: string;
@@ -199,11 +169,9 @@ export interface Reclamo {
   dependencia_asignada?: { id: number; dependencia_id: number; nombre?: string; color?: string; icono?: string };
   documentos: Documento[];
   imagenes?: string[];
-  // Confirmación del vecino (feedback después de finalizar)
-  confirmado_vecino?: boolean | null;  // null = sin respuesta, true = solucionado, false = sigue problema
+  confirmado_vecino?: boolean | null;
   fecha_confirmacion_vecino?: string;
   comentario_confirmacion_vecino?: string;
-  // Sistema de sumarse a reclamos
   personas?: ReclamoPersona[];
 }
 
@@ -258,39 +226,35 @@ export interface DashboardStats {
   tiempo_promedio_dias: number;
 }
 
-// Tramites - Estructura de 3 niveles
-// Nivel 1: TipoTramite (categorías: Obras Privadas, Comercio, etc.)
-// Nivel 2: Tramite (procedimientos: Permiso de obra, Habilitación comercial, etc.)
-// Nivel 3: Solicitud (solicitudes diarias de vecinos)
+// =====================================================================
+// TRÁMITES (per-municipio, 2 niveles: CategoriaTramite -> Tramite)
+// =====================================================================
 
-export type EstadoSolicitud = 'iniciado' | 'en_revision' | 'requiere_documentacion' | 'en_proceso' | 'aprobado' | 'rechazado' | 'finalizado';
+export type EstadoSolicitud =
+  | 'recibido'
+  | 'en_curso'
+  | 'finalizado'
+  | 'pospuesto'
+  | 'rechazado';
 
-// Nivel 1: Categorías de trámites
-export interface TipoTramite {
+export interface TramiteDocumentoRequerido {
   id: number;
-  municipio_id: number;
+  tramite_id: number;
   nombre: string;
   descripcion?: string;
-  codigo?: string;
-  icono?: string;
-  color?: string;
-  activo: boolean;
+  obligatorio: boolean;
   orden: number;
-  created_at: string;
-  tramites?: TramiteCatalogo[];
+  created_at?: string;
 }
 
-// Nivel 2: Catálogo de trámites específicos
-export interface TramiteCatalogo {
+export interface Tramite {
   id: number;
-  tipo_tramite_id: number;
-  tipo_tramite?: TipoTramite;
+  municipio_id: number;
+  categoria_tramite_id: number;
+  categoria_tramite?: { id: number; nombre: string; icono?: string; color?: string };
   nombre: string;
   descripcion?: string;
   icono?: string;
-  color?: string;
-  requisitos?: string;
-  documentos_requeridos?: string;
   tiempo_estimado_dias: number;
   costo?: number;
   url_externa?: string;
@@ -298,62 +262,10 @@ export interface TramiteCatalogo {
   requiere_validacion_facial?: boolean;
   activo: boolean;
   orden: number;
+  documentos_requeridos: TramiteDocumentoRequerido[];
   created_at: string;
 }
 
-// Tramite: tipo unificado para compatibilidad (soporta catálogo y solicitudes)
-// Nota: Este tipo combina campos de catálogo y solicitud para mantener compatibilidad
-export interface Tramite {
-  id: number;
-  // Campos comunes (requeridos)
-  nombre: string;
-  created_at: string;
-  activo: boolean;
-  orden: number;
-  // Campos de catálogo
-  tipo_tramite_id: number;
-  tipo_tramite?: TipoTramite;
-  icono?: string;
-  color?: string;
-  requisitos?: string;
-  documentos_requeridos?: string;
-  tiempo_estimado_dias: number;
-  costo?: number;
-  url_externa?: string;
-  favorito?: boolean;
-  // Campos de solicitud (requeridos para compatibilidad con código viejo)
-  municipio_id: number;
-  numero_tramite: string;
-  asunto: string;
-  descripcion?: string;
-  estado: EstadoSolicitud;
-  tramite_id?: number;
-  servicio_id?: number;
-  tramite?: TramiteCatalogo;
-  servicio?: TramiteCatalogo;
-  solicitante_id?: number;
-  nombre_solicitante?: string;
-  apellido_solicitante?: string;
-  dni_solicitante?: string;
-  email_solicitante?: string;
-  telefono_solicitante?: string;
-  direccion_solicitante?: string;
-  municipio_dependencia_id?: number;
-  dependencia_asignada?: {
-    id: number;
-    dependencia_id: number;
-    nombre?: string;
-    color?: string;
-    icono?: string;
-  };
-  prioridad?: number;
-  respuesta?: string;
-  observaciones?: string;
-  updated_at?: string;
-  fecha_resolucion?: string;
-}
-
-// Nivel 3: Solicitudes de vecinos
 export interface Solicitud {
   id: number;
   municipio_id: number;
@@ -362,9 +274,7 @@ export interface Solicitud {
   descripcion?: string;
   estado: EstadoSolicitud;
   tramite_id?: number;
-  servicio_id?: number; // Alias deprecado de tramite_id
   tramite?: Tramite;
-  servicio?: Tramite; // Alias deprecado de tramite
   solicitante_id?: number;
   nombre_solicitante?: string;
   apellido_solicitante?: string;
@@ -400,33 +310,67 @@ export interface HistorialSolicitud {
   created_at: string;
 }
 
-// Alias para compatibilidad temporal (deprecado)
-export type EstadoTramite = EstadoSolicitud;
-export type HistorialTramite = HistorialSolicitud;
-
-// ServicioTramite: compatibilidad con código viejo que usaba estructura plana
-// En la nueva estructura, estas propiedades vienen del Tramite (nivel 2)
-export interface ServicioTramite {
+// Documento subido a una solicitud, con datos de verificación
+export interface DocumentoSolicitud {
   id: number;
-  municipio_id?: number;
+  nombre_original: string;
+  url: string;
+  tipo: string;
+  tipo_documento?: string;
+  descripcion?: string;
+  etapa?: string;
+  mime_type?: string;
+  tamanio?: number;
+  tramite_documento_requerido_id?: number;
+  verificado: boolean;
+  verificado_por_id?: number;
+  fecha_verificacion?: string;
+  created_at: string;
+}
+
+// Item del checklist combinado para verificación de documentos
+export interface ChecklistDocumentoItem {
+  requerido_id?: number;
   nombre: string;
   descripcion?: string;
-  icono?: string;
-  color?: string;
-  requisitos?: string;
-  documentos_requeridos?: string;
-  tiempo_estimado_dias: number;
-  costo?: number;
-  url_externa?: string;
-  activo: boolean;
+  obligatorio: boolean;
   orden: number;
-  favorito: boolean;
-  created_at?: string;
-  // Campos de TipoTramite
-  codigo?: string;
-  // Campos de Tramite
-  tipo_tramite_id?: number;
-  // Validación de identidad
-  requiere_validacion_dni?: boolean;
-  requiere_validacion_facial?: boolean;
+  documento_id?: number;
+  documento_url?: string;
+  documento_nombre?: string;
+  verificado: boolean;
+  verificado_por_id?: number;
+  verificado_por_nombre?: string;
+  fecha_verificacion?: string;
 }
+
+export interface ChecklistDocumentos {
+  solicitud_id: number;
+  items: ChecklistDocumentoItem[];
+  todos_verificados: boolean;
+  total_obligatorios: number;
+  total_obligatorios_verificados: number;
+}
+
+// =====================================================================
+// COMPATIBILIDAD: aliases para código todavía no migrado
+// (se eliminan a medida que avance el refactor)
+// =====================================================================
+
+// Alias del tipo viejo `ServicioTramite` que el TramiteWizard sigue usando.
+// En el nuevo modelo equivale a `Tramite`.
+export type ServicioTramite = Tramite;
+
+// Alias deprecado: el modelo viejo tenía un nivel intermedio TipoTramite.
+// Ahora existe `CategoriaTramite` que cumple ese rol. Se conserva el alias
+// para que las pantallas viejas no exploten al instante (cada una se va a
+// migrar a CategoriaTramite con su refactor).
+export type TipoTramite = CategoriaTramite;
+
+// Alias deprecado: tipo unificado catalogo+solicitud. Ahora son `Tramite` y
+// `Solicitud` separados.
+export type TramiteCatalogo = Tramite;
+
+// Alias para tipos legacy que NO se usan más pero quedan en imports sueltos
+export type EstadoTramite = EstadoSolicitud;
+export type HistorialTramite = HistorialSolicitud;

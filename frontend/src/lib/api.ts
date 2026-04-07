@@ -41,8 +41,9 @@ const responseCache = new Map<string, CachedResponse>();
 const CACHE_TTL_CONFIG: Record<string, number> = {
   '/categorias': 5 * 60 * 1000,           // 5 minutos
   '/zonas': 5 * 60 * 1000,                // 5 minutos
-  '/tramites/tipos': 5 * 60 * 1000,       // 5 minutos
-  '/tramites/catalogo': 3 * 60 * 1000,    // 3 minutos
+  '/tramites': 3 * 60 * 1000,             // 3 minutos
+  '/categorias-reclamo': 5 * 60 * 1000,   // 5 minutos
+  '/categorias-tramite': 5 * 60 * 1000,   // 5 minutos
   '/publico/categorias': 5 * 60 * 1000,   // 5 minutos
   '/publico/zonas': 5 * 60 * 1000,        // 5 minutos
   '/empleados': 2 * 60 * 1000,            // 2 minutos (cambia más seguido)
@@ -308,26 +309,35 @@ export const reclamosApi = {
   sumarse: (id: number, comentario?: string) => api.post(`/reclamos/${id}/sumarse`, comentario ? { comentario } : undefined),
 };
 
-// Categorías
-export const categoriasApi = {
-  // Catálogo maestro (TODAS las categorías)
-  getCatalogo: (activo?: boolean) => api.get('/categorias/catalogo', { params: activo !== undefined ? { activo } : {} }),
-  // Categorías habilitadas para el municipio del usuario
-  getAll: (activo?: boolean) => api.get('/categorias', { params: activo !== undefined ? { activo } : {} }),
-  getOne: (id: number) => api.get(`/categorias/${id}`),
-  create: (data: Record<string, unknown>) => api.post('/categorias', data).then(res => { invalidateCache('/categorias'); return res; }),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/categorias/${id}`, data).then(res => { invalidateCache('/categorias'); return res; }),
-  delete: (id: number) => api.delete(`/categorias/${id}`).then(res => { invalidateCache('/categorias'); return res; }),
-  // IDs de categorías habilitadas para el municipio
-  getHabilitadas: () => api.get<number[]>('/categorias/municipio/habilitadas'),
-  // Habilitar/deshabilitar categoría para el municipio
-  habilitar: (categoriaId: number) =>
-    api.post(`/categorias/${categoriaId}/habilitar`).then(res => { invalidateCache('/categorias'); return res; }),
-  deshabilitar: (categoriaId: number) =>
-    api.delete(`/categorias/${categoriaId}/deshabilitar`).then(res => { invalidateCache('/categorias'); return res; }),
-  habilitarTodas: () =>
-    api.post('/categorias/habilitar-todas').then(res => { invalidateCache('/categorias'); return res; }),
+// Categorías de Reclamo (per-municipio)
+export const categoriasReclamoApi = {
+  getAll: (activo?: boolean) =>
+    api.get('/categorias-reclamo', { params: activo !== undefined ? { activo } : {} }),
+  getOne: (id: number) => api.get(`/categorias-reclamo/${id}`),
+  create: (data: Record<string, unknown>) =>
+    api.post('/categorias-reclamo', data).then(res => { invalidateCache('/categorias-reclamo'); return res; }),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/categorias-reclamo/${id}`, data).then(res => { invalidateCache('/categorias-reclamo'); return res; }),
+  delete: (id: number) =>
+    api.delete(`/categorias-reclamo/${id}`).then(res => { invalidateCache('/categorias-reclamo'); return res; }),
 };
+
+// Categorías de Trámite (per-municipio)
+export const categoriasTramiteApi = {
+  getAll: (activo?: boolean) =>
+    api.get('/categorias-tramite', { params: activo !== undefined ? { activo } : {} }),
+  getOne: (id: number) => api.get(`/categorias-tramite/${id}`),
+  create: (data: Record<string, unknown>) =>
+    api.post('/categorias-tramite', data).then(res => { invalidateCache('/categorias-tramite'); return res; }),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/categorias-tramite/${id}`, data).then(res => { invalidateCache('/categorias-tramite'); return res; }),
+  delete: (id: number) =>
+    api.delete(`/categorias-tramite/${id}`).then(res => { invalidateCache('/categorias-tramite'); return res; }),
+};
+
+// Alias retrocompat: el código viejo usa `categoriasApi` para reclamos.
+// Apuntalo al nuevo endpoint para que no se rompa de un golpe.
+export const categoriasApi = categoriasReclamoApi;
 
 // Zonas
 export const zonasApi = {
@@ -336,30 +346,6 @@ export const zonasApi = {
   create: (data: Record<string, unknown>) => api.post('/zonas', data).then(res => { invalidateCache('/zonas'); return res; }),
   update: (id: number, data: Record<string, unknown>) => api.put(`/zonas/${id}`, data).then(res => { invalidateCache('/zonas'); return res; }),
   delete: (id: number) => api.delete(`/zonas/${id}`).then(res => { invalidateCache('/zonas'); return res; }),
-};
-
-// Direcciones (unidades organizativas municipales)
-export const direccionesApi = {
-  getAll: (params?: { activo?: boolean; tipo_gestion?: string }) =>
-    api.get('/direcciones', { params }),
-  getOne: (id: number) => api.get(`/direcciones/${id}`),
-  create: (data: Record<string, unknown>) =>
-    api.post('/direcciones', data).then(res => { invalidateCache('/direcciones'); return res; }),
-  update: (id: number, data: Record<string, unknown>) =>
-    api.put(`/direcciones/${id}`, data).then(res => { invalidateCache('/direcciones'); return res; }),
-  delete: (id: number) =>
-    api.delete(`/direcciones/${id}`).then(res => { invalidateCache('/direcciones'); return res; }),
-  // Asignación de categorías
-  getCategorias: (direccionId: number) => api.get(`/direcciones/${direccionId}/categorias`),
-  asignarCategorias: (direccionId: number, categoriaIds: number[]) =>
-    api.post(`/direcciones/${direccionId}/categorias`, { categoria_ids: categoriaIds }),
-  // Asignación de tipos de trámite
-  getTiposTramite: (direccionId: number) => api.get(`/direcciones/${direccionId}/tipos-tramite`),
-  asignarTiposTramite: (direccionId: number, tipoTramiteIds: number[]) =>
-    api.post(`/direcciones/${direccionId}/tipos-tramite`, { tipo_tramite_ids: tipoTramiteIds }),
-  // Para configuración / drag & drop
-  getCategoriasDisponibles: () => api.get('/direcciones/configuracion/categorias-disponibles'),
-  getTiposTramiteDisponibles: () => api.get('/direcciones/configuracion/tipos-tramite-disponibles'),
 };
 
 // Dependencias (nuevo modelo desacoplado)
@@ -393,12 +379,6 @@ export const dependenciasApi = {
     api.post(`/dependencias/municipio/${muniDepId}/categorias`, { categoria_ids: categoriaIds })
       .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias'); return res; }),
 
-  // Asignación de tipos de trámite a una dependencia del municipio
-  getTiposTramite: (muniDepId: number) => api.get(`/dependencias/municipio/${muniDepId}/tipos-tramite`),
-  asignarTiposTramite: (muniDepId: number, tipoTramiteIds: number[]) =>
-    api.post(`/dependencias/municipio/${muniDepId}/tipos-tramite`, { tipo_tramite_ids: tipoTramiteIds })
-      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
-
   // Asignación de trámites específicos a una dependencia del municipio
   getTramites: (muniDepId: number) => api.get(`/dependencias/municipio/${muniDepId}/tramites`),
   asignarTramites: (muniDepId: number, tramiteIds: number[]) =>
@@ -410,20 +390,21 @@ export const dependenciasApi = {
     api.delete('/dependencias/municipio/categorias/limpiar')
       .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias'); return res; }),
 
-  // Limpiar todas las asignaciones de tipos de trámite del municipio
-  limpiarAsignacionesTiposTramite: () =>
-    api.delete('/dependencias/municipio/tipos-tramite/limpiar')
-      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
-
-  // Auto-asignar categorías a dependencias usando IA
+  // Auto-asignar categorías de reclamo a dependencias usando IA
   autoAsignarCategoriasIA: (categorias: Array<{id: number; nombre: string}>, dependencias: Array<{id: number; nombre: string; descripcion?: string}>) =>
     api.post('/dependencias/municipio/categorias/auto-asignar', { categorias, dependencias })
-      .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias'); return res; }),
+      .then(res => { invalidateCache('/dependencias'); invalidateCache('/categorias-reclamo'); return res; }),
 
-  // Auto-asignar tipos de trámite a dependencias usando IA
-  autoAsignarTiposTramiteIA: (tiposTramite: Array<{id: number; nombre: string}>, dependencias: Array<{id: number; nombre: string; descripcion?: string}>) =>
-    api.post('/dependencias/municipio/tipos-tramite/auto-asignar', { tipos_tramite: tiposTramite, dependencias })
-      .then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
+  // Auto-asignar categorías de trámite a dependencias usando IA (cada categoría
+  // arrastra todos sus trámites concretos)
+  autoAsignarCategoriasTramiteIA: (
+    categoriasTramite: Array<{id: number; nombre: string}>,
+    dependencias: Array<{id: number; nombre: string; descripcion?: string}>,
+  ) =>
+    api.post('/dependencias/municipio/categorias-tramite/auto-asignar', {
+      categorias_tramite: categoriasTramite,
+      dependencias,
+    }).then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
 };
 
 // Empleados
@@ -997,62 +978,61 @@ export const whatsappApi = {
   },
 };
 
-// Tramites - Nueva estructura de 3 niveles
+// =====================================================================
+// TRÁMITES (per-municipio, modelo nuevo)
+// =====================================================================
+//
+// Estructura:
+// - Tramite (per-municipio, con FK a CategoriaTramite y sub-tabla de
+//   documentos requeridos)
+// - Solicitud (instancia creada por un vecino)
+// - Verificación de documentos en la solicitud
+//
+// Aliases retrocompat: getServicios/getCatalogo apuntan al nuevo /tramites
+// para que el código viejo no explote en el primer renderer.
 export const tramitesApi = {
-  // ============================================
-  // NIVEL 1: Tipos de Trámite (categorías)
-  // ============================================
-  getTipos: (params?: { solo_activos?: boolean }) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    return api.get('/tramites/tipos', {
-      params: { municipio_id: municipioId, solo_activos: params?.solo_activos ?? true }
-    });
-  },
-  // Catálogo completo (para configuración de superusuario)
-  getTiposCatalogo: (params?: { solo_activos?: boolean }) =>
-    api.get('/tramites/tipos/catalogo', {
-      params: { solo_activos: params?.solo_activos ?? true }
-    }),
-  getTipo: (id: number) => api.get(`/tramites/tipos/${id}`),
-  createTipo: (data: Record<string, unknown>) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    // municipio_id es opcional (superadmin no tiene municipio) - va como query param
-    const params = municipioId ? { municipio_id: municipioId } : {};
-    return api.post('/tramites/tipos', data, { params }).then(res => { invalidateCache('/tramites/tipos'); return res; });
-  },
-  updateTipo: (id: number, data: Record<string, unknown>) =>
-    api.put(`/tramites/tipos/${id}`, data).then(res => { invalidateCache('/tramites/tipos'); return res; }),
-  deleteTipo: (id: number) => api.delete(`/tramites/tipos/${id}`).then(res => { invalidateCache('/tramites/tipos'); return res; }),
+  // ----- CRUD de Trámite (admin del municipio) -----
+  getAll: (params?: { categoria_tramite_id?: number; activo?: boolean }) =>
+    api.get('/tramites', { params }),
+  getOne: (id: number) => api.get(`/tramites/${id}`),
+  create: (data: Record<string, unknown>) =>
+    api.post('/tramites', data).then(res => { invalidateCache('/tramites'); return res; }),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tramites/${id}`, data).then(res => { invalidateCache('/tramites'); return res; }),
+  delete: (id: number) =>
+    api.delete(`/tramites/${id}`).then(res => { invalidateCache('/tramites'); return res; }),
 
-  // ============================================
-  // NIVEL 2: Catálogo de Trámites
-  // ============================================
-  getCatalogo: (params?: { tipo_tramite_id?: number; solo_activos?: boolean }) =>
-    api.get('/tramites/catalogo', { params: { ...params, solo_activos: params?.solo_activos ?? true } }),
-  getTramite: (id: number) => api.get(`/tramites/catalogo/${id}`),
-  createTramite: (data: Record<string, unknown>) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    // municipio_id es opcional (superadmin no tiene municipio) - va como query param
-    const params = municipioId ? { municipio_id: municipioId } : {};
-    return api.post('/tramites/catalogo', data, { params }).then(res => { invalidateCache('/tramites/catalogo'); return res; });
-  },
-  updateTramite: (id: number, data: Record<string, unknown>) =>
-    api.put(`/tramites/catalogo/${id}`, data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
-  deleteTramite: (id: number) => api.delete(`/tramites/catalogo/${id}`).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
+  // ----- Documentos requeridos (sub-tabla del Trámite) -----
+  getDocumentosRequeridos: (tramiteId: number) =>
+    api.get(`/tramites/${tramiteId}/documentos-requeridos`),
+  addDocumentoRequerido: (tramiteId: number, data: { nombre: string; descripcion?: string; obligatorio?: boolean; orden?: number }) =>
+    api.post(`/tramites/${tramiteId}/documentos-requeridos`, data)
+      .then(res => { invalidateCache('/tramites'); return res; }),
+  updateDocumentoRequerido: (docReqId: number, data: Record<string, unknown>) =>
+    api.put(`/tramites/documentos-requeridos/${docReqId}`, data)
+      .then(res => { invalidateCache('/tramites'); return res; }),
+  deleteDocumentoRequerido: (docReqId: number) =>
+    api.delete(`/tramites/documentos-requeridos/${docReqId}`)
+      .then(res => { invalidateCache('/tramites'); return res; }),
 
-  // ============================================
-  // NIVEL 3: Solicitudes (las de vecinos)
-  // ============================================
+  // ----- Solicitudes (instancias creadas por vecinos) -----
   getSolicitudes: (params?: { estado?: string; tramite_id?: number; skip?: number; limit?: number }) => {
     const municipioId = localStorage.getItem('municipio_id');
-    return api.get('/tramites/solicitudes', { params: { ...params, municipio_id: municipioId } });
+    return api.get('/tramites/solicitudes/list', { params: { ...params, municipio_id: municipioId } });
   },
   getMisSolicitudes: () => api.get('/tramites/solicitudes/mis-solicitudes'),
   getSolicitud: (id: number) => api.get(`/tramites/solicitudes/detalle/${id}`),
-  consultarSolicitud: (numeroTramite: string) => api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),
+  consultarSolicitud: (numeroTramite: string) =>
+    api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),
   createSolicitud: (data: Record<string, unknown>) => {
     const municipioId = localStorage.getItem('municipio_id');
-    return api.post('/tramites/solicitudes', data, { params: { municipio_id: municipioId } });
+    // Mapear servicio_id -> tramite_id para compatibilidad con código viejo
+    const payload = { ...data };
+    if (payload.servicio_id && !payload.tramite_id) {
+      payload.tramite_id = payload.servicio_id;
+      delete payload.servicio_id;
+    }
+    return api.post('/tramites/solicitudes', payload, { params: { municipio_id: municipioId } });
   },
   updateSolicitud: (id: number, data: { estado?: string; municipio_dependencia_id?: number; prioridad?: number; respuesta?: string; observaciones?: string }) =>
     api.put(`/tramites/solicitudes/detalle/${id}`, data),
@@ -1060,12 +1040,11 @@ export const tramitesApi = {
     api.post(`/tramites/solicitudes/${id}/asignar`, data),
   getHistorialSolicitud: (id: number) => api.get(`/tramites/solicitudes/${id}/historial`),
 
-  // ============================================
-  // Gestión y Stats
-  // ============================================
+  // ----- Gestión (listado supervisor) -----
   getGestionSolicitudes: (params?: {
     estado?: string;
     tramite_id?: number;
+    categoria_tramite_id?: number;
     municipio_dependencia_id?: number;
     sin_asignar?: boolean;
     search?: string;
@@ -1079,111 +1058,43 @@ export const tramitesApi = {
     const mId = municipioId || localStorage.getItem('municipio_id');
     return api.get('/tramites/stats/resumen', { params: { municipio_id: mId } });
   },
-
-  // ============================================
-  // Alias para compatibilidad (deprecados)
-  // ============================================
-  // getServicios devuelve trámites habilitados para el municipio (usa tabla intermedia)
-  getServicios: (params?: { municipio_id?: number; solo_activos?: boolean }) => {
-    const municipioId = params?.municipio_id || localStorage.getItem('municipio_id');
-    return api.get(`/tramites/municipio/${municipioId}/tramites`, {
-      params: { solo_activos: params?.solo_activos ?? true }
-    });
-  },
-  getAll: (params?: { estado?: string; skip?: number; limit?: number }) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    return api.get('/tramites/solicitudes', { params: { ...params, municipio_id: municipioId } });
-  },
-  getGestionTodos: (params?: Record<string, unknown>) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    return api.get('/tramites/gestion/solicitudes', { params: { ...params, municipio_id: municipioId } });
-  },
-  getOne: (id: number) => api.get(`/tramites/solicitudes/detalle/${id}`),
-  create: (data: Record<string, unknown>) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    // Mapear servicio_id -> tramite_id para compatibilidad
-    const mappedData = { ...data };
-    if (mappedData.servicio_id && !mappedData.tramite_id) {
-      mappedData.tramite_id = mappedData.servicio_id;
-      delete mappedData.servicio_id;
-    }
-    return api.post('/tramites/solicitudes', mappedData, { params: { municipio_id: municipioId } });
-  },
-  update: (id: number, data: Record<string, unknown>) => api.put(`/tramites/solicitudes/detalle/${id}`, data),
-  asignar: (id: number, data: { municipio_dependencia_id: number; comentario?: string }) =>
-    api.post(`/tramites/solicitudes/${id}/asignar`, data),
-  getHistorial: (id: number) => api.get(`/tramites/solicitudes/${id}/historial`),
-  consultar: (numeroTramite: string) => api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),
-  sugerirEmpleado: (id: number) => api.get(`/tramites/solicitudes/${id}/sugerir-empleado`),
-
-  // Conteos para filtros (optimizado)
   getConteoEstados: () => {
     const municipioId = localStorage.getItem('municipio_id');
     return api.get('/tramites/stats/conteo-estados', { params: { municipio_id: municipioId } });
   },
-  getConteoTipos: () => {
+  getConteoCategorias: () => {
     const municipioId = localStorage.getItem('municipio_id');
-    return api.get('/tramites/stats/conteo-tipos', { params: { municipio_id: municipioId } });
+    return api.get('/tramites/stats/conteo-categorias', { params: { municipio_id: municipioId } });
   },
 
-  // Alias de Servicios -> Catálogo (para Servicios.tsx)
-  getServicio: (id: number) => api.get(`/tramites/catalogo/${id}`),
-  createServicio: (data: Record<string, unknown>) => api.post('/tramites/catalogo', data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
-  updateServicio: (id: number, data: Record<string, unknown>) => api.put(`/tramites/catalogo/${id}`, data).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
-  deleteServicio: (id: number) => api.delete(`/tramites/catalogo/${id}`).then(res => { invalidateCache('/tramites/catalogo'); return res; }),
-
-  // Documentos de solicitudes
-  uploadDocumento: (solicitudId: number, formData: FormData, params?: { tipo_documento?: string; descripcion?: string; etapa?: string }) =>
+  // ----- Documentos en solicitud (upload, listado, delete) -----
+  uploadDocumento: (
+    solicitudId: number,
+    formData: FormData,
+    params?: { tipo_documento?: string; descripcion?: string; etapa?: string; tramite_documento_requerido_id?: number },
+  ) =>
     api.post(`/tramites/solicitudes/${solicitudId}/documentos`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       params,
     }),
-  getDocumentos: (solicitudId: number) => api.get(`/tramites/solicitudes/${solicitudId}/documentos`),
+  getDocumentos: (solicitudId: number) =>
+    api.get(`/tramites/solicitudes/${solicitudId}/documentos`),
   deleteDocumento: (solicitudId: number, documentoId: number) =>
     api.delete(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}`),
 
-  // Obtener trámites habilitados para el municipio (desde municipio_tramites)
-  getTramitesMunicipio: (params?: { tipo_tramite_id?: number; solo_activos?: boolean }) => {
-    const municipioId = localStorage.getItem('municipio_id');
-    return api.get(`/tramites/municipio/${municipioId}/tramites`, { params });
-  },
+  // ----- Verificación de documentos (checklist supervisor) -----
+  getChecklistDocumentos: (solicitudId: number) =>
+    api.get(`/tramites/solicitudes/${solicitudId}/checklist-documentos`),
+  verificarDocumento: (solicitudId: number, documentoId: number) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/verificar`),
+  desverificarDocumento: (solicitudId: number, documentoId: number) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/desverificar`),
 
-  // Habilitar tipos para municipio
-  habilitarTipoMunicipio: (tipoId: number, municipioId?: number) => {
-    const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.post(`/tramites/tipos/${tipoId}/habilitar`, null, { params: { municipio_id: mId } }).then(res => { invalidateCache('/tramites/tipos'); return res; });
-  },
-  habilitarTodosTiposMunicipio: async (municipioId?: number) => {
-    const mId = municipioId || localStorage.getItem('municipio_id');
-    // Habilitar tipos del 1 al 10
-    const promises = [];
-    for (let i = 1; i <= 10; i++) {
-      promises.push(api.post(`/tramites/tipos/${i}/habilitar`, null, { params: { municipio_id: mId } }).catch(() => null));
-    }
-    const result = await Promise.all(promises);
-    invalidateCache('/tramites/tipos');
-    return result;
-  },
-
-  // IDs de trámites habilitados para el municipio actual
-  getHabilitados: () => api.get<number[]>('/tramites/municipio/habilitados'),
-
-  // Habilitar/deshabilitar trámite individual
-  habilitarTramite: (tramiteId: number, municipioId?: number) => {
-    const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.post(`/tramites/catalogo/${tramiteId}/habilitar`, null, { params: { municipio_id: mId } })
-      .then(res => { invalidateCache('/tramites'); return res; });
-  },
-  deshabilitarTramite: (tramiteId: number, municipioId?: number) => {
-    const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.delete(`/tramites/catalogo/${tramiteId}/deshabilitar`, { params: { municipio_id: mId } })
-      .then(res => { invalidateCache('/tramites'); return res; });
-  },
-  habilitarTodosTramites: (municipioId?: number) => {
-    const mId = municipioId || localStorage.getItem('municipio_id');
-    return api.post('/tramites/tramites/habilitar-todos', null, { params: { municipio_id: mId } })
-      .then(res => { invalidateCache('/tramites'); return res; });
-  },
+  // ----- Aliases retrocompat (a borrar progresivamente) -----
+  // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites
+  // habilitados del municipio. Apuntalos al nuevo endpoint.
+  getServicios: () => api.get('/tramites'),
+  getCatalogo: () => api.get('/tramites'),
 };
 
 // Calificaciones

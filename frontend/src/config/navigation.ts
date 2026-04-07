@@ -1,6 +1,7 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2
+  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
+  FolderTree, FileText
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -120,6 +121,28 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: LayoutDashboard,
       show: isAdminOrSupervisor,
       description: 'Consultas y análisis con IA'
+    },
+    // === ABMs per-municipio (refactor trámites/categorías) ===
+    {
+      name: 'Categorías Reclamo',
+      href: '/gestion/categorias-reclamo',
+      icon: FolderTree,
+      show: isAdminOrSupervisor,
+      description: 'Categorías de reclamos del municipio'
+    },
+    {
+      name: 'Categorías Trámite',
+      href: '/gestion/categorias-tramite',
+      icon: FolderTree,
+      show: isAdminOrSupervisor,
+      description: 'Categorías de trámites del municipio'
+    },
+    {
+      name: 'Catálogo Trámites',
+      href: '/gestion/tramites-config',
+      icon: FileText,
+      show: isAdminOrSupervisor,
+      description: 'ABM de trámites con documentos requeridos'
     },
     {
       name: 'Ajustes',
