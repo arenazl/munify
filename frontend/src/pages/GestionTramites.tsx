@@ -27,11 +27,12 @@ import {
   Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi, empleadosApi } from '../lib/api';
+import { tramitesApi, empleadosApi, categoriasTramiteApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
 import { TramiteWizard } from '../components/TramiteWizard';
+import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -216,14 +217,26 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   const loadData = async (reloadTramites = true) => {
     try {
-      const [serviciosRes, tiposRes, empleadosRes, resumenRes] = await Promise.all([
-        tramitesApi.getTramitesMunicipio().catch(() => ({ data: [] })), // Trámites habilitados del municipio
-        tramitesApi.getTipos().catch(() => ({ data: [] })),
+      const [tramitesRes, categoriasRes, empleadosRes, resumenRes] = await Promise.all([
+        tramitesApi.getAll().catch(() => ({ data: [] })),           // Trámites per-municipio (nuevo modelo)
+        categoriasTramiteApi.getAll().catch(() => ({ data: [] })),  // Categorías de trámite per-municipio
         empleadosApi.getAll().catch(() => ({ data: [] })),
         tramitesApi.getResumen().catch(() => ({ data: null })),
       ]);
-      setServicios(serviciosRes.data);
-      setTipos(tiposRes.data);
+
+      // Shim para que el TramiteWizard viejo siga funcionando sin reescribirlo:
+      // - Le renombramos `categoria_tramite_id` a `tipo_tramite_id`
+      // - Convertimos el array `documentos_requeridos` a string "doc1 | doc2 | doc3"
+      const serviciosShim = (tramitesRes.data || []).map((t: any) => ({
+        ...t,
+        tipo_tramite_id: t.categoria_tramite_id,
+        documentos_requeridos: Array.isArray(t.documentos_requeridos)
+          ? t.documentos_requeridos.map((d: any) => d.nombre).join(' | ')
+          : t.documentos_requeridos,
+      }));
+
+      setServicios(serviciosShim);
+      setTipos(categoriasRes.data);  // CategoriaTramite tiene la misma forma que TipoTramite
       setEmpleados(empleadosRes.data);
       setResumen(resumenRes.data);
 
@@ -252,18 +265,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       const searchFiltro = search !== undefined ? search : searchTerm;
       const tramiteFiltro = tramiteId !== undefined ? tramiteId : filtroTramite;
 
-      if (tipoFiltro) params.tipo_tramite_id = tipoFiltro;
+      if (tipoFiltro) params.categoria_tramite_id = tipoFiltro;
       if (tramiteFiltro) params.tramite_id = tramiteFiltro;
-      // El backend espera el estado en mayúsculas (enum EstadoSolicitud)
       if (estadoFiltro) params.estado = estadoFiltro.toUpperCase();
-      // Búsqueda en servidor
       if (searchFiltro && searchFiltro.trim()) params.search = searchFiltro.trim();
-      // Filtrar por dependencia del usuario si es modo "soloMiArea"
       if (soloMiArea && user?.dependencia?.id) {
         params.municipio_dependencia_id = user.dependencia.id;
       }
 
-      const res = await tramitesApi.getGestionTodos(params);
+      const res = await tramitesApi.getGestionSolicitudes(params as any);
       setTramites(res.data);
       setSkip(LIMIT);
       setHasMore(res.data.length >= LIMIT);
@@ -285,12 +295,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         skip: skip,
       };
 
-      if (filtroTipo) params.tipo_tramite_id = filtroTipo;
+      if (filtroTipo) params.categoria_tramite_id = filtroTipo;
       if (filtroTramite) params.tramite_id = filtroTramite;
       if (filtroEstado) params.estado = filtroEstado.toUpperCase();
       if (searchTerm && searchTerm.trim()) params.search = searchTerm.trim();
 
-      const res = await tramitesApi.getGestionTodos(params);
+      const res = await tramitesApi.getGestionSolicitudes(params as any);
 
       if (res.data.length > 0) {
         setTramites(prev => {
@@ -356,16 +366,19 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   const loadConteos = async () => {
     try {
-      const [tiposRes, estadosRes] = await Promise.all([
-        tramitesApi.getConteoTipos().catch(() => ({ data: [] })),
+      const [categoriasRes, estadosRes] = await Promise.all([
+        tramitesApi.getConteoCategorias().catch(() => ({ data: [] })),
         tramitesApi.getConteoEstados().catch(() => ({ data: {} })),
       ]);
-      setConteosTipos(tiposRes.data);
+      // El endpoint nuevo devuelve {id, nombre, icono, color, cantidad} por categoría
+      // de trámite. Lo guardamos como "tipos" para mantener compat con el resto de
+      // la pantalla (que todavía habla de "tipos" internamente).
+      setConteosTipos(categoriasRes.data);
       setConteosEstados(estadosRes.data);
       setConteosLoaded(true);
     } catch (error) {
       console.error('Error cargando conteos:', error);
-      setConteosLoaded(true); // Marcar como cargado aunque haya error
+      setConteosLoaded(true);
     }
   };
 
@@ -483,6 +496,21 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     }
   };
 
+  /**
+   * Extrae el detail del error del backend y muestra toast apropiado.
+   * Si el backend bloqueó el cambio de estado porque faltan documentos
+   * obligatorios verificados (400 "Faltan verificar documentos obligatorios: ..."),
+   * muestra el mensaje completo para que el supervisor sepa qué tildar.
+   */
+  const showApiError = (err: any, fallback: string) => {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === 'string') {
+      toast.error(detail, { duration: 6000 });
+    } else {
+      toast.error(fallback);
+    }
+  };
+
   const handleUpdateTramite = async () => {
     if (!selectedTramite || !nuevoEstado) {
       toast.error('Selecciona un nuevo estado');
@@ -491,8 +519,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
     setSaving(true);
     try {
-      await tramitesApi.update(selectedTramite.id, {
-        estado: nuevoEstado.toUpperCase(), // Enviar en mayúsculas al backend
+      await tramitesApi.updateSolicitud(selectedTramite.id, {
+        estado: nuevoEstado, // Enums nuevos vienen en minúsculas (recibido, en_curso, etc.)
         respuesta: respuesta || undefined,
         observaciones: observaciones || undefined,
       });
@@ -501,7 +529,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       await recargarDespuesDeAccion();
     } catch (error) {
       console.error('Error actualizando trámite:', error);
-      toast.error('Error al actualizar trámite');
+      showApiError(error, 'Error al actualizar trámite');
     } finally {
       setSaving(false);
     }
@@ -512,8 +540,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     if (!selectedTramite) return;
     setSaving(true);
     try {
-      await tramitesApi.update(selectedTramite.id, {
-        estado: nuevoEstadoDirecto.toUpperCase(),
+      await tramitesApi.updateSolicitud(selectedTramite.id, {
+        estado: nuevoEstadoDirecto,
         respuesta: respuesta || undefined,
         observaciones: observaciones || undefined,
       });
@@ -522,7 +550,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       await recargarDespuesDeAccion();
     } catch (error) {
       console.error('Error actualizando trámite:', error);
-      toast.error('Error al actualizar trámite');
+      showApiError(error, 'Error al actualizar trámite');
     } finally {
       setSaving(false);
     }
@@ -1490,6 +1518,17 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Checklist de verificación de documentos requeridos */}
+            <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+              <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                Verificación de documentos
+              </h3>
+              <ChecklistDocumentosVerificacion
+                solicitudId={selectedTramite.id}
+                readOnly={user?.rol === 'vecino'}
+              />
             </div>
 
             {/* Asignación de empleado - Solo si no está en proceso/finalizado/rechazado */}

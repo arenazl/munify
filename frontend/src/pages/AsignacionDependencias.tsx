@@ -5,7 +5,12 @@ import {
   AlertCircle, BookOpen, GripVertical, Check, ChevronDown, ChevronRight, Wand2, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { dependenciasApi, categoriasApi, tramitesApi } from '../lib/api';
+import {
+  dependenciasApi,
+  categoriasReclamoApi,
+  categoriasTramiteApi,
+  tramitesApi,
+} from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -86,19 +91,27 @@ export default function AsignacionDependencias() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Una sola llamada con include_assignments=true trae todo
-      const [depsRes, catsRes, tiposRes, tramitesRes] = await Promise.all([
+      // Cargar categorías y trámites per-municipio (modelo nuevo)
+      const [depsRes, catsReclamoRes, catsTramiteRes, tramitesRes] = await Promise.all([
         dependenciasApi.getMunicipio({ activo: true, include_assignments: true }),
-        categoriasApi.getCatalogo(),
-        tramitesApi.getTiposCatalogo(),
-        tramitesApi.getCatalogo(),
+        categoriasReclamoApi.getAll(),
+        categoriasTramiteApi.getAll(),
+        tramitesApi.getAll(),
       ]);
 
       const deps: MunicipioDependencia[] = depsRes.data;
       setDependencias(deps);
-      setCategorias(catsRes.data);
-      setTiposTramite(tiposRes.data);
-      setTramitesCatalogo(tramitesRes.data);
+      setCategorias(catsReclamoRes.data);
+      setTiposTramite(catsTramiteRes.data);
+
+      // Shim: el UI todavía habla en términos de tipo_tramite_id.
+      // Mapeamos categoria_tramite_id del modelo nuevo a tipo_tramite_id
+      // para no reescribir toda la lógica de drag-drop.
+      const tramitesShim = (tramitesRes.data || []).map((t: any) => ({
+        ...t,
+        tipo_tramite_id: t.categoria_tramite_id,
+      }));
+      setTramitesCatalogo(tramitesShim);
 
       // Extraer asignaciones directamente de la respuesta (ya vienen incluidas)
       const asignacionesIniciales: AsignacionState = {};
@@ -154,9 +167,11 @@ export default function AsignacionDependencias() {
         }
 
         if (dep && (dep.tipo_gestion === 'TRAMITE' || dep.tipo_gestion === 'AMBOS')) {
-          if (JSON.stringify([...current.tipos_tramite].sort()) !== JSON.stringify([...original.tipos_tramite].sort())) {
-            promises.push(dependenciasApi.asignarTiposTramite(depId, current.tipos_tramite));
-          }
+          // Nota: en el modelo nuevo ya no se asigna "por tipo/categoría" a una
+          // dependencia; sólo se asignan trámites concretos (vía
+          // MunicipioDependenciaTramite). El estado local `tipos_tramite` se
+          // usa solo como helper visual para expandir/colapsar, pero no se
+          // persiste directamente.
           if (JSON.stringify([...current.tramites].sort()) !== JSON.stringify([...original.tramites].sort())) {
             promises.push(dependenciasApi.asignarTramites(depId, current.tramites));
           }
@@ -317,20 +332,28 @@ export default function AsignacionDependencias() {
         });
         toast.success('Se desasignaron todas las categorías');
       } else {
-        await dependenciasApi.limpiarAsignacionesTiposTramite();
-        // Limpiar tipos de trámite del estado local
+        // Ya no existe un endpoint para limpiar "tipos" (el concepto
+        // desapareció). Limpiamos el estado local y grabamos con el save
+        // normal: el backend borra todas las asignaciones de trámites al
+        // mandar un array vacío por cada dependencia.
+        const depsTramite = dependencias.filter(
+          d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS'
+        );
+        await Promise.all(
+          depsTramite.map(d => dependenciasApi.asignarTramites(d.id, []))
+        );
         setAsignaciones(prev => {
           const newState: AsignacionState = {};
           Object.keys(prev).forEach(depId => {
             newState[parseInt(depId)] = {
               ...prev[parseInt(depId)],
               tipos_tramite: [],
-              tramites: []
+              tramites: [],
             };
           });
           return newState;
         });
-        toast.success('Se desasignaron todos los tipos de trámite');
+        toast.success('Se desasignaron todos los trámites');
       }
       // Recargar datos
       fetchData();
@@ -360,13 +383,17 @@ export default function AsignacionDependencias() {
         // Obtener dependencias tipo TRAMITE o AMBOS
         const depsTramite = dependencias.filter(d => d.tipo_gestion === 'TRAMITE' || d.tipo_gestion === 'AMBOS');
 
-        const response = await dependenciasApi.autoAsignarTiposTramiteIA(
+        // Nuevo endpoint: auto-asignar por CATEGORÍAS de trámite. Cada
+        // categoría asignada arrastra todos sus trámites concretos
+        // automáticamente en el backend.
+        const response = await dependenciasApi.autoAsignarCategoriasTramiteIA(
           tiposTramite.map(t => ({ id: t.id, nombre: t.nombre })),
           depsTramite.map(d => ({ id: d.dependencia_id, nombre: d.nombre, descripcion: undefined }))
         );
 
         toast.dismiss();
-        toast.success(`IA asignó ${response.data.total} tipos de trámite automáticamente`);
+        const total = response.data.total_tramites ?? response.data.total_categorias ?? 0;
+        toast.success(`IA asignó ${total} trámites automáticamente`);
       }
 
       // Recargar datos para ver las nuevas asignaciones

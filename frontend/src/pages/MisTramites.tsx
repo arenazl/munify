@@ -21,7 +21,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi } from '../lib/api';
+import { tramitesApi, categoriasTramiteApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
@@ -122,12 +122,21 @@ export default function MisTramites() {
 
   const goToNuevoTramite = async () => {
     try {
-      const [serviciosRes, tiposRes] = await Promise.all([
-        tramitesApi.getServicios(),
-        tramitesApi.getTipos()
+      const [tramitesRes, categoriasRes] = await Promise.all([
+        tramitesApi.getAll(),
+        categoriasTramiteApi.getAll(),
       ]);
-      setServicios(serviciosRes.data);
-      setTipos(tiposRes.data);
+      // Shim: el TramiteWizard viejo todavía usa tipo_tramite_id y un string
+      // en documentos_requeridos. Los transformamos desde el modelo nuevo.
+      const serviciosShim = (tramitesRes.data || []).map((t: any) => ({
+        ...t,
+        tipo_tramite_id: t.categoria_tramite_id,
+        documentos_requeridos: Array.isArray(t.documentos_requeridos)
+          ? t.documentos_requeridos.map((d: any) => d.nombre).join(' | ')
+          : t.documentos_requeridos,
+      }));
+      setServicios(serviciosShim);
+      setTipos(categoriasRes.data);
     } catch (error) {
       console.error('Error cargando servicios/tipos:', error);
     }
