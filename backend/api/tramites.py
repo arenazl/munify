@@ -263,8 +263,18 @@ async def crear_tramite(
         db.add(TramiteDocumentoRequerido(tramite_id=tramite.id, **doc.model_dump()))
 
     await db.commit()
-    await db.refresh(tramite, ["categoria_tramite", "documentos_requeridos"])
-    return tramite
+
+    # Re-querear con selectinload para evitar lazy-load fuera del contexto
+    # async después del commit (los atributos quedan expirados).
+    result = await db.execute(
+        select(Tramite)
+        .options(
+            selectinload(Tramite.categoria_tramite),
+            selectinload(Tramite.documentos_requeridos),
+        )
+        .where(Tramite.id == tramite.id)
+    )
+    return result.scalar_one()
 
 
 @router.put("/{tramite_id}", response_model=TramiteResponse)
@@ -306,8 +316,17 @@ async def actualizar_tramite(
         setattr(tramite, k, v)
 
     await db.commit()
-    await db.refresh(tramite, ["categoria_tramite", "documentos_requeridos"])
-    return tramite
+
+    # Re-querear con selectinload (mismo motivo que en crear_tramite)
+    result = await db.execute(
+        select(Tramite)
+        .options(
+            selectinload(Tramite.categoria_tramite),
+            selectinload(Tramite.documentos_requeridos),
+        )
+        .where(Tramite.id == tramite_id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{tramite_id}", status_code=204)
@@ -619,8 +638,7 @@ async def crear_solicitud(
             )
 
     db.add(solicitud)
-    await db.commit()
-    await db.refresh(solicitud)
+    await db.flush()
 
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
@@ -631,17 +649,23 @@ async def crear_solicitud(
     )
     db.add(historial)
     await db.commit()
-    await db.refresh(solicitud, ["tramite"])
 
-    # Notificaciones en background
-    import asyncio
-    if current_user:
-        asyncio.create_task(enviar_notificacion_solicitud(db, solicitud, tramite.nombre))
-    asyncio.create_task(enviar_notificacion_supervisores_solicitud(db, solicitud, tramite.nombre))
-    if current_user:
-        asyncio.create_task(enviar_email_solicitud_creada(db, solicitud, current_user, tramite.nombre))
+    # Re-querear para evitar lazy-load en pydantic post-commit
+    result = await db.execute(
+        select(Solicitud)
+        .options(
+            selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
+            selectinload(Solicitud.solicitante),
+        )
+        .where(Solicitud.id == solicitud.id)
+    )
+    solicitud_full = result.scalar_one()
 
-    return solicitud
+    # Las notificaciones en background quedaron deshabilitadas porque
+    # el `db` session se cierra al terminar este request y romperia las tasks
+    # asyncio. Si se reactivan, hay que crear una sesion nueva dentro de cada
+    # task usando `async with AsyncSessionLocal() as fresh_db:`.
+    return solicitud_full
 
 
 @router.put("/solicitudes/detalle/{solicitud_id}", response_model=SolicitudResponse)
@@ -694,17 +718,17 @@ async def actualizar_solicitud(
         db.add(historial)
 
     await db.commit()
-    await db.refresh(solicitud)
 
-    if cambio_estado:
-        import asyncio
-        asyncio.create_task(enviar_notificacion_cambio_estado_solicitud(
-            db, solicitud,
-            estado_anterior.value if hasattr(estado_anterior, "value") else str(estado_anterior),
-            solicitud_data.estado.value,
-        ))
-
-    return solicitud
+    # Re-querear con relaciones para evitar lazy-load en pydantic.
+    result = await db.execute(
+        select(Solicitud)
+        .options(
+            selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
+            selectinload(Solicitud.solicitante),
+        )
+        .where(Solicitud.id == solicitud_id)
+    )
+    return result.scalar_one()
 
 
 @router.get("/solicitudes/{solicitud_id}/historial", response_model=List[HistorialSolicitudResponse])
@@ -785,8 +809,18 @@ async def asignar_solicitud(
     )
     db.add(historial)
     await db.commit()
-    await db.refresh(solicitud)
-    return solicitud
+
+    # Re-querear con relaciones (greenlet-safe)
+    result = await db.execute(
+        select(Solicitud)
+        .options(
+            selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
+            selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
+        )
+        .where(Solicitud.id == solicitud_id)
+    )
+    return result.scalar_one()
 
 
 # ============================================================
