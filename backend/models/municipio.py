@@ -46,6 +46,14 @@ class Municipio(Base):
     zoom_mapa_default = Column(Integer, default=13)
     max_reclamos_dia_vecino = Column(Integer, default=5)
 
+    # Flag de UI: si es True, el sidebar del admin muestra los ABMs
+    # "Categorías Reclamo", "Categorías Trámite" y "Tipos de Trámite" como
+    # items de primer nivel. Si es False, esos items quedan SOLO accesibles
+    # desde la pantalla de Ajustes (donde ya existen como cards). Reduce
+    # ruido visual en el sidebar. Los munis creados por el endpoint demo
+    # (`crear_municipio_demo`) arrancan en False por default.
+    abm_en_sidebar = Column(Boolean, default=True, nullable=False)
+
     # Estado
     activo = Column(Boolean, default=True)
 

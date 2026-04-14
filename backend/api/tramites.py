@@ -16,6 +16,7 @@ Reglas de negocio:
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, date
@@ -23,8 +24,10 @@ import logging
 import cloudinary
 import cloudinary.uploader
 
+import secrets
+
 from core.database import get_db
-from core.security import get_current_user, get_current_user_optional, require_roles
+from core.security import get_current_user, get_current_user_optional, require_roles, get_password_hash
 from core.config import settings
 from models.tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from models.tramite_documento_requerido import TramiteDocumentoRequerido
@@ -55,21 +58,9 @@ router = APIRouter()
 # HELPERS
 # ============================================================
 
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
-    """Obtiene el municipio_id efectivo (header X-Municipio-ID si admin/supervisor)."""
-    if current_user and current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
-        header_municipio_id = request.headers.get("X-Municipio-ID")
-        if header_municipio_id:
-            try:
-                return int(header_municipio_id)
-            except (ValueError, TypeError):
-                pass
-    if not current_user or current_user.municipio_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Usuario sin municipio asignado. Indicar X-Municipio-ID.",
-        )
-    return current_user.municipio_id
+# Resolución de municipio centralizada en core/tenancy.py (antes había 10
+# copias duplicadas, una por archivo de API). Ahora todas usan la misma.
+from core.tenancy import get_effective_municipio_id  # noqa: E402
 
 
 async def enviar_notificacion_solicitud(db, solicitud, tramite_nombre=None):
@@ -575,6 +566,12 @@ async def obtener_solicitud(
     return solicitud
 
 
+# El helper `_resolver_o_crear_vecino` se extrajo a `services/vecinos.py`
+# para poder reusarlo desde `api/reclamos.py`. Mantenemos este alias local
+# con el mismo nombre para no tocar los call sites existentes.
+from services.vecinos import resolver_o_crear_vecino as _resolver_o_crear_vecino  # noqa: E402
+
+
 @router.post("/solicitudes", response_model=SolicitudResponse)
 async def crear_solicitud(
     solicitud_data: SolicitudCreate,
@@ -599,46 +596,144 @@ async def crear_solicitud(
     if not tramite:
         raise HTTPException(status_code=404, detail="Trámite no disponible para este municipio")
 
-    # Generar número único
-    year = datetime.now().year
-    prefix = f"SOL-{year}-"
-    max_q = await db.execute(
-        select(func.max(Solicitud.numero_tramite)).where(
-            and_(
-                Solicitud.municipio_id == municipio_id,
-                Solicitud.numero_tramite.like(f"{prefix}%"),
-            )
-        )
-    )
-    max_numero = max_q.scalar()
-    if max_numero:
-        seq = int(max_numero.split("-")[-1])
-        numero_tramite = f"{prefix}{str(seq + 1).zfill(5)}"
-    else:
-        numero_tramite = f"{prefix}00001"
+    # ================================================================
+    # Resolver el solicitante (dueño real del trámite, no quien lo cargó)
+    # ================================================================
+    #
+    # Hay 3 escenarios posibles:
+    #
+    # 1. No hay `current_user` (solicitud pública/anónima desde portal):
+    #    exigimos al menos email o teléfono para poder contactar. La
+    #    solicitud queda sin `solicitante_id` (legacy, mantener compat).
+    #
+    # 2. `current_user` es rol `vecino`: el vecino está cargando SU propia
+    #    solicitud desde la web/app. `solicitante_id = current_user.id`
+    #    y los campos vacíos del form se completan con los datos del perfil.
+    #
+    # 3. `current_user` es rol `admin` o `supervisor`: el empleado está
+    #    cargando en ventanilla una solicitud a nombre de otra persona.
+    #    En este caso NO queremos que `solicitante_id` apunte al empleado
+    #    — tiene que apuntar al vecino. Entonces:
+    #      a) Buscamos un User con ese DNI en el municipio. Si existe,
+    #         linkeamos ahí (es el vecino, sea "ghost" o ya registrado).
+    #      b) Si no, buscamos por email (si el empleado cargó uno).
+    #      c) Si nada matchea, creamos un "ghost vecino" — un User normal
+    #         en `usuarios` con rol=vecino y un password_hash inutilizable
+    #         (bcrypt de un token random que nadie conoce). El día que el
+    #         vecino se registre por su cuenta, hace "olvidé mi contraseña"
+    #         con el mismo email y reclama la cuenta + su historial.
+    #
+    # El empleado que CREÓ la solicitud queda auditado en
+    # `historial_solicitudes.usuario_id`, que es el lugar correcto.
 
-    solicitud = Solicitud(
-        municipio_id=municipio_id,
-        numero_tramite=numero_tramite,
-        estado=EstadoSolicitud.RECIBIDO,
-        **solicitud_data.model_dump(),
-    )
+    solicitante_id: Optional[int] = None
+    overrides_perfil: dict = {}
 
-    if current_user:
-        solicitud.solicitante_id = current_user.id
-        for campo in ["nombre", "apellido", "email", "telefono", "dni", "direccion"]:
-            campo_sol = f"{campo}_solicitante"
-            if not getattr(solicitud, campo_sol, None):
-                setattr(solicitud, campo_sol, getattr(current_user, campo, None))
-    else:
+    if current_user is None:
+        # Escenario 1: anónimo
         if not solicitud_data.email_solicitante and not solicitud_data.telefono_solicitante:
             raise HTTPException(
                 status_code=400,
                 detail="Debe proporcionar email o teléfono para seguimiento",
             )
+    elif current_user.rol == RolUsuario.VECINO:
+        # Escenario 2: vecino cargando su propia solicitud
+        solicitante_id = current_user.id
+        for campo in ["nombre", "apellido", "email", "telefono", "dni", "direccion"]:
+            campo_sol = f"{campo}_solicitante"
+            if not getattr(solicitud_data, campo_sol, None):
+                overrides_perfil[campo_sol] = getattr(current_user, campo, None)
+    else:
+        # Escenario 3: empleado/admin cargando en ventanilla para un tercero.
+        # Resolvemos o creamos el vecino.
+        vecino = await _resolver_o_crear_vecino(
+            db=db,
+            municipio_id=municipio_id,
+            dni=solicitud_data.dni_solicitante,
+            email=solicitud_data.email_solicitante,
+            nombre=solicitud_data.nombre_solicitante,
+            apellido=solicitud_data.apellido_solicitante,
+            telefono=solicitud_data.telefono_solicitante,
+            direccion=solicitud_data.direccion_solicitante,
+        )
+        solicitante_id = vecino.id
 
-    db.add(solicitud)
-    await db.flush()
+    # ================================================================
+    # Generar número único + INSERT con retry por race de concurrencia
+    # ================================================================
+    #
+    # `Solicitud.numero_tramite` tiene índice UNIQUE global (no per-muni),
+    # porque el endpoint público /solicitudes/consultar/{numero_tramite}
+    # busca por número sin filtro de municipio y debe resolver a una sola
+    # fila. Por eso el contador acá también tiene que ser global: si
+    # filtrásemos por municipio_id, dos munis distintos calcularían ambos
+    # SOL-2026-00001 como su primer número y el segundo chocaría contra
+    # el índice UNIQUE. El costo es cosmético — los números por muni
+    # quedan salteados (muni A ve 1, 4, 7... y muni B ve 2, 3, 5...).
+    #
+    # El patrón "SELECT MAX + INSERT" no es atómico: dos requests paralelas
+    # pueden leer el mismo MAX bajo el snapshot de InnoDB (REPEATABLE READ)
+    # y terminar ambas intentando insertar el mismo número, rompiendo el
+    # índice UNIQUE. Por eso envolvemos el flush en un savepoint y
+    # reintentamos si chocamos: el perdedor del reintento vuelve a leer
+    # MAX (que ahora sí ve la fila del ganador ya commited en su savepoint)
+    # y toma el siguiente número libre.
+    year = datetime.now().year
+    prefix = f"SOL-{year}-"
+    MAX_RETRIES = 5
+    solicitud: Optional[Solicitud] = None
+
+    logger.info(f"[crear_solicitud] START retry-loop muni={municipio_id} prefix={prefix}")
+    for attempt in range(MAX_RETRIES):
+        max_q = await db.execute(
+            select(func.max(Solicitud.numero_tramite)).where(
+                Solicitud.numero_tramite.like(f"{prefix}%"),
+            )
+        )
+        max_numero = max_q.scalar()
+        if max_numero:
+            seq = int(max_numero.split("-")[-1])
+            numero_tramite = f"{prefix}{str(seq + 1).zfill(5)}"
+        else:
+            numero_tramite = f"{prefix}00001"
+
+        logger.info(
+            f"[crear_solicitud] attempt={attempt + 1}/{MAX_RETRIES} "
+            f"max_numero={max_numero!r} -> numero_tramite={numero_tramite}"
+        )
+
+        solicitud = Solicitud(
+            municipio_id=municipio_id,
+            numero_tramite=numero_tramite,
+            estado=EstadoSolicitud.RECIBIDO,
+            solicitante_id=solicitante_id,
+            **solicitud_data.model_dump(),
+        )
+        for campo_sol, valor in overrides_perfil.items():
+            setattr(solicitud, campo_sol, valor)
+
+        try:
+            async with db.begin_nested():
+                db.add(solicitud)
+                await db.flush()
+            logger.info(f"[crear_solicitud] OK numero={numero_tramite} id={solicitud.id}")
+            break
+        except IntegrityError as e:
+            # El savepoint ya revirtió el INSERT. Si la colisión fue por
+            # `numero_tramite`, reintentamos; cualquier otro IntegrityError
+            # (FK, NOT NULL, etc.) se propaga tal cual.
+            logger.warning(
+                f"[crear_solicitud] IntegrityError attempt={attempt + 1} "
+                f"numero={numero_tramite} err={e.orig!r}"
+            )
+            if "numero_tramite" not in str(e.orig).lower():
+                raise
+            if attempt == MAX_RETRIES - 1:
+                raise HTTPException(
+                    status_code=503,
+                    detail="No se pudo generar un número único de solicitud. Reintente.",
+                )
+            solicitud = None  # siguiente iter lo reconstruye con MAX fresco
 
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
@@ -1045,6 +1140,7 @@ async def get_checklist_documentos(
             documento_id=doc.id if doc else None,
             documento_url=doc.url if doc else None,
             documento_nombre=doc.nombre_original if doc else None,
+            documento_tipo=doc.tipo if doc else None,
             verificado=bool(doc and doc.verificado),
             verificado_por_id=doc.verificado_por_id if doc else None,
             verificado_por_nombre=verificado_por_nombre,
@@ -1112,6 +1208,105 @@ async def desverificar_documento(
     documento.fecha_verificacion = None
     await db.commit()
     return {"message": "Documento desverificado", "id": documento.id}
+
+
+@router.post("/solicitudes/{solicitud_id}/requeridos/{requerido_id}/verificar-visual")
+async def verificar_visual_sin_archivo(
+    solicitud_id: int,
+    requerido_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """
+    Marca un `TramiteDocumentoRequerido` como verificado SIN archivo adjunto.
+
+    Caso de uso: el empleado recibe el documento físico en ventanilla y lo
+    ve con sus propios ojos, pero no lo digitaliza. Solo tilda "OK verificado".
+
+    Lógica:
+    - Si ya existe un `DocumentoSolicitud` vinculado a este `requerido_id`,
+      se lo marca como verificado (como el endpoint `verificar_documento`).
+    - Si no existe ninguno, se crea un placeholder con `url=''`, `tipo='verificacion_manual'`
+      y se marca verificado de una.
+
+    El placeholder cuenta igual que un archivo verificado para la validación
+    de transición `recibido → en_curso` porque tiene `verificado=true` y
+    `tramite_documento_requerido_id` seteado.
+    """
+    # Validar que la solicitud existe
+    sol_q = await db.execute(select(Solicitud).where(Solicitud.id == solicitud_id))
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Validar que el requerido existe y pertenece al trámite de esta solicitud
+    req_q = await db.execute(
+        select(TramiteDocumentoRequerido).where(
+            TramiteDocumentoRequerido.id == requerido_id,
+            TramiteDocumentoRequerido.tramite_id == solicitud.tramite_id,
+        )
+    )
+    requerido = req_q.scalar_one_or_none()
+    if not requerido:
+        raise HTTPException(
+            status_code=404,
+            detail="Documento requerido no encontrado para este trámite",
+        )
+
+    # ¿Ya existe un DocumentoSolicitud para este requerido?
+    existing_q = await db.execute(
+        select(DocumentoSolicitud).where(
+            DocumentoSolicitud.solicitud_id == solicitud_id,
+            DocumentoSolicitud.tramite_documento_requerido_id == requerido_id,
+        )
+    )
+    existing = existing_q.scalar_one_or_none()
+
+    now = datetime.utcnow()
+
+    if existing:
+        # Solo marcar como verificado
+        existing.verificado = True
+        existing.verificado_por_id = current_user.id
+        existing.fecha_verificacion = now
+        doc = existing
+    else:
+        # Crear un placeholder sin archivo
+        doc = DocumentoSolicitud(
+            solicitud_id=solicitud_id,
+            usuario_id=current_user.id,
+            nombre_original="Verificado en ventanilla",
+            url="",
+            public_id=None,
+            tipo="verificacion_manual",
+            mime_type=None,
+            tamanio=None,
+            tipo_documento="verificacion_visual",
+            descripcion=f"Documento verificado visualmente: {requerido.nombre}",
+            etapa="creacion",
+            tramite_documento_requerido_id=requerido_id,
+            verificado=True,
+            verificado_por_id=current_user.id,
+            fecha_verificacion=now,
+        )
+        db.add(doc)
+
+    # Flush para que el id del placeholder recién creado esté disponible
+    await db.flush()
+
+    # Capturar escalares ANTES del commit para evitar greenlet error al acceder
+    # a attrs expired después del commit.
+    doc_id = doc.id
+    doc_tipo = doc.tipo
+
+    await db.commit()
+
+    return {
+        "message": "Documento verificado visualmente",
+        "id": doc_id,
+        "tramite_documento_requerido_id": requerido_id,
+        "tipo": doc_tipo,
+    }
 
 
 # ============================================================

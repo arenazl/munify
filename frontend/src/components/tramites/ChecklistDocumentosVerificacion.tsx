@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Check, Loader2, FileText, ExternalLink, AlertCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Check,
+  Loader2,
+  FileText,
+  ExternalLink,
+  AlertCircle,
+  Upload,
+  Eye,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi } from '../../lib/api';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -7,48 +15,67 @@ import type { ChecklistDocumentos, ChecklistDocumentoItem } from '../../types';
 
 interface Props {
   solicitudId: number;
-  /** Si el supervisor puede tildar (admin/supervisor) o solo lectura (vecino) */
+  /** Si es true, no muestra ningún botón de acción. Para vista de vecino. */
   readOnly?: boolean;
-  /** Callback al cambiar verificación, para que el caller refresque la solicitud */
+  /** Callback al cambiar verificación/upload, para que el caller refresque la solicitud */
   onChange?: () => void;
 }
 
 /**
  * Checklist de verificación de documentos requeridos por una solicitud.
  *
- * El supervisor ve cada documento requerido del trámite, si fue subido o no,
- * y puede tildarlo como verificado. Mientras falte alguno obligatorio sin
- * verificar, el backend bloquea la transición de `recibido` → `en_curso`.
+ * Flujo flexible: para cada documento requerido del trámite, el supervisor puede:
+ *
+ *   1. **Subir archivo**: abre file picker, sube a Cloudinary y lo vincula al
+ *      tramite_documento_requerido_id. El archivo queda sin verificar — hay que
+ *      tildarlo después con el checkbox (puede hacerlo el mismo o otro humano).
+ *
+ *   2. **Verificar visualmente sin archivo**: si el empleado vio el documento
+ *      físicamente en ventanilla, tilda "OK" sin digitalizar nada. El backend
+ *      crea un placeholder con tipo='verificacion_manual' y verificado=true.
+ *
+ *   3. **Tildar/destildar verificación**: si ya hay documento (archivo o visual),
+ *      el checkbox lo marca/desmarca como verificado.
+ *
+ * Mientras quede algún documento obligatorio sin verificar, el backend bloquea
+ * la transición `recibido → en_curso` con un 400.
  */
 export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false, onChange }: Props) {
   const { theme } = useTheme();
   const [data, setData] = useState<ChecklistDocumentos | null>(null);
   const [loading, setLoading] = useState(true);
-  const [verificandoId, setVerificandoId] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
-  const cargar = async () => {
-    setLoading(true);
+  // `cargar` tiene un flag para decidir si muestra el spinner grande. Solo el
+  // load inicial lo usa. Los refreshes después de acciones (upload, verificar,
+  // desverificar) pasan `false` para hacer un update silencioso — así no se
+  // "blanquea" todo el modal en cada click. El feedback per-fila ya lo da el
+  // spinner chico del `actionLoading`.
+  const cargar = async (mostrarSplash = false) => {
+    if (mostrarSplash) setLoading(true);
     try {
       const res = await tramitesApi.getChecklistDocumentos(solicitudId);
       setData(res.data);
     } catch (err) {
       console.error('Error cargando checklist', err);
     } finally {
-      setLoading(false);
+      if (mostrarSplash) setLoading(false);
     }
   };
 
   useEffect(() => {
-    cargar();
+    cargar(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [solicitudId]);
 
   const toggleVerificacion = async (item: ChecklistDocumentoItem) => {
     if (!item.documento_id) {
-      toast.error('Este documento aún no fue subido');
+      toast.error('Este documento aún no fue subido ni verificado visualmente');
       return;
     }
-    setVerificandoId(item.documento_id);
+    const key = `toggle-${item.documento_id}`;
+    setActionLoading(key);
     try {
       if (item.verificado) {
         await tramitesApi.desverificarDocumento(solicitudId, item.documento_id);
@@ -60,7 +87,43 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Error verificando documento');
     } finally {
-      setVerificandoId(null);
+      setActionLoading(null);
+    }
+  };
+
+  const handleUpload = async (item: ChecklistDocumentoItem, file: File) => {
+    if (!item.requerido_id) return;
+    const key = `upload-${item.requerido_id}`;
+    setActionLoading(key);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      await tramitesApi.uploadDocumento(solicitudId, formData, {
+        tramite_documento_requerido_id: item.requerido_id,
+      });
+      toast.success(`"${file.name}" subido correctamente. Falta tildar la verificación.`);
+      await cargar();
+      onChange?.();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Error subiendo archivo');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleVerificarVisual = async (item: ChecklistDocumentoItem) => {
+    if (!item.requerido_id) return;
+    const key = `visual-${item.requerido_id}`;
+    setActionLoading(key);
+    try {
+      await tramitesApi.verificarSinArchivo(solicitudId, item.requerido_id);
+      toast.success(`"${item.nombre}" marcado como verificado visualmente.`);
+      await cargar();
+      onChange?.();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Error marcando verificación visual');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -112,8 +175,15 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
       {/* Lista */}
       <div className="space-y-2">
         {data.items.map((item, idx) => {
-          const subido = !!item.documento_id;
-          const isLoading = verificandoId === item.documento_id;
+          const hasDocumento = !!item.documento_id;
+          const esVerificacionVisual = item.documento_tipo === 'verificacion_manual';
+          const toggleKey = `toggle-${item.documento_id}`;
+          const uploadKey = `upload-${item.requerido_id}`;
+          const visualKey = `visual-${item.requerido_id}`;
+          const isTogglingThis = actionLoading === toggleKey;
+          const isUploadingThis = actionLoading === uploadKey;
+          const isVisualThis = actionLoading === visualKey;
+
           return (
             <div
               key={idx}
@@ -126,22 +196,22 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
               {/* Checkbox */}
               <button
                 type="button"
-                disabled={readOnly || !subido || isLoading}
+                disabled={readOnly || !hasDocumento || isTogglingThis}
                 onClick={() => toggleVerificacion(item)}
-                className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-0.5"
                 style={{
                   backgroundColor: item.verificado ? '#10b981' : theme.card,
                   border: `2px solid ${item.verificado ? '#10b981' : theme.border}`,
                 }}
                 title={
-                  !subido
-                    ? 'El vecino aún no subió este documento'
+                  !hasDocumento
+                    ? 'Subí un archivo o marcá como verificado visualmente primero'
                     : item.verificado
                     ? 'Click para desmarcar'
                     : 'Click para marcar como verificado'
                 }
               >
-                {isLoading ? (
+                {isTogglingThis ? (
                   <Loader2 className="h-3 w-3 animate-spin text-white" />
                 ) : item.verificado ? (
                   <Check className="h-4 w-4 text-white" />
@@ -150,7 +220,7 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <FileText className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
                   <span className="text-sm font-medium" style={{ color: theme.text }}>
                     {item.nombre}
@@ -166,32 +236,84 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                     {item.descripcion}
                   </p>
                 )}
-                <div className="mt-2 ml-6 flex items-center gap-3 text-xs" style={{ color: theme.textSecondary }}>
-                  {subido ? (
-                    <>
-                      <a
-                        href={item.documento_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 hover:underline"
-                        style={{ color: theme.primary }}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        {item.documento_nombre}
-                      </a>
-                      {item.verificado && item.verificado_por_nombre && (
-                        <span>
-                          ✓ Verificado por <strong>{item.verificado_por_nombre}</strong>
-                          {item.fecha_verificacion && (
-                            <> el {new Date(item.fecha_verificacion).toLocaleDateString('es-AR')}</>
-                          )}
-                        </span>
+
+                {/* Estado actual del documento */}
+                <div className="mt-2 ml-6 flex items-center gap-3 text-xs flex-wrap" style={{ color: theme.textSecondary }}>
+                  {!hasDocumento && (
+                    <span className="italic">Sin cargar</span>
+                  )}
+                  {hasDocumento && esVerificacionVisual && (
+                    <span className="flex items-center gap-1" style={{ color: '#10b981' }}>
+                      <Eye className="h-3 w-3" />
+                      Verificado visualmente en ventanilla
+                    </span>
+                  )}
+                  {hasDocumento && !esVerificacionVisual && item.documento_url && (
+                    <a
+                      href={item.documento_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 hover:underline"
+                      style={{ color: theme.primary }}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      {item.documento_nombre}
+                    </a>
+                  )}
+                  {item.verificado && item.verificado_por_nombre && (
+                    <span>
+                      ✓ por <strong>{item.verificado_por_nombre}</strong>
+                      {item.fecha_verificacion && (
+                        <> el {new Date(item.fecha_verificacion).toLocaleDateString('es-AR')}</>
                       )}
-                    </>
-                  ) : (
-                    <span className="italic">Pendiente de carga del vecino</span>
+                    </span>
                   )}
                 </div>
+
+                {/* Acciones: solo si no hay documento y no es readOnly */}
+                {!readOnly && !hasDocumento && (
+                  <div className="mt-2 ml-6 flex items-center gap-2 flex-wrap">
+                    <input
+                      ref={el => { if (item.requerido_id) fileInputRefs.current[item.requerido_id] = el; }}
+                      type="file"
+                      className="hidden"
+                      accept="image/jpeg,image/png,image/jpg,image/webp,image/gif,application/pdf"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUpload(item, file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={isUploadingThis || isVisualThis}
+                      onClick={() => item.requerido_id && fileInputRefs.current[item.requerido_id]?.click()}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      style={{
+                        backgroundColor: `${theme.primary}15`,
+                        color: theme.primary,
+                        border: `1px solid ${theme.primary}40`,
+                      }}
+                    >
+                      {isUploadingThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                      Subir archivo
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isUploadingThis || isVisualThis}
+                      onClick={() => handleVerificarVisual(item)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                      style={{
+                        backgroundColor: '#10b98115',
+                        color: '#10b981',
+                        border: '1px solid #10b98140',
+                      }}
+                    >
+                      {isVisualThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+                      Verificado sin archivo
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );

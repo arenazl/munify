@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
-from typing import List
+from typing import List, Optional
 from models.municipio_dependencia import MunicipioDependencia
 from datetime import datetime, timedelta
 import secrets
@@ -12,22 +12,15 @@ from core.security import get_current_user, require_roles, get_password_hash
 from models.user import User
 from models.email_validation import EmailValidation
 from models.enums import RolUsuario
+from models.tramite import Solicitud
+from models.reclamo import Reclamo
 from schemas.user import UserResponse, UserUpdate, UserCreate, UserProfileUpdate
 from services.email_service import email_service, EmailTemplates
+from pydantic import BaseModel
+
+from core.tenancy import resolve_municipio_id as get_effective_municipio_id  # noqa: E402
 
 router = APIRouter()
-
-
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
-    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
-    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
-        header_municipio_id = request.headers.get('X-Municipio-ID')
-        if header_municipio_id:
-            try:
-                return int(header_municipio_id)
-            except (ValueError, TypeError):
-                pass
-    return current_user.municipio_id
 
 # ============================================
 # ENDPOINTS DE PERFIL PROPIO (cualquier usuario autenticado)
@@ -187,6 +180,123 @@ async def get_users(
         .order_by(User.created_at.desc())
     )
     return result.scalars().all()
+
+# ============================================
+# Búsqueda por DNI (para autocompletar datos del solicitante en el wizard
+# de nueva solicitud de trámite)
+# ============================================
+
+class VecinoPorDniResponse(BaseModel):
+    """
+    Resultado de buscar un vecino por DNI en el municipio actual.
+
+    Se usa en el wizard de creación de solicitud de trámite: cuando el
+    empleado termina de cargar el DNI, el frontend consulta este endpoint
+    para ver si el vecino ya existe. Si existe, autocompleta los campos.
+    """
+    id: int
+    nombre: str
+    apellido: Optional[str] = None
+    dni: Optional[str] = None
+    email: Optional[str] = None
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
+    solicitudes_previas: int = 0
+    ultima_solicitud_fecha: Optional[datetime] = None
+    # Total de reclamos previos en el mismo municipio, y dirección del más
+    # reciente. El frontend usa `ultimo_reclamo_direccion` como chip
+    # sugerido en el paso "Dónde" del wizard de reclamos.
+    reclamos_previos: int = 0
+    ultimo_reclamo_direccion: Optional[str] = None
+
+
+@router.get("/buscar-por-dni", response_model=Optional[VecinoPorDniResponse])
+async def buscar_vecino_por_dni(
+    dni: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """
+    Busca un usuario por DNI dentro del municipio actual (definido por el
+    header `X-Municipio-ID` o por el municipio del usuario logueado).
+
+    Devuelve `null` (200 con body vacío) si no existe — no es un error, es
+    simplemente un "no hay match".
+
+    Incluye el conteo de solicitudes previas de este vecino en el mismo
+    municipio y la fecha de la última, para que el frontend muestre un banner
+    tipo "Vecino existente — 3 solicitudes previas, última en Enero 2026".
+    """
+    municipio_id = get_effective_municipio_id(request, current_user)
+    if not municipio_id:
+        raise HTTPException(status_code=400, detail="Municipio no identificado")
+
+    # Normalizar el DNI: sacar puntos, espacios, guiones
+    dni_limpio = "".join(c for c in dni if c.isdigit())
+    if len(dni_limpio) < 7:
+        # Menos de 7 dígitos no es un DNI válido — devolvemos null sin buscar
+        return None
+
+    # Buscar el usuario por DNI dentro del municipio
+    result = await db.execute(
+        select(User)
+        .where(User.dni == dni_limpio)
+        .where(User.municipio_id == municipio_id)
+        .where(User.activo == True)
+        .limit(1)
+    )
+    user = result.scalar_one_or_none()
+    if not user:
+        return None
+
+    # Contar solicitudes previas + fecha de la última (trámites)
+    stats_result = await db.execute(
+        select(
+            func.count(Solicitud.id),
+            func.max(Solicitud.created_at),
+        )
+        .where(Solicitud.solicitante_id == user.id)
+        .where(Solicitud.municipio_id == municipio_id)
+    )
+    total_solicitudes, ultima_fecha = stats_result.one()
+
+    # Contar reclamos previos + dirección del más reciente. La dirección
+    # del último reclamo se usa en el frontend como chip sugerido en el
+    # paso "Dónde" del wizard, para ahorrar tipeo cuando el vecino
+    # reclama cosas cerca del mismo lugar.
+    reclamos_stats = await db.execute(
+        select(func.count(Reclamo.id))
+        .where(Reclamo.creador_id == user.id)
+        .where(Reclamo.municipio_id == municipio_id)
+    )
+    total_reclamos = reclamos_stats.scalar() or 0
+
+    ultima_direccion_reclamo: Optional[str] = None
+    if total_reclamos > 0:
+        ult_res = await db.execute(
+            select(Reclamo.direccion)
+            .where(Reclamo.creador_id == user.id)
+            .where(Reclamo.municipio_id == municipio_id)
+            .order_by(Reclamo.created_at.desc())
+            .limit(1)
+        )
+        ultima_direccion_reclamo = ult_res.scalar()
+
+    return VecinoPorDniResponse(
+        id=user.id,
+        nombre=user.nombre,
+        apellido=user.apellido,
+        dni=user.dni,
+        email=user.email,
+        telefono=user.telefono,
+        direccion=user.direccion,
+        solicitudes_previas=total_solicitudes or 0,
+        ultima_solicitud_fecha=ultima_fecha,
+        reclamos_previos=total_reclamos,
+        ultimo_reclamo_direccion=ultima_direccion_reclamo,
+    )
+
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(

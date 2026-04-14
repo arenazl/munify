@@ -31,51 +31,34 @@ import { tramitesApi, empleadosApi, categoriasTramiteApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
-import { TramiteWizard } from '../components/TramiteWizard';
+import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import type { Tramite, EstadoTramite, ServicioTramite, Empleado, TipoTramite, EmpleadoDisponibilidad } from '../types';
+import type { Solicitud, Tramite, CategoriaTramite, Empleado, EmpleadoDisponibilidad } from '../types';
+import {
+  getEstadoInfo,
+  normalizarEstado,
+  TRANSICIONES,
+  type EstadoCanonico,
+} from '../lib/estadoConfig';
 import React from 'react';
 
-// Configuración de estados
-const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; color: string; label: string; bg: string }> = {
-  iniciado: { icon: Clock, color: '#6366f1', label: 'Iniciado', bg: '#6366f115' },
-  en_revision: { icon: FileCheck, color: '#3b82f6', label: 'En Revisión', bg: '#3b82f615' },
-  requiere_documentacion: { icon: AlertCircle, color: '#f59e0b', label: 'Requiere Doc.', bg: '#f59e0b15' },
-  en_proceso: { icon: RefreshCw, color: '#8b5cf6', label: 'En Proceso', bg: '#8b5cf615' },
-  aprobado: { icon: CheckCircle2, color: '#10b981', label: 'Aprobado', bg: '#10b98115' },
-  rechazado: { icon: XCircle, color: '#ef4444', label: 'Rechazado', bg: '#ef444415' },
-  finalizado: { icon: CheckCircle2, color: '#059669', label: 'Finalizado', bg: '#05966915' },
-};
-
-// Helper para normalizar el estado (API devuelve MAYÚSCULAS, frontend usa minúsculas)
-const normalizeEstado = (estado: string | undefined | null): EstadoTramite => {
-  return (estado?.toLowerCase() || 'iniciado') as EstadoTramite;
-};
-
-// Obtener config del estado con normalización automática
-const getEstadoConfig = (estado: string | undefined | null) => {
-  return estadoConfig[normalizeEstado(estado)] || estadoConfig.iniciado;
-};
-
-const estadoTransiciones: Record<EstadoTramite, EstadoTramite[]> = {
-  iniciado: ['en_revision', 'requiere_documentacion', 'rechazado'],
-  en_revision: ['en_proceso', 'requiere_documentacion', 'aprobado', 'rechazado'],
-  requiere_documentacion: ['en_revision', 'rechazado'],
-  en_proceso: ['aprobado', 'rechazado'],
-  aprobado: ['finalizado'],
-  rechazado: [],
-  finalizado: [],
-};
+// Helpers locales que delegan en el source-of-truth `lib/estadoConfig.ts`.
+// Los mantenemos con el mismo nombre que usaba el código viejo para no tener
+// que tocar cada call site.
+const getEstadoConfig = getEstadoInfo;
+const normalizeEstado = normalizarEstado;
+const estadoTransiciones = TRANSICIONES;
 
 interface HistorialItem {
   id: number;
   tramite_id: number;
   usuario_id: number | null;
-  estado_anterior: EstadoTramite | null;
-  estado_nuevo: EstadoTramite | null;
+  estado_anterior: EstadoCanonico | null;
+  estado_nuevo: EstadoCanonico | null;
   accion: string;
   comentario: string | null;
   created_at: string;
@@ -109,9 +92,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [tramites, setTramites] = useState<Tramite[]>([]);
-  const [servicios, setServicios] = useState<ServicioTramite[]>([]);
-  const [tipos, setTipos] = useState<TipoTramite[]>([]);
+  const [tramites, setTramites] = useState<Solicitud[]>([]);
+  const [servicios, setServicios] = useState<Tramite[]>([]);
+  const [tipos, setTipos] = useState<CategoriaTramite[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -135,12 +118,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
 
   // Sheet para ver/editar trámite
-  const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(null);
+  const [selectedTramite, setSelectedTramite] = useState<Solicitud | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Formulario de actualización
-  const [nuevoEstado, setNuevoEstado] = useState<EstadoTramite | ''>('');
+  const [nuevoEstado, setNuevoEstado] = useState<EstadoCanonico | ''>('');
   const [respuesta, setRespuesta] = useState('');
   const [observaciones, setObservaciones] = useState('');
 
@@ -224,19 +207,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         tramitesApi.getResumen().catch(() => ({ data: null })),
       ]);
 
-      // Shim para que el TramiteWizard viejo siga funcionando sin reescribirlo:
-      // - Le renombramos `categoria_tramite_id` a `tipo_tramite_id`
-      // - Convertimos el array `documentos_requeridos` a string "doc1 | doc2 | doc3"
-      const serviciosShim = (tramitesRes.data || []).map((t: any) => ({
-        ...t,
-        tipo_tramite_id: t.categoria_tramite_id,
-        documentos_requeridos: Array.isArray(t.documentos_requeridos)
-          ? t.documentos_requeridos.map((d: any) => d.nombre).join(' | ')
-          : t.documentos_requeridos,
-      }));
-
-      setServicios(serviciosShim);
-      setTipos(categoriasRes.data);  // CategoriaTramite tiene la misma forma que TipoTramite
+      setServicios(tramitesRes.data || []);
+      setTipos(categoriasRes.data);
       setEmpleados(empleadosRes.data);
       setResumen(resumenRes.data);
 
@@ -406,7 +378,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const openTramite = async (tramite: Tramite) => {
+  const openTramite = async (tramite: Solicitud) => {
     setSelectedTramite(tramite);
     setNuevoEstado('');
     setRespuesta(tramite.respuesta || '');
@@ -433,7 +405,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     if (!selectedTramite) return;
     setLoadingHistorial(true);
     try {
-      const res = await tramitesApi.getHistorial(selectedTramite.id);
+      const res = await tramitesApi.getHistorialSolicitud(selectedTramite.id);
       setHistorial(res.data);
       setShowHistorial(true);
     } catch (error) {
@@ -448,12 +420,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     if (!selectedTramite) return;
     setLoadingSugerencia(true);
     try {
-      const res = await tramitesApi.sugerirEmpleado(selectedTramite.id);
-      setSugerenciaIA(res.data);
-      if (res.data.sugerencia) {
-        setEmpleadoSeleccionado(res.data.sugerencia.id);
-        toast.success(`IA sugiere: ${res.data.sugerencia.nombre}`);
-      }
+      // TODO: endpoint de sugerencia IA de empleado aún no está migrado al
+      // modelo per-municipio. Por ahora deshabilitado — el admin asigna a mano.
+      toast.info('Sugerencia IA temporalmente no disponible');
+      setSugerenciaIA(null);
     } catch (error) {
       console.error('Error obteniendo sugerencia:', error);
       toast.error('Error al obtener sugerencia de IA');
@@ -481,7 +451,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     }
     setAsignando(true);
     try {
-      await tramitesApi.asignar(selectedTramite.id, {
+      await tramitesApi.asignarSolicitud(selectedTramite.id, {
         municipio_dependencia_id: Number(empleadoSeleccionado),
         comentario: sugerenciaIA?.mensaje || undefined,
       });
@@ -536,7 +506,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   };
 
   // Funciones directas para cambio de estado (botones de acción)
-  const handleDirectStateChange = async (nuevoEstadoDirecto: EstadoTramite, mensajeExito: string) => {
+  const handleDirectStateChange = async (nuevoEstadoDirecto: EstadoCanonico, mensajeExito: string) => {
     if (!selectedTramite) return;
     setSaving(true);
     try {
@@ -556,11 +526,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     }
   };
 
-  const handleAceptar = () => handleDirectStateChange('en_revision', 'Trámite aceptado - En revisión');
-  const handleProcesar = () => handleDirectStateChange('en_proceso', 'Trámite en proceso');
-  const handleAprobar = () => handleDirectStateChange('aprobado', 'Trámite aprobado');
+  const handleAceptar = () => handleDirectStateChange('en_curso', 'Trámite en curso');
   const handleFinalizar = () => handleDirectStateChange('finalizado', 'Trámite finalizado');
   const handleRechazar = () => handleDirectStateChange('rechazado', 'Trámite rechazado');
+  const handlePosponer = () => handleDirectStateChange('pospuesto', 'Trámite pospuesto');
 
   // Renderizar footer con botones de acción
   const renderTramiteFooter = () => {
@@ -588,18 +557,14 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     let mainAction: { label: string; loadingLabel: string; handler: () => void; color: string } | null = null;
 
     switch (estadoActual) {
-      case 'iniciado':
-        mainAction = { label: 'Aceptar', loadingLabel: 'Aceptando...', handler: handleAceptar, color: '#16a34a' };
+      case 'recibido':
+        mainAction = { label: 'Poner en Curso', loadingLabel: 'Aceptando...', handler: handleAceptar, color: theme.primary };
         break;
-      case 'en_revision':
-      case 'requiere_documentacion':
-        mainAction = { label: 'Procesar', loadingLabel: 'Procesando...', handler: handleProcesar, color: theme.primary };
+      case 'en_curso':
+        mainAction = { label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981' };
         break;
-      case 'en_proceso':
-        mainAction = { label: 'Aprobar', loadingLabel: 'Aprobando...', handler: handleAprobar, color: '#10b981' };
-        break;
-      case 'aprobado':
-        mainAction = { label: 'Finalizado', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#059669' };
+      case 'pospuesto':
+        mainAction = { label: 'Reanudar', loadingLabel: 'Reanudando...', handler: handleAceptar, color: theme.primary };
         break;
     }
 
@@ -619,8 +584,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         >
           {saving ? mainAction.loadingLabel : mainAction.label}
         </button>
-        {estadoActual !== 'aprobado' && (
-          <button
+        {/* En este punto estadoActual ya es recibido/en_curso/pospuesto (los
+            finales fueron descartados arriba). Siempre se puede rechazar. */}
+        <button
             onClick={handleRechazar}
             disabled={saving}
             className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50"
@@ -632,13 +598,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           >
             Rechazar
           </button>
-        )}
       </div>
     );
   };
 
   // Función para calcular fecha de vencimiento
-  const calcularVencimiento = (t: Tramite) => {
+  const calcularVencimiento = (t: Solicitud) => {
     const tiempoEstimado = t.tramite?.tiempo_estimado_dias || 0;
     if (!tiempoEstimado) return null;
     const fechaCreacion = new Date(t.created_at);
@@ -649,9 +614,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   // Agrupar servicios por tipo para el dropdown del header
   const serviciosPorTipo = useMemo(() => {
-    const grouped: Record<number, { tipo: TipoTramite; servicios: ServicioTramite[] }> = {};
+    const grouped: Record<number, { tipo: CategoriaTramite; servicios: Tramite[] }> = {};
     servicios.forEach(s => {
-      const tipoId = s.tipo_tramite_id;
+      const tipoId = s.categoria_tramite_id;
       if (!tipoId) return;
       if (!grouped[tipoId]) {
         const tipo = tipos.find(t => t.id === tipoId);
@@ -691,7 +656,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return filteredTramites.map((t) => {
       const config = getEstadoConfig(t.estado);
       const IconEstado = config.icon;
-      const tipoTramite = t.tramite?.tipo_tramite;
+      const tipoTramite = t.tramite?.categoria_tramite;
       const tipoColor = tipoTramite?.color || theme.primary;
       return (
         <div
@@ -889,8 +854,11 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                       style={{ color: isSelected ? '#ffffff' : tipoColor }}
                       fallback={<FileText className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : tipoColor }} />}
                     />
-                    <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                      {tipo.nombre.split(' ')[0]}
+                    <span
+                      className={`text-[10px] font-medium whitespace-nowrap truncate ${isLoadingThis ? 'animate-pulse' : ''}`}
+                      style={{ color: isSelected ? '#ffffff' : theme.text, maxWidth: '140px' }}
+                    >
+                      {tipo.nombre}
                     </span>
                     <span
                       className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse' : ''}`}
@@ -1000,9 +968,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         {
           key: 'tipo',
           header: 'Tipo',
-          sortValue: (t) => t.tramite?.tipo_tramite?.nombre || '',
+          sortValue: (t) => t.tramite?.categoria_tramite?.nombre || '',
           render: (t) => {
-            const tipoTramite = t.tramite?.tipo_tramite;
+            const tipoTramite = t.tramite?.categoria_tramite;
             const tipoColor = tipoTramite?.color || theme.primary;
             return (
               <div className="flex items-center gap-1">
@@ -1161,7 +1129,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           ),
           sortValue: (t) => t.tramite?.nombre || '',
           render: (t) => {
-            const tipoColor = t.tramite?.tipo_tramite?.color || theme.primary;
+            const tipoColor = t.tramite?.categoria_tramite?.color || theme.primary;
             return (
               <div className="flex items-center gap-1">
                 <DynamicIcon
@@ -1305,6 +1273,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   return (
     <>
+      <PageHint pageId="tramites-list" />
       <ABMPage
         title="Trámites"
         buttonLabel="Nuevo Trámite"
@@ -1410,7 +1379,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Tipo de trámite */}
             {(() => {
-              const tipoDetalle = selectedTramite.tramite?.tipo_tramite;
+              const tipoDetalle = selectedTramite.tramite?.categoria_tramite;
               const colorDetalle = tipoDetalle?.color || theme.primary;
               return (
                 <div
@@ -1533,7 +1502,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Asignación de empleado - Solo si no está en proceso/finalizado/rechazado */}
             {(() => {
-              const estadosBloqueados: EstadoTramite[] = ['en_proceso', 'aprobado', 'finalizado', 'rechazado'];
+              const estadosBloqueados: EstadoCanonico[] = ['finalizado', 'rechazado'];
               const estadoActual = normalizeEstado(selectedTramite.estado);
               const tramiteCerrado = estadosBloqueados.includes(estadoActual);
 
@@ -1603,8 +1572,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     >
                       <p className="text-xs" style={{ color: theme.textSecondary }}>
                         No se puede modificar la asignación de un trámite {
-                          estadoActual === 'en_proceso' ? 'en proceso' :
-                          estadoActual === 'aprobado' ? 'aprobado' :
                           estadoActual === 'finalizado' ? 'finalizado' : 'rechazado'
                         }
                       </p>
@@ -1913,7 +1880,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     </label>
                     <select
                       value={nuevoEstado}
-                      onChange={(e) => setNuevoEstado(e.target.value as EstadoTramite)}
+                      onChange={(e) => setNuevoEstado(e.target.value as EstadoCanonico)}
                       className="w-full px-3 py-2 rounded-lg text-sm"
                       style={{
                         backgroundColor: theme.card,
@@ -2021,17 +1988,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         )}
       </Sheet>
 
-      {/* Wizard para nuevo trámite */}
-      <TramiteWizard
+      {/* Wizard para nueva solicitud (empleado en ventanilla) */}
+      <CrearSolicitudWizard
         open={wizardOpen}
         onClose={() => {
           setWizardOpen(false);
           setServicioInicial(null);
         }}
-        servicios={servicios}
-        tipos={tipos}
-        onSuccess={loadData}
-        servicioInicial={servicioInicial}
+        onSuccess={() => loadData()}
+        tramiteInicial={servicioInicial}
       />
     </>
   );

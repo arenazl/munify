@@ -21,65 +21,51 @@ import {
   Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi, categoriasTramiteApi } from '../lib/api';
+import { tramitesApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
-import { TramiteWizard } from '../components/TramiteWizard';
-import type { Tramite, EstadoTramite, ServicioTramite, TipoTramite } from '../types';
-
-// Colores sólidos para estados (similar a ReclamoCard)
-export const estadoColors: Record<EstadoTramite, { bg: string; text: string }> = {
-  iniciado: { bg: '#6366f1', text: '#ffffff' },      // Indigo
-  en_revision: { bg: '#3b82f6', text: '#ffffff' },   // Blue
-  requiere_documentacion: { bg: '#f59e0b', text: '#ffffff' }, // Amber
-  en_proceso: { bg: '#8b5cf6', text: '#ffffff' },    // Purple
-  aprobado: { bg: '#10b981', text: '#ffffff' },      // Emerald
-  rechazado: { bg: '#ef4444', text: '#ffffff' },     // Red
-  finalizado: { bg: '#059669', text: '#ffffff' },    // Green
-};
-
-const estadoConfig: Record<EstadoTramite, { icon: typeof Clock; label: string }> = {
-  iniciado: { icon: Clock, label: 'Iniciado' },
-  en_revision: { icon: FileCheck, label: 'En Revisión' },
-  requiere_documentacion: { icon: AlertCircle, label: 'Requiere Doc.' },
-  en_proceso: { icon: RefreshCw, label: 'En Proceso' },
-  aprobado: { icon: CheckCircle2, label: 'Aprobado' },
-  rechazado: { icon: XCircle, label: 'Rechazado' },
-  finalizado: { icon: CheckCircle2, label: 'Finalizado' },
-};
+import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
+import type { Solicitud, EstadoSolicitud } from '../types';
+import {
+  getEstadoInfo,
+  getEstadoLabel,
+  getEstadoColor,
+  ESTADOS_LIST,
+  type EstadoCanonico,
+} from '../lib/estadoConfig';
 
 export default function MisTramites() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [tramites, setTramites] = useState<Tramite[]>([]);
+  const [tramites, setTramites] = useState<Solicitud[]>([]);
+  const [tramiteTypesCount, setTramiteTypesCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   // Ordenamiento y filtros
   const [ordenarPor, setOrdenarPor] = useState<'fecha' | 'estado'>('fecha');
-  const [filtroEstado, setFiltroEstado] = useState<EstadoTramite | 'todos'>('todos');
+  const [filtroEstado, setFiltroEstado] = useState<EstadoCanonico | 'todos'>('todos');
 
   // Sheet states
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [selectedTramite, setSelectedTramite] = useState<Tramite | null>(null);
+  const [selectedTramite, setSelectedTramite] = useState<Solicitud | null>(null);
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [servicios, setServicios] = useState<ServicioTramite[]>([]);
-  const [tipos, setTipos] = useState<TipoTramite[]>([]);
 
   // Consulta por número de trámite (para usuarios no logueados)
   const [consultaNumero, setConsultaNumero] = useState('');
   const [consultando, setConsultando] = useState(false);
-  const [tramiteConsultado, setTramiteConsultado] = useState<Tramite | null>(null);
+  const [tramiteConsultado, setTramiteConsultado] = useState<Solicitud | null>(null);
 
   useEffect(() => {
     if (user) {
       loadTramites();
+      loadTramiteTypesCount();
     } else {
       setLoading(false);
     }
@@ -101,6 +87,19 @@ export default function MisTramites() {
     }
   };
 
+  // Cuenta cuántos tipos de trámite tiene configurado el municipio.
+  // Si es 0, el vecino NO ve el botón "Nuevo Trámite" (no puede hacer nada)
+  // y el admin lo ve pero redirige a /gestion/tramites-config para crearlos.
+  const loadTramiteTypesCount = async () => {
+    try {
+      const res = await tramitesApi.getAll({ activo: true });
+      setTramiteTypesCount(res.data?.length || 0);
+    } catch (error) {
+      console.error('Error cargando tipos de trámite:', error);
+      setTramiteTypesCount(0);
+    }
+  };
+
   const handleConsultar = async () => {
     if (!consultaNumero.trim()) {
       toast.error('Ingresa un número de trámite');
@@ -109,7 +108,7 @@ export default function MisTramites() {
 
     setConsultando(true);
     try {
-      const res = await tramitesApi.consultar(consultaNumero.trim());
+      const res = await tramitesApi.consultarSolicitud(consultaNumero.trim());
       setTramiteConsultado(res.data);
     } catch (error) {
       console.error('Error consultando trámite:', error);
@@ -120,35 +119,39 @@ export default function MisTramites() {
     }
   };
 
-  const goToNuevoTramite = async () => {
-    try {
-      const [tramitesRes, categoriasRes] = await Promise.all([
-        tramitesApi.getAll(),
-        categoriasTramiteApi.getAll(),
-      ]);
-      // Shim: el TramiteWizard viejo todavía usa tipo_tramite_id y un string
-      // en documentos_requeridos. Los transformamos desde el modelo nuevo.
-      const serviciosShim = (tramitesRes.data || []).map((t: any) => ({
-        ...t,
-        tipo_tramite_id: t.categoria_tramite_id,
-        documentos_requeridos: Array.isArray(t.documentos_requeridos)
-          ? t.documentos_requeridos.map((d: any) => d.nombre).join(' | ')
-          : t.documentos_requeridos,
-      }));
-      setServicios(serviciosShim);
-      setTipos(categoriasRes.data);
-    } catch (error) {
-      console.error('Error cargando servicios/tipos:', error);
+  const goToNuevoTramite = () => {
+    // Si el municipio no tiene trámites configurados, el admin/supervisor
+    // debe ir a configurarlos primero. El vecino no debería llegar acá
+    // porque el botón se le oculta (ver canCreateTramite abajo).
+    if (tramiteTypesCount === 0) {
+      const isAdmin = user?.rol === 'admin' || user?.rol === 'supervisor';
+      if (isAdmin) {
+        toast.info('Primero creá un trámite en el municipio');
+        navigate('/gestion/tramites-config');
+        return;
+      }
+      toast.error('Este municipio aún no tiene trámites disponibles');
+      return;
     }
+    // El wizard carga sus propios datos internamente
     setWizardOpen(true);
   };
+
+  // ¿Se muestra el botón "Nuevo Trámite"?
+  // - Vecinos: solo si hay trámites configurados (no tiene sentido mostrarles el botón si no hay nada que iniciar).
+  // - Admin/Supervisor: siempre — si está vacío, el botón los lleva a configurarlos.
+  const isAdminOrSupervisor = user?.rol === 'admin' || user?.rol === 'supervisor';
+  const showNewTramiteButton =
+    tramiteTypesCount === null ||
+    tramiteTypesCount > 0 ||
+    isAdminOrSupervisor;
 
   const handleWizardSuccess = () => {
     setWizardOpen(false);
     loadTramites();
   };
 
-  const openViewSheet = (tramite: Tramite) => {
+  const openViewSheet = (tramite: Solicitud) => {
     setSelectedTramite(tramite);
     setSheetOpen(true);
   };
@@ -158,22 +161,20 @@ export default function MisTramites() {
     setSelectedTramite(null);
   };
 
-  // Orden de estados para ordenamiento
+  // Orden de estados para ordenamiento (pendientes primero)
   const estadoOrden: Record<string, number> = {
-    'requiere_documentacion': 1,
-    'iniciado': 2,
-    'en_revision': 3,
-    'en_proceso': 4,
-    'aprobado': 5,
-    'finalizado': 6,
-    'rechazado': 7,
+    recibido: 1,
+    en_curso: 2,
+    pospuesto: 3,
+    finalizado: 4,
+    rechazado: 5,
   };
 
   const filteredTramites = tramites
     .filter(t => {
       const matchSearch = t.numero_tramite.toLowerCase().includes(search.toLowerCase()) ||
         t.asunto.toLowerCase().includes(search.toLowerCase()) ||
-        t.servicio?.nombre.toLowerCase().includes(search.toLowerCase());
+        (t.tramite?.nombre.toLowerCase().includes(search.toLowerCase()) ?? false);
       const matchEstado = filtroEstado === 'todos' || t.estado === filtroEstado;
       return matchSearch && matchEstado;
     })
@@ -181,13 +182,12 @@ export default function MisTramites() {
       if (ordenarPor === 'fecha') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       } else {
-        // Ordenar por estado (pendientes primero)
         return (estadoOrden[a.estado] || 99) - (estadoOrden[b.estado] || 99);
       }
     });
 
-  // Estados únicos para el filtro
-  const estadosUnicos = [...new Set(tramites.map(t => t.estado))];
+  // Estados únicos para el filtro (canónicos)
+  const estadosUnicos = Array.from(new Set(tramites.map(t => t.estado)));
 
   // Vista para usuarios no logueados - consulta por número
   if (!user) {
@@ -279,36 +279,94 @@ export default function MisTramites() {
   }
 
   // Empty state personalizado
-  const renderEmptyState = () => (
-    <div
-      className="rounded-lg p-6 sm:p-12 text-center"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
+  const renderEmptyState = () => {
+    // Si el municipio no tiene trámites configurados, mostramos un mensaje
+    // diferenciado según el rol: al admin lo invitamos a configurarlos,
+    // al vecino le explicamos que el municipio todavía no habilitó trámites.
+    const municipioSinTramites = tramiteTypesCount === 0;
+
+    if (municipioSinTramites && !isAdminOrSupervisor) {
+      return (
+        <div
+          className="rounded-lg p-6 sm:p-12 text-center"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div
+            className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <FileText className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: theme.textSecondary }} />
+          </div>
+          <p className="mb-1 text-sm sm:text-base font-medium" style={{ color: theme.text }}>
+            Aún no hay trámites disponibles
+          </p>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            El municipio todavía no habilitó trámites para realizar online.
+          </p>
+        </div>
+      );
+    }
+
+    if (municipioSinTramites && isAdminOrSupervisor) {
+      return (
+        <div
+          className="rounded-lg p-6 sm:p-12 text-center"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div
+            className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <FileText className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: theme.textSecondary }} />
+          </div>
+          <p className="mb-1 text-sm sm:text-base font-medium" style={{ color: theme.text }}>
+            Todavía no configuraste trámites
+          </p>
+          <p className="mb-4 text-sm" style={{ color: theme.textSecondary }}>
+            Creá el primer tipo de trámite de tu municipio (ej: "Licencia de conducir").
+          </p>
+          <button
+            onClick={() => navigate('/gestion/tramites-config')}
+            className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
+            style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Configurar trámites
+          </button>
+        </div>
+      );
+    }
+
+    return (
       <div
-        className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
-        style={{ backgroundColor: theme.backgroundSecondary }}
+        className="rounded-lg p-6 sm:p-12 text-center"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
       >
-        <FileText className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: theme.textSecondary }} />
+        <div
+          className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: theme.backgroundSecondary }}
+        >
+          <FileText className="h-6 w-6 sm:h-8 sm:w-8" style={{ color: theme.textSecondary }} />
+        </div>
+        <p className="mb-4 text-sm sm:text-base" style={{ color: theme.textSecondary }}>No tienes trámites registrados</p>
+        <button
+          onClick={goToNuevoTramite}
+          className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
+          style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Iniciar mi primer trámite
+        </button>
       </div>
-      <p className="mb-4 text-sm sm:text-base" style={{ color: theme.textSecondary }}>No tienes trámites registrados</p>
-      <button
-        onClick={goToNuevoTramite}
-        className="inline-flex items-center px-4 py-3 sm:py-2 rounded-lg transition-colors hover:opacity-90 active:scale-95 touch-manipulation"
-        style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-      >
-        <Plus className="h-4 w-4 mr-2" />
-        Iniciar mi primer trámite
-      </button>
-    </div>
-  );
+    );
+  };
 
   // Renderizar contenido del Sheet
   const renderViewContent = () => {
     if (!selectedTramite) return null;
 
-    const config = estadoConfig[selectedTramite.estado] || { icon: HelpCircle, label: selectedTramite.estado || 'Desconocido' };
-    const colors = estadoColors[selectedTramite.estado] || { bg: '#6b7280', text: '#ffffff' };
-    const IconEstado = config.icon;
+    const estadoInfo = getEstadoInfo(selectedTramite.estado);
+    const IconEstado = estadoInfo.icon;
 
     return (
       <div className="space-y-6">
@@ -316,10 +374,10 @@ export default function MisTramites() {
         <div className="flex items-center justify-between">
           <span
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full"
-            style={{ backgroundColor: colors.bg, color: colors.text }}
+            style={{ backgroundColor: estadoInfo.bg, color: estadoInfo.color }}
           >
             <IconEstado className="h-4 w-4" />
-            {config.label}
+            {estadoInfo.label}
           </span>
           <span className="text-sm" style={{ color: theme.textSecondary }}>
             {new Date(selectedTramite.created_at).toLocaleString()}
@@ -352,17 +410,17 @@ export default function MisTramites() {
 
         {/* Información del trámite */}
         <div className="space-y-4">
-          {selectedTramite.servicio && (
+          {selectedTramite.tramite && (
             <div>
               <label className="block text-sm font-medium" style={{ color: theme.textSecondary }}>Tipo de Trámite</label>
               <div className="flex items-center gap-2 mt-1">
                 <div
                   className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: `${selectedTramite.servicio.color || theme.primary}20` }}
+                  style={{ backgroundColor: `${selectedTramite.tramite.categoria_tramite?.color || theme.primary}20` }}
                 >
-                  <FileText className="h-4 w-4" style={{ color: selectedTramite.servicio.color || theme.primary }} />
+                  <FileText className="h-4 w-4" style={{ color: selectedTramite.tramite.categoria_tramite?.color || theme.primary }} />
                 </div>
-                <span style={{ color: theme.text }}>{selectedTramite.servicio.nombre}</span>
+                <span style={{ color: theme.text }}>{selectedTramite.tramite.nombre}</span>
               </div>
             </div>
           )}
@@ -488,22 +546,20 @@ export default function MisTramites() {
           Todos
         </button>
         {estadosUnicos.map(estado => {
-          const config = estadoConfig[estado];
-          const colors = estadoColors[estado];
-          if (!config || !colors) return null;
-          const isSelected = filtroEstado === estado;
+          const info = getEstadoInfo(estado);
+          const isSelected = filtroEstado === info.key;
           return (
             <button
-              key={estado}
-              onClick={() => setFiltroEstado(estado)}
+              key={info.key}
+              onClick={() => setFiltroEstado(info.key)}
               className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               style={{
-                backgroundColor: isSelected ? colors.bg : theme.backgroundSecondary,
-                border: `1px solid ${isSelected ? colors.bg : theme.border}`,
-                color: isSelected ? colors.text : theme.textSecondary,
+                backgroundColor: isSelected ? info.color : theme.backgroundSecondary,
+                border: `1px solid ${isSelected ? info.color : theme.border}`,
+                color: isSelected ? '#ffffff' : theme.textSecondary,
               }}
             >
-              {config.label}
+              {info.label}
             </button>
           );
         })}
@@ -512,7 +568,7 @@ export default function MisTramites() {
   );
 
   // Columnas para la vista de tabla
-  const tableColumns: ABMTableColumn<Tramite>[] = [
+  const tableColumns: ABMTableColumn<Solicitud>[] = [
     {
       key: 'numero_tramite',
       header: 'Número',
@@ -528,8 +584,8 @@ export default function MisTramites() {
       render: (t) => (
         <div className="min-w-0">
           <p className="font-medium truncate" style={{ color: theme.text }}>{t.asunto}</p>
-          {t.servicio && (
-            <p className="text-xs truncate" style={{ color: theme.textSecondary }}>{t.servicio.nombre}</p>
+          {t.tramite && (
+            <p className="text-xs truncate" style={{ color: theme.textSecondary }}>{t.tramite.nombre}</p>
           )}
         </div>
       ),
@@ -538,16 +594,15 @@ export default function MisTramites() {
       key: 'estado',
       header: 'Estado',
       render: (t) => {
-        const config = estadoConfig[t.estado] || { icon: HelpCircle, label: t.estado };
-        const colors = estadoColors[t.estado] || { bg: '#6b7280', text: '#ffffff' };
-        const IconEstado = config.icon;
+        const info = getEstadoInfo(t.estado);
+        const IconEstado = info.icon;
         return (
           <span
             className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full"
-            style={{ backgroundColor: colors.bg, color: colors.text }}
+            style={{ backgroundColor: info.bg, color: info.color }}
           >
             <IconEstado className="h-3 w-3" />
-            {config.label}
+            {info.label}
           </span>
         );
       },
@@ -580,8 +635,8 @@ export default function MisTramites() {
     <>
       <ABMPage
         title="Mis Trámites"
-        buttonLabel="Nuevo Trámite"
-        onAdd={goToNuevoTramite}
+        buttonLabel={showNewTramiteButton ? 'Nuevo Trámite' : undefined}
+        onAdd={showNewTramiteButton ? goToNuevoTramite : undefined}
         searchPlaceholder="Buscar en mis trámites..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -617,10 +672,9 @@ export default function MisTramites() {
           </div>
         ) : (
           filteredTramites.map((t) => {
-            const config = estadoConfig[t.estado] || { icon: HelpCircle, label: t.estado || 'Desconocido' };
-            const colors = estadoColors[t.estado] || { bg: '#6b7280', text: '#ffffff' };
-            const IconEstado = config.icon;
-            const servicioColor = t.servicio?.color || theme.primary;
+            const estadoInfo = getEstadoInfo(t.estado);
+            const IconEstado = estadoInfo.icon;
+            const servicioColor = t.tramite?.categoria_tramite?.color || theme.primary;
 
             return (
               <ABMCard key={t.id} onClick={() => openViewSheet(t)}>
@@ -645,21 +699,21 @@ export default function MisTramites() {
                       </p>
                       <span
                         className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0"
-                        style={{ backgroundColor: colors.bg, color: colors.text }}
+                        style={{ backgroundColor: estadoInfo.bg, color: estadoInfo.color }}
                       >
                         <IconEstado className="h-3 w-3" />
-                        {config.label}
+                        {estadoInfo.label}
                       </span>
                     </div>
 
                     {/* Línea 2: Tipo de servicio + Fecha */}
                     <div className="flex items-center gap-3 mt-1.5">
-                      {t.servicio && (
+                      {t.tramite && (
                         <span
                           className="text-xs font-medium px-2 py-0.5 rounded-md"
                           style={{ backgroundColor: `${servicioColor}15`, color: servicioColor }}
                         >
-                          {t.servicio.nombre}
+                          {t.tramite.nombre}
                         </span>
                       )}
                       <span className="text-xs flex items-center" style={{ color: theme.textSecondary }}>
@@ -701,8 +755,8 @@ export default function MisTramites() {
                       </span>
                     )}
                     {/* Por vencer - basado en tiempo_estimado_dias desde created_at */}
-                    {!['finalizado', 'rechazado', 'aprobado'].includes(t.estado) && (() => {
-                      const tiempoEstimado = t.servicio?.tiempo_estimado_dias || t.tramite?.tiempo_estimado_dias || 0;
+                    {!['finalizado', 'rechazado'].includes(t.estado) && (() => {
+                      const tiempoEstimado = t.tramite?.tiempo_estimado_dias || 0;
                       if (!tiempoEstimado) return null;
 
                       const fechaCreacion = new Date(t.created_at);
@@ -784,12 +838,10 @@ export default function MisTramites() {
         {renderViewContent()}
       </Sheet>
 
-      {/* Wizard para crear nuevo trámite */}
-      <TramiteWizard
+      {/* Wizard para crear nueva solicitud */}
+      <CrearSolicitudWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
-        servicios={servicios}
-        tipos={tipos}
         onSuccess={handleWizardSuccess}
       />
     </>
@@ -797,10 +849,9 @@ export default function MisTramites() {
 }
 
 // Componente para mostrar detalle del trámite (usado en consulta pública)
-function TramiteDetailCard({ tramite, theme }: { tramite: Tramite; theme: ReturnType<typeof useTheme>['theme'] }) {
-  const config = estadoConfig[tramite.estado] || { icon: HelpCircle, label: tramite.estado || 'Desconocido' };
-  const colors = estadoColors[tramite.estado] || { bg: '#6b7280', text: '#ffffff' };
-  const IconEstado = config.icon;
+function TramiteDetailCard({ tramite, theme }: { tramite: Solicitud; theme: ReturnType<typeof useTheme>['theme'] }) {
+  const estadoInfo = getEstadoInfo(tramite.estado);
+  const IconEstado = estadoInfo.icon;
 
   return (
     <div className="space-y-4">
@@ -825,24 +876,24 @@ function TramiteDetailCard({ tramite, theme }: { tramite: Tramite; theme: Return
         </div>
         <span
           className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full"
-          style={{ backgroundColor: colors.bg, color: colors.text }}
+          style={{ backgroundColor: estadoInfo.bg, color: estadoInfo.color }}
         >
           <IconEstado className="h-3 w-3" />
-          {config.label}
+          {estadoInfo.label}
         </span>
       </div>
 
-      {/* Servicio */}
-      {tramite.servicio && (
+      {/* Trámite */}
+      {tramite.tramite && (
         <div className="flex items-center gap-2">
           <div
             className="w-6 h-6 rounded flex items-center justify-center"
-            style={{ backgroundColor: `${tramite.servicio.color || theme.primary}20` }}
+            style={{ backgroundColor: `${tramite.tramite.categoria_tramite?.color || theme.primary}20` }}
           >
-            <FileText className="h-3 w-3" style={{ color: tramite.servicio.color || theme.primary }} />
+            <FileText className="h-3 w-3" style={{ color: tramite.tramite.categoria_tramite?.color || theme.primary }} />
           </div>
           <span className="text-sm font-medium" style={{ color: theme.text }}>
-            {tramite.servicio.nombre}
+            {tramite.tramite.nombre}
           </span>
         </div>
       )}
@@ -878,7 +929,7 @@ function TramiteDetailCard({ tramite, theme }: { tramite: Tramite; theme: Return
           })}
         </span>
         {tramite.fecha_resolucion && (
-          <span className="text-xs" style={{ color: colors.bg }}>
+          <span className="text-xs" style={{ color: estadoInfo.color }}>
             <CheckCircle2 className="h-3 w-3 inline mr-1" />
             Resuelto {new Date(tramite.fecha_resolucion).toLocaleDateString('es-AR')}
           </span>

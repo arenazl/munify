@@ -1,7 +1,17 @@
 // Service Worker para Push Notifications
-// VERSION: 2.3.0 - No interceptar API calls para evitar duplicados
-const SW_VERSION = '2.3.0';
+// VERSION: 2.4.0 - Soporte de SKIP_WAITING via postMessage para auto-update
+// sin que el usuario tenga que hacer hard-refresh manual
+const SW_VERSION = '2.4.0';
 const CACHE_NAME = `app-cache-v${SW_VERSION}`;
+
+// Handler de mensajes desde la app. Permite que el componente
+// ServiceWorkerUpdater le diga al SW que active la versión nueva
+// inmediatamente cuando el usuario clickea "Actualizar" en el toast.
+self.addEventListener('message', function (event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('push', function(event) {
   console.log('[SW] Push event recibido:', event);

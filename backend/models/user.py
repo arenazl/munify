@@ -52,6 +52,18 @@ class User(Base):
     dni = Column(String(20), nullable=True)
     direccion = Column(String(255), nullable=True)
     es_anonimo = Column(Boolean, default=False)  # Usuario anónimo (identidad oculta para el municipio)
+    # Identidad verificada por un medio externo (KYC facial / email verificado
+    # / SMS OTP). Mientras sea False, el endpoint `/auth/register` permite
+    # "tomar" o "retomar" la cuenta con sólo DNI+email+password — la idea es
+    # que el vecino real pueda reclamar cuentas ghost (creadas por empleados
+    # en ventanilla) sin verificación externa, confiando en que DNI+email
+    # que tipeó alcanzan como prueba de identidad por ahora.
+    #
+    # Cuando se implemente verificación (KYC con Didit/Renaper, o email link),
+    # al completarse exitosamente este flag pasa a True y desde ese momento
+    # el DNI queda "cerrado" — retomas posteriores se rechazan y el vecino
+    # tiene que pasar por "Olvidé mi contraseña".
+    cuenta_verificada = Column(Boolean, default=False, nullable=False)
     rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
 

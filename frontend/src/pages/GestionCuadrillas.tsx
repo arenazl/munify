@@ -7,6 +7,7 @@ import {
   ABMPage, ABMBadge, ABMSheetFooter, ABMInput,
   ABMSelect, ABMTable, ABMTableAction, ABMCardActions
 } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 
 interface Cuadrilla {
   id: number;
@@ -196,7 +197,9 @@ export default function GestionCuadrillas() {
   ];
 
   return (
-    <ABMPage
+    <>
+      <PageHint pageId="cuadrillas" />
+      <ABMPage
       title="Cuadrillas"
       icon={<Users className="h-5 w-5" />}
       buttonLabel="Asignar Empleado"
@@ -362,5 +365,6 @@ export default function GestionCuadrillas() {
         </div>
       ))}
     </ABMPage>
+    </>
   );
 }

@@ -9,6 +9,13 @@ interface NavigationOptions {
   hasDependencia?: boolean;
   /** Si el usuario admin no tiene municipio_id es superadmin (cross-municipio). */
   isSuperAdmin?: boolean;
+  /**
+   * Flag de UI del municipio actual. Si es false, los 3 ABMs de
+   * "Categorías Reclamo", "Categorías Trámite" y "Tipos de Trámite" se
+   * ocultan del sidebar (quedan sólo accesibles desde /gestion/ajustes).
+   * Default true para no romper munis existentes.
+   */
+  abmEnSidebar?: boolean;
 }
 
 export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => {
@@ -16,6 +23,9 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   const userRole = typeof userRoleOrOptions === 'string' ? userRoleOrOptions : userRoleOrOptions.userRole;
   const hasDependencia = typeof userRoleOrOptions === 'object' ? userRoleOrOptions.hasDependencia : false;
   const isSuperAdmin = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.isSuperAdmin : false;
+  const abmEnSidebar = typeof userRoleOrOptions === 'object'
+    ? (userRoleOrOptions.abmEnSidebar ?? true)
+    : true;
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
@@ -126,26 +136,29 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Consultas y análisis con IA'
     },
     // === ABMs per-municipio (refactor trámites/categorías) ===
+    // Se muestran sólo si el muni tiene `abm_en_sidebar=true`. Los munis
+    // creados por el flow de demo arrancan en false → estos 3 quedan
+    // accesibles únicamente desde /gestion/ajustes.
     {
       name: 'Categorías Reclamo',
       href: '/gestion/categorias-reclamo',
       icon: FolderTree,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && abmEnSidebar,
       description: 'Categorías de reclamos del municipio'
     },
     {
       name: 'Categorías Trámite',
       href: '/gestion/categorias-tramite',
       icon: FolderTree,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && abmEnSidebar,
       description: 'Categorías de trámites del municipio'
     },
     {
-      name: 'Catálogo Trámites',
+      name: 'Tipos de Trámite',
       href: '/gestion/tramites-config',
       icon: FileText,
-      show: isAdminOrSupervisor,
-      description: 'ABM de trámites con documentos requeridos'
+      show: isAdminOrSupervisor && abmEnSidebar,
+      description: 'Trámites específicos del municipio (ej: Licencia de Conducir)'
     },
     // === Solo SUPERADMIN (admin sin municipio asignado) ===
     {

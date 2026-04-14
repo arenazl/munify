@@ -3,7 +3,7 @@ API de Municipios - Endpoints publicos y protegidos
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from typing import Optional, List
 from pydantic import BaseModel
 from math import radians, cos, sin, asin, sqrt
@@ -41,6 +41,9 @@ class MunicipioPublic(BaseModel):
     logo_url: Optional[str] = None
     color_primario: str
     activo: bool
+    # Flag de UI: si es True, los ABMs de categorías / tipos de trámite se
+    # muestran como items del sidebar. Si es False, quedan sólo en Ajustes.
+    abm_en_sidebar: bool = True
 
     class Config:
         from_attributes = True
@@ -219,6 +222,7 @@ class DemoUser(BaseModel):
     apellido: str
     nombre_completo: str
     rol: str
+    dependencia_nombre: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -249,7 +253,7 @@ async def obtener_usuarios_demo(
     # 1. @{codigo}.test.com (patrón original)
     # 2. @{codigo}.demo.com (patrón nuevo del seed)
     # 3. @demo.com (patrón genérico)
-    # EXCLUIR usuarios de dependencia (tienen municipio_dependencia_id)
+    # Incluir los 3 usuarios demo principales (admin, supervisor, vecino)
     from sqlalchemy import or_
     email_pattern1 = f"%@{codigo}.test.com"
     email_pattern2 = f"%@{codigo}.demo.com"
@@ -262,7 +266,17 @@ async def obtener_usuarios_demo(
             User.email.like(email_pattern3)
         ),
         User.activo == True,
-        User.municipio_dependencia_id.is_(None)  # Excluir usuarios de dependencia
+        # Solo los 3 roles demo principales (excluye usuarios de dependencia
+        # que no son admin/supervisor/vecino@...)
+        User.email.like(f"admin@%") |
+        User.email.like(f"supervisor@%") |
+        User.email.like(f"vecino@%"),
+    )
+    from sqlalchemy.orm import selectinload
+    from models.municipio_dependencia import MunicipioDependencia
+    from models.dependencia import Dependencia as DepModel
+    query = query.options(
+        selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia)
     )
     result = await db.execute(query)
     users = result.scalars().all()
@@ -282,7 +296,12 @@ async def obtener_usuarios_demo(
             nombre=u.nombre,
             apellido=u.apellido,
             nombre_completo=f"{u.nombre} {u.apellido}",
-            rol=u.rol.value
+            rol=u.rol.value,
+            dependencia_nombre=(
+                u.dependencia.dependencia.nombre
+                if u.dependencia and u.dependencia.dependencia
+                else None
+            ),
         )
         for u in users_sorted
     ]
@@ -436,6 +455,111 @@ class MunicipioCreateResponse(MunicipioDetalle):
     seed_info: Optional[dict] = None
 
 
+class MunicipioDemoCreate(BaseModel):
+    """Input mínimo para crear un municipio de demo desde la landing pública."""
+    nombre: str
+
+
+class MunicipioDemoResponse(BaseModel):
+    """Respuesta del create demo — lo mínimo que el frontend necesita
+    para redirigir a la landing del muni nuevo."""
+    id: int
+    nombre: str
+    codigo: str
+    redirect_path: str
+
+
+def _normalizar_codigo(nombre: str) -> str:
+    """Convierte 'San Pedro' → 'san-pedro', saca acentos, espacios y símbolos."""
+    import unicodedata
+    import re
+    s = unicodedata.normalize("NFD", nombre.lower())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s
+
+
+@router.post("/crear-demo", response_model=MunicipioDemoResponse)
+async def crear_municipio_demo(
+    data: MunicipioDemoCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Crea un municipio de demo SIN autenticación.
+
+    Uso: la pantalla pública `/demo` (comercial) le deja a un prospecto
+    tipear el nombre de su municipio y ver la plataforma funcionando al
+    instante. Arma un seed completo:
+
+      - Categorías default (10 de reclamo + 10 de trámite)
+      - 5 dependencias reales con mapeos categoría→dependencia
+      - 4 trámites con documentos requeridos
+      - 3 usuarios demo (admin, supervisor, vecino) con password `demo123`
+      - 4 reclamos de ejemplo en distintos estados
+      - 1 solicitud de trámite de ejemplo
+
+    La redirección devuelta (`redirect_path`) apunta a la landing del muni
+    con los botones de quick-login ya funcionales.
+    """
+    from services.categorias_default import crear_categorias_default
+    from services.seed_demo import seed_demo_completo
+
+    nombre_limpio = (data.nombre or "").strip()
+    if len(nombre_limpio) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del municipio debe tener al menos 3 caracteres",
+        )
+
+    # Normalizar código. Si ya existe, sufijar con -2, -3... hasta encontrar
+    # uno libre. Así el prospecto puede tipear "Pergamino" dos veces y se
+    # crean demos separados sin choque.
+    base_codigo = _normalizar_codigo(nombre_limpio)
+    if not base_codigo:
+        raise HTTPException(status_code=400, detail="Nombre inválido")
+    codigo = base_codigo
+    suffix = 1
+    while True:
+        r = await db.execute(select(Municipio).where(Municipio.codigo == codigo))
+        if not r.scalar_one_or_none():
+            break
+        suffix += 1
+        codigo = f"{base_codigo}-{suffix}"
+
+    # 1. Crear fila del municipio
+    municipio = Municipio(
+        nombre=nombre_limpio,
+        codigo=codigo,
+        latitud=-34.603722,
+        longitud=-58.381592,
+        radio_km=10.0,
+        color_primario="#0088cc",
+        color_secundario="#005fa3",
+        zoom_mapa_default=13,
+        activo=True,
+        abm_en_sidebar=False,
+    )
+    db.add(municipio)
+    await db.flush()
+
+    # 2. Sembrar categorías default (10 reclamo + 10 trámite)
+    await crear_categorias_default(db, municipio.id)
+    await db.flush()
+
+    # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud
+    seed_info = await seed_demo_completo(db, municipio.id, codigo)
+
+    await db.commit()
+    await db.refresh(municipio)
+
+    return MunicipioDemoResponse(
+        id=municipio.id,
+        nombre=municipio.nombre,
+        codigo=municipio.codigo,
+        redirect_path=f"/demo/listo?muni={municipio.codigo}",
+    )
+
+
 @router.post("", response_model=MunicipioCreateResponse)
 async def crear_municipio(
     data: MunicipioCreate,
@@ -472,6 +596,7 @@ async def crear_municipio(
     # 1. Sembrar categorías default (10 reclamo + 10 trámite per-municipio)
     #    El admin del municipio puede luego renombrar/agregar/eliminar libremente.
     await crear_categorias_default(db, municipio.id)
+    await db.flush()
 
     # 2. Cargar barrios automáticamente con IA + Nominatim (best-effort)
     barrios_creados = 0
@@ -486,30 +611,9 @@ async def crear_municipio(
     except Exception as e:
         print(f"[MUNICIPIO] Error cargando barrios para {municipio.nombre}: {e}")
 
-    # 3. Crear usuarios demo (admin y vecino) for the new municipality
-    from core.security import get_password_hash
-    from models.user import User
-    from models.enums import RolUsuario
-
-    admin_demo = User(
-        email=f"admin@{municipio.codigo}.demo.com",
-        nombre="Admin",
-        apellido="Demo",
-        password_hash=get_password_hash("123456"),
-        rol=RolUsuario.ADMIN,
-        municipio_id=municipio.id,
-        activo=True
-    )
-    vecino_demo = User(
-        email=f"vecino@{municipio.codigo}.demo.com",
-        nombre="Vecino",
-        apellido="Demo",
-        password_hash=get_password_hash("123456"),
-        rol=RolUsuario.VECINO,
-        municipio_id=municipio.id,
-        activo=True
-    )
-    db.add_all([admin_demo, vecino_demo])
+    # 3. Seed completo: dependencias, trámites, usuarios demo, reclamos, solicitud
+    from services.seed_demo import seed_demo_completo
+    seed_info = await seed_demo_completo(db, municipio.id, municipio.codigo)
 
     await db.commit()
     await db.refresh(municipio)
@@ -521,8 +625,8 @@ async def crear_municipio(
             "categorias_reclamo": 10,
             "categorias_tramite": 10,
             "barrios": barrios_creados,
-            "tramites": 0,
-            "mensaje": "Categorias sembradas. Cargá tus tramites en /gestion/tramites-config",
+            **seed_info,
+            "mensaje": "Municipio creado con seed completo. Listo para usar.",
         },
     }
     response_data.pop("_sa_instance_state", None)
@@ -575,6 +679,95 @@ async def eliminar_municipio(
     await db.commit()
 
     return {"message": "Municipio desactivado correctamente"}
+
+
+@router.delete("/demo/{codigo}")
+async def eliminar_municipio_demo(
+    codigo: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Elimina un municipio demo (hard delete con cascade).
+    Endpoint PÚBLICO — solo borra munis que tengan usuarios @demo.com.
+    No permite borrar municipios "reales" (producción).
+    """
+    from sqlalchemy import func as sqla_func
+    query = select(Municipio).where(
+        sqla_func.lower(Municipio.codigo) == sqla_func.lower(codigo)
+    )
+    result = await db.execute(query)
+    municipio = result.scalar_one_or_none()
+
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Verificar que es un municipio demo (tiene users @demo.com)
+    demo_check = await db.execute(
+        select(User).where(
+            User.municipio_id == municipio.id,
+            User.email.like(f"%@{codigo}.demo.com"),
+        )
+    )
+    if not demo_check.scalars().first():
+        raise HTTPException(
+            status_code=403,
+            detail="Solo se pueden eliminar municipios de demo",
+        )
+
+    muni_id = municipio.id
+    await db.execute(text("SET FOREIGN_KEY_CHECKS = 0"))
+
+    # Primero borrar tablas intermedias sin municipio_id via JOIN
+    # (para que el loop plano de abajo no falle en borrar el padre)
+    for join_sql in [
+        # Historiales + tablas hijas de reclamos/solicitudes/tramites
+        "DELETE hr FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id WHERE r.municipio_id = :mid",
+        "DELETE hs FROM historial_solicitudes hs JOIN solicitudes s ON hs.solicitud_id = s.id WHERE s.municipio_id = :mid",
+        "DELETE td FROM tramite_documentos_requeridos td JOIN tramites t ON td.tramite_id = t.id WHERE t.municipio_id = :mid",
+        "DELETE sv FROM sla_violaciones sv JOIN reclamos r ON sv.reclamo_id = r.id WHERE r.municipio_id = :mid",
+        # Intermedias de empleados (via JOIN con empleados.municipio_id)
+        "DELETE ec FROM empleado_cuadrillas ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
+        "DELETE ec FROM empleado_categorias ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
+        "DELETE ea FROM empleado_ausencias ea JOIN empleados e ON ea.empleado_id = e.id WHERE e.municipio_id = :mid",
+        "DELETE eh FROM empleado_horarios eh JOIN empleados e ON eh.empleado_id = e.id WHERE e.municipio_id = :mid",
+        "DELETE em FROM empleado_metricas em JOIN empleados e ON em.empleado_id = e.id WHERE e.municipio_id = :mid",
+        "DELETE ec FROM empleado_capacitaciones ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
+        # Intermedia de cuadrillas
+        "DELETE cc FROM cuadrilla_categorias cc JOIN cuadrillas c ON cc.cuadrilla_id = c.id WHERE c.municipio_id = :mid",
+    ]:
+        try:
+            await db.execute(text(join_sql), {"mid": muni_id})
+        except Exception:
+            pass
+
+    # Cascade delete de todas las tablas con municipio_id
+    tables_with_muni = [
+        "historial_reclamos", "reclamo_personas", "historial_solicitudes",
+        "solicitudes", "reclamos", "tramite_documentos_requeridos",
+        "tramites", "categorias_reclamo", "categorias_tramite",
+        "municipio_dependencia_categorias", "municipio_dependencias",
+        "notificaciones", "push_subscriptions", "barrios", "zonas",
+        "badges_usuarios", "puntos_usuarios", "historial_puntos",
+        "email_validations",
+        # Nuevos (seed demo completo)
+        "cuadrillas", "empleados", "sla_config",
+    ]
+    for t in tables_with_muni:
+        try:
+            await db.execute(text(f"DELETE FROM {t} WHERE municipio_id = :mid"), {"mid": muni_id})
+        except Exception:
+            pass
+
+    # Usuarios
+    await db.execute(text("DELETE FROM usuarios WHERE municipio_id = :mid"), {"mid": muni_id})
+
+    # Municipio
+    await db.execute(text("DELETE FROM municipios WHERE id = :mid"), {"mid": muni_id})
+
+    await db.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
+    await db.commit()
+
+    return {"message": f"Municipio demo '{codigo}' eliminado correctamente"}
 
 
 @router.post("/{municipio_id}/branding", response_model=MunicipioDetalle)

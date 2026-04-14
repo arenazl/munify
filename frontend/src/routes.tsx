@@ -24,11 +24,10 @@ import Zonas from './pages/Zonas';
 // import Configuracion from './pages/Configuracion';  // Redirige a Ajustes
 import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
-import NuevoReclamo from './pages/NuevoReclamo';
+import NuevoReclamoPage from './pages/NuevoReclamoPage';
 import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
-import Tramites from './pages/Tramites';
 import MisTramites from './pages/MisTramites';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -44,6 +43,7 @@ import GestionHorarios from './pages/GestionHorarios';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import Demo from './pages/Demo';
+import DemoReady from './pages/DemoReady';
 import DependenciasConfig from './pages/DependenciasConfig';
 import AsignacionDependencias from './pages/AsignacionDependencias';
 import Municipios from './pages/Municipios';
@@ -62,8 +62,6 @@ import MobileLayout from './layouts/MobileLayout';
 import {
   MobileMisReclamos,
   MobilePerfil,
-  MobileNuevoReclamo,
-  MobileNuevoTramite,
   MobileLogros,
   MobileConsulta,
   MobileEstadisticas,
@@ -94,23 +92,24 @@ export const router = createBrowserRouter([
     ],
   },
   // Rutas mobile fuera del layout (pantalla completa)
-  { path: '/app/nuevo', element: <MobileNuevoReclamo /> },
-  { path: '/app/tramites', element: <Tramites /> },
-  { path: '/app/tramites/nuevo', element: <Tramites /> },
+  { path: '/app/nuevo', element: <NuevoReclamoPage /> },
+  { path: '/app/tramites', element: <Navigate to="/app/mis-tramites" replace /> },
+  { path: '/app/tramites/nuevo', element: <Navigate to="/app/mis-tramites" replace /> },
   { path: '/app/mis-tramites', element: <MisTramites /> },
   { path: '/app/login', element: <Navigate to="/login" replace /> },
   { path: '/app/register', element: <Navigate to="/register" replace /> },
 
   // === RUTAS PÚBLICAS ===
   { path: '/demo', element: <Demo /> },
+  { path: '/demo/listo', element: <DemoReady /> },
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
   { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
-  { path: '/nuevo-reclamo', element: <NuevoReclamo /> },
-  { path: '/tramites', element: <Tramites /> },
+  { path: '/nuevo-reclamo', element: <NuevoReclamoPage /> },
+  { path: '/tramites', element: <Navigate to="/home" replace /> },
   { path: '/calificar/:id', element: <CalificarReclamo /> },  // Link directo desde WhatsApp
   { path: '/onboarding', element: <Onboarding /> },  // Wizard post-registro
 
@@ -141,10 +140,10 @@ export const router = createBrowserRouter([
       { path: 'estadisticas-area', element: <ProtectedRoute roles={['supervisor']}><MiRendimiento /></ProtectedRoute> },
 
       // Nuevo Reclamo (dentro del Layout para usuarios logueados)
-      { path: 'crear-reclamo', element: <NuevoReclamo /> },
+      { path: 'crear-reclamo', element: <NuevoReclamoPage /> },
 
       // Nuevo Trámite (dentro del Layout para usuarios logueados)
-      { path: 'crear-tramite', element: <Tramites /> },
+      { path: 'crear-tramite', element: <Navigate to="/gestion/tramites" replace /> },
 
       // Reclamos (todo con Side Modal, sin páginas separadas)
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },

@@ -22,6 +22,7 @@ import {
   Legend,
 } from 'recharts';
 import HeatmapWidget from '../components/ui/HeatmapWidget';
+import PageHint from '../components/ui/PageHint';
 
 // Tipos para analytics
 interface HeatmapPoint {
@@ -430,6 +431,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <PageHint pageId="dashboard-home" />
+
       {/* Definiciones de gradientes SVG para los gráficos */}
       <svg width="0" height="0" style={{ position: 'absolute' }}>
         <defs>

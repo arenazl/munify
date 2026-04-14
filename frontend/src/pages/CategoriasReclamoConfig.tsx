@@ -7,6 +7,7 @@ export default function CategoriasReclamoConfig() {
       title="Categorías de Reclamo"
       api={categoriasReclamoApi as any}
       showReclamoFields
+      enableSugerencias
     />
   );
 }

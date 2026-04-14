@@ -354,16 +354,7 @@ async def enviar_email_reclamo_creado(
                 pass  # Si falla el registro del error, no hacer nada
 
 
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
-    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
-    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
-        header_municipio_id = request.headers.get('X-Municipio-ID')
-        if header_municipio_id:
-            try:
-                return int(header_municipio_id)
-            except (ValueError, TypeError):
-                pass
-    return current_user.municipio_id
+from core.tenancy import resolve_municipio_id as get_effective_municipio_id  # noqa: E402
 
 # Configurar Cloudinary
 cloudinary.config(
@@ -866,33 +857,64 @@ async def create_reclamo(
             detail=f"El municipio asignado a tu cuenta (ID: {current_user.municipio_id}) no existe. Contactá al administrador."
         )
 
-    # Actualizar datos de contacto del usuario si se proporcionan
-    if data.nombre_contacto or data.telefono_contacto or data.email_contacto:
-        if data.nombre_contacto:
-            # Separar nombre y apellido si viene con espacio
-            partes = data.nombre_contacto.strip().split(' ', 1)
-            current_user.nombre = partes[0]
-            if len(partes) > 1:
-                current_user.apellido = partes[1]
-        if data.telefono_contacto:
-            current_user.telefono = data.telefono_contacto
-        if data.email_contacto and data.email_contacto != current_user.email:
-            # Solo actualizar email si es diferente (y válido)
-            # El email es unique, así que verificamos que no exista otro usuario con ese email
-            existing = await db.execute(
-                select(User).where(User.email == data.email_contacto, User.id != current_user.id)
-            )
-            if not existing.scalar_one_or_none():
-                current_user.email = data.email_contacto
+    # ================================================================
+    # Resolver el creador del reclamo (dueño real, no quien lo carga)
+    # ================================================================
+    #
+    # Si el current_user es un VECINO, el reclamo es suyo — los campos de
+    # solicitante vienen vacíos y usamos current_user directamente.
+    #
+    # Si el current_user es ADMIN o SUPERVISOR (empleado en ventanilla),
+    # está cargando el reclamo a nombre de un tercero. Los campos
+    # `nombre_solicitante`, `apellido_solicitante`, `dni_solicitante` etc.
+    # vienen del form. Buscamos al vecino por DNI o email, y si no existe
+    # creamos un ghost. El `creador_id` del reclamo apunta al ghost, no
+    # al empleado. El empleado queda trazado sólo en logs.
+    from models.enums import RolUsuario
 
-    # Extraer solo los campos del reclamo (excluyendo datos de contacto)
+    if current_user.rol == RolUsuario.VECINO:
+        # Vecino cargando su propio reclamo — flujo viejo
+        if data.nombre_contacto or data.telefono_contacto or data.email_contacto:
+            if data.nombre_contacto:
+                partes = data.nombre_contacto.strip().split(' ', 1)
+                current_user.nombre = partes[0]
+                if len(partes) > 1:
+                    current_user.apellido = partes[1]
+            if data.telefono_contacto:
+                current_user.telefono = data.telefono_contacto
+            if data.email_contacto and data.email_contacto != current_user.email:
+                existing = await db.execute(
+                    select(User).where(User.email == data.email_contacto, User.id != current_user.id)
+                )
+                if not existing.scalar_one_or_none():
+                    current_user.email = data.email_contacto
+        creador_id = current_user.id
+    else:
+        # Admin/supervisor cargando en ventanilla — usar ghost vecino
+        from services.vecinos import resolver_o_crear_vecino
+        vecino = await resolver_o_crear_vecino(
+            db=db,
+            municipio_id=current_user.municipio_id,
+            dni=data.dni_solicitante,
+            email=data.email_solicitante,
+            nombre=data.nombre_solicitante,
+            apellido=data.apellido_solicitante,
+            telefono=data.telefono_solicitante,
+            direccion=data.direccion_solicitante,
+        )
+        creador_id = vecino.id
+
+    # Extraer solo los campos del reclamo (excluyendo datos de contacto
+    # y los campos de solicitante que ya procesamos para resolver el creador)
     reclamo_data = data.model_dump(exclude={
-        'nombre_contacto', 'telefono_contacto', 'email_contacto', 'recibir_notificaciones'
+        'nombre_contacto', 'telefono_contacto', 'email_contacto', 'recibir_notificaciones',
+        'nombre_solicitante', 'apellido_solicitante', 'dni_solicitante',
+        'email_solicitante', 'telefono_solicitante', 'direccion_solicitante',
     })
 
     reclamo = Reclamo(
         **reclamo_data,
-        creador_id=current_user.id,
+        creador_id=creador_id,
         municipio_id=current_user.municipio_id,
         estado=EstadoReclamo.NUEVO
     )

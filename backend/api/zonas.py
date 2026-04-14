@@ -10,19 +10,9 @@ from models.user import User
 from models.enums import RolUsuario
 from schemas.zona import ZonaCreate, ZonaUpdate, ZonaResponse
 
+from core.tenancy import resolve_municipio_id as get_effective_municipio_id  # noqa: E402
+
 router = APIRouter()
-
-
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
-    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
-    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
-        header_municipio_id = request.headers.get('X-Municipio-ID')
-        if header_municipio_id:
-            try:
-                return int(header_municipio_id)
-            except (ValueError, TypeError):
-                pass
-    return current_user.municipio_id
 
 
 @router.get("", response_model=List[ZonaResponse])

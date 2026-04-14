@@ -31,7 +31,7 @@ def find_available_port(start_port: int, max_attempts: int = 10) -> int:
 if __name__ == "__main__":
     port = find_available_port(settings.PORT)
     if port != settings.PORT:
-        print(f"Puerto {settings.PORT} ocupado → usando puerto {port}")
+        print(f"Puerto {settings.PORT} ocupado -> usando puerto {port}")
 
     uvicorn.run(
         "main:app",

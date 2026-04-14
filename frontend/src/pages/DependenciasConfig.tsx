@@ -6,7 +6,7 @@ import {
   Eye, ClipboardList, FileCheck, BookOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { dependenciasApi, categoriasApi, tramitesApi } from '../lib/api';
+import { dependenciasApi, categoriasReclamoApi, categoriasTramiteApi, tramitesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -170,43 +170,58 @@ export default function DependenciasConfig() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      // NOTA sobre el refactor per-municipio: ya no existe un "catálogo global"
+      // de categorías o trámites — cada municipio es dueño de los suyos y todo
+      // lo que el endpoint devuelve está, por definición, "habilitado". Por eso
+      // `categoriasHabilitadas` y `tramitesHabilitados` ahora se llenan con el
+      // conjunto completo de IDs devuelto por la API. Los handlers de
+      // habilitar/deshabilitar quedaron como no-ops (muestran un toast
+      // explicativo) porque la operación ya no tiene sentido.
       if (isSuperAdmin) {
-        // Superadmin: solo cargar catálogo global (maestros)
-        const [catalogoRes, categoriasRes, tiposRes, tramitesRes] = await Promise.all([
-          dependenciasApi.getCatalogo(),
-          categoriasApi.getCatalogo(),  // Catálogo maestro de categorías
-          tramitesApi.getTiposCatalogo(),  // Catálogo maestro de tipos
-          tramitesApi.getCatalogo(),  // Catálogo maestro de trámites
-        ]);
+        // Superadmin: solo puede ver el catálogo global de DEPENDENCIAS (eso
+        // sí sigue siendo global, no per-municipio). No hay catálogo global
+        // de categorías ni trámites para mostrarle.
+        const catalogoRes = await dependenciasApi.getCatalogo();
         setCatalogoGlobal(catalogoRes.data);
-        setCategorias(categoriasRes.data);
-        setTiposTramite(tiposRes.data);
-        setTramitesCatalogo(tramitesRes.data);
-        setDependenciasMunicipio([]); // No aplica para superadmin
-        // Superadmin no tiene habilitaciones
+        setCategorias([]);
+        setTiposTramite([]);
+        setTramitesCatalogo([]);
+        setDependenciasMunicipio([]);
         setCategoriasHabilitadas(new Set());
         setTramitesHabilitados(new Set());
       } else {
-        // Supervisor: cargar dependencias del municipio + catálogo para habilitar
+        // Supervisor/Admin: cargar todo lo del municipio en paralelo.
         const [
-          muniDepsRes, catalogoRes, categoriasRes, tiposRes, tramitesRes,
-          catsHabilitadasRes, tramHabilitadosRes
+          muniDepsRes,
+          catalogoRes,
+          categoriasRes,
+          categoriasTramiteRes,
+          tramitesRes,
         ] = await Promise.all([
           dependenciasApi.getMunicipio(),
           dependenciasApi.getCatalogo({ activo: true }),
-          categoriasApi.getCatalogo(),  // Catálogo maestro (TODAS las categorías)
-          tramitesApi.getTiposCatalogo(),  // Catálogo maestro de tipos de trámite
-          tramitesApi.getCatalogo(),  // Catálogo maestro de trámites
-          categoriasApi.getHabilitadas(),  // IDs de categorías habilitadas
-          tramitesApi.getHabilitados(),  // IDs de trámites habilitados
+          categoriasReclamoApi.getAll(true),
+          categoriasTramiteApi.getAll(true),
+          tramitesApi.getAll({ activo: true }),
         ]);
         setDependenciasMunicipio(muniDepsRes.data);
         setCatalogoGlobal(catalogoRes.data);
         setCategorias(categoriasRes.data);
-        setTiposTramite(tiposRes.data);
-        setTramitesCatalogo(tramitesRes.data);
-        setCategoriasHabilitadas(new Set(catsHabilitadasRes.data));
-        setTramitesHabilitados(new Set(tramHabilitadosRes.data));
+        // En el modelo nuevo, "tipos de trámite" == "categorías de trámite"
+        setTiposTramite(categoriasTramiteRes.data);
+        // Los trámites del nuevo modelo tienen `categoria_tramite_id` en vez
+        // de `tipo_tramite_id`. Mapeamos para mantener compat con el resto
+        // de la pantalla que todavía habla de `tipo_tramite_id`.
+        const tramitesMapeados = (tramitesRes.data || []).map((t: any) => ({
+          ...t,
+          tipo_tramite_id: t.categoria_tramite_id,
+          tipo_tramite: t.categoria_tramite,
+        }));
+        setTramitesCatalogo(tramitesMapeados);
+        // Todas las categorías/trámites del municipio están habilitadas
+        // por definición en el modelo nuevo.
+        setCategoriasHabilitadas(new Set((categoriasRes.data || []).map((c: any) => c.id)));
+        setTramitesHabilitados(new Set((tramitesRes.data || []).map((t: any) => t.id)));
       }
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -275,12 +290,16 @@ export default function DependenciasConfig() {
   // Cargar asignaciones cuando se expande una dependencia
   const loadAsignaciones = async (muniDepId: number) => {
     try {
-      const [catRes, tiposRes] = await Promise.all([
+      // En el modelo nuevo, `getTramites` devuelve los trámites asignados
+      // a la dependencia. Antes había un nivel intermedio "tipos" que ya no
+      // existe — ahora cada dependencia se asocia directamente a trámites
+      // específicos del municipio.
+      const [catRes, tramRes] = await Promise.all([
         dependenciasApi.getCategorias(muniDepId),
-        dependenciasApi.getTiposTramite(muniDepId),
+        dependenciasApi.getTramites(muniDepId),
       ]);
       setCategoriasAsignadas(catRes.data.map((a: AsignacionCategoria) => a.categoria_id));
-      setTiposTramiteAsignados(tiposRes.data.map((a: AsignacionTipoTramite) => a.tipo_tramite_id));
+      setTiposTramiteAsignados(tramRes.data.map((a: { tramite_id: number }) => a.tramite_id));
     } catch (error) {
       console.error('Error al cargar asignaciones:', error);
     }
@@ -320,7 +339,7 @@ export default function DependenciasConfig() {
     try {
       await Promise.all([
         dependenciasApi.asignarCategorias(expandedDep, categoriasAsignadas),
-        dependenciasApi.asignarTiposTramite(expandedDep, tiposTramiteAsignados),
+        dependenciasApi.asignarTramites(expandedDep, tiposTramiteAsignados),
       ]);
       toast.success('Asignaciones guardadas');
       await fetchData();
@@ -402,90 +421,29 @@ export default function DependenciasConfig() {
     }));
   };
 
-  // Toggle categoría habilitada/deshabilitada
-  const toggleCategoriaHabilitada = async (categoriaId: number) => {
-    const isHabilitada = categoriasHabilitadas.has(categoriaId);
-    setSaving(true);
-    try {
-      if (isHabilitada) {
-        await categoriasApi.deshabilitar(categoriaId);
-        setCategoriasHabilitadas(prev => {
-          const next = new Set(prev);
-          next.delete(categoriaId);
-          return next;
-        });
-        toast.success('Categoría deshabilitada');
-      } else {
-        await categoriasApi.habilitar(categoriaId);
-        setCategoriasHabilitadas(prev => new Set([...prev, categoriaId]));
-        toast.success('Categoría habilitada');
-      }
-    } catch (error) {
-      console.error('Error al cambiar estado:', error);
-      toast.error('Error al cambiar el estado de la categoría');
-    } finally {
-      setSaving(false);
-    }
+  // Toggle categoría habilitada/deshabilitada — NO-OP en el modelo nuevo.
+  // Las categorías de reclamo del municipio son todas las que están en la
+  // tabla `categorias_reclamo` filtradas por `municipio_id`. No existe la
+  // semántica de "habilitar/deshabilitar del catálogo global" porque ya no
+  // hay catálogo global. Si el usuario quiere sacar una categoría, la borra
+  // desde la pantalla de Categorías Reclamo.
+  const toggleCategoriaHabilitada = async (_categoriaId: number) => {
+    toast.info('Para sacar una categoría, eliminala desde "Categorías Reclamo".');
   };
 
-  // Toggle trámite habilitado/deshabilitado
-  const toggleTramiteHabilitado = async (tramiteId: number) => {
-    const isHabilitado = tramitesHabilitados.has(tramiteId);
-    setSaving(true);
-    try {
-      if (isHabilitado) {
-        await tramitesApi.deshabilitarTramite(tramiteId);
-        setTramitesHabilitados(prev => {
-          const next = new Set(prev);
-          next.delete(tramiteId);
-          return next;
-        });
-        toast.success('Trámite deshabilitado');
-      } else {
-        await tramitesApi.habilitarTramite(tramiteId);
-        setTramitesHabilitados(prev => new Set([...prev, tramiteId]));
-        toast.success('Trámite habilitado');
-      }
-    } catch (error) {
-      console.error('Error al cambiar estado:', error);
-      toast.error('Error al cambiar el estado del trámite');
-    } finally {
-      setSaving(false);
-    }
+  // Toggle trámite habilitado/deshabilitado — NO-OP por la misma razón.
+  const toggleTramiteHabilitado = async (_tramiteId: number) => {
+    toast.info('Para sacar un trámite, eliminalo o desactivalo desde "Trámites".');
   };
 
-  // Habilitar todas las categorías
+  // Habilitar todas las categorías — NO-OP.
   const habilitarTodasCategorias = async () => {
-    setSaving(true);
-    try {
-      await categoriasApi.habilitarTodas();
-      // Recargar datos
-      const res = await categoriasApi.getHabilitadas();
-      setCategoriasHabilitadas(new Set(res.data));
-      toast.success('Todas las categorías habilitadas');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al habilitar categorías');
-    } finally {
-      setSaving(false);
-    }
+    toast.info('Todas las categorías del municipio ya están habilitadas.');
   };
 
-  // Habilitar todos los trámites
+  // Habilitar todos los trámites — NO-OP.
   const habilitarTodosTramites = async () => {
-    setSaving(true);
-    try {
-      await tramitesApi.habilitarTodosTramites();
-      // Recargar datos
-      const res = await tramitesApi.getHabilitados();
-      setTramitesHabilitados(new Set(res.data));
-      toast.success('Todos los trámites habilitados');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al habilitar trámites');
-    } finally {
-      setSaving(false);
-    }
+    toast.info('Todos los trámites del municipio ya están habilitados.');
   };
 
   // Agrupar trámites por tipo

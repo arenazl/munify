@@ -113,7 +113,7 @@ const cleanupPendingRequest = (key: string) => {
   }, DEDUP_WINDOW_MS);
 };
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -327,6 +327,21 @@ export const categoriasReclamoApi = {
     api.delete(`/categorias-reclamo/${id}`).then(res => { invalidateCache('/categorias-reclamo'); return res; }),
 };
 
+// Catálogo cross-municipio de categorías de reclamo sugeridas — solo lectura.
+// Alimenta el autocomplete del wizard admin al crear una categoría nueva
+// y la búsqueda por texto del wizard del vecino (match contra descripciones
+// ricas con coloquialismos del maestro).
+export const categoriasReclamoSugeridasApi = {
+  // Trae todas las sugeridas (cap de 50 del backend). El wizard del vecino
+  // las baja una sola vez al abrir y filtra en memoria.
+  getAll: () => api.get('/categorias-reclamo-sugeridas', { params: { limit: 50 } }),
+  search: (q?: string, limit: number = 15) => {
+    const params: Record<string, unknown> = { limit };
+    if (q && q.trim()) params.q = q.trim();
+    return api.get('/categorias-reclamo-sugeridas', { params });
+  },
+};
+
 // Categorías de Trámite (per-municipio)
 export const categoriasTramiteApi = {
   getAll: (activo?: boolean) =>
@@ -343,6 +358,28 @@ export const categoriasTramiteApi = {
 // Alias retrocompat: el código viejo usa `categoriasApi` para reclamos.
 // Apuntalo al nuevo endpoint para que no se rompa de un golpe.
 export const categoriasApi = categoriasReclamoApi;
+
+// Trámites sugeridos (catálogo global cross-municipios, solo lectura)
+// Usado por el wizard de alta de trámite para autocomplete.
+export const tramitesSugeridosApi = {
+  search: (q?: string, rubro?: string, limit: number = 15) => {
+    const params: Record<string, unknown> = { limit };
+    if (q && q.trim()) params.q = q.trim();
+    if (rubro) params.rubro = rubro;
+    return api.get('/tramites-sugeridos', { params });
+  },
+  getRubros: () => api.get<string[]>('/tramites-sugeridos/rubros'),
+  /**
+   * Devuelve documentos frecuentes del catálogo para mostrar como chips
+   * en el Step 3 del wizard. Combina matches por rubro y por nombre.
+   */
+  documentosFrecuentes: (rubro?: string, nombre?: string, limit: number = 20) => {
+    const params: Record<string, unknown> = { limit };
+    if (rubro && rubro.trim()) params.rubro = rubro.trim();
+    if (nombre && nombre.trim()) params.nombre = nombre.trim();
+    return api.get('/tramites-sugeridos/documentos-frecuentes', { params });
+  },
+};
 
 // Zonas
 export const zonasApi = {
@@ -425,6 +462,23 @@ export const empleadosApi = {
 };
 
 // Usuarios
+export interface VecinoPorDni {
+  id: number;
+  nombre: string;
+  apellido?: string | null;
+  dni?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  direccion?: string | null;
+  solicitudes_previas: number;
+  ultima_solicitud_fecha?: string | null;
+  // Cantidad de reclamos previos del vecino + dirección del más reciente.
+  // El wizard de reclamos usa `ultimo_reclamo_direccion` como chip sugerido
+  // en el paso "Dónde".
+  reclamos_previos: number;
+  ultimo_reclamo_direccion?: string | null;
+}
+
 export const usersApi = {
   getAll: () => api.get('/users'),
   getOne: (id: number) => api.get(`/users/${id}`),
@@ -440,6 +494,10 @@ export const usersApi = {
     api.post('/users/me/request-email-change', { nuevo_email: nuevoEmail }).then(res => res.data),
   validateEmailChange: (nuevoEmail: string, codigo: string) =>
     api.post('/users/me/validate-email-change', { nuevo_email: nuevoEmail, codigo }).then(res => res.data),
+  // Buscar vecino por DNI en el municipio actual (para autocompletar datos en
+  // el wizard de nueva solicitud). Devuelve null si no hay match.
+  buscarPorDni: (dni: string) =>
+    api.get<VecinoPorDni | null>('/users/buscar-por-dni', { params: { dni } }),
 };
 
 // Dashboard
@@ -514,6 +572,17 @@ export const municipiosApi = {
     color_primario: string;
     activo: boolean;
   }) => api.post('/municipios', data),
+  // Endpoint público para crear municipio de demo desde la landing comercial.
+  // Arma todo el seed mínimo (categorías + dep General + 2 users demo) y
+  // devuelve la URL de redirección a la landing del muni nuevo.
+  crearDemo: (nombre: string) =>
+    api.post<{
+      id: number;
+      nombre: string;
+      codigo: string;
+      redirect_path: string;
+    }>('/municipios/crear-demo', { nombre }),
+  eliminarDemo: (codigo: string) => api.delete(`/municipios/demo/${codigo}`),
   update: (id: number, data: object) => api.put(`/municipios/${id}`, data),
   delete: (id: number) => api.delete(`/municipios/${id}`),
   // Barrios (se cargan automáticamente)
@@ -1094,6 +1163,13 @@ export const tramitesApi = {
     api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/verificar`),
   desverificarDocumento: (solicitudId: number, documentoId: number) =>
     api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/desverificar`),
+  /**
+   * Marca un documento requerido como verificado visualmente SIN archivo
+   * adjunto. Caso de uso: el empleado ve el documento físico en ventanilla
+   * y solo tilda "OK". El backend crea un placeholder verificado.
+   */
+  verificarSinArchivo: (solicitudId: number, requeridoId: number) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/requeridos/${requeridoId}/verificar-visual`),
 
   // ----- Aliases retrocompat (a borrar progresivamente) -----
   // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites

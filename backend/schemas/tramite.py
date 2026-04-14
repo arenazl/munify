@@ -230,10 +230,11 @@ class DocumentoSolicitudChecklistItem(BaseModel):
     descripcion: Optional[str] = None
     obligatorio: bool = True
     orden: int = 0
-    # Documento asociado (si fue subido)
+    # Documento asociado (si fue subido o verificado visualmente)
     documento_id: Optional[int] = None
     documento_url: Optional[str] = None
     documento_nombre: Optional[str] = None
+    documento_tipo: Optional[str] = None  # "imagen" | "documento" | "verificacion_manual"
     verificado: bool = False
     verificado_por_id: Optional[int] = None
     verificado_por_nombre: Optional[str] = None

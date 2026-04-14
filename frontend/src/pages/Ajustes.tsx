@@ -226,12 +226,30 @@ export default function Ajustes() {
           show: isAdminOrSupervisor && !isSuperAdmin // Solo supervisor con municipio
         },
         {
-          id: 'categorias',
-          label: 'Categorias',
-          description: 'Tipos de reclamos: alumbrado, bacheo, etc',
+          id: 'categorias-reclamo',
+          label: 'Categorías Reclamo',
+          description: 'Tipos de reclamos del municipio: alumbrado, bacheo, etc',
           icon: FolderTree,
           color: '#8b5cf6',
-          link: '/gestion/categorias',
+          link: '/gestion/categorias-reclamo',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'categorias-tramite',
+          label: 'Categorías Trámite',
+          description: 'Categorías de trámites del municipio: Obras, Comercio, etc',
+          icon: FolderTree,
+          color: '#10b981',
+          link: '/gestion/categorias-tramite',
+          show: isAdminOrSupervisor
+        },
+        {
+          id: 'tramites-config',
+          label: 'Tipos de Trámite',
+          description: 'Trámites específicos del municipio (ej: Licencia de Conducir)',
+          icon: FileText,
+          color: '#6366f1',
+          link: '/gestion/tramites-config',
           show: isAdminOrSupervisor
         },
         {
@@ -241,24 +259,6 @@ export default function Ajustes() {
           icon: MapPin,
           color: '#06b6d4',
           link: '/gestion/zonas',
-          show: isAdminOrSupervisor
-        },
-        {
-          id: 'tipos-tramite',
-          label: 'Tipos de Tramite',
-          description: 'Categorías: Obras, Comercio, etc',
-          icon: FolderTree,
-          color: '#10b981',
-          link: '/gestion/tipos-tramite',
-          show: isAdminOrSupervisor
-        },
-        {
-          id: 'tramites-catalogo',
-          label: 'Catálogo Trámites',
-          description: 'Trámites específicos: permisos, habilitaciones',
-          icon: FileText,
-          color: '#6366f1',
-          link: '/gestion/tramites-catalogo',
           show: isAdminOrSupervisor
         }
       ]

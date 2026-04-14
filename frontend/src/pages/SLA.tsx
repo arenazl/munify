@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { slaApi, categoriasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import PageHint from '../components/ui/PageHint';
 
 interface SLAConfig {
   id: number;
@@ -220,6 +221,8 @@ export default function SLA() {
         buttonLabel="Nueva Config"
         onButtonClick={() => setShowForm(true)}
       />
+
+      <PageHint pageId="sla" />
 
       {/* Resumen Cards */}
       {resumen && (

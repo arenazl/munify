@@ -13,11 +13,22 @@ class ReclamoCreate(BaseModel):
     categoria_id: int
     zona_id: Optional[int] = None
     prioridad: int = 3
-    # Datos de contacto del ciudadano (para registro automático)
+    # Datos de contacto del ciudadano (para registro automático - legacy)
     nombre_contacto: Optional[str] = None
     telefono_contacto: Optional[str] = None
     email_contacto: Optional[str] = None
     recibir_notificaciones: bool = True
+
+    # Datos del solicitante (cuando un empleado/admin carga el reclamo en
+    # nombre de un vecino desde /gestion/reclamos). Si vienen y el
+    # current_user NO es vecino, el backend resuelve/crea un ghost vecino
+    # y usa su id como `creador_id` del reclamo.
+    nombre_solicitante: Optional[str] = None
+    apellido_solicitante: Optional[str] = None
+    dni_solicitante: Optional[str] = None
+    email_solicitante: Optional[str] = None
+    telefono_solicitante: Optional[str] = None
+    direccion_solicitante: Optional[str] = None
 
 class ReclamoUpdate(BaseModel):
     titulo: Optional[str] = None

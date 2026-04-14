@@ -9,12 +9,13 @@ import { validationSchemas } from '../lib/validations';
 export default function Register() {
   const [formData, setFormData] = useState({
     nombre: '',
+    dni: '',
     email: '',
     password: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState({ nombre: false, email: false, password: false });
+  const [touched, setTouched] = useState({ nombre: false, dni: false, email: false, password: false });
   const [municipioNombre, setMunicipioNombre] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
   const { register, loginWithGoogle } = useAuth();
@@ -86,13 +87,29 @@ export default function Register() {
   const nombreValidation = validationSchemas.register.nombre(formData.nombre);
   const emailValidation = validationSchemas.register.email(formData.email);
   const passwordValidation = validationSchemas.register.password(formData.password);
-  const isFormValid = nombreValidation.isValid && emailValidation.isValid && passwordValidation.isValid;
+  // DNI: solo dígitos, entre 7 y 10 caracteres. Obligatorio — es la única
+  // identidad confiable para "tomar" un ghost que un empleado haya cargado
+  // en ventanilla a nombre del vecino.
+  const dniLimpio = formData.dni.replace(/\D/g, '');
+  const dniValidation = {
+    isValid: dniLimpio.length >= 7 && dniLimpio.length <= 10,
+    error: dniLimpio.length === 0
+      ? 'El DNI es obligatorio'
+      : dniLimpio.length < 7
+        ? 'El DNI debe tener al menos 7 dígitos'
+        : 'DNI inválido',
+  };
+  const isFormValid =
+    nombreValidation.isValid &&
+    dniValidation.isValid &&
+    emailValidation.isValid &&
+    passwordValidation.isValid;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleBlur = (field: 'nombre' | 'email' | 'password') => {
+  const handleBlur = (field: 'nombre' | 'dni' | 'email' | 'password') => {
     setTouched(t => ({ ...t, [field]: true }));
   };
 
@@ -107,11 +124,19 @@ export default function Register() {
       const nombre = partes[0] || '';
       const apellido = partes.slice(1).join(' ') || '-';
 
+      // `municipio_id` y `dni` son necesarios para el flujo "tomar ghost":
+      // el backend busca un ghost con ese DNI en ese muni y, si lo encuentra,
+      // le transfiere la identidad (email/password) en lugar de crear un
+      // user nuevo. Así el vecino hereda sus reclamos históricos.
+      const municipioId = Number(localStorage.getItem('municipio_id') || '0') || undefined;
+
       await register({
         email: formData.email,
         password: formData.password,
         nombre,
         apellido,
+        dni: dniLimpio,
+        municipio_id: municipioId,
       });
 
       // Verificar si el usuario venía de querer crear un reclamo
@@ -245,6 +270,40 @@ export default function Register() {
             {touched.nombre && !nombreValidation.isValid && (
               <p className="mt-1 text-xs text-red-400">{nombreValidation.error}</p>
             )}
+          </div>
+
+          {/* DNI — obligatorio porque es la identidad real del vecino.
+              Si un empleado ya cargó un reclamo a tu nombre en ventanilla,
+              usamos el DNI para encontrar ese "ghost vecino" y transferirte
+              la identidad: heredás automáticamente tus reclamos históricos. */}
+          <div>
+            <label htmlFor="dni" className="block text-sm font-medium text-slate-300 mb-1">
+              DNI
+            </label>
+            <div className="relative">
+              <User className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${touched.dni && !dniValidation.isValid ? 'text-red-400' : 'text-slate-500'}`} />
+              <input
+                id="dni"
+                name="dni"
+                type="text"
+                inputMode="numeric"
+                placeholder="30123456"
+                value={formData.dni}
+                onChange={handleChange}
+                onBlur={() => handleBlur('dni')}
+                className={`w-full pl-10 pr-4 py-3 bg-slate-800/50 border rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
+                  touched.dni && !dniValidation.isValid
+                    ? 'border-red-500/50 focus:border-red-500/50'
+                    : 'border-slate-700 focus:border-transparent'
+                }`}
+              />
+            </div>
+            {touched.dni && !dniValidation.isValid && (
+              <p className="mt-1 text-xs text-red-400">{dniValidation.error}</p>
+            )}
+            <p className="mt-1 text-[11px] text-slate-500">
+              Si ya tenés reclamos cargados a tu nombre en este municipio, los vamos a linkear a tu cuenta.
+            </p>
           </div>
 
           {/* Email */}

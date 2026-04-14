@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from .auth import router as auth_router
 from .users import router as users_router
 from .categorias_reclamo import router as categorias_reclamo_router
+from .categorias_reclamo_sugeridas import router as categorias_reclamo_sugeridas_router
 from .categorias_tramite import router as categorias_tramite_router
 from .zonas import router as zonas_router
 from .empleados import router as empleados_router
@@ -26,12 +27,14 @@ from .gamificacion import router as gamificacion_router
 # from .reportes import router as reportes_router
 from .noticias import router as noticias_router
 from .tramites import router as tramites_router
+from .tramites_sugeridos import router as tramites_sugeridos_router
 from .push import router as push_router
 from .empleados_gestion import router as empleados_gestion_router
 from .cuadrillas import router as cuadrillas_router
 from .planificacion import router as planificacion_router
 from .dependencias import router as dependencias_router
 from .validacion_identidad import router as validacion_identidad_router
+from .geocoding import router as geocoding_router
 
 api_router = APIRouter()
 
@@ -39,6 +42,7 @@ api_router.include_router(municipios_router, prefix="/municipios", tags=["Munici
 api_router.include_router(auth_router, prefix="/auth", tags=["Autenticación"])
 api_router.include_router(users_router, prefix="/users", tags=["Usuarios"])
 api_router.include_router(categorias_reclamo_router, prefix="/categorias-reclamo", tags=["Categorías Reclamo"])
+api_router.include_router(categorias_reclamo_sugeridas_router, prefix="/categorias-reclamo-sugeridas", tags=["Categorías Reclamo Sugeridas"])
 api_router.include_router(categorias_tramite_router, prefix="/categorias-tramite", tags=["Categorías Trámite"])
 api_router.include_router(zonas_router, prefix="/zonas", tags=["Zonas"])
 api_router.include_router(empleados_router, prefix="/empleados", tags=["Empleados"])
@@ -62,11 +66,13 @@ api_router.include_router(gamificacion_router, prefix="/gamificacion", tags=["Ga
 # api_router.include_router(reportes_router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(noticias_router, prefix="/noticias", tags=["Noticias"])
 api_router.include_router(tramites_router, prefix="/tramites", tags=["Trámites"])
+api_router.include_router(tramites_sugeridos_router, prefix="/tramites-sugeridos", tags=["Trámites Sugeridos"])
 api_router.include_router(push_router, tags=["Push Notifications"])
 api_router.include_router(cuadrillas_router, prefix="/cuadrillas", tags=["Cuadrillas"])
 api_router.include_router(planificacion_router, prefix="/planificacion", tags=["Planificación"])
 api_router.include_router(dependencias_router, tags=["Dependencias"])  # Ya tiene prefix /dependencias
 api_router.include_router(validacion_identidad_router)  # Ya tiene prefix /validacion-identidad
+api_router.include_router(geocoding_router, prefix="/geocoding", tags=["Geocoding"])
 
 # WebSockets
 from .ws import router as ws_router

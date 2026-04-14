@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, MapPin, UserPlus, LogIn, Check, Building2, Shield, User } from 'lucide-react';
+import { Loader2, LogIn, Check, Building2, Sparkles, ArrowRight, X } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
-import { useAuth } from '../contexts/AuthContext';
+import { clearMunicipio } from '../utils/municipioStorage';
+import DemoCreationProgress from '../components/DemoCreationProgress';
 import munifyLogo from '../assets/munify_logo.png';
 
 interface Municipio {
@@ -13,16 +14,29 @@ interface Municipio {
   logo_url?: string;
 }
 
+// Feature flag: el creador de muni demo al vuelo (POST /municipios/crear-demo)
+// vive sólo en la rama del refactor y todavía no fue deployado al backend de
+// prod. Lo ocultamos en builds de producción hasta que se suba el endpoint.
+// En dev (npm run dev) se ve normal porque corremos el working tree completo.
+const SHOW_DEMO_CREATOR = !import.meta.env.PROD;
+
 export default function Demo() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [selectedMunicipio, setSelectedMunicipio] = useState<Municipio | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Estado del creador de muni demo (input + loading del POST).
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [creando, setCreando] = useState(false);
+  const [creandoDone, setCreandoDone] = useState(false);
+  const [eliminando, setEliminando] = useState<string | null>(null);
 
-  // Cargar municipios al montar (endpoint público, sin auth)
+  // Cargar municipios al montar (endpoint público, sin auth).
+  // También limpiamos el municipio guardado del localStorage para que
+  // el tab vuelva a decir "Munify" (no el nombre de un muni anterior).
   useEffect(() => {
+    clearMunicipio();
     const fetchMunicipios = async () => {
       try {
         const response = await municipiosApi.getPublic();
@@ -47,34 +61,76 @@ export default function Demo() {
   };
 
   const handleSelectMunicipio = (municipio: Municipio) => {
+    // Al clickear un muni, ir directo a la pantalla de perfiles (DemoReady)
+    // para que elijan el rol con el que quieren entrar (admin/supervisor/vecino).
     setSelectedMunicipio(municipio);
     saveMunicipioToStorage(municipio);
+    navigate(`/demo/listo?muni=${municipio.codigo}`);
   };
 
-  const handleEntrarAnonimo = () => {
-    if (!selectedMunicipio) return;
-    navigate('/home');
-  };
-
-  const handleCrearCuenta = () => {
-    if (!selectedMunicipio) return;
-    navigate('/register');
-  };
-
-  const handleQuickLogin = async (role: 'admin' | 'vecino') => {
-    if (!selectedMunicipio) return;
+  const handleEliminarDemo = async (e: React.MouseEvent, municipio: Municipio) => {
+    e.stopPropagation();
+    if (!confirm(`¿Eliminar la demo "${municipio.nombre}"? Se borran todos sus datos.`)) return;
+    setEliminando(municipio.codigo);
     try {
-      await login(`${role}@demo.com`, '123456');
-      if (role === 'admin') navigate('/gestion');
-      else navigate('/home');
+      await municipiosApi.eliminarDemo(municipio.codigo);
+      setMunicipios((prev) => prev.filter((m) => m.id !== municipio.id));
+      if (selectedMunicipio?.id === municipio.id) setSelectedMunicipio(null);
     } catch (err) {
-      console.error('Error auto-login:', err);
-      setError('Error ingresando con la cuenta comodín');
+      console.error('Error eliminando demo:', err);
+      setError('No se pudo eliminar la demo');
+    } finally {
+      setEliminando(null);
+    }
+  };
+
+  /**
+   * Crea un municipio de demo en vivo desde el input comercial.
+   *
+   * Flujo:
+   * 1. POST /municipios/crear-demo con solo el nombre → el backend arma
+   *    todo el seed (categorías, dep General, 2 users demo con `demo123`).
+   * 2. Guardamos el muni en localStorage como "municipio actual".
+   * 3. Navegamos a /demo/listo?muni=<codigo> — pantalla minimalista con
+   *    SOLO los 2 botones de quick-login (Admin / Vecino) del muni creado.
+   */
+  const handleCrearDemo = async () => {
+    const nombre = nuevoNombre.trim();
+    if (nombre.length < 3) {
+      setError('El nombre del municipio debe tener al menos 3 caracteres');
+      return;
+    }
+    setCreando(true);
+    setCreandoDone(false);
+    setError('');
+    try {
+      const res = await municipiosApi.crearDemo(nombre);
+      const muni = res.data;
+      saveMunicipioToStorage({
+        id: muni.id,
+        nombre: muni.nombre,
+        codigo: muni.codigo,
+        color_primario: '#0088cc',
+      });
+      // Mostrar "¡Listo!" y check verde unos 600ms antes de navegar
+      setCreandoDone(true);
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      navigate(`/demo/listo?muni=${muni.codigo}`);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e.response?.data?.detail || 'Error creando el municipio de demo');
+    } finally {
+      setCreando(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col">
+      {/* Progress modal mientras crear-demo está en vuelo (endpoint tarda ~18s) */}
+      {creando && (
+        <DemoCreationProgress done={creandoDone} municipioNombre={nuevoNombre} />
+      )}
+
       {/* Header minimalista */}
       <header className="flex-shrink-0 px-6 py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -95,15 +151,74 @@ export default function Demo() {
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         <div className="w-full max-w-2xl">
-          {/* Título */}
-          <div className="text-center mb-10">
+          {/* Título comercial */}
+          <div className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">
-              Elegir municipio
+              Probá Munify en tu municipio
             </h1>
             <p className="text-slate-500 text-lg">
-              Seleccioná tu municipio para continuar
+              Escribí el nombre y armamos una demo en 3 segundos
             </p>
           </div>
+
+          {/* Creador de muni demo — protagonista comercial.
+              Oculto en prod hasta que el endpoint /crear-demo esté deployado. */}
+          {SHOW_DEMO_CREATOR && (
+          <div className="mb-10 bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-5 w-5 text-blue-500" />
+              <span className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                Crear demo en vivo
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={nuevoNombre}
+                onChange={(e) => setNuevoNombre(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !creando) handleCrearDemo();
+                }}
+                placeholder="Ej: Pergamino, San Pedro, Salta..."
+                disabled={creando}
+                className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400 transition-colors disabled:opacity-50"
+              />
+              <button
+                onClick={handleCrearDemo}
+                disabled={creando || nuevoNombre.trim().length < 3}
+                className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold hover:from-blue-600 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+              >
+                {creando ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    Probar ahora
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3">
+              Se crea un municipio con categorías, trámites y 2 usuarios de prueba (admin y vecino).
+              Sin registro ni tarjeta.
+            </p>
+          </div>
+          )}
+
+          {/* Separador entre "crear nuevo" y "elegir existente".
+              Sólo tiene sentido cuando el creador de demo está visible. */}
+          {SHOW_DEMO_CREATOR && municipios.length > 0 && (
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-xs text-slate-400 uppercase tracking-wider font-medium">
+                o entrá a uno existente
+              </span>
+              <div className="flex-1 h-px bg-slate-200" />
+            </div>
+          )}
 
           {/* Error */}
           {error && (
@@ -141,10 +256,23 @@ export default function Demo() {
                         borderColor: primaryColor,
                       } : undefined}
                     >
+                      {/* Delete button — siempre visible, hover resalta */}
+                      <div
+                        onClick={(e) => handleEliminarDemo(e, municipio)}
+                        className="absolute -top-2.5 -right-2.5 w-7 h-7 rounded-full bg-white border-2 border-red-400 flex items-center justify-center shadow-md cursor-pointer hover:bg-red-500 hover:border-red-500 hover:scale-110 active:scale-95 transition-all z-10 group/delete"
+                        title="Eliminar demo"
+                      >
+                        {eliminando === municipio.codigo ? (
+                          <Loader2 className="h-3.5 w-3.5 text-red-500 animate-spin" />
+                        ) : (
+                          <X className="h-4 w-4 text-red-500 group-hover/delete:text-white" strokeWidth={2.5} />
+                        )}
+                      </div>
+
                       {/* Check indicator */}
                       {isSelected && (
                         <div
-                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
+                          className="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
                           style={{ backgroundColor: primaryColor }}
                         >
                           <Check className="h-3.5 w-3.5 text-white" />
@@ -189,57 +317,10 @@ export default function Demo() {
                 })}
               </div>
 
-              {/* Botones de acción */}
-              <div className={`
-                flex flex-col items-center justify-center gap-4
-                transition-all duration-300
-                ${selectedMunicipio ? 'opacity-100 translate-y-0' : 'opacity-40 translate-y-2 pointer-events-none'}
-              `}>
-                <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                  <button
-                    onClick={handleEntrarAnonimo}
-                    disabled={!selectedMunicipio}
-                    className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 bg-white border-2 border-slate-200 rounded-2xl text-slate-700 font-semibold text-lg hover:border-slate-300 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <MapPin className="h-5 w-5" />
-                    Entrar anónimo
-                  </button>
-
-                  <button
-                    onClick={handleCrearCuenta}
-                    disabled={!selectedMunicipio}
-                    className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 text-white font-semibold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      background: selectedMunicipio
-                        ? `linear-gradient(135deg, ${selectedMunicipio.color_primario || '#0088cc'} 0%, ${selectedMunicipio.color_primario || '#0088cc'}dd 100%)`
-                        : 'linear-gradient(135deg, #0088cc 0%, #0088ccdd 100%)'
-                    }}
-                  >
-                    <UserPlus className="h-5 w-5" />
-                    Crear cuenta
-                  </button>
-                </div>
-
-                <div className="mt-4 border-t pt-6 w-full max-w-md">
-                  <p className="text-center text-sm text-slate-500 mb-3 font-medium">✨ Cuentas Comodín (Pruebas)</p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <button
-                      onClick={() => handleQuickLogin('vecino')}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-medium text-sm transition-colors border border-indigo-200"
-                    >
-                      <User className="h-4 w-4" />
-                      Como Vecino
-                    </button>
-                    <button
-                      onClick={() => handleQuickLogin('admin')}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded-xl font-medium text-sm transition-colors border border-rose-200"
-                    >
-                      <Shield className="h-4 w-4" />
-                      Como Admin
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {/* Hint sutil abajo — clickear card = ir al login con perfiles */}
+              <p className="text-center text-xs text-slate-400 mt-2">
+                Tocá un municipio para entrar con los perfiles de prueba (admin, supervisor, vecino)
+              </p>
 
               {/* Texto de ayuda */}
               {selectedMunicipio && (

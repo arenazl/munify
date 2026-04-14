@@ -671,7 +671,7 @@ async def clasificar_reclamo_endpoint(
     # Si no hay categorías en la base, usar las predefinidas de CATEGORY_KEYWORDS
     if categorias_db:
         categorias = [
-            {"id": c.id, "nombre": c.nombre}
+            {"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion or ""}
             for c in categorias_db
         ]
     else:

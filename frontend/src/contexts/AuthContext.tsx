@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '../types';
-import { authApi } from '../lib/api';
+import { authApi, API_URL } from '../lib/api';
 import api from '../lib/api';
 import { useMunicipioFromUrl, buildMunicipioUrl } from '../hooks/useSubdomain';
 import { subscribeToPush, isPushSupported } from '../lib/pushNotifications';
+import { saveMunicipio, clearMunicipio } from '../utils/municipioStorage';
 
 export interface Municipio {
   id: number;
@@ -21,6 +22,9 @@ export interface Municipio {
   telefono?: string;
   email?: string;
   sitio_web?: string;
+  // Flag de UI: si es true, los ABMs de Categorías Reclamo/Trámite y Tipos
+  // de Trámite se muestran en el sidebar. Si es false, quedan sólo en Ajustes.
+  abm_en_sidebar?: boolean;
   // Configuración de tema
   tema_config?: {
     // Nuevo sistema de presets
@@ -51,7 +55,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
-  register: (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => Promise<void>;
+  register: (data: { email: string; password: string; nombre: string; apellido: string; dni?: string; municipio_id?: number; es_anonimo?: boolean; telefono?: string }) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
   // Multi-tenant
@@ -164,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSuperAdmin) {
       // Para super admin, cargar todos los municipios
       try {
-        const apiUrl = import.meta.env.VITE_API_URL;
+        const apiUrl = API_URL;
         const res = await fetch(`${apiUrl}/municipios`, {
           headers: { Authorization: `Bearer ${access_token}` }
         });
@@ -180,12 +184,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (found) selectedMuni = found;
             }
             localStorage.setItem('municipio_actual_id', String(selectedMuni.id));
-            localStorage.setItem('municipio_id', String(selectedMuni.id));
-            localStorage.setItem('municipio_nombre', selectedMuni.nombre);
-            localStorage.setItem('municipio_codigo', selectedMuni.codigo);
-            localStorage.setItem('municipio_color', selectedMuni.color_primario || '#3b82f6');
             if (selectedMuni.latitud) localStorage.setItem('municipio_lat', String(selectedMuni.latitud));
             if (selectedMuni.longitud) localStorage.setItem('municipio_lon', String(selectedMuni.longitud));
+            await saveMunicipio({
+              id: String(selectedMuni.id),
+              codigo: selectedMuni.codigo,
+              nombre: selectedMuni.nombre,
+              color: selectedMuni.color_primario || '#3b82f6',
+              logo_url: selectedMuni.logo_url || undefined,
+            });
             setMunicipioActualState(selectedMuni);
           }
         }
@@ -195,19 +202,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else if (user.municipio_id) {
       // Usuario normal: cargar solo su municipio
       try {
-        const apiUrl = import.meta.env.VITE_API_URL;
+        const apiUrl = API_URL;
         const res = await fetch(`${apiUrl}/municipios/${user.municipio_id}`, {
           headers: { Authorization: `Bearer ${access_token}` }
         });
         if (res.ok) {
           const muni = await res.json();
           localStorage.setItem('municipio_actual_id', String(muni.id));
-          localStorage.setItem('municipio_id', String(muni.id));
-          localStorage.setItem('municipio_nombre', muni.nombre);
-          localStorage.setItem('municipio_codigo', muni.codigo);
-          localStorage.setItem('municipio_color', muni.color_primario || '#3b82f6');
           if (muni.latitud) localStorage.setItem('municipio_lat', String(muni.latitud));
           if (muni.longitud) localStorage.setItem('municipio_lon', String(muni.longitud));
+          // Usar saveMunicipio para que escriba en IndexedDB + localStorage
+          // y dispare el evento `municipio-changed` que el DynamicManifest
+          // escucha para actualizar el tab, manifest y theme-color.
+          await saveMunicipio({
+            id: String(muni.id),
+            codigo: muni.codigo,
+            nombre: muni.nombre,
+            color: muni.color_primario || '#3b82f6',
+            logo_url: muni.logo_url || undefined,
+          });
           setMunicipioActualState(muni);
         }
       } catch (e) {
@@ -237,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Cargar municipio del usuario
     if (user.municipio_id) {
       try {
-        const apiUrl = import.meta.env.VITE_API_URL;
+        const apiUrl = API_URL;
         const res = await fetch(`${apiUrl}/municipios/${user.municipio_id}`, {
           headers: { Authorization: `Bearer ${access_token}` }
         });
@@ -268,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const register = async (data: { email: string; password: string; nombre: string; apellido: string; es_anonimo?: boolean; telefono?: string }) => {
+  const register = async (data: { email: string; password: string; nombre: string; apellido: string; dni?: string; municipio_id?: number; es_anonimo?: boolean; telefono?: string }) => {
     await authApi.register(data);
     // Auto-login después del registro
     await login(data.email, data.password);
@@ -277,7 +290,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    localStorage.removeItem('municipio_actual_id');
+    // Limpiar TODA la data de municipio (localStorage + IndexedDB) — si solo
+    // borramos `municipio_actual_id` quedan `municipio_nombre`, `municipio_codigo`,
+    // etc. del usuario anterior y el próximo login ve basura en el tab, manifest,
+    // theme-color y APIs multi-tenant.
+    void clearMunicipio();
     setUser(null);
     setMunicipioActualState(null);
     setMunicipios([]);

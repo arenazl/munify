@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { empleadosApi, zonasApi, categoriasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import type { Empleado, Zona, Categoria } from '../types';
 
 export default function Empleados() {
@@ -310,7 +311,9 @@ export default function Empleados() {
   ];
 
   return (
-    <ABMPage
+    <>
+      <PageHint pageId="empleados" />
+      <ABMPage
       title="Empleados"
       icon={<Users className="h-5 w-5" />}
       backLink="/gestion/ajustes"
@@ -683,5 +686,6 @@ export default function Empleados() {
         );
       })}
     </ABMPage>
+    </>
   );
 }

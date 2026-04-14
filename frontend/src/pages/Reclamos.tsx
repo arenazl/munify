@@ -1,4 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, Inbox } from 'lucide-react';
 import { toast } from 'sonner';
@@ -6,8 +7,10 @@ import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboard
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { WizardModal } from '../components/ui/WizardModal';
+import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
@@ -145,6 +148,47 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
+
+  // Chips de categorías: limitadas a 2 renglones dinámicos.
+  //
+  // Estrategia de detección de overflow:
+  //   1. Medimos el alto que tendría cada chip individualmente (un chip solo
+  //      en una fila) → esa es la altura de 1 renglón.
+  //   2. Medimos el alto total del contenido sin límite.
+  //   3. Si el total > 2 renglones → hay overflow, mostrar botón "Ver todas".
+  //
+  // Importante: la medición se hace en un div oculto con el MISMO ancho que
+  // el contenedor real, para que flex-wrap calcule igual. No dependemos de
+  // max-h porque eso oculta información que necesitamos para medir.
+  const catsWrapRef = useRef<HTMLDivElement>(null);   // contenedor visible
+  const catsMeasureRef = useRef<HTMLDivElement>(null); // clon invisible para medir
+  const [catsChipsOverflow, setCatsChipsOverflow] = useState(false);
+  const [catsChipsExpanded, setCatsChipsExpanded] = useState(false);
+  const [chipLineHeight, setChipLineHeight] = useState(32);
+
+  useLayoutEffect(() => {
+    const measureEl = catsMeasureRef.current;
+    if (!measureEl || categorias.length === 0) return;
+
+    const check = () => {
+      // Altura real del primer chip (incluye padding/border/line-height)
+      const firstChip = measureEl.querySelector('button') as HTMLElement | null;
+      const lineH = firstChip?.offsetHeight ?? 28;
+      setChipLineHeight(lineH);
+
+      // scrollHeight del clon = alto total de todas las chips envueltas
+      const total = measureEl.scrollHeight;
+      // Un renglón = alto del chip. Dos renglones = 2 * alto + gap (4px).
+      const twoLinesHeight = lineH * 2 + 4;
+      setCatsChipsOverflow(total > twoLinesHeight + 2);
+    };
+
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(measureEl);
+    if (catsWrapRef.current) ro.observe(catsWrapRef.current);
+    return () => ro.disconnect();
+  }, [categorias]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
   const [conteosDependencias, setConteosDependencias] = useState<Record<number, number>>({});
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -3670,6 +3714,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
+      <PageHint pageId="reclamos-list" />
       <ABMPage
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
         buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
@@ -3737,8 +3782,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   </span>
                 </button>
 
-                {/* Scroll de dependencias */}
-                <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
+                {/* Chips de dependencias — wrap si no entran */}
+                <div className="flex flex-wrap gap-1 pb-1 flex-1 min-w-0">
                   {dependenciasDisponibles.length === 0 ? (
                     <FilterRowSkeleton count={4} height={28} widths={[100, 120, 110, 105]} />
                   ) : (
@@ -3802,54 +3847,124 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 </span>
               </button>
 
-              {/* Scroll de categorías */}
-              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-              {/* Skeleton solo si no hay categorías cargadas (carga inicial) */}
-              {categorias.length === 0 || Object.keys(conteosCategorias).length === 0 ? (
-                <FilterRowSkeleton count={6} height={28} widths={[50, 65, 80, 50, 65, 80]} />
-              ) : (
-              <>
-              {/* Mostrar categorías con conteo > 0 O que tengan reclamos cargados en la lista actual */}
-              {categorias.filter((cat) => (conteosCategorias[cat.id] || 0) > 0 || reclamos.some(r => r.categoria.id === cat.id)).map((cat) => {
-                const isSelected = filtroCategoria === cat.id;
-                const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
-                const count = conteosCategorias[cat.id] || 0;
-                const isLoadingThis = filterLoading === `cat-${cat.id}`;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => {
-                      setFilterLoading(`cat-${cat.id}`);
-                      setFiltroCategoria(isSelected ? null : cat.id);
-                    }}
-                    title={cat.nombre}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
-                    style={{
-                      background: isSelected ? catColor : theme.backgroundSecondary,
-                      border: `1px solid ${isSelected ? catColor : theme.border}`,
-                    }}
-                  >
-                    <span className={`[&>svg]:h-3 [&>svg]:w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : catColor }}>
-                      {getCategoryIcon(cat.nombre)}
-                    </span>
-                    <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                      {cat.nombre.split(' ')[0]}
-                    </span>
-                    <span
-                      className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+              {/* Chips de categorías — contenedor wrapper + clon invisible
+                  para medir overflow.
+                  - `catsWrapRef` = visible, con max-h dinámico = 2 renglones
+                  - `catsMeasureRef` = clon oculto, sin max-h, para medir
+                    scrollHeight real y comparar contra 2 líneas */}
+              <div className="flex-1 min-w-0 relative">
+                {/* Contenedor visible */}
+                <div
+                  ref={catsWrapRef}
+                  className="flex flex-wrap gap-1 pb-1"
+                  style={{
+                    maxHeight: catsChipsExpanded ? undefined : chipLineHeight * 2 + 4,
+                    overflow: catsChipsExpanded ? 'visible' : 'hidden',
+                  }}
+                >
+                {/* Skeleton solo mientras las categorías del municipio aún
+                    no se cargaron. */}
+                {categorias.length === 0 ? (
+                  <FilterRowSkeleton count={6} height={28} widths={[50, 65, 80, 50, 65, 80]} />
+                ) : (
+                <>
+                {categorias.map((cat) => {
+                  const isSelected = filtroCategoria === cat.id;
+                  const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
+                  const count = conteosCategorias[cat.id] || 0;
+                  const isLoadingThis = filterLoading === `cat-${cat.id}`;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => {
+                        setFilterLoading(`cat-${cat.id}`);
+                        setFiltroCategoria(isSelected ? null : cat.id);
+                      }}
+                      title={cat.nombre}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
                       style={{
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${catColor}30`,
-                        color: isSelected ? '#ffffff' : catColor,
+                        background: isSelected ? catColor : theme.backgroundSecondary,
+                        border: `1px solid ${isSelected ? catColor : theme.border}`,
                       }}
                     >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-              </>
-              )}
+                      <span className={`[&>svg]:h-3 [&>svg]:w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : catColor }}>
+                        {getCategoryIcon(cat.nombre)}
+                      </span>
+                      <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                        {cat.nombre}
+                      </span>
+                      <span
+                        className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${catColor}30`,
+                          color: isSelected ? '#ffffff' : catColor,
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+                </>
+                )}
+                </div>
+
+                {/* Clon invisible usado SOLO para medir overflow real.
+                    Mismo ancho y contenido que el visible, pero sin max-h
+                    ni overflow:hidden — así scrollHeight siempre refleja el
+                    alto real de N renglones sin restricción. */}
+                <div
+                  ref={catsMeasureRef}
+                  aria-hidden="true"
+                  className="flex flex-wrap gap-1 pb-1 absolute top-0 left-0 right-0 pointer-events-none invisible"
+                  style={{ visibility: 'hidden' }}
+                >
+                  {categorias.map((cat) => (
+                    <button
+                      key={`measure-${cat.id}`}
+                      type="button"
+                      tabIndex={-1}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md h-[28px] flex-shrink-0"
+                      style={{ border: '1px solid transparent' }}
+                    >
+                      <span className="[&>svg]:h-3 [&>svg]:w-3">
+                        {getCategoryIcon(cat.nombre)}
+                      </span>
+                      <span className="text-[10px] font-medium whitespace-nowrap">
+                        {cat.nombre}
+                      </span>
+                      <span className="text-[9px] font-bold px-1 rounded-full">
+                        {conteosCategorias[cat.id] || 0}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Toggle "Ver todas / Menos" — solo si hay overflow o expandido */}
+              {(catsChipsOverflow || catsChipsExpanded) && (
+                <button
+                  type="button"
+                  onClick={() => setCatsChipsExpanded(v => !v)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium flex-shrink-0 self-start transition-colors hover:brightness-110"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1px solid ${theme.border}`,
+                    color: theme.textSecondary,
+                    height: 28,
+                  }}
+                >
+                  {catsChipsExpanded ? (
+                    <>
+                      <ChevronUp className="h-3 w-3" /> Menos
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3" /> Ver todas
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Estados - botón Todos fijo + scroll horizontal */}
@@ -3875,12 +3990,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 </span>
               </button>
 
-              {/* Scroll de estados */}
-              <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-              {/* Skeleton solo si no hay conteos cargados (carga inicial) */}
-              {Object.keys(conteosEstados).length === 0 ? (
-                <FilterRowSkeleton count={6} height={26} widths={[45, 50, 45, 50, 45, 45]} />
-              ) : (
+              {/* Chips de estados — wrap si no entran en el ancho */}
+              <div className="flex flex-wrap gap-1 pb-1 flex-1 min-w-0">
+              {/* Lista fija de estados canónicos. Los counts vienen de
+                  `conteosEstados` y pueden ser 0 (sin skeleton falso). */}
+              {(
                 [
                   { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
                   { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: conteosEstados['recibido'] || 0 },
@@ -3888,7 +4002,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   { key: 'finalizado', label: 'Final.', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
                   { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
                   { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
-                ].map((estado) => {
+                ] as const
+              ).map((estado) => {
                   const Icon = estado.icon;
                   const isActive = filtroEstado === estado.key;
                   const isLoadingThis = filterLoading === `estado-${estado.key}`;
@@ -3923,8 +4038,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                       </span>
                     </button>
                   );
-                })
-              )}
+                })}
               </div>
             </div>
 
@@ -3995,23 +4109,17 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {renderViewContent()}
       </Sheet>
 
-      {/* Wizard Modal para crear nuevo reclamo */}
-      <WizardModal
+      {/* Wizard de creación de reclamo — usa el mismo componente que el wizard
+          de trámite (look & feel unificado). El código viejo del wizard interno
+          (~1500 líneas: wizardSteps, handleCreate, wizardAIPanel, states
+          asociados) quedó sin usar y se puede limpiar en otro pase. */}
+      <CrearReclamoWizard
         open={wizardOpen}
         onClose={closeWizard}
-        title="Nuevo Reclamo"
-        steps={wizardSteps}
-        currentStep={wizardStep}
-        onStepChange={setWizardStep}
-        onComplete={handleCreate}
-        loading={saving}
-        completeLabel="Enviar Reclamo"
-        aiPanel={wizardAIPanel}
-        headerBadge={selectedCategoria ? {
-          icon: getCategoryIcon(selectedCategoria.nombre),
-          label: selectedCategoria.nombre,
-          color: selectedCategoria.color || DEFAULT_CATEGORY_COLOR,
-        } : undefined}
+        onSuccess={() => {
+          closeWizard();
+          fetchReclamos();
+        }}
       />
 
     </PullToRefresh>

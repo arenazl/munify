@@ -23,19 +23,9 @@ from models.configuracion import Configuracion
 from models.municipio import Municipio
 from models.enums import EstadoReclamo, RolUsuario
 
+from core.tenancy import get_effective_municipio_id  # noqa: E402
+
 router = APIRouter()
-
-
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
-    """Obtiene el municipio_id efectivo (del header X-Municipio-ID si es admin/supervisor)"""
-    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
-        header_municipio_id = request.headers.get('X-Municipio-ID')
-        if header_municipio_id:
-            try:
-                return int(header_municipio_id)
-            except (ValueError, TypeError):
-                pass
-    return current_user.municipio_id
 
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:

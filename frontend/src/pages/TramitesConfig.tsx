@@ -1,15 +1,26 @@
-import { useEffect, useState } from 'react';
-import { Pencil, Trash2, Loader2, FileText } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import {
+  Pencil, Trash2, Loader2, FileText, FolderTree, Settings,
+  ClipboardList, CheckCircle2, Sparkles, Clock, CreditCard,
+  ShieldCheck, ScanFace,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { Sheet } from '../components/ui/Sheet';
+import { WizardModal, type WizardStep } from '../components/ui/WizardModal';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import PageHint from '../components/ui/PageHint';
 import { tramitesApi, categoriasTramiteApi } from '../lib/api';
 import {
   DocumentosRequeridosEditor,
   type DocRequeridoDraft,
 } from '../components/config/DocumentosRequeridosEditor';
+import {
+  TramiteAutocompleteInput,
+  type TramiteSugerencia,
+} from '../components/config/TramiteAutocompleteInput';
+import { ChipsDocumentosSugeridos } from '../components/config/ChipsDocumentosSugeridos';
 import type { Tramite, CategoriaTramite } from '../types';
 
 interface TramiteForm {
@@ -44,8 +55,15 @@ export default function TramitesConfig() {
   const [search, setSearch] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
 
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // Wizard (alta nueva)
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
+
+  // Sheet (edición)
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Tramite | null>(null);
+
+  // Form y guardado compartidos entre alta y edición
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<TramiteForm>(EMPTY_FORM);
 
@@ -70,18 +88,20 @@ export default function TramitesConfig() {
     cargar();
   }, []);
 
+  // ============ Apertura de alta (wizard) vs edición (sheet) ============
+
   const abrirNuevo = () => {
     setEditing(null);
     setForm({
       ...EMPTY_FORM,
       categoria_tramite_id: categorias[0]?.id ?? null,
     });
-    setSheetOpen(true);
+    setWizardStep(0);
+    setWizardOpen(true);
   };
 
   const abrirEdit = async (tramite: Tramite) => {
     setEditing(tramite);
-    // Cargar el detalle completo (incluye documentos_requeridos)
     try {
       const res = await tramitesApi.getOne(tramite.id);
       const t = res.data as Tramite;
@@ -102,11 +122,13 @@ export default function TramitesConfig() {
           orden: d.orden,
         })),
       });
-      setSheetOpen(true);
+      setEditSheetOpen(true);
     } catch (err) {
       toast.error('Error cargando trámite');
     }
   };
+
+  // ============ Guardar (alta desde wizard o edición desde sheet) ============
 
   const guardar = async () => {
     if (!form.categoria_tramite_id) {
@@ -121,7 +143,6 @@ export default function TramitesConfig() {
     setSaving(true);
     try {
       if (editing) {
-        // Update del trámite (campos básicos)
         await tramitesApi.update(editing.id, {
           categoria_tramite_id: form.categoria_tramite_id,
           nombre: form.nombre.trim(),
@@ -133,25 +154,18 @@ export default function TramitesConfig() {
           requiere_validacion_facial: form.requiere_validacion_facial,
         });
 
-        // Sincronizar documentos requeridos: borrar viejos no presentes,
-        // crear nuevos sin id, actualizar los existentes con id.
-        const idsExistentes = new Set(
-          (editing.documentos_requeridos || []).map(d => d.id),
-        );
+        // Sincronizar documentos requeridos
         const idsActuales = new Set(
           form.documentos_requeridos.filter(d => d.id).map(d => d.id!),
         );
-
-        // Eliminar
         for (const old of editing.documentos_requeridos || []) {
           if (!idsActuales.has(old.id)) {
             await tramitesApi.deleteDocumentoRequerido(old.id);
           }
         }
-        // Crear / actualizar
         for (const draft of form.documentos_requeridos) {
           if (!draft.nombre.trim()) continue;
-          if (draft.id && idsExistentes.has(draft.id)) {
+          if (draft.id) {
             await tramitesApi.updateDocumentoRequerido(draft.id, {
               nombre: draft.nombre,
               descripcion: draft.descripcion || undefined,
@@ -168,6 +182,7 @@ export default function TramitesConfig() {
           }
         }
         toast.success('Trámite actualizado');
+        setEditSheetOpen(false);
       } else {
         await tramitesApi.create({
           categoria_tramite_id: form.categoria_tramite_id,
@@ -188,8 +203,8 @@ export default function TramitesConfig() {
             })),
         });
         toast.success('Trámite creado');
+        setWizardOpen(false);
       }
-      setSheetOpen(false);
       await cargar();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Error guardando');
@@ -219,6 +234,353 @@ export default function TramitesConfig() {
     (acc[t.categoria_tramite_id] ||= []).push(t);
     return acc;
   }, {});
+
+  // ============ Steps del wizard ============
+
+  const selectedCategoria = useMemo(
+    () => categorias.find(c => c.id === form.categoria_tramite_id),
+    [categorias, form.categoria_tramite_id],
+  );
+
+  /**
+   * Cuando el admin elige una sugerencia del catálogo global, precargamos
+   * los campos básicos del form (nombre, descripción, tiempo, costo).
+   *
+   * NO precargamos los documentos requeridos: se mostrarán como chips
+   * sugeridos en el Step 3 (`ChipsDocumentosSugeridos`) para que el admin
+   * decida cuáles agregar tocando los chips, uno por uno.
+   */
+  const handleSelectSugerencia = (sug: TramiteSugerencia) => {
+    setForm(prev => ({
+      ...prev,
+      nombre: sug.nombre,
+      descripcion: sug.descripcion || prev.descripcion,
+      tiempo_estimado_dias: sug.tiempo_estimado_dias ?? prev.tiempo_estimado_dias,
+      costo: sug.costo != null ? String(sug.costo) : prev.costo,
+      // No se tocan documentos_requeridos — se sugieren como chips en Step 3
+    }));
+  };
+
+  /**
+   * Agrega un documento a la lista de docs requeridos del form (usado por
+   * los chips sugeridos en el Step 3). Si ya existe uno con el mismo nombre
+   * (case-insensitive), no lo duplica.
+   */
+  const agregarDocRequerido = (nombreDoc: string) => {
+    setForm(prev => {
+      const yaExiste = prev.documentos_requeridos.some(
+        d => d.nombre.toLowerCase().trim() === nombreDoc.toLowerCase().trim(),
+      );
+      if (yaExiste) return prev;
+      return {
+        ...prev,
+        documentos_requeridos: [
+          ...prev.documentos_requeridos,
+          {
+            nombre: nombreDoc,
+            descripcion: '',
+            obligatorio: true,
+            orden: prev.documentos_requeridos.length + 1,
+          },
+        ],
+      };
+    });
+  };
+
+  const step1Content = (
+    <div className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          Categoría <span className="text-red-500">*</span>
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {categorias.map(c => {
+            const active = form.categoria_tramite_id === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setForm({ ...form, categoria_tramite_id: c.id })}
+                className="flex items-center gap-2 p-3 rounded-xl text-left transition-all duration-200 hover:scale-[1.02]"
+                style={{
+                  backgroundColor: active ? `${c.color || theme.primary}20` : theme.backgroundSecondary,
+                  border: `2px solid ${active ? (c.color || theme.primary) : 'transparent'}`,
+                }}
+              >
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${c.color || theme.primary}25` }}
+                >
+                  <DynamicIcon name={c.icono || 'Folder'} className="h-4 w-4" style={{ color: c.color || theme.primary }} />
+                </div>
+                <span className="text-xs font-medium" style={{ color: theme.text }}>{c.nombre}</span>
+              </button>
+            );
+          })}
+        </div>
+        {categorias.length === 0 && (
+          <p className="text-sm italic" style={{ color: theme.textSecondary }}>
+            No hay categorías de trámite cargadas. Creá primero una en "Categorías Trámite".
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          Nombre del trámite <span className="text-red-500">*</span>
+        </label>
+        <TramiteAutocompleteInput
+          value={form.nombre}
+          onChange={nombre => setForm({ ...form, nombre })}
+          onSelectSugerencia={handleSelectSugerencia}
+          placeholder="Empezá a escribir, ej: Licencia de Conducir..."
+        />
+        <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
+          Escribí y elegí una sugerencia del catálogo para precargar tiempo, costo y documentos
+          requeridos. También podés escribir un trámite propio y seguir sin elegir nada.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          Descripción
+        </label>
+        <textarea
+          rows={3}
+          placeholder="Explicá brevemente de qué se trata este trámite"
+          value={form.descripcion}
+          onChange={e => setForm({ ...form, descripcion: e.target.value })}
+          className="w-full px-4 py-3 rounded-xl text-sm resize-none"
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+        />
+      </div>
+    </div>
+  );
+
+  const step2Content = (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: theme.text }}>
+            <Clock className="h-4 w-4" style={{ color: theme.textSecondary }} />
+            Tiempo estimado (días)
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={form.tiempo_estimado_dias}
+            onChange={e => setForm({ ...form, tiempo_estimado_dias: parseInt(e.target.value) || 1 })}
+            className="w-full px-4 py-3 rounded-xl text-sm"
+            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-2 flex items-center gap-2" style={{ color: theme.text }}>
+            <CreditCard className="h-4 w-4" style={{ color: theme.textSecondary }} />
+            Costo (vacío = gratis)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            value={form.costo}
+            onChange={e => setForm({ ...form, costo: e.target.value })}
+            className="w-full px-4 py-3 rounded-xl text-sm"
+            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
+          URL externa (opcional)
+        </label>
+        <input
+          type="text"
+          placeholder="https://... (sitio oficial o guía del trámite)"
+          value={form.url_externa}
+          onChange={e => setForm({ ...form, url_externa: e.target.value })}
+          className="w-full px-4 py-3 rounded-xl text-sm"
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+        />
+      </div>
+
+      <div className="space-y-3 pt-3" style={{ borderTop: `1px solid ${theme.border}` }}>
+        <p className="text-sm font-medium" style={{ color: theme.text }}>
+          Validaciones requeridas al solicitar el trámite
+        </p>
+        <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-black/5" style={{ backgroundColor: theme.backgroundSecondary }}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.requiere_validacion_dni}
+            onChange={e => setForm({ ...form, requiere_validacion_dni: e.target.checked })}
+          />
+          <div className="flex items-start gap-2 flex-1">
+            <ShieldCheck className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: '#3b82f6' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>Validación de DNI</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Pedirá foto del DNI frente y dorso al iniciar el trámite</p>
+            </div>
+          </div>
+        </label>
+        <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-black/5" style={{ backgroundColor: theme.backgroundSecondary }}>
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={form.requiere_validacion_facial}
+            onChange={e => setForm({ ...form, requiere_validacion_facial: e.target.checked })}
+          />
+          <div className="flex items-start gap-2 flex-1">
+            <ScanFace className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: '#8b5cf6' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: theme.text }}>Validación facial (selfie)</p>
+              <p className="text-xs" style={{ color: theme.textSecondary }}>Pedirá una selfie para verificar que sea la misma persona del DNI</p>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+  );
+
+  const step3Content = (
+    <div className="space-y-3">
+      <div className="p-3 rounded-xl flex items-start gap-3" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+        <Sparkles className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
+        <p className="text-xs" style={{ color: theme.text }}>
+          Listá los documentos que el vecino deberá adjuntar cuando inicie el trámite.
+          Los marcados como <strong>obligatorios</strong> deberán estar verificados por un supervisor
+          antes de que el trámite pueda pasar de "Recibido" a "En curso".
+        </p>
+      </div>
+
+      {/* Chips de documentos sugeridos del catalogo global. Priorizan los
+          que matchean con el nombre del tramite y los mas frecuentes en el
+          rubro de la categoria elegida. No auto-cargan nada — el admin
+          decide tocando cada chip. */}
+      <ChipsDocumentosSugeridos
+        rubro={selectedCategoria?.nombre}
+        nombreTramite={form.nombre}
+        nombresYaAgregados={form.documentos_requeridos.map(d => d.nombre)}
+        onAgregar={agregarDocRequerido}
+      />
+
+      <DocumentosRequeridosEditor
+        items={form.documentos_requeridos}
+        onChange={(items) => setForm({ ...form, documentos_requeridos: items })}
+      />
+    </div>
+  );
+
+  const step4Content = (
+    <div className="space-y-4">
+      <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+        <div className="flex items-center gap-3 mb-3">
+          {selectedCategoria && (
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ backgroundColor: `${selectedCategoria.color || theme.primary}25` }}
+            >
+              <DynamicIcon name={selectedCategoria.icono || 'Folder'} className="h-5 w-5" style={{ color: selectedCategoria.color || theme.primary }} />
+            </div>
+          )}
+          <div className="flex-1">
+            <p className="text-xs" style={{ color: theme.textSecondary }}>{selectedCategoria?.nombre || '—'}</p>
+            <h3 className="text-base font-semibold" style={{ color: theme.text }}>{form.nombre || 'Sin nombre'}</h3>
+          </div>
+        </div>
+        {form.descripcion && (
+          <p className="text-sm mb-3" style={{ color: theme.textSecondary }}>{form.descripcion}</p>
+        )}
+        <div className="flex flex-wrap gap-3 text-xs" style={{ color: theme.textSecondary }}>
+          <span className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5" />
+            {form.tiempo_estimado_dias} días estimados
+          </span>
+          <span className="flex items-center gap-1">
+            <CreditCard className="h-3.5 w-3.5" />
+            {form.costo ? `$${parseFloat(form.costo).toLocaleString('es-AR')}` : 'Gratis'}
+          </span>
+          {form.requiere_validacion_dni && (
+            <span className="flex items-center gap-1">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Valida DNI
+            </span>
+          )}
+          {form.requiere_validacion_facial && (
+            <span className="flex items-center gap-1">
+              <ScanFace className="h-3.5 w-3.5" />
+              Valida rostro
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium mb-2" style={{ color: theme.text }}>
+          Documentos requeridos ({form.documentos_requeridos.length})
+        </p>
+        {form.documentos_requeridos.length === 0 ? (
+          <p className="text-xs italic" style={{ color: theme.textSecondary }}>
+            No definiste documentos requeridos. Podrás agregarlos después editando el trámite.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {form.documentos_requeridos.map((d, idx) => (
+              <li
+                key={idx}
+                className="flex items-center gap-2 p-2 rounded-lg text-sm"
+                style={{ backgroundColor: theme.backgroundSecondary }}
+              >
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: d.obligatorio ? '#10b981' : theme.textSecondary }} />
+                <span style={{ color: theme.text }}>{d.nombre || <em>(sin nombre)</em>}</span>
+                {d.obligatorio && (
+                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+                    Obligatorio
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+
+  const wizardSteps: WizardStep[] = [
+    {
+      id: 'basico',
+      title: 'Datos básicos',
+      description: 'Categoría, nombre y descripción del trámite',
+      icon: <FolderTree className="h-4 w-4" />,
+      content: step1Content,
+      isValid: !!form.categoria_tramite_id && form.nombre.trim().length > 0,
+    },
+    {
+      id: 'config',
+      title: 'Configuración',
+      description: 'Tiempo, costo y validaciones',
+      icon: <Settings className="h-4 w-4" />,
+      content: step2Content,
+      isValid: form.tiempo_estimado_dias > 0,
+    },
+    {
+      id: 'docs',
+      title: 'Documentación',
+      description: 'Lista de documentos requeridos',
+      icon: <ClipboardList className="h-4 w-4" />,
+      content: step3Content,
+      isValid: true, // Los documentos son opcionales (se pueden agregar después)
+    },
+    {
+      id: 'confirmacion',
+      title: 'Confirmación',
+      description: 'Revisá y confirmá el trámite',
+      icon: <CheckCircle2 className="h-4 w-4" />,
+      content: step4Content,
+      isValid: !!form.categoria_tramite_id && form.nombre.trim().length > 0,
+    },
+  ];
 
   return (
     <div className="h-full flex flex-col">
@@ -261,6 +623,7 @@ export default function TramitesConfig() {
       />
 
       <div className="flex-1 overflow-y-auto p-6">
+        <PageHint pageId="tramites-config" />
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
@@ -338,15 +701,30 @@ export default function TramitesConfig() {
         )}
       </div>
 
+      {/* Wizard: alta de trámite nuevo */}
+      <WizardModal
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        title="Nuevo trámite"
+        steps={wizardSteps}
+        currentStep={wizardStep}
+        onStepChange={setWizardStep}
+        onComplete={guardar}
+        loading={saving}
+        completeLabel="Crear trámite"
+        primaryButtonColor={selectedCategoria?.color}
+      />
+
+      {/* Sheet: edición de trámite existente */}
       <Sheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={editing ? 'Editar trámite' : 'Nuevo trámite'}
-        description={editing ? 'Modificá los datos y los documentos requeridos' : 'Completá los datos del trámite'}
+        open={editSheetOpen}
+        onClose={() => setEditSheetOpen(false)}
+        title="Editar trámite"
+        description="Modificá los datos y los documentos requeridos"
         stickyFooter={
           <div className="flex justify-end gap-2">
             <button
-              onClick={() => setSheetOpen(false)}
+              onClick={() => setEditSheetOpen(false)}
               className="px-4 py-2 rounded-xl text-sm font-medium"
               style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
             >
@@ -388,7 +766,6 @@ export default function TramitesConfig() {
             </label>
             <input
               type="text"
-              placeholder="Ej: Licencia de Conducir - Primera vez"
               value={form.nombre}
               onChange={e => setForm({ ...form, nombre: e.target.value })}
               className="w-full px-3 py-2 rounded-xl text-sm"

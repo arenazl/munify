@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
-import { Pencil, Trash2, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Pencil, Trash2, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from '../ui/Sheet';
 import { DynamicIcon } from '../ui/DynamicIcon';
 import { StickyPageHeader } from '../ui/StickyPageHeader';
+import { categoriasReclamoSugeridasApi } from '../../lib/api';
 
 export interface CategoriaItem {
   id: number;
@@ -29,6 +30,23 @@ interface Props {
   api: CategoriaApi;
   /** Campos extra que sólo aplican a Categoría de Reclamo (tiempo, prioridad). */
   showReclamoFields?: boolean;
+  /**
+   * Si `true`, muestra el autocomplete contra el catálogo cross-municipio
+   * cuando el admin escribe el nombre al crear una categoría nueva. Solo
+   * aplica a categorías de reclamo (no hay catálogo global de trámite).
+   */
+  enableSugerencias?: boolean;
+}
+
+interface CategoriaSugerida {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  color?: string;
+  tiempo_resolucion_estimado?: number;
+  prioridad_default?: number;
+  rubro?: string;
 }
 
 const ICONOS_DISPONIBLES = [
@@ -45,9 +63,15 @@ const COLORES_DISPONIBLES = [
   '#8b5cf6', '#0ea5e9', '#6366f1', '#64748b',
 ];
 
-export function CategoriaConfigBase({ title, api, showReclamoFields = false }: Props) {
+export function CategoriaConfigBase({ title, api, showReclamoFields = false, enableSugerencias = false }: Props) {
   const { theme } = useTheme();
   const [items, setItems] = useState<CategoriaItem[]>([]);
+
+  // Autocomplete de sugerencias cross-municipio (solo en modo alta).
+  const [sugerencias, setSugerencias] = useState<CategoriaSugerida[]>([]);
+  const [loadingSugerencias, setLoadingSugerencias] = useState(false);
+  const [mostrarSugerencias, setMostrarSugerencias] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
@@ -94,7 +118,59 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false }: P
       tiempo_resolucion_estimado: 48,
       prioridad_default: 3,
     });
+    setSugerencias([]);
+    setMostrarSugerencias(false);
     setSheetOpen(true);
+  };
+
+  /**
+   * Handler del input "Nombre" en modo alta. Setea el valor y, si el
+   * autocomplete está habilitado, busca sugerencias en el catálogo global
+   * con debounce de 300ms. No se llama al backend en modo edición.
+   */
+  const handleNombreChange = (nombre: string) => {
+    setForm({ ...form, nombre });
+
+    if (!enableSugerencias || editing) return;
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (nombre.trim().length < 2) {
+      setSugerencias([]);
+      setMostrarSugerencias(false);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoadingSugerencias(true);
+      try {
+        const res = await categoriasReclamoSugeridasApi.search(nombre, 8);
+        setSugerencias(res.data || []);
+        setMostrarSugerencias(true);
+      } catch (err) {
+        console.error('Error buscando sugerencias', err);
+      } finally {
+        setLoadingSugerencias(false);
+      }
+    }, 300);
+  };
+
+  /**
+   * Al elegir una sugerencia del catálogo cross-municipio, precargamos
+   * todos los campos del form (nombre, descripción, ícono, color, tiempo,
+   * prioridad). El admin puede editarlos antes de guardar.
+   */
+  const aplicarSugerencia = (s: CategoriaSugerida) => {
+    setForm({
+      nombre: s.nombre,
+      descripcion: s.descripcion || '',
+      icono: s.icono || 'Folder',
+      color: s.color || '#6366f1',
+      orden: items.length + 1,
+      tiempo_resolucion_estimado: s.tiempo_resolucion_estimado ?? 48,
+      prioridad_default: s.prioridad_default ?? 3,
+    });
+    setMostrarSugerencias(false);
   };
 
   const abrirEdit = (item: CategoriaItem) => {
@@ -256,17 +332,99 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false }: P
         }
       >
         <div className="space-y-4">
-          <div>
+          <div className="relative">
             <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
               Nombre <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={form.nombre}
-              onChange={e => setForm({ ...form, nombre: e.target.value })}
+              onChange={e => handleNombreChange(e.target.value)}
+              onFocus={() => {
+                if (enableSugerencias && !editing && sugerencias.length > 0) {
+                  setMostrarSugerencias(true);
+                }
+              }}
+              placeholder={enableSugerencias && !editing ? 'Ej: "iluminación", "bache", "basura"...' : ''}
               className="w-full px-3 py-2 rounded-xl text-sm"
               style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
             />
+            {enableSugerencias && !editing && (
+              <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                <Sparkles className="h-3 w-3" />
+                Te sugerimos categorías típicas mientras tipeás. Click para precargar.
+              </p>
+            )}
+
+            {/* Dropdown de sugerencias cross-municipio */}
+            {enableSugerencias && !editing && mostrarSugerencias && (sugerencias.length > 0 || loadingSugerencias) && (
+              <div
+                className="absolute left-0 right-0 top-full mt-1 rounded-xl shadow-xl overflow-hidden max-h-72 overflow-y-auto z-50"
+                style={{
+                  backgroundColor: theme.card,
+                  border: `1px solid ${theme.border}`,
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div
+                  className="px-3 py-1.5 text-[10px] uppercase font-semibold tracking-wider flex items-center gap-1.5"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    color: theme.textSecondary,
+                    borderBottom: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {loadingSugerencias ? 'Buscando...' : `${sugerencias.length} sugerencias del catálogo`}
+                </div>
+                {sugerencias.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      aplicarSugerencia(s);
+                    }}
+                    className="w-full text-left px-3 py-2.5 transition-colors border-b last:border-b-0 hover:brightness-110"
+                    style={{
+                      borderBottomColor: theme.border,
+                      backgroundColor: theme.card,
+                    }}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${s.color || theme.primary}25` }}
+                      >
+                        <DynamicIcon
+                          name={s.icono || 'Folder'}
+                          className="h-4 w-4"
+                          style={{ color: s.color || theme.primary }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: theme.text }}>
+                          {s.nombre}
+                        </p>
+                        {s.descripcion && (
+                          <p className="text-[11px] mt-0.5 line-clamp-2" style={{ color: theme.textSecondary }}>
+                            {s.descripcion}
+                          </p>
+                        )}
+                      </div>
+                      {s.rubro && (
+                        <span
+                          className="text-[9px] px-1.5 py-0.5 rounded-full flex-shrink-0 mt-0.5"
+                          style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+                        >
+                          {s.rubro}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

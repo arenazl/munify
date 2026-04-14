@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # Groq (API rápida)
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "groq/compound"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # Pexels API (imagenes gratuitas)
     PEXELS_API_KEY: str = ""

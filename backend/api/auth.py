@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from datetime import timedelta
+from typing import Optional
 from pydantic import BaseModel
 import httpx
 
@@ -26,12 +27,35 @@ router = APIRouter()
 @router.post("/register", response_model=UserResponse)
 @limiter.limit(LIMITS["auth"])
 async def register(request: Request, user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    # Verificar si el email ya existe
-    result = await db.execute(select(User).where(User.email == user_data.email))
-    if result.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="El email ya está registrado")
+    """
+    Registro público de vecino con soporte de "tomar cuenta por DNI".
 
-    # Validar que el municipio existe si se proporciona
+    El modelo de identidad de este endpoint asume que **el DNI es la única
+    identidad confiable** de un vecino (lo registra el empleado en ventanilla
+    del DNI físico) y que **el email es cambiante / puede ser basura** (el
+    empleado lo tipeó a ojo, puede estar mal, o el vecino lo quiere cambiar
+    cuando entra a la app).
+
+    Flujo:
+
+      1. Buscar user por DNI + municipio_id.
+      2. Si existe y `cuenta_verificada=True` — alguien ya pasó por KYC /
+         verificación externa, la cuenta está "cerrada". Rechazar con
+         instrucción de usar "Olvidé mi contraseña".
+      3. Si existe y `cuenta_verificada=False` — es un ghost o una cuenta
+         todavía sin verificar. **Retomar**: pisar email, password, nombre,
+         apellido y devolver el MISMO user.id. Hereda automáticamente todo
+         el historial de reclamos/trámites porque apuntan a ese id.
+      4. Si no existe — crear un user nuevo.
+
+    Nota sobre seguridad: mientras `cuenta_verificada=False`, cualquier
+    registro con ese DNI puede pisar la cuenta. Eso es intencional en esta
+    etapa porque no hay verificación externa implementada — `DNI + email
+    tipeados en el form` es la única prueba de identidad hoy. Cuando se
+    agregue KYC (Didit/Renaper) o verificación por email, el flag pasa a
+    True al completarse y desde ahí las retomas se rechazan.
+    """
+    # Validar que el municipio existe
     if user_data.municipio_id:
         municipio_check = await db.execute(
             select(Municipio).where(Municipio.id == user_data.municipio_id)
@@ -39,25 +63,82 @@ async def register(request: Request, user_data: UserCreate, db: AsyncSession = D
         if not municipio_check.scalar_one_or_none():
             raise HTTPException(
                 status_code=400,
-                detail=f"El municipio seleccionado (ID: {user_data.municipio_id}) no existe. Por favor, vuelve a seleccionar tu municipio."
+                detail=(
+                    f"El municipio seleccionado (ID: {user_data.municipio_id}) "
+                    "no existe. Por favor, volvé a seleccionar tu municipio."
+                ),
             )
 
-    # Crear usuario (rol vecino por defecto para registro público)
+    # Normalizar el DNI: solo dígitos. El DNI es la identidad real del vecino.
+    dni_limpio = "".join(c for c in (user_data.dni or "") if c.isdigit()) or None
+
+    # Paso 1: si hay DNI + muni, buscar si existe alguien con esa identidad.
+    existente: Optional[User] = None
+    if dni_limpio and user_data.municipio_id:
+        exist_res = await db.execute(
+            select(User).where(
+                User.dni == dni_limpio,
+                User.municipio_id == user_data.municipio_id,
+            )
+        )
+        existente = exist_res.scalar_one_or_none()
+
+    # Paso 2: si existe y ya está verificado → rechazar. Alguien pasó por un
+    # flujo externo de verificación y es el dueño legítimo del DNI.
+    if existente and existente.cuenta_verificada:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Ese DNI ya está registrado y verificado en este municipio. "
+                "Si ya tenés cuenta, probá 'Olvidé mi contraseña'."
+            ),
+        )
+
+    # Paso 3: validar que el email del registro no choque con OTRO user. El
+    # email es unique global. Si colisiona con el mismo `existente` que vamos
+    # a retomar, está OK (es el mismo usuario).
+    email_res = await db.execute(select(User).where(User.email == user_data.email))
+    email_owner = email_res.scalar_one_or_none()
+    if email_owner and (existente is None or email_owner.id != existente.id):
+        raise HTTPException(status_code=400, detail="El email ya está registrado")
+
+    # Paso 4: si existe (no verificado), retomar la cuenta.
+    if existente:
+        existente.email = user_data.email
+        existente.password_hash = get_password_hash(user_data.password)
+        existente.nombre = user_data.nombre
+        existente.apellido = user_data.apellido
+        if user_data.telefono:
+            existente.telefono = user_data.telefono
+        if user_data.direccion:
+            existente.direccion = user_data.direccion
+        # `cuenta_verificada` se queda en False — el registro por sí solo no
+        # cuenta como verificación externa. Cuando se agregue KYC, ahí se
+        # actualiza.
+        await db.commit()
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))
+            .where(User.id == existente.id)
+        )
+        return result.scalar_one()
+
+    # Paso 5: no existe → crear un user nuevo como vecino.
     user = User(
         email=user_data.email,
         password_hash=get_password_hash(user_data.password),
         nombre=user_data.nombre,
         apellido=user_data.apellido,
         telefono=user_data.telefono,
-        dni=user_data.dni,
+        dni=dni_limpio,
         direccion=user_data.direccion,
         municipio_id=user_data.municipio_id,
         es_anonimo=user_data.es_anonimo or False,
-        rol="vecino"
+        rol="vecino",
+        cuenta_verificada=False,
     )
     db.add(user)
     await db.commit()
-    # Recargar con la relación (aunque vecino no tiene dependencia, por consistencia)
     result = await db.execute(
         select(User)
         .options(selectinload(User.dependencia).selectinload(MunicipioDependencia.dependencia))

@@ -8,7 +8,7 @@ import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { Sheet } from './ui/Sheet';
-import { usersApi, municipiosApi } from '../lib/api';
+import { usersApi, municipiosApi, API_URL as apiUrl_ } from '../lib/api';
 import NotificationSettings from './NotificationSettings';
 import { subscribeToPush } from '../lib/pushNotifications';
 import { toast } from 'sonner';
@@ -291,6 +291,10 @@ export default function Layout() {
     hasDependencia: !!user.dependencia,
     // Superadmin = admin sin municipio_id (gestiona todos los municipios)
     isSuperAdmin: user.rol === 'admin' && !user.municipio_id,
+    // Si el muni actual tiene `abm_en_sidebar=false`, los 3 items de ABMs
+    // (Categorías Reclamo, Categorías Trámite, Tipos de Trámite) se ocultan
+    // del sidebar. Quedan accesibles sólo desde /gestion/ajustes.
+    abmEnSidebar: municipioActual?.abm_en_sidebar ?? true,
   });
   const mobileTabs = getMobileTabs(user.rol);
 
@@ -505,7 +509,7 @@ export default function Layout() {
                           setUserMenuOpen(false);
                           try {
                             const token = localStorage.getItem('token');
-                            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                            const apiUrl = apiUrl_;
                             const res = await fetch(`${apiUrl}/push/test`, {
                               method: 'POST',
                               headers: {
@@ -2011,7 +2015,7 @@ export default function Layout() {
                       setUserMenuOpen(false);
                       try {
                         const token = localStorage.getItem('token');
-                        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                        const apiUrl = apiUrl_;
                         const res = await fetch(`${apiUrl}/push/test`, {
                           method: 'POST',
                           headers: {

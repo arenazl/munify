@@ -11,6 +11,7 @@ const TILE_URLS = {
 };
 import { reclamosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
+import PageHint from '../components/ui/PageHint';
 import { Reclamo } from '../types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -375,6 +376,8 @@ export default function Mapa() {
           </>
         )}
       </StickyPageHeader>
+
+      <PageHint pageId="mapa-reclamos" />
 
       <div className="relative rounded-lg shadow overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
         {/* Mapa */}

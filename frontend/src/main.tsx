@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ThemedToaster } from './components/ThemedToaster'
 import DynamicManifest from './components/DynamicManifest'
+import ServiceWorkerUpdater from './components/ServiceWorkerUpdater'
 import { router } from './routes'
 import './index.css'
 import './styles/animations.css'
@@ -21,6 +22,7 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <ThemeProvider>
             <DynamicManifest />
+            <ServiceWorkerUpdater />
             <RouterProvider router={router} />
             <ThemedToaster />
           </ThemeProvider>

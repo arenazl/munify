@@ -2,6 +2,7 @@ from .municipio import Municipio  # IMPORTANTE: Municipio debe ir primero por la
 from .barrio import Barrio  # Barrios del municipio (cargados via IA)
 from .user import User
 from .categoria_reclamo import CategoriaReclamo
+from .categoria_reclamo_sugerida import CategoriaReclamoSugerida
 from .categoria_tramite import CategoriaTramite
 from .zona import Zona
 from .cuadrilla_categoria import cuadrilla_categoria
@@ -32,6 +33,7 @@ from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .noticia import Noticia
 from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from .tramite_documento_requerido import TramiteDocumentoRequerido
+from .tramite_sugerido import TramiteSugerido
 from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
@@ -42,6 +44,7 @@ __all__ = [
     "Barrio",
     "User",
     "CategoriaReclamo",
+    "CategoriaReclamoSugerida",
     "CategoriaTramite",
     "Zona",
     "Cuadrilla",
@@ -90,6 +93,7 @@ __all__ = [
     "HistorialSolicitud",
     "EstadoSolicitud",
     "TramiteDocumentoRequerido",
+    "TramiteSugerido",
     "DocumentoSolicitud",
     # Push Notifications
     "PushSubscription",

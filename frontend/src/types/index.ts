@@ -338,6 +338,8 @@ export interface ChecklistDocumentoItem {
   documento_id?: number;
   documento_url?: string;
   documento_nombre?: string;
+  /** "imagen" | "documento" | "verificacion_manual" */
+  documento_tipo?: string;
   verificado: boolean;
   verificado_por_id?: number;
   verificado_por_nombre?: string;

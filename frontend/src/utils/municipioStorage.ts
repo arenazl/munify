@@ -125,6 +125,13 @@ export async function saveMunicipio(data: MunicipioData): Promise<void> {
 
   // Guardar en IndexedDB (asíncrono, persistente)
   await saveToIndexedDB(data);
+
+  // Avisar a los componentes que el municipio cambió (título del tab, manifest,
+  // theme-color, etc.) — los `storage` events nativos solo disparan en OTRAS
+  // pestañas, así que para la misma pestaña usamos este custom event.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('municipio-changed', { detail: data }));
+  }
 }
 
 /**
@@ -185,11 +192,20 @@ export function loadMunicipioSync(): MunicipioData | null {
  */
 export async function clearMunicipio(): Promise<void> {
   localStorage.removeItem('municipio_id');
+  localStorage.removeItem('municipio_actual_id');
   localStorage.removeItem('municipio_codigo');
   localStorage.removeItem('municipio_nombre');
   localStorage.removeItem('municipio_color');
   localStorage.removeItem('municipio_logo_url');
+  localStorage.removeItem('municipio_lat');
+  localStorage.removeItem('municipio_lon');
   await clearIndexedDB();
+
+  // Mismo mecanismo que saveMunicipio: avisar a los componentes reactivos
+  // para que limpien título del tab, manifest, theme-color, etc.
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('municipio-changed', { detail: null }));
+  }
 }
 
 /**

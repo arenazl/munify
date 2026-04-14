@@ -22,23 +22,9 @@ from schemas.categoria_tramite import (
     CategoriaTramiteResponse,
 )
 
+from core.tenancy import get_effective_municipio_id  # noqa: E402
+
 router = APIRouter()
-
-
-def get_effective_municipio_id(request: Request, current_user: User) -> int:
-    if current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]:
-        header_municipio_id = request.headers.get("X-Municipio-ID")
-        if header_municipio_id:
-            try:
-                return int(header_municipio_id)
-            except (ValueError, TypeError):
-                pass
-    if current_user.municipio_id is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Usuario sin municipio asignado. Indicar X-Municipio-ID.",
-        )
-    return current_user.municipio_id
 
 
 @router.get("", response_model=List[CategoriaTramiteResponse])
