@@ -18,11 +18,26 @@ export default function DynamicManifest() {
     const applyMunicipio = () => {
       const data = loadMunicipioSync();
 
-      if (!data?.codigo) {
-        // No hay municipio activo (p.ej. después del logout o en /demo).
-        // Resetear título + manifest a valores genéricos de la marca, y
-        // revocar cualquier blob previo para que el browser no quede
-        // pidiendo un blob:URL huérfano.
+      // Super admin (usuario sin municipio asignado) no debe ver el
+      // nombre de un municipio en el title del tab — aunque tenga uno
+      // "seleccionado" en localStorage por conveniencia operativa, el
+      // branding de la pestaña queda en "Munify" para reflejar su rol
+      // cross-tenant.
+      let isSuperAdmin = false;
+      try {
+        const rawUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+        if (rawUser) {
+          const parsed = JSON.parse(rawUser);
+          isSuperAdmin = !!parsed?.is_super_admin || (parsed?.rol === 'admin' && !parsed?.municipio_id);
+        }
+      } catch {
+        isSuperAdmin = false;
+      }
+
+      if (!data?.codigo || isSuperAdmin) {
+        // Sin municipio activo, o super admin: branding genérico de Munify.
+        // Resetear título + manifest y revocar cualquier blob previo para
+        // que el browser no quede pidiendo un blob:URL huérfano.
         document.title = 'Munify';
         const existingLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
         if (existingLink?.href.startsWith('blob:')) {
