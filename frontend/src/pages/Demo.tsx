@@ -14,12 +14,6 @@ interface Municipio {
   logo_url?: string;
 }
 
-// Feature flag: el creador de muni demo al vuelo (POST /municipios/crear-demo)
-// vive sólo en la rama del refactor y todavía no fue deployado al backend de
-// prod. Lo ocultamos en builds de producción hasta que se suba el endpoint.
-// En dev (npm run dev) se ve normal porque corremos el working tree completo.
-const SHOW_DEMO_CREATOR = !import.meta.env.PROD;
-
 export default function Demo() {
   const navigate = useNavigate();
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
@@ -161,9 +155,7 @@ export default function Demo() {
             </p>
           </div>
 
-          {/* Creador de muni demo — protagonista comercial.
-              Oculto en prod hasta que el endpoint /crear-demo esté deployado. */}
-          {SHOW_DEMO_CREATOR && (
+          {/* Creador de muni demo — protagonista comercial. */}
           <div className="mb-10 bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-6">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-blue-500" />
@@ -206,11 +198,9 @@ export default function Demo() {
               Sin registro ni tarjeta.
             </p>
           </div>
-          )}
 
-          {/* Separador entre "crear nuevo" y "elegir existente".
-              Sólo tiene sentido cuando el creador de demo está visible. */}
-          {SHOW_DEMO_CREATOR && municipios.length > 0 && (
+          {/* Separador entre "crear nuevo" y "elegir existente". */}
+          {municipios.length > 0 && (
             <div className="flex items-center gap-3 mb-6">
               <div className="flex-1 h-px bg-slate-200" />
               <span className="text-xs text-slate-400 uppercase tracking-wider font-medium">
