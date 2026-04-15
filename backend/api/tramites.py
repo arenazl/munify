@@ -114,6 +114,57 @@ async def enviar_notificacion_cambio_estado_solicitud(db, solicitud, estado_ante
         logger.warning(f"[PUSH] Error notificando cambio de estado: {e}")
 
 
+async def _todos_obligatorios_verificados(db: AsyncSession, solicitud: Solicitud) -> bool:
+    """True si todos los documentos obligatorios de la solicitud están verificados."""
+    if not solicitud.tramite_id:
+        return False
+    req_q = await db.execute(
+        select(TramiteDocumentoRequerido).where(
+            TramiteDocumentoRequerido.tramite_id == solicitud.tramite_id,
+            TramiteDocumentoRequerido.obligatorio == True,
+        )
+    )
+    requeridos = req_q.scalars().all()
+    if not requeridos:
+        return False  # sin requeridos → no amerita auto-transición
+    docs_q = await db.execute(
+        select(DocumentoSolicitud.tramite_documento_requerido_id).where(
+            DocumentoSolicitud.solicitud_id == solicitud.id,
+            DocumentoSolicitud.verificado == True,
+            DocumentoSolicitud.tramite_documento_requerido_id.is_not(None),
+        )
+    )
+    ids_verificados = {row[0] for row in docs_q.all()}
+    return all(r.id in ids_verificados for r in requeridos)
+
+
+async def _intentar_auto_transicion_a_en_curso(
+    db: AsyncSession, solicitud_id: int, user_id: int
+) -> bool:
+    """
+    Si el estado actual es RECIBIDO y todos los docs obligatorios ya están
+    verificados, avanza automáticamente a EN_CURSO + deja rastro en historial.
+    Retorna True si se hizo la transición.
+    """
+    r = await db.execute(select(Solicitud).where(Solicitud.id == solicitud_id))
+    solicitud = r.scalar_one_or_none()
+    if not solicitud or solicitud.estado != EstadoSolicitud.RECIBIDO:
+        return False
+    if not await _todos_obligatorios_verificados(db, solicitud):
+        return False
+    solicitud.estado = EstadoSolicitud.EN_CURSO
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud.id,
+        usuario_id=user_id,
+        estado_anterior=EstadoSolicitud.RECIBIDO,
+        estado_nuevo=EstadoSolicitud.EN_CURSO,
+        accion="Transición automática",
+        comentario="Todos los documentos obligatorios fueron verificados.",
+    ))
+    await db.commit()
+    return True
+
+
 async def validar_transicion_a_en_curso(db: AsyncSession, solicitud: Solicitud) -> None:
     """
     Bloquea pasar de `recibido` → `en_curso` si quedan documentos obligatorios
@@ -735,6 +786,28 @@ async def crear_solicitud(
                 )
             solicitud = None  # siguiente iter lo reconstruye con MAX fresco
 
+    # Auto-asignación a dependencia: si el trámite está mapeado a una dep del
+    # muni (via MunicipioDependenciaTramite), setear municipio_dependencia_id
+    # de una. Si no hay mapeo, queda NULL y el admin puede asignarla manual.
+    from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
+    from models.municipio_dependencia import MunicipioDependencia
+    auto_dep_q = await db.execute(
+        select(MunicipioDependenciaTramite.municipio_dependencia_id).where(
+            and_(
+                MunicipioDependenciaTramite.municipio_dependencia_id.in_(
+                    select(MunicipioDependencia.id).where(
+                        MunicipioDependencia.municipio_id == municipio_id
+                    )
+                ),
+                MunicipioDependenciaTramite.tramite_id == solicitud.tramite_id,
+                MunicipioDependenciaTramite.activo == True,
+            )
+        ).limit(1)
+    )
+    auto_dep_id = auto_dep_q.scalar_one_or_none()
+    if auto_dep_id:
+        solicitud.municipio_dependencia_id = auto_dep_id
+
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
         usuario_id=current_user.id if current_user else None,
@@ -1183,7 +1256,8 @@ async def verificar_documento(
     documento.verificado_por_id = current_user.id
     documento.fecha_verificacion = datetime.utcnow()
     await db.commit()
-    return {"message": "Documento verificado", "id": documento.id}
+    auto = await _intentar_auto_transicion_a_en_curso(db, solicitud_id, current_user.id)
+    return {"message": "Documento verificado", "id": documento.id, "auto_transicion_a_en_curso": auto}
 
 
 @router.post("/solicitudes/{solicitud_id}/documentos/{documento_id}/desverificar")
@@ -1300,12 +1374,14 @@ async def verificar_visual_sin_archivo(
     doc_tipo = doc.tipo
 
     await db.commit()
+    auto = await _intentar_auto_transicion_a_en_curso(db, solicitud_id, current_user.id)
 
     return {
         "message": "Documento verificado visualmente",
         "id": doc_id,
         "tramite_documento_requerido_id": requerido_id,
         "tipo": doc_tipo,
+        "auto_transicion_a_en_curso": auto,
     }
 
 

@@ -27,6 +27,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
+import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import type { Solicitud, EstadoSolicitud } from '../types';
 import {
   getEstadoInfo,
@@ -493,6 +494,18 @@ export default function MisTramites() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Checklist de documentos requeridos (vecino sube, no puede marcar verificado) */}
+        <div className="space-y-3">
+          <h4 className="text-sm font-semibold" style={{ color: theme.textSecondary }}>
+            Documentos requeridos
+          </h4>
+          <ChecklistDocumentosVerificacion
+            solicitudId={selectedTramite.id}
+            asVecino={true}
+            onChange={() => { /* opcional: refresh */ }}
+          />
         </div>
       </div>
     );

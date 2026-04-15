@@ -15,8 +15,13 @@ import type { ChecklistDocumentos, ChecklistDocumentoItem } from '../../types';
 
 interface Props {
   solicitudId: number;
-  /** Si es true, no muestra ningún botón de acción. Para vista de vecino. */
+  /** Si es true, no muestra ningún botón de acción (vista estática). */
   readOnly?: boolean;
+  /**
+   * Vista del vecino: oculta botones de verificación/verificar-visual
+   * (son del supervisor) pero permite subir sus propios documentos.
+   */
+  asVecino?: boolean;
   /** Callback al cambiar verificación/upload, para que el caller refresque la solicitud */
   onChange?: () => void;
 }
@@ -40,7 +45,7 @@ interface Props {
  * Mientras quede algún documento obligatorio sin verificar, el backend bloquea
  * la transición `recibido → en_curso` con un 400.
  */
-export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false, onChange }: Props) {
+export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false, asVecino = false, onChange }: Props) {
   const { theme } = useTheme();
   const [data, setData] = useState<ChecklistDocumentos | null>(null);
   const [loading, setLoading] = useState(true);
@@ -193,30 +198,43 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                 border: `1px solid ${item.verificado ? '#10b98140' : theme.border}`,
               }}
             >
-              {/* Checkbox */}
-              <button
-                type="button"
-                disabled={readOnly || !hasDocumento || isTogglingThis}
-                onClick={() => toggleVerificacion(item)}
-                className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-0.5"
-                style={{
-                  backgroundColor: item.verificado ? '#10b981' : theme.card,
-                  border: `2px solid ${item.verificado ? '#10b981' : theme.border}`,
-                }}
-                title={
-                  !hasDocumento
-                    ? 'Subí un archivo o marcá como verificado visualmente primero'
-                    : item.verificado
-                    ? 'Click para desmarcar'
-                    : 'Click para marcar como verificado'
-                }
-              >
-                {isTogglingThis ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-white" />
-                ) : item.verificado ? (
-                  <Check className="h-4 w-4 text-white" />
-                ) : null}
-              </button>
+              {/* Checkbox (oculto para vecino — solo supervisor marca verificado) */}
+              {asVecino ? (
+                <div
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{
+                    backgroundColor: item.verificado ? '#10b981' : theme.card,
+                    border: `2px solid ${item.verificado ? '#10b981' : theme.border}`,
+                  }}
+                  title={item.verificado ? 'Verificado por el municipio' : 'Pendiente de verificación'}
+                >
+                  {item.verificado ? <Check className="h-4 w-4 text-white" /> : null}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={readOnly || !hasDocumento || isTogglingThis}
+                  onClick={() => toggleVerificacion(item)}
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-0.5"
+                  style={{
+                    backgroundColor: item.verificado ? '#10b981' : theme.card,
+                    border: `2px solid ${item.verificado ? '#10b981' : theme.border}`,
+                  }}
+                  title={
+                    !hasDocumento
+                      ? 'Subí un archivo o marcá como verificado visualmente primero'
+                      : item.verificado
+                      ? 'Click para desmarcar'
+                      : 'Click para marcar como verificado'
+                  }
+                >
+                  {isTogglingThis ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-white" />
+                  ) : item.verificado ? (
+                    <Check className="h-4 w-4 text-white" />
+                  ) : null}
+                </button>
+              )}
 
               {/* Info */}
               <div className="flex-1 min-w-0">
@@ -270,7 +288,7 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                   )}
                 </div>
 
-                {/* Acciones: solo si no hay documento y no es readOnly */}
+                {/* Acciones: upload para vecino y supervisor; "verificar visual" solo supervisor */}
                 {!readOnly && !hasDocumento && (
                   <div className="mt-2 ml-6 flex items-center gap-2 flex-wrap">
                     <input
@@ -298,20 +316,22 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                       {isUploadingThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                       Subir archivo
                     </button>
-                    <button
-                      type="button"
-                      disabled={isUploadingThis || isVisualThis}
-                      onClick={() => handleVerificarVisual(item)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                      style={{
-                        backgroundColor: '#10b98115',
-                        color: '#10b981',
-                        border: '1px solid #10b98140',
-                      }}
-                    >
-                      {isVisualThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
-                      Verificado sin archivo
-                    </button>
+                    {!asVecino && (
+                      <button
+                        type="button"
+                        disabled={isUploadingThis || isVisualThis}
+                        onClick={() => handleVerificarVisual(item)}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+                        style={{
+                          backgroundColor: '#10b98115',
+                          color: '#10b981',
+                          border: '1px solid #10b98140',
+                        }}
+                      >
+                        {isVisualThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Eye className="h-3 w-3" />}
+                        Verificado sin archivo
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

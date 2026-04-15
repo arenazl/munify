@@ -68,6 +68,7 @@ TRAMITES_DEMO = [
         "nombre": "Licencia de conducir - Primera vez",
         "descripcion": "Obtención de la licencia de conducir para personas que no poseen una previa.",
         "categoria_tramite_nombre": "Tránsito y Transporte",
+        "dep_codigo": "TRANSITO_VIAL",
         "tiempo_estimado_dias": 15,
         "costo": 8500.0,
         "documentos": [
@@ -80,6 +81,7 @@ TRAMITES_DEMO = [
         "nombre": "Habilitación comercial",
         "descripcion": "Habilitación para apertura de un nuevo comercio o actividad comercial.",
         "categoria_tramite_nombre": "Habilitaciones Comerciales",
+        "dep_codigo": "HABILITACIONES",
         "tiempo_estimado_dias": 30,
         "costo": 15000.0,
         "documentos": [
@@ -92,6 +94,7 @@ TRAMITES_DEMO = [
         "nombre": "Permiso de obra menor",
         "descripcion": "Autorización para realizar obras menores (cercos, veredas, refacciones).",
         "categoria_tramite_nombre": "Obras Particulares",
+        "dep_codigo": "OBRAS_PUBLICAS",
         "tiempo_estimado_dias": 20,
         "costo": 5000.0,
         "documentos": [
@@ -103,6 +106,7 @@ TRAMITES_DEMO = [
         "nombre": "Certificado de libre deuda municipal",
         "descripcion": "Certificado que acredita la inexistencia de deudas con el municipio.",
         "categoria_tramite_nombre": "Tasas y Tributos",
+        "dep_codigo": "GENERAL",
         "tiempo_estimado_dias": 5,
         "costo": 2000.0,
         "documentos": [
@@ -523,6 +527,7 @@ async def seed_demo_completo(
     cats_tramite = {c.nombre: c for c in r.scalars().all()}
 
     tramites_creados = []
+    tramite_to_dep: dict[int, int] = {}  # tramite.id → muni_dep.id (post-flush)
     for i, t_data in enumerate(TRAMITES_DEMO):
         cat = cats_tramite.get(t_data["categoria_tramite_nombre"])
         if not cat:
@@ -549,8 +554,26 @@ async def seed_demo_completo(
             documentos_requeridos=docs,
         )
         db.add(tramite)
-        tramites_creados.append(tramite)
+        tramites_creados.append((tramite, t_data.get("dep_codigo")))
     await db.flush()
+
+    # Mapeo trámite → dependencia (tabla pivot MunicipioDependenciaTramite).
+    # Esto permite auto-asignar la dep al crear una solicitud desde el vecino.
+    from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
+    for tramite, dep_codigo in tramites_creados:
+        if not dep_codigo:
+            continue
+        muni_dep = muni_deps.get(dep_codigo)
+        if not muni_dep:
+            continue
+        db.add(MunicipioDependenciaTramite(
+            municipio_dependencia_id=muni_dep.id,
+            tramite_id=tramite.id,
+            activo=True,
+        ))
+    await db.flush()
+    # Back-compat: resto del código espera list de Tramite
+    tramites_creados = [t for t, _ in tramites_creados]
 
     # ------------------------------------------------------------------
     # 4. Crear usuarios demo
