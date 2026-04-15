@@ -35,9 +35,11 @@ const METHOD_STYLE: Record<string, { bg: string; color: string }> = {
 };
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
+  // Backend a veces serializa UTC sin tz-suffix. Forzamos UTC si no hay 'Z' ni offset.
+  const needsUtc = iso && !/(Z|[+-]\d{2}:?\d{2})$/.test(iso);
+  const d = new Date(needsUtc ? iso + 'Z' : iso);
   const now = Date.now();
-  const diff = (now - d.getTime()) / 1000;
+  const diff = Math.max(0, (now - d.getTime()) / 1000);
   if (diff < 60) return `hace ${Math.floor(diff)}s`;
   if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
   if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;

@@ -143,31 +143,24 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Categorías Reclamo',
       href: '/gestion/categorias-reclamo',
       icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar,
+      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
       description: 'Categorías de reclamos del municipio'
     },
     {
       name: 'Categorías Trámite',
       href: '/gestion/categorias-tramite',
       icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar,
+      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
       description: 'Categorías de trámites del municipio'
     },
     {
       name: 'Tipos de Trámite',
       href: '/gestion/tramites-config',
       icon: FileText,
-      show: isAdminOrSupervisor && abmEnSidebar,
+      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
       description: 'Trámites específicos del municipio (ej: Licencia de Conducir)'
     },
     // === Solo SUPERADMIN (admin sin municipio asignado) ===
-    {
-      name: 'Consola Global',
-      href: '/gestion/consola',
-      icon: Zap,
-      show: isSuperAdmin,
-      description: 'Vista cross-tenant del sistema'
-    },
     {
       name: 'Municipios',
       href: '/gestion/municipios',
@@ -180,7 +173,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/admin/audit-logs',
       icon: Activity,
       show: isSuperAdmin,
-      description: 'Logs de actividad cross-municipio (super admin)'
+      description: 'Consola de auditoría cross-municipio (resumen + logs)'
     },
     {
       name: 'Ajustes',
