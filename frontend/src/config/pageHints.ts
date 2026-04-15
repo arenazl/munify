@@ -273,4 +273,10 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
     description:
       'Configuración general: branding (logo, colores), ABMs visibles en el sidebar, integración WhatsApp, preferencias de notificación.',
   },
+  'audit-logs': {
+    title: 'Consola de auditoría',
+    accent: 'violet',
+    description:
+      'Logs en tiempo real de cada request HTTP relevante en el sistema. Filtrá por municipio, endpoint, latencia, status o usuario para investigar incidentes y entender la carga. Activá el "Modo debug" para capturar también GETs y request bodies (aumenta el volumen ~5×). Los logs viejos se borran manualmente con el botón "Limpiar >30d".',
+  },
 };

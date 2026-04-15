@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Clock, Building2, Check, Landmark, Link2
+  CalendarOff, Clock, Building2, Check, Landmark, Link2, Activity
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -262,7 +262,22 @@ export default function Ajustes() {
           show: isAdminOrSupervisor
         }
       ]
-    }
+    },
+    {
+      id: 'super-admin',
+      title: 'Super Admin',
+      items: [
+        {
+          id: 'audit-logs',
+          label: 'Consola de auditoría',
+          description: 'Logs cross-municipio con filtros por endpoint, latencia y status',
+          icon: Activity,
+          color: '#8b5cf6',
+          link: '/gestion/admin/audit-logs',
+          show: isSuperAdmin,
+        },
+      ],
+    },
   ];
 
   const visibleSections = sections.map(section => ({

@@ -66,6 +66,9 @@ class UserResponse(BaseModel):
     municipio_dependencia_id: Optional[int] = None
     dependencia: Optional[DependenciaInfo] = None
     created_at: datetime
+    # Super admin = usuario sin municipio asignado (cross-tenant).
+    # El frontend lo usa para mostrar/ocultar items del menú admin.
+    is_super_admin: bool = False
 
     class Config:
         from_attributes = True

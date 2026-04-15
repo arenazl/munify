@@ -592,6 +592,25 @@ export const municipiosApi = {
   generarDirecciones: (municipioId: number) => api.post(`/municipios/${municipioId}/direcciones/generar`),
 };
 
+// Audit logs (solo super admin)
+import type { AuditFilters, AuditLogPage, AuditLogDetail, AuditStats } from '../types/audit';
+
+export const auditApi = {
+  list: (filters: AuditFilters = {}) => api.get<AuditLogPage>('/admin/audit-logs', { params: filters }),
+  detail: (id: number) => api.get<AuditLogDetail>(`/admin/audit-logs/${id}`),
+  stats: (params: { municipio_id?: number; desde?: string; hasta?: string } = {}) =>
+    api.get<AuditStats>('/admin/audit-logs/stats', { params }),
+  distinct: (field: 'action' | 'method' | 'entity_type' | 'usuario_rol') =>
+    api.get<{ values: string[] }>(`/admin/audit-logs/distinct/${field}`),
+  cleanup: (older_than_days: number) =>
+    api.delete<{ deleted: number; older_than_days: number }>('/admin/audit-logs/cleanup', {
+      params: { older_than_days },
+    }),
+  getDebugMode: () => api.get<{ enabled: boolean }>('/admin/settings/debug_mode'),
+  setDebugMode: (enabled: boolean) =>
+    api.put<{ enabled: boolean }>('/admin/settings/debug_mode', { enabled }),
+};
+
 // Chat IA
 export const chatApi = {
   sendMessage: async (message: string, history: Array<{role: string, content: string}> = []) => {

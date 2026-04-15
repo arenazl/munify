@@ -27,6 +27,9 @@ export interface User {
   municipio_dependencia_id?: number;
   dependencia?: DependenciaInfo;
   created_at: string;
+  // Super admin = usuario sin municipio asignado (cross-tenant).
+  // Lo devuelve el endpoint /auth/me.
+  is_super_admin?: boolean;
 }
 
 // =====================================================================

@@ -13,6 +13,7 @@ import traceback
 from core.database import init_db, close_db
 from core.config import settings
 from core.rate_limit import limiter, rate_limit_exceeded_handler
+from core.audit_middleware import audit_middleware
 from api import api_router
 
 # Inicializar Sentry si está configurado
@@ -105,22 +106,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Middleware simple para loguear requests
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    if not request.url.path.startswith("/api"):
-        return await call_next(request)
-
-    method = request.method
-    path = request.url.path
-    start_time = time.time()
-
-    response = await call_next(request)
-
-    ms = (time.time() - start_time) * 1000
-    print(f"{method} {path} - {response.status_code} ({ms:.0f}ms)", flush=True)
-
-    return response
+# Audit middleware: loggea cada request /api/* a la tabla audit_logs
+# (en sesión separada y fire-and-forget — no bloquea el response).
+# También sigue imprimiendo la línea a stdout para los logs de Heroku.
+app.middleware("http")(audit_middleware)
 
 # Archivos estáticos del backend (imágenes subidas)
 static_path = Path(__file__).parent / "static"

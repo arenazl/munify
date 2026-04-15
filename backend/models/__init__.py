@@ -38,6 +38,7 @@ from .documento_solicitud import DocumentoSolicitud
 from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
+from .audit_log import AuditLog
 
 __all__ = [
     "Municipio",
@@ -100,7 +101,9 @@ __all__ = [
     # Consultas guardadas / BI
     "ConsultaGuardada",
     # Email validation
-    "EmailValidation"
+    "EmailValidation",
+    # Audit logs
+    "AuditLog",
 ]
 
 # Dependencias (modelo desacoplado del municipio)

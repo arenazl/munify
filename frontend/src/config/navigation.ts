@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText
+  FolderTree, FileText, Activity
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -167,6 +167,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: Building2,
       show: isSuperAdmin,
       description: 'Alta y gestión de municipios (cross-tenant)'
+    },
+    {
+      name: 'Auditoría',
+      href: '/gestion/admin/audit-logs',
+      icon: Activity,
+      show: isSuperAdmin,
+      description: 'Logs de actividad cross-municipio (super admin)'
     },
     {
       name: 'Ajustes',

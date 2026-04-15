@@ -251,6 +251,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
             telefono=current_user.dependencia.telefono_efectivo,
         ) if current_user.dependencia and current_user.dependencia.dependencia else None,
         created_at=current_user.created_at,
+        is_super_admin=current_user.municipio_id is None,
     )
 
 
