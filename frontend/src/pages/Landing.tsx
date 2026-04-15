@@ -54,7 +54,7 @@ export default function Landing() {
   // Super Admin login modal
   const [showSuperAdminLogin, setShowSuperAdminLogin] = useState(false);
   const [superAdminEmail, setSuperAdminEmail] = useState('superadmin@test.com');
-  const [superAdminPassword, setSuperAdminPassword] = useState('super123');
+  const [superAdminPassword, setSuperAdminPassword] = useState('demo123');
   const [demoUsers, setDemoUsers] = useState<Array<{
     email: string;
     nombre: string;
