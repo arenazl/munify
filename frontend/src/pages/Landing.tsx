@@ -514,7 +514,7 @@ export default function Landing() {
                               <button
                                 key={dep.email}
                                 type="button"
-                                onClick={() => quickLogin(dep.email, 'demo1234')}
+                                onClick={() => quickLogin(dep.email, 'demo123')}
                                 disabled={debugLoading}
                                 className="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
                                 style={{
@@ -544,7 +544,7 @@ export default function Landing() {
                           </div>
 
                           <p className="text-xs text-slate-500 text-center mt-3">
-                            Acceso por área · Pass: <span className="text-slate-400 font-mono">demo1234</span>
+                            Acceso por área · Pass: <span className="text-slate-400 font-mono">demo123</span>
                           </p>
                         </>
                       )}
