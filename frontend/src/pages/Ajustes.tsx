@@ -77,6 +77,12 @@ export default function Ajustes() {
         title: 'Catálogos',
       },
     ] : []),
+    ...(isSuperAdmin ? [
+      {
+        id: 'super-admin',
+        title: 'Super Admin',
+      },
+    ] : []),
   ];
 
   const sections: SettingSection[] = [
