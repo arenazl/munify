@@ -263,14 +263,18 @@ async def obtener_usuarios_demo(
         or_(
             User.email.like(email_pattern1),
             User.email.like(email_pattern2),
-            User.email.like(email_pattern3)
+            User.email.like(email_pattern3),
         ),
         User.activo == True,
-        # Solo los 3 roles demo principales (excluye usuarios de dependencia
-        # que no son admin/supervisor/vecino@...)
-        User.email.like(f"admin@%") |
-        User.email.like(f"supervisor@%") |
-        User.email.like(f"vecino@%"),
+        # Roles demo: admin, vecino, y supervisores (uno por dependencia).
+        # El prefijo `supervisor-` matchea `supervisor-obras-publicas@...`
+        # además del `supervisor@` legacy.
+        or_(
+            User.email.like("admin@%"),
+            User.email.like("supervisor@%"),
+            User.email.like("supervisor-%"),
+            User.email.like("vecino@%"),
+        ),
     )
     from sqlalchemy.orm import selectinload
     from models.municipio_dependencia import MunicipioDependencia

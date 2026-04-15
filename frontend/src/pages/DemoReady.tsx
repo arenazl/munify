@@ -72,16 +72,15 @@ export default function DemoReady() {
   }, [codigo]);
 
   const adminUser = users.find((u) => u.rol === 'admin');
-  const supervisorUser = users.find((u) => u.rol === 'supervisor');
+  const supervisorUsers = users.filter((u) => u.rol === 'supervisor');
   const vecinoUser = users.find((u) => u.rol === 'vecino');
 
-  const handleQuickLogin = async (role: 'admin' | 'supervisor' | 'vecino') => {
-    const target = role === 'admin' ? adminUser : role === 'supervisor' ? supervisorUser : vecinoUser;
-    if (!target) return;
+  const handleQuickLoginByEmail = async (email: string | undefined) => {
+    if (!email) return;
     setQuickLoading(true);
     setError('');
     try {
-      await login(target.email, 'demo123');
+      await login(email, 'demo123');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
@@ -149,10 +148,10 @@ export default function DemoReady() {
                 </div>
               )}
 
-              {/* 3 botones: Admin + Supervisor + Vecino */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Admin + Vecino arriba (roles globales) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => handleQuickLogin('admin')}
+                  onClick={() => handleQuickLoginByEmail(adminUser?.email)}
                   disabled={quickLoading || !adminUser}
                   className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl"
                 >
@@ -180,42 +179,7 @@ export default function DemoReady() {
                 </button>
 
                 <button
-                  onClick={() => handleQuickLogin('supervisor')}
-                  disabled={quickLoading || !supervisorUser}
-                  className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl"
-                >
-                  <div className="flex flex-col gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                      <Building2 className="h-5 w-5 text-white" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-bold text-white mb-1">Como Supervisor</h3>
-                      <p className="text-xs text-amber-100/90">
-                        Gestioná los reclamos de tu dependencia
-                      </p>
-                      {supervisorUser && (
-                        <>
-                          {supervisorUser.dependencia_nombre && (
-                            <p className="text-[11px] text-amber-100/80 font-medium mt-1">
-                              {supervisorUser.dependencia_nombre}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-amber-100/70 font-mono mt-1 truncate">
-                            {supervisorUser.email}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {quickLoading && (
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 text-white animate-spin" />
-                    </div>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleQuickLogin('vecino')}
+                  onClick={() => handleQuickLoginByEmail(vecinoUser?.email)}
                   disabled={quickLoading || !vecinoUser}
                   className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-xl hover:shadow-2xl"
                 >
@@ -243,8 +207,43 @@ export default function DemoReady() {
                 </button>
               </div>
 
+              {/* Supervisores por dependencia */}
+              {supervisorUsers.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Building2 className="h-4 w-4 text-amber-400" />
+                    <span className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                      Supervisores por dependencia
+                    </span>
+                    <span className="text-xs text-slate-500">({supervisorUsers.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {supervisorUsers.map((sup) => (
+                      <button
+                        key={sup.email}
+                        onClick={() => handleQuickLoginByEmail(sup.email)}
+                        disabled={quickLoading}
+                        className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-amber-500/90 to-orange-600/90 p-3 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-lg hover:shadow-xl"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                            <Building2 className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-white truncate">
+                              {sup.dependencia_nombre || sup.apellido || 'Dependencia'}
+                            </p>
+                            <p className="text-[9px] text-amber-100/70 font-mono truncate">{sup.email}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="text-center text-slate-500 text-xs mt-8">
-                Las 3 cuentas usan la contraseña <span className="font-mono text-slate-400">demo123</span> —
+                Todas las cuentas usan la contraseña <span className="font-mono text-slate-400">demo123</span> —
                 podés cerrar sesión y probar otra cuando quieras.
               </p>
             </>

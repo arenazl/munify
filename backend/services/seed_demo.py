@@ -555,8 +555,9 @@ async def seed_demo_completo(
     # ------------------------------------------------------------------
     # 4. Crear usuarios demo
     # ------------------------------------------------------------------
-    muni_dep_servicios = muni_deps.get("SERVICIOS_PUBLICOS")
-
+    # Admin (1), supervisores (1 por dependencia habilitada) y vecino (1).
+    # Los supervisores tienen email `supervisor-{dep_slug}@{codigo}.demo.com`
+    # para que cada dependencia tenga su login demo independiente.
     admin_demo = User(
         email=f"admin@{codigo}.demo.com",
         nombre="Admin",
@@ -567,17 +568,30 @@ async def seed_demo_completo(
         activo=True,
         cuenta_verificada=True,
     )
-    supervisor_demo = User(
-        email=f"supervisor@{codigo}.demo.com",
-        nombre="Supervisor",
-        apellido="Demo",
-        password_hash=hash_demo,
-        rol=RolUsuario.SUPERVISOR,
-        municipio_id=municipio_id,
-        municipio_dependencia_id=muni_dep_servicios.id if muni_dep_servicios else None,
-        activo=True,
-        cuenta_verificada=True,
-    )
+    db.add(admin_demo)
+
+    # Un supervisor por cada dependencia habilitada
+    supervisores_demo: list[User] = []
+    for dep_codigo, muni_dep in muni_deps.items():
+        # Nombre legible desde el código (ej: OBRAS_PUBLICAS → Obras Públicas)
+        # Buscamos la Dependencia global para obtener el nombre bonito
+        dep_obj = await db.get(Dependencia, muni_dep.dependencia_id)
+        dep_nombre = dep_obj.nombre if dep_obj else dep_codigo
+        slug = dep_codigo.lower().replace("_", "-")
+        sup = User(
+            email=f"supervisor-{slug}@{codigo}.demo.com",
+            nombre="Supervisor",
+            apellido=dep_nombre,
+            password_hash=hash_demo,
+            rol=RolUsuario.SUPERVISOR,
+            municipio_id=municipio_id,
+            municipio_dependencia_id=muni_dep.id,
+            activo=True,
+            cuenta_verificada=True,
+        )
+        db.add(sup)
+        supervisores_demo.append(sup)
+
     vecino_demo = User(
         email=f"vecino@{codigo}.demo.com",
         nombre="Vecino",
@@ -588,7 +602,7 @@ async def seed_demo_completo(
         activo=True,
         cuenta_verificada=True,
     )
-    db.add_all([admin_demo, supervisor_demo, vecino_demo])
+    db.add(vecino_demo)
     await db.flush()
 
     # ------------------------------------------------------------------
