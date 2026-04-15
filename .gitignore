@@ -80,3 +80,8 @@ netlify-ngcheck/
 .security-key
 logs/security/
 landing
+
+# Google Cloud credentials (NEVER commit)
+scripts/gsc-credentials.json
+*-credentials.json
+*.gcp.json

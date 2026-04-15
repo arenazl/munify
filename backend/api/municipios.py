@@ -530,12 +530,39 @@ async def crear_municipio_demo(
         suffix += 1
         codigo = f"{base_codigo}-{suffix}"
 
-    # 1. Crear fila del municipio
+    # 1. Geocodificar el nombre del muni con Nominatim (OpenStreetMap).
+    # Best-effort: si falla o no encuentra, usa fallback de CABA centro.
+    # Esto permite que los reclamos demo y el mapa del muni caigan en
+    # la ubicación real del municipio en Argentina.
+    lat, lng = -34.603722, -58.381592  # default CABA
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as hc:
+            r = await hc.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": f"{nombre_limpio}, Argentina",
+                    "format": "json",
+                    "limit": 1,
+                    "countrycodes": "ar",
+                },
+                headers={"User-Agent": "Munify/1.0 (demo creator)"},
+            )
+            if r.status_code == 200:
+                data = r.json()
+                if data:
+                    lat = float(data[0]["lat"])
+                    lng = float(data[0]["lon"])
+    except Exception:
+        # Silenciamos el error — el fallback de CABA ya está asignado
+        pass
+
+    # 2. Crear fila del municipio con coords (reales o fallback)
     municipio = Municipio(
         nombre=nombre_limpio,
         codigo=codigo,
-        latitud=-34.603722,
-        longitud=-58.381592,
+        latitud=lat,
+        longitud=lng,
         radio_km=10.0,
         color_primario="#0088cc",
         color_secundario="#005fa3",
