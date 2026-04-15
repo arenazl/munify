@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, Check, Building2, Sparkles, ArrowRight, X } from 'lucide-react';
+import { Loader2, LogIn, Check, Building2, Sparkles, ArrowRight, Trash2 } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
 import DemoCreationProgress from '../components/DemoCreationProgress';
@@ -230,86 +230,77 @@ export default function Demo() {
                   const isSelected = selectedMunicipio?.id === municipio.id;
                   const primaryColor = municipio.color_primario || '#0088cc';
 
+                  const isEliminando = eliminando === municipio.codigo;
                   return (
-                    <button
+                    <div
                       key={municipio.id}
-                      onClick={() => handleSelectMunicipio(municipio)}
-                      className={`
-                        relative group p-5 rounded-2xl border-2 text-left transition-all duration-200
-                        ${isSelected
-                          ? 'border-transparent shadow-lg scale-[1.02]'
-                          : 'border-slate-200 hover:border-slate-300 hover:shadow-md bg-white'
-                        }
-                      `}
-                      style={isSelected ? {
-                        background: `linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}08 100%)`,
-                        borderColor: primaryColor,
-                      } : undefined}
+                      className="relative group rounded-2xl border-2 border-slate-200 bg-white overflow-hidden transition-all duration-200 hover:border-slate-300 hover:shadow-lg"
                     >
-                      {/* Delete button — siempre visible, hover resalta */}
-                      <div
-                        onClick={(e) => handleEliminarDemo(e, municipio)}
-                        className="absolute -top-2.5 -right-2.5 w-7 h-7 rounded-full bg-white border-2 border-red-400 flex items-center justify-center shadow-md cursor-pointer hover:bg-red-500 hover:border-red-500 hover:scale-110 active:scale-95 transition-all z-10 group/delete"
-                        title="Eliminar demo"
-                      >
-                        {eliminando === municipio.codigo ? (
-                          <Loader2 className="h-3.5 w-3.5 text-red-500 animate-spin" />
-                        ) : (
-                          <X className="h-4 w-4 text-red-500 group-hover/delete:text-white" strokeWidth={2.5} />
-                        )}
-                      </div>
-
-                      {/* Check indicator */}
-                      {isSelected && (
-                        <div
-                          className="absolute -top-2 -left-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-                          style={{ backgroundColor: primaryColor }}
-                        >
-                          <Check className="h-3.5 w-3.5 text-white" />
-                        </div>
-                      )}
-
-                      {/* Content */}
-                      <div className="flex items-center gap-4">
-                        {/* Logo o icono */}
-                        <div
-                          className={`
-                            w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0
-                            ${isSelected ? 'bg-white/80' : 'bg-slate-100'}
-                          `}
-                        >
+                      {/* Contenido base (visible normal) */}
+                      <div className="p-5 flex items-center gap-4 transition-all duration-300 group-hover:opacity-20 group-hover:blur-[2px]">
+                        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
                           {municipio.logo_url ? (
-                            <img
-                              src={municipio.logo_url}
-                              alt={municipio.nombre}
-                              className="w-8 h-8 object-contain"
-                            />
+                            <img src={municipio.logo_url} alt={municipio.nombre} className="w-8 h-8 object-contain" />
                           ) : (
-                            <Building2
-                              className="h-6 w-6"
-                              style={{ color: isSelected ? primaryColor : '#64748b' }}
-                            />
+                            <Building2 className="h-6 w-6" style={{ color: primaryColor }} />
                           )}
                         </div>
-
-                        {/* Texto */}
                         <div className="min-w-0">
-                          <h3 className={`font-semibold truncate ${isSelected ? 'text-slate-800' : 'text-slate-700'}`}>
-                            {municipio.nombre}
-                          </h3>
-                          <p className="text-sm text-slate-500 truncate">
-                            {municipio.codigo}
-                          </p>
+                          <h3 className="font-semibold truncate text-slate-800">{municipio.nombre}</h3>
+                          <p className="text-sm text-slate-400 truncate">{municipio.codigo}</p>
                         </div>
                       </div>
-                    </button>
+
+                      {/* Overlay de acciones (aparece en hover) */}
+                      <div
+                        className="absolute inset-0 flex items-center justify-center gap-2 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        style={{
+                          background: `linear-gradient(135deg, ${primaryColor}08 0%, rgba(255,255,255,0.85) 100%)`,
+                          backdropFilter: 'blur(4px)',
+                        }}
+                      >
+                        <button
+                          onClick={() => handleSelectMunicipio(municipio)}
+                          disabled={isEliminando}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm shadow-lg hover:shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                          style={{
+                            background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryColor}dd 100%)`,
+                          }}
+                        >
+                          <LogIn className="h-4 w-4" />
+                          Entrar
+                        </button>
+                        <button
+                          onClick={(e) => handleEliminarDemo(e, municipio)}
+                          disabled={isEliminando}
+                          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-red-200 text-red-600 font-semibold text-sm shadow hover:bg-red-500 hover:text-white hover:border-red-500 active:scale-95 transition-all disabled:opacity-50"
+                          title="Eliminar demo"
+                        >
+                          {isEliminando ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Check indicator si está seleccionado (mantener por consistencia) */}
+                      {isSelected && (
+                        <div
+                          className="absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center shadow-md"
+                          style={{ backgroundColor: primaryColor }}
+                        >
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
 
-              {/* Hint sutil abajo — clickear card = ir al login con perfiles */}
+              {/* Hint sutil abajo */}
               <p className="text-center text-xs text-slate-400 mt-2">
-                Tocá un municipio para entrar con los perfiles de prueba (admin, supervisor, vecino)
+                Pasá el mouse sobre un municipio para entrar o eliminarlo
               </p>
 
               {/* Texto de ayuda */}
