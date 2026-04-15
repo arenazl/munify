@@ -378,29 +378,27 @@ async def obtener_usuarios_dependencias(
     # Para cada usuario, verificar si su dependencia maneja reclamos o trámites
     dependencia_users = []
     for row in rows:
-        # Verificar si maneja reclamos (tiene categorías asignadas)
+        # Contar reclamos asignados a la dep (via categorías)
         cat_query = select(func.count(MunicipioDependenciaCategoria.id)).where(
             MunicipioDependenciaCategoria.municipio_dependencia_id == row.municipio_dependencia_id
         )
-        cat_result = await db.execute(cat_query)
-        maneja_reclamos = cat_result.scalar() > 0
+        reclamos_count = (await db.execute(cat_query)).scalar() or 0
 
-        # Verificar si maneja trámites (tiene trámites asignados)
+        # Contar trámites asignados a la dep
         tram_query = select(func.count(MunicipioDependenciaTramite.id)).where(
             MunicipioDependenciaTramite.municipio_dependencia_id == row.municipio_dependencia_id
         )
-        tram_result = await db.execute(tram_query)
-        maneja_tramites = tram_result.scalar() > 0
+        tramites_count = (await db.execute(tram_query)).scalar() or 0
 
         dependencia_users.append(DependenciaUser(
             email=row.email,
             nombre_dependencia=row.nombre_dependencia,
             color=row.color,
             icono=row.icono,
-            reclamos_count=0,
-            tramites_count=0,
-            maneja_reclamos=maneja_reclamos,
-            maneja_tramites=maneja_tramites,
+            reclamos_count=reclamos_count,
+            tramites_count=tramites_count,
+            maneja_reclamos=reclamos_count > 0,
+            maneja_tramites=tramites_count > 0,
         ))
 
     return dependencia_users
