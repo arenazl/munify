@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
+import { getDefaultRouteForUser } from '../config/navigation';
 import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
@@ -29,7 +29,7 @@ export default function Login() {
     try {
       await loginWithGoogle(tokenResponse.access_token);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol, !!user.dependencia));
+      navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || 'Error al iniciar sesión con Google');
@@ -101,7 +101,7 @@ export default function Login() {
     try {
       await login(email, password);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol, !!user.dependencia));
+      navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || 'Email o contraseña incorrectos');
@@ -119,7 +119,7 @@ export default function Login() {
     try {
       await login(userEmail, userPassword);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol, !!user.dependencia));
+      navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setError(error.response?.data?.detail || 'Error al iniciar sesión');

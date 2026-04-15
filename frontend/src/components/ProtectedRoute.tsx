@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
+import { getDefaultRouteForUser } from '../config/navigation';
 
 interface Props {
   children: React.ReactNode;
@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children, roles }: Props) {
   }
 
   if (roles && !roles.includes(user.rol)) {
-    return <Navigate to={getDefaultRoute(user.rol, !!user.dependencia)} replace />;
+    return <Navigate to={getDefaultRouteForUser(user)} replace />;
   }
 
   return <>{children}</>;

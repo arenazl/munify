@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity
+  FolderTree, FileText, Activity, Zap
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -162,6 +162,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     },
     // === Solo SUPERADMIN (admin sin municipio asignado) ===
     {
+      name: 'Consola Global',
+      href: '/gestion/consola',
+      icon: Zap,
+      show: isSuperAdmin,
+      description: 'Vista cross-tenant del sistema'
+    },
+    {
       name: 'Municipios',
       href: '/gestion/municipios',
       icon: Building2,
@@ -244,7 +251,18 @@ export const isMobileDevice = (): boolean => {
  * @param role - Rol del usuario
  * @param hasDependencia - Si el usuario es de dependencia
  */
-export const getDefaultRoute = (role: string, hasDependencia?: boolean) => {
+/** Helper conveniente: deriva todo del objeto user. */
+export const getDefaultRouteForUser = (user: { rol: string; dependencia?: unknown; municipio_id?: number | null; is_super_admin?: boolean }) => {
+  const isSuperAdmin = !!user.is_super_admin || (user.rol === 'admin' && !user.municipio_id);
+  return getDefaultRoute(user.rol, !!user.dependencia, isSuperAdmin);
+};
+
+export const getDefaultRoute = (role: string, hasDependencia?: boolean, isSuperAdmin?: boolean) => {
+  // Super admin → consola global (cross-tenant), no dashboard de un muni específico
+  if (isSuperAdmin) {
+    return '/gestion/consola';
+  }
+
   // Usuarios de dependencia van a su dashboard de área
   if (hasDependencia && role === 'supervisor') {
     return '/gestion/mi-area';

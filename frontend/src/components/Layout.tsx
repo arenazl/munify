@@ -9,6 +9,7 @@ import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { Sheet } from './ui/Sheet';
 import { usersApi, municipiosApi, API_URL as apiUrl_ } from '../lib/api';
+import MunicipioSwitcher from './admin/MunicipioSwitcher';
 import NotificationSettings from './NotificationSettings';
 import { subscribeToPush } from '../lib/pushNotifications';
 import { toast } from 'sonner';
@@ -388,6 +389,13 @@ export default function Layout() {
             </div>
           </button>
         </div>
+
+        {/* Muni Switcher — solo super admin */}
+        {user?.rol === 'admin' && !user?.municipio_id && !isCollapsed && (
+          <div className="relative z-10 px-3 py-2 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
+            <MunicipioSwitcher />
+          </div>
+        )}
 
         {/* Usuario en el Sidebar */}
         <div className="relative z-10 px-3 py-3 border-b" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>

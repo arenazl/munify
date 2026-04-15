@@ -62,3 +62,39 @@ class DebugModeResponse(BaseModel):
 
 class DebugModeUpdate(BaseModel):
     enabled: bool
+
+
+class AuditGroupedRow(BaseModel):
+    """Fila de la vista agrupada por endpoint."""
+    path: str
+    count: int
+    p50_ms: int
+    p95_ms: int
+    max_ms: int
+    errors: int
+    last_seen: datetime
+
+
+class AuditGroupedPage(BaseModel):
+    items: list[AuditGroupedRow]
+    total: int
+
+
+class ConsolaResumen(BaseModel):
+    """Stats cross-tenant para la landing del super admin."""
+    total_municipios: int
+    total_usuarios: int
+    total_reclamos: int
+    total_solicitudes: int
+    # Actividad últimas 24h
+    requests_24h: int
+    errors_24h: int
+    error_rate_24h: float
+    p50_ms_24h: int
+    p95_ms_24h: int
+    # Top 5 munis por requests 24h
+    top_municipios: list[dict]  # [{municipio_id, municipio_nombre, count}]
+    # Top 5 endpoints más lentos (p95) en 24h
+    slowest_endpoints: list[dict]  # [{path, p95_ms, count}]
+    # Últimos 10 errores
+    recent_errors: list[dict]  # [{created_at, method, path, status_code, municipio_nombre}]

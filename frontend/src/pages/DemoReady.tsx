@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Shield, User, Sparkles, ArrowLeft, Building2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
+import { getDefaultRouteForUser } from '../config/navigation';
 import api from '../lib/api';
 import munifyLogo from '../assets/munify_logo.png';
 
@@ -83,7 +83,7 @@ export default function DemoReady() {
     try {
       await login(target.email, 'demo123');
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol, !!user.dependencia));
+      navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       setError(e.response?.data?.detail || 'Error ingresando con la cuenta de demo');

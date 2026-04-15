@@ -162,11 +162,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
 
-    // Super Admin (sin municipio_id): cargar todos los municipios y seleccionar el primero
+    // Super Admin (sin municipio_id): cargar la lista de municipios para el
+    // switcher, pero NO seleccionar ninguno por default. Queda "Global"
+    // hasta que elija uno desde el MunicipioSwitcher en el sidebar.
     const isSuperAdmin = user.rol === 'admin' && !user.municipio_id;
 
     if (isSuperAdmin) {
-      // Para super admin, cargar todos los municipios
       try {
         const apiUrl = API_URL;
         const res = await fetch(`${apiUrl}/municipios`, {
@@ -175,25 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const munis = await res.json();
           setMunicipios(munis);
-          if (munis.length > 0) {
-            // Usar el guardado en localStorage o el primero
-            const storedMuniId = localStorage.getItem('municipio_actual_id');
-            let selectedMuni = munis[0];
-            if (storedMuniId) {
-              const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
-              if (found) selectedMuni = found;
-            }
-            localStorage.setItem('municipio_actual_id', String(selectedMuni.id));
-            if (selectedMuni.latitud) localStorage.setItem('municipio_lat', String(selectedMuni.latitud));
-            if (selectedMuni.longitud) localStorage.setItem('municipio_lon', String(selectedMuni.longitud));
-            await saveMunicipio({
-              id: String(selectedMuni.id),
-              codigo: selectedMuni.codigo,
-              nombre: selectedMuni.nombre,
-              color: selectedMuni.color_primario || '#3b82f6',
-              logo_url: selectedMuni.logo_url || undefined,
-            });
-            setMunicipioActualState(selectedMuni);
+          // Si había un muni persistido de una sesión anterior, lo mantenemos
+          // como contexto seleccionado — pero NO fuerza redirect al dashboard.
+          const storedMuniId = localStorage.getItem('municipio_actual_id');
+          if (storedMuniId) {
+            const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
+            if (found) setMunicipioActualState(found);
           }
         }
       } catch (e) {

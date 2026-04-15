@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, AlertCircle, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
+import { getDefaultRouteForUser } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
 import { API_URL } from '../lib/api';
 
@@ -233,7 +233,7 @@ export default function Landing() {
     try {
       await login(email, password);
       const user = JSON.parse(localStorage.getItem('user') || '{}');
-      navigate(getDefaultRoute(user.rol, !!user.dependencia));
+      navigate(getDefaultRouteForUser(user));
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: string } } };
       setDebugError(error.response?.data?.detail || 'Error al iniciar sesión');

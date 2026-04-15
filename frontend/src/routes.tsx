@@ -43,6 +43,7 @@ import GestionHorarios from './pages/GestionHorarios';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import AuditLogs from './pages/admin/AuditLogs';
+import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Demo from './pages/Demo';
 import DemoReady from './pages/DemoReady';
 import DependenciasConfig from './pages/DependenciasConfig';
@@ -219,6 +220,10 @@ export const router = createBrowserRouter([
       {
         path: 'admin/audit-logs',
         element: <ProtectedRoute roles={['admin']}><AuditLogs /></ProtectedRoute>
+      },
+      {
+        path: 'consola',
+        element: <ProtectedRoute roles={['admin']}><ConsolaGlobal /></ProtectedRoute>
       },
       {
         path: 'exportar',

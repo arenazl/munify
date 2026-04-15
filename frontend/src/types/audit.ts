@@ -57,8 +57,48 @@ export interface AuditFilters {
   desde?: string;
   hasta?: string;
   q?: string;
-  order_by?: 'created_at' | 'duracion_ms' | 'status_code';
+  order_by?: 'created_at' | 'duracion_ms' | 'status_code' | 'method' | 'path' | 'action' | 'usuario_email' | 'municipio_id';
   order_dir?: 'asc' | 'desc';
   page?: number;
   limit?: number;
+}
+
+export interface AuditGroupedRow {
+  path: string;
+  count: number;
+  p50_ms: number;
+  p95_ms: number;
+  max_ms: number;
+  errors: number;
+  last_seen: string;
+}
+
+export interface AuditGroupedPage {
+  items: AuditGroupedRow[];
+  total: number;
+}
+
+export interface AuditGroupedFilters {
+  municipio_id?: number;
+  desde?: string;
+  hasta?: string;
+  method?: string[];
+  order_by?: 'count' | 'p50_ms' | 'p95_ms' | 'max_ms' | 'errors' | 'last_seen' | 'path';
+  order_dir?: 'asc' | 'desc';
+  limit?: number;
+}
+
+export interface ConsolaResumen {
+  total_municipios: number;
+  total_usuarios: number;
+  total_reclamos: number;
+  total_solicitudes: number;
+  requests_24h: number;
+  errors_24h: number;
+  error_rate_24h: number;
+  p50_ms_24h: number;
+  p95_ms_24h: number;
+  top_municipios: Array<{ municipio_id: number; municipio_nombre: string; count: number }>;
+  slowest_endpoints: Array<{ path: string; p95_ms: number; count: number }>;
+  recent_errors: Array<{ created_at: string; method: string; path: string; status_code: number; municipio_nombre: string | null }>;
 }

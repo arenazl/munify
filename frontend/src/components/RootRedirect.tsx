@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { getDefaultRoute } from '../config/navigation';
+import { getDefaultRouteForUser } from '../config/navigation';
 
 /**
  * Componente que maneja la redirección inteligente en la ruta raíz.
@@ -23,7 +23,7 @@ export default function RootRedirect() {
   useEffect(() => {
     // Si hay usuario logueado, ir a su ruta por defecto en /gestion
     if (user) {
-      navigate(getDefaultRoute(user.rol, !!user.dependencia), { replace: true });
+      navigate(getDefaultRouteForUser(user), { replace: true });
       return;
     }
 
