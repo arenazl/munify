@@ -33,6 +33,7 @@ from models.tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicit
 from models.tramite_documento_requerido import TramiteDocumentoRequerido
 from models.categoria_tramite import CategoriaTramite
 from models.documento_solicitud import DocumentoSolicitud
+from models.municipio_dependencia import MunicipioDependencia
 from models.user import User
 from models.enums import RolUsuario
 from schemas.tramite import (
@@ -539,6 +540,7 @@ async def listar_solicitudes(
     query = query.options(
         selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
         selectinload(Solicitud.solicitante),
+        selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
     ).order_by(Solicitud.created_at.desc()).offset(skip).limit(limit)
 
     result = await db.execute(query)
@@ -566,6 +568,7 @@ async def listar_mis_solicitudes(
     query = query.options(
         selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
         selectinload(Solicitud.solicitante),
+        selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
     ).order_by(Solicitud.created_at.desc()).offset(skip).limit(limit)
 
     result = await db.execute(query)
@@ -583,6 +586,7 @@ async def consultar_solicitud_por_numero(
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
             selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
         )
         .where(Solicitud.numero_tramite == numero_tramite)
     )
@@ -603,6 +607,7 @@ async def obtener_solicitud(
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
             selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
         )
         .where(Solicitud.id == solicitud_id)
     )
@@ -824,6 +829,9 @@ async def crear_solicitud(
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
             selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(
+                MunicipioDependencia.dependencia
+            ),
         )
         .where(Solicitud.id == solicitud.id)
     )
@@ -888,11 +896,15 @@ async def actualizar_solicitud(
     await db.commit()
 
     # Re-querear con relaciones para evitar lazy-load en pydantic.
+    from models.municipio_dependencia import MunicipioDependencia
     result = await db.execute(
         select(Solicitud)
         .options(
             selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
             selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(
+                MunicipioDependencia.dependencia
+            ),
         )
         .where(Solicitud.id == solicitud_id)
     )

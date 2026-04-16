@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate, useSearchParams } from 'react-router-dom';
-import { Home, Plus, ClipboardList, User, LogOut, Trophy, Building2, Loader2 } from 'lucide-react';
+import { Home, Plus, ClipboardList, User, LogOut, FileCheck, Building2, Loader2 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificacionesDropdown } from '../components/NotificacionesDropdown';
+import { FabActionSheet } from '../components/mobile/FabActionSheet';
 import { API_URL } from '../lib/api';
 
 export default function MobileLayout() {
@@ -12,6 +13,7 @@ export default function MobileLayout() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loadingMunicipio, setLoadingMunicipio] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
 
   // Cargar municipio desde query param si viene ?municipio=xxx
   useEffect(() => {
@@ -93,7 +95,7 @@ export default function MobileLayout() {
     { path: '/app', icon: Home, label: 'Inicio', end: true },
     { path: '/app/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
     { path: '/app/nuevo', icon: Plus, label: 'Crear', end: false, isMain: true },
-    { path: '/app/logros', icon: Trophy, label: 'Logros', end: false },
+    { path: '/app/mis-tramites', icon: FileCheck, label: 'Trámites', end: false },
     { path: '/app/perfil', icon: User, label: 'Perfil', end: false },
   ];
 
@@ -168,13 +170,15 @@ export default function MobileLayout() {
           }}
         >
           {tabs.map((tab) => {
-            // Para el botón central (Crear)
+            // Para el botón central (Crear) — abre action sheet con opciones Reclamo/Trámite
             if (tab.isMain) {
               return (
-                <NavLink
+                <button
                   key={tab.path}
-                  to={tab.path}
+                  type="button"
+                  onClick={() => setFabOpen(true)}
                   className="relative -mt-5 flex flex-col items-center"
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer' }}
                 >
                   {/* Glow effect behind */}
                   <div
@@ -187,6 +191,8 @@ export default function MobileLayout() {
                     style={{
                       background: `linear-gradient(135deg, ${theme.primary}, ${theme.primary}cc)`,
                       boxShadow: `0 4px 20px ${theme.primary}50`,
+                      transform: fabOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease',
                     }}
                   >
                     <Plus className="h-7 w-7 text-white" strokeWidth={2.5} />
@@ -197,7 +203,7 @@ export default function MobileLayout() {
                   >
                     {tab.label}
                   </span>
-                </NavLink>
+                </button>
               );
             }
 
@@ -244,6 +250,8 @@ export default function MobileLayout() {
         {/* Safe area for iOS */}
         <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </nav>
+
+      <FabActionSheet open={fabOpen} onClose={() => setFabOpen(false)} />
     </div>
   );
 }

@@ -180,6 +180,17 @@ export function WizardModal({
         min-height: calc(100vh - 144px);
         border-radius: 0;
       }
+      .wizard-modal-container {
+        padding: 0 !important;
+      }
+      .wizard-modal-content {
+        max-width: 100% !important;
+        width: 100% !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        border: none !important;
+      }
       .wizard-content-area > div {
         padding-bottom: 100px !important;
       }
@@ -208,12 +219,11 @@ export function WizardModal({
     }
     @media (max-width: 768px) {
       .wizard-footer {
-        position: fixed;
-        bottom: 65px;
-        left: 0;
-        right: 0;
+        position: sticky;
+        bottom: 0;
         z-index: 40;
         box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
       }
     }
     .wizard-ai-panel {
