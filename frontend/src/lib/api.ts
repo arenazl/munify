@@ -1240,6 +1240,12 @@ export const pagosApi = {
     api.post(`/pagos/sesiones/${sessionId}/confirmar`, { medio_pago, metadatos }),
   cancelarSesion: (sessionId: string) =>
     api.post(`/pagos/sesiones/${sessionId}/cancelar`),
+};
+
+// Vecino — agregados cross-modulo (sidebar badges, dashboard home).
+export const vecinoApi = {
+  resumenBadges: () =>
+    api.get<{ reclamos_pendientes: number; tramites_pendientes: number; tasas_pendientes: number }>('/vecino/resumen-badges'),
 
   // ----- Aliases retrocompat (a borrar progresivamente) -----
   // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites

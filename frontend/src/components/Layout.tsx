@@ -5,6 +5,7 @@ import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, Ch
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
+import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
@@ -100,6 +101,9 @@ export default function Layout() {
     setContentBgOpacity,
   } = useTheme();
   const location = useLocation();
+
+  // Badges de items pendientes (reclamos/tramites/tasas) — solo aplica a vecinos.
+  const badges = useVecinoBadges();
 
   // Guardar estado del sidebar en localStorage
   useEffect(() => {
@@ -586,6 +590,10 @@ export default function Layout() {
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
+            // Badge count si el item lo pide (ej: Mis Reclamos -> badges.reclamos)
+            const badgeCount = (item as { badgeKey?: 'reclamos' | 'tramites' | 'tasas' }).badgeKey
+              ? badges[(item as { badgeKey: 'reclamos' | 'tramites' | 'tasas' }).badgeKey]
+              : 0;
             return (
               <Link
                 key={item.name}
@@ -637,7 +645,20 @@ export default function Layout() {
                 >
                   {item.name}
                 </span>
-                {isActive && !isCollapsed && (
+                {/* Badge con contador de items pendientes (reclamos/tramites/tasas) */}
+                {badgeCount > 0 && (
+                  <span
+                    className={`${isCollapsed ? 'absolute top-1 right-1' : 'ml-auto'} flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center`}
+                    style={{
+                      backgroundColor: '#ef4444',
+                      color: '#ffffff',
+                      boxShadow: '0 2px 6px rgba(239,68,68,0.4)',
+                    }}
+                  >
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
+                {badgeCount === 0 && isActive && !isCollapsed && (
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse flex-shrink-0" />
                 )}
               </Link>
@@ -1314,7 +1335,12 @@ export default function Layout() {
                   );
                 }
 
-                // Tabs normales
+                // Tabs normales — con badge rojo si hay items pendientes del vecino
+                let tabBadge = 0;
+                if (tab.path === '/gestion/mis-reclamos') tabBadge = badges.reclamos;
+                else if (tab.path === '/gestion/mis-tramites') tabBadge = badges.tramites;
+                else if (tab.path === '/gestion/mis-tasas') tabBadge = badges.tasas;
+
                 return (
                   <NavLink
                     key={tab.path}
@@ -1326,7 +1352,7 @@ export default function Layout() {
                     {({ isActive }) => (
                       <>
                         <div
-                          className="p-2 rounded-xl transition-colors"
+                          className="p-2 rounded-xl transition-colors relative"
                           style={{
                             backgroundColor: isActive ? `${theme.primary}15` : 'transparent',
                           }}
@@ -1336,6 +1362,18 @@ export default function Layout() {
                               className="h-5 w-5"
                               style={{ color: isActive ? theme.primary : theme.textSecondary }}
                             />
+                          )}
+                          {tabBadge > 0 && (
+                            <span
+                              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                              style={{
+                                backgroundColor: '#ef4444',
+                                color: '#ffffff',
+                                boxShadow: '0 2px 4px rgba(239,68,68,0.5)',
+                              }}
+                            >
+                              {tabBadge > 9 ? '9+' : tabBadge}
+                            </span>
                           )}
                         </div>
                         <span

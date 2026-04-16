@@ -196,21 +196,24 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mis-reclamos',
       icon: ClipboardList,
       show: isVecino,
-      description: 'Ver tus reclamos'
+      description: 'Ver tus reclamos',
+      badgeKey: 'reclamos',
     },
     {
       name: 'Mis Trámites',
       href: '/gestion/mis-tramites',
       icon: FileCheck,
       show: isVecino,
-      description: 'Ver tus trámites'
+      description: 'Ver tus trámites',
+      badgeKey: 'tramites',
     },
     {
       name: 'Mis Tasas',
       href: '/gestion/mis-tasas',
       icon: BarChart3,
       show: isVecino,
-      description: 'Tasas y boletas pendientes (ABL, patente, multas)'
+      description: 'Tasas y boletas pendientes (ABL, patente, multas)',
+      badgeKey: 'tasas',
     },
     {
       name: 'Mapa',

@@ -38,6 +38,7 @@ from .geocoding import router as geocoding_router
 from .admin_audit import router as admin_audit_router
 from .tasas import router as tasas_router
 from .pagos import router as pagos_router
+from .vecino import router as vecino_router
 
 api_router = APIRouter()
 
@@ -79,6 +80,7 @@ api_router.include_router(geocoding_router, prefix="/geocoding", tags=["Geocodin
 api_router.include_router(admin_audit_router, tags=["Admin Audit"])  # ya tiene prefix /admin
 api_router.include_router(tasas_router, tags=["Tasas"])  # ya tiene prefix /tasas
 api_router.include_router(pagos_router, tags=["Pagos"])  # ya tiene prefix /pagos
+api_router.include_router(vecino_router, tags=["Vecino"])  # ya tiene prefix /vecino
 
 # WebSockets
 from .ws import router as ws_router
