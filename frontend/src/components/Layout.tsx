@@ -307,7 +307,7 @@ export default function Layout() {
 
   // Anchos dinámicos con medidas relativas para mejor responsividad
   // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
-  const sidebarWidth = isMobile ? '12.5rem' : (sidebarCollapsed ? '5rem' : '11rem');
+  const sidebarWidth = isMobile ? '14rem' : (sidebarCollapsed ? '5rem' : '14rem');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;
