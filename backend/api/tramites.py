@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, date
 import logging
