@@ -31,13 +31,14 @@ const getMobileTabs = (userRole: string) => {
     ];
   }
 
-  // Vecino: "+" en el centro para crear, con menú desplegable
+  // Vecino: "+" en el centro abre menú con Reclamo/Trámite (los dos core features).
+  // Inicio · Reclamos · + · Trámites · Perfil — simetría reclamo/trámite a los costados.
   return [
     { path: '/gestion/mi-panel', icon: Home, label: 'Inicio', end: true },
     { path: '/gestion/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
-    { path: null, icon: null, label: 'Crear', isCreateMenu: true }, // Botón especial
-    { path: '/gestion/logros', icon: Trophy, label: 'Logros', end: false },
-    { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
+    { path: null, icon: null, label: 'Crear', isCreateMenu: true },
+    { path: '/gestion/mis-tramites', icon: FileCheck, label: 'Trámites', end: false },
+    { path: '/gestion/ajustes', icon: User, label: 'Perfil', end: false },
   ];
 };
 
@@ -1284,18 +1285,10 @@ export default function Layout() {
 
                 // Botón especial de crear - sobresale del footer
                 if (isCreateButton) {
-                  const isVecino = user?.rol === 'vecino';
                   return (
                     <button
                       key="create-menu"
-                      onClick={() => {
-                        // Vecinos van directo al menú bonito de MobileNuevoReclamo
-                        if (isVecino) {
-                          navigate('/app/nuevo');
-                        } else {
-                          setCreateMenuOpen(!createMenuOpen);
-                        }
-                      }}
+                      onClick={() => setCreateMenuOpen(!createMenuOpen)}
                       className="flex flex-col items-center min-w-0 flex-1 relative -mt-5"
                     >
                       <div

@@ -147,7 +147,7 @@ export const router = createBrowserRouter([
       { path: 'crear-reclamo', element: <NuevoReclamoPage /> },
 
       // Nuevo Trámite (dentro del Layout para usuarios logueados)
-      { path: 'crear-tramite', element: <Navigate to="/gestion/tramites" replace /> },
+      { path: 'crear-tramite', element: <NuevoTramitePage /> },
 
       // Reclamos (todo con Side Modal, sin páginas separadas)
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
