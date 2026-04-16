@@ -194,6 +194,16 @@ export function WizardModal({
       .wizard-content-area > div {
         padding-bottom: 100px !important;
       }
+      .wizard-back-btn {
+        display: flex !important;
+      }
+      .wizard-close-btn {
+        display: none !important;
+      }
+      .wizard-stepper {
+        flex-shrink: 1 !important;
+        overflow: hidden !important;
+      }
     }
     .wizard-main-layout {
       display: flex;
@@ -324,6 +334,31 @@ export function WizardModal({
         />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          {/* Back button mobile — deja salir del wizard volviendo al listado */}
+          {!embedded && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Volver"
+              className="wizard-back-btn"
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                border: `1px solid ${theme.border}`,
+                backgroundColor: theme.card,
+                color: theme.text,
+                display: 'none',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              <ChevronLeft style={{ width: '20px', height: '20px' }} />
+            </button>
+          )}
+
           {/* Title - muestra categoría si está seleccionada, sino título normal */}
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '12px' }}>
             {headerBadge ? (
@@ -365,7 +400,7 @@ export function WizardModal({
           </div>
 
           {/* Stepper - centered */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div className="wizard-stepper" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             {steps.map((step, index) => {
               const isCompleted = index < currentStep;
               const isCurrent = index === currentStep;
@@ -422,7 +457,7 @@ export function WizardModal({
 
           {/* Close button - solo si no es embedded */}
           {!embedded && (
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <div className="wizard-close-btn" style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={onClose}
                 tabIndex={-1}
