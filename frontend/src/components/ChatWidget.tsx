@@ -301,39 +301,34 @@ export function ChatWidget() {
             height: 'min(700px, 85vh)',
             borderRadius: '16px',
           } : {
-            // Sidebar derecho slim: 40px colapsado, 320px al hover o click
+            // Sidebar derecho: invisible colapsado (hot zone de 24px), 320px al hover o click
             top: '0',
             right: '0',
-            width: (isOpen || isHovered) ? '320px' : '40px',
+            width: (isOpen || isHovered) ? '320px' : '24px',
             height: '100vh',
             borderRadius: '0',
           }),
           zIndex: 40,
-          backgroundColor: theme.card,
-          borderTop: !isMaximized ? `1px solid ${theme.border}` : undefined,
+          // Cuando colapsado: transparente. Cuando expandido/hover: fondo de card con borde izq.
+          backgroundColor: (isOpen || isHovered || isMaximized) ? theme.card : 'transparent',
+          borderLeft: (isOpen || isHovered) && !isMaximized ? `1px solid ${theme.border}` : undefined,
           border: isMaximized ? `1px solid ${theme.border}` : undefined,
-          boxShadow: isMaximized ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : `0 -4px 12px rgba(0, 0, 0, 0.06)`
+          boxShadow: isMaximized
+            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
+            : (isOpen || isHovered) ? '-4px 0 12px rgba(0, 0, 0, 0.06)' : 'none'
         }}
         onMouseEnter={() => !isMaximized && setIsHovered(true)}
         onMouseLeave={() => !isOpen && setIsHovered(false)}
       >
-        {/* Rail slim colapsado (cuando NO está expandido ni maximizado) */}
+        {/* Indicador mínimo colapsado: solo una linea sutil con un dot */}
         {!isOpen && !isHovered && !isMaximized && (
           <div
-            className="flex flex-col items-center justify-center gap-3 flex-1 cursor-pointer select-none"
-            style={{ color: theme.textSecondary }}
+            className="flex items-center justify-center h-full cursor-pointer select-none group"
           >
-            {canUseDataAssistant ? <Database className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
-            <span
-              className="text-[11px] font-medium tracking-wide"
-              style={{
-                writingMode: 'vertical-rl',
-                transform: 'rotate(180deg)',
-                color: theme.textSecondary,
-              }}
-            >
-              {canUseDataAssistant ? 'Asistente con Datos' : 'Asistente'}
-            </span>
+            <div
+              className="w-1 h-16 rounded-full transition-all duration-200 group-hover:h-24 group-hover:w-1.5"
+              style={{ backgroundColor: theme.primary, opacity: 0.4 }}
+            />
           </div>
         )}
 
