@@ -272,12 +272,25 @@ export function DocumentReviewModal({ open, onClose, solicitudId, items, onChang
             </div>
           </div>
         ) : isPdf ? (
-          <iframe
-            src={current.documento_url}
-            title={current.nombre}
-            className="w-full h-full border-0"
-            style={{ backgroundColor: '#fff' }}
-          />
+          (() => {
+            // Para PDFs usamos Google Docs Viewer como wrapper.
+            // Motivo: Cloudinary sirve PDFs con resource_type=raw con
+            // Content-Disposition: attachment, lo que hace que el browser
+            // los descargue en vez de mostrarlos inline. Google Docs Viewer
+            // los renderiza embebidos sin importar el disposition del origen.
+            // Funciona con cualquier URL publica (incluidos los PDFs viejos
+            // que se subieron como 'raw').
+            const url = current.documento_url!;
+            const viewer = `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+            return (
+              <iframe
+                src={viewer}
+                title={current.nombre}
+                className="w-full h-full border-0"
+                style={{ backgroundColor: '#fff' }}
+              />
+            );
+          })()
         ) : (
           <div className="flex items-center justify-center min-h-full p-4">
             <img

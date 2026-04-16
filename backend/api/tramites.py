@@ -1092,7 +1092,15 @@ async def upload_documento_solicitud(
         raise HTTPException(status_code=403, detail="No tiene permiso")
 
     try:
-        resource_type = "image" if file.content_type.startswith("image/") else "raw"
+        # Cloudinary sirve resource_type=raw con Content-Disposition: attachment
+        # (fuerza descarga). Para PDFs queremos embedarlos inline en iframe,
+        # asi que los subimos como 'image' — Cloudinary los maneja bien y los
+        # sirve con Content-Type application/pdf + disposition inline.
+        is_pdf = file.content_type == "application/pdf"
+        if file.content_type.startswith("image/") or is_pdf:
+            resource_type = "image"
+        else:
+            resource_type = "raw"
         upload_result = cloudinary.uploader.upload(
             file.file,
             folder=f"solicitudes/{solicitud_id}",
