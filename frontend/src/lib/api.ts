@@ -1214,6 +1214,9 @@ export const tramitesApi = {
    */
   enviarDocumentosARevision: (solicitudId: number) =>
     api.post(`/tramites/solicitudes/${solicitudId}/enviar-documentos`),
+  /** Asigna (o desasigna) un empleado responsable a la solicitud. Campo opcional. */
+  asignarResponsable: (solicitudId: number, empleadoId: number | null) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/asignar-responsable`, { empleado_id: empleadoId }),
 
   // ----- Aliases retrocompat (a borrar progresivamente) -----
   // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites

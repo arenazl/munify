@@ -145,6 +145,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [loadingSugerencia, setLoadingSugerencia] = useState(false);
   const [asignando, setAsignando] = useState(false);
 
+  // Responsable (empleado especifico de la dependencia, opcional)
+  const [responsableId, setResponsableId] = useState<number | null>(null);
+  const [asignandoResponsable, setAsignandoResponsable] = useState(false);
+
   // Historial
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
@@ -392,6 +396,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     setRespuesta(tramite.respuesta || '');
     setObservaciones(tramite.observaciones || '');
     setEmpleadoSeleccionado(tramite.municipio_dependencia_id || '');
+    setResponsableId(tramite.empleado_id ?? null);
     setSugerenciaIA(null);
     setHistorial([]);
     setShowHistorial(false);
@@ -400,6 +405,28 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     setSearchParams({ id: String(tramite.id) });
     // Cargar empleados con disponibilidad al abrir
     loadEmpleadosDisponibilidad();
+  };
+
+  const handleAsignarResponsable = async () => {
+    if (!selectedTramite) return;
+    setAsignandoResponsable(true);
+    try {
+      await tramitesApi.asignarResponsable(selectedTramite.id, responsableId);
+      const nombre = responsableId
+        ? empleadosDisponibilidad.find(e => e.id === responsableId)
+        : null;
+      toast.success(
+        responsableId
+          ? `Responsable asignado: ${nombre?.nombre || ''} ${nombre?.apellido || ''}`.trim()
+          : 'Responsable desasignado',
+      );
+      await recargarDespuesDeAccion();
+    } catch (err) {
+      console.error('Error asignando responsable', err);
+      toast.error('No se pudo asignar el responsable');
+    } finally {
+      setAsignandoResponsable(false);
+    }
   };
 
   const closeSheet = () => {
@@ -1573,10 +1600,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
                   {/* Dependencia actual */}
                   {selectedTramite.dependencia_asignada && (
-                    <div className="flex items-center gap-2 mb-3">
+                    <div className="flex items-center gap-2 mb-3 p-2 rounded-lg" style={{ backgroundColor: `${selectedTramite.dependencia_asignada.color || theme.primary}10`, border: `1px solid ${selectedTramite.dependencia_asignada.color || theme.primary}30` }}>
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
-                        style={{ backgroundColor: `${selectedTramite.dependencia_asignada.color || theme.primary}20`, color: selectedTramite.dependencia_asignada.color || theme.primary }}
+                        style={{ backgroundColor: selectedTramite.dependencia_asignada.color || theme.primary, color: '#fff' }}
                       >
                         {selectedTramite.dependencia_asignada.nombre?.[0]}
                       </div>
@@ -1589,6 +1616,16 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                         </p>
                       </div>
                     </div>
+                  )}
+
+                  {/* Separador entre dep actual y cambiar */}
+                  {selectedTramite.dependencia_asignada && !tramiteCerrado && (
+                    <div className="h-px mb-3" style={{ backgroundColor: theme.border }} />
+                  )}
+                  {!tramiteCerrado && (
+                    <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>
+                      Cambiar dependencia
+                    </p>
                   )}
 
                   {/* Controles de asignación - Solo si el trámite no está cerrado */}
@@ -1788,6 +1825,92 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 </div>
               );
             })()}
+
+            {/* Responsable asignado (opcional) — empleado especifico segun carga/horarios */}
+            {selectedTramite && !['finalizado', 'rechazado'].includes(normalizeEstado(selectedTramite.estado)) && (
+              <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-medium" style={{ color: theme.text }}>
+                    Responsable
+                  </h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: `${theme.textSecondary}15`, color: theme.textSecondary }}>
+                    Opcional
+                  </span>
+                </div>
+                <p className="text-xs mb-3" style={{ color: theme.textSecondary }}>
+                  Empleado específico a cargo. Si no se asigna, el trámite queda a cargo colectivo de la dependencia.
+                </p>
+
+                {/* Separador visual */}
+                <div className="h-px mb-3" style={{ backgroundColor: theme.border }} />
+
+                {/* Responsable actual */}
+                {responsableId && (() => {
+                  const resp = empleadosDisponibilidad.find(e => e.id === responsableId);
+                  if (!resp) return null;
+                  return (
+                    <div className="flex items-center gap-2 mb-3 p-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}>
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
+                        style={{ backgroundColor: theme.primary, color: '#fff' }}
+                      >
+                        {resp.nombre?.[0]}{resp.apellido?.[0]}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium" style={{ color: theme.text }}>
+                          {resp.nombre} {resp.apellido || ''}
+                        </p>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>
+                          {resp.especialidad || 'Responsable actual'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Selector + botón */}
+                <div className="flex gap-2">
+                  <select
+                    value={responsableId ?? ''}
+                    onChange={e => setResponsableId(e.target.value ? Number(e.target.value) : null)}
+                    disabled={loadingEmpleados || asignandoResponsable}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm"
+                    style={{
+                      backgroundColor: theme.card,
+                      border: `1px solid ${theme.border}`,
+                      color: theme.text,
+                    }}
+                  >
+                    <option value="">Sin responsable asignado</option>
+                    {empleadosDisponibilidad.map(emp => {
+                      const libre = 100 - (emp.porcentaje_ocupacion || 0);
+                      return (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.nombre} {emp.apellido || ''}
+                          {emp.horario_texto ? ` · ${emp.horario_texto}` : ''}
+                          {` · ${libre}% libre`}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  <button
+                    onClick={handleAsignarResponsable}
+                    disabled={asignandoResponsable || responsableId === (selectedTramite.empleado_id ?? null)}
+                    className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-all hover:scale-105"
+                    style={{
+                      background: responsableId
+                        ? `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`
+                        : theme.card,
+                      color: responsableId ? '#ffffff' : theme.textSecondary,
+                      border: responsableId ? 'none' : `1px solid ${theme.border}`,
+                    }}
+                  >
+                    {asignandoResponsable ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                    {responsableId ? 'Asignar' : 'Quitar'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Fechas */}
             <div className="flex gap-4">

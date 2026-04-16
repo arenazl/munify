@@ -1052,6 +1052,76 @@ async def asignar_solicitud(
     return result.scalar_one()
 
 
+class AsignarResponsableRequest(BaseModel):
+    empleado_id: Optional[int] = None  # None = desasignar responsable
+
+
+@router.post("/solicitudes/{solicitud_id}/asignar-responsable")
+async def asignar_responsable_solicitud(
+    solicitud_id: int,
+    body: AsignarResponsableRequest,
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Asigna (o desasigna) un empleado responsable a la solicitud.
+
+    Campo opcional — si un tramite no tiene responsable, queda a cargo colectivo
+    de la dependencia. Util cuando el supervisor quiere trackear carga por
+    persona o asignar segun horarios.
+    """
+    from models.empleado import Empleado
+
+    sol_q = await db.execute(select(Solicitud).where(Solicitud.id == solicitud_id))
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    empleado_nombre: Optional[str] = None
+    if body.empleado_id is not None:
+        emp_q = await db.execute(
+            select(Empleado).where(
+                Empleado.id == body.empleado_id,
+                Empleado.municipio_id == solicitud.municipio_id,
+                Empleado.activo == True,
+            )
+        )
+        empleado = emp_q.scalar_one_or_none()
+        if not empleado:
+            raise HTTPException(status_code=404, detail="Empleado no encontrado o inactivo")
+        empleado_nombre = f"{empleado.nombre} {empleado.apellido or ''}".strip()
+
+    anterior = solicitud.empleado_id
+    solicitud.empleado_id = body.empleado_id
+
+    if anterior != body.empleado_id:
+        if body.empleado_id is None:
+            accion = "Responsable desasignado"
+            comentario = "El trámite queda a cargo colectivo de la dependencia."
+        elif anterior is None:
+            accion = "Responsable asignado"
+            comentario = f"Responsable: {empleado_nombre}"
+        else:
+            accion = "Responsable reasignado"
+            comentario = f"Nuevo responsable: {empleado_nombre}"
+
+        db.add(HistorialSolicitud(
+            solicitud_id=solicitud.id,
+            usuario_id=current_user.id,
+            estado_anterior=solicitud.estado,
+            estado_nuevo=solicitud.estado,
+            accion=accion,
+            comentario=comentario,
+        ))
+
+    await db.commit()
+
+    return {
+        "message": "Responsable actualizado",
+        "empleado_id": body.empleado_id,
+        "empleado_nombre": empleado_nombre,
+    }
+
+
 # ============================================================
 # DOCUMENTOS DE SOLICITUD (upload + verificación)
 # ============================================================

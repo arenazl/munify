@@ -137,6 +137,15 @@ class Solicitud(Base):
         "MunicipioDependencia", back_populates="solicitudes"
     )
 
+    # Responsable (empleado concreto de la dependencia). Opcional — para cuando
+    # el supervisor quiere asignar el tramite a una persona especifica segun
+    # sus horarios/carga. Si es NULL, el tramite es responsabilidad colectiva
+    # de la dependencia.
+    empleado_id = Column(
+        Integer, ForeignKey("empleados.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    empleado = relationship("Empleado", foreign_keys=[empleado_id])
+
     # Resolución
     respuesta = Column(Text, nullable=True)
     observaciones = Column(Text, nullable=True)

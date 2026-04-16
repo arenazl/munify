@@ -164,6 +164,7 @@ class SolicitudResponse(BaseModel):
     direccion_solicitante: Optional[str] = None
     municipio_dependencia_id: Optional[int] = None
     dependencia_asignada: Optional[DependenciaAsignadaSimple] = None
+    empleado_id: Optional[int] = None
     prioridad: int = 3
     respuesta: Optional[str] = None
     observaciones: Optional[str] = None
@@ -194,6 +195,7 @@ class SolicitudGestionResponse(BaseModel):
     direccion_solicitante: Optional[str] = None
     municipio_dependencia_id: Optional[int] = None
     dependencia_asignada: Optional[DependenciaAsignadaSimple] = None
+    empleado_id: Optional[int] = None
     prioridad: int = 3
     respuesta: Optional[str] = None
     observaciones: Optional[str] = None

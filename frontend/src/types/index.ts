@@ -293,6 +293,7 @@ export interface Solicitud {
     color?: string;
     icono?: string;
   };
+  empleado_id?: number | null;
   prioridad: number;
   respuesta?: string;
   observaciones?: string;
