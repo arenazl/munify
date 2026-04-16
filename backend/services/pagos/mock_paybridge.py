@@ -32,15 +32,13 @@ class MockPayBridgeProvider(GatewayPagoProvider):
         sesion_id: str,
         return_url: str,
     ) -> CrearSesionResponse:
-        # En un provider real, acá haríamos POST a su API. Como es mock,
-        # generamos ID local y devolvemos el URL de nuestro checkout propio.
+        # En un provider real haríamos POST a su API y nos devolveria un URL
+        # absoluto tipo 'https://checkout.gire.com/sess/...'. Como el mock es
+        # nuestro propio frontend, devolvemos el PATH relativo — el browser
+        # lo resuelve contra el origin actual (local/preview/prod sin tocar
+        # env vars).
         external_id = f"PB-{token_hex(8).upper()}"
-
-        # El checkout del "gateway externo" en realidad es una página servida
-        # por el propio frontend de Munify, pero visualmente aparenta ser otra
-        # plataforma (branding PayBridge, URL /pago/checkout/...).
-        base = getattr(settings, "FRONTEND_URL", "https://app.munify.com.ar").rstrip("/")
-        checkout_url = f"{base}/pago/checkout/{sesion_id}"
+        checkout_url = f"/pago/checkout/{sesion_id}"
 
         return CrearSesionResponse(
             external_id=external_id,
