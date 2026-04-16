@@ -165,7 +165,7 @@ export function ChatWidget() {
       .replace(/<ol style="margin:8px 0;padding-left:20px">/g, `<ol style="margin:8px 0;padding-left:20px;color:${theme.text}">`)
       .replace(/<ul style="margin:8px 0;padding-left:20px">/g, `<ul style="margin:8px 0;padding-left:20px;color:${theme.text}">`);
   };
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>(chatCache.messages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -273,28 +273,6 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Botón flotante - esquina inferior derecha */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className={`
-          w-14 h-14 rounded-full
-          flex items-center justify-center
-          shadow-lg transition-all duration-300
-          hover:scale-110 active:scale-95
-          ${isOpen ? 'opacity-0 pointer-events-none scale-0' : 'opacity-100 scale-100'}
-        `}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          zIndex: 9999,
-          background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-          boxShadow: `0 4px 20px ${theme.primary}50`
-        }}
-      >
-        <MessageCircle className="h-6 w-6" style={{ color: theme.primaryText }} />
-      </button>
-
       {/* Backdrop oscuro (solo cuando está maximizado) */}
       {isOpen && isMaximized && (
         <div
@@ -304,13 +282,12 @@ export function ChatWidget() {
         />
       )}
 
-      {/* Modal de chat */}
+      {/* Chat footer / modal */}
       <div
         className={`
           flex flex-col overflow-hidden
           ${isMaximized ? 'rounded-2xl shadow-2xl' : ''}
-          transition-opacity duration-200
-          ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+          transition-all duration-300 ease-out
         `}
         style={{
           position: 'fixed',
@@ -323,26 +300,27 @@ export function ChatWidget() {
             height: 'min(700px, 85vh)',
             borderRadius: '16px',
           } : {
-            // Sidebar derecho permanente — integrado, sin sombra ni bordes redondeados
-            top: '0',
+            // Footer fijo: ancho = main area (sin sidebar nav), altura = 72px colapsado / 480px expandido
+            bottom: '0',
+            left: 'var(--sidebar-width, 0px)',
             right: '0',
-            width: '320px',
-            height: '100vh',
+            height: isOpen ? '480px' : '56px',
             borderRadius: '0',
           }),
           zIndex: 40,
           backgroundColor: theme.card,
-          borderLeft: !isMaximized ? `1px solid ${theme.border}` : undefined,
+          borderTop: !isMaximized ? `1px solid ${theme.border}` : undefined,
           border: isMaximized ? `1px solid ${theme.border}` : undefined,
-          boxShadow: isMaximized ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : undefined
+          boxShadow: isMaximized ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : `0 -4px 12px rgba(0, 0, 0, 0.08)`
         }}
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+          className="flex items-center justify-between px-4 py-3 flex-shrink-0 cursor-pointer select-none"
           style={{
             background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
           }}
+          onClick={() => !isMaximized && setIsOpen(!isOpen)}
         >
           <div className="flex items-center gap-2" style={{ color: theme.primaryText }}>
             {canUseDataAssistant ? <Database className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
@@ -350,7 +328,7 @@ export function ChatWidget() {
               {isMaximized && canUseDataAssistant ? 'Panel de Consultas' : canUseDataAssistant ? 'Asistente con Datos' : 'Asistente Municipal'}
             </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {/* Botón maximizar/minimizar (solo para usuarios con datos) */}
             {canUseDataAssistant && (
               <button
@@ -362,13 +340,27 @@ export function ChatWidget() {
                 {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
               </button>
             )}
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
-              style={{ color: theme.primaryText }}
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {/* Toggle expand/collapse del footer */}
+            {!isMaximized && (
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
+                style={{ color: theme.primaryText }}
+                title={isOpen ? 'Colapsar' : 'Expandir'}
+              >
+                {isOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}
+              </button>
+            )}
+            {/* Cerrar (solo en maximizado) */}
+            {isMaximized && (
+              <button
+                onClick={() => setIsMaximized(false)}
+                className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
+                style={{ color: theme.primaryText }}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
 
