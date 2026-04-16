@@ -24,6 +24,9 @@ interface Props {
   asVecino?: boolean;
   /** Callback al cambiar verificación/upload, para que el caller refresque la solicitud */
   onChange?: () => void;
+  /** Callback que expone el estado del checklist (lo usa el caller para
+   *  mostrar/ocultar el boton "Enviar documentos a revision", por ejemplo). */
+  onDataChange?: (data: ChecklistDocumentos) => void;
 }
 
 /**
@@ -45,7 +48,7 @@ interface Props {
  * Mientras quede algún documento obligatorio sin verificar, el backend bloquea
  * la transición `recibido → en_curso` con un 400.
  */
-export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false, asVecino = false, onChange }: Props) {
+export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false, asVecino = false, onChange, onDataChange }: Props) {
   const { theme } = useTheme();
   const [data, setData] = useState<ChecklistDocumentos | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +65,7 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
     try {
       const res = await tramitesApi.getChecklistDocumentos(solicitudId);
       setData(res.data);
+      onDataChange?.(res.data);
     } catch (err) {
       console.error('Error cargando checklist', err);
     } finally {

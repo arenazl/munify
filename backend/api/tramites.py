@@ -115,6 +115,42 @@ async def enviar_notificacion_cambio_estado_solicitud(db, solicitud, estado_ante
         logger.warning(f"[PUSH] Error notificando cambio de estado: {e}")
 
 
+async def _todos_obligatorios_subidos(db: AsyncSession, solicitud: Solicitud) -> bool:
+    """True si todos los documentos obligatorios del tramite tienen archivo
+    subido (aunque todavia no esten verificados por el supervisor)."""
+    if not solicitud.tramite_id:
+        return False
+    req_q = await db.execute(
+        select(TramiteDocumentoRequerido).where(
+            TramiteDocumentoRequerido.tramite_id == solicitud.tramite_id,
+            TramiteDocumentoRequerido.obligatorio == True,
+        )
+    )
+    requeridos = req_q.scalars().all()
+    if not requeridos:
+        return False
+    docs_q = await db.execute(
+        select(DocumentoSolicitud.tramite_documento_requerido_id).where(
+            DocumentoSolicitud.solicitud_id == solicitud.id,
+            DocumentoSolicitud.tramite_documento_requerido_id.is_not(None),
+        )
+    )
+    ids_subidos = {row[0] for row in docs_q.all()}
+    return all(r.id in ids_subidos for r in requeridos)
+
+
+async def _ya_envio_documentos_revision(db: AsyncSession, solicitud_id: int) -> bool:
+    """True si existe una entrada de historial 'Documentos enviados' para
+    esta solicitud. Usado para evitar reenvios duplicados."""
+    q = await db.execute(
+        select(HistorialSolicitud).where(
+            HistorialSolicitud.solicitud_id == solicitud_id,
+            HistorialSolicitud.accion == "Documentos enviados para revisión",
+        ).limit(1)
+    )
+    return q.scalar_one_or_none() is not None
+
+
 async def _todos_obligatorios_verificados(db: AsyncSession, solicitud: Solicitud) -> bool:
     """True si todos los documentos obligatorios de la solicitud están verificados."""
     if not solicitud.tramite_id:
@@ -1249,6 +1285,18 @@ async def get_checklist_documentos(
     total_obligatorios_verif = sum(
         1 for it in items if it.obligatorio and it.verificado
     )
+    total_obligatorios_subidos = sum(
+        1 for it in items if it.obligatorio and it.documento_id is not None
+    )
+
+    # Chequear si el vecino ya disparo el envio a revision (entrada en historial).
+    envio_q = await db.execute(
+        select(HistorialSolicitud).where(
+            HistorialSolicitud.solicitud_id == solicitud_id,
+            HistorialSolicitud.accion == "Documentos enviados para revisión",
+        ).order_by(HistorialSolicitud.created_at.desc()).limit(1)
+    )
+    envio_entry = envio_q.scalar_one_or_none()
 
     return ChecklistDocumentosResponse(
         solicitud_id=solicitud_id,
@@ -1256,6 +1304,9 @@ async def get_checklist_documentos(
         todos_verificados=(total_obligatorios == total_obligatorios_verif),
         total_obligatorios=total_obligatorios,
         total_obligatorios_verificados=total_obligatorios_verif,
+        total_obligatorios_subidos=total_obligatorios_subidos,
+        documentos_enviados_revision=envio_entry is not None,
+        fecha_envio_revision=envio_entry.created_at if envio_entry else None,
     )
 
 
@@ -1407,6 +1458,59 @@ async def verificar_visual_sin_archivo(
         "tramite_documento_requerido_id": requerido_id,
         "tipo": doc_tipo,
         "auto_transicion_a_en_curso": auto,
+    }
+
+
+@router.post("/solicitudes/{solicitud_id}/enviar-documentos")
+async def enviar_documentos_a_revision(
+    solicitud_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    El vecino marca que ya subio todos los documentos obligatorios y quiere
+    que la dependencia los revise. Deja rastro en historial + notifica al
+    supervisor. NO cambia el estado (sigue en RECIBIDO hasta que el sup
+    verifique los docs y el sistema auto-transicione a EN_CURSO).
+    """
+    sol_q = await db.execute(select(Solicitud).where(Solicitud.id == solicitud_id))
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Solo el solicitante (o admin) puede marcar envio.
+    if current_user.rol == RolUsuario.VECINO and solicitud.solicitante_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No podés enviar documentos de una solicitud ajena")
+
+    if await _ya_envio_documentos_revision(db, solicitud_id):
+        raise HTTPException(status_code=400, detail="Ya enviaste los documentos para revisión")
+
+    if not await _todos_obligatorios_subidos(db, solicitud):
+        raise HTTPException(
+            status_code=400,
+            detail="Faltan documentos obligatorios por subir antes de enviar a revisión",
+        )
+
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud.id,
+        usuario_id=current_user.id,
+        estado_anterior=solicitud.estado,
+        estado_nuevo=solicitud.estado,
+        accion="Documentos enviados para revisión",
+        comentario="El vecino terminó de subir los documentos obligatorios.",
+    ))
+    await db.commit()
+
+    # Notificacion al supervisor (best-effort, no rompe si falla).
+    try:
+        from services.push_service import notificar_cambio_estado_solicitud
+        await notificar_cambio_estado_solicitud(db, solicitud, solicitud.estado, solicitud.estado)
+    except Exception as e:
+        logger.warning(f"[PUSH] Error notificando envio de docs: {e}")
+
+    return {
+        "message": "Documentos enviados para revisión",
+        "enviado_at": datetime.utcnow().isoformat(),
     }
 
 

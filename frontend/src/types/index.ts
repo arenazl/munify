@@ -355,6 +355,9 @@ export interface ChecklistDocumentos {
   todos_verificados: boolean;
   total_obligatorios: number;
   total_obligatorios_verificados: number;
+  total_obligatorios_subidos?: number;
+  documentos_enviados_revision?: boolean;
+  fecha_envio_revision?: string | null;
 }
 
 // =====================================================================

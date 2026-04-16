@@ -54,6 +54,8 @@ export default function MisTramites() {
   // Sheet states
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedTramite, setSelectedTramite] = useState<Solicitud | null>(null);
+  const [checklistData, setChecklistData] = useState<import('../types').ChecklistDocumentos | null>(null);
+  const [enviandoRevision, setEnviandoRevision] = useState(false);
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -154,12 +156,14 @@ export default function MisTramites() {
 
   const openViewSheet = (tramite: Solicitud) => {
     setSelectedTramite(tramite);
+    setChecklistData(null);  // evita mostrar data del tramite anterior mientras carga
     setSheetOpen(true);
   };
 
   const closeSheet = () => {
     setSheetOpen(false);
     setSelectedTramite(null);
+    setChecklistData(null);
   };
 
   // Orden de estados para ordenamiento (pendientes primero)
@@ -505,7 +509,32 @@ export default function MisTramites() {
             solicitudId={selectedTramite.id}
             asVecino={true}
             onChange={() => { /* opcional: refresh */ }}
+            onDataChange={setChecklistData}
           />
+
+          {/* Estado de envio a revision */}
+          {checklistData?.documentos_enviados_revision && (
+            <div
+              className="p-3 rounded-xl flex items-start gap-3 mt-3"
+              style={{
+                backgroundColor: '#10b98115',
+                border: '1px solid #10b98140',
+              }}
+            >
+              <span style={{ fontSize: 20 }}>📤</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: '#10b981' }}>
+                  Documentos enviados para revisión
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+                  {checklistData.fecha_envio_revision
+                    ? `Enviaste el ${new Date(checklistData.fecha_envio_revision).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}. `
+                    : ''}
+                  La dependencia te va a avisar cuando termine de revisar.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -833,19 +862,66 @@ export default function MisTramites() {
         title={`Trámite ${selectedTramite?.numero_tramite || ''}`}
         description={selectedTramite?.asunto}
         stickyFooter={
-          selectedTramite && (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(selectedTramite.numero_tramite);
-                toast.success('Número de trámite copiado');
-              }}
-              className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-            >
-              <Copy className="h-4 w-4" />
-              Copiar Número de Trámite
-            </button>
-          )
+          selectedTramite && (() => {
+            const puedeEnviarRevision =
+              checklistData &&
+              user?.rol === 'vecino' &&
+              checklistData.total_obligatorios > 0 &&
+              (checklistData.total_obligatorios_subidos ?? 0) >= checklistData.total_obligatorios &&
+              !checklistData.documentos_enviados_revision;
+
+            const enviarRevision = async () => {
+              if (!selectedTramite) return;
+              setEnviandoRevision(true);
+              try {
+                await tramitesApi.enviarDocumentosARevision(selectedTramite.id);
+                toast.success('Documentos enviados a la dependencia para revisión');
+                // Refrescar checklist para actualizar el estado de envío.
+                const res = await tramitesApi.getChecklistDocumentos(selectedTramite.id);
+                setChecklistData(res.data);
+                loadTramites();
+              } catch (err: unknown) {
+                const e = err as { response?: { data?: { detail?: string } } };
+                toast.error(e.response?.data?.detail || 'No se pudo enviar a revisión');
+              } finally {
+                setEnviandoRevision(false);
+              }
+            };
+
+            return (
+              <div className="space-y-2">
+                {puedeEnviarRevision && (
+                  <button
+                    onClick={enviarRevision}
+                    disabled={enviandoRevision}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
+                      color: '#ffffff',
+                      boxShadow: `0 8px 24px ${theme.primary}40`,
+                    }}
+                  >
+                    📤 {enviandoRevision ? 'Enviando…' : 'Enviar documentos a revisión'}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedTramite.numero_tramite);
+                    toast.success('Número de trámite copiado');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-sm transition-all duration-200 hover:scale-[1.01] active:scale-95"
+                  style={{
+                    backgroundColor: `${theme.primary}15`,
+                    color: theme.primary,
+                    border: `1px solid ${theme.primary}30`,
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                  Copiar Número de Trámite
+                </button>
+              </div>
+            );
+          })()
         }
       >
         {renderViewContent()}

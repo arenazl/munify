@@ -1206,6 +1206,12 @@ export const tramitesApi = {
    */
   verificarSinArchivo: (solicitudId: number, requeridoId: number) =>
     api.post(`/tramites/solicitudes/${solicitudId}/requeridos/${requeridoId}/verificar-visual`),
+  /**
+   * El vecino indica que termino de subir los documentos y quiere que la
+   * dependencia los revise. Deja rastro en historial + notifica al supervisor.
+   */
+  enviarDocumentosARevision: (solicitudId: number) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/enviar-documentos`),
 
   // ----- Aliases retrocompat (a borrar progresivamente) -----
   // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites

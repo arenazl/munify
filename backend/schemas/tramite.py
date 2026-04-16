@@ -247,3 +247,9 @@ class ChecklistDocumentosResponse(BaseModel):
     todos_verificados: bool
     total_obligatorios: int
     total_obligatorios_verificados: int
+    # Cuantos obligatorios tienen archivo subido (puede ser > verificados
+    # si el vecino subio pero el supervisor todavia no tildo).
+    total_obligatorios_subidos: int = 0
+    # True cuando el vecino ya hizo click en "Enviar documentos a revisión".
+    documentos_enviados_revision: bool = False
+    fecha_envio_revision: Optional[datetime] = None
