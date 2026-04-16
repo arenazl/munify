@@ -301,11 +301,11 @@ export function ChatWidget() {
             height: 'min(700px, 85vh)',
             borderRadius: '16px',
           } : {
-            // Footer: slim colapsado (36px, hover +20%), expandido 480px
-            bottom: '0',
-            left: 'var(--sidebar-width, 0px)',
+            // Sidebar derecho slim: 40px colapsado, 320px al hover o click
+            top: '0',
             right: '0',
-            height: isOpen ? '480px' : (isHovered ? '44px' : '36px'),
+            width: (isOpen || isHovered) ? '320px' : '40px',
+            height: '100vh',
             borderRadius: '0',
           }),
           zIndex: 40,
@@ -314,77 +314,81 @@ export function ChatWidget() {
           border: isMaximized ? `1px solid ${theme.border}` : undefined,
           boxShadow: isMaximized ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : `0 -4px 12px rgba(0, 0, 0, 0.06)`
         }}
-        onMouseEnter={() => !isMaximized && !isOpen && setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={() => !isMaximized && setIsHovered(true)}
+        onMouseLeave={() => !isOpen && setIsHovered(false)}
       >
-        {/* Header - moderno, slim cuando está colapsado */}
-        <div
-          className="flex items-center justify-between flex-shrink-0 cursor-pointer select-none transition-all duration-200"
-          style={{
-            padding: isOpen || isMaximized ? '10px 16px' : '6px 14px',
-            background: isOpen || isMaximized
-              ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
-              : theme.backgroundSecondary,
-            borderBottom: isOpen || isMaximized ? 'none' : `1px solid ${theme.border}`,
-          }}
-          onClick={() => !isMaximized && setIsOpen(!isOpen)}
-        >
+        {/* Rail slim colapsado (cuando NO está expandido ni maximizado) */}
+        {!isOpen && !isHovered && !isMaximized && (
           <div
-            className="flex items-center gap-2 transition-all duration-200"
-            style={{
-              color: isOpen || isMaximized ? theme.primaryText : theme.textSecondary,
-              fontSize: isOpen || isMaximized ? '14px' : '12px',
-            }}
+            className="flex flex-col items-center justify-center gap-3 flex-1 cursor-pointer select-none"
+            style={{ color: theme.textSecondary }}
           >
-            {canUseDataAssistant
-              ? <Database className={isOpen || isMaximized ? "h-5 w-5" : "h-3.5 w-3.5"} />
-              : <Bot className={isOpen || isMaximized ? "h-5 w-5" : "h-3.5 w-3.5"} />}
-            <span className="font-semibold tracking-tight">
-              {isMaximized && canUseDataAssistant ? 'Panel de Consultas' : canUseDataAssistant ? 'Asistente con Datos' : 'Asistente Municipal'}
+            {canUseDataAssistant ? <Database className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+            <span
+              className="text-[11px] font-medium tracking-wide"
+              style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                color: theme.textSecondary,
+              }}
+            >
+              {canUseDataAssistant ? 'Asistente con Datos' : 'Asistente'}
             </span>
-            {!isOpen && !isMaximized && (
-              <span className="text-[10px] opacity-60 font-normal ml-1">
-                · click para abrir
+          </div>
+        )}
+
+        {/* Header completo (solo cuando expandido o maximizado) */}
+        {(isOpen || isHovered || isMaximized) && (
+          <div
+            className="flex items-center justify-between flex-shrink-0 cursor-pointer select-none"
+            style={{
+              padding: '10px 16px',
+              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+            }}
+            onClick={() => !isMaximized && setIsOpen(!isOpen)}
+          >
+            <div className="flex items-center gap-2" style={{ color: theme.primaryText }}>
+              {canUseDataAssistant ? <Database className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
+              <span className="font-semibold text-sm">
+                {isMaximized && canUseDataAssistant ? 'Panel de Consultas' : canUseDataAssistant ? 'Asistente con Datos' : 'Asistente Municipal'}
               </span>
-            )}
+            </div>
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              {/* Botón maximizar */}
+              {canUseDataAssistant && (
+                <button
+                  onClick={() => setIsMaximized(!isMaximized)}
+                  className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
+                  style={{ color: theme.primaryText }}
+                  title={isMaximized ? 'Minimizar' : 'Maximizar panel'}
+                >
+                  {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+              )}
+              {/* Pin/Unpin - si está fijo muestra X para desfijar */}
+              {!isMaximized && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+                  className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
+                  style={{ color: theme.primaryText }}
+                  title={isOpen ? 'Desfijar (se oculta al salir)' : 'Fijar abierto'}
+                >
+                  {isOpen ? <X className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </button>
+              )}
+              {/* Cerrar maximizado */}
+              {isMaximized && (
+                <button
+                  onClick={() => setIsMaximized(false)}
+                  className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
+                  style={{ color: theme.primaryText }}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            {/* Botón maximizar/minimizar (solo para usuarios con datos y cuando está expandido) */}
-            {canUseDataAssistant && (isOpen || isMaximized) && (
-              <button
-                onClick={() => setIsMaximized(!isMaximized)}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
-                style={{ color: theme.primaryText }}
-                title={isMaximized ? 'Minimizar' : 'Maximizar panel'}
-              >
-                {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              </button>
-            )}
-            {/* Toggle expand/collapse del footer */}
-            {!isMaximized && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-                className="p-1 rounded-md transition-colors hover:bg-black/10"
-                style={{
-                  color: isOpen ? theme.primaryText : theme.textSecondary,
-                }}
-                title={isOpen ? 'Colapsar' : 'Expandir'}
-              >
-                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              </button>
-            )}
-            {/* Cerrar (solo en maximizado) */}
-            {isMaximized && (
-              <button
-                onClick={() => setIsMaximized(false)}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
-                style={{ color: theme.primaryText }}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Contenido principal - layout diferente según maximizado */}
         <div className={`flex-1 flex ${isMaximized ? 'flex-row' : 'flex-col'} overflow-hidden`}>
