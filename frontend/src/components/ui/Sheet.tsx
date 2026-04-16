@@ -2,6 +2,22 @@ import { X } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { MobilePageHeader } from './MobilePageHeader';
+
+// Altura de la topbar mobile del Layout principal (px). El Sheet en mobile
+// arranca debajo para que la topbar del muni siempre quede visible.
+const TOPBAR_MOBILE_HEIGHT = 56;
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
+  );
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return isMobile;
+};
 
 interface SheetProps {
   open: boolean;
@@ -16,6 +32,8 @@ interface SheetProps {
 
 export function Sheet({ open, onClose, title, description, children, footer, stickyFooter, stickyHeader }: SheetProps) {
   const { theme } = useTheme();
+  const isMobile = useIsMobile();
+  const topOffset = isMobile ? TOPBAR_MOBILE_HEIGHT : 0;
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
 
@@ -43,12 +61,12 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
   // Usar portal para renderizar fuera del DOM normal y evitar problemas de contexto de posicionamiento
   const sheetContent = (
     <>
-      {/* Backdrop con fade y blur */}
+      {/* Backdrop con fade y blur — en mobile respeta la topbar del Layout */}
       <div
         className="sheet-backdrop"
         style={{
           position: 'fixed',
-          top: 0,
+          top: topOffset,
           left: 0,
           right: 0,
           bottom: 0,
@@ -61,12 +79,12 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         onClick={onClose}
       />
 
-      {/* Side Panel - dockeado al lado derecho, 100% del viewport */}
+      {/* Side Panel — en mobile arranca debajo de la topbar (56px) */}
       <div
         className="sheet-panel"
         style={{
           position: 'fixed',
-          top: 0,
+          top: topOffset,
           right: 0,
           bottom: 0,
           zIndex: 9999,
@@ -100,12 +118,10 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           }}
         />
 
-        {/* Header con animación de entrada */}
+        {/* Header estandar: en mobile usa MobilePageHeader (← volver + titulo),
+           en desktop mantiene el X a la derecha. */}
         <div
-          className="flex items-center justify-between px-6 py-4"
           style={{
-            borderBottom: `1px solid ${theme.border}`,
-            backgroundColor: `${theme.background}cc`,
             transform: isVisible ? 'translateX(0)' : 'translateX(20px)',
             opacity: isVisible ? 1 : 0,
             transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -113,24 +129,36 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
             flexShrink: 0,
           }}
         >
-          <div>
-            <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
-              {title}
-            </h2>
-            {description && (
-              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-                {description}
-              </p>
-            )}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg transition-all duration-200 hover:scale-110 hover:rotate-90 active:scale-95 relative overflow-hidden group"
-            style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}
-          >
-            <span className="absolute inset-0 bg-red-500/20 scale-0 group-hover:scale-100 transition-transform duration-200 rounded-lg" />
-            <X className="h-5 w-5 relative z-10 group-hover:text-red-500 transition-colors duration-200" />
-          </button>
+          {isMobile ? (
+            <MobilePageHeader title={title} subtitle={description} onBack={onClose} />
+          ) : (
+            <div
+              className="flex items-center justify-between px-6 py-4"
+              style={{
+                borderBottom: `1px solid ${theme.border}`,
+                backgroundColor: `${theme.background}cc`,
+              }}
+            >
+              <div>
+                <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
+                  {title}
+                </h2>
+                {description && (
+                  <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                    {description}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-lg transition-all duration-200 hover:scale-110 hover:rotate-90 active:scale-95 relative overflow-hidden group"
+                style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary }}
+              >
+                <span className="absolute inset-0 bg-red-500/20 scale-0 group-hover:scale-100 transition-transform duration-200 rounded-lg" />
+                <X className="h-5 w-5 relative z-10 group-hover:text-red-500 transition-colors duration-200" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sticky Header adicional (ej: estado y categoría) */}
