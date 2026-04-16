@@ -127,6 +127,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // Modal de revisión de documentos (fullscreen viewer con aprobar/rechazar)
   const [reviewOpen, setReviewOpen] = useState(false);
   const [checklistData, setChecklistData] = useState<import('../types').ChecklistDocumentos | null>(null);
+  // Key para forzar remount del Checklist cuando el modal apruebe/rechace docs.
+  const [checklistVersion, setChecklistVersion] = useState(0);
 
   // Formulario de actualización
   const [nuevoEstado, setNuevoEstado] = useState<EstadoCanonico | ''>('');
@@ -1518,6 +1520,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 )}
               </div>
               <ChecklistDocumentosVerificacion
+                key={`${selectedTramite.id}-v${checklistVersion}`}
                 solicitudId={selectedTramite.id}
                 readOnly={user?.rol === 'vecino'}
                 onDataChange={setChecklistData}
@@ -2031,8 +2034,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           solicitudId={selectedTramite.id}
           items={checklistData.items}
           onChange={async () => {
-            // Recargar el checklist para que se vea el cambio de estado
-            // (verificado/rechazado) sin cerrar el modal.
+            // Remount del Checklist para que re-fetcheé y se vean los checks
+            // actualizados al cerrar el modal (antes el Checklist mantenía su
+            // state interno y el último aprobado quedaba "desync").
+            setChecklistVersion(v => v + 1);
             try {
               const res = await tramitesApi.getChecklistDocumentos(selectedTramite.id);
               setChecklistData(res.data);
