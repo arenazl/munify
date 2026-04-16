@@ -205,8 +205,7 @@ export function WizardModal({
         display: none !important;
       }
       .wizard-stepper {
-        flex-shrink: 1 !important;
-        overflow: hidden !important;
+        display: none !important;
       }
     }
     .wizard-main-layout {
