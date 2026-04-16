@@ -1220,9 +1220,7 @@ export default function Layout() {
                 <button
                   onClick={() => {
                     setCreateMenuOpen(false);
-                    // Vecinos usan /app/nuevo, admin/supervisor usan /gestion/crear-reclamo
-                    const isVecino = user?.rol === 'vecino';
-                    navigate(isVecino ? '/app/nuevo' : '/gestion/crear-reclamo');
+                    navigate('/gestion/crear-reclamo');
                   }}
                   className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
                   style={{
@@ -1246,9 +1244,7 @@ export default function Layout() {
                 <button
                   onClick={() => {
                     setCreateMenuOpen(false);
-                    // Vecinos usan /app/tramites/nuevo, admin/supervisor usan /gestion/crear-tramite
-                    const isVecino = user?.rol === 'vecino';
-                    navigate(isVecino ? '/app/tramites/nuevo' : '/gestion/crear-tramite');
+                    navigate('/gestion/crear-tramite');
                   }}
                   className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
                   style={{

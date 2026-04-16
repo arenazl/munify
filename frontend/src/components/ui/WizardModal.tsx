@@ -180,14 +180,18 @@ export function WizardModal({
         min-height: calc(100vh - 144px);
         border-radius: 0;
       }
+      .wizard-modal-backdrop {
+        top: 56px !important;
+      }
       .wizard-modal-container {
         padding: 0 !important;
+        top: 56px !important;
       }
       .wizard-modal-content {
         max-width: 100% !important;
         width: 100% !important;
-        height: 100vh !important;
-        max-height: 100vh !important;
+        height: calc(100vh - 56px) !important;
+        max-height: calc(100vh - 56px) !important;
         border-radius: 0 !important;
         border: none !important;
       }
