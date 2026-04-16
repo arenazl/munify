@@ -776,7 +776,7 @@ export default function Layout() {
           style={{
             color: theme.text,
             paddingTop: isMobile ? '64px' : undefined, // Espacio para el header sticky mobile
-            paddingBottom: isMobile ? '80px' : '72px', // 80px mobile (tab bar), 72px desktop (chat footer)
+            paddingBottom: isMobile ? '80px' : '48px', // 80px mobile (tab bar), 48px desktop (chat footer slim)
             zIndex: 1,
           }}
         >
