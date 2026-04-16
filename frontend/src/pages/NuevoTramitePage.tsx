@@ -5,11 +5,11 @@ export default function NuevoTramitePage() {
   const navigate = useNavigate();
 
   const handleClose = () => {
-    navigate('/app/mis-tramites');
+    navigate('/gestion/mis-tramites');
   };
 
   const handleSuccess = () => {
-    navigate('/app/mis-tramites');
+    navigate('/gestion/mis-tramites');
   };
 
   return (

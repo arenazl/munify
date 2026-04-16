@@ -770,49 +770,12 @@ async def seed_demo_completo(
     reclamos_creados = len(reclamos_creados_list)
     await db.flush()
 
-    # ------------------------------------------------------------------
-    # 9. 1 Solicitud de ejemplo
-    # ------------------------------------------------------------------
-    solicitud_creada = False
-    if tramites_creados:
-        year = datetime.now().year
-        prefix = f"SOL-{year}-"
-        max_q = await db.execute(
-            select(func.max(Solicitud.numero_tramite)).where(
-                Solicitud.numero_tramite.like(f"{prefix}%"),
-            )
-        )
-        max_numero = max_q.scalar()
-        if max_numero:
-            seq = int(max_numero.split("-")[-1])
-            numero = f"{prefix}{str(seq + 1).zfill(5)}"
-        else:
-            numero = f"{prefix}00001"
-
-        solicitud = Solicitud(
-            municipio_id=municipio_id,
-            numero_tramite=numero,
-            tramite_id=tramites_creados[0].id,
-            asunto=f"Solicitud: {tramites_creados[0].nombre}",
-            descripcion="Solicitud de ejemplo creada con la demo.",
-            estado=EstadoSolicitud.RECIBIDO,
-            solicitante_id=vecino_demo.id,
-            nombre_solicitante="Vecino",
-            apellido_solicitante="Demo",
-            email_solicitante=f"vecino@{codigo}.demo.com",
-            prioridad=3,
-        )
-        db.add(solicitud)
-        await db.flush()
-
-        db.add(HistorialSolicitud(
-            solicitud_id=solicitud.id,
-            usuario_id=vecino_demo.id,
-            estado_nuevo=EstadoSolicitud.RECIBIDO,
-            accion="Solicitud creada",
-            comentario=f"Trámite: {tramites_creados[0].nombre}",
-        ))
-        solicitud_creada = True
+    # 9. Solicitudes de ejemplo: NO se crean.
+    # El catalogo de tramites (Licencia de conducir, etc) queda disponible
+    # para que en la presentacion el vecino los inicie el mismo. Si creamos
+    # una solicitud pre-hecha, el vecino aparece con un "Licencia en curso"
+    # apenas se loguea, y al tratar de sacar otra licencia veria dos iguales
+    # (confuso para la demo).
 
     return {
         "dependencias": len(muni_deps),
@@ -824,5 +787,5 @@ async def seed_demo_completo(
         "cuadrillas": len(cuadrillas),
         "sla_configs": sla_count,
         "reclamos": reclamos_creados,
-        "solicitudes": 1 if solicitud_creada else 0,
+        "solicitudes": 0,
     }

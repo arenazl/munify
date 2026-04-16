@@ -16,13 +16,12 @@ export default function NuevoReclamoPage() {
   const navigate = useNavigate();
 
   const handleClose = () => {
-    // Si el vecino cierra sin confirmar, volvemos al listado de sus reclamos.
-    navigate('/app/mis-reclamos');
+    // Volvemos al listado dentro del Layout (con topbar).
+    navigate('/gestion/mis-reclamos');
   };
 
   const handleSuccess = () => {
-    // Después de crear, lo llevamos a su listado de reclamos.
-    navigate('/app/mis-reclamos');
+    navigate('/gestion/mis-reclamos');
   };
 
   return (
