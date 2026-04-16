@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -795,14 +796,14 @@ export default function Layout() {
                   <Palette className="h-4 w-4" strokeWidth={3} />
                 </button>
 
-                {themeMenuOpen && (
+                {themeMenuOpen && createPortal(
                   <>
                     <div
                       className="fixed inset-0 z-[60]"
                       onClick={() => setThemeMenuOpen(false)}
                     />
                     <div
-                      className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-2xl z-[70] theme-dropdown-enter"
+                      className="fixed right-3 top-14 lg:right-6 w-80 max-w-[calc(100vw-1.5rem)] rounded-xl shadow-2xl z-[70] theme-dropdown-enter"
                       style={{
                         backgroundColor: theme.card,
                         border: `1px solid ${theme.border}`,
@@ -1041,7 +1042,8 @@ export default function Layout() {
                         </div>
                       )}
                     </div>
-                  </>
+                  </>,
+                  document.body
                 )}
               </div>
 
