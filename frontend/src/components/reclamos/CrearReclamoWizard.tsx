@@ -13,6 +13,8 @@ import {
   User,
   UserCheck,
   History,
+  Camera,
+  X as XIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -122,6 +124,11 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   const [form, setForm] = useState<ReclamoForm>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Foto opcional del problema. Si el vecino adjunta una imagen, se sube a
+  // Cloudinary despues de crear el reclamo (etapa='creacion').
+  const [fotoFile, setFotoFile] = useState<File | null>(null);
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null);
+
   // ============ Estado de la clasificación con IA ============
   const [sugerencias, setSugerencias] = useState<SugerenciaIA[]>([]);
   const [clasificando, setClasificando] = useState(false);
@@ -175,6 +182,9 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       setSugerencias([]);
       setMostrarGridCategorias(false);
       setVecinoExistente(null);
+      setFotoFile(null);
+      if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+      setFotoPreview(null);
       dniUltimoBuscado.current = '';
       cacheRef.current.clear();
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -419,6 +429,16 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         payload.telefono_solicitante = form.telefono_solicitante.trim() || undefined;
       }
       const res = await reclamosApi.create(payload);
+      // Si el vecino adjunto una foto, la subimos ahora. Si falla la foto
+      // no rompemos el flow — el reclamo ya se creo bien.
+      if (fotoFile) {
+        try {
+          await reclamosApi.upload(res.data.id, fotoFile, 'creacion');
+        } catch (uploadErr) {
+          console.error('Error subiendo foto (reclamo creado igual)', uploadErr);
+          toast.warning('Reclamo creado, pero no se pudo subir la foto. Agregala después.');
+        }
+      }
       toast.success('Reclamo creado correctamente', { duration: 4000 });
       onSuccess?.(res.data);
       onClose();
@@ -759,6 +779,117 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   );
 
   // ============================================================
+  // Step Foto (opcional): sacar o elegir una imagen del problema.
+  // ============================================================
+  const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) {
+      toast.error('La foto pesa más de 10MB');
+      return;
+    }
+    if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+    setFotoFile(f);
+    setFotoPreview(URL.createObjectURL(f));
+  };
+
+  const handleFotoQuitar = () => {
+    if (fotoPreview) URL.revokeObjectURL(fotoPreview);
+    setFotoFile(null);
+    setFotoPreview(null);
+  };
+
+  const fotoStepContent = (
+    <div className="space-y-4">
+      <div
+        className="p-3 rounded-xl flex items-start gap-2"
+        style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+      >
+        <Camera className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
+        <p className="text-xs" style={{ color: theme.text }}>
+          Una imagen ayuda al municipio a entender el problema.
+          <span className="block mt-0.5" style={{ color: theme.textSecondary }}>
+            Es opcional — podés subirla después también.
+          </span>
+        </p>
+      </div>
+
+      {fotoPreview ? (
+        <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${theme.border}` }}>
+          <img
+            src={fotoPreview}
+            alt="Foto del reclamo"
+            className="w-full object-cover"
+            style={{ maxHeight: 360 }}
+          />
+          <button
+            type="button"
+            onClick={handleFotoQuitar}
+            className="absolute top-2 right-2 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+            aria-label="Quitar foto"
+          >
+            <XIcon className="h-5 w-5" />
+          </button>
+          <div
+            className="absolute bottom-0 left-0 right-0 px-3 py-1.5 text-xs truncate"
+            style={{ backgroundColor: 'rgba(0,0,0,0.65)', color: '#fff' }}
+          >
+            {fotoFile?.name} · {fotoFile ? (fotoFile.size / 1024 / 1024).toFixed(1) : 0} MB
+          </div>
+        </div>
+      ) : (
+        <>
+          <label
+            htmlFor="foto-camara"
+            className="flex flex-col items-center justify-center p-8 rounded-xl cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+            style={{
+              background: `linear-gradient(135deg, ${theme.primary}15 0%, ${theme.backgroundSecondary} 80%)`,
+              border: `2px dashed ${theme.primary}60`,
+            }}
+          >
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2"
+              style={{ background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`, boxShadow: `0 6px 16px ${theme.primary}40` }}
+            >
+              <Camera className="h-7 w-7 text-white" />
+            </div>
+            <p className="text-sm font-semibold" style={{ color: theme.text }}>Sacar foto</p>
+            <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>Usar cámara del teléfono</p>
+          </label>
+          <input
+            id="foto-camara"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFotoChange}
+          />
+
+          <label
+            htmlFor="foto-galeria"
+            className="flex items-center justify-center gap-2 p-3 rounded-xl cursor-pointer text-sm font-medium transition-all hover:scale-[1.01]"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${theme.border}`,
+              color: theme.text,
+            }}
+          >
+            Elegir de galería
+          </label>
+          <input
+            id="foto-galeria"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFotoChange}
+          />
+        </>
+      )}
+    </div>
+  );
+
+  // ============================================================
   // Step 4: Confirmación
   // ============================================================
 
@@ -805,6 +936,17 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               <p className="text-[10px] uppercase flex items-center gap-1"><MessageSquare className="h-3 w-3" /> Descripción</p>
               <p style={{ color: theme.text }} className="whitespace-pre-wrap">{form.descripcion}</p>
             </div>
+            {fotoPreview && (
+              <div>
+                <p className="text-[10px] uppercase flex items-center gap-1"><Camera className="h-3 w-3" /> Foto</p>
+                <img
+                  src={fotoPreview}
+                  alt="Vista previa"
+                  className="mt-1 rounded-lg w-full object-cover"
+                  style={{ maxHeight: 200, border: `1px solid ${theme.border}` }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1029,6 +1171,14 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       isValid:
         form.titulo.trim().length >= 5 &&
         form.descripcion.trim().length >= 10,
+    },
+    {
+      id: 'foto',
+      title: 'Foto',
+      description: 'Opcional — una imagen del problema',
+      icon: <Camera className="h-4 w-4" />,
+      content: fotoStepContent,
+      isValid: true,  // paso opcional, siempre valido
     },
     {
       id: 'confirmar',
