@@ -3,7 +3,7 @@ import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Database, Maxi
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { chatApi } from '../lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { parseMarkdown } from './parseMarkdown';
 import { Modal } from './ui/Modal';
 
@@ -86,10 +86,49 @@ const iconMap: Record<string, React.ReactNode> = {
   'star': <Star className="h-4 w-4" />,
 };
 
+// Sugerencias rápidas según la ruta actual
+const getQuickPromptsForRoute = (pathname: string): string[] => {
+  if (pathname.includes('/reclamos')) {
+    return [
+      '¿Cuántos reclamos pendientes hay?',
+      'Reclamos más atrasados',
+      'Reclamos de esta semana por categoría',
+    ];
+  }
+  if (pathname.includes('/tramites') || pathname.includes('/solicitudes')) {
+    return [
+      '¿Cuántos trámites activos hay?',
+      'Trámites pendientes por tipo',
+      'Solicitudes de esta semana',
+    ];
+  }
+  if (pathname.includes('/empleados')) {
+    return [
+      'Top 5 empleados con más reclamos resueltos',
+      'Carga de trabajo por empleado',
+      'Empleados activos',
+    ];
+  }
+  if (pathname.includes('/dashboard') || pathname === '/' || pathname.includes('/gestion')) {
+    return [
+      'Resumen de reclamos por estado',
+      '¿Cuántos vecinos tenemos?',
+      'Trámites pendientes esta semana',
+    ];
+  }
+  return [
+    '¿Cuántos reclamos hay?',
+    'Resumen general',
+    'Top categorías',
+  ];
+};
+
 export function ChatWidget() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const quickPrompts = getQuickPromptsForRoute(location.pathname);
 
   // Determinar si puede usar el asistente con datos (gestores)
   // Automáticamente activado para supervisores/admins
@@ -126,7 +165,7 @@ export function ChatWidget() {
       .replace(/<ol style="margin:8px 0;padding-left:20px">/g, `<ol style="margin:8px 0;padding-left:20px;color:${theme.text}">`)
       .replace(/<ul style="margin:8px 0;padding-left:20px">/g, `<ul style="margin:8px 0;padding-left:20px;color:${theme.text}">`);
   };
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>(chatCache.messages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -268,10 +307,10 @@ export function ChatWidget() {
       {/* Modal de chat */}
       <div
         className={`
-          rounded-2xl shadow-2xl
           flex flex-col overflow-hidden
-          transition-all duration-300 ease-out
-          ${isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none'}
+          ${isMaximized ? 'rounded-2xl shadow-2xl' : ''}
+          transition-opacity duration-200
+          ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}
         `}
         style={{
           position: 'fixed',
@@ -284,16 +323,17 @@ export function ChatWidget() {
             height: 'min(700px, 85vh)',
             borderRadius: '16px',
           } : {
-            // Estilo chat flotante
-            bottom: '24px',
-            right: '24px',
-            width: '384px',
-            height: '500px',
-            borderRadius: '16px',
+            // Sidebar derecho permanente — integrado, sin sombra ni bordes redondeados
+            top: '0',
+            right: '0',
+            width: '320px',
+            height: '100vh',
+            borderRadius: '0',
           }),
-          zIndex: 9999,
+          zIndex: 40,
           backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
+          borderLeft: !isMaximized ? `1px solid ${theme.border}` : undefined,
+          border: isMaximized ? `1px solid ${theme.border}` : undefined,
           boxShadow: isMaximized ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)' : undefined
         }}
       >
@@ -672,6 +712,32 @@ export function ChatWidget() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Sugerencias rápidas contextuales (sidebar mode, solo gestores) */}
+            {!isMaximized && canUseDataAssistant && messages.length === 0 && (
+              <div
+                className="px-3 py-2 flex flex-wrap gap-1.5 flex-shrink-0"
+                style={{ borderTop: `1px solid ${theme.border}` }}
+              >
+                <span className="w-full text-[10px] uppercase tracking-wide opacity-60" style={{ color: theme.textSecondary }}>
+                  Sugerencias para esta pantalla
+                </span>
+                {quickPrompts.map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setInput(q)}
+                    className="text-xs px-2.5 py-1 rounded-full transition-colors hover:opacity-80"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
               </div>
             )}
 
