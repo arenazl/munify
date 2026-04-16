@@ -337,56 +337,49 @@ export function ChatWidget() {
           </div>
         )}
 
-        {/* Header completo (solo cuando expandido o maximizado) */}
+        {/* Barra minimalista de controles (solo cuando expandido o maximizado) */}
         {(isOpen || isHovered || isMaximized) && (
           <div
-            className="flex items-center justify-between flex-shrink-0 cursor-pointer select-none"
+            className="flex items-center justify-end flex-shrink-0 gap-0.5 px-2 py-1.5"
             style={{
-              padding: '10px 16px',
-              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+              borderBottom: `1px solid ${theme.border}`,
+              backgroundColor: isMaximized
+                ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
+                : theme.backgroundSecondary,
             }}
-            onClick={() => !isMaximized && setIsOpen(!isOpen)}
           >
-            <div className="flex items-center gap-2" style={{ color: theme.primaryText }}>
-              {canUseDataAssistant ? <Database className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
-              <span className="font-semibold text-sm">
-                {isMaximized && canUseDataAssistant ? 'Panel de Consultas' : canUseDataAssistant ? 'Asistente con Datos' : 'Asistente Municipal'}
-              </span>
-            </div>
-            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-              {/* Botón maximizar */}
-              {canUseDataAssistant && (
-                <button
-                  onClick={() => setIsMaximized(!isMaximized)}
-                  className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
-                  style={{ color: theme.primaryText }}
-                  title={isMaximized ? 'Minimizar' : 'Maximizar panel'}
-                >
-                  {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                </button>
-              )}
-              {/* Pin/Unpin - si está fijo muestra X para desfijar */}
-              {!isMaximized && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
-                  className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
-                  style={{ color: theme.primaryText }}
-                  title={isOpen ? 'Desfijar (se oculta al salir)' : 'Fijar abierto'}
-                >
-                  {isOpen ? <X className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                </button>
-              )}
-              {/* Cerrar maximizado */}
-              {isMaximized && (
-                <button
-                  onClick={() => setIsMaximized(false)}
-                  className="p-1.5 rounded-lg transition-colors hover:bg-white/20"
-                  style={{ color: theme.primaryText }}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
-            </div>
+            {/* Botón maximizar */}
+            {canUseDataAssistant && (
+              <button
+                onClick={() => setIsMaximized(!isMaximized)}
+                className="p-1.5 rounded-md transition-colors hover:bg-black/10"
+                style={{ color: theme.textSecondary }}
+                title={isMaximized ? 'Minimizar' : 'Maximizar panel'}
+              >
+                {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {/* Pin/Unpin */}
+            {!isMaximized && (
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-1.5 rounded-md transition-colors hover:bg-black/10"
+                style={{ color: theme.textSecondary }}
+                title={isOpen ? 'Desfijar (se oculta al salir)' : 'Fijar abierto'}
+              >
+                {isOpen ? <X className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {/* Cerrar maximizado */}
+            {isMaximized && (
+              <button
+                onClick={() => setIsMaximized(false)}
+                className="p-1.5 rounded-md transition-colors hover:bg-black/10"
+                style={{ color: theme.textSecondary }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         )}
 
