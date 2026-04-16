@@ -1199,6 +1199,8 @@ export const tramitesApi = {
     api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/verificar`),
   desverificarDocumento: (solicitudId: number, documentoId: number) =>
     api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/desverificar`),
+  rechazarDocumento: (solicitudId: number, documentoId: number, motivo: string) =>
+    api.post(`/tramites/solicitudes/${solicitudId}/documentos/${documentoId}/rechazar`, { motivo }),
   /**
    * Marca un documento requerido como verificado visualmente SIN archivo
    * adjunto. Caso de uso: el empleado ve el documento físico en ventanilla

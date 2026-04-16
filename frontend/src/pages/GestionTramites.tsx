@@ -25,6 +25,7 @@ import {
   Copy,
   ArrowUpDown,
   Calendar,
+  FileSearch,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi, categoriasTramiteApi } from '../lib/api';
@@ -33,6 +34,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
 import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
+import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
@@ -121,6 +123,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [selectedTramite, setSelectedTramite] = useState<Solicitud | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Modal de revisión de documentos (fullscreen viewer con aprobar/rechazar)
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [checklistData, setChecklistData] = useState<import('../types').ChecklistDocumentos | null>(null);
 
   // Formulario de actualización
   const [nuevoEstado, setNuevoEstado] = useState<EstadoCanonico | ''>('');
@@ -1491,12 +1497,30 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Checklist de verificación de documentos requeridos */}
             <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-              <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                Verificación de documentos
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium" style={{ color: theme.text }}>
+                  Verificación de documentos
+                </h3>
+                {user?.rol !== 'vecino' && (checklistData?.total_obligatorios_subidos ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setReviewOpen(true)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
+                      color: '#fff',
+                      boxShadow: `0 4px 10px ${theme.primary}40`,
+                    }}
+                  >
+                    <FileSearch className="h-4 w-4" />
+                    Revisar docs
+                  </button>
+                )}
+              </div>
               <ChecklistDocumentosVerificacion
                 solicitudId={selectedTramite.id}
                 readOnly={user?.rol === 'vecino'}
+                onDataChange={setChecklistData}
               />
             </div>
 
@@ -1998,6 +2022,27 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         onSuccess={() => loadData()}
         tramiteInicial={servicioInicial}
       />
+
+      {/* Modal fullscreen para revisar documentos (aprobar/rechazar con motivo) */}
+      {selectedTramite && checklistData && (
+        <DocumentReviewModal
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
+          solicitudId={selectedTramite.id}
+          items={checklistData.items}
+          onChange={async () => {
+            // Recargar el checklist para que se vea el cambio de estado
+            // (verificado/rechazado) sin cerrar el modal.
+            try {
+              const res = await tramitesApi.getChecklistDocumentos(selectedTramite.id);
+              setChecklistData(res.data);
+            } catch (e) {
+              console.error(e);
+            }
+            loadData();
+          }}
+        />
+      )}
     </>
   );
 }

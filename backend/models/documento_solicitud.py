@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
@@ -55,6 +55,12 @@ class DocumentoSolicitud(Base):
     verificado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     verificado_por = relationship("User", foreign_keys=[verificado_por_id])
     fecha_verificacion = Column(DateTime(timezone=True), nullable=True)
+
+    # Rechazo por supervisor (el vecino ve el motivo y puede resubir).
+    rechazado_at = Column(DateTime(timezone=True), nullable=True)
+    motivo_rechazo = Column(Text, nullable=True)
+    rechazado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    rechazado_por = relationship("User", foreign_keys=[rechazado_por_id])
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

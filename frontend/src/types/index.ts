@@ -347,6 +347,10 @@ export interface ChecklistDocumentoItem {
   verificado_por_id?: number;
   verificado_por_nombre?: string;
   fecha_verificacion?: string;
+  rechazado?: boolean;
+  motivo_rechazo?: string | null;
+  rechazado_por_nombre?: string | null;
+  fecha_rechazo?: string | null;
 }
 
 export interface ChecklistDocumentos {

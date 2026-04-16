@@ -292,8 +292,35 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                   )}
                 </div>
 
-                {/* Acciones: upload para vecino y supervisor; "verificar visual" solo supervisor */}
-                {!readOnly && !hasDocumento && (
+                {/* Banner de rechazo con motivo (visible para vecino y supervisor) */}
+                {item.rechazado && item.motivo_rechazo && (
+                  <div
+                    className="mt-2 ml-6 p-2 rounded-lg text-xs"
+                    style={{
+                      backgroundColor: '#ef444415',
+                      border: '1px solid #ef444440',
+                      color: '#ef4444',
+                    }}
+                  >
+                    <div className="font-semibold flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      Documento rechazado
+                      {item.rechazado_por_nombre && <> por {item.rechazado_por_nombre}</>}
+                      {item.fecha_rechazo && <> · {new Date(item.fecha_rechazo).toLocaleDateString('es-AR')}</>}
+                    </div>
+                    <div className="mt-0.5" style={{ color: theme.text }}>
+                      <strong>Motivo:</strong> {item.motivo_rechazo}
+                    </div>
+                    {asVecino && (
+                      <div className="mt-1" style={{ color: theme.textSecondary }}>
+                        Subí un archivo nuevo abajo.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Acciones: upload/resubir para vecino y supervisor; "verificar visual" solo supervisor */}
+                {!readOnly && (!hasDocumento || item.rechazado) && (
                   <div className="mt-2 ml-6 flex items-center gap-2 flex-wrap">
                     <input
                       ref={el => { if (item.requerido_id) fileInputRefs.current[item.requerido_id] = el; }}
@@ -312,15 +339,15 @@ export function ChecklistDocumentosVerificacion({ solicitudId, readOnly = false,
                       onClick={() => item.requerido_id && fileInputRefs.current[item.requerido_id]?.click()}
                       className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                       style={{
-                        backgroundColor: `${theme.primary}15`,
-                        color: theme.primary,
-                        border: `1px solid ${theme.primary}40`,
+                        backgroundColor: item.rechazado ? '#ef444415' : `${theme.primary}15`,
+                        color: item.rechazado ? '#ef4444' : theme.primary,
+                        border: `1px solid ${item.rechazado ? '#ef444440' : theme.primary + '40'}`,
                       }}
                     >
                       {isUploadingThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                      Subir archivo
+                      {item.rechazado ? 'Resubir archivo' : 'Subir archivo'}
                     </button>
-                    {!asVecino && (
+                    {!asVecino && !hasDocumento && (
                       <button
                         type="button"
                         disabled={isUploadingThis || isVisualThis}

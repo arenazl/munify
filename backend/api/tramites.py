@@ -1103,6 +1103,21 @@ async def upload_documento_solicitud(
 
     tipo = "imagen" if file.content_type.startswith("image/") else "documento"
 
+    # Si ya hay documento(s) para el mismo requerido (ej: el vecino esta
+    # resubiendo tras un rechazo), los borramos antes de insertar el nuevo.
+    # Asi queda una sola fila por requerido_id y el nuevo doc arranca limpio
+    # (sin flags de rechazo heredados).
+    if tramite_documento_requerido_id is not None:
+        prev_q = await db.execute(
+            select(DocumentoSolicitud).where(
+                DocumentoSolicitud.solicitud_id == solicitud_id,
+                DocumentoSolicitud.tramite_documento_requerido_id == tramite_documento_requerido_id,
+            )
+        )
+        for prev in prev_q.scalars().all():
+            await db.delete(prev)
+        await db.flush()
+
     documento = DocumentoSolicitud(
         solicitud_id=solicitud_id,
         usuario_id=current_user.id,
@@ -1249,7 +1264,10 @@ async def get_checklist_documentos(
     # Cargar documentos subidos para esta solicitud
     docs_q = await db.execute(
         select(DocumentoSolicitud)
-        .options(selectinload(DocumentoSolicitud.verificado_por))
+        .options(
+            selectinload(DocumentoSolicitud.verificado_por),
+            selectinload(DocumentoSolicitud.rechazado_por),
+        )
         .where(DocumentoSolicitud.solicitud_id == solicitud_id)
     )
     documentos = docs_q.scalars().all()
@@ -1265,6 +1283,9 @@ async def get_checklist_documentos(
         verificado_por_nombre = None
         if doc and doc.verificado_por:
             verificado_por_nombre = f"{doc.verificado_por.nombre} {doc.verificado_por.apellido or ''}".strip()
+        rechazado_por_nombre = None
+        if doc and doc.rechazado_por:
+            rechazado_por_nombre = f"{doc.rechazado_por.nombre} {doc.rechazado_por.apellido or ''}".strip()
         items.append(DocumentoSolicitudChecklistItem(
             requerido_id=req.id,
             nombre=req.nombre,
@@ -1279,6 +1300,10 @@ async def get_checklist_documentos(
             verificado_por_id=doc.verificado_por_id if doc else None,
             verificado_por_nombre=verificado_por_nombre,
             fecha_verificacion=doc.fecha_verificacion if doc else None,
+            rechazado=bool(doc and doc.rechazado_at),
+            motivo_rechazo=doc.motivo_rechazo if doc else None,
+            rechazado_por_nombre=rechazado_por_nombre,
+            fecha_rechazo=doc.rechazado_at if doc else None,
         ))
 
     total_obligatorios = sum(1 for r in requeridos if r.obligatorio)
@@ -1334,6 +1359,52 @@ async def verificar_documento(
     await db.commit()
     auto = await _intentar_auto_transicion_a_en_curso(db, solicitud_id, current_user.id)
     return {"message": "Documento verificado", "id": documento.id, "auto_transicion_a_en_curso": auto}
+
+
+@router.post("/solicitudes/{solicitud_id}/documentos/{documento_id}/rechazar")
+async def rechazar_documento(
+    solicitud_id: int,
+    documento_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """Rechaza un documento con motivo. El vecino ve el motivo y puede resubir."""
+    motivo = (body or {}).get("motivo", "").strip()
+    if not motivo:
+        raise HTTPException(status_code=400, detail="El motivo de rechazo es obligatorio")
+
+    result = await db.execute(
+        select(DocumentoSolicitud).where(
+            DocumentoSolicitud.id == documento_id,
+            DocumentoSolicitud.solicitud_id == solicitud_id,
+        )
+    )
+    documento = result.scalar_one_or_none()
+    if not documento:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+
+    documento.rechazado_at = datetime.utcnow()
+    documento.motivo_rechazo = motivo
+    documento.rechazado_por_id = current_user.id
+    # Si estaba verificado, lo desverificamos al rechazarlo.
+    documento.verificado = False
+    documento.verificado_por_id = None
+    documento.fecha_verificacion = None
+
+    # Historial + notif al vecino (best-effort).
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud_id,
+        usuario_id=current_user.id,
+        accion=f"Documento rechazado: {documento.nombre_original or 'doc'}",
+        comentario=motivo,
+    ))
+    await db.commit()
+    return {
+        "message": "Documento rechazado",
+        "id": documento.id,
+        "motivo": motivo,
+    }
 
 
 @router.post("/solicitudes/{solicitud_id}/documentos/{documento_id}/desverificar")

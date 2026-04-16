@@ -239,6 +239,11 @@ class DocumentoSolicitudChecklistItem(BaseModel):
     verificado_por_id: Optional[int] = None
     verificado_por_nombre: Optional[str] = None
     fecha_verificacion: Optional[datetime] = None
+    # Estado de rechazo por el supervisor.
+    rechazado: bool = False
+    motivo_rechazo: Optional[str] = None
+    rechazado_por_nombre: Optional[str] = None
+    fecha_rechazo: Optional[datetime] = None
 
 
 class ChecklistDocumentosResponse(BaseModel):
