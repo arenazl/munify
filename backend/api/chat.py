@@ -2003,22 +2003,21 @@ def schema_json_to_text() -> str | None:
 
 async def get_database_schema(db: AsyncSession = None, force_refresh: bool = False) -> str:
     """
-    Obtiene el schema de las tablas desde el archivo JSON de documentación.
-    Devuelve el JSON completo para que la IA tenga todo el contexto del dominio.
+    Obtiene el schema compacto de la BD para inyectar en el prompt del SQL generator.
+    Usa schema_json_to_text() que devuelve ~12KB en lugar del JSON crudo de ~56KB,
+    bajando el costo de tokens ~4.5x sin perder la info que necesita el modelo.
     """
-    # Intentar cada path en orden
-    for schema_path in SCHEMA_JSON_PATHS:
-        try:
-            if os.path.exists(schema_path):
-                with open(schema_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    print(f"[SCHEMA] JSON completo cargado desde {schema_path} ({len(content)} chars)")
-                    return content
-        except Exception as e:
-            print(f"[SCHEMA] Error loading from {schema_path}: {e}")
-            continue
+    if force_refresh:
+        global _SCHEMA_JSON_CACHE, _SCHEMA_TEXT_CACHE
+        _SCHEMA_JSON_CACHE = None
+        _SCHEMA_TEXT_CACHE = None
 
-    print(f"[SCHEMA] No encontrado en ningún path, usando fallback")
+    text = schema_json_to_text()
+    if text:
+        print(f"[SCHEMA] compacto cargado ({len(text)} chars)")
+        return text
+
+    print(f"[SCHEMA] no se pudo cargar, usando fallback")
     return DATABASE_SCHEMA_FALLBACK
 
 
