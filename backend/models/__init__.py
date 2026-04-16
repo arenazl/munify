@@ -119,3 +119,28 @@ __all__ += [
     "MunicipioDependenciaCategoria",
     "MunicipioDependenciaTramite",
 ]
+
+# Tasas (3er pilar: catalogo maestro cross-muni + padron por muni)
+from .tasas import (
+    TipoTasa,
+    Partida,
+    Deuda,
+    Pago,
+    CicloTasa,
+    EstadoPartida,
+    EstadoDeuda,
+    MedioPago,
+    EstadoPago,
+)
+
+__all__ += [
+    "TipoTasa",
+    "Partida",
+    "Deuda",
+    "Pago",
+    "CicloTasa",
+    "EstadoPartida",
+    "EstadoDeuda",
+    "MedioPago",
+    "EstadoPago",
+]
