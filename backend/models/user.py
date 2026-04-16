@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Enum, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
@@ -64,6 +64,24 @@ class User(Base):
     # el DNI queda "cerrado" — retomas posteriores se rechazan y el vecino
     # tiene que pasar por "Olvidé mi contraseña".
     cuenta_verificada = Column(Boolean, default=False, nullable=False)
+
+    # Nivel de verificacion de identidad (KYC Didit):
+    #   0 = sin verificar (solo email+password)
+    #   1 = email verificado (OTP)
+    #   2 = identidad verificada (DNI + selfie + liveness, via Didit)
+    # Los tramites pueden requerir un minimo (ej. habilitacion comercial => 2).
+    nivel_verificacion = Column(Integer, default=0, nullable=False)
+
+    # Datos filiatorios verificados (solo se llenan en nivel_verificacion=2).
+    # No se piden en registro normal — vienen del proveedor KYC.
+    sexo = Column(String(1), nullable=True)  # "M" | "F" | "X"
+    fecha_nacimiento = Column(Date, nullable=True)
+    nacionalidad = Column(String(10), nullable=True)  # ISO-3 (ARG, CHL, ...)
+
+    # Referencia a la sesion de Didit que verifico este user (trazabilidad).
+    didit_session_id = Column(String(100), nullable=True, index=True)
+    verificado_at = Column(DateTime(timezone=True), nullable=True)
+
     rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
 

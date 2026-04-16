@@ -420,3 +420,157 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
         access_token=access_token,
         user=user_response
     )
+
+
+# ============================================================
+# Didit KYC — verificacion de identidad con DNI + selfie
+# ============================================================
+
+class DiditSessionRequest(BaseModel):
+    municipio_codigo: str | None = None
+
+
+class DiditSessionResponse(BaseModel):
+    session_id: str
+    url: str
+
+
+class DiditCompleteRequest(BaseModel):
+    session_id: str
+    email: str
+    password: str
+    telefono: str | None = None
+    municipio_id: int | None = None
+
+
+@router.post("/didit/session", response_model=DiditSessionResponse)
+@limiter.limit(LIMITS["auth"])
+async def crear_sesion_didit(request: Request, body: DiditSessionRequest):
+    """Crea una sesion de verificacion en Didit y devuelve la URL."""
+    from services.didit import crear_sesion, DiditNotConfigured, DiditError
+
+    try:
+        vendor = f"register:{body.municipio_codigo or 'generic'}"
+        data = await crear_sesion(vendor_data=vendor)
+    except DiditNotConfigured as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Verificacion con DNI no disponible: {e}. Probá con Google.",
+        )
+    except DiditError as e:
+        raise HTTPException(status_code=502, detail=f"Error en Didit: {e}")
+
+    return DiditSessionResponse(
+        session_id=data.get("session_id") or data.get("id"),
+        url=data.get("url") or data.get("session_url"),
+    )
+
+
+@router.post("/didit/register", response_model=Token)
+@limiter.limit(LIMITS["auth"])
+async def registrar_con_didit(
+    request: Request,
+    body: DiditCompleteRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea el User despues de que el vecino completó el flow de Didit."""
+    from services.didit import (
+        consultar_sesion,
+        extraer_datos_filiatorios,
+        DiditNotConfigured,
+        DiditError,
+    )
+    from datetime import datetime
+
+    try:
+        decision = await consultar_sesion(body.session_id)
+    except DiditNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except DiditError as e:
+        raise HTTPException(status_code=502, detail=f"Error en Didit: {e}")
+
+    status_didit = decision.get("status")
+    if status_didit != "Approved":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Verificacion no aprobada (estado: {status_didit}). Reintentá.",
+        )
+
+    datos = extraer_datos_filiatorios(decision)
+    if not datos.get("dni") or not datos.get("nombre"):
+        raise HTTPException(
+            status_code=400,
+            detail="Didit aprobó pero no devolvió DNI/nombre. Reintentá.",
+        )
+
+    q = await db.execute(select(User).where(User.email == body.email))
+    user = q.scalar_one_or_none()
+
+    if user:
+        if user.nivel_verificacion >= 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Este email ya tiene cuenta verificada. Entrá con tu contraseña.",
+            )
+        user.password_hash = get_password_hash(body.password)
+    else:
+        dq = await db.execute(
+            select(User).where(User.dni == datos["dni"], User.nivel_verificacion >= 2)
+        )
+        existente = dq.scalar_one_or_none()
+        if existente:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ya existe una cuenta verificada con DNI {datos['dni']}. Ingresa con tu email.",
+            )
+        user = User(
+            email=body.email,
+            password_hash=get_password_hash(body.password),
+            nombre=datos["nombre"] or "",
+            apellido=datos["apellido"] or "",
+            telefono=body.telefono,
+            municipio_id=body.municipio_id,
+            rol="vecino",
+        )
+        db.add(user)
+
+    user.dni = datos["dni"]
+    user.nombre = datos["nombre"] or user.nombre
+    user.apellido = datos["apellido"] or user.apellido
+    user.sexo = datos["sexo"]
+    user.fecha_nacimiento = datos["fecha_nacimiento"]
+    user.nacionalidad = datos["nacionalidad"]
+    if datos["direccion"] and not user.direccion:
+        user.direccion = datos["direccion"]
+    user.nivel_verificacion = 2
+    user.cuenta_verificada = True
+    user.didit_session_id = body.session_id
+    user.verificado_at = datetime.utcnow()
+
+    await db.commit()
+    await db.refresh(user)
+
+    access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    user_response = UserResponse(
+        id=user.id,
+        municipio_id=user.municipio_id,
+        email=user.email,
+        nombre=user.nombre,
+        apellido=user.apellido,
+        telefono=user.telefono,
+        dni=user.dni,
+        direccion=user.direccion,
+        es_anonimo=user.es_anonimo,
+        rol=user.rol,
+        activo=user.activo,
+        empleado_id=user.empleado_id,
+        municipio_dependencia_id=user.municipio_dependencia_id,
+        dependencia=None,
+        created_at=user.created_at,
+    )
+
+    return Token(access_token=access_token, user=user_response)

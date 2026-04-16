@@ -245,6 +245,17 @@ export const authApi = {
   },
   me: () => api.get('/auth/me'),
   checkEmail: (email: string) => api.get<{ exists: boolean }>('/auth/check-email', { params: { email } }),
+
+  // Didit KYC — verificacion de identidad con DNI + selfie.
+  diditSession: (municipio_codigo?: string) =>
+    api.post<{ session_id: string; url: string }>('/auth/didit/session', { municipio_codigo }),
+  diditRegister: (data: { session_id: string; email: string; password: string; telefono?: string }) => {
+    const municipioId = localStorage.getItem('municipio_id');
+    return api.post('/auth/didit/register', {
+      ...data,
+      municipio_id: municipioId ? parseInt(municipioId) : null,
+    });
+  },
 };
 
 // Reclamos

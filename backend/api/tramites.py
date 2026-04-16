@@ -699,6 +699,28 @@ async def crear_solicitud(
             campo_sol = f"{campo}_solicitante"
             if not getattr(solicitud_data, campo_sol, None):
                 overrides_perfil[campo_sol] = getattr(current_user, campo, None)
+
+        # Merge inverso: si el vecino tipeó datos que NO tenía en su perfil y
+        # no está verificado por KYC, los guardamos en User para que la próxima
+        # vez vengan precargados. Si nivel_verificacion >= 2, los datos del
+        # perfil son de Didit (verificados) — no los pisamos.
+        nivel_verif = getattr(current_user, "nivel_verificacion", 0) or 0
+        campos_protegidos_si_verificado = {"nombre", "apellido", "dni"}
+        for campo in ["nombre", "apellido", "telefono", "dni", "direccion"]:
+            form_valor = getattr(solicitud_data, f"{campo}_solicitante", None)
+            if not form_valor:
+                continue
+            actual = getattr(current_user, campo, None)
+            if actual:
+                # Ya tenía un valor. Solo pisamos si nivel < 2 y el campo no
+                # es filiatorio verificado.
+                if nivel_verif >= 2 and campo in campos_protegidos_si_verificado:
+                    continue
+                if actual == form_valor:
+                    continue
+                setattr(current_user, campo, form_valor)
+            else:
+                setattr(current_user, campo, form_valor)
     else:
         # Escenario 3: empleado/admin cargando en ventanilla para un tercero.
         # Resolvemos o creamos el vecino.

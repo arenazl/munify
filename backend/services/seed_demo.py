@@ -615,10 +615,23 @@ async def seed_demo_completo(
         db.add(sup)
         supervisores_demo.append(sup)
 
+    # Vecino demo "como si ya hubiera pasado KYC Didit" — simula identidad
+    # verificada con datos filiatorios completos. Asi al crear tramites/reclamos
+    # el wizard se autocompleta y la demo muestra la experiencia ideal.
+    from datetime import date, datetime as _dt
     vecino_demo = User(
         email=f"vecino@{codigo}.demo.com",
         nombre="Vecino",
         apellido="Demo",
+        dni="30123456",
+        telefono="+54 9 11 5555-0123",
+        direccion="Av. Sarmiento 1234",
+        sexo="M",
+        fecha_nacimiento=date(1985, 3, 15),
+        nacionalidad="ARG",
+        nivel_verificacion=2,
+        didit_session_id=f"demo-{codigo}",
+        verificado_at=_dt.utcnow(),
         password_hash=hash_demo,
         rol=RolUsuario.VECINO,
         municipio_id=municipio_id,

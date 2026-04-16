@@ -26,6 +26,7 @@ import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamoPage from './pages/NuevoReclamoPage';
 import NuevoTramitePage from './pages/NuevoTramitePage';
+import RegisterDiditCallback from './pages/RegisterDiditCallback';
 import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
@@ -112,6 +113,7 @@ export const router = createBrowserRouter([
   { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
+  { path: '/register/didit-callback', element: <RegisterDiditCallback /> },
   { path: '/nuevo-reclamo', element: <NuevoReclamoPage /> },
   { path: '/tramites', element: <Navigate to="/home" replace /> },
   { path: '/calificar/:id', element: <CalificarReclamo /> },  // Link directo desde WhatsApp

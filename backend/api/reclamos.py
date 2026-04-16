@@ -874,8 +874,11 @@ async def create_reclamo(
 
     if current_user.rol == RolUsuario.VECINO:
         # Vecino cargando su propio reclamo — flujo viejo
+        # Si el user esta verificado por KYC (nivel 2), no pisamos nombre/apellido
+        # porque vienen verificados de Didit.
+        nivel_verif = getattr(current_user, "nivel_verificacion", 0) or 0
         if data.nombre_contacto or data.telefono_contacto or data.email_contacto:
-            if data.nombre_contacto:
+            if data.nombre_contacto and nivel_verif < 2:
                 partes = data.nombre_contacto.strip().split(' ', 1)
                 current_user.nombre = partes[0]
                 if len(partes) > 1:

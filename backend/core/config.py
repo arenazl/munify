@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
 
+    # Didit — KYC verification (identidad con foto DNI + selfie + liveness)
+    # https://didit.me  — 500 verificaciones gratis/mes (Core KYC nivel A)
+    DIDIT_API_KEY: str = ""
+    DIDIT_BASE_URL: str = "https://verification.didit.me"
+    DIDIT_WEBHOOK_SECRET: str = ""
+    # Workflow creado en el dashboard de Didit (define que checks corre).
+    # Si vacío, no se permite iniciar sesiones.
+    DIDIT_WORKFLOW_ID: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Retorna lista de origenes CORS permitidos"""
