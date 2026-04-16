@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { DynamicIcon } from '../ui/DynamicIcon';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
@@ -68,6 +69,9 @@ const EMPTY_FORM: SolicitudForm = {
  */
 export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial }: Props) {
   const { theme } = useTheme();
+  const { user } = useAuth();
+  const esVecino = user?.rol === 'vecino';
+  const nivelVerif = (user as { nivel_verificacion?: number } | null)?.nivel_verificacion ?? 0;
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -115,15 +119,29 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
     return () => { cancelled = true; };
   }, [open]);
 
-  // Reset al cerrar
+  // Reset al cerrar + precarga con datos del vecino logueado al abrir.
+  // Si el vecino ya tiene datos en su perfil (verificado por Didit o tipeados
+  // en tramites anteriores), el wizard arranca con todo precargado.
   useEffect(() => {
     if (!open) {
       setStep(0);
       setForm(EMPTY_FORM);
       setSearchTerm('');
       setSelectedCategoriaId(null);
+      return;
     }
-  }, [open]);
+    if (esVecino && user) {
+      setForm(prev => ({
+        ...prev,
+        nombre_solicitante: prev.nombre_solicitante || user.nombre || '',
+        apellido_solicitante: prev.apellido_solicitante || user.apellido || '',
+        dni_solicitante: prev.dni_solicitante || user.dni || '',
+        email_solicitante: prev.email_solicitante || user.email || '',
+        telefono_solicitante: prev.telefono_solicitante || user.telefono || '',
+        direccion_solicitante: prev.direccion_solicitante || user.direccion || '',
+      }));
+    }
+  }, [open, esVecino, user]);
 
   // Pre-seleccionar trámite si viene uno inicial
   useEffect(() => {

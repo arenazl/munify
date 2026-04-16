@@ -163,7 +163,10 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
     return () => { cancelled = true; };
   }, [open]);
 
-  // Reset al cerrar
+  // Reset al cerrar + precarga con datos del vecino logueado al abrir.
+  // Si el vecino ya tiene datos (verificado por Didit o cargados en tramites
+  // anteriores), el wizard arranca con todo precargado — no le repreguntamos
+  // lo que ya sabemos.
   useEffect(() => {
     if (!open) {
       setStep(0);
@@ -176,8 +179,20 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       cacheRef.current.clear();
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (dniSearchTimeoutRef.current) clearTimeout(dniSearchTimeoutRef.current);
+      return;
     }
-  }, [open]);
+    if (user?.rol === 'vecino') {
+      setForm(prev => ({
+        ...prev,
+        nombre_solicitante: prev.nombre_solicitante || user.nombre || '',
+        apellido_solicitante: prev.apellido_solicitante || user.apellido || '',
+        dni_solicitante: prev.dni_solicitante || user.dni || '',
+        email_solicitante: prev.email_solicitante || user.email || '',
+        telefono_solicitante: prev.telefono_solicitante || user.telefono || '',
+        direccion: prev.direccion || user.direccion || '',
+      }));
+    }
+  }, [open, user]);
 
   // Cleanup al desmontar
   useEffect(() => {
