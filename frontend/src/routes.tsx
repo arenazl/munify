@@ -32,6 +32,7 @@ import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
 import MisTramites from './pages/MisTramites';
 import MisTasas from './pages/MisTasas';
+import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
 import Ajustes from './pages/Ajustes';
@@ -115,6 +116,9 @@ export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },
   { path: '/register/didit-callback', element: <RegisterDiditCallback /> },
+  // Checkout externo PayBridge (fuera del Layout de Munify — visualmente es
+  // otra plataforma. En produccion real apuntaria al checkout del provider).
+  { path: '/pago/checkout/:sessionId', element: <PayBridgeCheckout /> },
   { path: '/nuevo-reclamo', element: <NuevoReclamoPage /> },
   { path: '/tramites', element: <Navigate to="/home" replace /> },
   { path: '/calificar/:id', element: <CalificarReclamo /> },  // Link directo desde WhatsApp

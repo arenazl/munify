@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Clock, Loader2, Receipt, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { tasasApi } from '../lib/api';
+import { tasasApi, pagosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import type { Partida, Deuda } from '../types';
@@ -21,7 +21,19 @@ export default function MisTasas() {
   const [deudas, setDeudas] = useState<Record<number, Deuda[]>>({});
   const [loadingDeudas, setLoadingDeudas] = useState<number | null>(null);
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargar();
+    // Si el vecino vuelve del checkout externo con ?pago=ok, mostramos toast.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('pago') === 'ok') {
+      toast.success('Pago procesado correctamente', {
+        description: 'Tu boleta se marcó como pagada.',
+        duration: 4000,
+      });
+      // Limpiar el query param para que no re-dispare al refrescar
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const cargar = async () => {
     setLoading(true);
@@ -56,11 +68,17 @@ export default function MisTasas() {
     }
   };
 
-  const handlePagar = (deuda: Deuda) => {
-    toast.info('Pronto vas a poder pagar desde acá', {
-      description: `Boleta ${deuda.periodo} — ${fmtPlata(deuda.importe)}. Por ahora, pagá con el número de trámite en Rapipago o portal del municipio.`,
-      duration: 5000,
-    });
+  const handlePagar = async (deuda: Deuda) => {
+    try {
+      // Crear sesion en el gateway externo (PayBridge / provider real)
+      const res = await pagosApi.crearSesion(deuda.id, '/gestion/mis-tasas?pago=ok');
+      const { checkout_url } = res.data;
+      // Redirigir al checkout externo — visualmente es otra plataforma.
+      window.location.href = checkout_url;
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo iniciar el pago. Intentá de nuevo.');
+    }
   };
 
   if (loading) {
@@ -147,14 +165,14 @@ export default function MisTasas() {
             ))}
           </div>
 
-          {/* Disclaimer sobre pago */}
+          {/* Disclaimer: el pago se hace en una plataforma externa */}
           <div
             className="flex items-start gap-2 p-3 rounded-xl text-xs"
             style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
           >
             <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span>
-              Pronto vas a poder pagar desde acá. Por ahora, usá el número de boleta en el portal del municipio o en Rapipago.
+              Al tocar <strong>Pagar</strong> te llevamos a <strong>PayBridge</strong>, nuestra plataforma de cobros externa. Tus datos de tarjeta no pasan por el municipio.
             </span>
           </div>
         </>

@@ -144,3 +144,16 @@ __all__ += [
     "MedioPago",
     "EstadoPago",
 ]
+
+# Pagos (gateway externo PayBridge / Aura / MP — provider-agnostic)
+from .pago_sesion import (
+    PagoSesion,
+    EstadoSesionPago,
+    MedioPagoGateway,
+)
+
+__all__ += [
+    "PagoSesion",
+    "EstadoSesionPago",
+    "MedioPagoGateway",
+]

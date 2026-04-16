@@ -310,40 +310,45 @@ export function ChatWidget() {
             width: 'min(1200px, 90vw)',
             height: 'min(700px, 85vh)',
             borderRadius: '16px',
-          } : {
-            // Sidebar derecho: invisible colapsado (hot zone de 24px), 320px al hover o click
+          } : (isOpen || isHovered) ? {
+            // Sidebar expandido: desde arriba hasta abajo, 320px
             top: '0',
             right: '0',
-            width: (isOpen || isHovered) ? '320px' : '24px',
+            width: '320px',
             height: '100vh',
             borderRadius: '0',
+          } : {
+            // Colapsado: cajita chica en la esquina inferior derecha con su propio rincón
+            bottom: '16px',
+            right: '16px',
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
           }),
           zIndex: 40,
-          // Cuando colapsado: transparente. Cuando expandido/hover: fondo de card con borde izq.
-          backgroundColor: (isOpen || isHovered || isMaximized) ? theme.card : 'transparent',
+          backgroundColor: theme.card,
           borderLeft: (isOpen || isHovered) && !isMaximized ? `1px solid ${theme.border}` : undefined,
-          border: isMaximized ? `1px solid ${theme.border}` : undefined,
+          border: isMaximized
+            ? `1px solid ${theme.border}`
+            : (!isOpen && !isHovered) ? `1px solid ${theme.border}` : undefined,
           boxShadow: isMaximized
             ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-            : (isOpen || isHovered) ? '-4px 0 12px rgba(0, 0, 0, 0.06)' : 'none'
+            : (isOpen || isHovered)
+              ? '-4px 0 12px rgba(0, 0, 0, 0.06)'
+              : `0 4px 12px ${theme.primary}30`
         }}
         onMouseEnter={() => !isMaximized && setIsHovered(true)}
         onMouseLeave={() => !isOpen && setIsHovered(false)}
       >
-        {/* Indicador mínimo colapsado: ícono de IA flotante */}
+        {/* Cajita colapsada: rincón propio 48x48 con ícono de IA */}
         {!isOpen && !isHovered && !isMaximized && (
-          <div className="flex items-center justify-center h-full cursor-pointer select-none">
-            <div
-              className="flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
-              style={{
-                width: '32px',
-                height: '32px',
-                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                boxShadow: `0 2px 8px ${theme.primary}60`,
-              }}
-            >
-              <Sparkles className="h-4 w-4" style={{ color: theme.primaryText }} />
-            </div>
+          <div
+            className="flex items-center justify-center w-full h-full cursor-pointer select-none rounded-xl transition-all duration-200 hover:scale-105"
+            style={{
+              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+            }}
+          >
+            <Sparkles className="h-5 w-5" style={{ color: theme.primaryText }} />
           </div>
         )}
 

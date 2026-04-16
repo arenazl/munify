@@ -1227,6 +1227,19 @@ export const tasasApi = {
   miResumen: () => api.get('/tasas/mi-resumen'),
   reclamarPartida: (tipo_tasa_codigo: string, identificador: string) =>
     api.post('/tasas/partidas/reclamar', { tipo_tasa_codigo, identificador }),
+};
+
+// Gateway de pagos externo (PayBridge / Aura / Mercado Pago — provider-agnostic)
+export const pagosApi = {
+  crearSesion: (deuda_id: number, return_url?: string) =>
+    api.post<{ session_id: string; checkout_url: string; expires_at: string }>(
+      '/pagos/crear-sesion', { deuda_id, return_url }),
+  obtenerSesion: (sessionId: string) =>
+    api.get(`/pagos/sesiones/${sessionId}`),
+  confirmarPago: (sessionId: string, medio_pago: string, metadatos?: Record<string, unknown>) =>
+    api.post(`/pagos/sesiones/${sessionId}/confirmar`, { medio_pago, metadatos }),
+  cancelarSesion: (sessionId: string) =>
+    api.post(`/pagos/sesiones/${sessionId}/cancelar`),
 
   // ----- Aliases retrocompat (a borrar progresivamente) -----
   // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites
