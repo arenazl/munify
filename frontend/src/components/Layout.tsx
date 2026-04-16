@@ -648,11 +648,11 @@ export default function Layout() {
                 {/* Badge con contador de items pendientes (reclamos/tramites/tasas) */}
                 {badgeCount > 0 && (
                   <span
-                    className={`${isCollapsed ? 'absolute top-1 right-1' : 'ml-auto'} flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center`}
+                    className={`${isCollapsed ? 'absolute top-1 right-1' : 'ml-2 flex-shrink-0'} min-w-[18px] h-[18px] px-1.5 rounded-full text-[10px] font-semibold flex items-center justify-center`}
                     style={{
-                      backgroundColor: '#ef4444',
-                      color: '#ffffff',
-                      boxShadow: '0 2px 6px rgba(239,68,68,0.4)',
+                      backgroundColor: `${theme.primary}25`,
+                      color: theme.primary,
+                      border: `1px solid ${theme.primary}40`,
                     }}
                   >
                     {badgeCount > 99 ? '99+' : badgeCount}
