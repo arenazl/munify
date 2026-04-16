@@ -627,8 +627,6 @@ async def seed_demo_completo(
     _NOMBRES_F = ["Ana", "María", "Laura", "Sofía", "Valentina", "Lucía", "Carolina", "Florencia"]
     _APELLIDOS = ["González", "Rodríguez", "López", "Martínez", "García", "Pérez",
                   "Fernández", "Sánchez", "Romero", "Torres", "Álvarez", "Ruiz"]
-    _CALLES = ["Av. San Martín", "Belgrano", "Mitre", "Rivadavia", "Sarmiento",
-               "Av. Libertador", "Irigoyen", "Alsina", "9 de Julio", "25 de Mayo"]
 
     # Hash determinístico a partir del código del muni.
     _h = int(hashlib.sha1(codigo.encode()).hexdigest(), 16)
@@ -643,12 +641,45 @@ async def seed_demo_completo(
     _mes = 1 + ((_h >> 17) % 12)
     _dia = 1 + ((_h >> 23) % 28)
     _fecha_nac_demo = date(_anio, _mes, _dia)
-    _calle_demo = _CALLES[(_h >> 29) % len(_CALLES)]
-    _numero_demo = 100 + ((_h >> 31) % 4900)
-    _direccion_demo = f"{_calle_demo} {_numero_demo}"
     # Tel: +54 9 11 + 4 dígitos del hash + 4 dígitos del hash.
     _tel_suffix = str(_h % 100_000_000).zfill(8)
     _telefono_demo = f"+54 9 11 {_tel_suffix[:4]}-{_tel_suffix[4:]}"
+
+    # Dirección: reverse-geocode contra Nominatim con un offset determinístico
+    # al centro del muni (~500m-2km). Así cada vecino demo vive en una calle
+    # REAL de su muni, geocodeable en el mapa. Si Nominatim falla, queda None
+    # y el vecino la carga al crear su primer trámite (que tiene autocomplete).
+    _direccion_demo: Optional[str] = None
+    try:
+        import httpx as _httpx
+        # Offset entre -0.01° y +0.01° (~1km) para no caer siempre en el mismo
+        # punto, pero sin salir del muni.
+        _dlat = ((((_h >> 37) % 2000) - 1000) / 100000.0)
+        _dlng = ((((_h >> 43) % 2000) - 1000) / 100000.0)
+        async with _httpx.AsyncClient(timeout=5.0) as _hc:
+            _r = await _hc.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={
+                    "lat": muni_lat + _dlat,
+                    "lon": muni_lng + _dlng,
+                    "format": "json",
+                    "zoom": 18,  # street-level
+                    "addressdetails": 1,
+                },
+                headers={"User-Agent": "Munify/1.0 (demo seed)"},
+            )
+            if _r.status_code == 200:
+                _data = _r.json()
+                _addr = _data.get("address", {}) if isinstance(_data, dict) else {}
+                _road = _addr.get("road") or _addr.get("pedestrian") or _addr.get("street")
+                if _road:
+                    _num = 100 + ((_h >> 31) % 4900)
+                    _loc = _addr.get("suburb") or _addr.get("city_district") or _addr.get("city") or _addr.get("town") or _addr.get("village") or ""
+                    _direccion_demo = f"{_road} {_num}" + (f", {_loc}" if _loc else "")
+    except Exception:
+        # Nominatim caido o timeout — el vecino queda sin direccion,
+        # la completa al crear su primer tramite.
+        pass
 
     vecino_demo = User(
         email=f"vecino@{codigo}.demo.com",
