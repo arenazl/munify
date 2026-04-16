@@ -616,18 +616,49 @@ async def seed_demo_completo(
         supervisores_demo.append(sup)
 
     # Vecino demo "como si ya hubiera pasado KYC Didit" — simula identidad
-    # verificada con datos filiatorios completos. Asi al crear tramites/reclamos
-    # el wizard se autocompleta y la demo muestra la experiencia ideal.
+    # verificada con datos filiatorios completos. Los datos se derivan del
+    # `codigo` del muni via hash determinístico: mismo muni => mismo vecino
+    # siempre, pero munis distintos tienen DNIs/nombres/direcciones distintos.
+    # Así las demos se ven realistas y no chocan entre sí.
     from datetime import date, datetime as _dt
+    import hashlib
+
+    _NOMBRES_M = ["Juan", "Carlos", "Jorge", "Pedro", "Martín", "Diego", "Pablo", "Lucas"]
+    _NOMBRES_F = ["Ana", "María", "Laura", "Sofía", "Valentina", "Lucía", "Carolina", "Florencia"]
+    _APELLIDOS = ["González", "Rodríguez", "López", "Martínez", "García", "Pérez",
+                  "Fernández", "Sánchez", "Romero", "Torres", "Álvarez", "Ruiz"]
+    _CALLES = ["Av. San Martín", "Belgrano", "Mitre", "Rivadavia", "Sarmiento",
+               "Av. Libertador", "Irigoyen", "Alsina", "9 de Julio", "25 de Mayo"]
+
+    # Hash determinístico a partir del código del muni.
+    _h = int(hashlib.sha1(codigo.encode()).hexdigest(), 16)
+    _sexo_idx = _h % 2
+    _sexo_demo = "M" if _sexo_idx == 0 else "F"
+    _nombre_demo = (_NOMBRES_M if _sexo_idx == 0 else _NOMBRES_F)[(_h >> 3) % 8]
+    _apellido_demo = _APELLIDOS[(_h >> 7) % len(_APELLIDOS)]
+    # DNI en rango plausible 25M-48M (mayores de edad con DNI argentino).
+    _dni_demo = str(25_000_000 + (_h % 23_000_000))
+    # Fecha nacimiento: 1965-2000 aprox (25-60 años).
+    _anio = 1965 + ((_h >> 11) % 36)
+    _mes = 1 + ((_h >> 17) % 12)
+    _dia = 1 + ((_h >> 23) % 28)
+    _fecha_nac_demo = date(_anio, _mes, _dia)
+    _calle_demo = _CALLES[(_h >> 29) % len(_CALLES)]
+    _numero_demo = 100 + ((_h >> 31) % 4900)
+    _direccion_demo = f"{_calle_demo} {_numero_demo}"
+    # Tel: +54 9 11 + 4 dígitos del hash + 4 dígitos del hash.
+    _tel_suffix = str(_h % 100_000_000).zfill(8)
+    _telefono_demo = f"+54 9 11 {_tel_suffix[:4]}-{_tel_suffix[4:]}"
+
     vecino_demo = User(
         email=f"vecino@{codigo}.demo.com",
-        nombre="Vecino",
-        apellido="Demo",
-        dni="30123456",
-        telefono="+54 9 11 5555-0123",
-        direccion="Av. Sarmiento 1234",
-        sexo="M",
-        fecha_nacimiento=date(1985, 3, 15),
+        nombre=_nombre_demo,
+        apellido=_apellido_demo,
+        dni=_dni_demo,
+        telefono=_telefono_demo,
+        direccion=_direccion_demo,
+        sexo=_sexo_demo,
+        fecha_nacimiento=_fecha_nac_demo,
         nacionalidad="ARG",
         nivel_verificacion=2,
         didit_session_id=f"demo-{codigo}",
