@@ -31,6 +31,13 @@ from schemas.tasas import (
     DeudaResponse,
     ResumenTasasVecino,
 )
+from services.curador_padron import (
+    fetch_padron,
+    analizar_padron,
+    PadronInvalido,
+)
+from datetime import datetime, date as date_cls
+from decimal import Decimal as Dec
 
 router = APIRouter(prefix="/tasas", tags=["tasas"])
 
@@ -292,3 +299,188 @@ async def reclamar_partida(
     await db.commit()
     await db.refresh(partida)
     return PartidaResponse.model_validate(partida)
+
+
+# ============================================================
+# Import de padron desde URL — flujo admin/settings
+# ============================================================
+
+class ImportPadronPreviewRequest(BaseModel):
+    url: str
+
+
+class MappingTasa(BaseModel):
+    """Mapping final definido por el admin para una tasa del padron."""
+    codigo_local: str  # codigo del padron original
+    tipo_tasa_codigo: Optional[str] = None  # codigo canonico Munify (None = saltar)
+
+
+class ImportPadronConfirmRequest(BaseModel):
+    url: str
+    mappings: List[MappingTasa]
+
+
+def _require_admin(user: User):
+    if user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor puede importar el padron")
+    if not user.municipio_id:
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene municipio asignado")
+
+
+@router.post("/importar-padron/preview")
+async def importar_padron_preview(
+    body: ImportPadronPreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Paso 1: descarga la URL, analiza la estructura y devuelve un preview
+    con los matches sugeridos. No escribe nada en la DB."""
+    _require_admin(current_user)
+
+    try:
+        padron = await fetch_padron(body.url)
+    except PadronInvalido as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    tipos_q = await db.execute(select(TipoTasa).where(TipoTasa.activo == True))
+    tipos_db = list(tipos_q.scalars().all())
+
+    preview = analizar_padron(padron, tipos_db)
+    preview["catalogo_munify"] = [
+        {"codigo": t.codigo, "nombre": t.nombre, "icono": t.icono, "color": t.color}
+        for t in sorted(tipos_db, key=lambda x: x.orden)
+    ]
+    return preview
+
+
+def _parse_fecha(v) -> Optional[date_cls]:
+    if not v:
+        return None
+    if isinstance(v, date_cls):
+        return v
+    try:
+        return datetime.fromisoformat(str(v)).date()
+    except Exception:
+        return None
+
+
+@router.post("/importar-padron/confirmar")
+async def importar_padron_confirmar(
+    body: ImportPadronConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Paso 3: con los mappings ya revisados por el admin, baja el padron y
+    crea las Partidas + Deudas en la DB. Upserts por (muni + tipo + identificador)
+    para que re-ejecutar la import no duplique."""
+    _require_admin(current_user)
+
+    try:
+        padron = await fetch_padron(body.url)
+    except PadronInvalido as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Indexar mappings: codigo_local → tipo_tasa_codigo
+    map_dict = {m.codigo_local: m.tipo_tasa_codigo for m in body.mappings}
+
+    # Cargar tipos canonicos
+    tipos_q = await db.execute(select(TipoTasa))
+    tipos_por_codigo: dict[str, TipoTasa] = {t.codigo: t for t in tipos_q.scalars().all()}
+
+    municipio_id = current_user.municipio_id
+    partidas_creadas = 0
+    partidas_actualizadas = 0
+    deudas_creadas = 0
+    tasas_saltadas = 0
+    errores: list[str] = []
+
+    for tasa in padron.get("tasas", []):
+        codigo_local = tasa.get("codigo_local") or tasa.get("codigo") or ""
+        tipo_codigo = map_dict.get(codigo_local)
+
+        if not tipo_codigo:
+            tasas_saltadas += 1
+            continue
+
+        tipo = tipos_por_codigo.get(tipo_codigo)
+        if not tipo:
+            errores.append(f"Tipo '{tipo_codigo}' no existe en Munify (saltado).")
+            continue
+
+        for p in tasa.get("partidas") or []:
+            identificador = str(p.get("identificador") or "").strip()
+            if not identificador:
+                continue
+
+            # Upsert partida
+            existe_q = await db.execute(
+                select(Partida).where(
+                    Partida.municipio_id == municipio_id,
+                    Partida.tipo_tasa_id == tipo.id,
+                    Partida.identificador == identificador,
+                )
+            )
+            partida = existe_q.scalar_one_or_none()
+
+            if partida:
+                partida.titular_dni = p.get("titular_dni") or partida.titular_dni
+                partida.titular_nombre = p.get("titular_nombre") or partida.titular_nombre
+                partida.objeto = p.get("objeto") or partida.objeto
+                partidas_actualizadas += 1
+            else:
+                partida = Partida(
+                    municipio_id=municipio_id,
+                    tipo_tasa_id=tipo.id,
+                    identificador=identificador,
+                    titular_dni=p.get("titular_dni"),
+                    titular_nombre=p.get("titular_nombre"),
+                    objeto=p.get("objeto"),
+                )
+                db.add(partida)
+                await db.flush()
+                partidas_creadas += 1
+
+            # Insertar deudas (upsert por periodo)
+            for d in p.get("deudas") or []:
+                periodo = str(d.get("periodo") or "").strip()
+                if not periodo:
+                    continue
+
+                d_q = await db.execute(
+                    select(Deuda).where(
+                        Deuda.partida_id == partida.id,
+                        Deuda.periodo == periodo,
+                    )
+                )
+                if d_q.scalar_one_or_none():
+                    continue  # ya existe, no duplicar
+
+                importe = Dec(str(d.get("importe") or "0"))
+                fecha_emi = _parse_fecha(d.get("fecha_emision")) or date_cls.today()
+                fecha_vto = _parse_fecha(d.get("fecha_vencimiento")) or date_cls.today()
+                estado_str = (d.get("estado") or "pendiente").lower()
+                try:
+                    estado = EstadoDeuda(estado_str)
+                except ValueError:
+                    estado = EstadoDeuda.PENDIENTE
+
+                db.add(Deuda(
+                    partida_id=partida.id,
+                    periodo=periodo,
+                    importe=importe,
+                    fecha_emision=fecha_emi,
+                    fecha_vencimiento=fecha_vto,
+                    estado=estado,
+                ))
+                deudas_creadas += 1
+
+    await db.commit()
+
+    return {
+        "ok": True,
+        "partidas_creadas": partidas_creadas,
+        "partidas_actualizadas": partidas_actualizadas,
+        "deudas_creadas": deudas_creadas,
+        "tasas_saltadas": tasas_saltadas,
+        "errores": errores,
+    }

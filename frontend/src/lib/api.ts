@@ -1227,6 +1227,10 @@ export const tasasApi = {
   miResumen: () => api.get('/tasas/mi-resumen'),
   reclamarPartida: (tipo_tasa_codigo: string, identificador: string) =>
     api.post('/tasas/partidas/reclamar', { tipo_tasa_codigo, identificador }),
+  importarPadronPreview: (url: string) =>
+    api.post('/tasas/importar-padron/preview', { url }),
+  importarPadronConfirmar: (url: string, mappings: { codigo_local: string; tipo_tasa_codigo: string | null }[]) =>
+    api.post('/tasas/importar-padron/confirmar', { url, mappings }),
 };
 
 // Gateway de pagos externo (PayBridge / Aura / Mercado Pago — provider-agnostic)

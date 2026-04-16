@@ -36,6 +36,7 @@ import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
 import Ajustes from './pages/Ajustes';
+import ImportarPadron from './pages/ImportarPadron';
 import MiRendimiento from './pages/MiRendimiento';
 import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
@@ -264,6 +265,10 @@ export const router = createBrowserRouter([
       {
         path: 'ajustes',
         element: <Ajustes />
+      },
+      {
+        path: 'ajustes/importar-padron',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><ImportarPadron /></ProtectedRoute>
       },
       // Configuración del Dashboard (qué ven vecinos y empleados)
       {

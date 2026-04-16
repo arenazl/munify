@@ -266,6 +266,15 @@ export default function Ajustes() {
           color: '#06b6d4',
           link: '/gestion/zonas',
           show: isAdminOrSupervisor
+        },
+        {
+          id: 'importar-padron',
+          label: 'Catálogo de Tasas',
+          description: 'Importá el padrón tributario desde una URL y mapealo al catálogo Munify',
+          icon: Landmark,
+          color: '#0ea5e9',
+          link: '/gestion/ajustes/importar-padron',
+          show: isAdminOrSupervisor && !isSuperAdmin,
         }
       ]
     },
