@@ -344,7 +344,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
           ¿Qué trámite necesitás?
         </label>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: theme.textSecondary }} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: theme.primary }} />
           <input
             type="text"
             autoFocus
@@ -354,11 +354,12 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
               setSearchTerm(e.target.value);
               if (e.target.value.trim()) setSelectedCategoriaId(null);
             }}
-            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm"
+            className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none focus:ring-2 transition-all"
             style={{
               backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${theme.primary}40`,
               color: theme.text,
+              boxShadow: `0 2px 8px ${theme.primary}15`,
             }}
           />
         </div>
@@ -451,27 +452,36 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {categorias.map(c => {
                 const count = tramitesPorCategoria[c.id] || 0;
+                const catColor = c.color || theme.primary;
+                const active = count > 0;
                 return (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => setSelectedCategoriaId(c.id)}
-                    disabled={count === 0}
-                    className="flex items-center gap-2 p-3 rounded-xl text-left transition-all duration-200 hover:scale-[1.02] disabled:opacity-40 disabled:cursor-not-allowed"
+                    disabled={!active}
+                    className="flex items-center gap-2 p-3 rounded-xl text-left transition-all duration-200 hover:scale-[1.03] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      border: `1px solid ${theme.border}`,
+                      background: active
+                        ? `linear-gradient(135deg, ${catColor}22 0%, ${theme.backgroundSecondary} 90%)`
+                        : theme.backgroundSecondary,
+                      border: `1px solid ${active ? catColor + '50' : theme.border}`,
+                      borderLeft: active ? `3px solid ${catColor}` : `1px solid ${theme.border}`,
+                      boxShadow: active ? `0 2px 8px ${catColor}15` : 'none',
                     }}
                   >
                     <div
-                      className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${c.color || theme.primary}25` }}
+                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{
+                        background: `linear-gradient(135deg, ${catColor} 0%, ${catColor}cc 100%)`,
+                        boxShadow: active ? `0 4px 10px ${catColor}40` : 'none',
+                      }}
                     >
-                      <DynamicIcon name={c.icono || 'Folder'} className="h-4 w-4" style={{ color: c.color || theme.primary }} />
+                      <DynamicIcon name={c.icono || 'Folder'} className="h-5 w-5" style={{ color: 'white' }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: theme.text }}>{c.nombre}</p>
-                      <p className="text-[10px]" style={{ color: theme.textSecondary }}>
+                      <p className="text-xs font-semibold truncate" style={{ color: theme.text }}>{c.nombre}</p>
+                      <p className="text-[10px] font-medium" style={{ color: active ? catColor : theme.textSecondary }}>
                         {count} trámite{count !== 1 ? 's' : ''}
                       </p>
                     </div>
@@ -484,21 +494,30 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
       )}
 
       {/* Lista de trámites de la categoría seleccionada */}
-      {!loadingData && !searchTerm.trim() && selectedCategoriaId && (
+      {!loadingData && !searchTerm.trim() && selectedCategoriaId && (() => {
+        const catActual = categorias.find(c => c.id === selectedCategoriaId);
+        const catColor = catActual?.color || theme.primary;
+        return (
         <div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-3">
             <button
               type="button"
               onClick={() => setSelectedCategoriaId(null)}
-              className="flex items-center gap-1 text-xs hover:underline"
-              style={{ color: theme.primary }}
+              className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-all hover:scale-105 active:scale-95"
+              style={{ color: theme.primary, backgroundColor: `${theme.primary}15` }}
             >
               <ArrowLeft className="h-3 w-3" />
-              Volver a categorías
+              Volver
             </button>
-            <span className="text-xs" style={{ color: theme.textSecondary }}>·</span>
-            <span className="text-xs font-semibold" style={{ color: theme.text }}>
-              {categorias.find(c => c.id === selectedCategoriaId)?.nombre}
+            <span
+              className="text-xs font-bold px-2.5 py-1 rounded-lg"
+              style={{
+                color: catColor,
+                backgroundColor: `${catColor}18`,
+                border: `1px solid ${catColor}40`,
+              }}
+            >
+              {catActual?.nombre}
             </span>
           </div>
           {tramitesFiltrados.length === 0 ? (
@@ -512,21 +531,41 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
                   key={t.id}
                   type="button"
                   onClick={() => handleSelectTramite(t)}
-                  className="w-full text-left p-3 rounded-xl transition-all hover:scale-[1.01]"
+                  className="w-full text-left p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.99]"
                   style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1px solid ${theme.border}`,
+                    background: `linear-gradient(135deg, ${catColor}18 0%, ${theme.backgroundSecondary} 70%)`,
+                    border: `1px solid ${catColor}40`,
+                    borderLeft: `4px solid ${catColor}`,
+                    boxShadow: `0 2px 10px ${catColor}10`,
                   }}
                 >
-                  <p className="text-sm font-medium" style={{ color: theme.text }}>{t.nombre}</p>
+                  <p className="text-sm font-semibold" style={{ color: theme.text }}>{t.nombre}</p>
                   {t.descripcion && (
                     <p className="text-xs mt-0.5 line-clamp-1" style={{ color: theme.textSecondary }}>{t.descripcion}</p>
                   )}
-                  <div className="flex items-center gap-3 mt-1 text-[10px]" style={{ color: theme.textSecondary }}>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {t.tiempo_estimado_dias} días</span>
-                    <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> {t.costo ? `$${t.costo}` : 'Gratis'}</span>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ backgroundColor: `${catColor}20`, color: catColor }}
+                    >
+                      <Clock className="h-3 w-3" /> {t.tiempo_estimado_dias} días
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        backgroundColor: t.costo ? '#f59e0b20' : '#10b98120',
+                        color: t.costo ? '#f59e0b' : '#10b981',
+                      }}
+                    >
+                      <CreditCard className="h-3 w-3" /> {t.costo ? `$${t.costo}` : 'Gratis'}
+                    </span>
                     {t.documentos_requeridos && t.documentos_requeridos.length > 0 && (
-                      <span>{t.documentos_requeridos.length} docs</span>
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium"
+                        style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                      >
+                        {t.documentos_requeridos.length} docs
+                      </span>
                     )}
                   </div>
                 </button>
@@ -534,7 +573,8 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
             </div>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* Si ya hay uno elegido, mostrarlo como "actualmente seleccionado" */}
       {tramiteSeleccionado && !searchTerm.trim() && !selectedCategoriaId && (
