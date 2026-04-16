@@ -318,14 +318,17 @@ export default function Layout() {
       )}
 
       {/* Sidebar - full height desde arriba */}
-      {/* NOTA: En desktop NO usamos transform para evitar crear containing block que rompe position:fixed */}
-      {/* En mobile usamos -translate-x-full solo cuando está cerrado */}
-      {/* z-50 para estar por encima del backdrop móvil (z-40) */}
+      {/* Transition SOLO transform para evitar jank en el primer click (antes
+         usaba transition-all + -translate-x-full clase => el primer paint no
+         tenia transform base y aparecia un frame mal posicionado). */}
       <div
-        className={`fixed left-0 top-0 bottom-0 z-50 shadow-xl flex flex-col sidebar-container backdrop-blur-sm transition-all duration-300 ${isCollapsed ? 'sidebar-collapsed' : ''} ${isMobile && !sidebarOpen ? '-translate-x-full' : ''}`}
+        className={`fixed left-0 top-0 bottom-0 z-50 shadow-xl flex flex-col sidebar-container backdrop-blur-sm ${isCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{
-          backgroundColor: `${theme.sidebar}e6`, // ~90% opacity
+          backgroundColor: `${theme.sidebar}e6`,
           width: sidebarWidth,
+          transform: isMobile ? (sidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+          transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
+          willChange: isMobile ? 'transform' : 'auto',
         }}
       >
         {/* Imagen de fondo del sidebar */}

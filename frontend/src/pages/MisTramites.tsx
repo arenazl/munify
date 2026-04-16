@@ -875,11 +875,9 @@ export default function MisTramites() {
               setEnviandoRevision(true);
               try {
                 await tramitesApi.enviarDocumentosARevision(selectedTramite.id);
-                toast.success('Documentos enviados a la dependencia para revisión');
-                // Refrescar checklist para actualizar el estado de envío.
-                const res = await tramitesApi.getChecklistDocumentos(selectedTramite.id);
-                setChecklistData(res.data);
-                loadTramites();
+                toast.success('Documentos enviados. La dependencia te va a avisar.');
+                closeSheet();
+                navigate('/gestion/mi-panel');
               } catch (err: unknown) {
                 const e = err as { response?: { data?: { detail?: string } } };
                 toast.error(e.response?.data?.detail || 'No se pudo enviar a revisión');
