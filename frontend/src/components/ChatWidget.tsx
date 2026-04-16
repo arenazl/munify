@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Database, Maximize2, Minimize2, ChevronDown, ChevronUp, Table2, Download, TrendingUp, TrendingDown, Star, Save, Play, Users, FileText, MapPin, Folder, Layers, AlertTriangle, LayoutGrid, List, BarChart3, Rows3 } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Database, Maximize2, Minimize2, ChevronDown, ChevronUp, Table2, Download, TrendingUp, TrendingDown, Star, Save, Play, Users, FileText, MapPin, Folder, Layers, AlertTriangle, LayoutGrid, List, BarChart3, Rows3, Plus, Sparkles } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { chatApi } from '../lib/api';
@@ -205,14 +205,24 @@ export function ChatWidget() {
     scrollToBottom();
   }, [messages]);
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const resetConversation = () => {
+    setMessages([]);
+    setInput('');
+    setError(null);
+    setLastRawData(null);
+    setLastSqlQuery(null);
+    setShowRawData(false);
+  };
+
+  const sendMessage = async (promptOverride?: string) => {
+    const textToSend = promptOverride ?? input;
+    if (!textToSend.trim() || loading) return;
 
     // Agregar sufijo de formato si no es 'auto'
     const formatSuffix = displayFormat !== 'auto' ? ` [formato: ${displayFormat}]` : '';
-    const inputWithFormat = input + formatSuffix;
+    const inputWithFormat = textToSend + formatSuffix;
 
-    const userMessage: Message = { role: 'user', content: input }; // Mostrar sin el sufijo
+    const userMessage: Message = { role: 'user', content: textToSend }; // Mostrar sin el sufijo
     const currentInput = inputWithFormat; // Enviar con el sufijo
     setMessages(prev => [...prev, userMessage]);
     setInput('');
@@ -320,15 +330,20 @@ export function ChatWidget() {
         onMouseEnter={() => !isMaximized && setIsHovered(true)}
         onMouseLeave={() => !isOpen && setIsHovered(false)}
       >
-        {/* Indicador mínimo colapsado: solo una linea sutil con un dot */}
+        {/* Indicador mínimo colapsado: ícono de IA flotante */}
         {!isOpen && !isHovered && !isMaximized && (
-          <div
-            className="flex items-center justify-center h-full cursor-pointer select-none group"
-          >
+          <div className="flex items-center justify-center h-full cursor-pointer select-none">
             <div
-              className="w-1 h-16 rounded-full transition-all duration-200 group-hover:h-24 group-hover:w-1.5"
-              style={{ backgroundColor: theme.primary, opacity: 0.4 }}
-            />
+              className="flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110"
+              style={{
+                width: '32px',
+                height: '32px',
+                background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                boxShadow: `0 2px 8px ${theme.primary}60`,
+              }}
+            >
+              <Sparkles className="h-4 w-4" style={{ color: theme.primaryText }} />
+            </div>
           </div>
         )}
 
@@ -343,6 +358,18 @@ export function ChatWidget() {
                 : theme.backgroundSecondary,
             }}
           >
+            {/* Botón nueva conversación (solo si ya hay mensajes) */}
+            {messages.length > 0 && (
+              <button
+                onClick={resetConversation}
+                className="p-1.5 rounded-md transition-colors hover:bg-black/10 flex items-center gap-1"
+                style={{ color: theme.textSecondary }}
+                title="Nueva conversación"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="text-[11px] font-medium">Nueva</span>
+              </button>
+            )}
             {/* Botón maximizar */}
             {canUseDataAssistant && (
               <button
@@ -405,7 +432,7 @@ export function ChatWidget() {
                   ].map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => { setInput(q); }}
+                      onClick={() => { sendMessage(q); }}
                       className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
                       style={{
                         backgroundColor: theme.card,
@@ -432,7 +459,7 @@ export function ChatWidget() {
                   ].map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => { setInput(q); }}
+                      onClick={() => { sendMessage(q); }}
                       className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
                       style={{
                         backgroundColor: theme.card,
@@ -460,7 +487,7 @@ export function ChatWidget() {
                   ].map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => { setInput(q); }}
+                      onClick={() => { sendMessage(q); }}
                       className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
                       style={{
                         backgroundColor: theme.card,
@@ -486,7 +513,7 @@ export function ChatWidget() {
                   ].map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => { setInput(q); }}
+                      onClick={() => { sendMessage(q); }}
                       className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
                       style={{
                         backgroundColor: theme.card,
@@ -513,10 +540,6 @@ export function ChatWidget() {
                 <div className="text-center py-4" style={{ color: theme.textSecondary }}>
                   {canUseDataAssistant ? (
                     <>
-                      <Database className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm font-medium">Asistente con Datos</p>
-                      <p className="text-xs mt-1 mb-3">Preguntame lo que quieras sobre reclamos, trámites y empleados</p>
-
                       {/* Consultas rápidas como chips */}
                       {!isMaximized && (
                         <div className="flex flex-wrap gap-1.5 justify-center px-2">
@@ -534,7 +557,7 @@ export function ChatWidget() {
                           ].map((q, i) => (
                             <button
                               key={i}
-                              onClick={() => { setInput(q); }}
+                              onClick={() => { sendMessage(q); }}
                               className="px-2.5 py-1.5 rounded-full text-[11px] transition-all hover:scale-105"
                               style={{
                                 backgroundColor: `${theme.primary}15`,
@@ -733,7 +756,7 @@ export function ChatWidget() {
                 {quickPrompts.map((q, i) => (
                   <button
                     key={i}
-                    onClick={() => setInput(q)}
+                    onClick={() => sendMessage(q)}
                     className="text-xs px-2.5 py-1 rounded-full transition-colors hover:opacity-80"
                     style={{
                       backgroundColor: theme.backgroundSecondary,
@@ -766,7 +789,7 @@ export function ChatWidget() {
                 }}
               />
               <button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={!input.trim() || loading}
                 className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                 style={{
