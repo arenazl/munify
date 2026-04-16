@@ -36,6 +36,7 @@ from .dependencias import router as dependencias_router
 from .validacion_identidad import router as validacion_identidad_router
 from .geocoding import router as geocoding_router
 from .admin_audit import router as admin_audit_router
+from .tasas import router as tasas_router
 
 api_router = APIRouter()
 
@@ -75,6 +76,7 @@ api_router.include_router(dependencias_router, tags=["Dependencias"])  # Ya tien
 api_router.include_router(validacion_identidad_router)  # Ya tiene prefix /validacion-identidad
 api_router.include_router(geocoding_router, prefix="/geocoding", tags=["Geocoding"])
 api_router.include_router(admin_audit_router, tags=["Admin Audit"])  # ya tiene prefix /admin
+api_router.include_router(tasas_router, tags=["Tasas"])  # ya tiene prefix /tasas
 
 # WebSockets
 from .ws import router as ws_router

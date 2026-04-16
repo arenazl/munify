@@ -704,6 +704,139 @@ async def seed_demo_completo(
     await db.flush()
 
     # ------------------------------------------------------------------
+    # Tasas demo: partidas ABL + Patente + Multa + sus deudas
+    # Determinístico por hash del codigo del muni. Asi cuando el vecino entra
+    # ya ve tasas para pagar (engagement de la home).
+    # ------------------------------------------------------------------
+    from models.tasas import (
+        TipoTasa, Partida, Deuda, EstadoPartida, EstadoDeuda,
+    )
+    from decimal import Decimal
+    from datetime import date as _date, timedelta
+
+    # Buscar tipos de tasa del catalogo global (cargados por seed_tipos_tasa.py).
+    tipos_q = await db.execute(
+        select(TipoTasa).where(TipoTasa.codigo.in_(["abl", "patente_automotor", "multa_transito"]))
+    )
+    tipos_map = {t.codigo: t for t in tipos_q.scalars().all()}
+
+    # Solo generar si el catalogo esta poblado.
+    if tipos_map:
+        hoy = _date.today()
+
+        # === Partida ABL === (asociada al domicilio del vecino)
+        if "abl" in tipos_map:
+            partida_abl = Partida(
+                municipio_id=municipio_id,
+                tipo_tasa_id=tipos_map["abl"].id,
+                identificador=f"ABL-{((_h >> 7) % 900000 + 100000)}/{(_h % 9) + 1}",
+                titular_user_id=vecino_demo.id,
+                titular_dni=_dni_demo,
+                titular_nombre=f"{_nombre_demo} {_apellido_demo}",
+                objeto={
+                    "direccion": _direccion_demo,
+                    "superficie_m2": 80 + ((_h >> 11) % 120),
+                    "zona": "B",
+                },
+                estado=EstadoPartida.ACTIVA,
+            )
+            db.add(partida_abl)
+            await db.flush()
+
+            # 3 boletas ABL: una pagada anterior, una pendiente actual, una vencida
+            importe_abl = Decimal(str(12000 + ((_h >> 13) % 8000)))
+            db.add_all([
+                Deuda(  # vencida (bimestre anterior)
+                    partida_id=partida_abl.id,
+                    periodo=f"{hoy.year}-{str(max(1, hoy.month - 3)).zfill(2)}",
+                    importe=importe_abl,
+                    fecha_emision=hoy - timedelta(days=90),
+                    fecha_vencimiento=hoy - timedelta(days=60),
+                    estado=EstadoDeuda.VENCIDA,
+                ),
+                Deuda(  # pagada anterior
+                    partida_id=partida_abl.id,
+                    periodo=f"{hoy.year}-{str(max(1, hoy.month - 2)).zfill(2)}",
+                    importe=importe_abl,
+                    fecha_emision=hoy - timedelta(days=60),
+                    fecha_vencimiento=hoy - timedelta(days=30),
+                    estado=EstadoDeuda.PAGADA,
+                    fecha_pago=_dt.utcnow() - timedelta(days=25),
+                ),
+                Deuda(  # pendiente actual
+                    partida_id=partida_abl.id,
+                    periodo=f"{hoy.year}-{str(hoy.month).zfill(2)}",
+                    importe=importe_abl,
+                    fecha_emision=hoy - timedelta(days=5),
+                    fecha_vencimiento=hoy + timedelta(days=15),
+                    estado=EstadoDeuda.PENDIENTE,
+                ),
+            ])
+
+        # === Partida Patente === (dominio inventado)
+        if "patente_automotor" in tipos_map:
+            _letras = ["AB", "AC", "AD", "AE", "AF"]
+            _letras2 = ["CD", "DF", "GH", "JK", "LM"]
+            dominio = f"{_letras[(_h >> 17) % 5]}{((_h >> 19) % 900) + 100}{_letras2[(_h >> 23) % 5]}"
+            partida_pat = Partida(
+                municipio_id=municipio_id,
+                tipo_tasa_id=tipos_map["patente_automotor"].id,
+                identificador=dominio,
+                titular_user_id=vecino_demo.id,
+                titular_dni=_dni_demo,
+                titular_nombre=f"{_nombre_demo} {_apellido_demo}",
+                objeto={
+                    "dominio": dominio,
+                    "marca": ["Fiat", "Peugeot", "Volkswagen", "Toyota", "Ford"][(_h >> 25) % 5],
+                    "modelo": ["Cronos", "208", "Gol", "Corolla", "Ka"][(_h >> 25) % 5],
+                    "anio": 2018 + ((_h >> 27) % 7),
+                },
+                estado=EstadoPartida.ACTIVA,
+            )
+            db.add(partida_pat)
+            await db.flush()
+
+            importe_pat = Decimal(str(28000 + ((_h >> 29) % 15000)))
+            db.add(Deuda(
+                partida_id=partida_pat.id,
+                periodo=f"{hoy.year}-Q{((hoy.month - 1) // 3) + 1}",
+                importe=importe_pat,
+                fecha_emision=hoy - timedelta(days=10),
+                fecha_vencimiento=hoy + timedelta(days=20),
+                estado=EstadoDeuda.PENDIENTE,
+            ))
+
+        # === Multa de transito === (one-shot)
+        if "multa_transito" in tipos_map:
+            partida_multa = Partida(
+                municipio_id=municipio_id,
+                tipo_tasa_id=tipos_map["multa_transito"].id,
+                identificador=f"ACTA-{((_h >> 31) % 90000) + 10000}",
+                titular_user_id=vecino_demo.id,
+                titular_dni=_dni_demo,
+                titular_nombre=f"{_nombre_demo} {_apellido_demo}",
+                objeto={
+                    "infraccion": "Estacionamiento en lugar prohibido",
+                    "lugar": _direccion_demo,
+                    "fecha_acta": (hoy - timedelta(days=20)).isoformat(),
+                },
+                estado=EstadoPartida.ACTIVA,
+            )
+            db.add(partida_multa)
+            await db.flush()
+
+            db.add(Deuda(
+                partida_id=partida_multa.id,
+                periodo=f"{hoy.year}-{str(max(1, hoy.month - 1)).zfill(2)}",
+                importe=Decimal(str(15000 + ((_h >> 33) % 20000))),
+                fecha_emision=hoy - timedelta(days=20),
+                fecha_vencimiento=hoy + timedelta(days=10),
+                estado=EstadoDeuda.PENDIENTE,
+            ))
+
+        await db.flush()
+
+    # ------------------------------------------------------------------
     # 5. Zonas + Barrios (geografía para mapa y selectors)
     # ------------------------------------------------------------------
     zonas = await _seed_zonas(db, municipio_id, codigo, muni_lat, muni_lng)

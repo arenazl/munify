@@ -206,6 +206,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Ver tus trámites'
     },
     {
+      name: 'Mis Tasas',
+      href: '/gestion/mis-tasas',
+      icon: BarChart3,
+      show: isVecino,
+      description: 'Tasas y boletas pendientes (ABL, patente, multas)'
+    },
+    {
       name: 'Mapa',
       href: '/gestion/mapa',
       icon: Map,

@@ -1217,6 +1217,16 @@ export const tramitesApi = {
   /** Asigna (o desasigna) un empleado responsable a la solicitud. Campo opcional. */
   asignarResponsable: (solicitudId: number, empleadoId: number | null) =>
     api.post(`/tramites/solicitudes/${solicitudId}/asignar-responsable`, { empleado_id: empleadoId }),
+};
+
+// Tasas (3er pilar: ABL, patentes, multas, etc)
+export const tasasApi = {
+  getTipos: () => api.get('/tasas/tipos'),
+  misPartidas: () => api.get('/tasas/mis-partidas'),
+  deudasDePartida: (partidaId: number) => api.get(`/tasas/partidas/${partidaId}/deudas`),
+  miResumen: () => api.get('/tasas/mi-resumen'),
+  reclamarPartida: (tipo_tasa_codigo: string, identificador: string) =>
+    api.post('/tasas/partidas/reclamar', { tipo_tasa_codigo, identificador }),
 
   // ----- Aliases retrocompat (a borrar progresivamente) -----
   // El código viejo usaba `getServicios` / `getCatalogo` para listar trámites

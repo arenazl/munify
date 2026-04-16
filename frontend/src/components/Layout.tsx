@@ -33,13 +33,13 @@ const getMobileTabs = (userRole: string) => {
   }
 
   // Vecino: "+" en el centro abre menú con Reclamo/Trámite (los dos core features).
-  // Inicio · Reclamos · + · Trámites · Perfil — simetría reclamo/trámite a los costados.
+  // Inicio · Reclamos · + · Trámites · Tasas — los 3 pilares del ciudadano.
   return [
     { path: '/gestion/mi-panel', icon: Home, label: 'Inicio', end: true },
     { path: '/gestion/mis-reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
     { path: null, icon: null, label: 'Crear', isCreateMenu: true },
     { path: '/gestion/mis-tramites', icon: FileCheck, label: 'Trámites', end: false },
-    { path: '/gestion/ajustes', icon: User, label: 'Perfil', end: false },
+    { path: '/gestion/mis-tasas', icon: BarChart3, label: 'Tasas', end: false },
   ];
 };
 

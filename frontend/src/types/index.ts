@@ -354,6 +354,66 @@ export interface ChecklistDocumentoItem {
   fecha_rechazo?: string | null;
 }
 
+// =====================================================================
+// TASAS (3er pilar)
+// =====================================================================
+
+export interface TipoTasa {
+  id: number;
+  codigo: string;
+  nombre: string;
+  descripcion?: string;
+  icono: string;
+  color: string;
+  ciclo: 'mensual' | 'bimestral' | 'cuatrimestral' | 'anual' | 'one_shot';
+  activo: boolean;
+  orden: number;
+}
+
+export interface Partida {
+  id: number;
+  municipio_id: number;
+  tipo_tasa_id: number;
+  tipo_tasa?: TipoTasa;
+  identificador: string;
+  titular_user_id?: number | null;
+  titular_dni?: string | null;
+  titular_nombre?: string | null;
+  objeto?: Record<string, unknown> | null;
+  estado: 'activa' | 'baja' | 'suspendida';
+  created_at: string;
+  deudas_pendientes?: number;
+  monto_pendiente?: string | number;
+}
+
+export interface Deuda {
+  id: number;
+  partida_id: number;
+  periodo: string;
+  importe: string | number;
+  importe_original?: string | number | null;
+  recargo: string | number;
+  descuento: string | number;
+  fecha_emision: string;
+  fecha_vencimiento: string;
+  estado: 'pendiente' | 'pagada' | 'vencida' | 'en_plan_pago' | 'anulada';
+  fecha_pago?: string | null;
+  pago_externo_id?: string | null;
+  codigo_barras?: string | null;
+  observaciones?: string | null;
+  created_at: string;
+  tipo_tasa_nombre?: string | null;
+  partida_identificador?: string | null;
+}
+
+export interface ResumenTasasVecino {
+  partidas_total: number;
+  deudas_pendientes: number;
+  deudas_vencidas: number;
+  monto_total_pendiente: string | number;
+  proxima_vencimiento?: string | null;
+}
+
 export interface ChecklistDocumentos {
   solicitud_id: number;
   items: ChecklistDocumentoItem[];

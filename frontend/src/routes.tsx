@@ -31,6 +31,7 @@ import WhatsAppConfig from './pages/WhatsAppConfig';
 import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
 import MisTramites from './pages/MisTramites';
+import MisTasas from './pages/MisTasas';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
 import Ajustes from './pages/Ajustes';
@@ -249,6 +250,11 @@ export const router = createBrowserRouter([
       {
         path: 'mis-tramites',
         element: <MisTramites />
+      },
+      // Mis Tasas — 3er pilar (ABL, patentes, multas, etc)
+      {
+        path: 'mis-tasas',
+        element: <MisTasas />
       },
       // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
       {
