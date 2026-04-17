@@ -313,12 +313,12 @@ export function ChatWidget() {
             height: 'min(700px, 85vh)',
             borderRadius: '16px',
           } : (isOpen || isHovered) ? {
-            // Sidebar expandido: desde arriba hasta abajo, 320px
-            top: '0',
-            right: '0',
-            width: '320px',
-            height: '100vh',
-            borderRadius: '0',
+            // Floating chat abierto: esquina inferior derecha
+            bottom: '16px',
+            right: '16px',
+            width: '360px',
+            height: 'min(520px, 75vh)',
+            borderRadius: '16px',
           } : {
             // Colapsado: cajita chica en la esquina inferior derecha con su propio rincón
             bottom: '16px',
@@ -329,14 +329,11 @@ export function ChatWidget() {
           }),
           zIndex: 40,
           backgroundColor: theme.card,
-          borderLeft: (isOpen || isHovered) && !isMaximized ? `1px solid ${theme.border}` : undefined,
-          border: isMaximized
-            ? `1px solid ${theme.border}`
-            : (!isOpen && !isHovered) ? `1px solid ${theme.border}` : undefined,
+          border: `1px solid ${theme.border}`,
           boxShadow: isMaximized
             ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
             : (isOpen || isHovered)
-              ? '-4px 0 12px rgba(0, 0, 0, 0.06)'
+              ? '0 8px 30px rgba(0, 0, 0, 0.15)'
               : `0 4px 12px ${theme.primary}30`
         }}
         onMouseEnter={() => !isMaximized && setIsHovered(true)}
