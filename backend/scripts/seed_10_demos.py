@@ -242,15 +242,37 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
         if ya_existe_conceptualmente(nombre):
             continue
 
+        # Defaults inteligentes de pago segun el tipo de tramite
+        if costo and costo > 0:
+            nombre_lower = nombre.lower()
+            # Rapipago para montos chicos (<= $1500) - tipico en cupones
+            if costo <= 1500:
+                tipo_pago_default = "rapipago"
+            # Adhesion debito para tramites recurrentes (renovaciones)
+            elif "renovacion" in nombre_lower or "renovación" in nombre_lower:
+                tipo_pago_default = "adhesion_debito"
+            # Boton de pago para el resto (montos altos, online)
+            else:
+                tipo_pago_default = "boton_pago"
+            # Momento: certificados al final (te lo dan al pagar), resto al inicio
+            momento_default = "fin" if (
+                "certificado" in nombre_lower or "libre deuda" in nombre_lower or "dominio" in nombre_lower
+            ) else "inicio"
+        else:
+            tipo_pago_default = None
+            momento_default = None
+
         await db.execute(text("""
             INSERT INTO tramites (
                 municipio_id, categoria_tramite_id, nombre, descripcion,
                 icono, requiere_validacion_dni, requiere_validacion_facial,
-                tiempo_estimado_dias, costo, activo, orden, created_at, updated_at
+                tiempo_estimado_dias, costo, tipo_pago, momento_pago,
+                activo, orden, created_at, updated_at
             ) VALUES (
                 :mid, :cat_id, :nombre, :descripcion,
                 :icono, 0, 0,
-                :dias, :costo, 1, :orden, NOW(), NOW()
+                :dias, :costo, :tipo_pago, :momento_pago,
+                1, :orden, NOW(), NOW()
             )
         """), {
             "mid": muni_id,
@@ -260,6 +282,8 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
             "icono": icono,
             "dias": dias,
             "costo": costo,
+            "tipo_pago": tipo_pago_default,
+            "momento_pago": momento_default,
             "orden": tramites_creados + 1,
         })
         tramites_creados += 1

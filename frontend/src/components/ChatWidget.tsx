@@ -450,24 +450,6 @@ export function ChatWidget() {
         )}
       </div>
 
-      {/* Burbuja flotante abajo a la derecha — mismo rol que la línea */}
-      {!isOpen && (
-        <button
-          onClick={() => setIsPinned(true)}
-          onMouseEnter={() => setIsHovered(true)}
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 animate-in fade-in slide-in-from-bottom-2"
-          style={{
-            zIndex: 50,
-            backgroundColor: theme.primary,
-            color: theme.primaryText,
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
-          }}
-          title="Abrir y anclar asistente IA"
-        >
-          <MessageCircle className="h-6 w-6" />
-        </button>
-      )}
-
       {/* Panel lateral con slide-in desde la derecha. Siempre renderizado para
           que el CSS transition anime el transform. Si no está pinned y el
           mouse sale, se cierra con animación. */}
@@ -511,27 +493,40 @@ export function ChatWidget() {
           </div>
         )}
 
+        {/* Pin flotante en el borde izquierdo, centrado vertical — fácil de clickear
+            sin tener que llegar hasta el header. */}
+        {isOpen && (
+          <button
+            onClick={() => setIsPinned(p => !p)}
+            className="absolute transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
+            style={{
+              left: '-14px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              zIndex: 42,
+              color: isPinned ? theme.primaryText : theme.textSecondary,
+              backgroundColor: isPinned ? theme.primary : theme.card,
+              border: `1px solid ${isPinned ? theme.primary : theme.border}`,
+              boxShadow: '-2px 2px 8px rgba(0,0,0,0.15)',
+            }}
+            title={isPinned ? 'Desanclar (se cierra al sacar el mouse)' : 'Anclar panel abierto'}
+          >
+            {isPinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
+          </button>
+        )}
+
         {/* Barra minimalista de controles */}
         {isOpen && (
           <div
-            className="flex items-center justify-between flex-shrink-0 gap-0.5 px-2 py-1.5"
+            className="flex items-center justify-end flex-shrink-0 gap-0.5 px-2 py-1.5"
             style={{
               borderBottom: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,
             }}
           >
-            {/* Pin: ancla el panel abierto (no se cierra al sacar mouse) */}
-            <button
-              onClick={() => setIsPinned(p => !p)}
-              className="p-1 rounded-md transition-all hover:scale-110 active:scale-95"
-              style={{
-                color: isPinned ? theme.primary : theme.textSecondary,
-                backgroundColor: isPinned ? `${theme.primary}20` : 'transparent',
-              }}
-              title={isPinned ? 'Desanclar (se cerrará al sacar el mouse)' : 'Anclar panel abierto'}
-            >
-              {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
-            </button>
 
             {/* Nueva conversación (derecha) */}
             {messages.length > 0 && (

@@ -273,6 +273,8 @@ async def obtener_sesion(
     porque conceptualmente es otra plataforma. La seguridad la da el
     session_id no-enumerable (hex random de 14 chars).
     """
+    from models.tramite import Solicitud as _Solicitud, Tramite as _Tramite
+
     q = await db.execute(
         select(PagoSesion)
         .options(
@@ -308,7 +310,14 @@ async def obtener_sesion(
     tipo_pago_origen = None
     if sesion.deuda and sesion.deuda.partida and sesion.deuda.partida.tipo_tasa:
         tipo_pago_origen = sesion.deuda.partida.tipo_tasa.tipo_pago
-    # En el futuro: chequear sesion.solicitud.tramite.tipo_pago tambien
+    elif sesion.solicitud_id:
+        # Pago de tramite — leer tipo_pago del tramite asociado a la solicitud
+        sq = await db.execute(
+            select(_Solicitud).options(selectinload(_Solicitud.tramite)).where(_Solicitud.id == sesion.solicitud_id)
+        )
+        sol = sq.scalar_one_or_none()
+        if sol and sol.tramite:
+            tipo_pago_origen = sol.tramite.tipo_pago
 
     if tipo_pago_origen and tipo_pago_origen in TIPO_PAGO_TO_MEDIOS:
         permitidos = set(TIPO_PAGO_TO_MEDIOS[tipo_pago_origen])
