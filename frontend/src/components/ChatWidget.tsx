@@ -295,7 +295,16 @@ export function ChatWidget() {
         />
       )}
 
-      {/* Chat footer / modal */}
+      {/* Backdrop transparente para cerrar al click afuera (solo floating abierto) */}
+      {isOpen && !isMaximized && (
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 39 }}
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Chat floating / modal */}
       <div
         className={`
           flex flex-col overflow-hidden
@@ -336,7 +345,7 @@ export function ChatWidget() {
               ? '0 8px 30px rgba(0, 0, 0, 0.15)'
               : `0 4px 12px ${theme.primary}30`
         }}
-        onMouseEnter={() => !isMaximized && setIsHovered(true)}
+        onMouseEnter={() => !isMaximized && !isOpen && setIsHovered(true)}
         onMouseLeave={() => !isOpen && setIsHovered(false)}
       >
         {/* Cajita colapsada: rincón propio 48x48 con ícono de IA */}
@@ -346,6 +355,7 @@ export function ChatWidget() {
             style={{
               background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
             }}
+            onClick={() => setIsOpen(true)}
           >
             <Sparkles className="h-5 w-5" style={{ color: theme.primaryText }} />
           </div>
