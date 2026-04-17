@@ -8,11 +8,12 @@ import enum
 class EstadoSolicitud(str, enum.Enum):
     """Estados de una solicitud de trámite - alineados con reclamos"""
     # Estados activos (en orden de flujo)
-    RECIBIDO = "recibido"           # Solicitud recibida
-    EN_CURSO = "en_curso"           # En proceso
-    FINALIZADO = "finalizado"       # Completado exitosamente
-    POSPUESTO = "pospuesto"         # Diferido
-    RECHAZADO = "rechazado"         # Rechazado
+    RECIBIDO = "recibido"               # Solicitud recibida
+    PENDIENTE_PAGO = "pendiente_pago"   # Esperando pago del vecino (antes/despues segun momento_pago)
+    EN_CURSO = "en_curso"               # En proceso
+    FINALIZADO = "finalizado"           # Completado exitosamente
+    POSPUESTO = "pospuesto"             # Diferido
+    RECHAZADO = "rechazado"             # Rechazado
 
     # Estados legacy (para compatibilidad con datos existentes)
     INICIADO = "INICIADO"
@@ -67,6 +68,14 @@ class Tramite(Base):
     tiempo_estimado_dias = Column(Integer, default=15)
     costo = Column(Float, nullable=True)
     url_externa = Column(String(500), nullable=True)
+
+    # Configuracion de pago (cuando costo > 0)
+    # tipo_pago: como se cobra → "boton_pago" (tarjeta web), "rapipago" (cupon),
+    #   "adhesion_debito" (CBU), "qr" (QR interoperable), null si gratis.
+    tipo_pago = Column(String(30), nullable=True)
+    # momento_pago: cuando se cobra → "inicio" (antes de trabajar) o "fin"
+    #   (al retirar). Default "inicio" si tiene costo.
+    momento_pago = Column(String(10), nullable=True)
 
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)

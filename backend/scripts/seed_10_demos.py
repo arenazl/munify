@@ -215,14 +215,31 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
         print(f"  - 0 tramites (sin coincidencia con catalogo)")
         return reclamos_creados, 0
 
+    # Cargar nombres existentes una sola vez para detectar solapamiento conceptual
+    r_existentes = await db.execute(text("""
+        SELECT nombre FROM tramites WHERE municipio_id = :mid
+    """), {"mid": muni_id})
+    existentes_norm = [normaliza(row[0]) for row in r_existentes.fetchall()]
+
+    def ya_existe_conceptualmente(nombre: str) -> bool:
+        """True si hay un tramite con nombre que solapa conceptualmente.
+        Evita duplicar 'Renovacion Licencia de Conducir' cuando ya existe
+        'Licencia de conducir - Primera vez' del seed_demo base."""
+        n = normaliza(nombre)
+        palabras_clave = [w for w in n.split() if len(w) > 4][:3]
+        if not palabras_clave:
+            palabras_clave = n.split()[:2]
+        for ex in existentes_norm:
+            comunes = sum(1 for w in palabras_clave if w in ex)
+            if comunes >= 2:
+                return True
+            if n in ex or ex in n:
+                return True
+        return False
+
     seleccionados = random.sample(candidatos, min(CANT_TRAMITES_POR_MUNI, len(candidatos)))
     for cat_id, cat_nombre, nombre, descripcion, dias, costo, icono in seleccionados:
-        # Idempotencia: salteo si ya existe
-        r = await db.execute(text("""
-            SELECT id FROM tramites
-            WHERE municipio_id = :mid AND nombre = :nombre
-        """), {"mid": muni_id, "nombre": nombre})
-        if r.scalar():
+        if ya_existe_conceptualmente(nombre):
             continue
 
         await db.execute(text("""

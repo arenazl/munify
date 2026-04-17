@@ -55,6 +55,9 @@ class TramiteBase(BaseModel):
     url_externa: Optional[str] = None
     requiere_validacion_dni: bool = False
     requiere_validacion_facial: bool = False
+    # Configuracion de pago (cuando costo > 0)
+    tipo_pago: Optional[str] = None       # boton_pago | rapipago | adhesion_debito | qr
+    momento_pago: Optional[str] = None    # inicio | fin
     activo: bool = True
     orden: int = 0
 
@@ -74,6 +77,8 @@ class TramiteUpdate(BaseModel):
     url_externa: Optional[str] = None
     requiere_validacion_dni: Optional[bool] = None
     requiere_validacion_facial: Optional[bool] = None
+    tipo_pago: Optional[str] = None
+    momento_pago: Optional[str] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
 
@@ -84,6 +89,8 @@ class TramiteSimple(BaseModel):
     icono: Optional[str] = None
     tiempo_estimado_dias: int = 15
     costo: Optional[float] = None
+    tipo_pago: Optional[str] = None
+    momento_pago: Optional[str] = None
     requiere_validacion_dni: bool = False
     requiere_validacion_facial: bool = False
     categoria_tramite_id: Optional[int] = None

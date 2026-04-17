@@ -36,6 +36,7 @@ import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizar
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import PageHint from '../components/ui/PageHint';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -585,7 +586,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const handleRechazar = () => handleDirectStateChange('rechazado', 'Trámite rechazado');
   const handlePosponer = () => handleDirectStateChange('pospuesto', 'Trámite pospuesto');
 
-  // Renderizar footer con botones de acción
+  // Renderizar footer con botones grandes dockeados (grid 2 col, hasta 2 filas)
   const renderTramiteFooter = () => {
     if (!selectedTramite) return null;
 
@@ -595,63 +596,69 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     if (estadoActual === 'rechazado' || estadoActual === 'finalizado') {
       return (
         <div
-          className="flex-1 px-4 py-2.5 rounded-xl font-medium text-center"
+          className="w-full px-4 py-3 rounded-xl font-semibold text-center"
           style={{
             backgroundColor: estadoActual === 'finalizado' ? '#05966920' : '#ef444420',
             color: estadoActual === 'finalizado' ? '#059669' : '#ef4444',
             border: `1px solid ${estadoActual === 'finalizado' ? '#05966950' : '#ef444450'}`
           }}
         >
-          {estadoActual === 'finalizado' ? '✓ Finalizado' : '✗ Rechazado'}
+          {estadoActual === 'finalizado' ? '✓ Trámite Finalizado' : '✗ Trámite Rechazado'}
         </div>
       );
     }
 
-    // Determinar acción principal según estado
-    let mainAction: { label: string; loadingLabel: string; handler: () => void; color: string } | null = null;
+    // Acciones disponibles según estado — cada una con su color/handler.
+    // Mostrado como grid 2 col; si hay 3 acciones, la tercera (Rechazar) abarca toda la fila.
+    type Accion = { label: string; loadingLabel: string; handler: () => void; color: string; variant?: 'solid' | 'outline'; fullRow?: boolean };
+    const acciones: Accion[] = [];
 
-    switch (estadoActual) {
-      case 'recibido':
-        mainAction = { label: 'Poner en Curso', loadingLabel: 'Aceptando...', handler: handleAceptar, color: theme.primary };
-        break;
-      case 'en_curso':
-        mainAction = { label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981' };
-        break;
-      case 'pospuesto':
-        mainAction = { label: 'Reanudar', loadingLabel: 'Reanudando...', handler: handleAceptar, color: theme.primary };
-        break;
+    if (estadoActual === 'recibido') {
+      acciones.push(
+        { label: 'Poner en Curso', loadingLabel: 'Aceptando...', handler: handleAceptar, color: theme.primary, variant: 'solid' },
+        { label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline' },
+      );
+    } else if (estadoActual === 'en_curso') {
+      acciones.push(
+        { label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981', variant: 'solid' },
+        { label: 'Posponer', loadingLabel: 'Posponiendo...', handler: handlePosponer, color: '#f59e0b', variant: 'outline' },
+        { label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline', fullRow: true },
+      );
+    } else if (estadoActual === 'pospuesto') {
+      acciones.push(
+        { label: 'Reanudar', loadingLabel: 'Reanudando...', handler: handleAceptar, color: theme.primary, variant: 'solid' },
+        { label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981', variant: 'solid' },
+        { label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline', fullRow: true },
+      );
     }
 
-    if (!mainAction) return null;
+    if (acciones.length === 0) return null;
 
     return (
-      <div className="flex gap-2">
-        <button
-          onClick={mainAction.handler}
-          disabled={saving}
-          className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-lg"
-          style={{
-            backgroundColor: mainAction.color,
-            color: '#ffffff',
-            boxShadow: `0 4px 14px ${mainAction.color}40`
-          }}
-        >
-          {saving ? mainAction.loadingLabel : mainAction.label}
-        </button>
-        {/* En este punto estadoActual ya es recibido/en_curso/pospuesto (los
-            finales fueron descartados arriba). Siempre se puede rechazar. */}
-        <button
-            onClick={handleRechazar}
+      <div className="grid grid-cols-2 gap-2">
+        {acciones.map((a, i) => (
+          <button
+            key={i}
+            onClick={a.handler}
             disabled={saving}
-            className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50"
-            style={{
-              backgroundColor: '#ef444415',
-              border: '1px solid #ef444450',
-              color: '#ef4444'
-            }}
+            className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${a.fullRow ? 'col-span-2' : ''}`}
+            style={
+              a.variant === 'solid'
+                ? {
+                    backgroundColor: a.color,
+                    color: '#ffffff',
+                    boxShadow: `0 4px 14px ${a.color}40`,
+                  }
+                : {
+                    backgroundColor: `${a.color}15`,
+                    border: `1.5px solid ${a.color}60`,
+                    color: a.color,
+                  }
+            }
           >
-            Rechazar
+            {saving ? a.loadingLabel : a.label}
           </button>
+        ))}
       </div>
     );
   };
@@ -1888,30 +1895,33 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 })()}
 
                 {/* Selector + botón */}
-                <div className="flex gap-2">
-                  <select
-                    value={responsableId ?? ''}
-                    onChange={e => setResponsableId(e.target.value ? Number(e.target.value) : null)}
-                    disabled={loadingEmpleados || asignandoResponsable}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm"
-                    style={{
-                      backgroundColor: theme.card,
-                      border: `1px solid ${theme.border}`,
-                      color: theme.text,
-                    }}
-                  >
-                    <option value="">Sin responsable asignado</option>
-                    {empleadosDisponibilidad.map(emp => {
-                      const libre = 100 - (emp.porcentaje_ocupacion || 0);
-                      return (
-                        <option key={emp.id} value={emp.id}>
-                          {emp.nombre} {emp.apellido || ''}
-                          {emp.horario_texto ? ` · ${emp.horario_texto}` : ''}
-                          {` · ${libre}% libre`}
-                        </option>
-                      );
-                    })}
-                  </select>
+                <div className="flex gap-2 items-end">
+                  {(() => {
+                    const respOptions: SelectOption[] = [
+                      { value: '', label: 'Sin responsable asignado', icon: <UserPlus className="w-4 h-4" /> },
+                      ...empleadosDisponibilidad.map(emp => {
+                        const libre = 100 - (emp.porcentaje_ocupacion || 0);
+                        const desc = [emp.horario_texto, `${libre}% libre`].filter(Boolean).join(' · ');
+                        return {
+                          value: String(emp.id),
+                          label: `${emp.nombre} ${emp.apellido || ''}`.trim(),
+                          description: desc,
+                        };
+                      }),
+                    ];
+                    return (
+                      <div className="flex-1 min-w-0">
+                        <ModernSelect
+                          value={responsableId !== null ? String(responsableId) : ''}
+                          onChange={(value) => setResponsableId(value ? Number(value) : null)}
+                          options={respOptions}
+                          placeholder="Sin responsable asignado"
+                          searchable={empleadosDisponibilidad.length > 5}
+                          disabled={loadingEmpleados || asignandoResponsable}
+                        />
+                      </div>
+                    );
+                  })()}
                   <button
                     onClick={handleAsignarResponsable}
                     disabled={asignandoResponsable || responsableId === (selectedTramite.empleado_id ?? null)}
@@ -2030,100 +2040,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 </p>
               )}
             </div>
-
-            {/* Actualizar estado */}
-            {(estadoTransiciones[normalizeEstado(selectedTramite.estado)]?.length || 0) > 0 && (
-              <div
-                className="p-4 rounded-xl"
-                style={{ backgroundColor: theme.backgroundSecondary }}
-              >
-                <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
-                  Actualizar Estado
-                </h3>
-
-                <div className="space-y-4">
-                  {/* Selector de nuevo estado */}
-                  <div>
-                    <label className="text-xs font-medium mb-1 block" style={{ color: theme.textSecondary }}>
-                      Nuevo estado
-                    </label>
-                    <select
-                      value={nuevoEstado}
-                      onChange={(e) => setNuevoEstado(e.target.value as EstadoCanonico)}
-                      className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        color: theme.text,
-                      }}
-                    >
-                      <option value="">Seleccionar estado...</option>
-                      {(estadoTransiciones[normalizeEstado(selectedTramite.estado)] || []).map(estado => (
-                        <option key={estado} value={estado}>
-                          {getEstadoConfig(estado).label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Respuesta */}
-                  <div>
-                    <label className="text-xs font-medium mb-1 block" style={{ color: theme.textSecondary }}>
-                      Respuesta al solicitante
-                    </label>
-                    <textarea
-                      value={respuesta}
-                      onChange={(e) => setRespuesta(e.target.value)}
-                      placeholder="Escribe una respuesta para el solicitante..."
-                      rows={3}
-                      className="w-full px-3 py-2 rounded-lg text-sm resize-none"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        color: theme.text,
-                      }}
-                    />
-                  </div>
-
-                  {/* Observaciones internas */}
-                  <div>
-                    <label className="text-xs font-medium mb-1 block" style={{ color: theme.textSecondary }}>
-                      Observaciones internas
-                    </label>
-                    <textarea
-                      value={observaciones}
-                      onChange={(e) => setObservaciones(e.target.value)}
-                      placeholder="Notas internas (no visibles para el solicitante)..."
-                      rows={2}
-                      className="w-full px-3 py-2 rounded-lg text-sm resize-none"
-                      style={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        color: theme.text,
-                      }}
-                    />
-                  </div>
-
-                  {/* Botón guardar */}
-                  <button
-                    onClick={handleUpdateTramite}
-                    disabled={saving || !nuevoEstado}
-                    className="w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
-                      color: '#ffffff',
-                    }}
-                  >
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    {saving ? 'Guardando...' : 'Actualizar Trámite'}
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Respuesta/observaciones existentes */}
             {(selectedTramite.respuesta || selectedTramite.observaciones) && (

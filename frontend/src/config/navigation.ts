@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap, Receipt
+  FolderTree, FileText, Activity, Zap, Receipt, Wallet
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -166,6 +166,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: FileText,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
       description: 'Trámites específicos del municipio (ej: Licencia de Conducir)'
+    },
+    {
+      name: 'Proveedores de Pago',
+      href: '/gestion/proveedores-pago',
+      icon: Wallet,
+      show: isAdminOrSupervisor && !isSuperAdmin,
+      description: 'GIRE, MercadoPago y MODO — quién procesa los cobros'
     },
     // === Solo SUPERADMIN (admin sin municipio asignado) ===
     {

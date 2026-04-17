@@ -21,7 +21,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi } from '../lib/api';
+import { tramitesApi, pagosApi } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
@@ -886,8 +886,44 @@ export default function MisTramites() {
               }
             };
 
+            // Pago: el tramite tiene costo y el estado lo permite
+            const tramiteCfg = (selectedTramite as any).tramite || {};
+            const tieneCosto = tramiteCfg.costo && tramiteCfg.costo > 0;
+            const estadoActual = String(selectedTramite.estado || '').toLowerCase();
+            const estadoPermitePago =
+              estadoActual === 'recibido' ||
+              estadoActual === 'pendiente_pago' ||
+              (estadoActual === 'en_curso' && tramiteCfg.momento_pago === 'fin') ||
+              (estadoActual === 'finalizado' && tramiteCfg.momento_pago === 'fin');
+            const puedePagar = !!(tieneCosto && user?.rol === 'vecino' && estadoPermitePago && !selectedTramite.pago_externo_id);
+
+            const iniciarPago = async () => {
+              try {
+                const res = await pagosApi.crearSesionTramite(
+                  selectedTramite.id,
+                  '/gestion/mis-tramites?pago=ok',
+                );
+                window.location.href = res.data.checkout_url;
+              } catch (err: any) {
+                toast.error(err?.response?.data?.detail || 'No se pudo iniciar el pago');
+              }
+            };
+
             return (
               <div className="space-y-2">
+                {puedePagar && (
+                  <button
+                    onClick={iniciarPago}
+                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95"
+                    style={{
+                      background: `linear-gradient(135deg, #10b981 0%, #059669 100%)`,
+                      color: '#ffffff',
+                      boxShadow: `0 8px 24px #10b98140`,
+                    }}
+                  >
+                    💳 Pagar trámite ${tramiteCfg.costo?.toLocaleString('es-AR') || tramiteCfg.costo}
+                  </button>
+                )}
                 {puedeEnviarRevision && (
                   <button
                     onClick={enviarRevision}

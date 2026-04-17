@@ -184,6 +184,83 @@ async def crear_sesion_pago(
 # 2. Obtener sesion (desde el checkout externo)
 # ============================================================
 
+class CrearSesionTramiteRequest(BaseModel):
+    solicitud_id: int
+    return_url: Optional[str] = None
+
+
+@router.post("/sesion-tramite", response_model=CrearSesionResponse)
+async def crear_sesion_tramite(
+    body: CrearSesionTramiteRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    El vecino hizo click en 'Pagar' sobre una solicitud de tramite.
+    Crea la sesion de pago y devuelve el checkout_url.
+    """
+    from models.tramite import Solicitud, EstadoSolicitud, Tramite
+    from sqlalchemy.orm import selectinload as _sl
+
+    q = await db.execute(
+        select(Solicitud)
+        .options(_sl(Solicitud.tramite))
+        .where(Solicitud.id == body.solicitud_id)
+    )
+    solicitud = q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    if not solicitud.tramite or not solicitud.tramite.costo or solicitud.tramite.costo <= 0:
+        raise HTTPException(status_code=400, detail="Este tramite no tiene costo")
+
+    # Permiso: vecino solo paga lo suyo
+    if current_user.rol == RolUsuario.VECINO and solicitud.solicitante_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No podes pagar una solicitud ajena")
+
+    if solicitud.estado in (EstadoSolicitud.FINALIZADO, EstadoSolicitud.RECHAZADO):
+        raise HTTPException(status_code=400, detail=f"Esta solicitud esta {solicitud.estado.value}")
+
+    provider = get_provider()
+    sesion_id = _generar_session_id()
+    concepto = f"{solicitud.tramite.nombre} — Solicitud {solicitud.numero_tramite}"
+
+    sesion_ext = await provider.crear_sesion(
+        concepto=concepto,
+        monto=Decimal(str(solicitud.tramite.costo)),
+        sesion_id=sesion_id,
+        return_url=body.return_url or "/gestion/mis-tramites",
+    )
+
+    expires_at = datetime.utcnow() + timedelta(seconds=sesion_ext.expires_in_seconds)
+    sesion = PagoSesion(
+        id=sesion_id,
+        solicitud_id=solicitud.id,
+        municipio_id=solicitud.municipio_id,
+        vecino_user_id=current_user.id,
+        concepto=concepto,
+        monto=Decimal(str(solicitud.tramite.costo)),
+        estado=EstadoSesionPago.PENDING,
+        provider=provider.nombre,
+        external_id=sesion_ext.external_id,
+        checkout_url=sesion_ext.checkout_url,
+        return_url=body.return_url,
+        expires_at=expires_at,
+    )
+    db.add(sesion)
+
+    # Si es momento_pago=inicio, dejar el tramite en pendiente_pago hasta que se confirme
+    if solicitud.tramite.momento_pago == "inicio" and solicitud.estado == EstadoSolicitud.RECIBIDO:
+        solicitud.estado = EstadoSolicitud.PENDIENTE_PAGO
+
+    await db.commit()
+
+    return CrearSesionResponse(
+        session_id=sesion_id,
+        checkout_url=sesion_ext.checkout_url,
+    )
+
+
 @router.get("/sesiones/{session_id}", response_model=SesionPagoPublica)
 async def obtener_sesion(
     session_id: str,
@@ -201,6 +278,7 @@ async def obtener_sesion(
         .options(
             selectinload(PagoSesion.municipio),
             selectinload(PagoSesion.vecino),
+            selectinload(PagoSesion.deuda).selectinload(Deuda.partida).selectinload(Partida.tipo_tasa),
         )
         .where(PagoSesion.id == session_id)
     )
@@ -217,6 +295,27 @@ async def obtener_sesion(
     vecino_nombre = f"{sesion.vecino.nombre} {sesion.vecino.apellido or ''}".strip() if sesion.vecino else ""
 
     provider = get_provider()
+    medios_todos = provider.medios_soportados()
+
+    # Filtrar por tipo_pago configurado en la tasa/tramite del origen.
+    # Mapeo tipo_pago (config catalogo) -> medios validos en la sesion.
+    TIPO_PAGO_TO_MEDIOS = {
+        "boton_pago": [MedioPagoGateway.TARJETA, MedioPagoGateway.QR],
+        "rapipago": [MedioPagoGateway.EFECTIVO_CUPON],
+        "adhesion_debito": [MedioPagoGateway.DEBITO_AUTOMATICO],
+        "qr": [MedioPagoGateway.QR],
+    }
+    tipo_pago_origen = None
+    if sesion.deuda and sesion.deuda.partida and sesion.deuda.partida.tipo_tasa:
+        tipo_pago_origen = sesion.deuda.partida.tipo_tasa.tipo_pago
+    # En el futuro: chequear sesion.solicitud.tramite.tipo_pago tambien
+
+    if tipo_pago_origen and tipo_pago_origen in TIPO_PAGO_TO_MEDIOS:
+        permitidos = set(TIPO_PAGO_TO_MEDIOS[tipo_pago_origen])
+        medios_filtrados = [m for m in medios_todos if m in permitidos]
+        if medios_filtrados:
+            medios_todos = medios_filtrados
+
     return SesionPagoPublica(
         session_id=sesion.id,
         estado=sesion.estado,
@@ -224,7 +323,7 @@ async def obtener_sesion(
         monto=Decimal(str(sesion.monto)),
         municipio_nombre=muni_nombre,
         vecino_nombre=vecino_nombre,
-        medios_soportados=provider.medios_soportados(),
+        medios_soportados=medios_todos,
         return_url=sesion.return_url,
         provider=sesion.provider,
     )
@@ -289,6 +388,22 @@ async def confirmar_pago(
             estado="confirmado",
             payload_externo=sesion.metadatos,
         ))
+
+    # Si era pago de un tramite, avanzar el estado segun momento_pago
+    if sesion.solicitud_id:
+        from models.tramite import Solicitud, EstadoSolicitud
+        sol_q = await db.execute(
+            select(Solicitud).options(selectinload(Solicitud.tramite)).where(Solicitud.id == sesion.solicitud_id)
+        )
+        solicitud = sol_q.scalar_one_or_none()
+        if solicitud and solicitud.tramite:
+            momento = solicitud.tramite.momento_pago or "inicio"
+            if momento == "inicio":
+                # Pago al inicio: pasa de pendiente_pago/recibido a recibido (listo para que la dependencia lo tome)
+                solicitud.estado = EstadoSolicitud.RECIBIDO
+            elif momento == "fin":
+                # Pago al final: la dependencia ya termino el trabajo, ahora se finaliza
+                solicitud.estado = EstadoSolicitud.FINALIZADO
 
     await db.commit()
 

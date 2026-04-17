@@ -20,6 +20,7 @@ import Categorias from './pages/Categorias';
 import CategoriasReclamoConfig from './pages/CategoriasReclamoConfig';
 import CategoriasTramiteConfig from './pages/CategoriasTramiteConfig';
 import TramitesConfig from './pages/TramitesConfig';
+import ProveedoresPago from './pages/ProveedoresPago';
 import Zonas from './pages/Zonas';
 // import Configuracion from './pages/Configuracion';  // Redirige a Ajustes
 import Exportar from './pages/Exportar';
@@ -218,6 +219,10 @@ export const router = createBrowserRouter([
       {
         path: 'tramites-config',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><TramitesConfig /></ProtectedRoute>
+      },
+      {
+        path: 'proveedores-pago',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><ProveedoresPago /></ProtectedRoute>
       },
       {
         path: 'configuracion',

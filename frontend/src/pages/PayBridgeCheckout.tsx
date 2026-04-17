@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   CreditCard, QrCode, Receipt, Landmark, Repeat,
   ShieldCheck, Loader2, CheckCircle2, ArrowLeft, Lock, Info,
+  Download, Calendar, Building, Banknote,
 } from 'lucide-react';
 import { pagosApi } from '../lib/api';
 
@@ -97,6 +98,22 @@ export default function PayBridgeCheckout() {
     }
     cargar();
   }, [sessionId]);
+
+  // Auto-seleccionar el medio si la sesion solo tiene uno (caso típico cuando
+  // el tramite/tasa tiene tipo_pago especifico — ej "rapipago" → solo cupon).
+  useEffect(() => {
+    if (sesion && sesion.medios_soportados.length === 1 && !medioSeleccionado) {
+      setMedioSeleccionado(sesion.medios_soportados[0] as Medio);
+    }
+  }, [sesion, medioSeleccionado]);
+
+  // Si el medio unico es "efectivo_cupon" o "debito_automatico", se renderiza
+  // un panel especializado en vez del flujo generico de seleccion + confirmar.
+  const usaPanelEspecializado = (
+    sesion?.medios_soportados.length === 1 &&
+    (sesion.medios_soportados[0] === 'efectivo_cupon' ||
+     sesion.medios_soportados[0] === 'debito_automatico')
+  );
 
   const cargar = async () => {
     try {
@@ -306,6 +323,24 @@ export default function PayBridgeCheckout() {
               Volver al municipio
             </button>
           </div>
+        ) : usaPanelEspecializado && sesion ? (
+          sesion.medios_soportados[0] === 'efectivo_cupon' ? (
+            <RapipagoCuponPanel
+              sesion={sesion}
+              procesando={procesando}
+              onConfirmar={confirmar}
+              onCancelar={volver}
+              accent={GIRE_ACCENT}
+            />
+          ) : (
+            <AdhesionDebitoPanel
+              sesion={sesion}
+              procesando={procesando}
+              onConfirmar={confirmar}
+              onCancelar={volver}
+              accent={GIRE_ACCENT}
+            />
+          )
         ) : (
           <>
             {/* === Selector de medios === */}
@@ -399,4 +434,303 @@ function formatMonto(v: string | number): string {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency', currency: 'ARS', minimumFractionDigits: 2,
   }).format(n);
+}
+
+// ============================================================
+// Panel especializado: RAPIPAGO (cupon con codigo de barras)
+// ============================================================
+
+interface PanelProps {
+  sesion: SesionData;
+  procesando: boolean;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+  accent: string;
+}
+
+function RapipagoCuponPanel({ sesion, procesando, onConfirmar, onCancelar, accent }: PanelProps) {
+  // Genera un "numero de cupon" determinista desde session_id para que no cambie en reloads.
+  const cuponNumero = (() => {
+    const hash = sesion.session_id.split('').reduce((a, c) => ((a << 5) - a) + c.charCodeAt(0), 0);
+    const n = Math.abs(hash);
+    return `${String(n).padStart(14, '0').slice(0, 14)}`;
+  })();
+
+  // Fecha de vencimiento = hoy + 15 dias
+  const vencimiento = new Date();
+  vencimiento.setDate(vencimiento.getDate() + 15);
+
+  // Barcode "CODE 128" simulado con barras variables
+  const barras = cuponNumero.split('').map((c, i) => {
+    const w = 1 + (parseInt(c) % 4);
+    const fill = (parseInt(c) + i) % 3 !== 0;
+    return { w, fill };
+  });
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden"
+      style={{
+        background: '#ffffff',
+        color: '#1a1a1a',
+        boxShadow: `0 20px 60px rgba(0,0,0,0.4)`,
+      }}
+    >
+      {/* Header Rapipago */}
+      <div
+        className="px-5 py-3 flex items-center justify-between"
+        style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+      >
+        <div className="flex items-center gap-2">
+          <Banknote className="h-5 w-5" />
+          <span className="font-bold tracking-wider">RAPIPAGO</span>
+        </div>
+        <span className="text-[10px] opacity-80 uppercase tracking-wide">Cupón de pago</span>
+      </div>
+
+      {/* Datos */}
+      <div className="p-5 space-y-3">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-gray-500">Concepto</p>
+          <p className="font-semibold text-sm">{sesion.concepto}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Titular</p>
+            <p className="text-sm">{sesion.vecino_nombre}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Municipio</p>
+            <p className="text-sm">{sesion.municipio_nombre}</p>
+          </div>
+        </div>
+        <div className="flex items-end justify-between pt-2" style={{ borderTop: '1px dashed #e5e7eb' }}>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Vencimiento</p>
+            <p className="font-semibold flex items-center gap-1.5 text-sm">
+              <Calendar className="h-3.5 w-3.5" />
+              {vencimiento.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">Total a pagar</p>
+            <p className="text-2xl font-black" style={{ color: '#ef4444' }}>
+              {formatMonto(sesion.monto)}
+            </p>
+          </div>
+        </div>
+
+        {/* Código de barras simulado */}
+        <div className="pt-3">
+          <svg viewBox={`0 0 ${barras.reduce((a, b) => a + b.w + 1, 0)} 60`} className="w-full h-16">
+            {(() => {
+              let x = 0;
+              return barras.map((b, i) => {
+                const rect = (
+                  <rect
+                    key={i}
+                    x={x}
+                    y={0}
+                    width={b.w}
+                    height={60}
+                    fill={b.fill ? '#000' : 'transparent'}
+                  />
+                );
+                x += b.w + 1;
+                return rect;
+              });
+            })()}
+          </svg>
+          <p className="text-center font-mono text-xs tracking-widest mt-2 text-gray-700">
+            {cuponNumero.replace(/(\d{4})(?=\d)/g, '$1 ')}
+          </p>
+        </div>
+
+        <div className="p-3 rounded-lg text-xs leading-snug" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>
+          <p className="font-semibold mb-1">Pagá en cualquier sucursal Rapipago</p>
+          <p>Mostrá este cupón (o el código de barras desde tu celu) en cualquiera de las +4.700 sucursales. Acreditación en 24-48 hs.</p>
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={onCancelar}
+            disabled={procesando}
+            className="px-4 py-2.5 rounded-lg font-medium text-sm transition-all active:scale-95"
+            style={{ backgroundColor: '#f3f4f6', color: '#374151' }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => window.print()}
+            disabled={procesando}
+            className="flex-1 px-4 py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+            style={{ backgroundColor: '#f3f4f6', color: '#374151' }}
+          >
+            <Download className="h-4 w-4" />
+            Imprimir
+          </button>
+          <button
+            onClick={onConfirmar}
+            disabled={procesando}
+            className="flex-1 px-4 py-2.5 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+          >
+            {procesando ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Procesando...</>
+            ) : (
+              'Simular pago en sucursal'
+            )}
+          </button>
+        </div>
+      </div>
+      <div className="px-5 py-2 text-[10px] text-center text-gray-500" style={{ backgroundColor: '#f9fafb' }}>
+        Cupón procesado por <span style={{ color: accent, fontWeight: 600 }}>GIRE · Rapipago</span>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Panel especializado: ADHESION A DEBITO AUTOMATICO (form CBU)
+// ============================================================
+
+function AdhesionDebitoPanel({ sesion, procesando, onConfirmar, onCancelar, accent }: PanelProps) {
+  const [cbu, setCbu] = useState('');
+  const [banco, setBanco] = useState('');
+  const [alias, setAlias] = useState('');
+  const [acepto, setAcepto] = useState(false);
+
+  // Auto-detectar banco simple por los primeros 3 digitos (simulado)
+  const detectarBanco = (c: string) => {
+    if (c.length < 3) return '';
+    const prefijo = c.slice(0, 3);
+    const bancos: Record<string, string> = {
+      '007': 'Banco Galicia',
+      '011': 'Banco Nación',
+      '014': 'BBVA Argentina',
+      '017': 'Banco BBVA',
+      '027': 'Banco Supervielle',
+      '034': 'Banco Patagonia',
+      '044': 'Banco Hipotecario',
+      '072': 'Banco Santander',
+      '150': 'HSBC Argentina',
+      '285': 'Banco Macro',
+    };
+    return bancos[prefijo] || 'Banco detectado';
+  };
+
+  const cbuValido = cbu.length === 22;
+
+  return (
+    <div
+      className="rounded-2xl p-6 space-y-4"
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.1)',
+      }}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ backgroundColor: `${accent}30`, color: accent }}
+        >
+          <Repeat className="h-5 w-5" />
+        </div>
+        <div>
+          <h3 className="font-bold">Adhesión a débito automático</h3>
+          <p className="text-xs opacity-70">Autorizá a GIRE a debitar {sesion.concepto}</p>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-wider opacity-70 mb-1.5">CBU (22 dígitos)</label>
+        <input
+          type="text"
+          inputMode="numeric"
+          maxLength={22}
+          placeholder="0000000000000000000000"
+          value={cbu}
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, '').slice(0, 22);
+            setCbu(v);
+            setBanco(detectarBanco(v));
+          }}
+          className="w-full px-4 py-3 rounded-xl text-sm font-mono tracking-wider"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            border: `1px solid ${cbuValido ? accent : 'rgba(255,255,255,0.15)'}`,
+            color: '#ffffff',
+          }}
+        />
+        {banco && (
+          <p className="text-xs mt-1.5 flex items-center gap-1.5" style={{ color: accent }}>
+            <Building className="h-3 w-3" />
+            {banco}
+          </p>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-wider opacity-70 mb-1.5">
+          Alias (opcional)
+        </label>
+        <input
+          type="text"
+          placeholder="ej: juan.perez.mp"
+          value={alias}
+          onChange={(e) => setAlias(e.target.value)}
+          className="w-full px-4 py-3 rounded-xl text-sm"
+          style={{
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            color: '#ffffff',
+          }}
+        />
+      </div>
+
+      <div className="p-3 rounded-lg text-xs leading-snug" style={{ backgroundColor: `${accent}15`, border: `1px solid ${accent}30` }}>
+        <p className="font-semibold mb-1.5">¿Qué estás autorizando?</p>
+        <ul className="space-y-1 opacity-90 list-disc pl-4">
+          <li>Débito automático mensual por {formatMonto(sesion.monto)} mientras la deuda esté vigente.</li>
+          <li>Notificación por email 72 hs antes de cada débito.</li>
+          <li>Cancelable en cualquier momento desde tu panel o tu banco.</li>
+        </ul>
+      </div>
+
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={acepto}
+          onChange={(e) => setAcepto(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span className="text-xs leading-snug opacity-90">
+          Acepto la adhesión al débito automático con mi CBU y los términos del servicio GIRE.
+        </span>
+      </label>
+
+      <div className="flex gap-2 pt-2">
+        <button
+          onClick={onCancelar}
+          disabled={procesando}
+          className="px-4 py-3 rounded-xl font-medium transition-all active:scale-95"
+          style={{ backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={onConfirmar}
+          disabled={!cbuValido || !acepto || procesando}
+          className="flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: accent, color: '#0a1929' }}
+        >
+          {procesando ? (
+            <><Loader2 className="h-5 w-5 animate-spin" /> Procesando adhesión...</>
+          ) : (
+            <><ShieldCheck className="h-5 w-5" /> Confirmar adhesión</>
+          )}
+        </button>
+      </div>
+    </div>
+  );
 }

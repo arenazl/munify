@@ -88,6 +88,13 @@ class TipoTasa(Base):
     activo = Column(Boolean, default=True, nullable=False)
     orden = Column(Integer, default=0)
 
+    # Configuracion de pago — analogo a Tramite.tipo_pago.
+    # Default "boton_pago" para tasas (la tarjeta es lo mas comun).
+    tipo_pago = Column(String(30), nullable=True)
+    # Las tasas casi siempre cobran al inicio (no se "trabaja" la tasa).
+    # Default null = se usa "inicio" implicito.
+    momento_pago = Column(String(10), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

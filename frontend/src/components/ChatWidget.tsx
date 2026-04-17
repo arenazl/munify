@@ -407,10 +407,10 @@ export function ChatWidget() {
       <div
         onMouseEnter={() => setIsHovered(true)}
         onClick={() => setIsPinned(true)}
-        className="fixed right-0 top-[56px] bottom-0 transition-all flex flex-col items-center pt-4 group"
+        className="fixed right-0 top-0 bottom-0 transition-all flex flex-col items-center pt-4 group"
         style={{
           zIndex: isOpen ? 29 : 50,
-          width: isOpen ? '4px' : '24px',
+          width: isOpen ? '4px' : '18px',
           background: isOpen
             ? theme.primary
             : `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
@@ -422,16 +422,18 @@ export function ChatWidget() {
         title="Asistente IA — click o hover para abrir"
       >
         {!isOpen && (
-          <div
-            className="w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-transform group-hover:scale-110"
-            style={{
-              backgroundColor: theme.primaryText || '#ffffff',
-              color: theme.primary,
-              marginLeft: '-1px',
-            }}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke={theme.primaryText || '#ffffff'}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 transition-transform group-hover:scale-110"
           >
-            <Bot className="h-4 w-4" strokeWidth={2.5} />
-          </div>
+            <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+          </svg>
         )}
         {!isOpen && (
           <span

@@ -151,9 +151,11 @@ from .pago_sesion import (
     EstadoSesionPago,
     MedioPagoGateway,
 )
+from .municipio_proveedor_pago import MunicipioProveedorPago
 
 __all__ += [
     "PagoSesion",
     "EstadoSesionPago",
     "MedioPagoGateway",
+    "MunicipioProveedorPago",
 ]

@@ -657,6 +657,60 @@ export const auditApi = {
   consolaResumen: () => api.get<ConsolaResumen>('/admin/consola/resumen'),
 };
 
+// Proveedores de pago (GIRE, MercadoPago, MODO)
+export const proveedoresPagoApi = {
+  list: () => api.get<Array<{
+    proveedor: string;
+    nombre_display: string;
+    descripcion: string;
+    activo: boolean;
+    productos_disponibles: string[];
+    productos_activos: Record<string, boolean>;
+    metadata_importada: Record<string, unknown> | null;
+    requiere_importacion: boolean;
+  }>>('/proveedores-pago'),
+
+  update: (proveedor: string, data: { activo: boolean; productos_activos?: Record<string, boolean> }) =>
+    api.put(`/proveedores-pago/${proveedor}`, data),
+
+  /** Stream SSE con progreso de importacion. Callback invocado por cada evento. */
+  importarPadron: async (
+    proveedor: string,
+    onEvent: (ev: { step: string; progress: number; step_index: number; total_steps: number; resultado?: Record<string, unknown> }) => void,
+  ) => {
+    const token = localStorage.getItem('token');
+    const url = `${API_URL}/proveedores-pago/${proveedor}/importar-padron`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok || !resp.body) {
+      const txt = await resp.text().catch(() => '');
+      throw new Error(txt || `HTTP ${resp.status}`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data:')) continue;
+        try {
+          const payload = JSON.parse(line.slice(5).trim());
+          onEvent(payload);
+        } catch {
+          // ignorar lineas no-json
+        }
+      }
+    }
+  },
+};
+
 // Chat IA
 export const chatApi = {
   sendMessage: async (message: string, history: Array<{role: string, content: string}> = []) => {
@@ -1284,6 +1338,9 @@ export const pagosApi = {
   crearSesion: (deuda_id: number, return_url?: string) =>
     api.post<{ session_id: string; checkout_url: string; expires_at: string }>(
       '/pagos/crear-sesion', { deuda_id, return_url }),
+  crearSesionTramite: (solicitud_id: number, return_url?: string) =>
+    api.post<{ session_id: string; checkout_url: string }>(
+      '/pagos/sesion-tramite', { solicitud_id, return_url }),
   obtenerSesion: (sessionId: string) =>
     api.get(`/pagos/sesiones/${sessionId}`),
   confirmarPago: (sessionId: string, medio_pago: string, metadatos?: Record<string, unknown>) =>

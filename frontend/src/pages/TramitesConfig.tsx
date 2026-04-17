@@ -32,6 +32,8 @@ interface TramiteForm {
   url_externa: string;
   requiere_validacion_dni: boolean;
   requiere_validacion_facial: boolean;
+  tipo_pago: string;        // '' | 'boton_pago' | 'rapipago' | 'adhesion_debito' | 'qr'
+  momento_pago: string;     // '' | 'inicio' | 'fin'
   documentos_requeridos: DocRequeridoDraft[];
 }
 
@@ -44,6 +46,8 @@ const EMPTY_FORM: TramiteForm = {
   url_externa: '',
   requiere_validacion_dni: false,
   requiere_validacion_facial: false,
+  tipo_pago: '',
+  momento_pago: '',
   documentos_requeridos: [],
 };
 
@@ -114,6 +118,8 @@ export default function TramitesConfig() {
         url_externa: t.url_externa || '',
         requiere_validacion_dni: !!t.requiere_validacion_dni,
         requiere_validacion_facial: !!t.requiere_validacion_facial,
+        tipo_pago: (t as any).tipo_pago || '',
+        momento_pago: (t as any).momento_pago || '',
         documentos_requeridos: (t.documentos_requeridos || []).map(d => ({
           id: d.id,
           nombre: d.nombre,
@@ -152,6 +158,8 @@ export default function TramitesConfig() {
           url_externa: form.url_externa.trim() || undefined,
           requiere_validacion_dni: form.requiere_validacion_dni,
           requiere_validacion_facial: form.requiere_validacion_facial,
+          tipo_pago: form.tipo_pago || undefined,
+          momento_pago: form.momento_pago || undefined,
         });
 
         // Sincronizar documentos requeridos
@@ -193,6 +201,8 @@ export default function TramitesConfig() {
           url_externa: form.url_externa.trim() || undefined,
           requiere_validacion_dni: form.requiere_validacion_dni,
           requiere_validacion_facial: form.requiere_validacion_facial,
+          tipo_pago: form.tipo_pago || undefined,
+          momento_pago: form.momento_pago || undefined,
           documentos_requeridos: form.documentos_requeridos
             .filter(d => d.nombre.trim())
             .map(d => ({
@@ -404,6 +414,54 @@ export default function TramitesConfig() {
           style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
         />
       </div>
+
+      {/* Configuración de pago — solo si tiene costo > 0 */}
+      {!!form.costo && parseFloat(form.costo) > 0 && (
+        <div className="p-4 rounded-xl space-y-3" style={{ backgroundColor: `${theme.primary}08`, border: `1px solid ${theme.primary}30` }}>
+          <p className="text-sm font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+            <CreditCard className="h-4 w-4" style={{ color: theme.primary }} />
+            Configuración de cobro
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                Método de pago
+              </label>
+              <select
+                value={form.tipo_pago}
+                onChange={e => setForm({ ...form, tipo_pago: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+              >
+                <option value="">— Elegí un método —</option>
+                <option value="boton_pago">Botón de Pago (tarjeta web)</option>
+                <option value="rapipago">Rapipago (cupón efectivo)</option>
+                <option value="adhesion_debito">Adhesión Débito (CBU)</option>
+                <option value="qr">QR Interoperable</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                Momento de cobro
+              </label>
+              <select
+                value={form.momento_pago}
+                onChange={e => setForm({ ...form, momento_pago: e.target.value })}
+                className="w-full px-3 py-2 rounded-lg text-sm"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+              >
+                <option value="">— Elegí cuándo cobrar —</option>
+                <option value="inicio">Al inicio (antes de trabajar)</option>
+                <option value="fin">Al final (al retirar)</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed" style={{ color: theme.textSecondary }}>
+            <strong>Inicio</strong>: el vecino paga primero y la dependencia recién entonces toma el trámite.{' '}
+            <strong>Fin</strong>: la dependencia trabaja y el vecino paga al retirar el resultado.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-3 pt-3" style={{ borderTop: `1px solid ${theme.border}` }}>
         <p className="text-sm font-medium" style={{ color: theme.text }}>
