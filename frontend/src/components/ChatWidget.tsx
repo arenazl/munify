@@ -401,22 +401,52 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Línea fina de trigger: al pasar el mouse abre el panel (modal slide-in).
-          Mantiene presencia permanente en el borde derecho cuando el panel
-          está cerrado. Si está abierto queda detrás del panel y no se ve. */}
+      {/* Barra colapsada del trigger: gradiente vertical + ícono de bot
+          centrado arriba. Más visible que la línea fina anterior y deja
+          claro qué hace al pasar el mouse. */}
       <div
         onMouseEnter={() => setIsHovered(true)}
-        className="fixed right-0 top-[56px] bottom-0 transition-all"
+        onClick={() => setIsPinned(true)}
+        className="fixed right-0 top-[56px] bottom-0 transition-all flex flex-col items-center pt-4 group"
         style={{
           zIndex: isOpen ? 29 : 50,
-          width: isOpen ? '4px' : '6px',
-          background: theme.primary,
-          opacity: isOpen ? 0 : 0.55,
+          width: isOpen ? '4px' : '24px',
+          background: isOpen
+            ? theme.primary
+            : `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
+          opacity: isOpen ? 0 : 1,
           pointerEvents: isOpen ? 'none' : 'auto',
           cursor: 'pointer',
+          boxShadow: isOpen ? 'none' : `-4px 0 12px ${theme.primary}40`,
         }}
-        title="Pasá el mouse para abrir el asistente"
-      />
+        title="Asistente IA — click o hover para abrir"
+      >
+        {!isOpen && (
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center shadow-md transition-transform group-hover:scale-110"
+            style={{
+              backgroundColor: theme.primaryText || '#ffffff',
+              color: theme.primary,
+              marginLeft: '-1px',
+            }}
+          >
+            <Bot className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+        )}
+        {!isOpen && (
+          <span
+            className="mt-3 text-[10px] font-bold tracking-wider opacity-80"
+            style={{
+              color: theme.primaryText || '#ffffff',
+              writingMode: 'vertical-rl',
+              transform: 'rotate(180deg)',
+              letterSpacing: '0.15em',
+            }}
+          >
+            ASISTENTE IA
+          </span>
+        )}
+      </div>
 
       {/* Burbuja flotante abajo a la derecha — mismo rol que la línea */}
       {!isOpen && (
