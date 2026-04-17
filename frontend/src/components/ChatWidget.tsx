@@ -165,7 +165,9 @@ export function ChatWidget() {
       .replace(/<ol style="margin:8px 0;padding-left:20px">/g, `<ol style="margin:8px 0;padding-left:20px;color:${theme.text}">`)
       .replace(/<ul style="margin:8px 0;padding-left:20px">/g, `<ul style="margin:8px 0;padding-left:20px;color:${theme.text}">`);
   };
-  const [isOpen, setIsOpen] = useState(false);
+  const isVecino = user?.rol === 'vecino';
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
+  const [isOpen, setIsOpen] = useState(isVecino && isDesktop);
   const [isHovered, setIsHovered] = useState(false);
   const [messages, setMessages] = useState<Message[]>(chatCache.messages);
   const [input, setInput] = useState('');
