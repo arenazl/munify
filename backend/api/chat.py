@@ -2263,19 +2263,19 @@ FORMATO DE RESPUESTA (MUY IMPORTANTE):
 EJEMPLOS:
 
 Usuario: "traeme 10 reclamos"
-{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.created_at FROM reclamos r LEFT JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at DESC LIMIT 10", "descripcion": "Los 10 reclamos más recientes"}}
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.created_at FROM reclamos r LEFT JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at DESC LIMIT 10", "descripcion": "Los 10 reclamos más recientes"}}
 
 Usuario: "10 reclamos con más atraso con todos sus datos"
-{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at ASC LIMIT 10", "descripcion": "Los 10 reclamos más antiguos"}}
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at ASC LIMIT 10", "descripcion": "Los 10 reclamos más antiguos"}}
 
 Usuario: "dame toda la info de los reclamos pendientes"
-{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.estado IN ('nuevo', 'asignado')", "descripcion": "Reclamos pendientes"}}
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.estado IN ('nuevo', 'asignado')", "descripcion": "Reclamos pendientes"}}
 
 Usuario: "los 5 empleados con más reclamos resueltos"
 {{"sql": "SELECT e.id, e.nombre, COUNT(*) as resueltos FROM empleados e JOIN reclamos r ON r.empleado_id = e.id WHERE e.municipio_id = {municipio_id} AND r.estado = 'resuelto' GROUP BY e.id ORDER BY resueltos DESC LIMIT 5", "descripcion": "Top 5 empleados"}}
 
 Usuario: "reclamos de esta semana por categoría"
-{{"sql": "SELECT c.nombre, COUNT(*) as cantidad FROM reclamos r JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY c.id", "descripcion": "Reclamos por categoría"}}
+{{"sql": "SELECT c.nombre, COUNT(*) as cantidad FROM reclamos r JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY c.id", "descripcion": "Reclamos por categoría"}}
 
 Usuario: "lista los empleados"
 {{"sql": "SELECT e.id, e.nombre, e.descripcion, e.telefono FROM empleados e WHERE e.municipio_id = {municipio_id}", "descripcion": "Lista de empleados"}}
@@ -2290,7 +2290,7 @@ Usuario: "ranking de empleados por reclamos resueltos"
 {{"sql": "SELECT e.id, e.nombre, COUNT(*) as cantidad FROM empleados e JOIN reclamos r ON r.empleado_id = e.id WHERE e.municipio_id = {municipio_id} AND r.estado = 'resuelto' GROUP BY e.id ORDER BY cantidad DESC", "descripcion": "Ranking de empleados por reclamos resueltos"}}
 
 Usuario: "reclamos agrupados por categoría"
-{{"sql": "SELECT c.nombre as categoria, r.id, r.titulo, r.estado, r.created_at FROM reclamos r JOIN categorias c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY c.nombre, r.created_at DESC", "descripcion": "Reclamos agrupados por categoría"}}
+{{"sql": "SELECT c.nombre as categoria, r.id, r.titulo, r.estado, r.created_at FROM reclamos r JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY c.nombre, r.created_at DESC", "descripcion": "Reclamos agrupados por categoría"}}
 
 Usuario: "resumen de reclamos" o "dashboard de reclamos"
 {{"sql": "SELECT estado, COUNT(*) as cantidad FROM reclamos WHERE municipio_id = {municipio_id} GROUP BY estado", "descripcion": "Resumen de reclamos por estado"}}"""
