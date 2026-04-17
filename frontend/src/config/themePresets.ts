@@ -344,6 +344,82 @@ export const themePresets: ThemePreset[] = [
       vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar cyan, acento amber vibrante
     }),
   },
+
+  // ====================================================================
+  // PALETAS SOBRIAS Y PROFESIONALES (gobierno / corporativo / institucional)
+  // ====================================================================
+
+  // 18. Onyx - Negro profundo con acento dorado sobrio (corporativo premium)
+  {
+    id: 'onyx',
+    name: 'Onyx',
+    palette: ['#0a0a0a', '#1a1a1a', '#9b8755', '#d4b986'],
+    variants: generateVariants(['#0a0a0a', '#1a1a1a', '#9b8755', '#d4b986'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+    }),
+  },
+
+  // 19. Pearl - Blancos cálidos + navy (institucional clean)
+  {
+    id: 'pearl',
+    name: 'Pearl',
+    palette: ['#fafaf9', '#f0eee8', '#1e3a5f', '#475569'],
+    variants: generateVariants(['#fafaf9', '#f0eee8', '#1e3a5f', '#475569'], {
+      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 2 },  // Sidebar navy oscuro
+      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Sidebar claro
+    }),
+  },
+
+  // 20. Espresso - Café tostado + crema (cálido pro)
+  {
+    id: 'espresso',
+    name: 'Espresso',
+    palette: ['#1c1410', '#2e211a', '#8b5a3c', '#c9a878'],
+    variants: generateVariants(['#1c1410', '#2e211a', '#8b5a3c', '#c9a878'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+    }),
+  },
+
+  // 21. Steel - Acero industrial + cyan sobrio (tech/SaaS pro)
+  {
+    id: 'steel',
+    name: 'Steel',
+    palette: ['#111418', '#1f2937', '#334155', '#0891b2'],
+    variants: generateVariants(['#111418', '#1f2937', '#334155', '#0891b2'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vintage: { bgIndex: 1, sidebarIndex: 2, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
+
+  // 22. Sage - Verde salvia apagado + crema (calmo / juridico)
+  {
+    id: 'sage',
+    name: 'Sage',
+    palette: ['#f5f5f0', '#e7e5dc', '#5a6e58', '#3d5a4f'],
+    variants: generateVariants(['#f5f5f0', '#e7e5dc', '#5a6e58', '#3d5a4f'], {
+      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar verde oscuro
+      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+    }),
+  },
+
+  // 23. Bordeaux - Vino oscuro + nude (sofisticado / institucional)
+  {
+    id: 'bordeaux',
+    name: 'Bordeaux',
+    palette: ['#1a0d0f', '#2e1418', '#8b1e3f', '#c9a097'],
+    variants: generateVariants(['#1a0d0f', '#2e1418', '#8b1e3f', '#c9a097'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
 ];
 
 // Helper para obtener un tema por ID y variante
