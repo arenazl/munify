@@ -401,54 +401,21 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Barra colapsada del trigger: gradiente vertical + ícono de bot
-          centrado arriba. Más visible que la línea fina anterior y deja
-          claro qué hace al pasar el mouse. */}
+      {/* Trigger sutil: línea fina invisible al borde derecho que abre el panel
+          al pasar el mouse. Sin botón flotante visible (se removió a pedido). */}
       <div
         onMouseEnter={() => setIsHovered(true)}
-        onClick={() => setIsPinned(true)}
-        className="fixed right-0 top-0 bottom-0 transition-all flex flex-col items-center pt-4 group"
+        className="fixed right-0 top-0 bottom-0 transition-opacity"
         style={{
           zIndex: isOpen ? 29 : 50,
-          width: isOpen ? '4px' : '18px',
-          background: isOpen
-            ? theme.primary
-            : `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
-          opacity: isOpen ? 0 : 1,
+          width: '6px',
+          background: 'transparent',
+          opacity: 0,
           pointerEvents: isOpen ? 'none' : 'auto',
           cursor: 'pointer',
-          boxShadow: isOpen ? 'none' : `-4px 0 12px ${theme.primary}40`,
         }}
-        title="Asistente IA — click o hover para abrir"
-      >
-        {!isOpen && (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke={theme.primaryText || '#ffffff'}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4 transition-transform group-hover:scale-110"
-          >
-            <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-          </svg>
-        )}
-        {!isOpen && (
-          <span
-            className="mt-3 text-[10px] font-bold tracking-wider opacity-80"
-            style={{
-              color: theme.primaryText || '#ffffff',
-              writingMode: 'vertical-rl',
-              transform: 'rotate(180deg)',
-              letterSpacing: '0.15em',
-            }}
-          >
-            ASISTENTE IA
-          </span>
-        )}
-      </div>
+        title="Pasá el mouse para abrir el asistente IA"
+      />
 
 
       {/* Panel lateral con slide-in desde la derecha. Siempre renderizado para
