@@ -3868,7 +3868,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   <FilterRowSkeleton count={6} height={28} widths={[50, 65, 80, 50, 65, 80]} />
                 ) : (
                 <>
-                {categorias.map((cat) => {
+                {categorias.filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id).map((cat) => {
                   const isSelected = filtroCategoria === cat.id;
                   const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
                   const count = conteosCategorias[cat.id] || 0;
@@ -3919,7 +3919,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   className="flex flex-wrap gap-1 pb-1 absolute top-0 left-0 right-0 pointer-events-none invisible"
                   style={{ visibility: 'hidden' }}
                 >
-                  {categorias.map((cat) => (
+                  {categorias.filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id).map((cat) => (
                     <button
                       key={`measure-${cat.id}`}
                       type="button"

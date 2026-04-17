@@ -41,6 +41,7 @@ export default function MisReclamos() {
   // Ordenamiento y filtros
   const [ordenarPor, setOrdenarPor] = useState<'fecha' | 'vencimiento'>('fecha');
   const [filtroEstado, setFiltroEstado] = useState<EstadoReclamo | 'todos'>('todos');
+  const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
 
   // Sheet states
   const [sheetMode, setSheetMode] = useState<SheetMode>('closed');
@@ -232,7 +233,8 @@ export default function MisReclamos() {
         r.descripcion.toLowerCase().includes(search.toLowerCase()) ||
         r.direccion.toLowerCase().includes(search.toLowerCase());
       const matchEstado = filtroEstado === 'todos' || r.estado === filtroEstado;
-      return matchSearch && matchEstado;
+      const matchCat = !filtroCategoria || r.categoria?.id === filtroCategoria;
+      return matchSearch && matchEstado && matchCat;
     })
     .sort((a, b) => {
       if (ordenarPor === 'fecha') {
@@ -249,6 +251,26 @@ export default function MisReclamos() {
 
   // Estados únicos para el filtro
   const estadosUnicos = [...new Set(reclamos.map(r => r.estado))];
+
+  // Categorías con conteo (solo las que tienen al menos 1 reclamo)
+  const categoriasConConteo = (() => {
+    const map = new Map<number, { id: number; nombre: string; color: string; count: number }>();
+    reclamos.forEach(r => {
+      if (!r.categoria) return;
+      const existing = map.get(r.categoria.id);
+      if (existing) {
+        existing.count++;
+      } else {
+        map.set(r.categoria.id, {
+          id: r.categoria.id,
+          nombre: r.categoria.nombre,
+          color: r.categoria.color || '#6366f1',
+          count: 1,
+        });
+      }
+    });
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  })();
 
   // Renderizar contenido del Sheet de ver
   const renderViewContent = () => {
@@ -747,6 +769,50 @@ export default function MisReclamos() {
           Por vencer
         </button>
       </div>
+
+      {/* Categorías (solo las que tienen reclamos) */}
+      {categoriasConConteo.length > 1 && (
+        <>
+          <div className="h-6 w-px flex-shrink-0" style={{ backgroundColor: theme.border }} />
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setFiltroCategoria(null)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: !filtroCategoria ? theme.primary : theme.backgroundSecondary,
+                color: !filtroCategoria ? '#ffffff' : theme.textSecondary,
+                border: `1px solid ${!filtroCategoria ? theme.primary : theme.border}`,
+              }}
+            >
+              Todas
+            </button>
+            {categoriasConConteo.map(cat => {
+              const isSelected = filtroCategoria === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setFiltroCategoria(isSelected ? null : cat.id)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+                  style={{
+                    backgroundColor: isSelected ? cat.color : theme.backgroundSecondary,
+                    color: isSelected ? '#ffffff' : theme.textSecondary,
+                    border: `1px solid ${isSelected ? cat.color : theme.border}`,
+                  }}
+                >
+                  {cat.nombre}
+                  <span className="text-[9px] font-bold px-1 rounded-full"
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${cat.color}30`,
+                          color: isSelected ? '#ffffff' : cat.color,
+                        }}>
+                    {cat.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Separador */}
       <div className="h-6 w-px flex-shrink-0" style={{ backgroundColor: theme.border }} />
