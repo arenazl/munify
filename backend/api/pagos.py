@@ -24,7 +24,7 @@ Flow del vecino pagando una tasa:
 from datetime import datetime, timedelta
 from decimal import Decimal
 from secrets import token_hex
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -249,15 +249,21 @@ async def crear_sesion_tramite(
     )
     db.add(sesion)
 
-    # Si es momento_pago=inicio, dejar el tramite en pendiente_pago hasta que se confirme
-    if solicitud.tramite.momento_pago == "inicio" and solicitud.estado == EstadoSolicitud.RECIBIDO:
-        solicitud.estado = EstadoSolicitud.PENDIENTE_PAGO
+    # Auditoría: dejar rastro en historial de la solicitud
+    from models.tramite import HistorialSolicitud
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud.id,
+        usuario_id=current_user.id,
+        accion="Sesión de pago iniciada",
+        comentario=f"Sesión {sesion_id} · ${solicitud.tramite.costo:.2f} · vía {provider.nombre}",
+    ))
 
     await db.commit()
 
     return CrearSesionResponse(
         session_id=sesion_id,
         checkout_url=sesion_ext.checkout_url,
+        expires_at=expires_at,
     )
 
 
@@ -398,21 +404,25 @@ async def confirmar_pago(
             payload_externo=sesion.metadatos,
         ))
 
-    # Si era pago de un tramite, avanzar el estado segun momento_pago
+    # Si era pago de un tramite, dejar registro en historial y eventualmente
+    # auto-finalizar si ya estaba en_curso/pendiente_pago.
     if sesion.solicitud_id:
-        from models.tramite import Solicitud, EstadoSolicitud
+        from models.tramite import Solicitud, EstadoSolicitud, HistorialSolicitud
         sol_q = await db.execute(
             select(Solicitud).options(selectinload(Solicitud.tramite)).where(Solicitud.id == sesion.solicitud_id)
         )
         solicitud = sol_q.scalar_one_or_none()
-        if solicitud and solicitud.tramite:
-            momento = solicitud.tramite.momento_pago or "inicio"
-            if momento == "inicio":
-                # Pago al inicio: pasa de pendiente_pago/recibido a recibido (listo para que la dependencia lo tome)
-                solicitud.estado = EstadoSolicitud.RECIBIDO
-            elif momento == "fin":
-                # Pago al final: la dependencia ya termino el trabajo, ahora se finaliza
-                solicitud.estado = EstadoSolicitud.FINALIZADO
+        if solicitud:
+            estado_previo = solicitud.estado
+            costo_fmt = f"${sesion.monto:,.2f}".replace(",", ".") if sesion.monto else ""
+            db.add(HistorialSolicitud(
+                solicitud_id=solicitud.id,
+                usuario_id=sesion.vecino_user_id,
+                estado_anterior=estado_previo,
+                estado_nuevo=estado_previo,  # el pago no fuerza cambio de estado, solo registra
+                accion=f"💳 Pago aprobado · {body.medio_pago.value if hasattr(body.medio_pago, 'value') else body.medio_pago}",
+                comentario=f"Sesión {sesion.id} · {costo_fmt} · N° operación {sesion.external_id}",
+            ))
 
     await db.commit()
 
@@ -444,5 +454,103 @@ async def cancelar_sesion(session_id: str, db: AsyncSession = Depends(get_db)):
     if sesion.estado in (EstadoSesionPago.APPROVED, EstadoSesionPago.CANCELLED):
         return {"estado": sesion.estado.value}
     sesion.estado = EstadoSesionPago.CANCELLED
+
+    # Auditoría de cancelación si era de un tramite
+    if sesion.solicitud_id:
+        from models.tramite import HistorialSolicitud
+        db.add(HistorialSolicitud(
+            solicitud_id=sesion.solicitud_id,
+            usuario_id=sesion.vecino_user_id,
+            accion="✗ Pago cancelado",
+            comentario=f"Sesión {sesion.id} cancelada antes de confirmar",
+        ))
     await db.commit()
     return {"estado": sesion.estado.value}
+
+
+# ============================================================
+# Endpoint para que la UI muestre el estado de pagos de una solicitud
+# ============================================================
+
+class SesionPagoResumen(BaseModel):
+    session_id: str
+    estado: str
+    monto: str
+    medio_pago: Optional[str] = None
+    provider: str
+    external_id: Optional[str] = None
+    created_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class EstadoPagoSolicitud(BaseModel):
+    solicitud_id: int
+    requiere_pago: bool
+    costo: float
+    pagado: bool                           # True si hay sesion APPROVED
+    monto_pagado: Optional[str] = None     # monto de la sesion aprobada
+    fecha_pago: Optional[str] = None       # ISO
+    medio_pago: Optional[str] = None       # tarjeta, qr, efectivo_cupon, ...
+    sesion_aprobada_id: Optional[str] = None
+    intentos_total: int = 0
+    intentos_fallidos: int = 0
+    sesiones: List[SesionPagoResumen] = []
+
+
+@router.get("/estado-solicitud/{solicitud_id}", response_model=EstadoPagoSolicitud)
+async def estado_pago_solicitud(
+    solicitud_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Resumen del estado de pago para una solicitud (info para el modal del admin)."""
+    from models.tramite import Solicitud as _Sol
+    sq = await db.execute(
+        select(_Sol).options(selectinload(_Sol.tramite)).where(_Sol.id == solicitud_id)
+    )
+    sol = sq.scalar_one_or_none()
+    if not sol:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    costo = float(sol.tramite.costo) if (sol.tramite and sol.tramite.costo) else 0.0
+    requiere_pago = costo > 0
+
+    pq = await db.execute(
+        select(PagoSesion).where(PagoSesion.solicitud_id == solicitud_id)
+        .order_by(PagoSesion.created_at.desc())
+    )
+    sesiones = pq.scalars().all()
+
+    aprobada = next((s for s in sesiones if s.estado == EstadoSesionPago.APPROVED), None)
+    fallidas = sum(1 for s in sesiones if s.estado in (EstadoSesionPago.REJECTED, EstadoSesionPago.EXPIRED, EstadoSesionPago.CANCELLED))
+
+    sesiones_payload = [
+        SesionPagoResumen(
+            session_id=s.id,
+            estado=s.estado.value if hasattr(s.estado, 'value') else str(s.estado),
+            monto=str(s.monto),
+            medio_pago=s.medio_pago.value if s.medio_pago and hasattr(s.medio_pago, 'value') else (str(s.medio_pago) if s.medio_pago else None),
+            provider=s.provider,
+            external_id=s.external_id,
+            created_at=s.created_at.isoformat() if s.created_at else None,
+            completed_at=s.completed_at.isoformat() if s.completed_at else None,
+        )
+        for s in sesiones
+    ]
+
+    return EstadoPagoSolicitud(
+        solicitud_id=solicitud_id,
+        requiere_pago=requiere_pago,
+        costo=costo,
+        pagado=aprobada is not None,
+        monto_pagado=str(aprobada.monto) if aprobada else None,
+        fecha_pago=aprobada.completed_at.isoformat() if aprobada and aprobada.completed_at else None,
+        medio_pago=(aprobada.medio_pago.value if aprobada and aprobada.medio_pago and hasattr(aprobada.medio_pago, 'value') else None),
+        sesion_aprobada_id=aprobada.id if aprobada else None,
+        intentos_total=len(sesiones),
+        intentos_fallidos=fallidas,
+        sesiones=sesiones_payload,
+    )

@@ -450,6 +450,7 @@ export function ChatWidget() {
         )}
       </div>
 
+
       {/* Panel lateral con slide-in desde la derecha. Siempre renderizado para
           que el CSS transition anime el transform. Si no está pinned y el
           mouse sale, se cierra con animación. */}
@@ -493,40 +494,29 @@ export function ChatWidget() {
           </div>
         )}
 
-        {/* Pin flotante en el borde izquierdo, centrado vertical — fácil de clickear
-            sin tener que llegar hasta el header. */}
-        {isOpen && (
-          <button
-            onClick={() => setIsPinned(p => !p)}
-            className="absolute transition-all hover:scale-110 active:scale-95 flex items-center justify-center"
-            style={{
-              left: '-14px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              zIndex: 42,
-              color: isPinned ? theme.primaryText : theme.textSecondary,
-              backgroundColor: isPinned ? theme.primary : theme.card,
-              border: `1px solid ${isPinned ? theme.primary : theme.border}`,
-              boxShadow: '-2px 2px 8px rgba(0,0,0,0.15)',
-            }}
-            title={isPinned ? 'Desanclar (se cierra al sacar el mouse)' : 'Anclar panel abierto'}
-          >
-            {isPinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
-          </button>
-        )}
-
-        {/* Barra minimalista de controles */}
+        {/* Barra de controles del panel */}
         {isOpen && (
           <div
-            className="flex items-center justify-end flex-shrink-0 gap-0.5 px-2 py-1.5"
+            className="flex items-center justify-between flex-shrink-0 gap-2 px-3 py-2"
             style={{
               borderBottom: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,
             }}
           >
+            {/* PIN: botón grande y claro para anclar/desanclar */}
+            <button
+              onClick={() => setIsPinned(p => !p)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all hover:scale-[1.03] active:scale-95 text-[11px] font-semibold"
+              style={{
+                color: isPinned ? theme.primaryText : theme.primary,
+                backgroundColor: isPinned ? theme.primary : `${theme.primary}15`,
+                border: `1px solid ${theme.primary}`,
+              }}
+              title={isPinned ? 'Desanclar (se cerrará al sacar el mouse)' : 'Anclar panel abierto'}
+            >
+              {isPinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
+              <span>{isPinned ? 'Anclado' : 'Anclar'}</span>
+            </button>
 
             {/* Nueva conversación (derecha) */}
             {messages.length > 0 && (

@@ -732,6 +732,43 @@ export default function TramitesConfig() {
                               <span>{t.documentos_requeridos.length} docs</span>
                             )}
                           </div>
+                          {/* Badge de método de cobro — solo si tiene costo */}
+                          {!!t.costo && t.costo > 0 && (() => {
+                            const tp = (t as any).tipo_pago as string | null;
+                            const mp = (t as any).momento_pago as string | null;
+                            const tipoPagoMeta: Record<string, { label: string; color: string; emoji: string }> = {
+                              boton_pago: { label: 'Botón de Pago', color: '#3b82f6', emoji: '💳' },
+                              rapipago: { label: 'Rapipago', color: '#ef4444', emoji: '🧾' },
+                              adhesion_debito: { label: 'Adhesión Débito', color: '#10b981', emoji: '🔁' },
+                              qr: { label: 'QR', color: '#8b5cf6', emoji: '📱' },
+                            };
+                            const meta = tp ? tipoPagoMeta[tp] : null;
+                            if (!meta) {
+                              return (
+                                <div
+                                  className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium"
+                                  style={{ backgroundColor: '#f59e0b15', color: '#f59e0b', border: '1px solid #f59e0b40' }}
+                                  title="Tiene costo pero no tiene método de cobro asignado"
+                                >
+                                  ⚠️ Sin método de cobro
+                                </div>
+                              );
+                            }
+                            return (
+                              <div
+                                className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium"
+                                style={{
+                                  backgroundColor: `${meta.color}15`,
+                                  color: meta.color,
+                                  border: `1px solid ${meta.color}40`,
+                                }}
+                                title={`Cobra ${mp === 'fin' ? 'al retirar' : 'al iniciar el trámite'}`}
+                              >
+                                {meta.emoji} {meta.label}
+                                {mp && <span className="opacity-70">· {mp === 'fin' ? 'al retirar' : 'al inicio'}</span>}
+                              </div>
+                            );
+                          })()}
                         </div>
                         <div className="flex flex-col gap-1 flex-shrink-0">
                           <button
@@ -886,6 +923,54 @@ export default function TramitesConfig() {
               style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
             />
           </div>
+
+          {/* Configuración de cobro — solo si tiene costo > 0 */}
+          {!!form.costo && parseFloat(form.costo) > 0 && (
+            <div className="p-4 rounded-xl space-y-3" style={{ backgroundColor: `${theme.primary}08`, border: `1px solid ${theme.primary}30` }}>
+              <p className="text-sm font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+                <CreditCard className="h-4 w-4" style={{ color: theme.primary }} />
+                Configuración de cobro
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    Método de pago
+                  </label>
+                  <select
+                    value={form.tipo_pago}
+                    onChange={e => setForm({ ...form, tipo_pago: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+                  >
+                    <option value="">— Elegí un método —</option>
+                    <option value="boton_pago">💳 Botón de Pago (tarjeta web)</option>
+                    <option value="rapipago">🧾 Rapipago (cupón efectivo)</option>
+                    <option value="adhesion_debito">🔁 Adhesión Débito (CBU)</option>
+                    <option value="qr">📱 QR Interoperable</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    Momento de cobro
+                  </label>
+                  <select
+                    value={form.momento_pago}
+                    onChange={e => setForm({ ...form, momento_pago: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+                  >
+                    <option value="">— Elegí cuándo cobrar —</option>
+                    <option value="inicio">Al inicio (antes de trabajar)</option>
+                    <option value="fin">Al final (al retirar)</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: theme.textSecondary }}>
+                <strong>Inicio</strong>: el vecino paga primero y la dependencia recién entonces toma el trámite.{' '}
+                <strong>Fin</strong>: la dependencia trabaja y el vecino paga al retirar el resultado.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: theme.text }}>

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Building2, Check, Landmark, Link2, Activity
+  CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -75,6 +75,10 @@ export default function Ajustes() {
       {
         id: 'catalogo',
         title: 'Catálogos',
+      },
+      {
+        id: 'cobranzas',
+        title: 'Cobranzas',
       },
     ] : []),
     ...(isSuperAdmin ? [
@@ -268,6 +272,39 @@ export default function Ajustes() {
           show: isAdminOrSupervisor && !isSuperAdmin,
         }
       ]
+    },
+    {
+      id: 'cobranzas',
+      title: 'Cobranzas',
+      items: [
+        {
+          id: 'proveedores-pago',
+          label: 'Proveedores de Pago',
+          description: 'Activá GIRE, MercadoPago o MODO e importá el padrón de contribuyentes',
+          icon: Wallet,
+          color: '#0066cc',
+          link: '/gestion/proveedores-pago',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
+          id: 'tramites-pago',
+          label: 'Método de cobro por trámite',
+          description: 'Asigná Botón de Pago, Rapipago o Adhesión Débito a cada trámite con costo',
+          icon: FileText,
+          color: '#10b981',
+          link: '/gestion/tramites-config',
+          show: isAdminOrSupervisor,
+        },
+        {
+          id: 'tasas-catalogo',
+          label: 'Catálogo de Tasas',
+          description: 'Importá el padrón tributario y asociá método de cobro a cada tasa',
+          icon: Landmark,
+          color: '#0ea5e9',
+          link: '/gestion/ajustes/importar-padron',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+      ],
     },
     {
       id: 'super-admin',

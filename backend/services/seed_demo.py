@@ -71,6 +71,8 @@ TRAMITES_DEMO = [
         "dep_codigo": "TRANSITO_VIAL",
         "tiempo_estimado_dias": 15,
         "costo": 8500.0,
+        "tipo_pago": "boton_pago",
+        "momento_pago": "inicio",
         "documentos": [
             ("DNI (frente y dorso)", "Copia digitalizada del documento nacional de identidad", True),
             ("Certificado médico psicofísico", "Emitido por centro habilitado, vigencia 30 días", True),
@@ -84,6 +86,8 @@ TRAMITES_DEMO = [
         "dep_codigo": "HABILITACIONES",
         "tiempo_estimado_dias": 30,
         "costo": 15000.0,
+        "tipo_pago": "adhesion_debito",
+        "momento_pago": "inicio",
         "documentos": [
             ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
             ("Plano del local", "Plano aprobado por profesional matriculado", True),
@@ -97,6 +101,8 @@ TRAMITES_DEMO = [
         "dep_codigo": "OBRAS_PUBLICAS",
         "tiempo_estimado_dias": 20,
         "costo": 5000.0,
+        "tipo_pago": "boton_pago",
+        "momento_pago": "inicio",
         "documentos": [
             ("DNI del propietario", "Copia digitalizada del documento nacional de identidad", True),
             ("Plano de obra", "Croquis o plano firmado por profesional", True),
@@ -109,6 +115,8 @@ TRAMITES_DEMO = [
         "dep_codigo": "GENERAL",
         "tiempo_estimado_dias": 5,
         "costo": 2000.0,
+        "tipo_pago": "rapipago",
+        "momento_pago": "fin",
         "documentos": [
             ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
             ("Última boleta de tasa municipal", "Boleta del último período abonado", False),
@@ -549,6 +557,8 @@ async def seed_demo_completo(
             descripcion=t_data["descripcion"],
             tiempo_estimado_dias=t_data["tiempo_estimado_dias"],
             costo=t_data["costo"],
+            tipo_pago=t_data.get("tipo_pago"),
+            momento_pago=t_data.get("momento_pago"),
             activo=True,
             orden=i,
             documentos_requeridos=docs,

@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Loader2, Receipt, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Receipt, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { tasasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import type { Partida, TipoTasa } from '../types';
 
 /**
@@ -57,101 +58,107 @@ export default function GestionTasas() {
   }, [partidas]);
 
   return (
-    <div className="p-3 sm:p-6 space-y-4 max-w-5xl mx-auto">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold" style={{ color: theme.text }}>Tasas</h1>
-        <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-          Partidas del padrón municipal y estado de sus boletas.
-        </p>
-      </div>
-
-      {/* Resumen */}
-      {!loading && partidas.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <ResumenCard
-            icon={<Receipt className="h-5 w-5" />}
-            label="Partidas"
-            value={String(totales.total)}
-            color={theme.primary}
-            theme={theme}
-          />
-          <ResumenCard
-            icon={<AlertCircle className="h-5 w-5" />}
-            label="Con deuda"
-            value={String(totales.conDeuda)}
-            color="#ef4444"
-            theme={theme}
-          />
-          <ResumenCard
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            label="Monto adeudado"
-            value={fmtPlata(totales.totalMonto)}
-            color="#10b981"
-            theme={theme}
-          />
-        </div>
-      )}
-
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div
-          className="flex items-center gap-2 px-3 py-2 rounded-xl flex-1 min-w-0"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <Search className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={e => {
-              setSearchInput(e.target.value);
-              onSearchChange(e.target.value);
-            }}
-            placeholder="Buscar por identificador, DNI o titular..."
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm"
-            style={{ color: theme.text }}
-          />
-        </div>
-
-        {/* Chips de tipos */}
-        <div className="flex flex-wrap gap-1.5">
-          <FilterChip
-            active={tipoFiltro === null}
-            onClick={() => setTipoFiltro(null)}
-            color={theme.primary}
-            theme={theme}
-          >
-            Todas
-          </FilterChip>
-          {tipos.map(t => (
-            <FilterChip
-              key={t.id}
-              active={tipoFiltro === t.id}
-              onClick={() => setTipoFiltro(t.id)}
-              color={t.color}
-              theme={theme}
+    <div className="space-y-4">
+      <StickyPageHeader
+        backLink="/gestion/ajustes"
+        icon={<Wallet className="h-5 w-5" />}
+        title="Tasas"
+        searchPlaceholder="Buscar por identificador, DNI o titular..."
+        searchValue={searchInput}
+        onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}
+        filterPanel={
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            <button
+              onClick={() => setTipoFiltro(null)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03]"
+              style={{
+                backgroundColor: tipoFiltro === null ? `${theme.primary}20` : 'transparent',
+                color: tipoFiltro === null ? theme.primary : theme.textSecondary,
+                border: `1.5px solid ${tipoFiltro === null ? theme.primary : theme.border}`,
+              }}
             >
-              <DynamicIcon name={t.icono} className="h-3.5 w-3.5" />
-              <span>{t.nombre}</span>
-            </FilterChip>
-          ))}
-        </div>
-      </div>
+              Todas
+              <span className="text-[10px] font-bold opacity-80">{partidas.length}</span>
+            </button>
+            {tipos.map(t => {
+              const isActive = tipoFiltro === t.id;
+              const cnt = partidas.filter(p => p.tipo_tasa?.id === t.id).length;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTipoFiltro(t.id)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03]"
+                  style={{
+                    background: isActive
+                      ? `linear-gradient(135deg, ${t.color}, ${t.color}dd)`
+                      : `${t.color}12`,
+                    border: `1px solid ${isActive ? t.color : `${t.color}40`}`,
+                    color: isActive ? '#ffffff' : theme.text,
+                  }}
+                >
+                  <DynamicIcon name={t.icono} className="h-3 w-3" style={{ color: isActive ? '#ffffff' : t.color }} />
+                  <span className="whitespace-nowrap">{t.nombre}</span>
+                  {cnt > 0 && (
+                    <span
+                      className="text-[10px] font-bold px-1 rounded-full"
+                      style={{
+                        backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${t.color}25`,
+                        color: isActive ? '#ffffff' : t.color,
+                      }}
+                    >
+                      {cnt}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        }
+      />
 
-      {/* Lista */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
-        </div>
-      ) : partidas.length === 0 ? (
-        <EmptyState theme={theme} hasFilter={!!(tipoFiltro || searchQuery)} />
-      ) : (
-        <div className="space-y-2">
-          {partidas.map(p => (
-            <PartidaRow key={p.id} partida={p} theme={theme} />
-          ))}
-        </div>
-      )}
+      <div className="px-3 sm:px-6 space-y-4 max-w-5xl mx-auto">
+        {/* Resumen */}
+        {!loading && partidas.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <ResumenCard
+              icon={<Receipt className="h-5 w-5" />}
+              label="Partidas"
+              value={String(totales.total)}
+              color={theme.primary}
+              theme={theme}
+            />
+            <ResumenCard
+              icon={<AlertCircle className="h-5 w-5" />}
+              label="Con deuda"
+              value={String(totales.conDeuda)}
+              color="#ef4444"
+              theme={theme}
+            />
+            <ResumenCard
+              icon={<CheckCircle2 className="h-5 w-5" />}
+              label="Monto adeudado"
+              value={fmtPlata(totales.totalMonto)}
+              color="#10b981"
+              theme={theme}
+            />
+          </div>
+        )}
+
+        {/* Lista */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
+          </div>
+        ) : partidas.length === 0 ? (
+          <EmptyState theme={theme} hasFilter={!!(tipoFiltro || searchQuery)} />
+        ) : (
+          <div className="space-y-2">
+            {partidas.map(p => (
+              <PartidaRow key={p.id} partida={p} theme={theme} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

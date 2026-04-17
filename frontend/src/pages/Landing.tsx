@@ -302,22 +302,22 @@ export default function Landing() {
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
-        <header className="px-4 sm:px-6 py-6">
+        <header className="px-3 sm:px-6 py-4 sm:py-6">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-                <Building2 className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 flex-shrink-0">
+                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
-              <div>
-                <h1 className="font-bold text-white text-xl">Reclamos Municipales</h1>
-                <p className="text-xs text-slate-400">Sistema de gestion vecinal</p>
+              <div className="min-w-0">
+                <h1 className="font-bold text-white text-base sm:text-xl truncate">Reclamos Municipales</h1>
+                <p className="text-[10px] sm:text-xs text-slate-400 truncate">Sistema de gestion vecinal</p>
               </div>
             </div>
 
             {/* Botón Super Admin */}
             <button
               onClick={() => setShowSuperAdminLogin(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30 hover:text-white transition-all text-sm font-medium"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg sm:rounded-xl text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30 hover:text-white transition-all text-xs sm:text-sm font-medium flex-shrink-0"
             >
               <Shield className="h-4 w-4" />
               <span className="hidden sm:inline">Super Admin</span>

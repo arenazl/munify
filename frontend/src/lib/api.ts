@@ -1347,6 +1347,30 @@ export const pagosApi = {
     api.post(`/pagos/sesiones/${sessionId}/confirmar`, { medio_pago, metadatos }),
   cancelarSesion: (sessionId: string) =>
     api.post(`/pagos/sesiones/${sessionId}/cancelar`),
+  // Resumen de pagos para una solicitud (para el modal del admin)
+  estadoPagoSolicitud: (solicitudId: number) =>
+    api.get<{
+      solicitud_id: number;
+      requiere_pago: boolean;
+      costo: number;
+      pagado: boolean;
+      monto_pagado: string | null;
+      fecha_pago: string | null;
+      medio_pago: string | null;
+      sesion_aprobada_id: string | null;
+      intentos_total: number;
+      intentos_fallidos: number;
+      sesiones: Array<{
+        session_id: string;
+        estado: string;
+        monto: string;
+        medio_pago: string | null;
+        provider: string;
+        external_id: string | null;
+        created_at: string | null;
+        completed_at: string | null;
+      }>;
+    }>(`/pagos/estado-solicitud/${solicitudId}`),
 };
 
 export interface Recomendacion {

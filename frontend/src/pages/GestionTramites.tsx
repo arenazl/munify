@@ -124,6 +124,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [selectedTramite, setSelectedTramite] = useState<Solicitud | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Tracking del boton activo para que solo el clickeado muestre loading
+  const [accionEnCurso, setAccionEnCurso] = useState<string | null>(null);
 
   // Modal de revisión de documentos (fullscreen viewer con aprobar/rechazar)
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -154,6 +156,13 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [historial, setHistorial] = useState<HistorialItem[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [showHistorial, setShowHistorial] = useState(false);
+  const [estadoPago, setEstadoPago] = useState<{
+    requiere_pago: boolean; costo: number; pagado: boolean;
+    monto_pagado: string | null; fecha_pago: string | null;
+    medio_pago: string | null; sesion_aprobada_id: string | null;
+    intentos_total: number; intentos_fallidos: number;
+    sesiones: Array<{ session_id: string; estado: string; monto: string; medio_pago: string | null; provider: string; external_id: string | null; created_at: string | null; completed_at: string | null }>;
+  } | null>(null);
 
   // Resumen
   const [resumen, setResumen] = useState<{ total: number; hoy: number; por_estado: Record<string, number> } | null>(null);
@@ -406,10 +415,22 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     setHistorial([]);
     setShowHistorial(false);
     setShowEmpleadosDropdown(false);
+    setEstadoPago(null);
     setSheetOpen(true);
     setSearchParams({ id: String(tramite.id) });
     // Cargar empleados con disponibilidad al abrir
     loadEmpleadosDisponibilidad();
+    // Cargar estado de pago (si el tramite tiene costo)
+    const costoTramite = (tramite as any).tramite?.costo;
+    if (costoTramite && costoTramite > 0) {
+      try {
+        const { pagosApi } = await import('../lib/api');
+        const r = await pagosApi.estadoPagoSolicitud(tramite.id);
+        setEstadoPago(r.data as any);
+      } catch {
+        // silent — se puede reintentar abriendo el trámite de nuevo
+      }
+    }
   };
 
   const handleAsignarResponsable = async () => {
@@ -564,6 +585,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const handleDirectStateChange = async (nuevoEstadoDirecto: EstadoCanonico, mensajeExito: string) => {
     if (!selectedTramite) return;
     setSaving(true);
+    setAccionEnCurso(nuevoEstadoDirecto);
     try {
       await tramitesApi.updateSolicitud(selectedTramite.id, {
         estado: nuevoEstadoDirecto,
@@ -578,6 +600,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       showApiError(error, 'Error al actualizar trámite');
     } finally {
       setSaving(false);
+      setAccionEnCurso(null);
     }
   };
 
@@ -608,27 +631,48 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       );
     }
 
+    // Pendiente_pago — el trabajo terminó pero el vecino aún no pagó.
+    // El supervisor no puede cerrar hasta que el vecino confirme el pago.
+    if (estadoActual === 'pendiente_pago') {
+      const tramiteCfg: any = (selectedTramite as any).tramite || {};
+      return (
+        <div
+          className="w-full px-4 py-3 rounded-xl flex items-start gap-2"
+          style={{ backgroundColor: '#f59e0b15', color: '#f59e0b', border: '1px solid #f59e0b50' }}
+        >
+          <span className="text-lg">💳</span>
+          <div>
+            <p className="font-semibold">Listo para entregar — falta pago</p>
+            <p className="text-xs opacity-90 mt-0.5">
+              El trabajo está terminado. El vecino debe pagar ${tramiteCfg.costo?.toLocaleString('es-AR') || ''} en la pasarela
+              para que podamos cerrar el trámite y entregarlo.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     // Acciones disponibles según estado — cada una con su color/handler.
     // Mostrado como grid 2 col; si hay 3 acciones, la tercera (Rechazar) abarca toda la fila.
-    type Accion = { label: string; loadingLabel: string; handler: () => void; color: string; variant?: 'solid' | 'outline'; fullRow?: boolean };
+    type Accion = { id: string; label: string; loadingLabel: string; handler: () => void; color: string; variant?: 'solid' | 'outline'; fullRow?: boolean };
     const acciones: Accion[] = [];
 
     if (estadoActual === 'recibido') {
       acciones.push(
-        { label: 'Poner en Curso', loadingLabel: 'Aceptando...', handler: handleAceptar, color: theme.primary, variant: 'solid' },
-        { label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline' },
+        { id: 'en_curso', label: 'Poner en Curso', loadingLabel: 'Aceptando...', handler: handleAceptar, color: theme.primary, variant: 'solid' },
+        { id: 'rechazado', label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline' },
       );
     } else if (estadoActual === 'en_curso') {
       acciones.push(
-        { label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981', variant: 'solid' },
-        { label: 'Posponer', loadingLabel: 'Posponiendo...', handler: handlePosponer, color: '#f59e0b', variant: 'outline' },
-        { label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline', fullRow: true },
+        { id: 'finalizado', label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981', variant: 'solid' },
+        { id: 'pospuesto', label: 'Posponer', loadingLabel: 'Posponiendo...', handler: handlePosponer, color: '#f59e0b', variant: 'outline' },
+        { id: 'rechazado', label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline', fullRow: true },
       );
     } else if (estadoActual === 'pospuesto') {
       acciones.push(
-        { label: 'Reanudar', loadingLabel: 'Reanudando...', handler: handleAceptar, color: theme.primary, variant: 'solid' },
-        { label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981', variant: 'solid' },
-        { label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline', fullRow: true },
+        { id: 'en_curso', label: 'Reanudar', loadingLabel: 'Reanudando...', handler: handleAceptar, color: theme.primary, variant: 'solid' },
+        { id: 'finalizado', label: 'Finalizar', loadingLabel: 'Finalizando...', handler: handleFinalizar, color: '#10b981', variant: 'solid' },
+        { id: 'rechazado', label: 'Rechazar', loadingLabel: 'Rechazando...', handler: handleRechazar, color: '#ef4444', variant: 'outline', fullRow: true },
       );
     }
 
@@ -636,9 +680,11 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
     return (
       <div className="grid grid-cols-2 gap-2">
-        {acciones.map((a, i) => (
+        {acciones.map((a) => {
+          const isThisLoading = saving && accionEnCurso === a.id;
+          return (
           <button
-            key={i}
+            key={a.id}
             onClick={a.handler}
             disabled={saving}
             className={`px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${a.fullRow ? 'col-span-2' : ''}`}
@@ -656,9 +702,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                   }
             }
           >
-            {saving ? a.loadingLabel : a.label}
+            {isThisLoading ? a.loadingLabel : a.label}
           </button>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -1958,6 +2005,130 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 </div>
               )}
             </div>
+
+            {/* Estado de pago — solo si el tramite tiene costo */}
+            {estadoPago?.requiere_pago && (() => {
+              const medioLabels: Record<string, { label: string; emoji: string; color: string }> = {
+                tarjeta: { label: 'Tarjeta', emoji: '💳', color: '#3b82f6' },
+                qr: { label: 'QR', emoji: '📱', color: '#8b5cf6' },
+                efectivo_cupon: { label: 'Rapipago (efectivo)', emoji: '🧾', color: '#ef4444' },
+                transferencia: { label: 'Transferencia', emoji: '🏦', color: '#14b8a6' },
+                debito_automatico: { label: 'Débito automático', emoji: '🔁', color: '#10b981' },
+              };
+              const estadoLabels: Record<string, { label: string; color: string }> = {
+                pending: { label: 'Pendiente de inicio', color: '#6b7280' },
+                in_checkout: { label: 'En checkout', color: '#3b82f6' },
+                approved: { label: 'Aprobado', color: '#10b981' },
+                rejected: { label: 'Rechazado', color: '#ef4444' },
+                expired: { label: 'Expirado', color: '#f59e0b' },
+                cancelled: { label: 'Cancelado', color: '#6b7280' },
+              };
+              const tramiteCfg: any = (selectedTramite as any).tramite || {};
+              const tipoPagoConfig = tramiteCfg.tipo_pago;
+              const momentoPagoConfig = tramiteCfg.momento_pago;
+              const pagado = estadoPago.pagado;
+
+              return (
+                <div
+                  className="p-4 rounded-xl space-y-3"
+                  style={{
+                    backgroundColor: pagado ? '#10b98110' : '#f59e0b10',
+                    border: `1px solid ${pagado ? '#10b98140' : '#f59e0b40'}`,
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{pagado ? '✅' : '💳'}</span>
+                      <span className="text-sm font-semibold" style={{ color: theme.text }}>
+                        Estado del pago
+                      </span>
+                    </div>
+                    <span
+                      className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                      style={{
+                        backgroundColor: pagado ? '#10b98125' : '#f59e0b25',
+                        color: pagado ? '#10b981' : '#f59e0b',
+                      }}
+                    >
+                      {pagado ? 'PAGADO' : 'PENDIENTE'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: theme.textSecondary }}>Monto</p>
+                      <p className="font-bold" style={{ color: theme.text }}>
+                        ${estadoPago.costo.toLocaleString('es-AR')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: theme.textSecondary }}>Método configurado</p>
+                      <p className="font-medium" style={{ color: theme.text }}>
+                        {tipoPagoConfig === 'boton_pago' ? '💳 Botón de Pago'
+                          : tipoPagoConfig === 'rapipago' ? '🧾 Rapipago'
+                          : tipoPagoConfig === 'adhesion_debito' ? '🔁 Adhesión Débito'
+                          : tipoPagoConfig === 'qr' ? '📱 QR'
+                          : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: theme.textSecondary }}>Momento</p>
+                      <p className="font-medium" style={{ color: theme.text }}>
+                        {momentoPagoConfig === 'fin' ? 'Al retirar' : 'Al iniciar'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: theme.textSecondary }}>Intentos</p>
+                      <p className="font-medium" style={{ color: theme.text }}>
+                        {estadoPago.intentos_total} {estadoPago.intentos_fallidos > 0 && (
+                          <span style={{ color: '#ef4444' }}>· {estadoPago.intentos_fallidos} fallidos</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {pagado && (
+                    <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: '#10b98115', color: '#10b981', border: '1px solid #10b98130' }}>
+                      <p className="font-semibold mb-1">✅ Pago confirmado</p>
+                      <div className="grid grid-cols-2 gap-1 text-[11px]">
+                        {estadoPago.fecha_pago && (
+                          <p><span className="opacity-70">Fecha:</span> {new Date(estadoPago.fecha_pago).toLocaleString('es-AR')}</p>
+                        )}
+                        {estadoPago.medio_pago && (
+                          <p><span className="opacity-70">Medio:</span> {medioLabels[estadoPago.medio_pago]?.label || estadoPago.medio_pago}</p>
+                        )}
+                        {estadoPago.sesion_aprobada_id && (
+                          <p className="col-span-2"><span className="opacity-70">N° operación:</span> <span className="font-mono">{estadoPago.sesion_aprobada_id}</span></p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!pagado && estadoPago.intentos_total === 0 && (
+                    <p className="text-xs" style={{ color: theme.textSecondary }}>
+                      El vecino todavía no inició el pago. No se puede finalizar el trámite hasta que pague.
+                    </p>
+                  )}
+
+                  {!pagado && estadoPago.intentos_total > 0 && (
+                    <div className="text-xs" style={{ color: theme.textSecondary }}>
+                      <p className="font-medium mb-1" style={{ color: '#ef4444' }}>Intentos previos sin éxito:</p>
+                      <div className="space-y-1">
+                        {estadoPago.sesiones.slice(0, 3).map(s => {
+                          const est = estadoLabels[s.estado] || { label: s.estado, color: theme.textSecondary };
+                          return (
+                            <div key={s.session_id} className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded" style={{ backgroundColor: theme.card }}>
+                              <span style={{ color: est.color }}>● {est.label}</span>
+                              {s.created_at && <span className="opacity-70">{new Date(s.created_at).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Historial */}
             <div

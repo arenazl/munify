@@ -863,6 +863,8 @@ async def crear_solicitud(
     if auto_dep_id:
         solicitud.municipio_dependencia_id = auto_dep_id
 
+    # La solicitud SIEMPRE arranca en RECIBIDO. El pago es opcional durante el
+    # flujo, pero obligatorio para finalizar (chequeado en actualizar_solicitud).
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
         usuario_id=current_user.id if current_user else None,
@@ -925,6 +927,31 @@ async def actualizar_solicitud(
     # Validación: bloqueo recibido -> en_curso si faltan docs verificados
     if cambio_estado and solicitud_data.estado == EstadoSolicitud.EN_CURSO:
         await validar_transicion_a_en_curso(db, solicitud)
+
+    # Validación de pago al cierre: si el tramite tiene costo y se intenta
+    # pasar a FINALIZADO sin un pago aprobado, BLOQUEAR con 400.
+    # No transformamos el estado silenciosamente — el supervisor tiene que
+    # ver el error claro, y la solicitud queda donde estaba (en_curso).
+    if cambio_estado and solicitud_data.estado == EstadoSolicitud.FINALIZADO:
+        if solicitud.tramite and solicitud.tramite.costo and solicitud.tramite.costo > 0:
+            from models.pago_sesion import PagoSesion, EstadoSesionPago
+            ps_q = await db.execute(
+                select(PagoSesion).where(
+                    and_(
+                        PagoSesion.solicitud_id == solicitud.id,
+                        PagoSesion.estado == EstadoSesionPago.APPROVED,
+                    )
+                ).limit(1)
+            )
+            if not ps_q.scalar_one_or_none():
+                costo_fmt = f"${solicitud.tramite.costo:,.0f}".replace(",", ".")
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"No se puede finalizar: el vecino aún no pagó {costo_fmt}. "
+                        f"Avisale para que pague desde su panel y volvé a intentar."
+                    ),
+                )
 
     for field, value in solicitud_data.model_dump(exclude_unset=True).items():
         setattr(solicitud, field, value)

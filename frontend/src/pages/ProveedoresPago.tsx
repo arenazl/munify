@@ -3,7 +3,7 @@ import { Wallet, CreditCard, Banknote, QrCode, RefreshCcw, Check, Loader2, Downl
 import { toast } from 'sonner';
 import { proveedoresPagoApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
+import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 
 interface Proveedor {
   proveedor: string;
@@ -128,14 +128,11 @@ export default function ProveedoresPago() {
 
   return (
     <div className="space-y-4">
-      <StickyPageHeader>
-        <PageTitleIcon icon={<Wallet className="h-4 w-4" />} />
-        <PageTitle>Proveedores de Pago</PageTitle>
-        <HeaderSeparator />
-        <span className="text-sm hidden sm:block" style={{ color: theme.textSecondary }}>
-          Configurá quién procesa los pagos del municipio
-        </span>
-      </StickyPageHeader>
+      <StickyPageHeader
+        backLink="/gestion/ajustes"
+        icon={<Wallet className="h-5 w-5" />}
+        title="Proveedores de Pago"
+      />
 
       {loading ? (
         <div className="flex items-center justify-center h-48">

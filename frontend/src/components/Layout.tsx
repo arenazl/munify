@@ -788,8 +788,12 @@ export default function Layout() {
             zIndex: 1,
           }}
         >
-          {/* Barra superior ultra-compacta - iconos a la derecha - SOLO DESKTOP */}
-          <div className="hidden lg:flex items-center justify-end mt-4 mb-2">
+          {/* Barra superior ultra-compacta - iconos a la derecha - SOLO DESKTOP.
+              Sticky: se mantiene visible al hacer scroll de la página. */}
+          <div
+            className="hidden lg:flex items-center justify-end pt-4 pb-2 sticky top-0 z-50"
+            style={{ backgroundColor: theme.contentBackground }}
+          >
 
             {/* Iconos de acciones */}
             <div className="flex items-center">

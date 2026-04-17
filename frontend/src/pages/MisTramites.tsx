@@ -154,16 +154,35 @@ export default function MisTramites() {
     loadTramites();
   };
 
-  const openViewSheet = (tramite: Solicitud) => {
+  // Estado de pago para el tramite seleccionado (cargado al abrir el sheet)
+  const [estadoPagoSheet, setEstadoPagoSheet] = useState<{ pagado: boolean; medio_pago: string | null; fecha_pago: string | null } | null>(null);
+
+  const openViewSheet = async (tramite: Solicitud) => {
     setSelectedTramite(tramite);
-    setChecklistData(null);  // evita mostrar data del tramite anterior mientras carga
+    setChecklistData(null);
+    setEstadoPagoSheet(null);
     setSheetOpen(true);
+    // Si el tramite tiene costo, traer el estado de pago real (sesiones APPROVED)
+    const costo = (tramite as any).tramite?.costo;
+    if (costo && costo > 0) {
+      try {
+        const r = await pagosApi.estadoPagoSolicitud(tramite.id);
+        setEstadoPagoSheet({
+          pagado: r.data.pagado,
+          medio_pago: r.data.medio_pago,
+          fecha_pago: r.data.fecha_pago,
+        });
+      } catch {
+        // silent
+      }
+    }
   };
 
   const closeSheet = () => {
     setSheetOpen(false);
     setSelectedTramite(null);
     setChecklistData(null);
+    setEstadoPagoSheet(null);
   };
 
   // Orden de estados para ordenamiento (pendientes primero)
@@ -886,16 +905,20 @@ export default function MisTramites() {
               }
             };
 
-            // Pago: el tramite tiene costo y el estado lo permite
+            // Pago: aparece cuando el supervisor ya revisó los docs y el trámite
+            // está activo. El pago es el HITO POSTERIOR a la revisión de documentos.
             const tramiteCfg = (selectedTramite as any).tramite || {};
             const tieneCosto = tramiteCfg.costo && tramiteCfg.costo > 0;
             const estadoActual = String(selectedTramite.estado || '').toLowerCase();
             const estadoPermitePago =
-              estadoActual === 'recibido' ||
+              estadoActual === 'en_curso' ||
               estadoActual === 'pendiente_pago' ||
-              (estadoActual === 'en_curso' && tramiteCfg.momento_pago === 'fin') ||
-              (estadoActual === 'finalizado' && tramiteCfg.momento_pago === 'fin');
-            const puedePagar = !!(tieneCosto && user?.rol === 'vecino' && estadoPermitePago && !selectedTramite.pago_externo_id);
+              estadoActual === 'recibido';
+            // El estado real de pago viene del endpoint estadoPagoSolicitud
+            // (chequea sesiones APPROVED). Mientras carga asumimos NO pagado.
+            const yaSePago = !!estadoPagoSheet?.pagado;
+            const puedePagar = !!(tieneCosto && user?.rol === 'vecino' && estadoPermitePago && !yaSePago);
+            const esPagoUrgente = puedePagar && estadoActual === 'pendiente_pago';
 
             const iniciarPago = async () => {
               try {
@@ -911,10 +934,39 @@ export default function MisTramites() {
 
             return (
               <div className="space-y-2">
+                {tieneCosto && estadoPagoSheet?.pagado && (
+                  <div
+                    className="px-4 py-3 rounded-xl text-sm flex items-start gap-2"
+                    style={{ backgroundColor: '#10b98115', border: '1px solid #10b98150', color: '#10b981' }}
+                  >
+                    <span className="text-base">✅</span>
+                    <div>
+                      <p className="font-semibold">Pago confirmado</p>
+                      <p className="text-xs opacity-90 mt-0.5">
+                        Pagaste ${tramiteCfg.costo?.toLocaleString('es-AR')} {estadoPagoSheet.medio_pago ? `con ${estadoPagoSheet.medio_pago}` : ''}
+                        {estadoPagoSheet.fecha_pago && ` el ${new Date(estadoPagoSheet.fecha_pago).toLocaleString('es-AR')}`}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {esPagoUrgente && (
+                  <div
+                    className="px-4 py-3 rounded-xl text-sm flex items-start gap-2"
+                    style={{ backgroundColor: '#f59e0b15', border: '1px solid #f59e0b50', color: '#f59e0b' }}
+                  >
+                    <span className="text-base">⏳</span>
+                    <div>
+                      <p className="font-semibold">Esperando tu pago</p>
+                      <p className="text-xs opacity-90 mt-0.5">
+                        Tu solicitud no avanza hasta que pagues el trámite. Tocá el botón verde abajo.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {puedePagar && (
                   <button
                     onClick={iniciarPago}
-                    className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95"
+                    className={`w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-95 ${esPagoUrgente ? 'animate-pulse' : ''}`}
                     style={{
                       background: `linear-gradient(135deg, #10b981 0%, #059669 100%)`,
                       color: '#ffffff',

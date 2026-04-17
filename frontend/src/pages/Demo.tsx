@@ -126,40 +126,41 @@ export default function Demo() {
       )}
 
       {/* Header minimalista */}
-      <header className="flex-shrink-0 px-6 py-5">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={munifyLogo} alt="Munify" className="h-9 w-auto" />
-            <span className="text-xl font-bold text-slate-800">Munify</span>
+      <header className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-5">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <img src={munifyLogo} alt="Munify" className="h-8 sm:h-9 w-auto flex-shrink-0" />
+            <span className="text-lg sm:text-xl font-bold text-slate-800 truncate">Munify</span>
           </div>
           <button
             onClick={() => navigate('/login')}
-            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-900 font-medium text-sm transition-colors"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-slate-600 hover:text-slate-900 font-medium text-xs sm:text-sm transition-colors flex-shrink-0"
           >
             <LogIn className="h-4 w-4" />
-            Ya tengo cuenta
+            <span className="hidden sm:inline">Ya tengo cuenta</span>
+            <span className="sm:hidden">Ingresar</span>
           </button>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-8">
         <div className="w-full max-w-2xl">
           {/* Título comercial */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-800 mb-3">
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-800 mb-3 leading-tight">
               Probá Munify en tu municipio
             </h1>
-            <p className="text-slate-500 text-lg">
+            <p className="text-slate-500 text-base sm:text-lg">
               Escribí el nombre y armamos una demo en 3 segundos
             </p>
           </div>
 
           {/* Creador de muni demo — protagonista comercial. */}
-          <div className="mb-10 bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-6">
+          <div className="mb-8 sm:mb-10 bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-blue-500" />
-              <span className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+              <span className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">
                 Crear demo en vivo
               </span>
             </div>
@@ -173,7 +174,7 @@ export default function Demo() {
                 }}
                 placeholder="Ej: Pergamino, San Pedro, Salta..."
                 disabled={creando}
-                className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400 transition-colors disabled:opacity-50"
+                className="flex-1 min-w-0 px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-slate-800 placeholder-slate-400 transition-colors disabled:opacity-50"
               />
               <button
                 onClick={handleCrearDemo}

@@ -5,6 +5,7 @@ import {
   Lightbulb, ClipboardList, FileText, Users, TrendingUp,
 } from 'lucide-react';
 import { PAGE_HINTS, type HintStep } from '../../config/pageHints';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Mapa de íconos disponibles para los steps (por nombre)
 const ICON_MAP: Record<string, typeof Sparkles> = {
@@ -107,13 +108,16 @@ interface PageHintProps {
  * El dismiss se persiste en localStorage por pageId.
  */
 export default function PageHint({ pageId }: PageHintProps) {
+  const { theme } = useTheme();
   const hint = PAGE_HINTS[pageId];
   // Scopeamos el dismiss al municipio actual — así cada demo arranca con
   // sus hints visibles aunque el usuario los haya cerrado en otra demo.
   const muniCodigo = typeof window !== 'undefined' ? localStorage.getItem('municipio_codigo') || 'default' : 'default';
   const storageKey = `hint_dismissed_${pageId}_${muniCodigo}`;
   const isWizard = !!hint?.steps?.length;
-  const accent = ACCENT_STYLES[hint?.accent ?? 'blue'];
+  // Mantenemos ACCENT_STYLES para compat pero ya no se usa en el render —
+  // los colores ahora salen del theme activo para respetar la paleta elegida.
+  void ACCENT_STYLES;
 
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -167,34 +171,47 @@ export default function PageHint({ pageId }: PageHintProps) {
 
   const handleBack = () => setStepIdx((i) => Math.max(i - 1, 0));
 
+  // Todos los colores derivan de theme.primary para respetar la paleta activa
+  const primary = theme.primary;
+
   return (
     <div
-      className={`relative mb-4 overflow-hidden rounded-2xl border ${accent.border} bg-gradient-to-br ${accent.gradient} shadow-sm animate-in fade-in slide-in-from-top-2 duration-400`}
+      className="relative mb-4 overflow-hidden rounded-2xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400"
+      style={{
+        background: `linear-gradient(135deg, ${primary}12 0%, ${primary}06 60%, ${theme.card} 100%)`,
+        border: `1px solid ${primary}30`,
+      }}
     >
       {/* Barra de acento decorativa arriba */}
-      <div className={`absolute inset-x-0 top-0 h-0.5 ${accent.accentBar}`} />
+      <div className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: primary }} />
 
       <div className="p-5 md:p-6">
         <div className="flex items-start gap-4">
           {/* Ícono */}
-          <div className={`flex-shrink-0 w-11 h-11 rounded-xl ${accent.iconBg} flex items-center justify-center shadow-sm`}>
-            <IconComponent className={`h-5 w-5 ${accent.iconColor}`} strokeWidth={2.2} />
+          <div
+            className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-sm"
+            style={{ backgroundColor: `${primary}20`, color: primary }}
+          >
+            <IconComponent className="h-5 w-5" strokeWidth={2.2} />
           </div>
 
           {/* Contenido */}
           <div className="flex-1 min-w-0">
             {/* Chip superior (solo en wizard) */}
             {isWizard && (
-              <div className={`inline-flex items-center gap-1.5 ${accent.chipBg} ${accent.chipText} text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mb-2`}>
+              <div
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mb-2"
+                style={{ backgroundColor: `${primary}20`, color: primary }}
+              >
                 <Sparkles className="h-3 w-3" />
                 Tutorial · {stepIdx + 1} de {steps.length}
               </div>
             )}
 
-            <h3 className={`text-base md:text-lg font-bold ${accent.title} mb-1.5 leading-tight`}>
+            <h3 className="text-base md:text-lg font-bold mb-1.5 leading-tight" style={{ color: theme.text }}>
               {isWizard ? currentStep?.title : hint.title}
             </h3>
-            <p className={`text-sm ${accent.body} leading-relaxed`}>
+            <p className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
               {isWizard ? currentStep?.description : hint.description}
             </p>
 
@@ -202,7 +219,12 @@ export default function PageHint({ pageId }: PageHintProps) {
             {isWizard && currentStep?.cta && (
               <Link
                 to={currentStep.cta.href}
-                className={`inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold border border-current/20 ${accent.buttonGhost} transition-colors`}
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                style={{
+                  backgroundColor: `${primary}15`,
+                  color: primary,
+                  border: `1px solid ${primary}30`,
+                }}
               >
                 {currentStep.cta.label}
                 <ExternalLink className="h-3 w-3" />
@@ -218,11 +240,11 @@ export default function PageHint({ pageId }: PageHintProps) {
                     <button
                       key={idx}
                       onClick={() => setStepIdx(idx)}
-                      className={`h-1.5 rounded-full transition-all ${
-                        idx === stepIdx
-                          ? `w-6 ${accent.dotActive}`
-                          : `w-1.5 ${accent.dotInactive} hover:opacity-70`
-                      }`}
+                      className="h-1.5 rounded-full transition-all"
+                      style={{
+                        width: idx === stepIdx ? 24 : 6,
+                        backgroundColor: idx === stepIdx ? primary : `${primary}40`,
+                      }}
                       aria-label={`Ir al paso ${idx + 1}`}
                     />
                   ))}
@@ -233,7 +255,8 @@ export default function PageHint({ pageId }: PageHintProps) {
                   {stepIdx > 0 && (
                     <button
                       onClick={handleBack}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition ${accent.buttonGhost}`}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition hover:scale-[1.02]"
+                      style={{ backgroundColor: `${primary}12`, color: primary }}
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                       Atrás
@@ -241,7 +264,11 @@ export default function PageHint({ pageId }: PageHintProps) {
                   )}
                   <button
                     onClick={handleNext}
-                    className={`flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm ${accent.button}`}
+                    className="flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm hover:scale-[1.02]"
+                    style={{
+                      background: `linear-gradient(135deg, ${primary}, ${primary}dd)`,
+                      color: theme.primaryText || '#ffffff',
+                    }}
                   >
                     {isLastStep ? (
                       <>
@@ -263,7 +290,8 @@ export default function PageHint({ pageId }: PageHintProps) {
           {/* Botón cerrar */}
           <button
             onClick={handleDismiss}
-            className={`flex-shrink-0 w-7 h-7 rounded-lg ${accent.closeHover} flex items-center justify-center ${accent.closeColor} transition-colors`}
+            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:brightness-125"
+            style={{ backgroundColor: `${primary}15`, color: primary }}
             aria-label="Ocultar sugerencia"
           >
             <X className="h-4 w-4" />
