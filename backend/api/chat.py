@@ -2337,28 +2337,30 @@ DATOS:
     default_template = load_template('dashboard')
     if default_template:
         return base_prompt + f"""INSTRUCCIONES:
-1. Hacé un RESUMEN con KPIs o mini-tabla (máx 5-8 filas destacadas)
-2. Los datos completos ya se muestran en una grilla debajo
-3. Español rioplatense, respuesta CORTA
-4. HTML con estilos inline
+1. Mostrá TODOS los registros del JSON como cards individuales o mini-tabla. NUNCA resumas N registros en un solo número genérico.
+2. Español rioplatense, respuesta CORTA pero COMPLETA.
+3. HTML con estilos inline.
 
 {get_template_prompt('dashboard', total) or ''}
 
-IMPORTANTE: Solo hacé un resumen, la grilla con todos los datos ya está abajo."""
+IMPORTANTE: Mostrá CADA registro individualmente, no los agrupes en "X totales"."""
 
     # Fallback hardcodeado si no hay templates
     return base_prompt + f"""INSTRUCCIONES:
-1. Hacé un RESUMEN con KPIs o mini-tabla (máx 5-8 filas destacadas)
-2. Los datos completos ya se muestran en una grilla debajo
-3. Español rioplatense, respuesta CORTA
-4. HTML con estilos inline
+1. Mostrá TODOS los datos del JSON como cards individuales o mini-tabla. Si hay 4 categorías, mostrá las 4 con su nombre y cantidad. NUNCA resumas N registros en "X totales" — mostrá cada uno.
+2. Español rioplatense, respuesta CORTA pero COMPLETA con todos los registros.
+3. HTML con estilos inline.
+4. Al final una línea de resumen breve.
 
-KPI CARDS (para números/totales):
+CARD POR CADA REGISTRO (usar para datos agrupados — una card por fila):
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
-<div style="flex:1;min-width:120px;background:#f8f5f0;border:1px solid #e5e0d8;padding:16px 20px;border-radius:12px;text-align:center"><div style="font-size:28px;font-weight:700;color:#b08d57">VALOR</div><div style="font-size:12px;color:#8b7355;margin-top:2px">Etiqueta</div></div>
+<div style="flex:1;min-width:140px;background:#f8f5f0;border:1px solid #e5e0d8;padding:16px 20px;border-radius:12px;text-align:center"><div style="font-size:28px;font-weight:700;color:#b08d57">CANTIDAD</div><div style="font-size:12px;color:#8b7355;margin-top:2px">Nombre de la categoría/item</div></div>
 </div>
 
-IMPORTANTE: Solo hacé un resumen, la grilla con todos los datos ya está abajo."""
+MINI-TABLA (usar para listados con más columnas):
+<table style="width:100%;border-collapse:collapse;margin:12px 0"><tr style="background:#f8f5f0"><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e0d8;font-size:12px;color:#8b7355">Col1</th><th>Col2</th></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e0d8">dato</td></tr></table>
+
+IMPORTANTE: Mostrá CADA registro del JSON, no los resumas en un solo número."""
 
 
 def build_asistente_prompt(
