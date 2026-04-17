@@ -903,12 +903,88 @@ async def seed_demo_completo(
     reclamos_creados = len(reclamos_creados_list)
     await db.flush()
 
-    # 9. Solicitudes de ejemplo: NO se crean.
-    # El catalogo de tramites (Licencia de conducir, etc) queda disponible
-    # para que en la presentacion el vecino los inicie el mismo. Si creamos
-    # una solicitud pre-hecha, el vecino aparece con un "Licencia en curso"
-    # apenas se loguea, y al tratar de sacar otra licencia veria dos iguales
-    # (confuso para la demo).
+    # 9. Solicitudes de ejemplo: 2 por trámite del catálogo (estados variados).
+    # Genera datos de demo realistas. El vecino demo es solicitante de la mitad;
+    # el resto se genera como "otro vecino" sin user asociado (solo datos de contacto).
+    solicitudes_creadas = 0
+    _ASUNTOS_EXTRA = [
+        "Solicitud iniciada por ventanilla",
+        "Necesito resolver esto antes de fin de mes",
+    ]
+    _ESTADOS_CICLO = [
+        EstadoSolicitud.RECIBIDO,
+        EstadoSolicitud.EN_CURSO,
+        EstadoSolicitud.RECIBIDO,
+        EstadoSolicitud.FINALIZADO,
+        EstadoSolicitud.EN_CURSO,
+        EstadoSolicitud.POSPUESTO,
+        EstadoSolicitud.RECIBIDO,
+        EstadoSolicitud.FINALIZADO,
+    ]
+
+    for t_idx, tramite in enumerate(tramites_creados):
+        for j in range(2):
+            sol_idx = t_idx * 2 + j
+            _sh = int(hashlib.sha1(f"{codigo}-sol-{sol_idx}".encode()).hexdigest(), 16)
+            estado = _ESTADOS_CICLO[sol_idx % len(_ESTADOS_CICLO)]
+
+            es_del_vecino = (sol_idx % 2 == 0)
+            _nom_sol = _nombre_demo if es_del_vecino else (
+                ["Mariana", "Roberto", "Claudia", "Héctor", "Patricia"][_sh % 5]
+            )
+            _ape_sol = _apellido_demo if es_del_vecino else (
+                ["Díaz", "Morales", "Herrera", "Castro", "Ríos"][_sh % 5]
+            )
+            _dni_sol = _dni_demo if es_del_vecino else str(30_000_000 + (_sh % 18_000_000))
+
+            # Buscar dep asignada para este trámite
+            dep_id_sol = None
+            if t_idx < len(TRAMITES_DEMO):
+                dep_code = TRAMITES_DEMO[t_idx].get("dep_codigo")
+                if dep_code:
+                    muni_dep_obj = muni_deps.get(dep_code)
+                    if muni_dep_obj:
+                        dep_id_sol = muni_dep_obj.id
+
+            numero = f"SOL-{date.today().year}-{(sol_idx + 1):05d}"
+            sol = Solicitud(
+                municipio_id=municipio_id,
+                numero_tramite=numero,
+                tramite_id=tramite.id,
+                asunto=f"{tramite.nombre} — {_nom_sol} {_ape_sol}",
+                descripcion=_ASUNTOS_EXTRA[j % len(_ASUNTOS_EXTRA)],
+                estado=estado,
+                solicitante_id=vecino_demo.id if es_del_vecino else None,
+                nombre_solicitante=_nom_sol,
+                apellido_solicitante=_ape_sol,
+                dni_solicitante=_dni_sol,
+                email_solicitante=f"vecino@{codigo}.demo.com" if es_del_vecino else f"{_nom_sol.lower()}@mail.com",
+                telefono_solicitante=_telefono_demo if es_del_vecino else None,
+                direccion_solicitante=_direccion_demo if es_del_vecino else None,
+                municipio_dependencia_id=dep_id_sol,
+                prioridad=2 + (sol_idx % 3),
+            )
+            db.add(sol)
+            await db.flush()
+
+            db.add(HistorialSolicitud(
+                solicitud_id=sol.id,
+                usuario_id=vecino_demo.id if es_del_vecino else None,
+                estado_nuevo=EstadoSolicitud.RECIBIDO,
+                accion="Solicitud creada",
+                comentario="Solicitud generada automáticamente en la demo.",
+            ))
+            if estado != EstadoSolicitud.RECIBIDO:
+                db.add(HistorialSolicitud(
+                    solicitud_id=sol.id,
+                    usuario_id=supervisores_demo[0].id if supervisores_demo else None,
+                    estado_anterior=EstadoSolicitud.RECIBIDO,
+                    estado_nuevo=estado,
+                    accion=f"Cambio a {estado.value}",
+                    comentario="Avance del trámite (demo).",
+                ))
+            solicitudes_creadas += 1
+    await db.flush()
 
     return {
         "dependencias": len(muni_deps),
@@ -920,5 +996,5 @@ async def seed_demo_completo(
         "cuadrillas": len(cuadrillas),
         "sla_configs": sla_count,
         "reclamos": reclamos_creados,
-        "solicitudes": 0,
+        "solicitudes": solicitudes_creadas,
     }
