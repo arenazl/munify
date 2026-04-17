@@ -2028,14 +2028,14 @@ DATABASE_SCHEMA_FALLBACK = """
 
 ### reclamos (per-municipio)
 - id, municipio_id, titulo, descripcion, estado, prioridad, direccion, created_at
-- categoria_id → categorias_reclamo.id
+- categoria_id → categorias_reclamo.id (IMPORTANTE: la tabla se llama categorias_reclamo, NO categorias)
 - zona_id → zonas.id
 - creador_id → usuarios.id
-- estado: 'NUEVO', 'ASIGNADO', 'EN_CURSO', 'RESUELTO', 'RECHAZADO'
+- estado (SIEMPRE en minúsculas): 'nuevo', 'recibido', 'en_curso', 'finalizado', 'pospuesto', 'rechazado', 'resuelto', 'asignado'
 
-### categorias_reclamo (per-municipio)
+### categorias_reclamo (per-municipio) — NUNCA usar "categorias" a secas
 - id, municipio_id, nombre, descripcion, icono, color, orden, activo
-- Cada municipio tiene sus propias categorías de reclamo (sin catálogo global).
+- JOIN siempre como: JOIN categorias_reclamo c ON r.categoria_id = c.id
 
 ### empleados (per-municipio)
 - id, municipio_id, nombre, apellido, especialidad, activo
@@ -2240,7 +2240,8 @@ SCHEMA DE LA BASE DE DATOS:
 
 MUNICIPIO_ID ACTUAL: {municipio_id}
 
-REGLAS:
+REGLAS CRÍTICAS:
+0. La tabla de categorías de reclamo se llama `categorias_reclamo` (NO `categorias`). Los estados de reclamos son SIEMPRE en minúsculas: 'nuevo', 'recibido', 'en_curso', 'finalizado', 'pospuesto', 'rechazado'. NUNCA uses mayúsculas para estados.
 1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. Para filtrar por municipio: verificá en el schema si la tabla tiene columna "municipio_id". Si NO la tiene, buscá "multi_tenant_note" que te indica qué tabla pivote usar.
 2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
 3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()

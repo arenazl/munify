@@ -56,7 +56,8 @@ async def call_gemini(messages: List[dict], max_tokens: int = 1000) -> Optional[
                     "contents": gemini_contents,
                     "generationConfig": {
                         "maxOutputTokens": max_tokens,
-                        "temperature": 0.7
+                        "temperature": 0.7,
+                        "thinkingConfig": {"thinkingBudget": 0},
                     }
                 }
             )
