@@ -582,8 +582,33 @@ export function ChatWidget() {
                   ) : (
                     <>
                       <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm">Hola! Soy tu asistente virtual.</p>
-                      <p className="text-sm">En qué puedo ayudarte?</p>
+                      <p className="text-sm font-medium mb-1">Hola! Soy tu asistente virtual.</p>
+                      <p className="text-xs opacity-70 mb-3">Preguntame lo que necesites o tocá una sugerencia:</p>
+                      <div className="flex flex-wrap gap-1.5 justify-center px-2">
+                        {[
+                          '¿Cómo creo un reclamo?',
+                          '¿Qué trámites puedo hacer?',
+                          '¿Cómo pago mis tasas?',
+                          '¿Cómo verifico mi identidad?',
+                          '¿Dónde veo el estado de mi reclamo?',
+                          '¿Qué documentos necesito para un trámite?',
+                          '¿Cómo me sumo a un reclamo existente?',
+                          '¿Qué es ABL?',
+                        ].map((q, i) => (
+                          <button
+                            key={i}
+                            onClick={() => { sendMessage(q); }}
+                            className="px-2.5 py-1.5 rounded-full text-[11px] transition-all hover:scale-105"
+                            style={{
+                              backgroundColor: `${theme.primary}15`,
+                              color: theme.primary,
+                              border: `1px solid ${theme.primary}30`
+                            }}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
                     </>
                   )}
                 </div>
