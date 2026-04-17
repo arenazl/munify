@@ -1,36 +1,25 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FileText,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  MapPin,
-  ChevronRight,
-  Trophy,
-  Map,
-  Megaphone,
-  Calendar,
-  Newspaper,
-  ClipboardList,
-  Sparkles,
-  FileCheck,
-  XCircle,
-  TrendingUp,
-  TrendingDown,
-  Building2,
-  Star,
-  BarChart3,
-  X,
-  Users,
-  Target,
-  Zap,
-  ArrowUpRight,
-  ArrowDownRight,
-  Activity,
+  FileText, CheckCircle, Clock, AlertCircle, AlertTriangle, MapPin,
+  ChevronRight, Trophy, Map, Megaphone, Calendar, Newspaper,
+  ClipboardList, Sparkles, FileCheck, XCircle, TrendingUp,
+  TrendingDown, Building2, Star, BarChart3, X, Users, Target,
+  Zap, ArrowUpRight, ArrowDownRight, Activity,
+  Search, PlusCircle, Upload, Loader, ShieldCheck, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, configuracionApi, publicoApi } from '../lib/api';
+import { reclamosApi, configuracionApi, publicoApi, vecinoApi } from '../lib/api';
+import type { Recomendacion } from '../lib/api';
+
+const REC_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+  AlertTriangle, Clock, Search, Star, PlusCircle, Upload, Loader, ShieldCheck, Info,
+};
+
+function RecIcono({ nombre, color }: { nombre: string; color: string }) {
+  const Icon = REC_ICONS[nombre] || Info;
+  return <Icon className="w-5 h-5" style={{ color }} />;
+}
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPrompt from '../components/NotificationPrompt';
@@ -225,6 +214,7 @@ export default function DashboardVecino() {
   const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig | null>(null);
   const [estadisticasPublicas, setEstadisticasPublicas] = useState<EstadisticasPublicas | null>(null);
   const [modalEstadistica, setModalEstadistica] = useState<string | null>(null);
+  const [recomendaciones, setRecomendaciones] = useState<Recomendacion[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -232,11 +222,12 @@ export default function DashboardVecino() {
 
   const fetchData = async () => {
     try {
-      const [reclamosRes, configRes, dashConfigRes, estadisticasRes] = await Promise.all([
+      const [reclamosRes, configRes, dashConfigRes, estadisticasRes, recsRes] = await Promise.all([
         reclamosApi.getMisReclamos(),
         configuracionApi.getPublica('municipio').catch(() => ({ data: {} })),
         configuracionApi.getDashboardConfig('vecino').catch(() => ({ data: { config: null } })),
         publicoApi.getEstadisticas().catch(() => ({ data: null })),
+        vecinoApi.recomendaciones().catch(() => ({ data: [] })),
       ]);
 
       const reclamos = reclamosRes.data as Reclamo[];
@@ -263,6 +254,10 @@ export default function DashboardVecino() {
 
       if (estadisticasRes.data) {
         setEstadisticasPublicas(estadisticasRes.data);
+      }
+
+      if (recsRes.data) {
+        setRecomendaciones(recsRes.data);
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -388,6 +383,54 @@ export default function DashboardVecino() {
           </div>
         </div>
       </div>
+
+      {/* Recomendaciones inteligentes */}
+      {recomendaciones.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold flex items-center gap-2 px-1" style={{ color: theme.text }}>
+            <Sparkles className="w-4 h-4" style={{ color: theme.primary }} />
+            Recomendaciones para vos
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {recomendaciones.map((rec, i) => (
+              <div
+                key={i}
+                className="group relative rounded-xl p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer overflow-hidden"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+                onClick={() => rec.accion_url && navigate(rec.accion_url)}
+              >
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                  style={{ background: `linear-gradient(135deg, ${rec.color}10 0%, transparent 60%)` }}
+                />
+                <div className="relative flex items-start gap-3">
+                  <div
+                    className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: `${rec.color}15` }}
+                  >
+                    <RecIcono nombre={rec.icono} color={rec.color} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
+                      {rec.titulo}
+                    </h4>
+                    <p className="text-xs mt-0.5 leading-relaxed" style={{ color: theme.textSecondary }}>
+                      {rec.descripcion}
+                    </p>
+                    {rec.accion_label && (
+                      <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold"
+                            style={{ color: rec.color }}>
+                        {rec.accion_label}
+                        <ChevronRight className="w-3 h-3" />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards - Estilo Glassmorphism */}
       {isComponentVisible('stats') && (
