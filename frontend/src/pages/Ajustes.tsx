@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Clock, Building2, Check, Landmark, Link2, Activity
+  CalendarOff, Building2, Check, Landmark, Link2, Activity
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -178,15 +178,6 @@ export default function Ajustes() {
           icon: CalendarOff,
           color: '#ef4444',
           link: '/gestion/ausencias',
-          show: isAdminOrSupervisor
-        },
-        {
-          id: 'horarios',
-          label: 'Horarios',
-          description: 'Turnos y horarios de trabajo',
-          icon: Clock,
-          color: '#06b6d4',
-          link: '/gestion/horarios',
           show: isAdminOrSupervisor
         }
       ]

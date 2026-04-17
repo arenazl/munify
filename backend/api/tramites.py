@@ -1123,6 +1123,77 @@ async def asignar_responsable_solicitud(
     }
 
 
+@router.post("/solicitudes/{solicitud_id}/auto-asignar")
+async def auto_asignar_solicitud(
+    solicitud_id: int,
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Auto-asigna un empleado a la solicitud priorizando:
+      1. Empleado activo de la misma dependencia
+      2. Con menor carga actual (solicitudes activas asignadas)
+      3. Tipo administrativo (los que procesan tramites)
+    """
+    from models.empleado import Empleado
+    from sqlalchemy import func as sql_func
+
+    sol_q = await db.execute(select(Solicitud).where(Solicitud.id == solicitud_id))
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Buscar empleados activos del municipio (preferir administrativos para trámites)
+    emp_q = await db.execute(
+        select(Empleado).where(
+            Empleado.municipio_id == solicitud.municipio_id,
+            Empleado.activo == True,
+        )
+    )
+    empleados = list(emp_q.scalars().all())
+    if not empleados:
+        raise HTTPException(status_code=400, detail="No hay empleados activos disponibles")
+
+    # Contar carga actual (solicitudes activas por empleado)
+    carga_q = await db.execute(
+        select(Solicitud.empleado_id, sql_func.count(Solicitud.id))
+        .where(
+            Solicitud.municipio_id == solicitud.municipio_id,
+            Solicitud.empleado_id.isnot(None),
+            Solicitud.estado.in_([EstadoSolicitud.RECIBIDO, EstadoSolicitud.EN_CURSO, EstadoSolicitud.POSPUESTO]),
+        )
+        .group_by(Solicitud.empleado_id)
+    )
+    carga_map = {row[0]: row[1] for row in carga_q.all()}
+
+    def score(emp: Empleado) -> tuple:
+        # menor carga, administrativos primero
+        carga = carga_map.get(emp.id, 0)
+        admin_bonus = 0 if emp.tipo == "administrativo" else 1
+        return (carga, admin_bonus)
+
+    empleados.sort(key=score)
+    mejor = empleados[0]
+    nombre = f"{mejor.nombre} {mejor.apellido or ''}".strip()
+
+    solicitud.empleado_id = mejor.id
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud.id,
+        usuario_id=current_user.id,
+        estado_anterior=solicitud.estado,
+        estado_nuevo=solicitud.estado,
+        accion="Auto-asignación",
+        comentario=f"Asignado automáticamente a {nombre} (carga actual: {carga_map.get(mejor.id, 0)})",
+    ))
+    await db.commit()
+
+    return {
+        "empleado_id": mejor.id,
+        "empleado_nombre": nombre,
+        "carga_actual": carga_map.get(mejor.id, 0),
+        "razon": "Menor carga de trabajo" + (" + administrativo" if mejor.tipo == "administrativo" else ""),
+    }
+
+
 # ============================================================
 # DOCUMENTOS DE SOLICITUD (upload + verificación)
 # ============================================================

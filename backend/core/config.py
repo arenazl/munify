@@ -71,6 +71,7 @@ class Settings(BaseSettings):
 
     # Didit — KYC verification (identidad con foto DNI + selfie + liveness)
     # https://didit.me  — 500 verificaciones gratis/mes (Core KYC nivel A)
+    DIDIT_APP_ID: str = ""
     DIDIT_API_KEY: str = ""
     DIDIT_BASE_URL: str = "https://verification.didit.me"
     DIDIT_WEBHOOK_SECRET: str = ""

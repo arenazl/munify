@@ -115,6 +115,63 @@ async def _resumen_deudas(db: AsyncSession, partida_ids: List[int]) -> dict[int,
 
 
 # ============================================================
+# Admin/Supervisor: listado de todas las partidas del municipio
+# ============================================================
+
+@router.get("/partidas", response_model=List[PartidaResponse])
+async def listar_partidas_admin(
+    tipo_tasa_id: Optional[int] = None,
+    q: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Listado paginado de partidas del municipio (solo admin/supervisor).
+
+    Filtros:
+      - tipo_tasa_id: filtra por tipo de tasa.
+      - q: busca por identificador, DNI o nombre del titular.
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor puede listar partidas")
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Tu cuenta no tiene municipio asignado")
+
+    query = (
+        select(Partida)
+        .options(selectinload(Partida.tipo_tasa))
+        .where(Partida.municipio_id == current_user.municipio_id)
+    )
+    if tipo_tasa_id is not None:
+        query = query.where(Partida.tipo_tasa_id == tipo_tasa_id)
+    if q:
+        from sqlalchemy import or_
+        term = f"%{q.strip()}%"
+        query = query.where(or_(
+            Partida.identificador.ilike(term),
+            Partida.titular_dni.ilike(term),
+            Partida.titular_nombre.ilike(term),
+        ))
+    query = query.order_by(Partida.tipo_tasa_id, Partida.identificador).limit(limit).offset(offset)
+
+    r = await db.execute(query)
+    partidas = list(r.scalars().all())
+    if not partidas:
+        return []
+
+    resumen = await _resumen_deudas(db, [p.id for p in partidas])
+    out = []
+    for p in partidas:
+        r = resumen.get(p.id, {"pendientes": 0, "monto": Decimal("0")})
+        item = PartidaResponse.model_validate(p)
+        item.deudas_pendientes = r["pendientes"]
+        item.monto_pendiente = r["monto"]
+        out.append(item)
+    return out
+
+
+# ============================================================
 # Vecino: mis partidas + deudas
 # ============================================================
 

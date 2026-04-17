@@ -16,18 +16,16 @@ const queryClient = new QueryClient()
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ThemeProvider>
-            <DynamicManifest />
-            <ServiceWorkerUpdater />
-            <RouterProvider router={router} />
-            <ThemedToaster />
-          </ThemeProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </GoogleOAuthProvider>
-  </StrictMode>,
+  <GoogleOAuthProvider clientId={googleClientId}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ThemeProvider>
+          <DynamicManifest />
+          <ServiceWorkerUpdater />
+          <RouterProvider router={router} />
+          <ThemedToaster />
+        </ThemeProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  </GoogleOAuthProvider>,
 )

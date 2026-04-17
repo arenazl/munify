@@ -224,6 +224,7 @@ async def create_empleado(
         'especialidad': data.especialidad,
         'tipo': data.tipo or 'operario',
         'zona_id': data.zona_id,
+        'municipio_dependencia_id': data.municipio_dependencia_id,
         'capacidad_maxima': data.capacidad_maxima,
         'categoria_principal_id': data.categoria_principal_id,
         'municipio_id': current_user.municipio_id

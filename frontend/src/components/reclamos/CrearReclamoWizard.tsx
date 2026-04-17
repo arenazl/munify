@@ -118,6 +118,9 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   // hay que pedir los datos del solicitante; en el segundo, el current_user
   // ya es el solicitante.
   const isEmpleado = user && user.rol !== 'vecino';
+  // KYC verificado por Didit (nivel 2): DNI/nombre/apellido son read-only
+  // porque vienen validados del documento.
+  const kycVerificado = user?.rol === 'vecino' && (user?.nivel_verificacion ?? 0) >= 2;
 
   const [categorias, setCategorias] = useState<CategoriaReclamo[]>([]);
 
@@ -192,11 +195,14 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       return;
     }
     if (user?.rol === 'vecino') {
+      // Si el vecino esta verificado por Didit (nivel 2), pisamos los
+      // datos filiatorios con los oficiales para evitar que esten stale.
+      const kyc = (user.nivel_verificacion ?? 0) >= 2;
       setForm(prev => ({
         ...prev,
-        nombre_solicitante: prev.nombre_solicitante || user.nombre || '',
-        apellido_solicitante: prev.apellido_solicitante || user.apellido || '',
-        dni_solicitante: prev.dni_solicitante || user.dni || '',
+        nombre_solicitante: kyc ? (user.nombre || '') : (prev.nombre_solicitante || user.nombre || ''),
+        apellido_solicitante: kyc ? (user.apellido || '') : (prev.apellido_solicitante || user.apellido || ''),
+        dni_solicitante: kyc ? (user.dni || '') : (prev.dni_solicitante || user.dni || ''),
         email_solicitante: prev.email_solicitante || user.email || '',
         telefono_solicitante: prev.telefono_solicitante || user.telefono || '',
         direccion: prev.direccion || user.direccion || '',
@@ -1009,8 +1015,13 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         </p>
 
         <div>
-          <label className="block text-xs mb-1" style={{ color: theme.text }}>
+          <label className="block text-xs mb-1 flex items-center gap-1" style={{ color: theme.text }}>
             DNI <span className="text-red-500">*</span>
+            {kycVerificado && (
+              <span className="ml-auto flex items-center gap-1 text-[10px] font-medium" style={{ color: '#10b981' }}>
+                <UserCheck className="h-3 w-3" /> Verificado
+              </span>
+            )}
           </label>
           <div className="relative">
             <input
@@ -1018,11 +1029,13 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               placeholder="30123456"
               value={form.dni_solicitante}
               onChange={e => handleDniChange(e.target.value)}
-              className="w-full px-3 py-2 pr-10 rounded-xl text-sm"
+              disabled={kycVerificado}
+              className="w-full px-3 py-2 pr-10 rounded-xl text-sm disabled:cursor-not-allowed"
               style={{
-                backgroundColor: theme.backgroundSecondary,
+                backgroundColor: kycVerificado ? theme.border : theme.backgroundSecondary,
                 border: `1px solid ${vecinoExistente ? '#10b981' : theme.border}`,
-                color: theme.text,
+                color: kycVerificado ? theme.textSecondary : theme.text,
+                opacity: kycVerificado ? 0.7 : 1,
               }}
             />
             {buscandoVecino && (
@@ -1033,7 +1046,9 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
             )}
           </div>
           <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>
-            Si el vecino ya existe en el sistema, autocompletamos sus datos.
+            {kycVerificado
+              ? 'Datos validados con tu DNI. Si cambió algo, actualizá tu perfil.'
+              : 'Si el vecino ya existe en el sistema, autocompletamos sus datos.'}
           </p>
         </div>
 
@@ -1072,8 +1087,14 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               type="text"
               value={form.nombre_solicitante}
               onChange={e => setForm({ ...form, nombre_solicitante: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              disabled={kycVerificado}
+              className="w-full px-3 py-2 rounded-xl text-sm disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: kycVerificado ? theme.border : theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: kycVerificado ? theme.textSecondary : theme.text,
+                opacity: kycVerificado ? 0.7 : 1,
+              }}
             />
           </div>
           <div>
@@ -1084,8 +1105,14 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               type="text"
               value={form.apellido_solicitante}
               onChange={e => setForm({ ...form, apellido_solicitante: e.target.value })}
-              className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              disabled={kycVerificado}
+              className="w-full px-3 py-2 rounded-xl text-sm disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: kycVerificado ? theme.border : theme.backgroundSecondary,
+                border: `1px solid ${theme.border}`,
+                color: kycVerificado ? theme.textSecondary : theme.text,
+                opacity: kycVerificado ? 0.7 : 1,
+              }}
             />
           </div>
         </div>

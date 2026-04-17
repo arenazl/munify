@@ -172,7 +172,7 @@ export default function MisTasas() {
           >
             <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <span>
-              Al tocar <strong>Pagar</strong> te llevamos a <strong>PayBridge</strong>, nuestra plataforma de cobros externa. Tus datos de tarjeta no pasan por el municipio.
+              Al tocar <strong>Pagar</strong> te llevamos a <strong>GIRE · Aura</strong>, la plataforma de pagos y cobranzas. Tus datos de tarjeta no pasan por el municipio.
             </span>
           </div>
         </>

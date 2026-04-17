@@ -30,6 +30,10 @@ export interface User {
   // Super admin = usuario sin municipio asignado (cross-tenant).
   // Lo devuelve el endpoint /auth/me.
   is_super_admin?: boolean;
+  // Nivel KYC: 0=basico, 1=email, 2=DNI+selfie (Didit). Bloquea edicion
+  // de campos verificados (DNI/nombre/apellido) en los wizards.
+  nivel_verificacion?: number;
+  cuenta_verificada?: boolean;
 }
 
 // =====================================================================
@@ -100,6 +104,7 @@ export interface Empleado {
   especialidad?: string;
   tipo: TipoEmpleado;
   zona_id?: number;
+  municipio_dependencia_id?: number;
   capacidad_maxima: number;
   activo: boolean;
   created_at: string;

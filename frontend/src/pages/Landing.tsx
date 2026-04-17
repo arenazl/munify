@@ -336,7 +336,7 @@ export default function Landing() {
                   <span className="text-blue-400 text-sm font-medium">Sistema activo</span>
                 </div>
 
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight">
                   Tu voz importa en{' '}
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
                     tu ciudad
@@ -412,43 +412,24 @@ export default function Landing() {
                         </div>
                       )}
 
-                      {/* Opción 1: Continuar sin registrarse */}
-                      <div className="mb-4 p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl">
-                        <div className="flex items-start gap-3 mb-3">
-                          <AlertCircle className="h-5 w-5 text-green-400 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-medium text-white">Sin registro</p>
-                            <p className="text-xs text-slate-400">Podés hacer reclamos sin crear una cuenta</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => navigate('/home')}
-                          disabled={debugLoading}
-                          className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg shadow-green-500/25 disabled:opacity-50"
-                        >
-                          <User className="h-5 w-5" />
-                          Continuar sin registrarme
-                        </button>
-                      </div>
-
-                      {/* Opción 2: Iniciar sesión */}
-                      <button
-                        onClick={() => navigate('/login')}
-                        disabled={debugLoading}
-                        className="w-full mb-3 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50"
-                      >
-                        <LogIn className="h-5 w-5" />
-                        Iniciar Sesión
-                      </button>
-
-                      {/* Opción 3: Registrarse */}
+                      {/* Opción principal: Crear cuenta (resaltada) */}
                       <button
                         onClick={() => navigate('/register')}
                         disabled={debugLoading}
-                        className="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 bg-white/10 border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
+                        className="w-full mb-3 flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg shadow-green-500/30 disabled:opacity-50"
                       >
                         <User className="h-5 w-5" />
                         Crear Cuenta
+                      </button>
+
+                      {/* Opción secundaria: Iniciar sesión */}
+                      <button
+                        onClick={() => navigate('/login')}
+                        disabled={debugLoading}
+                        className="w-full mb-4 flex items-center justify-center gap-2 py-3 px-4 bg-white/10 border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
+                      >
+                        <LogIn className="h-5 w-5" />
+                        Iniciar Sesión
                       </button>
 
                       {/* Accesos Rápidos - Admin, Supervisor y Vecino (uno de cada) */}

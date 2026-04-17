@@ -428,6 +428,7 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
 
 class DiditSessionRequest(BaseModel):
     municipio_codigo: str | None = None
+    callback_url: str | None = None
 
 
 class DiditSessionResponse(BaseModel):
@@ -451,7 +452,10 @@ async def crear_sesion_didit(request: Request, body: DiditSessionRequest):
 
     try:
         vendor = f"register:{body.municipio_codigo or 'generic'}"
-        data = await crear_sesion(vendor_data=vendor)
+        data = await crear_sesion(
+            vendor_data=vendor,
+            callback_url=body.callback_url,
+        )
     except DiditNotConfigured as e:
         raise HTTPException(
             status_code=503,
@@ -503,6 +507,29 @@ async def registrar_con_didit(
             detail="Didit aprobó pero no devolvió DNI/nombre. Reintentá.",
         )
 
+    # Resolver municipio: preferimos el que quedo anclado al vendor_data de
+    # la sesion de Didit (al crearla, fijamos "register:<codigo>"). Asi no
+    # depende de que el localStorage del frontend no haya cambiado entre
+    # que el vecino arranco el flow y volvio del callback.
+    municipio_id_final: int | None = None
+    vendor = decision.get("vendor_data") or ""
+    if isinstance(vendor, str) and vendor.startswith("register:"):
+        codigo_vendor = vendor.split(":", 1)[1].strip()
+        if codigo_vendor and codigo_vendor != "generic":
+            from models.municipio import Municipio
+            from sqlalchemy import func as sqla_func
+            mq = await db.execute(
+                select(Municipio).where(
+                    sqla_func.lower(Municipio.codigo) == codigo_vendor.lower()
+                )
+            )
+            m = mq.scalar_one_or_none()
+            if m:
+                municipio_id_final = m.id
+    # Fallback: si el vendor_data no lo trajo, usamos lo que mando el front.
+    if municipio_id_final is None:
+        municipio_id_final = body.municipio_id
+
     q = await db.execute(select(User).where(User.email == body.email))
     user = q.scalar_one_or_none()
 
@@ -529,7 +556,7 @@ async def registrar_con_didit(
             nombre=datos["nombre"] or "",
             apellido=datos["apellido"] or "",
             telefono=body.telefono,
-            municipio_id=body.municipio_id,
+            municipio_id=municipio_id_final,
             rol="vecino",
         )
         db.add(user)

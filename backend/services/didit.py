@@ -41,6 +41,7 @@ def _require_config() -> tuple[str, str, str]:
 async def crear_sesion(
     vendor_data: str | None = None,
     callback_url: str | None = None,
+    language: str = "es",
 ) -> dict[str, Any]:
     """Crea una session de verificacion en Didit.
 
@@ -48,6 +49,7 @@ async def crear_sesion(
     para correlacionar con tu user, ej. "register:abc-email").
     `callback_url` sobrescribe el callback default del workflow si querés
     redirigir al frontend.
+    `language` fija el idioma de la UI hosted (default 'es').
 
     Retorna dict con session_id, url (redirigir al user) y otros metadatos.
     """
@@ -58,6 +60,11 @@ async def crear_sesion(
         payload["vendor_data"] = vendor_data
     if callback_url:
         payload["callback"] = callback_url
+    if language:
+        # Didit acepta tanto 'language' como 'locale' en distintos endpoints;
+        # mandamos ambos para cubrir las dos versiones del API.
+        payload["language"] = language
+        payload["locale"] = language
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         resp = await client.post(

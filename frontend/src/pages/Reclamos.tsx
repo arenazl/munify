@@ -233,6 +233,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
   // Action states for view
   const [dependenciaSeleccionada, setDependenciaSeleccionada] = useState<string>('');
+  const [empleadoSeleccionadoId, setEmpleadoSeleccionadoId] = useState<string>('');
+  const [asignandoEmpleado, setAsignandoEmpleado] = useState(false);
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
   const [descripcionInicio, setDescripcionInicio] = useState('');
   const [fechaProgramada, setFechaProgramada] = useState('');
@@ -350,6 +352,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
   // Cargar datos del municipio y conteos UNA SOLA VEZ al montar
   useEffect(() => {
+    // PRIORIDAD 1: los reclamos (lo que el user quiere ver primero)
+    fetchReclamos(true);
+
     fetchMunicipioData();
 
     // Cargar conteos UNA SOLA VEZ (GROUP BY optimizado) - solo para admin/supervisor
@@ -454,7 +459,13 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   }, [search]);
 
   // Cargar reclamos cuando cambia el filtro de estado, categoría, dependencia o búsqueda (con debounce)
+  // NO en el primer mount — ese caso ya lo hace el useEffect de inicialización
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     fetchReclamos(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
@@ -530,10 +541,10 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       }
     };
 
-    const pollingInterval = setInterval(checkForUpdates, 10000);
+    const pollingInterval = setInterval(checkForUpdates, 30000);
     return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch, soloMiArea, user?.dependencia?.id, reclamos]);
+  }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch, soloMiArea, user?.dependencia?.id]);
 
   // Recargar conteos de categorías y estados cuando cambia el filtro de dependencia
   useEffect(() => {
@@ -1217,6 +1228,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setHistorial([]);
     // Reset asignación states
     setDependenciaSeleccionada('');
+    setEmpleadoSeleccionadoId('');
     setFechaProgramada('');
     setHoraInicio('09:00');
     setDuracion('1');
@@ -1309,6 +1321,69 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       console.error('Error:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAutoAsignar = async () => {
+    if (!selectedReclamo) return;
+    setAsignandoEmpleado(true);
+    try {
+      const res = await reclamosApi.autoAsignar(selectedReclamo.id);
+      toast.success(`Asignado a ${res.data.empleado_nombre}`, {
+        description: res.data.razon,
+      });
+      setEmpleadoSeleccionadoId(String(res.data.empleado_id));
+      fetchReclamos();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo auto-asignar');
+    } finally {
+      setAsignandoEmpleado(false);
+    }
+  };
+
+  const handleAsignarEmpleadoManual = async (empleadoId: string) => {
+    if (!selectedReclamo) return;
+    setEmpleadoSeleccionadoId(empleadoId);
+    if (!empleadoId) return;
+
+    // Si asigno empleado, fecha + hora_inicio son obligatorios (sincroniza con planificacion)
+    const hoy = new Date().toISOString().split('T')[0];
+    const fechaParaAsignar = fechaProgramada || hoy;
+    const horaParaAsignar = horaInicio || '09:00';
+
+    setAsignandoEmpleado(true);
+    try {
+      await reclamosApi.asignarEmpleado(selectedReclamo.id, Number(empleadoId), {
+        fecha_programada: fechaParaAsignar,
+        hora_inicio: horaParaAsignar,
+        hora_fin: horaFin || undefined,
+      });
+      const emp = empleados.find(e => e.id === Number(empleadoId));
+      toast.success(`Asignado a ${emp?.nombre || ''} ${emp?.apellido || ''}`.trim());
+      fetchReclamos();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo asignar');
+    } finally {
+      setAsignandoEmpleado(false);
+    }
+  };
+
+  const handleReasignar = async () => {
+    if (!selectedReclamo) return;
+    const motivo = window.prompt('Motivo de la reasignación (queda en historial):');
+    if (!motivo || !motivo.trim()) return;
+    try {
+      await reclamosApi.reasignar(selectedReclamo.id, motivo.trim());
+      toast.success('Reclamo devuelto a Recibido. Ya puede tomarlo otro empleado.');
+      setEmpleadoSeleccionadoId('');
+      setFechaProgramada('');
+      setHoraInicio('09:00');
+      fetchReclamos();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo reasignar');
     }
   };
 
@@ -2747,7 +2822,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       render: (r: Reclamo) => {
         if (!r.dependencia_asignada?.nombre) return null;
         return (
-          <span className="text-xs" style={{ color: theme.text }}>
+          <span
+            className="text-xs"
+            style={{
+              color: theme.text,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              lineHeight: 1.2,
+              maxWidth: '140px',
+            }}
+            title={r.dependencia_asignada.nombre}
+          >
             {r.dependencia_asignada.nombre}
           </span>
         );
@@ -2759,7 +2846,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
       render: (r: Reclamo) => (
         <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-          {new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+          {new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
         </span>
       ),
     },
@@ -2769,7 +2856,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       sortValue: (r: Reclamo) => new Date(r.updated_at || r.created_at).getTime(),
       render: (r: Reclamo) => (
         <span className="text-[10px]" style={{ color: theme.text }}>
-          {new Date(r.updated_at || r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+          {new Date(r.updated_at || r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
         </span>
       ),
     },
@@ -2917,6 +3004,56 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 icon={<Clock className="h-4 w-4" style={{ color: theme.primary }} />}
               />
             )}
+
+            {/* Asignación de empleado — botón chico + combo, solo en estados activos */}
+            {(user?.rol === 'admin' || user?.rol === 'supervisor') && ['recibido', 'en_curso', 'pospuesto'].includes(selectedReclamo.estado) && (() => {
+              const empleadosDependencia = empleados.filter(e =>
+                e.tipo === 'operario' && (
+                  e.categoria_principal_id === selectedReclamo.categoria.id ||
+                  e.categorias?.some(c => c.id === selectedReclamo.categoria.id)
+                )
+              );
+              return (
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={handleAutoAsignar}
+                    disabled={asignandoEmpleado}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
+                    style={{
+                      backgroundColor: `${theme.primary}15`,
+                      color: theme.primary,
+                      border: `1px solid ${theme.primary}40`,
+                    }}
+                    title="Asigna el empleado con mejor match (especialidad + zona + carga)"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {asignandoEmpleado ? 'Asignando…' : 'Auto-asignar'}
+                  </button>
+                  <select
+                    value={empleadoSeleccionadoId}
+                    onChange={(e) => handleAsignarEmpleadoManual(e.target.value)}
+                    disabled={asignandoEmpleado || empleadosDependencia.length === 0}
+                    className="flex-1 min-w-0 rounded-lg text-xs px-2 py-1.5 transition-colors focus:outline-none"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    <option value="">
+                      {empleadosDependencia.length === 0
+                        ? 'Sin empleados en esta dependencia'
+                        : 'Seleccionar empleado…'}
+                    </option>
+                    {empleadosDependencia.map(emp => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.nombre} {emp.apellido || ''}{emp.especialidad ? ` · ${emp.especialidad}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
           </ABMInfoPanel>
         )}
 
@@ -3708,6 +3845,25 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </div>
         )}
         </div>
+
+        {/* Botón Reasignar — disponible en cualquier estado posterior a "recibido"
+            para devolver el reclamo y que otro empleado lo pueda tomar */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') &&
+         ['en_curso', 'pospuesto', 'finalizado', 'rechazado', 'resuelto'].includes(selectedReclamo.estado) && (
+          <button
+            onClick={handleReasignar}
+            className="w-full px-4 py-2 rounded-xl font-medium text-sm transition-all duration-200 hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2"
+            style={{
+              backgroundColor: `${theme.primary}10`,
+              border: `1.5px dashed ${theme.primary}60`,
+              color: theme.primary,
+            }}
+            title="Devuelve el reclamo a Recibido y libera al empleado para que otro lo pueda tomar"
+          >
+            <Sparkles className="h-4 w-4" />
+            Reasignar a otro empleado
+          </button>
+        )}
       </div>
     );
   };
@@ -3764,20 +3920,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             {/* Dependencias - solo para supervisor (fila 1) */}
             {user?.rol === 'supervisor' && (
               <div className="flex gap-1">
-                {/* Botón Todas fijo - outlined */}
+                {/* Botón Todas fijo - outlined con tinte primario */}
                 <button
                   onClick={() => {
                     setFilterLoading('dep-all');
                     setFiltroDependencia(null);
                   }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all duration-200 h-[28px] flex-shrink-0 hover:scale-[1.03] active:scale-95"
                   style={{
-                    background: 'transparent',
+                    background: filtroDependencia === null ? `${theme.primary}12` : 'transparent',
                     border: `1.5px solid ${filtroDependencia === null ? theme.primary : theme.border}`,
+                    boxShadow: filtroDependencia === null ? `0 2px 6px ${theme.primary}25` : 'none',
                   }}
                 >
                   <Building2 className={`h-3 w-3 ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }} />
-                  <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }}>
+                  <span className={`text-[10px] font-semibold whitespace-nowrap tracking-wide ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }}>
                     Todas
                   </span>
                 </button>
@@ -3791,7 +3948,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                       const isSelected = filtroDependencia === dep.id;
                       const count = conteosDependencias[dep.id] || 0;
                       const isLoadingThis = filterLoading === `dep-${dep.id}`;
-                      const depColor = '#6366f1';
+                      const depColor = dep.color || '#6366f1';
+                      const depIcon = dep.icono || 'Building2';
                       return (
                         <button
                           key={dep.id}
@@ -3800,21 +3958,36 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                             setFiltroDependencia(isSelected ? null : dep.id);
                           }}
                           title={dep.nombre}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+                          className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all duration-200 h-[28px] flex-shrink-0 hover:scale-[1.03] active:scale-95"
                           style={{
-                            background: isSelected ? depColor : theme.backgroundSecondary,
-                            border: `1px solid ${isSelected ? depColor : theme.border}`,
+                            background: isSelected
+                              ? `linear-gradient(135deg, ${depColor} 0%, ${depColor}dd 100%)`
+                              : `${depColor}12`,
+                            border: `1px solid ${isSelected ? depColor : `${depColor}40`}`,
+                            boxShadow: isSelected
+                              ? `0 2px 8px ${depColor}55, inset 0 1px 0 rgba(255,255,255,0.2)`
+                              : `0 1px 2px ${depColor}10`,
                           }}
                         >
-                          <Building2 className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : depColor }} />
-                          <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
+                          <span
+                            className={`[&>svg]:h-3 [&>svg]:w-3 transition-transform group-hover:scale-110 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                            style={{ color: isSelected ? '#ffffff' : depColor }}
+                          >
+                            <DynamicIcon name={depIcon} className="h-3 w-3" />
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold whitespace-nowrap tracking-tight ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                            style={{ color: isSelected ? '#ffffff' : theme.text }}
+                          >
                             {dep.nombre}
                           </span>
                           <span
-                            className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
+                            className={`text-[9px] font-bold px-1.5 py-px rounded-full leading-none ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
                             style={{
-                              backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${depColor}30`,
+                              backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : `${depColor}25`,
                               color: isSelected ? '#ffffff' : depColor,
+                              minWidth: '16px',
+                              textAlign: 'center',
                             }}
                           >
                             {count}
@@ -4101,7 +4274,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       <Sheet
         open={sheetMode === 'view'}
         onClose={closeSheet}
-        title={`Reclamo #${selectedReclamo?.id || ''} · ${selectedReclamo ? new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''}`}
+        title={`Reclamo #${selectedReclamo?.id || ''} · ${selectedReclamo ? new Date(selectedReclamo.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : ''}`}
         description={selectedReclamo?.titulo}
         stickyHeader={renderSheetStickyHeader()}
         stickyFooter={renderSheetFooter()}

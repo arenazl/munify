@@ -7,19 +7,19 @@ import {
 import { pagosApi } from '../lib/api';
 
 /**
- * Checkout externo PayBridge.
+ * Checkout externo GIRE Aura.
  *
  * Esta pagina es intencionalmente DISTINTA visualmente de Munify — el objetivo
  * es que el vecino (y cualquier persona viendo la demo) perciba que "salio"
- * de la app y esta en una plataforma externa de cobros.
+ * de la app y esta en la plataforma de pagos y cobranzas de GIRE (Aura).
  *
- * En un entorno real este componente seria servido por el provider (GIRE/Aura,
- * Mercado Pago, Modo) con su propio dominio. En la demo lo servimos nosotros
- * con branding propio para no comprometernos con ningun proveedor especifico.
+ * En un entorno real este componente seria servido por GIRE en su propio
+ * dominio (payment-hub-web.api.gire.com). En la demo lo servimos nosotros
+ * con branding de GIRE para mostrar el flow visual completo.
  *
  * La arquitectura es provider-agnostic — cambiando GATEWAY_PAGO_PROVIDER en
- * el backend, la sesion se crea contra otro rail (ej: Aura real), y el
- * checkout_url apunta a su checkout hosted, no a esta pagina.
+ * el backend, la sesion se crea contra otro rail, y el checkout_url apunta
+ * a su checkout hosted, no a esta pagina.
  */
 
 interface SesionData {
@@ -73,6 +73,10 @@ const MEDIOS_CONFIG: Record<Medio, {
     color: '#ec4899',
   },
 };
+
+// Paleta GIRE / Aura: turquesa como acento sobre fondo oscuro corporativo.
+const GIRE_ACCENT = '#00bcd4';
+const GIRE_ACCENT_DARK = '#0097a7';
 
 export default function PayBridgeCheckout() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -143,7 +147,7 @@ export default function PayBridgeCheckout() {
   // Fondo y branding FIJO que se ve distinto a Munify
   const wrapperStyle: React.CSSProperties = {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+    background: 'linear-gradient(135deg, #0a1929 0%, #12344a 100%)',
     color: '#fff',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   };
@@ -151,7 +155,7 @@ export default function PayBridgeCheckout() {
   if (loading) {
     return (
       <div style={wrapperStyle} className="flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: '#fbbf24' }} />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: GIRE_ACCENT }} />
       </div>
     );
   }
@@ -165,7 +169,7 @@ export default function PayBridgeCheckout() {
           <button
             onClick={() => navigate('/gestion/mis-tasas')}
             className="px-4 py-2 rounded-lg font-medium"
-            style={{ backgroundColor: '#fbbf24', color: '#0f172a' }}
+            style={{ backgroundColor: GIRE_ACCENT, color: '#0a1929' }}
           >
             Volver
           </button>
@@ -176,24 +180,32 @@ export default function PayBridgeCheckout() {
 
   return (
     <div style={wrapperStyle}>
-      {/* === HEADER PayBridge (marca externa) === */}
+      {/* === HEADER GIRE Aura (marca externa) === */}
       <header
         className="px-4 py-3 flex items-center justify-between"
         style={{
-          backgroundColor: 'rgba(0,0,0,0.3)',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          backgroundColor: 'rgba(0,0,0,0.35)',
+          borderBottom: `1px solid ${GIRE_ACCENT}33`,
         }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {/* Logo Aura: círculo turquesa con inicial. Reemplazar por asset oficial cuando exista. */}
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center font-bold"
-            style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', color: '#0f172a' }}
+            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg"
+            style={{
+              background: `linear-gradient(135deg, ${GIRE_ACCENT} 0%, ${GIRE_ACCENT_DARK} 100%)`,
+              color: '#ffffff',
+              boxShadow: `0 4px 12px ${GIRE_ACCENT}40`,
+            }}
           >
-            PB
+            A
           </div>
           <div>
-            <p className="font-bold text-sm leading-none">PayBridge</p>
-            <p className="text-[10px] opacity-70 leading-none mt-0.5">Plataforma de Cobros</p>
+            <p className="font-bold text-sm leading-none tracking-wide">
+              <span style={{ color: GIRE_ACCENT }}>GIRE</span>
+              <span className="opacity-70 ml-1 font-normal">· Aura</span>
+            </p>
+            <p className="text-[10px] opacity-60 leading-none mt-1">Plataforma de Pagos y Cobranzas</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs opacity-80">
@@ -207,13 +219,13 @@ export default function PayBridgeCheckout() {
       <div
         className="px-4 py-2 text-xs flex items-center justify-center gap-2"
         style={{
-          backgroundColor: 'rgba(251, 191, 36, 0.12)',
-          borderBottom: '1px solid rgba(251, 191, 36, 0.3)',
-          color: '#fbbf24',
+          backgroundColor: `${GIRE_ACCENT}14`,
+          borderBottom: `1px solid ${GIRE_ACCENT}33`,
+          color: GIRE_ACCENT,
         }}
       >
         <Info className="h-3.5 w-3.5 flex-shrink-0" />
-        Estás en un entorno externo de pagos. Al finalizar volvés automáticamente a tu municipio.
+        Estás en el Botón de Pago de GIRE. Al finalizar volvés automáticamente a tu municipio.
       </div>
 
       <div className="max-w-2xl mx-auto p-4 sm:p-6 pb-20">
@@ -227,7 +239,7 @@ export default function PayBridgeCheckout() {
               className="w-12 h-12 rounded-xl flex-shrink-0 flex items-center justify-center"
               style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)' }}
             >
-              <Receipt className="h-6 w-6" style={{ color: '#fbbf24' }} />
+              <Receipt className="h-6 w-6" style={{ color: '#00bcd4' }} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[10px] uppercase tracking-wider opacity-60">Estás pagando</p>
@@ -238,7 +250,7 @@ export default function PayBridgeCheckout() {
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-[10px] uppercase tracking-wider opacity-60">Total</p>
-              <p className="text-2xl font-bold" style={{ color: '#fbbf24' }}>
+              <p className="text-2xl font-bold" style={{ color: '#00bcd4' }}>
                 {formatMonto(sesion?.monto || 0)}
               </p>
             </div>
@@ -282,14 +294,14 @@ export default function PayBridgeCheckout() {
               )}
               <div className="flex justify-between pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 <span className="opacity-70">Procesado por:</span>
-                <span className="font-semibold" style={{ color: '#fbbf24' }}>PayBridge</span>
+                <span className="font-semibold" style={{ color: '#00bcd4' }}>GIRE · Aura</span>
               </div>
             </div>
 
             <button
               onClick={volver}
               className="w-full py-3 rounded-xl font-semibold transition-all active:scale-95"
-              style={{ backgroundColor: '#fbbf24', color: '#0f172a' }}
+              style={{ backgroundColor: '#00bcd4', color: '#0a1929' }}
             >
               Volver al municipio
             </button>
@@ -315,7 +327,7 @@ export default function PayBridgeCheckout() {
                     className="w-full p-4 rounded-xl text-left flex items-center gap-3 transition-all hover:scale-[1.01] active:scale-[0.99]"
                     style={{
                       backgroundColor: seleccionado ? 'rgba(251, 191, 36, 0.15)' : 'rgba(255,255,255,0.06)',
-                      border: `2px solid ${seleccionado ? '#fbbf24' : 'transparent'}`,
+                      border: `2px solid ${seleccionado ? '#00bcd4' : 'transparent'}`,
                     }}
                   >
                     <div
@@ -331,9 +343,9 @@ export default function PayBridgeCheckout() {
                     {seleccionado && (
                       <div
                         className="w-5 h-5 rounded-full flex items-center justify-center"
-                        style={{ backgroundColor: '#fbbf24' }}
+                        style={{ backgroundColor: '#00bcd4' }}
                       >
-                        <CheckCircle2 className="h-4 w-4" style={{ color: '#0f172a' }} />
+                        <CheckCircle2 className="h-4 w-4" style={{ color: '#0a1929' }} />
                       </div>
                     )}
                   </button>
@@ -356,7 +368,7 @@ export default function PayBridgeCheckout() {
                 onClick={confirmar}
                 disabled={!medioSeleccionado || procesando}
                 className="flex-1 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
-                style={{ backgroundColor: '#fbbf24', color: '#0f172a' }}
+                style={{ backgroundColor: '#00bcd4', color: '#0a1929' }}
               >
                 {procesando ? (
                   <><Loader2 className="h-5 w-5 animate-spin" /> Procesando pago...</>
@@ -368,9 +380,9 @@ export default function PayBridgeCheckout() {
           </>
         )}
 
-        {/* Footer PayBridge */}
+        {/* Footer GIRE Aura */}
         <div className="mt-8 text-center text-[11px] opacity-50 leading-relaxed">
-          <p>PayBridge — Plataforma de Cobros Municipales</p>
+          <p><span style={{ color: '#00bcd4' }}>GIRE</span> · Aura — Plataforma de Pagos y Cobranzas</p>
           <p>Demo · Procesador de pago externo simulado</p>
           <p className="mt-2">
             <Lock className="h-3 w-3 inline mr-1" />

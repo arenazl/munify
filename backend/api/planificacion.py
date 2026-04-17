@@ -13,6 +13,7 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.reclamo import Reclamo
 from models.empleado import Empleado
+from models.municipio_dependencia import MunicipioDependencia
 from models.user import User
 from models.enums import RolUsuario, EstadoReclamo
 
@@ -38,6 +39,16 @@ class ZonaMinima(BaseModel):
         from_attributes = True
 
 
+class DependenciaMinima(BaseModel):
+    id: int
+    nombre: str
+    color: Optional[str] = "#6366f1"
+    icono: Optional[str] = "Building2"
+
+    class Config:
+        from_attributes = True
+
+
 class EmpleadoPlanificacion(BaseModel):
     id: int
     nombre: str
@@ -50,6 +61,7 @@ class EmpleadoPlanificacion(BaseModel):
     categoria_principal: Optional[CategoriaMinima] = None
     categorias: List[CategoriaMinima] = []  # Todas las categorías que maneja
     zona: Optional[ZonaMinima] = None
+    dependencia: Optional[DependenciaMinima] = None
 
     class Config:
         from_attributes = True
@@ -139,7 +151,8 @@ async def get_planificacion_semanal(
         .options(
             selectinload(Empleado.categoria_principal),
             selectinload(Empleado.categorias),
-            selectinload(Empleado.zona_asignada)
+            selectinload(Empleado.zona_asignada),
+            selectinload(Empleado.municipio_dependencia).selectinload(MunicipioDependencia.dependencia),
         )
         .where(
             Empleado.municipio_id == municipio_id,
@@ -175,7 +188,13 @@ async def get_planificacion_semanal(
                     for c in (list(e.categorias) if e.categorias else [])
                 ],
                 zona=ZonaMinima(id=e.zona_asignada.id, nombre=e.zona_asignada.nombre)
-                    if e.zona_asignada else None
+                    if e.zona_asignada else None,
+                dependencia=DependenciaMinima(
+                    id=e.municipio_dependencia.id,
+                    nombre=e.municipio_dependencia.dependencia.nombre if e.municipio_dependencia.dependencia else "Sin nombre",
+                    color=getattr(e.municipio_dependencia.dependencia, 'color', None) if e.municipio_dependencia.dependencia else "#6366f1",
+                    icono=getattr(e.municipio_dependencia.dependencia, 'icono', None) if e.municipio_dependencia.dependencia else "Building2",
+                ) if e.municipio_dependencia else None,
             )
             empleados_response.append(emp)
         except Exception as ex:
@@ -192,32 +211,26 @@ async def get_planificacion_semanal(
             ))
 
     # 2. Obtener reclamos asignados en el rango de fechas
-    # TODO: Migrar a dependencia cuando se implemente asignación por IA
-    # Por ahora traemos reclamos con fecha_programada en el rango (sin filtrar por empleado)
+    # Reclamos activos con fecha_programada dentro del rango
+    estados_activos_tareas = [
+        EstadoReclamo.RECIBIDO,
+        EstadoReclamo.EN_CURSO,
+        EstadoReclamo.POSPUESTO,
+        EstadoReclamo.ASIGNADO,   # legacy
+    ]
     query_reclamos = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
-            or_(
-                # Reclamos con fecha_programada en el rango
-                and_(
-                    Reclamo.fecha_programada.isnot(None),
-                    Reclamo.fecha_programada >= fecha_ini,
-                    Reclamo.fecha_programada <= fecha_f
-                ),
-                # O reclamos asignados recientemente sin fecha_programada
-                and_(
-                    Reclamo.fecha_programada.is_(None),
-                    Reclamo.updated_at >= datetime.combine(fecha_ini, datetime.min.time())
-                )
-            )
+            Reclamo.estado.in_(estados_activos_tareas),
+            Reclamo.fecha_programada.isnot(None),
+            Reclamo.fecha_programada >= fecha_ini,
+            Reclamo.fecha_programada <= fecha_f,
         )
     )
-    # TODO: Migrar filtro empleado_id a dependencia_id
-    # if empleado_id:
-    #     query_reclamos = query_reclamos.where(Reclamo.municipio_dependencia_id == dependencia_id)
+    if empleado_id:
+        query_reclamos = query_reclamos.where(Reclamo.empleado_id == empleado_id)
 
     result = await db.execute(query_reclamos)
     reclamos = result.scalars().all()
@@ -237,7 +250,7 @@ async def get_planificacion_semanal(
             fecha_programada=r.fecha_programada.isoformat() if r.fecha_programada else None,
             hora_inicio=r.hora_inicio.strftime("%H:%M") if r.hora_inicio else None,
             hora_fin=r.hora_fin.strftime("%H:%M") if r.hora_fin else None,
-            empleado_id=None,  # TODO: Migrar a dependencia_id
+            empleado_id=r.empleado_id,
             prioridad=r.prioridad
         )
         for r in reclamos
@@ -287,14 +300,21 @@ async def get_planificacion_semanal(
         pass
 
     # 4. Obtener reclamos sin asignar (para el pool)
-    # TODO: Migrar a dependencia cuando se implemente asignación por IA
-    # Por ahora usamos estado NUEVO como indicador de "sin asignar"
+    # "Sin asignar" = activo y sin empleado asignado
+    estados_activos_sin_asignar = [
+        EstadoReclamo.RECIBIDO,
+        EstadoReclamo.EN_CURSO,
+        EstadoReclamo.POSPUESTO,
+        EstadoReclamo.NUEVO,      # legacy
+        EstadoReclamo.ASIGNADO,   # legacy
+    ]
     query_sin_asignar = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
         .where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado == EstadoReclamo.NUEVO
+            Reclamo.estado.in_(estados_activos_sin_asignar),
+            Reclamo.empleado_id.is_(None),
         )
         .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
         .limit(30)
@@ -332,6 +352,38 @@ async def get_planificacion_semanal(
         ausencias=ausencias_response,
         sin_asignar=sin_asignar_response
     )
+
+
+@router.post("/desasignar")
+async def desasignar_reclamo(
+    request: Request,
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR]))
+):
+    """
+    Quita la asignación de un reclamo (empleado, fecha programada, horas).
+    Usado al arrastrar una tarea desde el calendario al pool "sin asignar".
+    """
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    result = await db.execute(
+        select(Reclamo).where(
+            Reclamo.id == reclamo_id,
+            Reclamo.municipio_id == municipio_id
+        )
+    )
+    reclamo = result.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    reclamo.empleado_id = None
+    reclamo.fecha_programada = None
+    reclamo.hora_inicio = None
+    reclamo.hora_fin = None
+    await db.commit()
+
+    return {"success": True, "message": "Asignación quitada"}
 
 
 @router.post("/asignar-fecha")

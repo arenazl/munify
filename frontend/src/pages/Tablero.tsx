@@ -61,6 +61,22 @@ const columnas: Columna[] = [
   },
 ];
 
+// Transiciones permitidas entre estados (debe estar alineado con backend/api/reclamos.py)
+const TRANSICIONES: Record<string, EstadoReclamo[]> = {
+  nuevo: ['recibido', 'rechazado'],
+  recibido: ['en_curso', 'rechazado'],
+  en_curso: ['finalizado', 'pospuesto', 'rechazado'],
+  pospuesto: ['en_curso', 'finalizado', 'rechazado'],
+  finalizado: [],
+  rechazado: [],
+};
+
+const puedeTransicionar = (from: EstadoReclamo | null, to: EstadoReclamo): boolean => {
+  if (!from) return true;
+  if (from === to) return true;
+  return (TRANSICIONES[from] || []).includes(to);
+};
+
 // Función helper para obtener fecha en formato YYYY-MM-DD
 const getDateString = (date: Date) => {
   return date.toISOString().split('T')[0];
@@ -81,6 +97,7 @@ export default function Tablero() {
   const [fechaHasta, setFechaHasta] = useState(() => getDateString(new Date()));
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [activeColumnIndex, setActiveColumnIndex] = useState(0);
+  const [draggingFrom, setDraggingFrom] = useState<EstadoReclamo | null>(null);
   const { user } = useAuth();
   const { theme } = useTheme();
 
@@ -100,8 +117,13 @@ export default function Tablero() {
     }
   };
 
+  const handleDragStart = (start: { source: { droppableId: string } }) => {
+    setDraggingFrom(start.source.droppableId as EstadoReclamo);
+  };
+
   const handleDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
+    setDraggingFrom(null);
 
     if (!destination) return;
     if (source.droppableId === destination.droppableId) return;
@@ -109,6 +131,12 @@ export default function Tablero() {
     const reclamoId = parseInt(draggableId);
     const nuevoEstado = destination.droppableId as EstadoReclamo;
     const estadoAnterior = source.droppableId as EstadoReclamo;
+
+    // Validar transición localmente antes de pegarle al backend
+    if (!puedeTransicionar(estadoAnterior, nuevoEstado)) {
+      toast.error(`No se puede pasar de "${estadoAnterior}" a "${nuevoEstado}"`);
+      return;
+    }
 
     // Actualizar estado local optimistamente
     setReclamos(prev =>
@@ -120,7 +148,7 @@ export default function Tablero() {
     try {
       await reclamosApi.cambiarEstado(reclamoId, nuevoEstado);
       toast.success(`Reclamo movido a "${columnas.find(c => c.id === nuevoEstado)?.titulo}"`);
-    } catch (error) {
+    } catch (error: any) {
       // Revertir en caso de error
       setReclamos(prev =>
         prev.map(r =>
@@ -128,7 +156,8 @@ export default function Tablero() {
         )
       );
       console.error('Error al cambiar estado:', error);
-      toast.error('Error al cambiar el estado del reclamo');
+      const detalle = error?.response?.data?.detail || 'Error al cambiar el estado del reclamo';
+      toast.error(detalle);
     }
   };
 
@@ -353,11 +382,15 @@ export default function Tablero() {
       </StickyPageHeader>
 
       {/* Tablero Kanban */}
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* En móvil: solo columna activa. En desktop: grid de 5 columnas */}
         <div className="md:grid md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3 lg:gap-4">
           {columnas.map((col, colIndex) => (
-            <Droppable droppableId={col.id} key={col.id} isDropDisabled={!canDrag}>
+            <Droppable
+              droppableId={col.id}
+              key={col.id}
+              isDropDisabled={!canDrag || (draggingFrom !== null && !puedeTransicionar(draggingFrom, col.id))}
+            >
               {(provided, snapshot) => (
                 <div
                   ref={provided.innerRef}
@@ -450,11 +483,11 @@ export default function Tablero() {
                                   {/* Si tiene dependencia asignada mostrar su nombre, sino la categoría */}
                                   {reclamo.dependencia_asignada ? (
                                     <span
-                                      className="text-xs px-2 py-1 rounded-full inline-block font-medium"
+                                      className="text-xs px-2.5 py-1.5 rounded-md block w-full font-medium text-center leading-tight line-clamp-2"
                                       style={{
                                         border: `1px solid ${reclamo.dependencia_asignada.color || col.color}`,
                                         color: reclamo.dependencia_asignada.color || col.color,
-                                        backgroundColor: 'transparent'
+                                        backgroundColor: `${reclamo.dependencia_asignada.color || col.color}10`,
                                       }}
                                       title={reclamo.dependencia_asignada.nombre}
                                     >
@@ -462,11 +495,11 @@ export default function Tablero() {
                                     </span>
                                   ) : (
                                     <span
-                                      className="text-xs px-2 py-1 rounded-full inline-block font-medium"
+                                      className="text-xs px-2.5 py-1.5 rounded-md block w-full font-medium text-center leading-tight line-clamp-2"
                                       style={{
                                         border: `1px solid ${reclamo.categoria?.color || '#6b7280'}`,
                                         color: reclamo.categoria?.color || '#6b7280',
-                                        backgroundColor: 'transparent'
+                                        backgroundColor: `${reclamo.categoria?.color || '#6b7280'}10`,
                                       }}
                                       title={reclamo.categoria?.nombre}
                                     >

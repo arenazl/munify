@@ -20,8 +20,9 @@ import {
   HardHat,
   Briefcase,
   Tag,
+  Building2,
 } from 'lucide-react';
-import { planificacionApi } from '../lib/api';
+import { planificacionApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { toast } from 'sonner';
 import { ModernSelect, SelectOption } from '../components/ui/ModernSelect';
@@ -46,6 +47,7 @@ interface Empleado {
   categoria_principal?: CategoriaMinima;
   categorias: CategoriaMinima[];
   zona?: { id: number; nombre: string };
+  dependencia?: { id: number; nombre: string; color?: string; icono?: string };
 }
 
 interface TareaReclamo {
@@ -108,6 +110,19 @@ const isWeekend = (date: Date): boolean => {
   return day === 0 || day === 6;
 };
 
+// Paleta de colores fallback cuando un empleado no tiene categoria_principal asignada.
+// Mismo set visual que usan los chips del resto de la app.
+const FALLBACK_COLORS = [
+  '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',
+  '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#06b6d4',
+];
+
+const getEmpleadoColor = (empleado: Empleado): string => {
+  if (empleado.categoria_principal?.color) return empleado.categoria_principal.color;
+  // Fallback determinístico por id — mismo empleado, siempre mismo color
+  return FALLBACK_COLORS[empleado.id % FALLBACK_COLORS.length];
+};
+
 // Helper para contar tareas por empleado/día
 const getTareasEmpleadoDia = (
   tareas: Tarea[],
@@ -138,8 +153,17 @@ export default function Planificacion() {
   const [filtroEmpleado, setFiltroEmpleado] = useState<number | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
+  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
+  const [dependenciasDisponibles, setDependenciasDisponibles] = useState<Array<{ id: number; nombre: string; color?: string; icono?: string }>>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [showWeekend, setShowWeekend] = useState(false);
+
+  // Cargar dependencias del municipio para el filtro
+  useEffect(() => {
+    dependenciasApi.getMunicipio({ activo: true })
+      .then((res) => setDependenciasDisponibles(res.data || []))
+      .catch(() => setDependenciasDisponibles([]));
+  }, []);
 
   const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
   const visibleDates = showWeekend ? weekDates : weekDates.slice(0, 5); // Lun-Vie o Lun-Dom
@@ -250,7 +274,22 @@ export default function Planificacion() {
 
     // Parse destination: "empleado-5-2024-01-15" o "sin-asignar"
     if (destination.droppableId === 'sin-asignar') {
-      toast.info('Para quitar la asignación, usa el detalle del reclamo');
+      // Quitar asignación (mover de calendario al pool sin-asignar)
+      const tarea = tareas.find(t => t.id === tareaId);
+      if (!tarea) return;
+
+      // Optimista: sacar de tareas y agregar a sinAsignar
+      setTareas(prev => prev.filter(t => t.id !== tareaId));
+      setSinAsignar(prev => [...prev, { ...tarea, empleado_id: undefined, fecha_programada: undefined }]);
+
+      try {
+        await planificacionApi.desasignar(tareaId);
+        toast.success('Asignación quitada');
+      } catch (error: any) {
+        console.error('Error desasignando:', error);
+        toast.error(error?.response?.data?.detail || 'Error al quitar la asignación');
+        fetchData();
+      }
       return;
     }
 
@@ -323,6 +362,8 @@ export default function Planificacion() {
       // Filtro por tipo (operario/administrativo)
       if (filtroTipo && e.tipo !== filtroTipo) return false;
       // Filtro por categoría
+      if (filtroDependencia && e.dependencia?.id !== filtroDependencia) return false;
+
       if (filtroCategoria) {
         const tieneCategoria = e.categorias.some(c => c.id === filtroCategoria) ||
                                e.categoria_principal?.id === filtroCategoria;
@@ -330,7 +371,7 @@ export default function Planificacion() {
       }
       return true;
     });
-  }, [empleados, filtroEmpleado, filtroTipo, filtroCategoria]);
+  }, [empleados, filtroEmpleado, filtroTipo, filtroCategoria, filtroDependencia]);
 
   // Obtener lista única de categorías para el filtro
   const categoriasUnicas = useMemo(() => {
@@ -370,6 +411,22 @@ export default function Planificacion() {
     { value: 'administrativo', label: 'Administrativos', description: 'Personal de oficina', icon: <Briefcase className="w-4 h-4" />, color: '#8b5cf6' },
   ], []);
 
+  // Opciones para ModernSelect - Dependencias
+  const dependenciaOptions: SelectOption[] = useMemo(() => {
+    const options: SelectOption[] = [
+      { value: '', label: 'Todas las dependencias', icon: <Building2 className="w-4 h-4" /> }
+    ];
+    dependenciasDisponibles.forEach(dep => {
+      options.push({
+        value: dep.id.toString(),
+        label: dep.nombre,
+        icon: <Building2 className="w-4 h-4" />,
+        color: dep.color || '#6366f1',
+      });
+    });
+    return options;
+  }, [dependenciasDisponibles]);
+
   // Opciones para ModernSelect - Categorías
   const categoriaOptions: SelectOption[] = useMemo(() => {
     const options: SelectOption[] = [
@@ -397,7 +454,7 @@ export default function Planificacion() {
   // Panel de filtros expandible
   const filterPanel = showFilters ? (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Filtro por empleado */}
         <ModernSelect
           value={filtroEmpleado?.toString() || ''}
@@ -417,6 +474,16 @@ export default function Planificacion() {
           label="Tipo"
         />
 
+        {/* Filtro por dependencia */}
+        <ModernSelect
+          value={filtroDependencia?.toString() || ''}
+          onChange={(value) => setFiltroDependencia(value ? parseInt(value) : null)}
+          options={dependenciaOptions}
+          placeholder="Todas las dependencias"
+          label="Dependencia"
+          searchable={true}
+        />
+
         {/* Filtro por categoría */}
         <ModernSelect
           value={filtroCategoria?.toString() || ''}
@@ -429,13 +496,14 @@ export default function Planificacion() {
       </div>
 
       {/* Botón limpiar filtros */}
-      {(filtroEmpleado || filtroTipo || filtroCategoria) && (
+      {(filtroEmpleado || filtroTipo || filtroCategoria || filtroDependencia) && (
         <div className="flex justify-end">
           <button
             onClick={() => {
               setFiltroEmpleado(null);
               setFiltroTipo('');
               setFiltroCategoria(null);
+              setFiltroDependencia(null);
             }}
             className="px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-all hover:opacity-80"
             style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
@@ -449,7 +517,7 @@ export default function Planificacion() {
   ) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-full overflow-x-hidden">
       {/* Header Sticky con componente reutilizable */}
       <StickyPageHeader filterPanel={filterPanel}>
         <PageTitleIcon icon={<CalendarDays className="h-4 w-4" />} />
@@ -572,89 +640,40 @@ export default function Planificacion() {
                   backgroundColor: theme.border,
                 }}
               >
-                {/* Info empleado - expandida */}
+                {(() => {
+                  const empColor = getEmpleadoColor(empleado);
+                  const subtitulo = empleado.categoria_principal?.nombre || empleado.especialidad || empleado.categorias.slice(0, 1).map(c => c.nombre).join(', ') || empleado.zona?.nombre || (empleado.tipo === 'administrativo' ? 'Admin' : 'Operativo');
+                  return (
                 <div
-                  className="p-2 flex flex-col gap-1"
+                  className="px-2 py-1.5 flex items-center gap-2 relative overflow-hidden"
                   style={{ backgroundColor: theme.card }}
+                  title={`${empleado.nombre} ${empleado.apellido || ''}${empleado.categoria_principal ? ' · ' + empleado.categoria_principal.nombre : ''}${empleado.zona ? ' · ' + empleado.zona.nombre : ''}`}
                 >
-                  {/* Fila 1: Avatar + Nombre */}
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                      style={{
-                        backgroundColor: empleado.categoria_principal?.color || theme.primary
-                      }}
-                    >
-                      {empleado.nombre.charAt(0)}{empleado.apellido?.charAt(0) || ''}
+                  {/* Barra lateral de color = guia visual de categoria/identidad del empleado */}
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-1"
+                    style={{ backgroundColor: empColor }}
+                  />
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ml-1"
+                    style={{ backgroundColor: empColor }}
+                  >
+                    {empleado.nombre.charAt(0)}{empleado.apellido?.charAt(0) || ''}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-xs truncate" style={{ color: theme.text }}>
+                      {empleado.nombre} {empleado.apellido || ''}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-sm truncate" style={{ color: theme.text }}>
-                        {empleado.nombre} {empleado.apellido || ''}
-                      </div>
-                      <div className="text-[10px] flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                        <span
-                          className="px-1.5 py-0.5 rounded text-white"
-                          style={{
-                            backgroundColor: empleado.tipo === 'administrativo' ? '#8b5cf6' : '#3b82f6',
-                            fontSize: '9px',
-                          }}
-                        >
-                          {empleado.tipo === 'administrativo' ? 'ADMIN' : 'OPER'}
-                        </span>
-                        {empleado.zona && (
-                          <span className="truncate">{empleado.zona.nombre}</span>
-                        )}
-                      </div>
+                    <div
+                      className="text-[10px] truncate font-medium"
+                      style={{ color: empColor }}
+                    >
+                      {subtitulo}
                     </div>
                   </div>
-
-                  {/* Fila 2: Especialidad o Categorías */}
-                  {(empleado.especialidad || empleado.categorias.length > 0) && (
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {empleado.especialidad ? (
-                        <span
-                          className="text-[10px] px-1.5 py-0.5 rounded-full truncate max-w-full"
-                          style={{
-                            backgroundColor: `${theme.primary}15`,
-                            color: theme.primary,
-                            border: `1px solid ${theme.primary}30`,
-                          }}
-                        >
-                          {empleado.especialidad}
-                        </span>
-                      ) : (
-                        empleado.categorias.slice(0, 3).map(cat => (
-                          <span
-                            key={cat.id}
-                            className="text-[9px] px-1 py-0.5 rounded"
-                            style={{
-                              backgroundColor: `${cat.color}20`,
-                              color: cat.color,
-                            }}
-                            title={cat.nombre}
-                          >
-                            {cat.nombre.slice(0, 8)}
-                          </span>
-                        ))
-                      )}
-                      {empleado.categorias.length > 3 && !empleado.especialidad && (
-                        <span
-                          className="text-[9px] px-1 py-0.5 rounded"
-                          style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-                        >
-                          +{empleado.categorias.length - 3}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Fila 3: Teléfono (si existe) */}
-                  {empleado.telefono && (
-                    <div className="text-[10px] truncate" style={{ color: theme.textSecondary }}>
-                      {empleado.telefono}
-                    </div>
-                  )}
                 </div>
+                  );
+                })()}
 
                 {/* Celdas por día */}
                 {visibleDates.map(date => {
@@ -694,19 +713,20 @@ export default function Planificacion() {
                               draggableId={`${tarea.tipo}-${tarea.id}`}
                               index={index}
                             >
-                              {(provided, snapshot) => (
+                              {(provided, snapshot) => {
+                                const tareaColor = tarea.tipo === 'reclamo'
+                                  ? (tarea.categoria?.color || theme.primary)
+                                  : theme.primary;
+                                return (
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  className={`mb-2 p-2 rounded-lg text-xs ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-500' : ''}`}
+                                  className={`mb-2 p-2 rounded-lg text-xs relative overflow-hidden ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-500' : ''}`}
                                   style={{
                                     ...provided.draggableProps.style,
-                                    backgroundColor: tarea.tipo === 'reclamo'
-                                      ? (tarea.categoria?.color || theme.primary) + '20'
-                                      : `${theme.primary}20`,
-                                    border: `1px solid ${tarea.tipo === 'reclamo'
-                                      ? (tarea.categoria?.color || theme.primary) + '40'
-                                      : theme.primary + '40'}`,
+                                    backgroundColor: `${tareaColor}20`,
+                                    border: `1px solid ${tareaColor}40`,
+                                    borderLeft: `3px solid ${tareaColor}`,
                                   }}
                                 >
                                   <div className="flex items-start gap-1">
@@ -755,7 +775,8 @@ export default function Planificacion() {
                                     </div>
                                   </div>
                                 </div>
-                              )}
+                                );
+                              }}
                             </Draggable>
                           ))}
 
@@ -801,7 +822,9 @@ export default function Planificacion() {
                 {...provided.droppableProps}
                 className="flex flex-wrap gap-2 min-h-[60px]"
               >
-                {sinAsignar.map((tarea, index) => (
+                {sinAsignar.map((tarea, index) => {
+                  const tareaColor = tarea.categoria?.color || theme.primary;
+                  return (
                   <Draggable
                     key={`${tarea.tipo}-${tarea.id}`}
                     draggableId={`${tarea.tipo}-${tarea.id}`}
@@ -814,19 +837,20 @@ export default function Planificacion() {
                         className={`p-3 rounded-lg max-w-[200px] ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-500' : ''}`}
                         style={{
                           ...provided.draggableProps.style,
-                          backgroundColor: theme.backgroundSecondary,
-                          border: `1px solid ${theme.border}`,
+                          backgroundColor: `${tareaColor}15`,
+                          border: `1px solid ${tareaColor}40`,
+                          borderLeft: `3px solid ${tareaColor}`,
                         }}
                       >
                         <div className="flex items-start gap-2">
                           <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
-                            <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <GripVertical className="w-4 h-4 flex-shrink-0" style={{ color: tareaColor }} />
                           </div>
                           <div className="min-w-0">
                             <div className="font-medium text-sm truncate" style={{ color: theme.text }}>
                               {tarea.titulo}
                             </div>
-                            <div className="text-xs truncate mt-0.5" style={{ color: theme.textSecondary }}>
+                            <div className="text-xs truncate mt-0.5 font-medium" style={{ color: tareaColor }}>
                               {tarea.categoria?.nombre}
                             </div>
                           </div>
@@ -834,7 +858,8 @@ export default function Planificacion() {
                       </div>
                     )}
                   </Draggable>
-                ))}
+                  );
+                })}
                 {provided.placeholder}
                 {sinAsignar.length === 0 && (
                   <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>

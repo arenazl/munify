@@ -579,6 +579,25 @@ async def crear_municipio_demo(
     seed_info = await seed_demo_completo(db, municipio.id, codigo)
 
     await db.commit()
+
+    # 4. Seed extra (best-effort): 10 reclamos + 10 trámites con datos coherentes.
+    # Va separado del commit principal: si falla, la demo queda creada igual.
+    try:
+        from scripts.seed_10_demos import seed_municipio
+        await seed_municipio(db, municipio.id, municipio.nombre)
+        await db.commit()
+    except Exception as e:
+        print(f"[CREAR DEMO] Seed extra 10+10 fallo (best-effort): {e}")
+        await db.rollback()
+
+    # 5. Seed de tasas (best-effort): partidas + deudas ficticias para el demo
+    # del Boton de Pago GIRE. Requiere seed_tipos_tasa.py ya corrido (global).
+    try:
+        from scripts.seed_tasas_completo import seed_para_municipio as seed_tasas
+        await seed_tasas(municipio.id, limpiar=False)
+    except Exception as e:
+        print(f"[CREAR DEMO] Seed de tasas fallo (best-effort): {e}")
+
     await db.refresh(municipio)
 
     return MunicipioDemoResponse(
@@ -730,14 +749,21 @@ async def eliminar_municipio_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
-    # Verificar que es un municipio demo (tiene users @demo.com)
-    demo_check = await db.execute(
+    # Verificar que es un municipio demo: rechazar solo si hay usuarios "reales"
+    # (cualquiera que NO matchee los patrones de demo). Un muni sin usuarios o
+    # con solo users demo se considera borrable.
+    from sqlalchemy import or_, not_
+    non_demo_check = await db.execute(
         select(User).where(
             User.municipio_id == municipio.id,
-            User.email.like(f"%@{codigo}.demo.com"),
+            not_(or_(
+                User.email.like(f"%@{codigo}.demo.com"),
+                User.email.like(f"%@{codigo}.test.com"),
+                User.email.like("%@demo.com"),
+            )),
         )
     )
-    if not demo_check.scalars().first():
+    if non_demo_check.scalars().first():
         raise HTTPException(
             status_code=403,
             detail="Solo se pueden eliminar municipios de demo",

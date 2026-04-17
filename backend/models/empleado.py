@@ -32,6 +32,10 @@ class Empleado(Base):
     zona_id = Column(Integer, ForeignKey("zonas.id"), nullable=True)
     zona_asignada = relationship("Zona", back_populates="empleados")
 
+    # Dependencia a la que pertenece el empleado (per-municipio)
+    municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id", ondelete="SET NULL"), nullable=True, index=True)
+    municipio_dependencia = relationship("MunicipioDependencia", foreign_keys=[municipio_dependencia_id])
+
     # Capacidad y estado
     capacidad_maxima = Column(Integer, default=10)
     activo = Column(Boolean, default=True)

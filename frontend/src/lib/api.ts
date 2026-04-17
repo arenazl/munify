@@ -140,8 +140,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // No redirigir en páginas públicas donde se espera que el usuario no esté autenticado
+    const status = error.response?.status;
+    const detail = error.response?.data?.detail;
+
+    if (status === 401) {
       const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register', '/app'];
       const currentPath = window.location.pathname;
       const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
@@ -151,6 +153,11 @@ api.interceptors.response.use(
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
+    } else if (status && status >= 400 && status < 500 && detail) {
+      // Mostrar errores de validación como toast
+      import('sonner').then(({ toast }) => {
+        toast.error(detail, { duration: 5000 });
+      });
     }
     return Promise.reject(error);
   }
@@ -247,8 +254,17 @@ export const authApi = {
   checkEmail: (email: string) => api.get<{ exists: boolean }>('/auth/check-email', { params: { email } }),
 
   // Didit KYC — verificacion de identidad con DNI + selfie.
-  diditSession: (municipio_codigo?: string) =>
-    api.post<{ session_id: string; url: string }>('/auth/didit/session', { municipio_codigo }),
+  // El callback se arma desde window.location.origin para que el mismo
+  // workflow funcione en local y prod sin configurar nada en el dashboard.
+  diditSession: (municipio_codigo?: string) => {
+    const callback_url = typeof window !== 'undefined'
+      ? `${window.location.origin}/register/didit-callback`
+      : undefined;
+    return api.post<{ session_id: string; url: string }>(
+      '/auth/didit/session',
+      { municipio_codigo, callback_url },
+    );
+  },
   diditRegister: (data: { session_id: string; email: string; password: string; telefono?: string }) => {
     const municipioId = localStorage.getItem('municipio_id');
     return api.post('/auth/didit/register', {
@@ -302,6 +318,19 @@ export const reclamosApi = {
     api.get(`/reclamos/empleado/${empleadoId}/disponibilidad/${fecha}`, { params: { buscar_siguiente: buscarSiguiente } }),
   getSugerenciaAsignacion: (reclamoId: number) =>
     api.get(`/reclamos/${reclamoId}/sugerencia-asignacion`),
+  autoAsignar: (reclamoId: number) =>
+    api.post<{ empleado_id: number; empleado_nombre: string; score: number; razon: string }>(`/reclamos/${reclamoId}/auto-asignar`),
+  asignarEmpleado: (
+    reclamoId: number,
+    empleadoId: number | null,
+    extras?: { fecha_programada?: string; hora_inicio?: string; hora_fin?: string }
+  ) =>
+    api.put(`/reclamos/${reclamoId}/empleado`, {
+      empleado_id: empleadoId,
+      ...(extras || {}),
+    }),
+  reasignar: (reclamoId: number, motivo: string) =>
+    api.post(`/reclamos/${reclamoId}/reasignar`, { motivo }),
   getSimilares: (params: {
     categoria_id: number;
     latitud?: number;
@@ -633,6 +662,19 @@ export const chatApi = {
   sendMessage: async (message: string, history: Array<{role: string, content: string}> = []) => {
     const response = await api.post('/chat', { message, history });
     return response.data;
+  },
+
+  /**
+   * Genera 5 sugerencias de prompts contextuales para la página actual.
+   * Cacheadas en backend por ruta+rol — la primera visita es lenta, el resto inmediato.
+   */
+  getQuickPrompts: async (route: string, rol: string): Promise<string[]> => {
+    try {
+      const response = await api.get('/chat/quick-prompts', { params: { route, rol } });
+      return response.data?.prompts || [];
+    } catch {
+      return [];
+    }
   },
 
   /**
@@ -1217,12 +1259,16 @@ export const tramitesApi = {
   /** Asigna (o desasigna) un empleado responsable a la solicitud. Campo opcional. */
   asignarResponsable: (solicitudId: number, empleadoId: number | null) =>
     api.post(`/tramites/solicitudes/${solicitudId}/asignar-responsable`, { empleado_id: empleadoId }),
+  autoAsignarSolicitud: (solicitudId: number) =>
+    api.post<{ empleado_id: number; empleado_nombre: string; carga_actual: number; razon: string }>(`/tramites/solicitudes/${solicitudId}/auto-asignar`),
 };
 
 // Tasas (3er pilar: ABL, patentes, multas, etc)
 export const tasasApi = {
   getTipos: () => api.get('/tasas/tipos'),
   misPartidas: () => api.get('/tasas/mis-partidas'),
+  listarPartidas: (params?: { tipo_tasa_id?: number; q?: string; limit?: number; offset?: number }) =>
+    api.get('/tasas/partidas', { params }),
   deudasDePartida: (partidaId: number) => api.get(`/tasas/partidas/${partidaId}/deudas`),
   miResumen: () => api.get('/tasas/mi-resumen'),
   reclamarPartida: (tipo_tasa_codigo: string, identificador: string) =>
@@ -1378,6 +1424,9 @@ export const planificacionApi = {
         empleado_id: empleadoId,
       },
     }),
+  desasignar: (reclamoId: number) =>
+    api.post('/planificacion/desasignar', null, { params: { reclamo_id: reclamoId } }),
+
   asignarFecha: (reclamoId: number, empleadoId: number, fechaProgramada: string, horaInicio?: string, horaFin?: string) =>
     api.post('/planificacion/asignar-fecha', null, {
       params: {

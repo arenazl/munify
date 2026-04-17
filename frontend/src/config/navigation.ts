@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap
+  FolderTree, FileText, Activity, Zap, Receipt
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -92,6 +92,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: FileCheck,
       show: isAdminOrSupervisor,
       description: 'Gestionar trámites'
+    },
+    {
+      name: 'Tasas',
+      href: '/gestion/tasas',
+      icon: Receipt,
+      show: isAdminOrSupervisor,
+      description: 'Partidas del padrón y deudas'
     },
     {
       name: 'Mapa',

@@ -1793,8 +1793,10 @@ async def get_sugerencia_asignacion(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.NUEVO:
-        raise HTTPException(status_code=400, detail="Solo se pueden sugerir asignaciones para reclamos nuevos")
+    # Aceptar estados activos (recibido, en_curso, nuevo legacy, asignado legacy)
+    estados_validos = {EstadoReclamo.RECIBIDO, EstadoReclamo.EN_CURSO, EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO}
+    if reclamo.estado not in estados_validos:
+        raise HTTPException(status_code=400, detail="Solo se puede sugerir asignación para reclamos activos (recibido, en_curso)")
 
     # Obtener todos los empleados OPERARIOS activos del municipio
     # (los reclamos son atendidos por operarios, no administrativos)
@@ -1963,6 +1965,200 @@ def _get_razon_principal(detalles: dict, cat_score: int, zona_score: int, carga_
         razones.append("disponible")
 
     return ", ".join(razones).capitalize()
+
+
+# ============ AUTO-ASIGNACIÓN ============
+
+class AutoAsignarResponse(BaseModel):
+    empleado_id: int
+    empleado_nombre: str
+    score: int
+    razon: str
+
+
+@router.post("/{reclamo_id}/auto-asignar", response_model=AutoAsignarResponse)
+async def auto_asignar_reclamo(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Calcula el mejor empleado para el reclamo (usando el mismo algoritmo que
+    sugerencia-asignacion) y lo asigna directamente.
+
+    Solo admin/supervisor. El reclamo tiene que estar en un estado activo.
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor puede auto-asignar")
+
+    # Reutilizar la sugerencia
+    sugerencias_response = await get_sugerencia_asignacion(reclamo_id, db, current_user)
+    sugerencias = sugerencias_response.get("sugerencias", []) if isinstance(sugerencias_response, dict) else []
+    if not sugerencias:
+        raise HTTPException(status_code=400, detail=sugerencias_response.get("mensaje", "No hay empleados disponibles"))
+
+    top = sugerencias[0]
+    empleado_id = top["empleado_id"]
+
+    r = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
+    reclamo = r.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    reclamo.empleado_id = empleado_id
+    await db.commit()
+    await db.refresh(reclamo)
+
+    return AutoAsignarResponse(
+        empleado_id=empleado_id,
+        empleado_nombre=top.get("empleado_nombre", ""),
+        score=top.get("score", 0),
+        razon=top.get("razon", ""),
+    )
+
+
+class AsignarEmpleadoRequest(BaseModel):
+    empleado_id: Optional[int] = None  # None para desasignar
+    fecha_programada: Optional[str] = None  # YYYY-MM-DD
+    hora_inicio: Optional[str] = None  # HH:MM
+    hora_fin: Optional[str] = None  # HH:MM
+
+
+@router.put("/{reclamo_id}/empleado")
+async def asignar_empleado(
+    reclamo_id: int,
+    data: AsignarEmpleadoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Asigna o desasigna un empleado específico al reclamo (manual).
+    Si se manda empleado_id, también se requiere fecha_programada + hora_inicio
+    para que el reclamo aparezca en la planificación.
+    Solo se puede editar la asignación cuando el reclamo está en estado RECIBIDO.
+    """
+    from datetime import datetime as _dt
+
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor puede asignar empleados")
+
+    r = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
+    reclamo = r.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Solo se puede asignar/editar cuando esta en RECIBIDO (o NUEVO/ASIGNADO legacy).
+    # En estados posteriores hay que pasar por "Reasignar" primero.
+    estados_editables = {EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO}
+    if reclamo.estado not in estados_editables:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede modificar la asignación en estado '{reclamo.estado.value}'. Usa 'Reasignar' primero.",
+        )
+
+    # Si hay empleado, fecha + hora_inicio son obligatorios para sincronizar con planificacion
+    if data.empleado_id is not None:
+        if not data.fecha_programada or not data.hora_inicio:
+            raise HTTPException(
+                status_code=400,
+                detail="Si asignás un empleado, fecha y hora de inicio son obligatorias",
+            )
+
+    reclamo.empleado_id = data.empleado_id
+
+    if data.fecha_programada:
+        try:
+            reclamo.fecha_programada = _dt.strptime(data.fecha_programada, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="fecha_programada invalida (use YYYY-MM-DD)")
+    elif data.empleado_id is None:
+        reclamo.fecha_programada = None
+
+    if data.hora_inicio:
+        try:
+            reclamo.hora_inicio = _dt.strptime(data.hora_inicio, "%H:%M").time()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="hora_inicio invalida (use HH:MM)")
+    elif data.empleado_id is None:
+        reclamo.hora_inicio = None
+
+    if data.hora_fin:
+        try:
+            reclamo.hora_fin = _dt.strptime(data.hora_fin, "%H:%M").time()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="hora_fin invalida (use HH:MM)")
+    elif data.empleado_id is None:
+        reclamo.hora_fin = None
+
+    await db.commit()
+    return {
+        "ok": True,
+        "empleado_id": data.empleado_id,
+        "fecha_programada": data.fecha_programada,
+        "hora_inicio": data.hora_inicio,
+        "hora_fin": data.hora_fin,
+    }
+
+
+class ReasignarRequest(BaseModel):
+    """Devuelve el reclamo a estado RECIBIDO limpiando empleado/fecha/horario.
+    El motivo es obligatorio (queda en historial)."""
+    motivo: str
+
+
+@router.post("/{reclamo_id}/reasignar")
+async def reasignar_reclamo(
+    reclamo_id: int,
+    data: ReasignarRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Vuelve un reclamo al estado RECIBIDO para que otro empleado lo pueda tomar.
+    Limpia empleado, fecha programada, hora_inicio y hora_fin.
+    Requiere motivo (queda en historial).
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor puede reasignar")
+
+    if not data.motivo or not data.motivo.strip():
+        raise HTTPException(status_code=400, detail="El motivo es obligatorio")
+
+    r = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
+    reclamo = r.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    # Solo tiene sentido reasignar si ya estaba en un estado posterior
+    if reclamo.estado == EstadoReclamo.RECIBIDO:
+        raise HTTPException(status_code=400, detail="El reclamo ya está en estado Recibido")
+    if reclamo.estado == EstadoReclamo.NUEVO:
+        raise HTTPException(status_code=400, detail="El reclamo aun no fue recibido por una dependencia")
+
+    estado_anterior = reclamo.estado
+    reclamo.estado = EstadoReclamo.RECIBIDO
+    reclamo.empleado_id = None
+    reclamo.fecha_programada = None
+    reclamo.hora_inicio = None
+    reclamo.hora_fin = None
+    # Limpiar resolución por si venia de finalizado/rechazado
+    reclamo.fecha_resolucion = None
+    reclamo.resolucion = None
+
+    db.add(HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=current_user.id,
+        estado_anterior=estado_anterior,
+        estado_nuevo=EstadoReclamo.RECIBIDO,
+        accion="reasignacion",
+        comentario=f"Reasignado: {data.motivo.strip()}",
+    ))
+    await db.commit()
+    return {
+        "ok": True,
+        "id": reclamo.id,
+        "estado": reclamo.estado.value,
+        "message": "Reclamo devuelto a Recibido. Disponible para otro empleado.",
+    }
 
 
 # ============ CONFIRMACIÓN DEL VECINO ============

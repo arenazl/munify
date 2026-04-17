@@ -212,22 +212,26 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   const loadData = async (reloadTramites = true) => {
     try {
-      const [tramitesRes, categoriasRes, empleadosRes, resumenRes] = await Promise.all([
-        tramitesApi.getAll().catch(() => ({ data: [] })),           // Trámites per-municipio (nuevo modelo)
-        categoriasTramiteApi.getAll().catch(() => ({ data: [] })),  // Categorías de trámite per-municipio
+      // PRIORIDAD 1: las solicitudes (lo que el user quiere ver primero)
+      const tramitesPromise = reloadTramites ? loadTramites(filtroTipo, filtroEstado) : Promise.resolve();
+
+      // Paralelo: catálogos y conteos (no bloquean la tabla)
+      const catalogosPromise = Promise.all([
+        tramitesApi.getAll().catch(() => ({ data: [] })),
+        categoriasTramiteApi.getAll().catch(() => ({ data: [] })),
         empleadosApi.getAll().catch(() => ({ data: [] })),
         tramitesApi.getResumen().catch(() => ({ data: null })),
-      ]);
+      ]).then(([tramitesRes, categoriasRes, empleadosRes, resumenRes]) => {
+        setServicios(tramitesRes.data || []);
+        setTipos(categoriasRes.data);
+        setEmpleados(empleadosRes.data);
+        setResumen(resumenRes.data);
+      });
 
-      setServicios(tramitesRes.data || []);
-      setTipos(categoriasRes.data);
-      setEmpleados(empleadosRes.data);
-      setResumen(resumenRes.data);
-
-      // Cargar conteos para filtros visuales y trámites en paralelo
       const conteosPromise = loadConteos();
-      const tramitesPromise = reloadTramites ? loadTramites(filtroTipo, filtroEstado) : Promise.resolve();
-      await Promise.all([conteosPromise, tramitesPromise]);
+
+      // Dejar que todas corran; marcar loading=false apenas terminen las tres
+      await Promise.all([tramitesPromise, catalogosPromise, conteosPromise]);
     } catch (error) {
       console.error('Error cargando datos:', error);
       toast.error('Error al cargar trámites');
@@ -424,6 +428,21 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     } catch (err) {
       console.error('Error asignando responsable', err);
       toast.error('No se pudo asignar el responsable');
+    } finally {
+      setAsignandoResponsable(false);
+    }
+  };
+
+  const handleAutoAsignarResponsable = async () => {
+    if (!selectedTramite) return;
+    setAsignandoResponsable(true);
+    try {
+      const res = await tramitesApi.autoAsignarSolicitud(selectedTramite.id);
+      toast.success(`Asignado a ${res.data.empleado_nombre}`, { description: res.data.razon });
+      await recargarDespuesDeAccion();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo auto-asignar');
     } finally {
       setAsignandoResponsable(false);
     }

@@ -10,7 +10,7 @@ categorías que ya siembra `crear_categorias_default()`.
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 
 from core.security import get_password_hash
 from models.user import User
@@ -907,6 +907,15 @@ async def seed_demo_completo(
     # Genera datos de demo realistas. El vecino demo es solicitante de la mitad;
     # el resto se genera como "otro vecino" sin user asociado (solo datos de contacto).
     solicitudes_creadas = 0
+
+    # numero_tramite es UNIQUE GLOBAL (no por municipio). Arrancar desde el max
+    # actual del año para no chocar con demos creadas previamente.
+    _year = date.today().year
+    _r = await db.execute(text(
+        "SELECT COALESCE(MAX(CAST(SUBSTRING(numero_tramite, 10) AS UNSIGNED)), 0) "
+        "FROM solicitudes WHERE numero_tramite LIKE :patt"
+    ), {"patt": f"SOL-{_year}-%"})
+    _sol_offset = int(_r.scalar() or 0)
     _ASUNTOS_EXTRA = [
         "Solicitud iniciada por ventanilla",
         "Necesito resolver esto antes de fin de mes",
@@ -946,7 +955,7 @@ async def seed_demo_completo(
                     if muni_dep_obj:
                         dep_id_sol = muni_dep_obj.id
 
-            numero = f"SOL-{date.today().year}-{(sol_idx + 1):05d}"
+            numero = f"SOL-{_year}-{(_sol_offset + sol_idx + 1):05d}"
             sol = Solicitud(
                 municipio_id=municipio_id,
                 numero_tramite=numero,

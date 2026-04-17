@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Database, Maximize2, Minimize2, ChevronDown, ChevronUp, Table2, Download, TrendingUp, TrendingDown, Star, Save, Play, Users, FileText, MapPin, Folder, Layers, AlertTriangle, LayoutGrid, List, BarChart3, Rows3, Plus, Sparkles } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, AlertCircle, Database, Maximize2, Minimize2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Table2, Download, TrendingUp, TrendingDown, Star, Save, Play, Users, FileText, MapPin, Folder, Layers, AlertTriangle, LayoutGrid, List, BarChart3, Rows3, Plus, Sparkles, Pin, PinOff } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { chatApi } from '../lib/api';
@@ -86,49 +86,111 @@ const iconMap: Record<string, React.ReactNode> = {
   'star': <Star className="h-4 w-4" />,
 };
 
-// Sugerencias rápidas según la ruta actual
-const getQuickPromptsForRoute = (pathname: string): string[] => {
-  if (pathname.includes('/reclamos')) {
-    return [
-      '¿Cuántos reclamos pendientes hay?',
-      'Reclamos más atrasados',
-      'Reclamos de esta semana por categoría',
-    ];
+// Fallback estático mientras se resuelve la generación dinámica con IA
+const DEFAULT_QUICK_PROMPTS: string[] = [
+  'Resumen de reclamos por estado',
+  '¿Cuántos reclamos pendientes hay?',
+  'Trámites activos esta semana',
+  'Top categorías más reportadas',
+  '¿Qué debería priorizar hoy?',
+];
+
+function ChatDataView({ data, theme }: { data: any[]; theme: any }) {
+  if (!data || data.length === 0) return null;
+  const keys = Object.keys(data[0]);
+  const hasNumericCol = keys.some(k => /cant|count|total|cantidad|resueltos|pendientes/i.test(k));
+
+  // Caso 1: dato único (ej: {total: 4}) → mostrar número grande
+  if (data.length === 1 && keys.length <= 2 && hasNumericCol) {
+    const numKey = keys.find(k => /cant|count|total|cantidad|resueltos|pendientes/i.test(k))!;
+    const labelKey = keys.find(k => k !== numKey);
+    return (
+      <div className="text-center py-2">
+        <div className="text-2xl font-bold" style={{ color: theme.primary }}>{data[0][numKey]}</div>
+        <div className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+          {labelKey ? data[0][labelKey] : numKey.replace(/_/g, ' ')}
+        </div>
+      </div>
+    );
   }
-  if (pathname.includes('/tramites') || pathname.includes('/solicitudes')) {
-    return [
-      '¿Cuántos trámites activos hay?',
-      'Trámites pendientes por tipo',
-      'Solicitudes de esta semana',
-    ];
+
+  // Caso 2: agrupados (nombre + cantidad) → filas compactas
+  if (keys.length <= 3 && hasNumericCol) {
+    const numKey = keys.find(k => /cant|count|total|cantidad|resueltos|pendientes/i.test(k))!;
+    const labelKey = keys.find(k => k !== numKey && !/^id$/i.test(k)) || keys[0];
+    const total = data.reduce((s, r) => s + (Number(r[numKey]) || 0), 0);
+    return (
+      <div className="space-y-1">
+        {data.map((row, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs"
+            style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.border}` }}
+          >
+            <span style={{ color: theme.text }}>{row[labelKey]}</span>
+            <strong style={{ color: theme.primary }}>{row[numKey]}</strong>
+          </div>
+        ))}
+        <p className="text-[10px] mt-1.5" style={{ color: theme.textSecondary }}>
+          Total: {total} · {data.length} items
+        </p>
+      </div>
+    );
   }
-  if (pathname.includes('/empleados')) {
-    return [
-      'Top 5 empleados con más reclamos resueltos',
-      'Carga de trabajo por empleado',
-      'Empleados activos',
-    ];
-  }
-  if (pathname.includes('/dashboard') || pathname === '/' || pathname.includes('/gestion')) {
-    return [
-      'Resumen de reclamos por estado',
-      '¿Cuántos vecinos tenemos?',
-      'Trámites pendientes esta semana',
-    ];
-  }
-  return [
-    '¿Cuántos reclamos hay?',
-    'Resumen general',
-    'Top categorías',
-  ];
-};
+
+  // Caso 3: listado (reclamos, trámites, etc) → cards con border-left
+  return (
+    <div className="space-y-1.5">
+      {data.slice(0, 10).map((row, i) => {
+        const vals = Object.values(row).map(v => v != null ? String(v) : '');
+        const id = row.id;
+        const title = row.titulo || row.nombre || row.asunto || row.email || vals.find(v => v.length > 3 && !/^\d+$/.test(v)) || `Registro ${i + 1}`;
+        const meta = Object.entries(row)
+          .filter(([k, v]) => k !== 'id' && k !== 'titulo' && k !== 'nombre' && k !== 'asunto' && v != null)
+          .map(([, v]) => {
+            const s = String(v);
+            if (s.match(/^\d{4}-\d{2}-\d{2}/)) return s.slice(0, 10);
+            return s.length > 30 ? s.slice(0, 30) + '…' : s;
+          })
+          .slice(0, 3)
+          .join(' · ');
+        return (
+          <div
+            key={i}
+            className="px-2.5 py-2 rounded-md text-xs"
+            style={{ borderLeft: `3px solid ${theme.primary}`, backgroundColor: `${theme.primary}08` }}
+          >
+            <div className="font-semibold truncate" style={{ color: theme.text }}>
+              {id != null && <span style={{ color: theme.textSecondary }}>#{id} </span>}
+              {title}
+            </div>
+            {meta && <div className="truncate mt-0.5" style={{ color: theme.textSecondary }}>{meta}</div>}
+          </div>
+        );
+      })}
+      {data.length > 10 && (
+        <p className="text-[10px]" style={{ color: theme.textSecondary }}>...y {data.length - 10} más</p>
+      )}
+    </div>
+  );
+}
 
 export function ChatWidget() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const quickPrompts = getQuickPromptsForRoute(location.pathname);
+
+  // Sugerencias dinámicas generadas por IA según ruta + rol (con cache backend)
+  const [quickPrompts, setQuickPrompts] = useState<string[]>(DEFAULT_QUICK_PROMPTS);
+  useEffect(() => {
+    let alive = true;
+    const rol = user?.rol || 'vecino';
+    chatApi.getQuickPrompts(location.pathname, rol).then(prompts => {
+      if (alive && prompts.length > 0) setQuickPrompts(prompts);
+    });
+    return () => { alive = false; };
+  }, [location.pathname, user?.rol]);
 
   // Determinar si puede usar el asistente con datos (gestores)
   // Automáticamente activado para supervisores/admins
@@ -136,7 +198,8 @@ export function ChatWidget() {
   const [isMaximized, setIsMaximized] = useState(chatCache.isMaximized);
 
   const handleLinkClick = (url: string) => {
-    setIsOpen(false);
+    setIsPinned(false);
+    setIsHovered(false);
     navigate(url);
   };
 
@@ -167,8 +230,60 @@ export function ChatWidget() {
   };
   const isVecino = user?.rol === 'vecino';
   const isDesktop = typeof window !== 'undefined' && window.innerWidth >= 1024;
-  const [isOpen, setIsOpen] = useState(isVecino && isDesktop);
+  // Pin: el vecino ancla el panel y queda abierto aunque saque el mouse.
+  // Persiste entre sesiones en localStorage.
+  const [isPinned, setIsPinned] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('chat_pinned') === 'true';
+  });
+  // Hover: el panel se abre al pasar el mouse sobre la línea/panel y se
+  // cierra al salir. El estado abierto efectivo = pinned OR hovered.
   const [isHovered, setIsHovered] = useState(false);
+  const isOpen = isPinned || isHovered;
+  // Legacy setter para el evento global munify:toggle-chat (lo invierte el pin).
+  const setIsOpen = (v: boolean | ((o: boolean) => boolean)) => {
+    setIsPinned(prev => (typeof v === 'function' ? v(prev) : v));
+  };
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 260;
+    const saved = localStorage.getItem('chat_sidebar_width');
+    return 240;
+  });
+  const isResizing = useRef(false);
+
+  // Toggle desde topbar — ahora pisa el pin (forzar abrir/cerrar).
+  useEffect(() => {
+    const toggle = () => setIsPinned(o => !o);
+    window.addEventListener('munify:toggle-chat', toggle);
+    return () => window.removeEventListener('munify:toggle-chat', toggle);
+  }, []);
+
+  // Persistir pin en localStorage.
+  useEffect(() => {
+    localStorage.setItem('chat_pinned', isPinned ? 'true' : 'false');
+  }, [isPinned]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      const w = Math.max(160, Math.min(720, window.innerWidth - e.clientX));
+      setSidebarWidth(w);
+    };
+    const onUp = () => {
+      if (isResizing.current) {
+        isResizing.current = false;
+        localStorage.setItem('chat_sidebar_width', String(sidebarWidth));
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [sidebarWidth]);
   const [messages, setMessages] = useState<Message[]>(chatCache.messages);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -286,262 +401,123 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Backdrop oscuro (solo cuando está maximizado) */}
-      {isOpen && isMaximized && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
-          style={{ zIndex: 9998 }}
-          onClick={() => setIsMaximized(false)}
-        />
-      )}
-
-      {/* Backdrop transparente para cerrar al click afuera (solo floating abierto) */}
-      {isOpen && !isMaximized && (
-        <div
-          className="fixed inset-0"
-          style={{ zIndex: 39 }}
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Chat floating / modal */}
+      {/* Línea fina de trigger: al pasar el mouse abre el panel (modal slide-in).
+          Mantiene presencia permanente en el borde derecho cuando el panel
+          está cerrado. Si está abierto queda detrás del panel y no se ve. */}
       <div
-        className={`
-          flex flex-col overflow-hidden
-          ${isMaximized ? 'rounded-2xl shadow-2xl' : ''}
-          transition-all duration-300 ease-out
-        `}
+        onMouseEnter={() => setIsHovered(true)}
+        className="fixed right-0 top-[56px] bottom-0 transition-all"
+        style={{
+          zIndex: isOpen ? 29 : 50,
+          width: isOpen ? '4px' : '6px',
+          background: theme.primary,
+          opacity: isOpen ? 0 : 0.55,
+          pointerEvents: isOpen ? 'none' : 'auto',
+          cursor: 'pointer',
+        }}
+        title="Pasá el mouse para abrir el asistente"
+      />
+
+      {/* Burbuja flotante abajo a la derecha — mismo rol que la línea */}
+      {!isOpen && (
+        <button
+          onClick={() => setIsPinned(true)}
+          onMouseEnter={() => setIsHovered(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 animate-in fade-in slide-in-from-bottom-2"
+          style={{
+            zIndex: 50,
+            backgroundColor: theme.primary,
+            color: theme.primaryText,
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
+          }}
+          title="Abrir y anclar asistente IA"
+        >
+          <MessageCircle className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* Panel lateral con slide-in desde la derecha. Siempre renderizado para
+          que el CSS transition anime el transform. Si no está pinned y el
+          mouse sale, se cierra con animación. */}
+      <div
+        className="flex flex-col overflow-hidden backdrop-blur-sm chat-overlay"
         style={{
           position: 'fixed',
-          ...(isMaximized ? {
-            // Estilo modal centrado (como los wizards)
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 'min(1200px, 90vw)',
-            height: 'min(700px, 85vh)',
-            borderRadius: '16px',
-          } : (isOpen || isHovered) ? {
-            // Floating chat abierto: esquina inferior derecha
-            bottom: '16px',
-            right: '16px',
-            width: '360px',
-            height: 'min(520px, 75vh)',
-            borderRadius: '16px',
-          } : {
-            // Colapsado: cajita chica en la esquina inferior derecha con su propio rincón
-            bottom: '16px',
-            right: '16px',
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-          }),
-          zIndex: 40,
+          top: '56px',
+          right: 0,
+          bottom: 0,
+          width: `${sidebarWidth}px`,
+          zIndex: 30,
+          transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 0.15s',
           backgroundColor: theme.card,
-          border: `1px solid ${theme.border}`,
-          boxShadow: isMaximized
-            ? '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-            : (isOpen || isHovered)
-              ? '0 8px 30px rgba(0, 0, 0, 0.15)'
-              : `0 4px 12px ${theme.primary}30`
+          borderLeft: `1px solid ${theme.border}`,
+          boxShadow: isOpen ? '-8px 0 28px rgba(0, 0, 0, 0.18)' : 'none',
+          pointerEvents: isOpen ? 'auto' : 'none',
+          opacity: isOpen ? 1 : 0.98,
         }}
-        onMouseEnter={() => !isMaximized && !isOpen && setIsHovered(true)}
-        onMouseLeave={() => !isOpen && setIsHovered(false)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Cajita colapsada: rincón propio 48x48 con ícono de IA */}
-        {!isOpen && !isHovered && !isMaximized && (
+        {/* Handle de resize — barra vertical en el borde izquierdo */}
+        {isOpen && (
           <div
-            className="flex items-center justify-center w-full h-full cursor-pointer select-none rounded-xl transition-all duration-200 hover:scale-105"
-            style={{
-              background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+            onMouseDown={(e) => {
+              e.preventDefault();
+              isResizing.current = true;
+              document.body.style.userSelect = 'none';
+              document.body.style.cursor = 'col-resize';
             }}
-            onClick={() => setIsOpen(true)}
+            className="absolute top-0 left-0 bottom-0 w-1.5 cursor-col-resize hover:w-2 transition-all group"
+            style={{ zIndex: 41 }}
+            title="Arrastrar para cambiar ancho"
           >
-            <Sparkles className="h-5 w-5" style={{ color: theme.primaryText }} />
+            <div
+              className="w-full h-full transition-colors group-hover:bg-[var(--color-primary)]"
+              style={{ backgroundColor: 'transparent' }}
+            />
           </div>
         )}
 
-        {/* Barra minimalista de controles (solo cuando expandido o maximizado) */}
-        {(isOpen || isHovered || isMaximized) && (
+        {/* Barra minimalista de controles */}
+        {isOpen && (
           <div
-            className="flex items-center justify-end flex-shrink-0 gap-0.5 px-2 py-1.5"
+            className="flex items-center justify-between flex-shrink-0 gap-0.5 px-2 py-1.5"
             style={{
               borderBottom: `1px solid ${theme.border}`,
-              backgroundColor: isMaximized
-                ? `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`
-                : theme.backgroundSecondary,
+              backgroundColor: theme.backgroundSecondary,
             }}
           >
-            {/* Botón nueva conversación (solo si ya hay mensajes) */}
+            {/* Pin: ancla el panel abierto (no se cierra al sacar mouse) */}
+            <button
+              onClick={() => setIsPinned(p => !p)}
+              className="p-1 rounded-md transition-all hover:scale-110 active:scale-95"
+              style={{
+                color: isPinned ? theme.primary : theme.textSecondary,
+                backgroundColor: isPinned ? `${theme.primary}20` : 'transparent',
+              }}
+              title={isPinned ? 'Desanclar (se cerrará al sacar el mouse)' : 'Anclar panel abierto'}
+            >
+              {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+            </button>
+
+            {/* Nueva conversación (derecha) */}
             {messages.length > 0 && (
               <button
                 onClick={resetConversation}
-                className="p-1.5 rounded-md transition-colors hover:bg-black/10 flex items-center gap-1"
+                className="px-2 py-1 rounded-md transition-all hover:bg-black/10 flex items-center gap-1"
                 style={{ color: theme.textSecondary }}
                 title="Nueva conversación"
               >
-                <Plus className="h-3.5 w-3.5" />
-                <span className="text-[11px] font-medium">Nueva</span>
-              </button>
-            )}
-            {/* Botón maximizar */}
-            {canUseDataAssistant && (
-              <button
-                onClick={() => setIsMaximized(!isMaximized)}
-                className="p-1.5 rounded-md transition-colors hover:bg-black/10"
-                style={{ color: theme.textSecondary }}
-                title={isMaximized ? 'Minimizar' : 'Maximizar panel'}
-              >
-                {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              </button>
-            )}
-            {/* Pin/Unpin */}
-            {!isMaximized && (
-              <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="p-1.5 rounded-md transition-colors hover:bg-black/10"
-                style={{ color: theme.textSecondary }}
-                title={isOpen ? 'Desfijar (se oculta al salir)' : 'Fijar abierto'}
-              >
-                {isOpen ? <X className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-              </button>
-            )}
-            {/* Cerrar maximizado */}
-            {isMaximized && (
-              <button
-                onClick={() => setIsMaximized(false)}
-                className="p-1.5 rounded-md transition-colors hover:bg-black/10"
-                style={{ color: theme.textSecondary }}
-              >
-                <X className="h-3.5 w-3.5" />
+                <Plus className="h-3 w-3" />
+                <span className="text-[10px] font-medium">Nueva</span>
               </button>
             )}
           </div>
         )}
 
         {/* Contenido principal - layout diferente según maximizado */}
-        <div className={`flex-1 flex ${isMaximized ? 'flex-row' : 'flex-col'} overflow-hidden`}>
-
-          {/* Panel lateral de sugerencias (solo maximizado y usuarios con datos) */}
-          {isMaximized && canUseDataAssistant && (
-            <div
-              className="w-72 flex-shrink-0 p-4 overflow-y-auto"
-              style={{ borderRight: `1px solid ${theme.border}`, backgroundColor: theme.backgroundSecondary }}
-            >
-              <h3 className="font-semibold text-sm mb-3" style={{ color: theme.text }}>
-                Consultas rápidas
-              </h3>
-
-              {/* Categoría: Reclamos */}
-              <div className="mb-4">
-                <p className="text-xs font-medium mb-2 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                  📋 Reclamos
-                </p>
-                <div className="space-y-1.5">
-                  {[
-                    '¿Cuántos reclamos pendientes hay?',
-                    '¿Cuáles son los reclamos más atrasados?',
-                    'Reclamos de esta semana por categoría',
-                    'Reclamos nuevos sin asignar',
-                  ].map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { sendMessage(q); }}
-                      className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: theme.card,
-                        color: theme.text,
-                        border: `1px solid ${theme.border}`
-                      }}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Categoría: Empleados */}
-              <div className="mb-4">
-                <p className="text-xs font-medium mb-2 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                  👥 Empleados
-                </p>
-                <div className="space-y-1.5">
-                  {[
-                    'Ranking de empleados por resueltos',
-                    '¿Qué empleados tienen más carga?',
-                    'Efectividad de cada empleado',
-                  ].map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { sendMessage(q); }}
-                      className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: theme.card,
-                        color: theme.text,
-                        border: `1px solid ${theme.border}`
-                      }}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Categoría: Análisis */}
-              <div className="mb-4">
-                <p className="text-xs font-medium mb-2 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                  📊 Análisis
-                </p>
-                <div className="space-y-1.5">
-                  {[
-                    'Reclamos por zona',
-                    'Reclamos rechazados y motivos',
-                    'Vecinos con más reclamos',
-                    'Categorías más problemáticas',
-                  ].map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { sendMessage(q); }}
-                      className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: theme.card,
-                        color: theme.text,
-                        border: `1px solid ${theme.border}`
-                      }}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Categoría: Resumen */}
-              <div>
-                <p className="text-xs font-medium mb-2 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
-                  🎯 Resumen
-                </p>
-                <div className="space-y-1.5">
-                  {[
-                    'Dame un resumen general',
-                    '¿Qué debería priorizar hoy?',
-                  ].map((q, i) => (
-                    <button
-                      key={i}
-                      onClick={() => { sendMessage(q); }}
-                      className="w-full text-left px-3 py-2 rounded-lg text-xs transition-colors hover:scale-[1.02]"
-                      style={{
-                        backgroundColor: theme.card,
-                        color: theme.text,
-                        border: `1px solid ${theme.border}`
-                      }}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+        <div className="flex-1 flex flex-col overflow-hidden">
 
           {/* Área del chat */}
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -552,112 +528,86 @@ export function ChatWidget() {
             >
               {messages.length === 0 && (
                 <div className="text-center py-4" style={{ color: theme.textSecondary }}>
-                  {canUseDataAssistant ? (
-                    <>
-                      {/* Consultas rápidas como chips */}
-                      {!isMaximized && (
-                        <div className="flex flex-wrap gap-1.5 justify-center px-2">
-                          {[
-                            '¿Cuántos reclamos pendientes?',
-                            'Empleados sin asignaciones',
-                            'Reclamos de esta semana',
-                            'Categoría con más reclamos',
-                            'Ranking de empleados',
-                            'Reclamos atrasados',
-                            'Trámites en proceso',
-                            'Resumen general',
-                            'Zonas más problemáticas',
-                            '¿Qué priorizar hoy?',
-                          ].map((q, i) => (
-                            <button
-                              key={i}
-                              onClick={() => { sendMessage(q); }}
-                              className="px-2.5 py-1.5 rounded-full text-[11px] transition-all hover:scale-105"
-                              style={{
-                                backgroundColor: `${theme.primary}15`,
-                                color: theme.primary,
-                                border: `1px solid ${theme.primary}30`
-                              }}
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {isMaximized && (
-                        <p className="text-xs opacity-70">Usá las consultas rápidas de la izquierda o escribí tu pregunta</p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Bot className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm font-medium mb-1">Hola! Soy tu asistente virtual.</p>
-                      <p className="text-xs opacity-70 mb-3">Preguntame lo que necesites o tocá una sugerencia:</p>
-                      <div className="flex flex-wrap gap-1.5 justify-center px-2">
-                        {[
-                          '¿Cómo creo un reclamo?',
-                          '¿Qué trámites puedo hacer?',
-                          '¿Cómo pago mis tasas?',
-                          '¿Cómo verifico mi identidad?',
-                          '¿Dónde veo el estado de mi reclamo?',
-                          '¿Qué documentos necesito para un trámite?',
-                          '¿Cómo me sumo a un reclamo existente?',
-                          '¿Qué es ABL?',
-                        ].map((q, i) => (
-                          <button
-                            key={i}
-                            onClick={() => { sendMessage(q); }}
-                            className="px-2.5 py-1.5 rounded-full text-[11px] transition-all hover:scale-105"
-                            style={{
-                              backgroundColor: `${theme.primary}15`,
-                              color: theme.primary,
-                              border: `1px solid ${theme.primary}30`
-                            }}
-                          >
-                            {q}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  <Bot className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-xs opacity-70 mb-3">Preguntame o tocá una sugerencia</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center px-2">
+                    {quickPrompts.map((q, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { sendMessage(q); }}
+                        className="px-2.5 py-1.5 rounded-full text-[11px] transition-all hover:scale-105 active:scale-95"
+                        style={{
+                          backgroundColor: `${theme.primary}15`,
+                          color: theme.primary,
+                          border: `1px solid ${theme.primary}30`
+                        }}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-              {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {msg.role === 'assistant' && (
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: `${theme.primary}20` }}
-                    >
-                      <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+              {messages.map((msg, i) => {
+                const hasData = msg.role === 'assistant' && msg.rawData && msg.rawData.length > 0;
+
+                // Para resultados de datos: bot arriba, cards abajo a todo el ancho
+                if (hasData) {
+                  return (
+                    <div key={i} className="flex flex-col gap-2 w-full">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${theme.primary}20` }}
+                      >
+                        <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+                      </div>
+                      <div className="w-full min-w-0">
+                        <ChatDataView data={msg.rawData!} theme={theme} />
+                      </div>
                     </div>
-                  )}
+                  );
+                }
+
+                // Mensajes de texto: layout horizontal clásico
+                return (
                   <div
-                    className={`${isMaximized ? 'max-w-[70%]' : 'max-w-[80%]'} px-4 py-2 rounded-2xl text-sm ${
-                      msg.role === 'user' ? 'rounded-br-sm' : 'rounded-bl-sm'
-                    } chat-message`}
-                    style={{
-                      backgroundColor: msg.role === 'user' ? theme.primary : theme.backgroundSecondary,
-                      color: msg.role === 'user' ? theme.primaryText : theme.text
-                    }}
-                    {...(msg.role === 'assistant'
-                      ? { dangerouslySetInnerHTML: { __html: processHtml(msg.content) } }
-                      : { children: msg.content }
+                    key={i}
+                    className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {msg.role === 'assistant' && (
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${theme.primary}20` }}
+                      >
+                        <Bot className="h-4 w-4" style={{ color: theme.primary }} />
+                      </div>
                     )}
-                  />
-                  {msg.role === 'user' && (
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: theme.backgroundSecondary }}
+                      className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm ${
+                        msg.role === 'user' ? 'rounded-br-sm' : 'rounded-bl-sm'
+                      } chat-message`}
+                      style={{
+                        backgroundColor: msg.role === 'user' ? theme.primary : theme.backgroundSecondary,
+                        color: msg.role === 'user' ? theme.primaryText : theme.text
+                      }}
                     >
-                      <User className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                      {msg.role === 'user' ? (
+                        msg.content
+                      ) : (
+                        <div dangerouslySetInnerHTML={{ __html: processHtml(msg.content) }} />
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {msg.role === 'user' && (
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: theme.backgroundSecondary }}
+                      >
+                        <User className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               {loading && (
                 <div className="flex gap-2">
                   <div
@@ -692,126 +642,10 @@ export function ChatWidget() {
               </div>
             )}
 
-            {/* Panel de datos crudos (solo maximizado y con datos) */}
-            {isMaximized && lastRawData && lastRawData.length > 0 && (
-              <div
-                className="mx-4 mb-2"
-                style={{ borderTop: `1px solid ${theme.border}` }}
-              >
-                <button
-                  onClick={() => setShowRawData(!showRawData)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-black/5 transition-colors"
-                  style={{ color: theme.textSecondary }}
-                >
-                  <span className="flex items-center gap-2">
-                    <Table2 className="h-4 w-4" />
-                    Ver datos ({lastRawData.length} registros)
-                  </span>
-                  {showRawData ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </button>
-
-                {showRawData && (
-                  <div className="pb-2">
-                    {/* SQL ejecutado */}
-                    {lastSqlQuery && (
-                      <div
-                        className="mx-3 mb-2 p-2 rounded text-xs font-mono overflow-x-auto"
-                        style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-                      >
-                        <span style={{ color: theme.primary }}>SQL:</span> {lastSqlQuery.slice(0, 200)}{lastSqlQuery.length > 200 ? '...' : ''}
-                      </div>
-                    )}
-
-                    {/* Tabla de datos */}
-                    <div className="mx-3 overflow-auto max-h-48 rounded" style={{ border: `1px solid ${theme.border}` }}>
-                      <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr style={{ backgroundColor: theme.backgroundSecondary }}>
-                            {Object.keys(lastRawData[0]).map((col) => (
-                              <th
-                                key={col}
-                                className="px-2 py-1.5 text-left font-semibold whitespace-nowrap"
-                                style={{ borderBottom: `1px solid ${theme.border}`, color: theme.text }}
-                              >
-                                {col}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {lastRawData.slice(0, 20).map((row, idx) => (
-                            <tr key={idx} style={{ borderBottom: `1px solid ${theme.border}` }}>
-                              {Object.values(row).map((val: any, colIdx) => (
-                                <td
-                                  key={colIdx}
-                                  className="px-2 py-1 whitespace-nowrap"
-                                  style={{ color: theme.text }}
-                                >
-                                  {val === null ? <span style={{ color: theme.textSecondary }}>null</span> : String(val)}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Botón exportar */}
-                    <div className="mx-3 mt-2 flex justify-end">
-                      <button
-                        onClick={() => {
-                          const csv = [
-                            Object.keys(lastRawData[0]).join(','),
-                            ...lastRawData.map(row => Object.values(row).map(v => `"${v}"`).join(','))
-                          ].join('\n');
-                          const blob = new Blob([csv], { type: 'text/csv' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `consulta_${new Date().toISOString().slice(0,10)}.csv`;
-                          a.click();
-                        }}
-                        className="flex items-center gap-1 px-2 py-1 text-xs rounded"
-                        style={{ backgroundColor: theme.primary, color: theme.primaryText }}
-                      >
-                        <Download className="h-3 w-3" />
-                        Exportar CSV
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Sugerencias rápidas contextuales (sidebar mode, solo gestores) */}
-            {!isMaximized && canUseDataAssistant && messages.length === 0 && (
-              <div
-                className="px-3 py-2 flex flex-wrap gap-1.5 flex-shrink-0"
-                style={{ borderTop: `1px solid ${theme.border}` }}
-              >
-                <span className="w-full text-[10px] uppercase tracking-wide opacity-60" style={{ color: theme.textSecondary }}>
-                  Sugerencias para esta pantalla
-                </span>
-                {quickPrompts.map((q, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(q)}
-                    className="text-xs px-2.5 py-1 rounded-full transition-colors hover:opacity-80"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      color: theme.text,
-                      border: `1px solid ${theme.border}`,
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Input */}
             <div
-              className="p-4 flex gap-2 flex-shrink-0"
+              className="p-2 flex gap-1.5 flex-shrink-0 items-center min-w-0"
               style={{ borderTop: `1px solid ${theme.border}` }}
             >
               <input
@@ -819,8 +653,8 @@ export function ChatWidget() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder={isMaximized ? "Escribí tu consulta o seleccioná una de la izquierda..." : "Escribe tu mensaje..."}
-                className="flex-1 px-4 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all duration-200"
+                placeholder="Consulta..."
+                className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-1 transition-all"
                 style={{
                   backgroundColor: theme.backgroundSecondary,
                   color: theme.text,
@@ -830,13 +664,13 @@ export function ChatWidget() {
               <button
                 onClick={() => sendMessage()}
                 disabled={!input.trim() || loading}
-                className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
                 style={{
                   backgroundColor: theme.primary,
                   color: theme.primaryText
                 }}
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>

@@ -117,6 +117,38 @@ function FitBoundsToData({ data, onReady }: { data: HeatmapPoint[]; onReady?: ()
   return null;
 }
 
+// Fuerza al mapa a recalcular su tamaño cuando el contenedor cambia de dimensiones.
+// Sin esto, Leaflet solo renderiza tiles en el área que tenía al montarse —
+// si el layout del dashboard se estabiliza después (flex/grid), la mitad
+// inferior queda gris.
+function InvalidateOnResize() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    if (!container) return;
+
+    // Invalidar una vez al montar (por si el tamaño ya es distinto)
+    const initial = setTimeout(() => map.invalidateSize(), 50);
+
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    ro.observe(container);
+
+    const onWinResize = () => map.invalidateSize();
+    window.addEventListener('resize', onWinResize);
+
+    return () => {
+      clearTimeout(initial);
+      ro.disconnect();
+      window.removeEventListener('resize', onWinResize);
+    };
+  }, [map]);
+
+  return null;
+}
+
 // Componente interno que maneja la capa de calor
 function HeatLayer({ data }: { data: HeatmapPoint[] }) {
   const map = useMap();
@@ -521,6 +553,7 @@ export default function HeatmapWidget({
           url={tileUrl}
           attribution='&copy; OSM &copy; CARTO'
         />
+        <InvalidateOnResize />
         <FitBoundsToData data={filteredData} onReady={handleMapReady} />
         <HeatLayer data={filteredData} />
         {showMarkers && <CategoryMarkers data={filteredData} />}

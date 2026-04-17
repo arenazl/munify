@@ -22,6 +22,7 @@ class EmpleadoCreate(BaseModel):
     especialidad: Optional[str] = None
     tipo: str = "operario"  # operario | administrativo
     zona_id: Optional[int] = None
+    municipio_dependencia_id: Optional[int] = None
     capacidad_maxima: int = 10
     categoria_principal_id: Optional[int] = None
     categoria_ids: Optional[List[int]] = None
@@ -34,6 +35,7 @@ class EmpleadoUpdate(BaseModel):
     especialidad: Optional[str] = None
     tipo: Optional[str] = None  # operario | administrativo
     zona_id: Optional[int] = None
+    municipio_dependencia_id: Optional[int] = None
     capacidad_maxima: Optional[int] = None
     activo: Optional[bool] = None
     categoria_principal_id: Optional[int] = None
@@ -57,6 +59,7 @@ class EmpleadoResponse(BaseModel):
     especialidad: Optional[str] = None
     tipo: Optional[str] = "operario"  # operario | administrativo
     zona_id: Optional[int] = None
+    municipio_dependencia_id: Optional[int] = None
     capacidad_maxima: int
     activo: bool
     created_at: datetime

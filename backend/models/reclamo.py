@@ -48,6 +48,10 @@ class Reclamo(Base):
     municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
     dependencia_asignada = relationship("MunicipioDependencia", back_populates="reclamos")
 
+    # Empleado responsable (opcional — puede ser asignado manual o via auto-asignar)
+    empleado_id = Column(Integer, ForeignKey("empleados.id", ondelete="SET NULL"), nullable=True, index=True)
+    empleado = relationship("Empleado", foreign_keys=[empleado_id])
+
     # Programación del trabajo
     fecha_programada = Column(Date, nullable=True)
     hora_inicio = Column(Time, nullable=True)

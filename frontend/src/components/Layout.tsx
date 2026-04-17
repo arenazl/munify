@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -307,7 +307,7 @@ export default function Layout() {
 
   // Anchos dinámicos con medidas relativas para mejor responsividad
   // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
-  const sidebarWidth = isMobile ? '14rem' : (sidebarCollapsed ? '5rem' : '14rem');
+  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4rem' : '10.5rem');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;
@@ -670,7 +670,7 @@ export default function Layout() {
         <div className="hidden lg:flex relative z-10 px-2 py-3 border-t justify-center" style={{ borderColor: `${theme.sidebarTextSecondary}20` }}>
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 rounded-md hover:scale-110 active:scale-95 transition-all w-full flex items-center justify-center gap-2"
+            className="p-2 rounded-md hover:scale-110 active:scale-95 transition-all flex items-center justify-center"
             style={{
               color: theme.sidebarText,
               backgroundColor: `${theme.primary}20`,
@@ -680,20 +680,7 @@ export default function Layout() {
             {sidebarCollapsed ? (
               <ChevronRight className="h-5 w-5" />
             ) : (
-              <>
-                <ChevronLeft className="h-5 w-5" />
-                <span
-                  className="text-sm"
-                  style={{
-                    opacity: isCollapsed ? 0 : 1,
-                    width: isCollapsed ? 0 : 'auto',
-                    overflow: 'hidden',
-                    transition: 'opacity 0.3s, width 0.3s',
-                  }}
-                >
-                  Colapsar
-                </span>
-              </>
+              <ChevronLeft className="h-5 w-5" />
             )}
           </button>
         </div>
@@ -1070,6 +1057,16 @@ export default function Layout() {
 
               {/* Notificaciones */}
               <NotificacionesDropdown />
+
+              {/* Asistente IA */}
+              <button
+                onClick={() => window.dispatchEvent(new Event('munify:toggle-chat'))}
+                className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{ color: theme.primary }}
+                title="Asistente IA"
+              >
+                <Sparkles className="h-4 w-4" strokeWidth={2.5} />
+              </button>
 
               {/* Ajustes */}
               <Link

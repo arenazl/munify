@@ -171,10 +171,11 @@ export function StickyPageHeader({
 
       {/* Header sticky - se pega al top cuando scrolleas */}
       <div
-        className="sticky z-30 top-0 pt-1 pb-3 transition-transform"
+        className="sticky z-40 top-0 pt-1 pb-3 transition-transform"
         style={{
           backgroundColor: theme.background,
           transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
+          boxShadow: '0 4px 12px -8px rgba(0,0,0,0.4)',
         }}
       >
         {/* Parte 1: Header principal */}

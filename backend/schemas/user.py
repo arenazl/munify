@@ -69,6 +69,10 @@ class UserResponse(BaseModel):
     # Super admin = usuario sin municipio asignado (cross-tenant).
     # El frontend lo usa para mostrar/ocultar items del menú admin.
     is_super_admin: bool = False
+    # Nivel de verificacion KYC (0=basico, 1=email, 2=DNI+selfie Didit).
+    # El frontend lo usa para bloquear edicion de campos verificados.
+    nivel_verificacion: int = 0
+    cuenta_verificada: bool = False
 
     class Config:
         from_attributes = True

@@ -108,7 +108,10 @@ interface PageHintProps {
  */
 export default function PageHint({ pageId }: PageHintProps) {
   const hint = PAGE_HINTS[pageId];
-  const storageKey = `hint_dismissed_${pageId}`;
+  // Scopeamos el dismiss al municipio actual — así cada demo arranca con
+  // sus hints visibles aunque el usuario los haya cerrado en otra demo.
+  const muniCodigo = typeof window !== 'undefined' ? localStorage.getItem('municipio_codigo') || 'default' : 'default';
+  const storageKey = `hint_dismissed_${pageId}_${muniCodigo}`;
   const isWizard = !!hint?.steps?.length;
   const accent = ACCENT_STYLES[hint?.accent ?? 'blue'];
 
@@ -122,6 +125,19 @@ export default function PageHint({ pageId }: PageHintProps) {
     setDismissed(localStorage.getItem(storageKey) === 'true');
     setStepIdx(0);
   }, [storageKey]);
+
+  // Si el municipio cambia (ej: el usuario cambia de demo en otra pestaña),
+  // resetear el dismiss para que los hints vuelvan a aparecer.
+  useEffect(() => {
+    const onMuniChanged = () => {
+      const newMuni = localStorage.getItem('municipio_codigo') || 'default';
+      const newKey = `hint_dismissed_${pageId}_${newMuni}`;
+      setDismissed(localStorage.getItem(newKey) === 'true');
+      setStepIdx(0);
+    };
+    window.addEventListener('municipio-changed', onMuniChanged);
+    return () => window.removeEventListener('municipio-changed', onMuniChanged);
+  }, [pageId]);
 
   const steps = hint?.steps ?? [];
   const currentStep: HintStep | undefined = steps[stepIdx];

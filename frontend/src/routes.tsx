@@ -32,6 +32,7 @@ import Gamificacion from './pages/Gamificacion';
 import ReclamoDetalle from './pages/ReclamoDetalle';
 import MisTramites from './pages/MisTramites';
 import MisTasas from './pages/MisTasas';
+import GestionTasas from './pages/GestionTasas';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -44,7 +45,6 @@ import Onboarding from './pages/Onboarding';
 import MunicipioHome from './pages/MunicipioHome';
 import GestionCuadrillas from './pages/GestionCuadrillas';
 import GestionAusencias from './pages/GestionAusencias';
-import GestionHorarios from './pages/GestionHorarios';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
 import AuditLogs from './pages/admin/AuditLogs';
@@ -261,6 +261,11 @@ export const router = createBrowserRouter([
         path: 'mis-tasas',
         element: <MisTasas />
       },
+      // Listado admin de partidas del padrón
+      {
+        path: 'tasas',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionTasas /></ProtectedRoute>
+      },
       // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
       {
         path: 'ajustes',
@@ -283,10 +288,6 @@ export const router = createBrowserRouter([
       {
         path: 'ausencias',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionAusencias /></ProtectedRoute>
-      },
-      {
-        path: 'horarios',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionHorarios /></ProtectedRoute>
       },
       // Planificación Semanal (calendario visual)
       {

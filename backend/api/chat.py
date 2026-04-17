@@ -3,7 +3,7 @@ Chat API con IA.
 Usa el servicio centralizado de chat con fallback automático.
 Implementa sesiones para mantener contexto sin reenviar el system prompt.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sql_func, case
@@ -1295,6 +1295,71 @@ Sin introducciones ni despedidas. Solo la info práctica."""
     return ChatResponse(response="No pude procesar tu pregunta. Intentá de nuevo.")
 
 
+# Cache en memoria para quick prompts (key=ruta normalizada+rol, value=prompts)
+_quick_prompts_cache: dict[str, list[str]] = {}
+
+
+@router.get("/quick-prompts")
+async def get_quick_prompts(
+    route: str = Query(..., description="Path actual del frontend (ej: /gestion/planificacion)"),
+    rol: str = Query("vecino", description="Rol del usuario"),
+):
+    """
+    Genera 5 sugerencias de chat contextuales para la página actual usando IA.
+    Cacheado en memoria (proceso) por ruta+rol — la primera visita paga el costo, las siguientes son instantáneas.
+    """
+    cache_key = f"{route}::{rol}"
+    if cache_key in _quick_prompts_cache:
+        return {"prompts": _quick_prompts_cache[cache_key], "cached": True}
+
+    # Fallback genérico si la IA no está disponible
+    fallback = [
+        "Resumen de reclamos por estado",
+        "¿Cuántos reclamos pendientes hay?",
+        "Trámites activos esta semana",
+        "Top categorías más reportadas",
+        "¿Qué debería priorizar hoy?",
+    ]
+
+    if not chat_service.is_available():
+        return {"prompts": fallback, "cached": False, "ai": False}
+
+    prompt = f"""Sos asistente de un sistema municipal. El usuario (rol: {rol}) está viendo la página: {route}
+
+Generá EXACTAMENTE 5 preguntas cortas (máx 8 palabras cada una) que un usuario en esta página probablemente quiera hacerle al chat para consultar datos de la base.
+
+Reglas:
+- Una por línea, sin numeración, sin viñetas, sin prefijos
+- Específicas al contexto de la URL (ej: si dice "planificacion" → preguntas de agenda/asignaciones; si dice "reclamos" → preguntas sobre reclamos; si dice "tramites" → trámites; etc.)
+- Tono natural en español rioplatense
+- Empezar con verbo o "¿Cuántos/Cuáles..."
+- Sin explicaciones, sin texto extra antes ni después
+
+Solo las 5 líneas."""
+
+    try:
+        response = await chat_service.chat(prompt, max_tokens=200)
+        if not response:
+            return {"prompts": fallback, "cached": False, "ai": False}
+
+        # Parsear: una línea por pregunta, descartar vacías y bullets
+        lineas = [
+            l.strip().lstrip("0123456789.-•* ").strip()
+            for l in response.strip().split("\n")
+            if l.strip()
+        ]
+        prompts = [l for l in lineas if l and len(l) < 80][:5]
+
+        if len(prompts) < 3:
+            return {"prompts": fallback, "cached": False, "ai": False}
+
+        _quick_prompts_cache[cache_key] = prompts
+        return {"prompts": prompts, "cached": False, "ai": True}
+    except Exception as e:
+        print(f"[QUICK PROMPTS] Error: {e}")
+        return {"prompts": fallback, "cached": False, "ai": False}
+
+
 @router.get("/status")
 async def chat_status():
     """Verificar si el servicio de IA está disponible."""
@@ -2146,6 +2211,14 @@ async def execute_dynamic_sql(
     # Reemplazar placeholder de municipio_id
     sql_base = sql.replace("{municipio_id}", str(municipio_id))
 
+    # Fix automático: la IA a veces genera "categorias" en vez de "categorias_reclamo"
+    import re as _re
+    sql_base = _re.sub(
+        r'\bcategorias\b(?!_reclamo|_tramite|_reclamo_sugeridas)',
+        'categorias_reclamo',
+        sql_base,
+    )
+
     # Detectar si el usuario especificó un LIMIT explícito
     limit_match = regex.search(r'\s+LIMIT\s+(\d+)', sql_base, flags=regex.IGNORECASE)
     user_limit = int(limit_match.group(1)) if limit_match else None
@@ -2241,7 +2314,7 @@ SCHEMA DE LA BASE DE DATOS:
 MUNICIPIO_ID ACTUAL: {municipio_id}
 
 REGLAS CRÍTICAS:
-0. La tabla de categorías de reclamo se llama `categorias_reclamo` (NO `categorias`). Los estados de reclamos son SIEMPRE en minúsculas: 'nuevo', 'recibido', 'en_curso', 'finalizado', 'pospuesto', 'rechazado'. NUNCA uses mayúsculas para estados.
+0. La tabla de categorías de reclamo se llama `categorias_reclamo` (NO `categorias`). Los estados de reclamos son SIEMPRE en minúsculas. Estados ACTIVOS (los que existen hoy): 'recibido', 'en_curso', 'pospuesto', 'finalizado', 'rechazado'. Para "pendientes" o "atrasados" usá: estado IN ('recibido', 'en_curso', 'pospuesto'). NUNCA uses 'nuevo', 'asignado', 'en_proceso' — son legacy y no hay datos con esos valores.
 1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. Para filtrar por municipio: verificá en el schema si la tabla tiene columna "municipio_id". Si NO la tiene, buscá "multi_tenant_note" que te indica qué tabla pivote usar.
 2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
 3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()
@@ -2270,7 +2343,7 @@ Usuario: "10 reclamos con más atraso con todos sus datos"
 {{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} ORDER BY r.created_at ASC LIMIT 10", "descripcion": "Los 10 reclamos más antiguos"}}
 
 Usuario: "dame toda la info de los reclamos pendientes"
-{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.estado IN ('nuevo', 'asignado')", "descripcion": "Reclamos pendientes"}}
+{{"sql": "SELECT r.id, r.titulo, r.estado, c.nombre as categoria, r.direccion, r.created_at FROM reclamos r LEFT JOIN categorias_reclamo c ON r.categoria_id = c.id WHERE r.municipio_id = {municipio_id} AND r.estado IN ('recibido', 'en_curso', 'pospuesto')", "descripcion": "Reclamos pendientes"}}
 
 Usuario: "los 5 empleados con más reclamos resueltos"
 {{"sql": "SELECT e.id, e.nombre, COUNT(*) as resueltos FROM empleados e JOIN reclamos r ON r.empleado_id = e.id WHERE e.municipio_id = {municipio_id} AND r.estado = 'resuelto' GROUP BY e.id ORDER BY resueltos DESC LIMIT 5", "descripcion": "Top 5 empleados"}}
@@ -2333,34 +2406,33 @@ DATOS:
         if template_prompt:
             return base_prompt + template_prompt
 
-    # Fallback: formato por defecto (resumen + grilla abajo)
-    default_template = load_template('dashboard')
-    if default_template:
-        return base_prompt + f"""INSTRUCCIONES:
-1. Mostrá TODOS los registros del JSON como cards individuales o mini-tabla. NUNCA resumas N registros en un solo número genérico.
-2. Español rioplatense, respuesta CORTA pero COMPLETA.
-3. HTML con estilos inline.
+    # Fallback: formato compacto para chat floating (360px)
+    return base_prompt + f"""INSTRUCCIONES DE FORMATO (chat compacto, max 360px de ancho):
+1. Respondé en español rioplatense, CORTO y directo.
+2. Mostrá CADA registro del JSON — nunca resumas N filas en un solo número.
+3. Usá HTML SIMPLE y COMPACTO. Nada de cards gigantes, nada de font-size grande.
+4. Para datos agrupados (nombre + cantidad): usá una lista simple.
+5. Para listados (reclamos, trámites): usá mini-tabla compacta.
+6. Al final UNA línea de resumen.
 
-{get_template_prompt('dashboard', total) or ''}
+FORMATO PARA AGRUPADOS (por categoría, por estado, etc):
+<div style="margin:8px 0">
+<div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-card,#1e293b);border:1px solid var(--border-color,#334155);border-radius:6px;margin:3px 0;font-size:13px;color:var(--text-primary,#e2e8f0)"><span>Nombre</span><strong style="color:var(--color-primary,#3b82f6)">N</strong></div>
+</div>
+<p style="font-size:11px;color:var(--text-secondary,#94a3b8);margin-top:8px">Resumen breve</p>
 
-IMPORTANTE: Mostrá CADA registro individualmente, no los agrupes en "X totales"."""
-
-    # Fallback hardcodeado si no hay templates
-    return base_prompt + f"""INSTRUCCIONES:
-1. Mostrá TODOS los datos del JSON como cards individuales o mini-tabla. Si hay 4 categorías, mostrá las 4 con su nombre y cantidad. NUNCA resumas N registros en "X totales" — mostrá cada uno.
-2. Español rioplatense, respuesta CORTA pero COMPLETA con todos los registros.
-3. HTML con estilos inline.
-4. Al final una línea de resumen breve.
-
-CARD POR CADA REGISTRO (usar para datos agrupados — una card por fila):
-<div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0">
-<div style="flex:1;min-width:140px;background:#f8f5f0;border:1px solid #e5e0d8;padding:16px 20px;border-radius:12px;text-align:center"><div style="font-size:28px;font-weight:700;color:#b08d57">CANTIDAD</div><div style="font-size:12px;color:#8b7355;margin-top:2px">Nombre de la categoría/item</div></div>
+FORMATO PARA LISTADOS (reclamos, trámites, empleados):
+<div style="margin:8px 0">
+<div style="padding:8px 10px;border-left:3px solid var(--color-primary,#3b82f6);background:var(--bg-card,#1e293b);border-radius:0 6px 6px 0;margin:4px 0;font-size:12px;color:var(--text-primary,#e2e8f0)"><strong>Título</strong><br><span style="color:var(--text-secondary,#94a3b8)">Estado · Dirección · Fecha</span></div>
 </div>
 
-MINI-TABLA (usar para listados con más columnas):
-<table style="width:100%;border-collapse:collapse;margin:12px 0"><tr style="background:#f8f5f0"><th style="padding:8px;text-align:left;border-bottom:2px solid #e5e0d8;font-size:12px;color:#8b7355">Col1</th><th>Col2</th></tr><tr><td style="padding:8px;border-bottom:1px solid #e5e0d8">dato</td></tr></table>
-
-IMPORTANTE: Mostrá CADA registro del JSON, no los resumas en un solo número."""
+REGLAS DE ESTILO ESTRICTAS:
+- SIEMPRE usá CSS variables: var(--bg-card), var(--color-primary), var(--border-color), var(--text-primary), var(--text-secondary)
+- NUNCA uses colores hardcodeados como #f8f5f0, #b08d57, #5c4d3d
+- NUNCA uses font-size mayor a 14px
+- NUNCA uses padding mayor a 10px
+- NUNCA uses min-width
+- Máximo ancho del contenedor: 320px"""
 
 
 def build_asistente_prompt(

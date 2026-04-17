@@ -1,17 +1,38 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, User, Star, X, Check, Users } from 'lucide-react';
+import { Edit, Trash2, User, Star, X, Check, Users, Clock } from 'lucide-react';
 import { toast } from 'sonner';
-import { empleadosApi, zonasApi, categoriasApi } from '../lib/api';
+import { empleadosApi, zonasApi, categoriasApi, empleadosGestionApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
 import type { Empleado, Zona, Categoria } from '../types';
+
+const DIAS_SEMANA = [
+  { value: 0, label: 'Lunes', short: 'Lun' },
+  { value: 1, label: 'Martes', short: 'Mar' },
+  { value: 2, label: 'Miércoles', short: 'Mié' },
+  { value: 3, label: 'Jueves', short: 'Jue' },
+  { value: 4, label: 'Viernes', short: 'Vie' },
+  { value: 5, label: 'Sábado', short: 'Sáb' },
+  { value: 6, label: 'Domingo', short: 'Dom' },
+];
+
+type HorarioDia = { activo: boolean; hora_entrada: string; hora_salida: string };
+
+const horariosDefault = (): Record<number, HorarioDia> => {
+  const r: Record<number, HorarioDia> = {};
+  DIAS_SEMANA.forEach(d => {
+    r[d.value] = { activo: d.value < 5, hora_entrada: '08:00', hora_salida: '17:00' };
+  });
+  return r;
+};
 
 export default function Empleados() {
   const { theme } = useTheme();
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [dependencias, setDependencias] = useState<Array<{ id: number; nombre: string; color?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -29,9 +50,11 @@ export default function Empleados() {
     tipo: 'operario' as 'operario' | 'administrativo',
     capacidad_maxima: 10,
     zona_id: '',
+    municipio_dependencia_id: '',
     categoria_principal_id: '',
     categoria_ids: [] as number[]
   });
+  const [horariosSemana, setHorariosSemana] = useState<Record<number, HorarioDia>>(horariosDefault);
 
   useEffect(() => {
     fetchData();
@@ -39,14 +62,20 @@ export default function Empleados() {
 
   const fetchData = async () => {
     try {
-      const [empleadosRes, zonasRes, categoriasRes] = await Promise.all([
+      const [empleadosRes, zonasRes, categoriasRes, dependenciasRes] = await Promise.all([
         empleadosApi.getAll(),
         zonasApi.getAll(true),
-        categoriasApi.getAll(true)
+        categoriasApi.getAll(true),
+        dependenciasApi.getMunicipio({ activo: true }).catch(() => ({ data: [] })),
       ]);
       setEmpleados(empleadosRes.data);
       setZonas(zonasRes.data);
       setCategorias(categoriasRes.data);
+      setDependencias((dependenciasRes.data || []).map((d: { id: number; dependencia?: { nombre: string; color?: string }; nombre?: string; color?: string }) => ({
+        id: d.id,
+        nombre: d.dependencia?.nombre || d.nombre || '',
+        color: d.dependencia?.color || d.color,
+      })));
     } catch (error) {
       toast.error('Error al cargar datos');
       console.error('Error:', error);
@@ -55,7 +84,7 @@ export default function Empleados() {
     }
   };
 
-  const openSheet = (empleado: Empleado | null = null) => {
+  const openSheet = async (empleado: Empleado | null = null) => {
     if (empleado) {
       setFormData({
         nombre: empleado.nombre,
@@ -69,10 +98,26 @@ export default function Empleados() {
         tipo: (empleado as any).tipo || 'operario',
         capacidad_maxima: empleado.capacidad_maxima,
         zona_id: empleado.zona_id?.toString() || '',
+        municipio_dependencia_id: empleado.municipio_dependencia_id?.toString() || '',
         categoria_principal_id: empleado.categoria_principal_id?.toString() || '',
         categoria_ids: empleado.categorias?.map(c => c.id) || []
       });
       setSelectedEmpleado(empleado);
+      // Cargar horarios existentes del empleado
+      try {
+        const res = await empleadosGestionApi.getHorarios({ empleado_id: empleado.id });
+        const semana = horariosDefault();
+        (res.data || []).forEach((h: { dia_semana: number; hora_entrada: string; hora_salida: string; activo: boolean }) => {
+          semana[h.dia_semana] = {
+            activo: h.activo,
+            hora_entrada: h.hora_entrada?.slice(0, 5) || '08:00',
+            hora_salida: h.hora_salida?.slice(0, 5) || '17:00',
+          };
+        });
+        setHorariosSemana(semana);
+      } catch {
+        setHorariosSemana(horariosDefault());
+      }
     } else {
       setFormData({
         nombre: '',
@@ -86,9 +131,11 @@ export default function Empleados() {
         tipo: 'operario',
         capacidad_maxima: 10,
         zona_id: '',
+        municipio_dependencia_id: '',
         categoria_principal_id: '',
         categoria_ids: []
       });
+      setHorariosSemana(horariosDefault());
       setSelectedEmpleado(null);
     }
     setSheetOpen(true);
@@ -118,6 +165,7 @@ export default function Empleados() {
       tipo: formData.tipo,
       capacidad_maxima: formData.capacidad_maxima,
       zona_id: formData.zona_id ? parseInt(formData.zona_id) : null,
+      municipio_dependencia_id: formData.municipio_dependencia_id ? parseInt(formData.municipio_dependencia_id) : null,
       categoria_principal_id: formData.categoria_principal_id ? parseInt(formData.categoria_principal_id) : null,
       categoria_ids: formData.categoria_ids
     };
@@ -130,13 +178,32 @@ export default function Empleados() {
     }
 
     try {
+      let empleadoId: number;
       if (selectedEmpleado) {
         await empleadosApi.update(selectedEmpleado.id, payload);
+        empleadoId = selectedEmpleado.id;
         toast.success('Empleado actualizado correctamente');
       } else {
-        await empleadosApi.create(payload);
+        const res = await empleadosApi.create(payload);
+        empleadoId = (res.data as { id: number }).id;
         toast.success('Empleado creado correctamente');
       }
+
+      // Guardar horarios de la semana
+      try {
+        const horariosArray = DIAS_SEMANA.map(d => ({
+          empleado_id: empleadoId,
+          dia_semana: d.value,
+          hora_entrada: horariosSemana[d.value].hora_entrada,
+          hora_salida: horariosSemana[d.value].hora_salida,
+          activo: horariosSemana[d.value].activo,
+        }));
+        await empleadosGestionApi.setHorariosSemana(empleadoId, horariosArray);
+      } catch (e) {
+        console.error('Error guardando horarios:', e);
+        toast.error('Empleado guardado, pero falló guardar horarios');
+      }
+
       fetchData();
       closeSheet();
     } catch (error) {
@@ -452,6 +519,14 @@ export default function Empleados() {
             />
           </div>
 
+          <ABMSelect
+            label="Dependencia"
+            value={formData.municipio_dependencia_id}
+            onChange={(e) => setFormData({ ...formData, municipio_dependencia_id: e.target.value })}
+            placeholder={dependencias.length === 0 ? 'Sin dependencias disponibles' : 'Sin dependencia asignada'}
+            options={dependencias.map(d => ({ value: d.id, label: d.nombre }))}
+          />
+
           {/* Selector de Especialidades (Categorias) */}
           <div>
             <label className="block text-sm font-medium mb-2" style={{ color: theme.text }}>
@@ -533,6 +608,79 @@ export default function Empleados() {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Horarios de trabajo por día */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: theme.text }}>
+              <Clock className="h-4 w-4" />
+              Horarios de trabajo
+            </label>
+            <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>
+              Activá los días que trabaja y definí los horarios de entrada/salida.
+            </p>
+            <div className="rounded-lg p-2 space-y-1" style={{ backgroundColor: theme.backgroundSecondary }}>
+              {DIAS_SEMANA.map(d => {
+                const h = horariosSemana[d.value];
+                return (
+                  <div
+                    key={d.value}
+                    className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors"
+                    style={{
+                      backgroundColor: h.activo ? theme.card : 'transparent',
+                      border: `1px solid ${h.activo ? theme.border : 'transparent'}`,
+                    }}
+                  >
+                    <label className="flex items-center gap-2 w-24 cursor-pointer flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={h.activo}
+                        onChange={(e) => setHorariosSemana(prev => ({
+                          ...prev,
+                          [d.value]: { ...prev[d.value], activo: e.target.checked },
+                        }))}
+                        className="h-4 w-4 rounded cursor-pointer"
+                        style={{ accentColor: theme.primary }}
+                      />
+                      <span className="text-sm" style={{ color: h.activo ? theme.text : theme.textSecondary }}>
+                        {d.label}
+                      </span>
+                    </label>
+                    <input
+                      type="time"
+                      value={h.hora_entrada}
+                      disabled={!h.activo}
+                      onChange={(e) => setHorariosSemana(prev => ({
+                        ...prev,
+                        [d.value]: { ...prev[d.value], hora_entrada: e.target.value },
+                      }))}
+                      className="flex-1 rounded px-2 py-1 text-sm transition-colors disabled:opacity-40 focus:outline-none"
+                      style={{
+                        backgroundColor: theme.background,
+                        color: theme.text,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    />
+                    <span className="text-xs" style={{ color: theme.textSecondary }}>a</span>
+                    <input
+                      type="time"
+                      value={h.hora_salida}
+                      disabled={!h.activo}
+                      onChange={(e) => setHorariosSemana(prev => ({
+                        ...prev,
+                        [d.value]: { ...prev[d.value], hora_salida: e.target.value },
+                      }))}
+                      className="flex-1 rounded px-2 py-1 text-sm transition-colors disabled:opacity-40 focus:outline-none"
+                      style={{
+                        backgroundColor: theme.background,
+                        color: theme.text,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {selectedEmpleado && selectedEmpleado.miembros && selectedEmpleado.miembros.length > 0 && (
