@@ -12,6 +12,7 @@ import { useSuperAdmin } from '../hooks/useSuperAdmin';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
 import { MapPicker } from '../components/ui/MapPicker';
+import PageHint from '../components/ui/PageHint';
 
 interface Dependencia {
   id: number;
@@ -554,6 +555,9 @@ export default function DependenciasConfig() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: theme.background }}>
+      <div className="px-3 sm:px-6 pt-3">
+        <PageHint pageId="dependencias-config" />
+      </div>
       {/* Header sticky */}
       <StickyPageHeader
         icon={isSuperAdmin ? <BookOpen className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
@@ -589,7 +593,7 @@ export default function DependenciasConfig() {
               <button
                 key={tab.key}
                 onClick={() => { setMainTab(tab.key); setSearchTerm(''); }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap flex-shrink-0 ${
                   mainTab === tab.key ? 'shadow-sm' : 'hover:opacity-80'
                 }`}
                 style={{

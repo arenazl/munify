@@ -215,14 +215,17 @@ export default function SLA() {
 
   return (
     <div className="space-y-6">
+      <div className="px-3 sm:px-6 pt-3">
+        <PageHint pageId="sla" />
+      </div>
+
       <StickyPageHeader
         icon={<Clock className="h-5 w-5" />}
         title="Gestión de SLA"
+        backLink="/gestion/ajustes"
         buttonLabel="Nueva Config"
         onButtonClick={() => setShowForm(true)}
       />
-
-      <PageHint pageId="sla" />
 
       {/* Resumen Cards */}
       {resumen && (

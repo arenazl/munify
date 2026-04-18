@@ -108,15 +108,21 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
         print(f"  [SKIP] Sin vecinos")
         return 0, 0
 
-    # Barrios del municipio (con coords)
+    # Barrios del municipio (id + nombre + coords) — id va al FK del reclamo
     r = await db.execute(text("""
-        SELECT nombre, latitud, longitud FROM barrios
+        SELECT id, nombre, latitud, longitud FROM barrios
         WHERE municipio_id = :mid AND latitud IS NOT NULL
     """), {"mid": muni_id})
     barrios = r.fetchall()
     if not barrios:
         print(f"  [SKIP] Sin barrios")
         return 0, 0
+
+    # Zonas del municipio — opcional, solo el id (random pool para reclamos)
+    r = await db.execute(text("""
+        SELECT id FROM zonas WHERE municipio_id = :mid
+    """), {"mid": muni_id})
+    zonas_ids = [row[0] for row in r.fetchall()]
 
     # Categorias de tramite del municipio
     r = await db.execute(text("""
@@ -125,7 +131,7 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
     """), {"mid": muni_id})
     cat_tramite = [(row[0], row[1]) for row in r.fetchall()]
 
-    print(f"  - {len(categorias)} categorias reclamo, {len(vecinos)} vecinos, {len(barrios)} barrios, {len(cat_tramite)} cats tramite")
+    print(f"  - {len(categorias)} categorias reclamo, {len(vecinos)} vecinos, {len(barrios)} barrios, {len(zonas_ids)} zonas, {len(cat_tramite)} cats tramite")
 
     # =================== 10 RECLAMOS ===================
     reclamos_creados = 0
@@ -144,7 +150,8 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
         titulo = random.choice(cat_data["titulos"])
         descripcion = random.choice(cat_data["descripciones"])
 
-        barrio_nombre, barrio_lat, barrio_lon = random.choice(barrios)
+        barrio_id, barrio_nombre, barrio_lat, barrio_lon = random.choice(barrios)
+        zona_id = random.choice(zonas_ids) if zonas_ids else None
         calle = random.choice(CALLES_GENERICAS)
         numero = random.randint(100, 3500)
         direccion = f"{calle} {numero}, {barrio_nombre}, {muni_nombre}"
@@ -163,12 +170,14 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
                 municipio_id, titulo, descripcion, direccion,
                 latitud, longitud, estado, prioridad,
                 categoria_id, creador_id, municipio_dependencia_id,
+                barrio_id, zona_id,
                 fecha_recibido, fecha_resolucion, resolucion,
                 created_at, updated_at
             ) VALUES (
                 :mid, :titulo, :descripcion, :direccion,
                 :lat, :lon, :estado, :prioridad,
                 :cat_id, :creador_id, :muni_dep_id,
+                :barrio_id, :zona_id,
                 :fecha_recibido, :fecha_resolucion, :resolucion,
                 :created_at, :created_at
             )
@@ -184,6 +193,8 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
             "cat_id": cat_id,
             "creador_id": random.choice(vecinos),
             "muni_dep_id": cat_to_dep.get(cat_id),
+            "barrio_id": barrio_id,
+            "zona_id": zona_id,
             "fecha_recibido": fecha_recibido,
             "fecha_resolucion": fecha_resolucion,
             "resolucion": resolucion,

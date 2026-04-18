@@ -401,21 +401,47 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Trigger sutil: línea fina invisible al borde derecho que abre el panel
-          al pasar el mouse. Sin botón flotante visible (se removió a pedido). */}
+      {/* Trigger lateral: barrita vertical con ícono + label "ASISTENTE IA".
+          Visible cuando el panel está cerrado, oculta cuando está abierto.
+          Hover abre el panel; click ancla. */}
       <div
         onMouseEnter={() => setIsHovered(true)}
-        className="fixed right-0 top-0 bottom-0 transition-opacity"
+        onClick={() => setIsPinned(true)}
+        className="fixed right-0 top-0 bottom-0 transition-all flex flex-col items-center pt-4 group"
         style={{
           zIndex: isOpen ? 29 : 50,
-          width: '6px',
-          background: 'transparent',
-          opacity: 0,
+          width: isOpen ? '4px' : '20px',
+          background: isOpen
+            ? theme.primary
+            : `linear-gradient(180deg, ${theme.primary} 0%, ${theme.primary}cc 100%)`,
+          opacity: isOpen ? 0 : 1,
           pointerEvents: isOpen ? 'none' : 'auto',
           cursor: 'pointer',
+          boxShadow: isOpen ? 'none' : `-4px 0 14px ${theme.primary}55`,
         }}
-        title="Pasá el mouse para abrir el asistente IA"
-      />
+        title="Asistente IA — hover para abrir, click para anclar"
+      >
+        {!isOpen && (
+          <Sparkles
+            className="h-4 w-4 transition-transform group-hover:scale-110"
+            style={{ color: theme.primaryText || '#ffffff' }}
+            strokeWidth={2.5}
+          />
+        )}
+        {!isOpen && (
+          <span
+            className="mt-3 text-[10px] font-bold tracking-wider opacity-90"
+            style={{
+              color: theme.primaryText || '#ffffff',
+              writingMode: 'vertical-rl',
+              transform: 'rotate(180deg)',
+              letterSpacing: '0.18em',
+            }}
+          >
+            ASISTENTE IA
+          </span>
+        )}
+      </div>
 
 
       {/* Panel lateral con slide-in desde la derecha. Siempre renderizado para

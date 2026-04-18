@@ -240,6 +240,7 @@ export default function GestionAusencias() {
     <ABMPage
       title="Ausencias"
       icon={<CalendarX2 className="h-5 w-5" />}
+      backLink="/gestion/ajustes"
       buttonLabel="Nueva Ausencia"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar por empleado o tipo..."

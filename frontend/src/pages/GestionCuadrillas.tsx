@@ -202,6 +202,7 @@ export default function GestionCuadrillas() {
       <ABMPage
       title="Cuadrillas"
       icon={<Users className="h-5 w-5" />}
+      backLink="/gestion/ajustes"
       buttonLabel="Asignar Empleado"
       buttonIcon={<UserPlus className="h-4 w-4" />}
       onAdd={() => openSheet()}

@@ -871,6 +871,10 @@ async def seed_demo_completo(
     #   paso B: agregar todos los historiales referenciando esos ids.
     reclamos_creados_list: list[Reclamo] = []
     historiales_data: list[tuple[int, list[dict]]] = []  # (idx_reclamo_en_lista, historial_dicts)
+    import random as _random_rec
+    _zonas_pool = list(zonas.values())
+    _barrios_pool = list(barrios.values())
+    _muni_deps_pool = list(muni_deps.values())
     for r_data in RECLAMOS_DEMO:
         cat = cats_reclamo.get(r_data["categoria_nombre"])
         if not cat:
@@ -878,6 +882,15 @@ async def seed_demo_completo(
         muni_dep = muni_deps.get(r_data["dependencia_codigo"])
         zona = zonas.get(r_data["zona_nombre"])
         barrio = barrios.get(r_data["barrio_nombre"])
+
+        # Fallback random si el match por nombre no devolvió nada — evita
+        # quedar con FKs en NULL que rompen las queries agrupadas.
+        if zona is None and _zonas_pool:
+            zona = _random_rec.choice(_zonas_pool)
+        if barrio is None and _barrios_pool:
+            barrio = _random_rec.choice(_barrios_pool)
+        if muni_dep is None and _muni_deps_pool:
+            muni_dep = _random_rec.choice(_muni_deps_pool)
 
         reclamo = Reclamo(
             municipio_id=municipio_id,
@@ -956,7 +969,9 @@ async def seed_demo_completo(
             )
             _dni_sol = _dni_demo if es_del_vecino else str(30_000_000 + (_sh % 18_000_000))
 
-            # Buscar dep asignada para este trámite
+            # Buscar dep asignada para este trámite. Si no hay match, fallback
+            # a una dependencia random del muni para no dejar la solicitud
+            # huérfana (causaba que las queries por dependencia las omitieran).
             dep_id_sol = None
             if t_idx < len(TRAMITES_DEMO):
                 dep_code = TRAMITES_DEMO[t_idx].get("dep_codigo")
@@ -964,6 +979,9 @@ async def seed_demo_completo(
                     muni_dep_obj = muni_deps.get(dep_code)
                     if muni_dep_obj:
                         dep_id_sol = muni_dep_obj.id
+            if dep_id_sol is None and muni_deps:
+                import random as _random
+                dep_id_sol = _random.choice(list(muni_deps.values())).id
 
             numero = f"SOL-{_year}-{(_sol_offset + sol_idx + 1):05d}"
             sol = Solicitud(

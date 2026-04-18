@@ -642,7 +642,13 @@ export default function TramitesConfig() {
 
   return (
     <div className="h-full flex flex-col">
+      {/* Hint SIEMPRE arriba de todo (consistencia con otras pantallas de settings) */}
+      <div className="px-3 sm:px-6 pt-3">
+        <PageHint pageId="tramites-config" />
+      </div>
+
       <StickyPageHeader
+        backLink="/gestion/ajustes"
         icon={<FileText className="h-5 w-5" />}
         title="Trámites"
         searchValue={search}
@@ -654,7 +660,7 @@ export default function TramitesConfig() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <button
               onClick={() => setFiltroCategoria(null)}
-              className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors"
+              className="px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0"
               style={{
                 backgroundColor: filtroCategoria === null ? theme.primary : theme.backgroundSecondary,
                 color: filtroCategoria === null ? '#fff' : theme.text,
@@ -666,7 +672,7 @@ export default function TramitesConfig() {
               <button
                 key={c.id}
                 onClick={() => setFiltroCategoria(c.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0"
                 style={{
                   backgroundColor: filtroCategoria === c.id ? c.color || theme.primary : theme.backgroundSecondary,
                   color: filtroCategoria === c.id ? '#fff' : theme.text,
@@ -681,7 +687,6 @@ export default function TramitesConfig() {
       />
 
       <div className="flex-1 overflow-y-auto p-6">
-        <PageHint pageId="tramites-config" />
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />

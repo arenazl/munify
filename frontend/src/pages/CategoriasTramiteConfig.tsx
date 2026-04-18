@@ -3,6 +3,7 @@ import { categoriasTramiteApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Info } from 'lucide-react';
+import PageHint from '../components/ui/PageHint';
 
 export default function CategoriasTramiteConfig() {
   const { theme } = useTheme();
@@ -10,6 +11,9 @@ export default function CategoriasTramiteConfig() {
 
   return (
     <div className="h-full flex flex-col">
+      <div className="px-3 sm:px-6 pt-3">
+        <PageHint pageId="categorias-tramite-config" />
+      </div>
       {/* Banner de ayuda para UX */}
       <div 
         className="shrink-0 p-4" 

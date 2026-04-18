@@ -241,6 +241,7 @@ export function CategoriaConfigBase({ title, api, showReclamoFields = false, ena
   return (
     <div className="h-full flex flex-col">
       <StickyPageHeader
+        backLink="/gestion/ajustes"
         title={title}
         searchValue={search}
         onSearchChange={setSearch}

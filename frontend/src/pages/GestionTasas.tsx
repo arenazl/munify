@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { tasasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { ABMPage } from '../components/ui/ABMPage';
 import type { Partida, TipoTasa } from '../types';
 
 /**
@@ -57,66 +57,71 @@ export default function GestionTasas() {
     return { totalMonto, conDeuda, total: partidas.length };
   }, [partidas]);
 
-  return (
-    <div className="space-y-4">
-      <StickyPageHeader
-        backLink="/gestion/ajustes"
-        icon={<Wallet className="h-5 w-5" />}
-        title="Tasas"
-        searchPlaceholder="Buscar por identificador, DNI o titular..."
-        searchValue={searchInput}
-        onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}
-        filterPanel={
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-            <button
-              onClick={() => setTipoFiltro(null)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03]"
-              style={{
-                backgroundColor: tipoFiltro === null ? `${theme.primary}20` : 'transparent',
-                color: tipoFiltro === null ? theme.primary : theme.textSecondary,
-                border: `1.5px solid ${tipoFiltro === null ? theme.primary : theme.border}`,
-              }}
-            >
-              Todas
-              <span className="text-[10px] font-bold opacity-80">{partidas.length}</span>
-            </button>
-            {tipos.map(t => {
-              const isActive = tipoFiltro === t.id;
-              const cnt = partidas.filter(p => p.tipo_tasa?.id === t.id).length;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => setTipoFiltro(t.id)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03]"
-                  style={{
-                    background: isActive
-                      ? `linear-gradient(135deg, ${t.color}, ${t.color}dd)`
-                      : `${t.color}12`,
-                    border: `1px solid ${isActive ? t.color : `${t.color}40`}`,
-                    color: isActive ? '#ffffff' : theme.text,
-                  }}
-                >
-                  <DynamicIcon name={t.icono} className="h-3 w-3" style={{ color: isActive ? '#ffffff' : t.color }} />
-                  <span className="whitespace-nowrap">{t.nombre}</span>
-                  {cnt > 0 && (
-                    <span
-                      className="text-[10px] font-bold px-1 rounded-full"
-                      style={{
-                        backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${t.color}25`,
-                        color: isActive ? '#ffffff' : t.color,
-                      }}
-                    >
-                      {cnt}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        }
-      />
+  // Chips de tipos de tasa — barra horizontal scrolleable abajo del header
+  const chipsBar = (
+    <div className="flex gap-1.5 overflow-x-auto pb-1 px-1 scrollbar-hide">
+      <button
+        onClick={() => setTipoFiltro(null)}
+        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03] whitespace-nowrap"
+        style={{
+          backgroundColor: tipoFiltro === null ? `${theme.primary}20` : 'transparent',
+          color: tipoFiltro === null ? theme.primary : theme.textSecondary,
+          border: `1.5px solid ${tipoFiltro === null ? theme.primary : theme.border}`,
+        }}
+      >
+        Todas
+        <span className="text-[10px] font-bold opacity-80">{partidas.length}</span>
+      </button>
+      {tipos.map(t => {
+        const isActive = tipoFiltro === t.id;
+        const cnt = partidas.filter(p => p.tipo_tasa?.id === t.id).length;
+        return (
+          <button
+            key={t.id}
+            onClick={() => setTipoFiltro(t.id)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03] whitespace-nowrap"
+            style={{
+              background: isActive
+                ? `linear-gradient(135deg, ${t.color}, ${t.color}dd)`
+                : `${t.color}12`,
+              border: `1px solid ${isActive ? t.color : `${t.color}40`}`,
+              color: isActive ? '#ffffff' : theme.text,
+            }}
+          >
+            <DynamicIcon name={t.icono} className="h-3 w-3" style={{ color: isActive ? '#ffffff' : t.color }} />
+            <span>{t.nombre}</span>
+            {cnt > 0 && (
+              <span
+                className="text-[10px] font-bold px-1 rounded-full"
+                style={{
+                  backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${t.color}25`,
+                  color: isActive ? '#ffffff' : t.color,
+                }}
+              >
+                {cnt}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 
-      <div className="px-3 sm:px-6 space-y-4 max-w-5xl mx-auto">
+  const isEmpty = !loading && partidas.length === 0;
+
+  return (
+    <ABMPage
+      title="Tasas"
+      icon={<Wallet className="h-5 w-5" />}
+      searchPlaceholder="Buscar por identificador, DNI o titular..."
+      searchValue={searchInput}
+      onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}
+      secondaryFilters={chipsBar}
+      loading={loading}
+      isEmpty={isEmpty}
+      emptyMessage="No hay partidas cargadas. Importá el padrón desde Ajustes para empezar."
+    >
+      <div className="space-y-4 max-w-5xl mx-auto">
         {/* Resumen */}
         {!loading && partidas.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -145,13 +150,7 @@ export default function GestionTasas() {
         )}
 
         {/* Lista */}
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.primary }} />
-          </div>
-        ) : partidas.length === 0 ? (
-          <EmptyState theme={theme} hasFilter={!!(tipoFiltro || searchQuery)} />
-        ) : (
+        {!loading && partidas.length > 0 && (
           <div className="space-y-2">
             {partidas.map(p => (
               <PartidaRow key={p.id} partida={p} theme={theme} />
@@ -159,7 +158,7 @@ export default function GestionTasas() {
           </div>
         )}
       </div>
-    </div>
+    </ABMPage>
   );
 }
 

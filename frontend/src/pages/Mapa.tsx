@@ -5,9 +5,10 @@ import { X, MapPin, Calendar, User, Tag, Clock, Navigation, Map as MapIcon } fro
 import { useTheme } from '../contexts/ThemeContext';
 
 // URLs de tiles para tema claro y oscuro
+// Voyager = mucho más detalle de calles, nombres y POIs que light_all/dark_all
 const TILE_URLS = {
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
 };
 import { reclamosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
