@@ -2208,7 +2208,7 @@ async def confirmar_reclamo_vecino(
             detail="Este reclamo ya fue confirmado anteriormente"
         )
 
-    # Guardar confirmación
+    # Guardar confirmación (el estado no cambia — queda finalizado)
     from datetime import datetime
     reclamo.confirmado_vecino = data.solucionado
     reclamo.fecha_confirmacion_vecino = datetime.now()
@@ -2224,7 +2224,7 @@ async def confirmar_reclamo_vecino(
         reclamo_id=reclamo.id,
         usuario_id=current_user.id,
         estado_anterior=reclamo.estado,
-        estado_nuevo=reclamo.estado,  # No cambia el estado
+        estado_nuevo=reclamo.estado,  # El estado no cambia
         accion=accion,
         comentario=comentario_historial
     )
@@ -2232,9 +2232,31 @@ async def confirmar_reclamo_vecino(
 
     await db.commit()
 
+    # Notificar a supervisores cuando el vecino rechaza la resolución
+    if not data.solucionado:
+        try:
+            from services.notificacion_service import NotificacionService
+            vecino_nombre = f"{current_user.nombre} {current_user.apellido or ''}".strip()
+            mensaje_sup = (
+                f"El vecino {vecino_nombre} indica que el problema del reclamo "
+                f"#{reclamo.id} '{reclamo.titulo}' sigue sin resolverse. "
+                f"Comentario: {data.comentario or '(sin comentario)'}."
+            )
+            await NotificacionService.notificar_supervisores(
+                db=db,
+                municipio_id=reclamo.municipio_id,
+                titulo="Vecino indica que el problema persiste",
+                mensaje=mensaje_sup,
+                tipo="warning",
+                reclamo_id=reclamo.id,
+                enviar_whatsapp=True,
+            )
+        except Exception as e:
+            logging.error(f"Error notificando rechazo vecino reclamo {reclamo.id}: {e}")
+
     return {
         "success": True,
-        "message": "Gracias por tu confirmación" if data.solucionado else "Lamentamos que el problema persista. Tu feedback fue registrado.",
+        "message": "Gracias por tu confirmación" if data.solucionado else "Lamentamos que el problema persista. Tu feedback fue registrado y el equipo fue notificado.",
         "confirmado_vecino": data.solucionado,
         "fecha_confirmacion": reclamo.fecha_confirmacion_vecino.isoformat()
     }
