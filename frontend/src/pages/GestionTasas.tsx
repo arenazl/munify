@@ -93,8 +93,8 @@ export default function GestionTasas() {
           />
         }
       >
-        {/* Resumen */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        {/* Resumen — col-span-full porque ABMPage envuelve children en grid 1/2/3 cols */}
+        <div className="col-span-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
           <ResumenCard
             icon={<Receipt className="h-4 w-4" />}
             label="Partidas"
@@ -118,8 +118,8 @@ export default function GestionTasas() {
           />
         </div>
 
-        {/* Lista */}
-        <div className="space-y-2">
+        {/* Lista — también col-span-full para ocupar todo el ancho */}
+        <div className="col-span-full space-y-2">
           {partidas.map(p => (
             <PartidaRow key={p.id} partida={p} theme={theme} />
           ))}
