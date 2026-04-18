@@ -3510,7 +3510,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMCollapsible>
         )}
 
-        {motivoRechazo && selectedReclamo.estado === 'nuevo' && (
+        {motivoRechazo && ['nuevo', 'recibido', 'asignado', 'en_curso', 'en_proceso', 'pospuesto'].includes(selectedReclamo.estado) && (
           <ABMInfoPanel
             title="Rechazar Reclamo"
             icon={<XCircle className="h-4 w-4" />}
