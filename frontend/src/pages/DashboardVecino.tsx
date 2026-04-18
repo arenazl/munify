@@ -23,6 +23,7 @@ function RecIcono({ nombre, color }: { nombre: string; color: string }) {
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationPrompt from '../components/NotificationPrompt';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import type { Reclamo, EstadoReclamo } from '../types';
 
 interface MisEstadisticas {
@@ -329,6 +330,7 @@ export default function DashboardVecino() {
   ];
 
   return (
+    <PullToRefresh onRefresh={async () => { await fetchData(); }}>
     <div className="space-y-6">
       <NotificationPrompt delay={2000} />
 
@@ -933,6 +935,7 @@ export default function DashboardVecino() {
         </div>
       </div>
     </div>
+    </PullToRefresh>
   );
 }
 

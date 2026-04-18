@@ -26,6 +26,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMCard, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import type { Solicitud, EstadoSolicitud } from '../types';
@@ -693,7 +694,7 @@ export default function MisTramites() {
   ];
 
   return (
-    <>
+    <PullToRefresh onRefresh={async () => { await loadTramites(); await loadTramiteTypesCount(); }}>
       <ABMPage
         title="Mis Trámites"
         buttonLabel={showNewTramiteButton ? 'Nuevo Trámite' : undefined}
@@ -1019,7 +1020,7 @@ export default function MisTramites() {
         onClose={() => setWizardOpen(false)}
         onSuccess={handleWizardSuccess}
       />
-    </>
+    </PullToRefresh>
   );
 }
 

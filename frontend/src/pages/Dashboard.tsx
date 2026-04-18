@@ -24,6 +24,7 @@ import {
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import PageHint from '../components/ui/PageHint';
 import DashboardLive from '../components/DashboardLive';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { Radio } from 'lucide-react';
 
 // Tipos para analytics
@@ -145,6 +146,13 @@ export default function Dashboard() {
   // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
   const [liveMode, setLiveMode] = useState(false);
 
+  // Pull-to-refresh: refreshKey fuerza re-fetch cuando el usuario tira hacia abajo
+  const [refreshKey, setRefreshKey] = useState(0);
+  const handleRefresh = useCallback(async () => {
+    setRefreshKey(k => k + 1);
+    await new Promise(r => setTimeout(r, 800));
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -255,7 +263,7 @@ export default function Dashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [refreshKey]);
 
   if (loading) {
     return (
@@ -435,6 +443,7 @@ export default function Dashboard() {
   const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
       <PageHint pageId="dashboard-home" />
 
@@ -1324,5 +1333,6 @@ export default function Dashboard() {
         heatmapData={heatmapData}
       />
     </div>
+    </PullToRefresh>
   );
 }

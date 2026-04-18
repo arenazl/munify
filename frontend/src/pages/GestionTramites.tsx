@@ -36,6 +36,7 @@ import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizar
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import PageHint from '../components/ui/PageHint';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
@@ -1381,7 +1382,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   );
 
   return (
-    <>
+    <PullToRefresh onRefresh={async () => { await loadData(); }}>
       <PageHint pageId="tramites-list" />
       <ABMPage
         title="Trámites"
@@ -2278,6 +2279,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           }}
         />
       )}
-    </>
+    </PullToRefresh>
   );
 }

@@ -6,6 +6,7 @@ import { reclamosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { ABMPage, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, DynamicIcon, estadoColors, estadoLabels } from '../components/ui/ReclamoCard';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
@@ -963,7 +964,7 @@ export default function MisReclamos() {
   ];
 
   return (
-    <>
+    <PullToRefresh onRefresh={async () => { await fetchData(); }}>
       <ABMPage
         title="Mis Reclamos"
         buttonLabel="Nuevo Reclamo"
@@ -1032,6 +1033,6 @@ export default function MisReclamos() {
         {renderCalificarContent()}
       </Sheet>
 
-    </>
+    </PullToRefresh>
   );
 }

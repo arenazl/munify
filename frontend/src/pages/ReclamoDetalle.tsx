@@ -12,6 +12,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { DynamicIcon } from '../components/ui/ReclamoCard';
+import { PullToRefresh } from '../components/ui/PullToRefresh';
 import type { Reclamo, HistorialReclamo, EstadoReclamo } from '../types';
 
 interface WhatsAppLog {
@@ -268,42 +269,44 @@ export default function ReclamoDetalle() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [reclamoRes, historialRes] = await Promise.all([
-          reclamosApi.getOne(Number(id)),
-          reclamosApi.getHistorial(Number(id)),
-        ]);
-        setReclamo(reclamoRes.data);
-        setHistorial(historialRes.data);
+  const fetchData = async () => {
+    try {
+      const [reclamoRes, historialRes] = await Promise.all([
+        reclamosApi.getOne(Number(id)),
+        reclamosApi.getHistorial(Number(id)),
+      ]);
+      setReclamo(reclamoRes.data);
+      setHistorial(historialRes.data);
 
-        // Cargar logs de WhatsApp (puede fallar si no hay permisos, ignorar)
-        try {
-          const logsRes = await whatsappApi.getLogsByReclamo(Number(id));
-          setWhatsappLogs(logsRes.data);
-        } catch {
-          // Ignorar errores de logs de WhatsApp
-        }
-      } catch (err: unknown) {
-        console.error('Error cargando reclamo:', err);
-        if (err && typeof err === 'object' && 'response' in err) {
-          const axiosError = err as { response?: { status?: number } };
-          if (axiosError.response?.status === 403) {
-            setError('No tienes permiso para ver este reclamo');
-          } else if (axiosError.response?.status === 404) {
-            setError('Reclamo no encontrado');
-          } else {
-            setError('Error al cargar el reclamo');
-          }
+      // Cargar logs de WhatsApp (puede fallar si no hay permisos, ignorar)
+      try {
+        const logsRes = await whatsappApi.getLogsByReclamo(Number(id));
+        setWhatsappLogs(logsRes.data);
+      } catch {
+        // Ignorar errores de logs de WhatsApp
+      }
+    } catch (err: unknown) {
+      console.error('Error cargando reclamo:', err);
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { status?: number } };
+        if (axiosError.response?.status === 403) {
+          setError('No tienes permiso para ver este reclamo');
+        } else if (axiosError.response?.status === 404) {
+          setError('Reclamo no encontrado');
         } else {
           setError('Error al cargar el reclamo');
         }
-      } finally {
-        setLoading(false);
+      } else {
+        setError('Error al cargar el reclamo');
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Combinar historial y logs de WhatsApp en un timeline unificado
@@ -385,6 +388,7 @@ export default function ReclamoDetalle() {
   const EstadoIcon = estadoActual.icon;
 
   return (
+    <PullToRefresh onRefresh={async () => { await fetchData(); }}>
     <div className="space-y-6">
       <StickyPageHeader
         icon={<ClipboardList className="h-5 w-5" />}
@@ -1042,5 +1046,6 @@ export default function ReclamoDetalle() {
         </div>
       </div>
     </div>
+    </PullToRefresh>
   );
 }
