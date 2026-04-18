@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Loader2, Receipt, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
+import { Receipt, AlertCircle, CheckCircle2, Wallet, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tasasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import { ABMPage } from '../components/ui/ABMPage';
+import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
 import type { Partida, TipoTasa } from '../types';
 
 /**
@@ -57,108 +57,87 @@ export default function GestionTasas() {
     return { totalMonto, conDeuda, total: partidas.length };
   }, [partidas]);
 
-  // Chips de tipos de tasa — barra horizontal scrolleable abajo del header
-  const chipsBar = (
-    <div className="flex gap-1.5 overflow-x-auto pb-1 px-1 scrollbar-hide">
-      <button
-        onClick={() => setTipoFiltro(null)}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03] whitespace-nowrap"
-        style={{
-          backgroundColor: tipoFiltro === null ? `${theme.primary}20` : 'transparent',
-          color: tipoFiltro === null ? theme.primary : theme.textSecondary,
-          border: `1.5px solid ${tipoFiltro === null ? theme.primary : theme.border}`,
-        }}
-      >
-        Todas
-        <span className="text-[10px] font-bold opacity-80">{partidas.length}</span>
-      </button>
-      {tipos.map(t => {
-        const isActive = tipoFiltro === t.id;
-        const cnt = partidas.filter(p => p.tipo_tasa?.id === t.id).length;
-        return (
-          <button
-            key={t.id}
-            onClick={() => setTipoFiltro(t.id)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-all hover:scale-[1.03] whitespace-nowrap"
-            style={{
-              background: isActive
-                ? `linear-gradient(135deg, ${t.color}, ${t.color}dd)`
-                : `${t.color}12`,
-              border: `1px solid ${isActive ? t.color : `${t.color}40`}`,
-              color: isActive ? '#ffffff' : theme.text,
-            }}
-          >
-            <DynamicIcon name={t.icono} className="h-3 w-3" style={{ color: isActive ? '#ffffff' : t.color }} />
-            <span>{t.nombre}</span>
-            {cnt > 0 && (
-              <span
-                className="text-[10px] font-bold px-1 rounded-full"
-                style={{
-                  backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : `${t.color}25`,
-                  color: isActive ? '#ffffff' : t.color,
-                }}
-              >
-                {cnt}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-
-  const isEmpty = !loading && partidas.length === 0;
+  // Chips de tipos de tasa con conteo por tipo
+  const filterChips: FilterChip[] = useMemo(() => tipos.map(t => ({
+    key: String(t.id),
+    label: t.nombre,
+    color: t.color,
+    icon: <DynamicIcon name={t.icono} className="h-3.5 w-3.5" />,
+    count: partidas.filter(p => p.tipo_tasa?.id === t.id).length,
+  })), [tipos, partidas]);
 
   return (
-    <ABMPage
-      title="Tasas"
-      icon={<Wallet className="h-5 w-5" />}
-      searchPlaceholder="Buscar por identificador, DNI o titular..."
-      searchValue={searchInput}
-      onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}
-      secondaryFilters={chipsBar}
-      loading={loading}
-      isEmpty={isEmpty}
-      emptyMessage="No hay partidas cargadas. Importá el padrón desde Ajustes para empezar."
-    >
-      <div className="space-y-4 max-w-5xl mx-auto">
-        {/* Resumen */}
-        {!loading && partidas.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <ResumenCard
-              icon={<Receipt className="h-5 w-5" />}
-              label="Partidas"
-              value={String(totales.total)}
-              color={theme.primary}
-              theme={theme}
-            />
-            <ResumenCard
-              icon={<AlertCircle className="h-5 w-5" />}
-              label="Con deuda"
-              value={String(totales.conDeuda)}
-              color="#ef4444"
-              theme={theme}
-            />
-            <ResumenCard
-              icon={<CheckCircle2 className="h-5 w-5" />}
-              label="Monto adeudado"
-              value={fmtPlata(totales.totalMonto)}
-              color="#10b981"
-              theme={theme}
-            />
-          </div>
-        )}
+    <div className="space-y-4">
+      <StickyPageHeader
+        icon={<Wallet className="h-5 w-5" />}
+        title="Tasas"
+        searchPlaceholder="Buscar por identificador, DNI o titular..."
+        searchValue={searchInput}
+        onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}
+        filterPanel={
+          <FilterChipRow
+            chips={filterChips}
+            activeKey={tipoFiltro != null ? String(tipoFiltro) : null}
+            onChipClick={(key) => setTipoFiltro(key ? Number(key) : null)}
+            allLabel="Todas"
+            allIcon={<Receipt className="h-4 w-4" />}
+          />
+        }
+      />
 
-        {/* Lista */}
-        {!loading && partidas.length > 0 && (
-          <div className="space-y-2">
-            {partidas.map(p => (
-              <PartidaRow key={p.id} partida={p} theme={theme} />
-            ))}
-          </div>
-        )}
+      {/* Resumen */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <ResumenCard
+          icon={<Receipt className="h-4 w-4" />}
+          label="Partidas"
+          value={String(totales.total)}
+          color={theme.primary}
+          theme={theme}
+        />
+        <ResumenCard
+          icon={<AlertCircle className="h-4 w-4" />}
+          label="Con deuda"
+          value={String(totales.conDeuda)}
+          color="#ef4444"
+          theme={theme}
+        />
+        <ResumenCard
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          label="Monto adeudado"
+          value={fmtPlata(totales.totalMonto)}
+          color="#10b981"
+          theme={theme}
+        />
       </div>
-    </ABMPage>
+
+      {/* Lista */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} />
+        </div>
+      ) : partidas.length === 0 ? (
+        <div
+          className="rounded-xl p-10 text-center"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <Receipt className="h-10 w-10 mx-auto mb-2" style={{ color: theme.textSecondary }} />
+          <p className="text-sm font-medium" style={{ color: theme.text }}>
+            {searchQuery || tipoFiltro ? 'Sin resultados' : 'No hay partidas cargadas'}
+          </p>
+          <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+            {searchQuery || tipoFiltro
+              ? 'Probá ajustando los filtros o la búsqueda.'
+              : 'Importá el padrón desde Ajustes para empezar.'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {partidas.map(p => (
+            <PartidaRow key={p.id} partida={p} theme={theme} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -175,52 +154,28 @@ function ResumenCard({
 }) {
   return (
     <div
-      className="rounded-2xl p-4 flex items-center gap-3"
+      className="rounded-xl p-3 flex items-center gap-3"
       style={{
-        background: `linear-gradient(135deg, ${color}15 0%, ${theme.card} 60%)`,
-        border: `1px solid ${color}40`,
+        backgroundColor: theme.card,
+        border: `1px solid ${theme.border}`,
+        borderLeft: `3px solid ${color}`,
       }}
     >
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ backgroundColor: `${color}20`, color }}
       >
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
+        <p className="text-[10px] uppercase tracking-wider font-medium" style={{ color: theme.textSecondary }}>
           {label}
         </p>
-        <p className="text-xl font-bold truncate" style={{ color: theme.text }}>
+        <p className="text-base font-bold truncate" style={{ color: theme.text }}>
           {value}
         </p>
       </div>
     </div>
-  );
-}
-
-function FilterChip({
-  active, onClick, color, theme, children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  color: string;
-  theme: { text: string; textSecondary: string; card: string; border: string };
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:scale-[1.02] active:scale-95"
-      style={{
-        backgroundColor: active ? `${color}25` : theme.card,
-        color: active ? color : theme.textSecondary,
-        border: `1px solid ${active ? color : theme.border}`,
-      }}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -238,15 +193,15 @@ function PartidaRow({
 
   return (
     <div
-      className="rounded-2xl p-4 flex items-center gap-3 transition-all hover:scale-[1.005]"
+      className="rounded-xl p-3 flex items-center gap-3 transition-all hover:scale-[1.005]"
       style={{
         backgroundColor: theme.card,
         border: `1px solid ${tienePendientes ? color + '40' : theme.border}`,
-        borderLeft: `4px solid ${color}`,
+        borderLeft: `3px solid ${color}`,
       }}
     >
       <div
-        className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
         style={{ background: `linear-gradient(135deg, ${color} 0%, ${color}cc 100%)`, color: '#fff' }}
       >
         <DynamicIcon name={icono} className="h-5 w-5" />
@@ -300,30 +255,6 @@ function PartidaRow({
           </span>
         )}
       </div>
-    </div>
-  );
-}
-
-function EmptyState({
-  theme, hasFilter,
-}: {
-  theme: { text: string; textSecondary: string; backgroundSecondary: string };
-  hasFilter: boolean;
-}) {
-  return (
-    <div
-      className="rounded-2xl p-8 text-center"
-      style={{ backgroundColor: theme.backgroundSecondary }}
-    >
-      <Receipt className="h-12 w-12 mx-auto mb-3" style={{ color: theme.textSecondary }} />
-      <h3 className="font-semibold" style={{ color: theme.text }}>
-        {hasFilter ? 'Sin resultados' : 'No hay partidas cargadas'}
-      </h3>
-      <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-        {hasFilter
-          ? 'Probá ajustando los filtros o la búsqueda.'
-          : 'Importá el padrón desde Ajustes para empezar.'}
-      </p>
     </div>
   );
 }

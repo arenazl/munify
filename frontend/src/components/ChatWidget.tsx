@@ -511,18 +511,30 @@ export function ChatWidget() {
               <span>{isPinned ? 'Anclado' : 'Anclar'}</span>
             </button>
 
-            {/* Nueva conversación (derecha) */}
-            {messages.length > 0 && (
+            <div className="flex items-center gap-1">
+              {/* Nueva conversación */}
+              {messages.length > 0 && (
+                <button
+                  onClick={resetConversation}
+                  className="px-2 py-1 rounded-md transition-all hover:bg-black/10 flex items-center gap-1"
+                  style={{ color: theme.textSecondary }}
+                  title="Nueva conversación"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span className="text-[10px] font-medium">Nueva</span>
+                </button>
+              )}
+
+              {/* Cerrar panel: desancla y oculta */}
               <button
-                onClick={resetConversation}
-                className="px-2 py-1 rounded-md transition-all hover:bg-black/10 flex items-center gap-1"
+                onClick={() => { setIsPinned(false); setIsHovered(false); }}
+                className="w-7 h-7 rounded-md transition-all hover:bg-black/10 flex items-center justify-center"
                 style={{ color: theme.textSecondary }}
-                title="Nueva conversación"
+                title="Cerrar"
               >
-                <Plus className="h-3 w-3" />
-                <span className="text-[10px] font-medium">Nueva</span>
+                <X className="h-4 w-4" />
               </button>
-            )}
+            </div>
           </div>
         )}
 

@@ -4,10 +4,12 @@ import { useTheme } from '../../contexts/ThemeContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// URLs de tiles para tema claro y oscuro
+// URLs de tiles para tema claro y oscuro.
+// Voyager: tiles claros con detalle (calles, nombres, color). Más legible
+// que "light_all" — el user ve mejor dónde pincha el marker.
 const TILE_URLS = {
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
 };
 
 // Fix para el icono de Leaflet en Vite

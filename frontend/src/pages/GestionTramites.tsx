@@ -633,7 +633,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
     // Pendiente_pago — el trabajo terminó pero el vecino aún no pagó.
     // El supervisor no puede cerrar hasta que el vecino confirme el pago.
-    if (estadoActual === 'pendiente_pago') {
+    // Cast a string porque pendiente_pago aún no está en EstadoCanonico.
+    if ((estadoActual as string) === 'pendiente_pago') {
       const tramiteCfg: any = (selectedTramite as any).tramite || {};
       return (
         <div

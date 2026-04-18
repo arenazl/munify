@@ -343,8 +343,10 @@ function getCategoryKey(categoria: string): string {
 
 // URLs de tiles para tema claro y oscuro
 const TILE_URLS = {
-  light: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  // Voyager: tiles claros con detalle (calles, nombres, color suave). Mucho
+  // más legible que el "light_all" (que es casi un wireframe sin color).
+  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
 };
 
 export default function HeatmapWidget({
