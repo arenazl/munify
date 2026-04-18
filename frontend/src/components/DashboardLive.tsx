@@ -357,63 +357,63 @@ export default function DashboardLive({
 
       {/* HEADER */}
       <header
-        className="relative z-10 flex-shrink-0 px-8 py-4 flex items-center justify-between backdrop-blur-md"
+        className="relative z-10 flex-shrink-0 px-3 py-2 sm:px-8 sm:py-4 flex items-center justify-between backdrop-blur-md gap-2"
         style={{
           backgroundColor: `${theme.card}cc`,
           borderBottom: `1px solid ${theme.border}`,
         }}
       >
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-3 h-3 rounded-full bg-red-500" />
-            <div className="absolute inset-0 w-3 h-3 rounded-full bg-red-500 animate-ping" />
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <div className="relative flex-shrink-0">
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500" />
+            <div className="absolute inset-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-red-500 animate-ping" />
           </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-red-500">EN VIVO</span>
-          <span className="opacity-30">·</span>
-          <span className="text-base font-semibold" style={{ color: theme.text }}>
-            Municipalidad de {municipioNombre}
+          <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-red-500 flex-shrink-0">EN VIVO</span>
+          <span className="opacity-30 hidden sm:inline">·</span>
+          <span className="text-sm sm:text-base font-semibold truncate" style={{ color: theme.text }}>
+            <span className="hidden sm:inline">Municipalidad de </span>{municipioNombre}
           </span>
-          <span className="opacity-30">·</span>
-          <span className="text-sm font-mono tabular-nums" style={{ color: theme.textSecondary }}>
+          <span className="opacity-30 hidden md:inline">·</span>
+          <span className="text-xs sm:text-sm font-mono tabular-nums hidden md:inline" style={{ color: theme.textSecondary }}>
             {now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <button
             onClick={() => setCurrentSlide(s => (s - 1 + slides.length) % slides.length)}
-            className="p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
+            className="p-1.5 sm:p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
             style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
             title="Anterior (←)"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
           <button
             onClick={() => setPaused(p => !p)}
-            className="p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
+            className="p-1.5 sm:p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
             style={{
               backgroundColor: paused ? theme.primary : theme.backgroundSecondary,
               color: paused ? (theme.primaryText || '#fff') : theme.text,
             }}
             title={paused ? 'Reanudar (espacio)' : 'Pausar (espacio)'}
           >
-            {paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+            {paused ? <Play className="h-4 w-4 sm:h-5 sm:w-5" /> : <Pause className="h-4 w-4 sm:h-5 sm:w-5" />}
           </button>
           <button
             onClick={() => setCurrentSlide(s => (s + 1) % slides.length)}
-            className="p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
+            className="p-1.5 sm:p-2 rounded-lg transition-all hover:scale-110 active:scale-95"
             style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}
             title="Siguiente (→)"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
+            className="p-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold flex items-center gap-2 transition-all hover:scale-105 active:scale-95"
             style={{ backgroundColor: theme.primary, color: theme.primaryText || '#fff' }}
           >
             <X className="h-4 w-4" />
-            Salir
+            <span className="hidden sm:inline">Salir</span>
           </button>
         </div>
       </header>
@@ -434,11 +434,11 @@ export default function DashboardLive({
       <div className="relative z-10 flex-1 overflow-hidden">
         <div
           key={currentSlide}
-          className="absolute inset-0 flex flex-col p-8 animate-in fade-in slide-in-from-right-12 duration-700"
+          className="absolute inset-0 flex flex-col p-3 sm:p-6 md:p-8 animate-in fade-in slide-in-from-right-12 duration-700"
         >
-          <div className="flex items-center gap-4 mb-6 flex-shrink-0">
+          <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-5 md:mb-6 flex-shrink-0">
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center animate-in zoom-in-50 duration-500"
+              className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center animate-in zoom-in-50 duration-500 flex-shrink-0"
               style={{
                 background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover || theme.primary})`,
                 color: theme.primaryText || '#fff',
@@ -447,12 +447,12 @@ export default function DashboardLive({
             >
               {slide.icon}
             </div>
-            <div className="animate-in fade-in slide-in-from-left-4 duration-700">
-              <p className="text-xs uppercase tracking-[0.2em] opacity-50 font-bold flex items-center gap-2" style={{ color: theme.textSecondary }}>
+            <div className="animate-in fade-in slide-in-from-left-4 duration-700 min-w-0">
+              <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] opacity-50 font-bold flex items-center gap-2" style={{ color: theme.textSecondary }}>
                 <Sparkles className="h-3 w-3" />
                 Slide {currentSlide + 1} de {slides.length}
               </p>
-              <h2 className="text-3xl font-bold mt-1" style={{ color: theme.text }}>
+              <h2 className="text-lg sm:text-2xl md:text-3xl font-bold mt-0.5 sm:mt-1 truncate" style={{ color: theme.text }}>
                 {slide.title}
               </h2>
             </div>
@@ -571,7 +571,7 @@ function KPIsSlide({ stats, tramitesStats, theme }: { stats: Stats | null; trami
   ];
 
   return (
-    <div className="grid grid-cols-4 grid-rows-2 gap-4 h-full">
+    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 auto-rows-fr gap-2 sm:gap-3 md:gap-4 h-full overflow-y-auto">
       {gauges.map((g, i) => <GaugeKPI key={g.label} item={g} theme={theme} delay={i * 120} />)}
       {cards.map((c, i) => <KPICard key={c.label} item={c} theme={theme} delay={500 + i * 100} />)}
     </div>
@@ -1064,16 +1064,16 @@ function EmptyState({ text, theme }: { text: string; theme: any }) {
 // DualSlide — split 2 columnas con encabezado por panel
 // ============================================================
 
-// QuadSlide — grid adaptativo según # de paneles (2x2 para 4, 3x2 para 6)
+// QuadSlide — grid adaptativo (mobile 1 col → tablet 2 → desktop 2/3 según # paneles)
 function QuadSlide({
   panels, theme,
 }: {
   panels: { title: string; icon: React.ReactNode; content: React.ReactNode }[];
   theme: any;
 }) {
-  const cols = panels.length > 4 ? 'grid-cols-3' : 'grid-cols-2';
+  const lgCols = panels.length > 4 ? 'lg:grid-cols-3' : 'lg:grid-cols-2';
   return (
-    <div className={`grid ${cols} grid-rows-2 gap-4 h-full`}>
+    <div className={`grid grid-cols-1 sm:grid-cols-2 ${lgCols} auto-rows-fr gap-3 sm:gap-4 h-full overflow-y-auto`}>
       {panels.map((panel, i) => (
         <div
           key={i}
@@ -1109,7 +1109,7 @@ function DualSlide({
   theme: any;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-6 h-full">
+    <div className="grid grid-cols-1 md:grid-cols-2 auto-rows-fr gap-4 md:gap-6 h-full overflow-y-auto">
       {[left, right].map((panel, i) => (
         <div
           key={i}
@@ -1119,14 +1119,14 @@ function DualSlide({
             animationFillMode: 'backwards',
           }}
         >
-          <div className="flex items-center gap-2 mb-3 flex-shrink-0">
+          <div className="flex items-center gap-2 mb-2 sm:mb-3 flex-shrink-0">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0"
               style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
             >
               {panel.icon}
             </div>
-            <h3 className="text-lg font-bold" style={{ color: theme.text }}>
+            <h3 className="text-base sm:text-lg font-bold truncate" style={{ color: theme.text }}>
               {panel.title}
             </h3>
           </div>

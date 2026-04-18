@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Receipt, AlertCircle, CheckCircle2, Wallet, Loader2 } from 'lucide-react';
+import { Receipt, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { tasasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
+import { ABMPage } from '../components/ui/ABMPage';
+import { FilterChipRow, FilterChip } from '../components/ui/StickyPageHeader';
+import PageHint from '../components/ui/PageHint';
 import type { Partida, TipoTasa } from '../types';
 
 /**
@@ -66,15 +68,22 @@ export default function GestionTasas() {
     count: partidas.filter(p => p.tipo_tasa?.id === t.id).length,
   })), [tipos, partidas]);
 
+  const emptyMsg = searchQuery || tipoFiltro ? 'Sin resultados' : 'No hay partidas cargadas';
+
   return (
-    <div className="space-y-4">
-      <StickyPageHeader
-        icon={<Wallet className="h-5 w-5" />}
+    <>
+      <PageHint pageId="gestion-tasas" />
+      <ABMPage
         title="Tasas"
+        icon={<Wallet className="h-5 w-5" />}
+        backLink="/gestion/ajustes"
         searchPlaceholder="Buscar por identificador, DNI o titular..."
         searchValue={searchInput}
         onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}
-        filterPanel={
+        loading={loading}
+        isEmpty={partidas.length === 0}
+        emptyMessage={emptyMsg}
+        secondaryFilters={
           <FilterChipRow
             chips={filterChips}
             activeKey={tipoFiltro != null ? String(tipoFiltro) : null}
@@ -83,61 +92,40 @@ export default function GestionTasas() {
             allIcon={<Receipt className="h-4 w-4" />}
           />
         }
-      />
-
-      {/* Resumen */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <ResumenCard
-          icon={<Receipt className="h-4 w-4" />}
-          label="Partidas"
-          value={String(totales.total)}
-          color={theme.primary}
-          theme={theme}
-        />
-        <ResumenCard
-          icon={<AlertCircle className="h-4 w-4" />}
-          label="Con deuda"
-          value={String(totales.conDeuda)}
-          color="#ef4444"
-          theme={theme}
-        />
-        <ResumenCard
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          label="Monto adeudado"
-          value={fmtPlata(totales.totalMonto)}
-          color="#10b981"
-          theme={theme}
-        />
-      </div>
-
-      {/* Lista */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} />
+      >
+        {/* Resumen */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <ResumenCard
+            icon={<Receipt className="h-4 w-4" />}
+            label="Partidas"
+            value={String(totales.total)}
+            color={theme.primary}
+            theme={theme}
+          />
+          <ResumenCard
+            icon={<AlertCircle className="h-4 w-4" />}
+            label="Con deuda"
+            value={String(totales.conDeuda)}
+            color="#ef4444"
+            theme={theme}
+          />
+          <ResumenCard
+            icon={<CheckCircle2 className="h-4 w-4" />}
+            label="Monto adeudado"
+            value={fmtPlata(totales.totalMonto)}
+            color="#10b981"
+            theme={theme}
+          />
         </div>
-      ) : partidas.length === 0 ? (
-        <div
-          className="rounded-xl p-10 text-center"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        >
-          <Receipt className="h-10 w-10 mx-auto mb-2" style={{ color: theme.textSecondary }} />
-          <p className="text-sm font-medium" style={{ color: theme.text }}>
-            {searchQuery || tipoFiltro ? 'Sin resultados' : 'No hay partidas cargadas'}
-          </p>
-          <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
-            {searchQuery || tipoFiltro
-              ? 'Probá ajustando los filtros o la búsqueda.'
-              : 'Importá el padrón desde Ajustes para empezar.'}
-          </p>
-        </div>
-      ) : (
+
+        {/* Lista */}
         <div className="space-y-2">
           {partidas.map(p => (
             <PartidaRow key={p.id} partida={p} theme={theme} />
           ))}
         </div>
-      )}
-    </div>
+      </ABMPage>
+    </>
   );
 }
 
