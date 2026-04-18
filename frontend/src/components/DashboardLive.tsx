@@ -289,19 +289,19 @@ export default function DashboardLive({
       {/* Animated background blobs (3 capas con movimiento) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full blur-3xl opacity-40 live-bg-blob-1"
+          className="absolute -top-20 -right-20 sm:-top-40 sm:-right-40 w-[250px] h-[250px] sm:w-[500px] sm:h-[500px] rounded-full blur-3xl opacity-40 live-bg-blob-1"
           style={{ background: `radial-gradient(circle, ${theme.primary} 0%, transparent 70%)` }}
         />
         <div
-          className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full blur-3xl opacity-40 live-bg-blob-2"
+          className="absolute -bottom-20 -left-20 sm:-bottom-40 sm:-left-40 w-[250px] h-[250px] sm:w-[500px] sm:h-[500px] rounded-full blur-3xl opacity-40 live-bg-blob-2"
           style={{ background: `radial-gradient(circle, ${theme.primaryHover || theme.primary} 0%, transparent 70%)` }}
         />
         <div
-          className="absolute top-1/3 left-1/2 w-[300px] h-[300px] rounded-full blur-3xl opacity-30 live-bg-blob-3"
+          className="absolute top-1/3 left-1/2 w-[150px] h-[150px] sm:w-[300px] sm:h-[300px] rounded-full blur-3xl opacity-30 live-bg-blob-3"
           style={{ background: `radial-gradient(circle, #8b5cf6 0%, transparent 70%)` }}
         />
-        {/* Particles flotando */}
-        {[...Array(12)].map((_, i) => (
+        {/* Particles flotando - menos en mobile */}
+        {[...Array(typeof window !== 'undefined' && window.innerWidth < 640 ? 5 : 12)].map((_, i) => (
           <div
             key={i}
             className="absolute w-1.5 h-1.5 rounded-full live-particle"
@@ -315,44 +315,46 @@ export default function DashboardLive({
           />
         ))}
 
-        {/* Iconos del muni flotando — capa decorativa con drift lento */}
-        {[
-          { Icon: ClipboardList, color: '#3b82f6' },
-          { Icon: Receipt, color: '#10b981' },
-          { Icon: FileCheck, color: '#8b5cf6' },
-          { Icon: Wrench, color: '#f59e0b' },
-          { Icon: Building2, color: '#06b6d4' },
-          { Icon: Lightbulb, color: '#eab308' },
-          { Icon: Trash2, color: '#ec4899' },
-          { Icon: Construction, color: '#f97316' },
-          { Icon: BarChart3, color: '#14b8a6' },
-          { Icon: Bell, color: '#6366f1' },
-          { Icon: Wallet, color: '#22c55e' },
-          { Icon: Zap, color: '#facc15' },
-          { Icon: MapPin, color: '#ef4444' },
-          { Icon: Trophy, color: '#a855f7' },
-        ].map(({ Icon, color }, i) => (
-          <div
-            key={`icon-${i}`}
-            className="absolute live-icon"
-            style={{
-              top: `${(i * 11 + 7) % 88}%`,
-              left: `${(i * 17 + 3) % 92}%`,
-              color,
-              opacity: 0.18,
-              animationDelay: `${i * 0.7}s`,
-              animationDuration: `${8 + (i % 5) * 2}s`,
-            }}
-          >
-            <Icon
+        {/* Iconos del muni flotando — capa decorativa con drift lento. Se ocultan en mobile para no saturar */}
+        <div className="hidden sm:block absolute inset-0">
+          {[
+            { Icon: ClipboardList, color: '#3b82f6' },
+            { Icon: Receipt, color: '#10b981' },
+            { Icon: FileCheck, color: '#8b5cf6' },
+            { Icon: Wrench, color: '#f59e0b' },
+            { Icon: Building2, color: '#06b6d4' },
+            { Icon: Lightbulb, color: '#eab308' },
+            { Icon: Trash2, color: '#ec4899' },
+            { Icon: Construction, color: '#f97316' },
+            { Icon: BarChart3, color: '#14b8a6' },
+            { Icon: Bell, color: '#6366f1' },
+            { Icon: Wallet, color: '#22c55e' },
+            { Icon: Zap, color: '#facc15' },
+            { Icon: MapPin, color: '#ef4444' },
+            { Icon: Trophy, color: '#a855f7' },
+          ].map(({ Icon, color }, i) => (
+            <div
+              key={`icon-${i}`}
+              className="absolute live-icon"
               style={{
-                width: `${28 + (i % 4) * 12}px`,
-                height: `${28 + (i % 4) * 12}px`,
-                filter: `drop-shadow(0 0 12px ${color})`,
+                top: `${(i * 11 + 7) % 88}%`,
+                left: `${(i * 17 + 3) % 92}%`,
+                color,
+                opacity: 0.18,
+                animationDelay: `${i * 0.7}s`,
+                animationDuration: `${8 + (i % 5) * 2}s`,
               }}
-            />
-          </div>
-        ))}
+            >
+              <Icon
+                style={{
+                  width: `${28 + (i % 4) * 12}px`,
+                  height: `${28 + (i % 4) * 12}px`,
+                  filter: `drop-shadow(0 0 12px ${color})`,
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* HEADER */}
@@ -684,7 +686,7 @@ function GaugeKPI({ item, theme, delay }: { item: any; theme: any; delay: number
         {/* Valor al centro del gauge */}
         <div className="absolute inset-0 flex flex-col items-center justify-end pb-1 pointer-events-none">
           <p
-            className="text-5xl font-black tabular-nums leading-none"
+            className="text-3xl sm:text-4xl md:text-5xl font-black tabular-nums leading-none"
             style={{
               background: `linear-gradient(135deg, ${baseColor}, ${baseColor}aa)`,
               WebkitBackgroundClip: 'text',
@@ -745,12 +747,12 @@ function KPICard({ item, theme, delay }: { item: any; theme: any; delay: number 
       {/* Shimmer en borde */}
       <div className="absolute inset-x-0 top-0 h-px live-shimmer" style={{ opacity: 0.6 }} />
 
-      <div className="relative z-10 flex items-start justify-between p-8 pb-0">
-        <p className="text-base uppercase tracking-wider font-bold" style={{ color: theme.textSecondary }}>
+      <div className="relative z-10 flex items-start justify-between p-4 sm:p-6 md:p-8 pb-0">
+        <p className="text-xs sm:text-sm md:text-base uppercase tracking-wider font-bold truncate" style={{ color: theme.textSecondary }}>
           {item.label}
         </p>
         <div
-          className="p-3 rounded-2xl backdrop-blur-sm"
+          className="p-2 sm:p-3 rounded-xl sm:rounded-2xl backdrop-blur-sm flex-shrink-0"
           style={{
             background: `linear-gradient(135deg, ${item.color}30, ${item.color}10)`,
             color: item.color,
@@ -760,9 +762,9 @@ function KPICard({ item, theme, delay }: { item: any; theme: any; delay: number 
           {item.icon}
         </div>
       </div>
-      <div className="relative z-10 px-8 pb-8 mt-auto flex items-baseline gap-2">
+      <div className="relative z-10 px-4 sm:px-6 md:px-8 pb-4 sm:pb-6 md:pb-8 mt-auto flex items-baseline gap-2">
         <p
-          className="text-8xl font-black tabular-nums leading-none"
+          className="text-4xl sm:text-6xl md:text-8xl font-black tabular-nums leading-none"
           style={{
             background: `linear-gradient(135deg, ${item.color}, ${item.color}aa)`,
             WebkitBackgroundClip: 'text',
@@ -774,7 +776,7 @@ function KPICard({ item, theme, delay }: { item: any; theme: any; delay: number 
           {animatedValue}
         </p>
         {item.suffix && (
-          <p className="text-4xl font-bold" style={{ color: item.color }}>
+          <p className="text-xl sm:text-3xl md:text-4xl font-bold" style={{ color: item.color }}>
             {item.suffix}
           </p>
         )}
@@ -1180,7 +1182,7 @@ function MiniTendenciaSlide({ data, theme }: { data: TendenciaData[]; theme: any
         border: `1px solid ${theme.border}`,
       }}
     >
-      <div className="grid grid-cols-3 gap-2 mb-3 flex-shrink-0">
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mb-3 flex-shrink-0">
         <MiniStat label="Total" value={animTotal} color={theme.primary} theme={theme} />
         <MiniStat label="Promedio" value={animProm} color="#8b5cf6" theme={theme} />
         <MiniStat label="Pico" value={animPico} color="#10b981" theme={theme} sub={pico?.fecha} />
@@ -1385,7 +1387,7 @@ function TasaResolucionSlide({ stats, theme }: { stats: Stats | null; theme: any
       </div>
 
       {/* Mini KPIs debajo */}
-      <div className="grid grid-cols-4 gap-2 mt-3 flex-shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 flex-shrink-0">
         <MiniStatBig label="Finalizados" value={animFin} color="#10b981" theme={theme} />
         <MiniStatBig label="En curso" value={animEnCurso} color="#f59e0b" theme={theme} />
         <MiniStatBig label="Pendientes" value={animPend} color="#3b82f6" theme={theme} />
@@ -1425,28 +1427,28 @@ function DiaSemanaSlide({ data, theme }: { data: TendenciaData[]; theme: any }) 
 
   return (
     <div
-      className="rounded-3xl p-6 h-full flex flex-col"
+      className="rounded-3xl p-4 sm:p-6 h-full flex flex-col"
       style={{
         background: `linear-gradient(135deg, ${theme.card} 0%, ${theme.card} 60%, ${theme.primary}08 100%)`,
         border: `1px solid ${theme.border}`,
       }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-4 flex-shrink-0">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.2em] font-bold opacity-60" style={{ color: theme.textSecondary }}>
+      <div className="flex items-start justify-between mb-3 sm:mb-4 flex-shrink-0 gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-[11px] uppercase tracking-[0.2em] font-bold opacity-60" style={{ color: theme.textSecondary }}>
             Últimos 30 días
           </p>
-          <p className="text-4xl font-black tabular-nums leading-none mt-1" style={{ color: theme.text }}>{animTotal}</p>
-          <p className="text-[11px] font-semibold opacity-60 mt-0.5" style={{ color: theme.textSecondary }}>reclamos totales</p>
+          <p className="text-2xl sm:text-4xl font-black tabular-nums leading-none mt-1" style={{ color: theme.text }}>{animTotal}</p>
+          <p className="text-[10px] sm:text-[11px] font-semibold opacity-60 mt-0.5" style={{ color: theme.textSecondary }}>reclamos totales</p>
         </div>
         <div
-          className="rounded-xl px-3 py-2"
+          className="rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 flex-shrink-0"
           style={{ background: `${theme.primary}18`, border: `1px solid ${theme.primary}40` }}
         >
-          <p className="text-[10px] uppercase tracking-wider font-bold opacity-70" style={{ color: theme.textSecondary }}>Pico</p>
-          <p className="text-xl font-black" style={{ color: theme.primary }}>{peak.dia}</p>
-          <p className="text-xs font-bold tabular-nums" style={{ color: theme.primary, opacity: 0.8 }}>{peak.cantidad}</p>
+          <p className="text-[9px] sm:text-[10px] uppercase tracking-wider font-bold opacity-70" style={{ color: theme.textSecondary }}>Pico</p>
+          <p className="text-base sm:text-xl font-black" style={{ color: theme.primary }}>{peak.dia}</p>
+          <p className="text-[10px] sm:text-xs font-bold tabular-nums" style={{ color: theme.primary, opacity: 0.8 }}>{peak.cantidad}</p>
         </div>
       </div>
 
@@ -1515,8 +1517,8 @@ function TramitesEstadoSlide({ tramitesStats, theme }: { tramitesStats: Tramites
         border: `1px solid ${theme.border}`,
       }}
     >
-      <div className="grid grid-cols-5 gap-3 flex-1 min-h-0 items-center">
-        <div className="col-span-2 relative h-full min-h-0">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 flex-1 min-h-0 items-center">
+        <div className="sm:col-span-2 relative h-[160px] sm:h-full sm:min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <defs>
@@ -1551,7 +1553,7 @@ function TramitesEstadoSlide({ tramitesStats, theme }: { tramitesStats: Tramites
             <p className="text-2xl font-black tabular-nums leading-none mt-0.5" style={{ color: theme.text }}>{animTotal}</p>
           </div>
         </div>
-        <div className="col-span-3 space-y-1.5 h-full flex flex-col justify-center">
+        <div className="sm:col-span-3 space-y-1.5 sm:h-full flex flex-col justify-center">
           {data.map((d, i) => {
             const pct = (d.value / total) * 100;
             return <DonutLegendRow key={d.name} item={d} pct={pct} idx={i} theme={theme} />;
@@ -1670,9 +1672,9 @@ function DonutSlide({ stats, theme }: { stats: Stats | null; theme: any }) {
         border: `1px solid ${theme.border}`,
       }}
     >
-      <div className="grid grid-cols-5 gap-3 flex-1 min-h-0 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 flex-1 min-h-0 items-center">
         {/* Donut con total al centro */}
-        <div className="col-span-2 relative h-full min-h-0">
+        <div className="sm:col-span-2 relative h-[160px] sm:h-full sm:min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <defs>
@@ -1722,7 +1724,7 @@ function DonutSlide({ stats, theme }: { stats: Stats | null; theme: any }) {
         </div>
 
         {/* Leyenda con números, barras y % */}
-        <div className="col-span-3 space-y-1.5 h-full flex flex-col justify-center">
+        <div className="sm:col-span-3 space-y-1.5 sm:h-full flex flex-col justify-center">
           {data.map((d, i) => {
             const pct = (d.value / total) * 100;
             return <DonutLegendRow key={d.name} item={d} pct={pct} idx={i} theme={theme} />;
@@ -1797,9 +1799,9 @@ function RadialSlide({ data, theme }: { data: CategoriaData[]; theme: any }) {
         border: `1px solid ${theme.border}`,
       }}
     >
-      <div className="grid grid-cols-5 gap-3 flex-1 min-h-0 items-center">
+      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 flex-1 min-h-0 items-center">
         {/* Radial chart con total al centro */}
-        <div className="col-span-2 relative h-full min-h-0">
+        <div className="sm:col-span-2 relative h-[160px] sm:h-full sm:min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <RadialBarChart
               cx="50%" cy="50%"
@@ -1833,7 +1835,7 @@ function RadialSlide({ data, theme }: { data: CategoriaData[]; theme: any }) {
         </div>
 
         {/* Ranking con números, barras y posición */}
-        <div className="col-span-3 space-y-1.5 h-full flex flex-col justify-center">
+        <div className="sm:col-span-3 space-y-1.5 sm:h-full flex flex-col justify-center">
           {top.map((t, i) => (
             <RadialLegendRow
               key={t.name}
