@@ -22,7 +22,7 @@ import CategoriasTramiteConfig from './pages/CategoriasTramiteConfig';
 import TramitesConfig from './pages/TramitesConfig';
 import ProveedoresPago from './pages/ProveedoresPago';
 import Zonas from './pages/Zonas';
-// import Configuracion from './pages/Configuracion';  // Redirige a Ajustes
+import Configuracion from './pages/Configuracion';
 import Exportar from './pages/Exportar';
 import SLA from './pages/SLA';
 import NuevoReclamoPage from './pages/NuevoReclamoPage';
@@ -226,7 +226,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'configuracion',
-        element: <Navigate to="/gestion/ajustes" replace />
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><Configuracion /></ProtectedRoute>
       },
       {
         path: 'municipios',

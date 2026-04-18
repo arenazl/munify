@@ -328,7 +328,9 @@ async def get_tiempo_resolucion_por_categoria(
         .join(Reclamo, Reclamo.categoria_id == Categoria.id)
         .where(
             and_(
-                Reclamo.estado == EstadoReclamo.RESUELTO,
+                # Incluye ambos estados "resueltos": finalizado (nuevo) y resuelto (legacy)
+                Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
+                Reclamo.fecha_resolucion.isnot(None),
                 Reclamo.fecha_resolucion >= fecha_inicio,
                 Reclamo.municipio_id == municipio_id
             )

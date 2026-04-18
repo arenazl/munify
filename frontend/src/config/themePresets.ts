@@ -420,6 +420,58 @@ export const themePresets: ThemePreset[] = [
       vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
     }),
   },
+
+  // ====================================================================
+  // PALETAS B&N / GRISES (minimalistas, neutras, editoriales)
+  // ====================================================================
+
+  // 24. Paper - Blanco papel editorial con tipografía negra (tema claro)
+  {
+    id: 'paper',
+    name: 'Paper',
+    palette: ['#ffffff', '#f4f4f4', '#8a8a8a', '#1a1a1a'],
+    variants: generateVariants(['#ffffff', '#f4f4f4', '#8a8a8a', '#1a1a1a'], {
+      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 3 },  // Fondo puro, sidebar negro
+      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 3 },  // Fondo crudo
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Sidebar gris claro
+    }),
+  },
+
+  // 25. Ink - Negro tinta profundo + blanco roto (editorial dark)
+  {
+    id: 'ink',
+    name: 'Ink',
+    palette: ['#000000', '#121212', '#a3a3a3', '#ffffff'],
+    variants: generateVariants(['#000000', '#121212', '#a3a3a3', '#ffffff'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Negro puro + acento blanco
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 2 },  // Acento gris
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Sidebar gris claro
+    }),
+  },
+
+  // 26. Concrete - Gris cemento medio (neutro industrial)
+  {
+    id: 'concrete',
+    name: 'Concrete',
+    palette: ['#2a2a2a', '#3d3d3d', '#6b6b6b', '#cfcfcf'],
+    variants: generateVariants(['#2a2a2a', '#3d3d3d', '#6b6b6b', '#cfcfcf'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vintage: { bgIndex: 1, sidebarIndex: 0, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
+
+  // 27. Platinum - Gris plateado claro + carbón (tema claro profesional)
+  {
+    id: 'platinum',
+    name: 'Platinum',
+    palette: ['#f5f5f7', '#e5e5ea', '#86868b', '#1d1d1f'],
+    variants: generateVariants(['#f5f5f7', '#e5e5ea', '#86868b', '#1d1d1f'], {
+      clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 3 },  // Fondo platino, sidebar carbón
+      vintage: { bgIndex: 1, sidebarIndex: 3, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+    }),
+  },
 ];
 
 // Helper para obtener un tema por ID y variante

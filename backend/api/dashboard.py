@@ -355,7 +355,8 @@ async def get_stats(
     )
     semana_count = semana_query.scalar()
 
-    # Tiempo promedio de resolución (en días) - compatible con MySQL
+    # Tiempo promedio de resolución (en días) - compatible con MySQL.
+    # Aceptamos AMBOS estados: 'finalizado' (nuevo) y 'resuelto' (legacy).
     resueltos_query = await db.execute(
         select(
             func.avg(
@@ -363,7 +364,8 @@ async def get_stats(
             )
         ).where(
             Reclamo.municipio_id == municipio_id,
-            Reclamo.estado == EstadoReclamo.RESUELTO
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
+            Reclamo.fecha_resolucion.is_not(None),
         )
     )
     tiempo_promedio = resueltos_query.scalar() or 0
@@ -373,7 +375,7 @@ async def get_stats(
         "por_estado": estados,
         "hoy": hoy_count,
         "semana": semana_count,
-        "tiempo_promedio_dias": round(tiempo_promedio, 1)
+        "tiempo_promedio_dias": round(float(tiempo_promedio), 1)
     }
 
 

@@ -43,6 +43,8 @@ interface HeatmapWidgetProps {
   loading?: boolean;
   /** Callback cuando se hace click en una categoría - si está definido, redirige en lugar de filtrar */
   onCategoryClick?: (categoryKey: string, categoryLabel: string) => void;
+  /** Fuerza tiles oscuros (usado por el Dashboard Live) */
+  forceDark?: boolean;
 }
 
 const DEFAULT_COLOR = '#64748b'; // Gris para categorías sin color
@@ -192,17 +194,20 @@ function HeatLayer({ data }: { data: HeatmapPoint[] }) {
     // Crear capa de calor con gradiente personalizado
     try {
       const heat = L.heatLayer(heatData, {
-        radius: 20,
-        blur: 15,
+        radius: 28,
+        blur: 22,
         maxZoom: 17,
         max: 3,
-        minOpacity: 0.4,
+        minOpacity: 0.55,
         gradient: {
-          0.0: '#3b82f6',
-          0.25: '#22d3ee',
-          0.5: '#22c55e',
-          0.75: '#f59e0b',
-          1.0: '#ef4444',
+          0.0:  '#1e3a8a',  // azul profundo (frío)
+          0.15: '#3b82f6',  // azul
+          0.3:  '#06b6d4',  // cian
+          0.45: '#22c55e',  // verde
+          0.6:  '#eab308',  // amarillo
+          0.75: '#f97316',  // naranja
+          0.9:  '#ef4444',  // rojo
+          1.0:  '#ec4899',  // magenta (pico caliente)
         },
       });
 
@@ -343,10 +348,10 @@ function getCategoryKey(categoria: string): string {
 
 // URLs de tiles para tema claro y oscuro
 const TILE_URLS = {
-  // Voyager: tiles claros con detalle (calles, nombres, color suave). Mucho
-  // más legible que el "light_all" (que es casi un wireframe sin color).
+  // Voyager: claro con detalle (calles, nombres, color suave).
+  // dark_all: base negra con calles/labels visibles, ideal para realzar el heatmap.
   light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
 };
 
 export default function HeatmapWidget({
@@ -360,10 +365,17 @@ export default function HeatmapWidget({
   title = 'Mapa de Calor',
   loading = false,
   onCategoryClick,
+  forceDark = false,
 }: HeatmapWidgetProps) {
-  const { currentPresetId } = useTheme();
-  // Detectar si el tema es claro (solo sand y arctic son claros)
-  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const { theme } = useTheme();
+  // Detectar tema oscuro por luminancia del background (independiente del preset/variante)
+  const isDarkTheme = forceDark || (() => {
+    const hex = theme.background?.replace('#', '') || '';
+    if (hex.length !== 6) return true;
+    const n = parseInt(hex, 16);
+    const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff)) / 255;
+    return lum < 0.5;
+  })();
   const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
 
   const [isExpanded, setIsExpanded] = useState(false);

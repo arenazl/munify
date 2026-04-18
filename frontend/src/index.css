@@ -193,6 +193,11 @@ html, body {
   z-index: 1;
 }
 
+/* Oscurecer tiles en tema oscuro manteniendo la legibilidad de calles */
+.map-tiles-dark {
+  filter: brightness(0.65) contrast(1.05) saturate(0.85) hue-rotate(10deg);
+}
+
 /* Animación suave para el pin al hacer hover */
 .custom-pin-marker:hover svg {
   transform: scale(1.1);

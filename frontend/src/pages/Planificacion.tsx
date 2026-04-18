@@ -597,7 +597,7 @@ export default function Planificacion() {
             <div
               className="grid gap-px"
               style={{
-                gridTemplateColumns: `240px repeat(${visibleDates.length}, 1fr)`,
+                gridTemplateColumns: `320px repeat(${visibleDates.length}, 1fr)`,
                 backgroundColor: theme.border,
               }}
             >
@@ -636,7 +636,7 @@ export default function Planificacion() {
                 key={empleado.id}
                 className="grid gap-px"
                 style={{
-                  gridTemplateColumns: `240px repeat(${visibleDates.length}, 1fr)`,
+                  gridTemplateColumns: `320px repeat(${visibleDates.length}, 1fr)`,
                   backgroundColor: theme.border,
                 }}
               >
@@ -645,27 +645,27 @@ export default function Planificacion() {
                   const subtitulo = empleado.categoria_principal?.nombre || empleado.especialidad || empleado.categorias.slice(0, 1).map(c => c.nombre).join(', ') || empleado.zona?.nombre || (empleado.tipo === 'administrativo' ? 'Admin' : 'Operativo');
                   return (
                 <div
-                  className="px-2 py-1.5 flex items-center gap-2 relative overflow-hidden"
+                  className="px-4 py-3 flex items-center gap-3 relative overflow-hidden"
                   style={{ backgroundColor: theme.card }}
                   title={`${empleado.nombre} ${empleado.apellido || ''}${empleado.categoria_principal ? ' · ' + empleado.categoria_principal.nombre : ''}${empleado.zona ? ' · ' + empleado.zona.nombre : ''}`}
                 >
                   {/* Barra lateral de color = guia visual de categoria/identidad del empleado */}
                   <div
-                    className="absolute left-0 top-0 bottom-0 w-1"
+                    className="absolute left-0 top-0 bottom-0 w-1.5"
                     style={{ backgroundColor: empColor }}
                   />
                   <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0 ml-1"
-                    style={{ backgroundColor: empColor }}
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 ml-1"
+                    style={{ backgroundColor: empColor, boxShadow: `0 2px 8px ${empColor}60` }}
                   >
                     {empleado.nombre.charAt(0)}{empleado.apellido?.charAt(0) || ''}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-xs truncate" style={{ color: theme.text }}>
+                    <div className="font-semibold text-sm truncate" style={{ color: theme.text }}>
                       {empleado.nombre} {empleado.apellido || ''}
                     </div>
                     <div
-                      className="text-[10px] truncate font-medium"
+                      className="text-xs truncate font-medium mt-0.5"
                       style={{ color: empColor }}
                     >
                       {subtitulo}

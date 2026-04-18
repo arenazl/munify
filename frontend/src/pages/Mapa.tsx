@@ -1,14 +1,15 @@
 import { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import { X, MapPin, Calendar, User, Tag, Clock, Navigation, Map as MapIcon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 // URLs de tiles para tema claro y oscuro
-// Voyager = mucho más detalle de calles, nombres y POIs que light_all/dark_all
+// light: Voyager (detalle de calles + nombres). dark: dark_matter (base negra con labels legibles).
 const TILE_URLS = {
   light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
 };
 import { reclamosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
@@ -138,11 +139,16 @@ function FitBoundsToMarkers({ reclamos }: { reclamos: Reclamo[] }) {
 }
 
 export default function Mapa() {
-  const { theme, currentPresetId } = useTheme();
+  const { theme } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Detectar si el tema es claro (solo sand y arctic son claros)
-  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
+  const isDarkTheme = (() => {
+    const hex = theme.background?.replace('#', '') || '';
+    if (hex.length !== 6) return true;
+    const n = parseInt(hex, 16);
+    const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff)) / 255;
+    return lum < 0.5;
+  })();
   const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
 
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
@@ -416,18 +422,29 @@ export default function Mapa() {
           </MapContainer>
         </div>
 
-        {/* Side Modal para detalle del reclamo */}
-        <div
-          className={`absolute top-0 right-0 h-full w-96 transform transition-transform duration-300 ease-in-out z-[1000] ${
-            sidebarOpen ? 'translate-x-0' : 'translate-x-full'
-          }`}
-          style={{
-            backgroundColor: theme.card,
-            borderLeft: `1px solid ${theme.border}`,
-            boxShadow: sidebarOpen ? '-4px 0 15px rgba(0,0,0,0.1)' : 'none'
-          }}
-        >
-          {selected && (
+      </div>
+
+      {/* Side Drawer fijo al viewport — se abre desde la derecha, independiente del scroll */}
+      {createPortal(
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={closeSidebar}
+            className={`fixed inset-0 bg-black/30 backdrop-blur-[2px] transition-opacity duration-300 z-[9998] ${
+              sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}
+          />
+          <div
+            className={`fixed top-0 right-0 h-screen w-full sm:w-[420px] transform transition-transform duration-300 ease-in-out z-[9999] ${
+              sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+            style={{
+              backgroundColor: theme.card,
+              borderLeft: `1px solid ${theme.border}`,
+              boxShadow: sidebarOpen ? '-8px 0 32px rgba(0,0,0,0.25)' : 'none',
+            }}
+          >
+            {selected && (
             <div className="h-full flex flex-col">
               {/* Header del sidebar */}
               <div
@@ -588,49 +605,10 @@ export default function Mapa() {
 
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Lista de reclamos con ubicación */}
-      <div className="rounded-lg shadow p-6" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        <h2 className="text-lg font-semibold mb-4" style={{ color: theme.text }}>
-          {filtroCategoria && categoryConfig
-            ? `${categoryConfig.label}${filtroEstado ? ` - ${STATUS_LABELS[filtroEstado]}` : ''} (${reclamosFiltrados.length})`
-            : filtroEstado
-              ? `${STATUS_LABELS[filtroEstado]} (${reclamosFiltrados.length})`
-              : `Reclamos con ubicación (${reclamos.length})`}
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {reclamosFiltrados.slice(0, 9).map((reclamo) => (
-            <div
-              key={reclamo.id}
-              className="p-4 rounded-lg cursor-pointer transition-all hover:scale-[1.02]"
-              style={{
-                backgroundColor: selected?.id === reclamo.id ? `${theme.primary}15` : theme.backgroundSecondary,
-                border: `1px solid ${selected?.id === reclamo.id ? theme.primary : theme.border}`,
-              }}
-              onClick={() => handleMarkerClick(reclamo)}
-            >
-              <p className="font-medium" style={{ color: theme.text }}>{reclamo.titulo}</p>
-              <p className="text-sm" style={{ color: theme.textSecondary }}>{reclamo.direccion}</p>
-              <div className="flex items-center mt-2">
-                <span
-                  className="text-xs px-2 py-1 rounded text-white"
-                  style={{ backgroundColor: reclamo.categoria?.color || '#6b7280' }}
-                >
-                  {reclamo.categoria?.nombre}
-                </span>
-                <span
-                  className="ml-auto text-xs font-medium"
-                  style={{ color: STATUS_COLORS[reclamo.estado] }}
-                >
-                  {STATUS_LABELS[reclamo.estado] || reclamo.estado}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

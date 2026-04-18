@@ -23,6 +23,8 @@ import {
 } from 'recharts';
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import PageHint from '../components/ui/PageHint';
+import DashboardLive from '../components/DashboardLive';
+import { Radio } from 'lucide-react';
 
 // Tipos para analytics
 interface HeatmapPoint {
@@ -139,6 +141,9 @@ export default function Dashboard() {
   const handleCategoryClick = useCallback((categoryKey: string, categoryLabel: string) => {
     navigate(`/gestion/mapa?categoria=${encodeURIComponent(categoryKey)}`);
   }, [navigate]);
+
+  // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
+  const [liveMode, setLiveMode] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -479,6 +484,23 @@ export default function Dashboard() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
           )}
         </div>
+
+        {/* Botón LIVE — convierte el dashboard en modo televisor con auto-rotate */}
+        <button
+          onClick={() => setLiveMode(true)}
+          className="absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all hover:scale-105 active:scale-95 backdrop-blur-md"
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+            border: '2px solid rgba(239, 68, 68, 0.6)',
+            color: '#ffffff',
+            boxShadow: '0 4px 16px rgba(239, 68, 68, 0.4)',
+          }}
+          title="Modo televisor — slides en pantalla completa"
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+          <Radio className="h-4 w-4" />
+          <span className="tracking-wider">LIVE</span>
+        </button>
 
         {/* Contenido del header */}
         <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
@@ -1289,6 +1311,18 @@ export default function Dashboard() {
       </div>
       </>
       )}
+
+      {/* Modo televisor (TV mode) — overlay fullscreen con auto-rotate */}
+      <DashboardLive
+        open={liveMode}
+        onClose={() => setLiveMode(false)}
+        municipioNombre={municipioNombre}
+        stats={stats}
+        porCategoria={porCategoria}
+        porZona={porZona}
+        tendencias={tendencias}
+        heatmapData={heatmapData}
+      />
     </div>
   );
 }
