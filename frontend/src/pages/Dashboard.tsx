@@ -102,7 +102,7 @@ interface MetricasDetalle {
 export default function Dashboard() {
   console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
   const { theme } = useTheme();
-  const { municipioActual } = useAuth();
+  const { municipioActual, user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tramitesStats, setTramitesStats] = useState<DashboardStats | null>(null);
@@ -494,22 +494,94 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Botón LIVE — convierte el dashboard en modo televisor con auto-rotate */}
+        {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
         <button
           onClick={() => setLiveMode(true)}
-          className="absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all hover:scale-105 active:scale-95 backdrop-blur-md"
+          className="live-btn absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.2)',
-            border: '2px solid rgba(239, 68, 68, 0.6)',
+            backgroundColor: 'rgba(239, 68, 68, 0.25)',
+            border: '2px solid rgba(239, 68, 68, 0.7)',
             color: '#ffffff',
-            boxShadow: '0 4px 16px rgba(239, 68, 68, 0.4)',
           }}
           title="Modo televisor — slides en pantalla completa"
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-          <Radio className="h-4 w-4" />
-          <span className="tracking-wider">LIVE</span>
+          {/* Anillo pulsante exterior para llamar la atención */}
+          <span className="live-ring absolute inset-0 rounded-full pointer-events-none" />
+          {/* Shimmer que atraviesa el botón */}
+          <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
+
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 live-dot relative z-10" />
+          <Radio className="h-4 w-4 relative z-10 live-radio" />
+          <span className="tracking-wider relative z-10">LIVE</span>
         </button>
+        )}
+
+        <style>{`
+          .live-btn {
+            animation: liveBtnBreathe 2.4s ease-in-out infinite;
+            box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5);
+          }
+          .live-btn:hover {
+            animation-play-state: paused;
+            transform: scale(1.08);
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.7);
+          }
+          .live-btn:active { transform: scale(0.95); }
+
+          @keyframes liveBtnBreathe {
+            0%, 100% { box-shadow: 0 4px 16px rgba(239, 68, 68, 0.5); transform: scale(1); }
+            50%      { box-shadow: 0 6px 28px rgba(239, 68, 68, 0.85); transform: scale(1.04); }
+          }
+
+          /* Anillo pulsante que se expande hacia afuera */
+          .live-ring {
+            border: 2px solid rgba(239, 68, 68, 0.6);
+            animation: liveRingPulse 2s ease-out infinite;
+          }
+          @keyframes liveRingPulse {
+            0%   { transform: scale(1);   opacity: 0.7; }
+            100% { transform: scale(1.6); opacity: 0; }
+          }
+
+          /* Shimmer diagonal que cruza cada 3s */
+          .live-shimmer-btn {
+            background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.35) 45%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.35) 55%, transparent 70%);
+            background-size: 250% 100%;
+            background-position: 200% 0;
+            animation: liveShimmerMove 3s ease-in-out infinite;
+          }
+          @keyframes liveShimmerMove {
+            0%, 100% { background-position: 200% 0; }
+            50%      { background-position: -50% 0; }
+          }
+
+          /* Puntito rojo con pulso más vivo */
+          .live-dot {
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.9);
+            animation: liveDotPulse 1.2s ease-in-out infinite;
+          }
+          @keyframes liveDotPulse {
+            0%, 100% { transform: scale(1);   opacity: 1;   box-shadow: 0 0 8px rgba(239,68,68,0.9); }
+            50%      { transform: scale(1.3); opacity: 0.7; box-shadow: 0 0 14px rgba(239,68,68,1); }
+          }
+
+          /* Icono de radio con micro-wobble sutil */
+          .live-radio {
+            animation: liveRadioWobble 4s ease-in-out infinite;
+          }
+          @keyframes liveRadioWobble {
+            0%, 100% { transform: rotate(0deg); }
+            25%      { transform: rotate(-8deg); }
+            75%      { transform: rotate(8deg); }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            .live-btn, .live-ring, .live-shimmer-btn, .live-dot, .live-radio {
+              animation: none !important;
+            }
+          }
+        `}</style>
 
         {/* Contenido del header */}
         <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
