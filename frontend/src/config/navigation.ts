@@ -174,13 +174,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
       description: 'Trámites específicos del municipio (ej: Licencia de Conducir)'
     },
-    {
-      name: 'Proveedores de Pago',
-      href: '/gestion/proveedores-pago',
-      icon: Wallet,
-      show: isAdminOrSupervisor && !isSuperAdmin,
-      description: 'GIRE, MercadoPago y MODO — quién procesa los cobros'
-    },
     // === Solo SUPERADMIN (admin sin municipio asignado) ===
     {
       name: 'Municipios',
