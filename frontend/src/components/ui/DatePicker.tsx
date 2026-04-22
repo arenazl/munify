@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Calendar, ChevronDown, X } from 'lucide-react';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker, type Matcher } from 'react-day-picker';
 import { es } from 'date-fns/locale';
 import 'react-day-picker/style.css';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -63,10 +63,15 @@ export function DatePicker({
   const selected = fromISO(value);
   const display = value ? formatDisplay(value) : placeholder;
 
-  const disabledMatcher = [
-    minDate ? { before: fromISO(minDate)! } : undefined,
-    maxDate ? { after: fromISO(maxDate)! } : undefined,
-  ].filter(Boolean) as { before?: Date; after?: Date }[];
+  const disabledMatcher: Matcher[] = [];
+  if (minDate) {
+    const d = fromISO(minDate);
+    if (d) disabledMatcher.push({ before: d });
+  }
+  if (maxDate) {
+    const d = fromISO(maxDate);
+    if (d) disabledMatcher.push({ after: d });
+  }
 
   const rdpVars = {
     '--rdp-accent-color': theme.primary,
