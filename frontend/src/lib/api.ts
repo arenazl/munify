@@ -1511,6 +1511,19 @@ export const operadorApi = {
     }>('/operador/tramite-presencial/iniciar', body),
   reenviarWhatsapp: (solicitudId: number) =>
     api.post<{ ok: boolean }>('/operador/tramite-presencial/reenviar-whatsapp', { solicitud_id: solicitudId }),
+  registrarPagoEfectivo: (solicitudId: number, monto: number, numeroComprobante: string, foto: File | null) => {
+    const form = new FormData();
+    form.append('solicitud_id', String(solicitudId));
+    form.append('monto', String(monto));
+    form.append('numero_comprobante', numeroComprobante);
+    if (foto) form.append('foto', foto);
+    return api.post<{
+      session_id: string;
+      codigo_cut_qr: string;
+      monto: number;
+      foto_comprobante_url: string | null;
+    }>('/operador/pagos/efectivo/registrar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
 };
 
 // CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial

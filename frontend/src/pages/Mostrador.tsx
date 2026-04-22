@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { User as UserIcon, FileText, CheckCircle2, AlertTriangle, Copy, ExternalLink, Clock, Receipt, MessageSquare } from 'lucide-react';
+import { User as UserIcon, FileText, CheckCircle2, AlertTriangle, Copy, ExternalLink, Clock, Receipt, MessageSquare, Banknote, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,6 +56,7 @@ export default function Mostrador() {
 
   // Resultado
   const [result, setResult] = useState<InicioResult | null>(null);
+  const [efectivoOpen, setEfectivoOpen] = useState(false);
 
   const municipioId = user?.municipio_id ?? null;
 
@@ -330,6 +331,17 @@ export default function Mostrador() {
                 </div>
               )}
 
+              {result.requiere_pago && (
+                <button
+                  onClick={() => setEfectivoOpen(true)}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-[1.01] active:scale-95"
+                  style={{ backgroundColor: '#f59e0b20', color: '#d97706', border: '1px solid #f59e0b60' }}
+                >
+                  <Banknote className="w-4 h-4" />
+                  El vecino paga en efectivo (caja del muni)
+                </button>
+              )}
+
               <button
                 onClick={resetForm}
                 className="w-full px-3 py-2 rounded-lg text-sm font-semibold"
@@ -339,6 +351,140 @@ export default function Mostrador() {
               </button>
             </div>
           )}
+        </div>
+      </div>
+
+      {result && result.requiere_pago && (
+        <EfectivoModal
+          open={efectivoOpen}
+          onClose={() => setEfectivoOpen(false)}
+          solicitudId={result.solicitud_id}
+          montoSugerido={result.monto ?? 0}
+          onConfirmed={() => {
+            setEfectivoOpen(false);
+            toast.success('Pago en efectivo registrado');
+            operadorApi.home().then((m) => setMetricas(m.data)).catch(() => {});
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EfectivoModal({
+  open,
+  onClose,
+  solicitudId,
+  montoSugerido,
+  onConfirmed,
+}: {
+  open: boolean;
+  onClose: () => void;
+  solicitudId: number;
+  montoSugerido: number;
+  onConfirmed: () => void;
+}) {
+  const { theme } = useTheme();
+  const [monto, setMonto] = useState(String(montoSugerido || ''));
+  const [numComp, setNumComp] = useState('');
+  const [foto, setFoto] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMonto(String(montoSugerido || ''));
+      setNumComp('');
+      setFoto(null);
+    }
+  }, [open, montoSugerido]);
+
+  if (!open) return null;
+
+  const handleSubmit = async () => {
+    const m = parseFloat(monto);
+    if (!Number.isFinite(m) || m <= 0) {
+      toast.error('Monto inválido');
+      return;
+    }
+    if (!numComp.trim()) {
+      toast.error('N° de comprobante obligatorio');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await operadorApi.registrarPagoEfectivo(solicitudId, m, numComp.trim(), foto);
+      onConfirmed();
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'No se pudo registrar el pago');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <div className="rounded-xl p-5 w-full max-w-md space-y-3" style={{ backgroundColor: theme.card }}>
+        <div className="flex items-center gap-2">
+          <Banknote className="w-5 h-5" style={{ color: '#d97706' }} />
+          <h3 className="text-base font-bold">Registrar pago en efectivo</h3>
+        </div>
+        <p className="text-xs" style={{ color: theme.textSecondary }}>
+          Pegá el N° de comprobante de la caja del muni y subí la foto del ticket.
+        </p>
+
+        <div>
+          <label className="block text-[11px] font-semibold mb-1">Monto cobrado</label>
+          <input
+            type="number"
+            step="0.01"
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold mb-1">N° comprobante caja *</label>
+          <input
+            type="text"
+            value={numComp}
+            onChange={(e) => setNumComp(e.target.value)}
+            placeholder="Ej: 00001234"
+            className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+          />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold mb-1">Foto del ticket</label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFoto(e.target.files?.[0] || null)}
+            className="w-full text-xs"
+          />
+          {foto && (
+            <p className="text-[11px] mt-1 flex items-center gap-1" style={{ color: '#22c55e' }}>
+              <Upload className="w-3 h-3" /> {foto.name}
+            </p>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button onClick={onClose} disabled={submitting} className="px-3 py-2 rounded-lg text-sm" style={{ color: theme.textSecondary }}>
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: '#d97706' }}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            {submitting ? 'Registrando…' : 'Registrar pago'}
+          </button>
         </div>
       </div>
     </div>

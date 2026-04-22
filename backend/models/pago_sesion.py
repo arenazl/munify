@@ -51,6 +51,7 @@ class MedioPagoGateway(str, enum.Enum):
     EFECTIVO_CUPON = "efectivo_cupon"      # cupon con codigo barras, se paga en Rapipago/Pago Facil/etc
     TRANSFERENCIA = "transferencia"        # CBU/CVU
     DEBITO_AUTOMATICO = "debito_automatico"  # adhesion via CBU
+    EFECTIVO_VENTANILLA = "efectivo_ventanilla"  # caja del muni — Fase 8 bundle pagos
 
 
 class PagoSesion(Base):

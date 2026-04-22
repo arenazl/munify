@@ -28,7 +28,7 @@ from decimal import Decimal
 from secrets import token_hex
 from typing import Optional, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -346,6 +346,109 @@ async def reenviar_whatsapp(
         usuario_id=vecino.id,
     )
     return {"ok": ok}
+
+
+# ============================================================
+# Fase 8 — Pago en efectivo en caja del muni
+# ============================================================
+#
+# Flow: operador carga un tramite presencialmente (F6), el vecino paga en
+# la caja fisica del palacio municipal, trae el ticket al operador y este
+# lo registra acá subiendo foto del comprobante. La sesion queda APPROVED
+# directo + medio=efectivo_ventanilla + canal=ventanilla_asistida, y entra
+# al flujo normal de imputacion (F1). Audit trail: registrado_por_operador_id.
+# ============================================================
+
+
+@router.post("/pagos/efectivo/registrar")
+async def registrar_pago_efectivo(
+    solicitud_id: int = Form(...),
+    monto: float = Form(...),
+    numero_comprobante: str = Form(...),
+    foto: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Registra un pago efectivo en caja del muni con foto del ticket."""
+    _asegurar_operador(current_user)
+    if not numero_comprobante.strip():
+        raise HTTPException(status_code=400, detail="N° de comprobante obligatorio")
+    if monto <= 0:
+        raise HTTPException(status_code=400, detail="Monto debe ser > 0")
+
+    sol_q = await db.execute(
+        select(Solicitud).options(selectinload(Solicitud.tramite)).where(Solicitud.id == solicitud_id)
+    )
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _asegurar_muni(current_user, solicitud.municipio_id)
+
+    # Subir foto a Cloudinary si se envio
+    foto_url: Optional[str] = None
+    if foto and foto.filename:
+        try:
+            import cloudinary.uploader
+            content = await foto.read()
+            if len(content) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Foto > 10MB")
+            await foto.seek(0)
+            up = cloudinary.uploader.upload(
+                foto.file,
+                folder=f"pagos_efectivo/{solicitud.municipio_id}",
+                resource_type="image",
+            )
+            foto_url = up.get("secure_url")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo foto: {e}")
+
+    # Crear PagoSesion APPROVED + medio efectivo_ventanilla
+    from models.pago_sesion import PagoSesion, EstadoSesionPago, MedioPagoGateway, EstadoImputacion
+    from models.tasas import Pago, MedioPago as MedioPagoTasa
+
+    session_id = f"PB-{token_hex(7).upper()}"
+    cut = f"CUT-{token_hex(3).upper()}"
+    ahora = datetime.utcnow()
+    concepto = f"{solicitud.tramite.nombre if solicitud.tramite else 'Tramite'} — {solicitud.numero_tramite} (efectivo)"
+
+    sesion = PagoSesion(
+        id=session_id,
+        solicitud_id=solicitud.id,
+        municipio_id=solicitud.municipio_id,
+        vecino_user_id=solicitud.solicitante_id,
+        concepto=concepto,
+        monto=Decimal(str(monto)),
+        estado=EstadoSesionPago.APPROVED,
+        medio_pago=MedioPagoGateway.EFECTIVO_VENTANILLA,
+        provider="caja_muni",
+        external_id=numero_comprobante.strip()[:100],
+        completed_at=ahora,
+        codigo_cut_qr=cut,
+        imputacion_estado=EstadoImputacion.PENDIENTE,
+        canal="ventanilla_asistida",
+        operador_user_id=current_user.id,
+        metadatos={"numero_comprobante": numero_comprobante.strip(), "foto_url": foto_url},
+    )
+    db.add(sesion)
+
+    # Historial
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud.id,
+        usuario_id=current_user.id,
+        accion="💵 Pago en efectivo registrado",
+        comentario=f"Comprobante #{numero_comprobante} · ${monto:.2f} · Operador {current_user.email}",
+    ))
+
+    await db.commit()
+
+    return {
+        "session_id": session_id,
+        "codigo_cut_qr": cut,
+        "monto": monto,
+        "foto_comprobante_url": foto_url,
+    }
 
 
 @router.get("/mostrador/home", response_model=MostradorMetricas)
