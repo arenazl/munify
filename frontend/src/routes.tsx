@@ -34,6 +34,7 @@ import ReclamoDetalle from './pages/ReclamoDetalle';
 import MisTramites from './pages/MisTramites';
 import MisTasas from './pages/MisTasas';
 import GestionTasas from './pages/GestionTasas';
+import GestionPagos from './pages/GestionPagos';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -270,6 +271,11 @@ export const router = createBrowserRouter([
       {
         path: 'tasas',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionTasas /></ProtectedRoute>
+      },
+      // Gestión de pagos — vista contaduría (histórico transaccional)
+      {
+        path: 'pagos',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionPagos /></ProtectedRoute>
       },
       // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
       {

@@ -1375,6 +1375,16 @@ export const pagosApi = {
     }>(`/pagos/estado-solicitud/${solicitudId}`),
 };
 
+// Contaduria — listado + resumen + export de pagos realizados (backoffice)
+export const pagosContaduriaApi = {
+  listar: (params: Record<string, unknown>) =>
+    api.get('/pagos/contaduria/listar', { params, paramsSerializer: { indexes: null } }),
+  resumen: (params: Record<string, unknown>) =>
+    api.get('/pagos/contaduria/resumen', { params, paramsSerializer: { indexes: null } }),
+  exportar: (params: Record<string, unknown>) =>
+    api.get('/pagos/contaduria/exportar', { params, paramsSerializer: { indexes: null }, responseType: 'blob' }),
+};
+
 export interface Recomendacion {
   tipo: string;
   icono: string;

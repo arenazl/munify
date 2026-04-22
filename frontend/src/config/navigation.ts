@@ -101,6 +101,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Partidas del padrón y deudas'
     },
     {
+      name: 'Pagos',
+      href: '/gestion/pagos',
+      icon: Wallet,
+      show: isAdminOrSupervisor,
+      description: 'Histórico transaccional para contaduría'
+    },
+    {
       name: 'Mapa',
       href: '/gestion/mapa',
       icon: Map,

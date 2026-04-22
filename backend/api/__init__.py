@@ -38,6 +38,7 @@ from .geocoding import router as geocoding_router
 from .admin_audit import router as admin_audit_router
 from .tasas import router as tasas_router
 from .pagos import router as pagos_router
+from .pagos_contaduria import router as pagos_contaduria_router
 from .proveedores_pago import router as proveedores_pago_router
 from .vecino import router as vecino_router
 from .mock_padron import router as mock_padron_router
@@ -82,6 +83,7 @@ api_router.include_router(geocoding_router, prefix="/geocoding", tags=["Geocodin
 api_router.include_router(admin_audit_router, tags=["Admin Audit"])  # ya tiene prefix /admin
 api_router.include_router(tasas_router, tags=["Tasas"])  # ya tiene prefix /tasas
 api_router.include_router(pagos_router, tags=["Pagos"])  # ya tiene prefix /pagos
+api_router.include_router(pagos_contaduria_router, tags=["Pagos - Contaduria"])  # prefix /pagos/contaduria
 api_router.include_router(proveedores_pago_router, prefix="/proveedores-pago", tags=["Proveedores Pago"])
 api_router.include_router(vecino_router, tags=["Vecino"])  # ya tiene prefix /vecino
 api_router.include_router(mock_padron_router)  # ya tiene prefix /mock
