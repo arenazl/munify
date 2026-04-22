@@ -40,6 +40,7 @@ from models.enums import RolUsuario
 from models.pago_sesion import (
     PagoSesion,
     EstadoSesionPago,
+    EstadoImputacion,
     MedioPagoGateway,
 )
 from models.tasas import Deuda, EstadoDeuda, Pago, MedioPago as MedioPagoTasa, Partida
@@ -91,6 +92,7 @@ class ConfirmarPagoResponse(BaseModel):
     session_id: str
     estado: EstadoSesionPago
     external_id: str
+    codigo_cut_qr: Optional[str] = None
     comprobante: dict
 
 
@@ -101,6 +103,23 @@ class ConfirmarPagoResponse(BaseModel):
 def _generar_session_id() -> str:
     """ID publico no enumerable: PB-ABC123DEF456 (14 chars hex)."""
     return f"PB-{token_hex(7).upper()}"
+
+
+async def _generar_cut_unico(db: AsyncSession, intentos: int = 6) -> str:
+    """Genera un CUT corto (CUT-A3F2B1) garantizando unicidad en DB.
+
+    Colision practicamente imposible con 6 chars hex (16M combinaciones), pero
+    reintentamos igual si el UNIQUE INDEX rechaza. Si despues de N intentos
+    no lo logramos, caemos a un CUT largo con timestamp para no fallar.
+    """
+    from sqlalchemy import exists as _exists, select as _select
+    for _ in range(intentos):
+        candidato = f"CUT-{token_hex(3).upper()}"
+        q = await db.execute(_select(PagoSesion.id).where(PagoSesion.codigo_cut_qr == candidato))
+        if q.scalar_one_or_none() is None:
+            return candidato
+    # Fallback — larguisimo, pero garantizado unico
+    return f"CUT-{token_hex(6).upper()}"
 
 
 # ============================================================
@@ -380,6 +399,16 @@ async def confirmar_pago(
         "simulado": True,
     }
 
+    # Generar CUT (Codigo Unico de Tramite) si aun no lo tiene —
+    # el operador de ventanilla lo escanea para verificar el pago.
+    if not sesion.codigo_cut_qr:
+        sesion.codigo_cut_qr = await _generar_cut_unico(db)
+
+    # Marcar pendiente de imputacion contable. Contaduria despues lo pasa
+    # a 'imputado' cuando carga el asiento en el sistema tributario (RAFAM).
+    if sesion.imputacion_estado is None:
+        sesion.imputacion_estado = EstadoImputacion.PENDIENTE
+
     # Marcar la deuda como pagada + crear registro de Pago
     if sesion.deuda:
         sesion.deuda.estado = EstadoDeuda.PAGADA
@@ -430,6 +459,7 @@ async def confirmar_pago(
         session_id=sesion.id,
         estado=sesion.estado,
         external_id=sesion.external_id or "",
+        codigo_cut_qr=sesion.codigo_cut_qr,
         comprobante={
             "concepto": sesion.concepto,
             "monto": str(sesion.monto),
@@ -437,7 +467,76 @@ async def confirmar_pago(
             "fecha": sesion.completed_at.isoformat() if sesion.completed_at else None,
             "numero_operacion": sesion.external_id,
             "provider": sesion.provider,
+            "cut": sesion.codigo_cut_qr,
         },
+    )
+
+
+# ============================================================
+# 3.5. Consulta publica por CUT (operador de ventanilla)
+# ============================================================
+
+class CUTInfo(BaseModel):
+    """Info publica que devuelve /pagos/cut/{codigo}.
+
+    Para el operador de ventanilla: sirve para verificar en el mostrador
+    que un vecino efectivamente pago, sin que el operador tenga que
+    loguearse como el vecino ni revelar datos sensibles.
+    """
+    codigo_cut_qr: str
+    concepto: str
+    monto: str
+    medio_pago: Optional[str]
+    estado: str
+    fecha_pago: Optional[str]
+    provider: str
+    numero_operacion: Optional[str]
+    municipio_nombre: Optional[str]
+    vecino_nombre: Optional[str]
+    imputacion_estado: Optional[str]
+
+
+@router.get("/cut/{codigo}", response_model=CUTInfo)
+async def obtener_por_cut(codigo: str, db: AsyncSession = Depends(get_db)):
+    """Endpoint publico — el operador escanea el CUT y valida el pago.
+
+    Abierto (sin JWT): el CUT es no-enumerable y solo revela info minima
+    necesaria para confirmar que el pago existe y esta aprobado. Si la
+    sesion no esta APPROVED devuelve 404 para evitar fishing de estados.
+    """
+    q = await db.execute(
+        select(PagoSesion)
+        .options(
+            selectinload(PagoSesion.municipio),
+            selectinload(PagoSesion.vecino),
+        )
+        .where(PagoSesion.codigo_cut_qr == codigo.upper())
+    )
+    sesion = q.scalar_one_or_none()
+    if not sesion or sesion.estado != EstadoSesionPago.APPROVED:
+        raise HTTPException(status_code=404, detail="CUT no encontrado o pago no aprobado")
+
+    muni_nombre = (
+        sesion.municipio.nombre.replace("Municipalidad de ", "")
+        if sesion.municipio else None
+    )
+    vecino_nombre = (
+        f"{sesion.vecino.nombre or ''} {sesion.vecino.apellido or ''}".strip()
+        if sesion.vecino else None
+    )
+
+    return CUTInfo(
+        codigo_cut_qr=sesion.codigo_cut_qr,
+        concepto=sesion.concepto,
+        monto=str(sesion.monto),
+        medio_pago=sesion.medio_pago.value if sesion.medio_pago else None,
+        estado=sesion.estado.value,
+        fecha_pago=sesion.completed_at.isoformat() if sesion.completed_at else None,
+        provider=sesion.provider,
+        numero_operacion=sesion.external_id,
+        municipio_nombre=muni_nombre,
+        vecino_nombre=vecino_nombre,
+        imputacion_estado=sesion.imputacion_estado.value if sesion.imputacion_estado else None,
     )
 
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, CheckCircle2, Clock, XCircle, TrendingUp, Download,
   CreditCard, QrCode, Receipt, ArrowRightLeft, Repeat2, Building2, FileText,
+  History, ClipboardCheck,
 } from 'lucide-react';
 import { ABMPage, ABMTable, ABMTableColumn } from '../components/ui/ABMPage';
 import { DateRangePicker, DateRange, currentMonthRange } from '../components/ui/DateRangePicker';
@@ -9,6 +10,7 @@ import { ModernSelect } from '../components/ui/ModernSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import { pagosContaduriaApi } from '../lib/api';
 import { dependenciasApi } from '../lib/api';
+import ColaImputacion from '../components/pagos/ColaImputacion';
 
 // ------------------------------------------------------------
 // Tipos
@@ -128,8 +130,11 @@ function formatDate(iso: string | null): string {
 // ------------------------------------------------------------
 // Componente
 // ------------------------------------------------------------
+type TabKey = 'historial' | 'imputacion';
+
 export default function GestionPagos() {
   const { theme } = useTheme();
+  const [tab, setTab] = useState<TabKey>('historial');
 
   // Filtros
   const [range, setRange] = useState<DateRange>(currentMonthRange());
@@ -185,8 +190,9 @@ export default function GestionPagos() {
     };
   }, [range, estados, medios, origen, dependenciaId, search]);
 
-  // Cargar datos cuando cambian filtros
+  // Cargar datos cuando cambian filtros (solo en tab historial)
   useEffect(() => {
+    if (tab !== 'historial') return;
     const fetch = async () => {
       setLoading(true);
       try {
@@ -205,7 +211,7 @@ export default function GestionPagos() {
       }
     };
     fetch();
-  }, [buildParams]);
+  }, [buildParams, tab]);
 
   const handleExportar = async () => {
     setExporting(true);
@@ -537,7 +543,7 @@ export default function GestionPagos() {
     </div>
   );
 
-  const headerActions = (
+  const headerActions = tab === 'historial' ? (
     <button
       onClick={handleExportar}
       disabled={exporting || items.length === 0}
@@ -552,7 +558,57 @@ export default function GestionPagos() {
       <Download className="w-4 h-4" />
       {exporting ? 'Exportando…' : 'Exportar CSV'}
     </button>
+  ) : null;
+
+  const tabsSwitcher = (
+    <div
+      className="inline-flex items-center rounded-lg p-1 gap-1"
+      style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+    >
+      {([
+        { key: 'historial', label: 'Historial', icon: History },
+        { key: 'imputacion', label: 'Cola de imputación', icon: ClipboardCheck },
+      ] as const).map((t) => {
+        const active = tab === t.key;
+        const Icon = t.icon;
+        return (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200"
+            style={{
+              backgroundColor: active ? theme.card : 'transparent',
+              color: active ? theme.primary : theme.textSecondary,
+              boxShadow: active ? `0 1px 2px ${theme.border}` : 'none',
+            }}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
   );
+
+  if (tab === 'imputacion') {
+    return (
+      <ABMPage
+        title="Gestión de Pagos"
+        icon={<Wallet className="w-5 h-5" />}
+        searchPlaceholder=""
+        searchValue=""
+        onSearchChange={() => {}}
+        secondaryFilters={tabsSwitcher}
+        headerActions={null}
+        loading={false}
+        isEmpty={false}
+        emptyMessage=""
+        tableView={<ColaImputacion />}
+      >
+        <ColaImputacion />
+      </ABMPage>
+    );
+  }
 
   return (
     <ABMPage
@@ -561,7 +617,12 @@ export default function GestionPagos() {
       searchPlaceholder="Buscar por concepto o N° de operación…"
       searchValue={search}
       onSearchChange={setSearch}
-      secondaryFilters={secondaryFilters}
+      secondaryFilters={
+        <div className="flex flex-col gap-3">
+          {tabsSwitcher}
+          {secondaryFilters}
+        </div>
+      }
       headerActions={headerActions}
       loading={loading && !resumen}
       isEmpty={!loading && items.length === 0}

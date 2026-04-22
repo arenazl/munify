@@ -32,6 +32,19 @@ class EstadoSesionPago(str, enum.Enum):
     CANCELLED = "cancelled"      # el vecino cancelo
 
 
+class EstadoImputacion(str, enum.Enum):
+    """Estado de la imputacion contable del pago en el sistema del muni (RAFAM).
+
+    Relevante solo para sesiones APPROVED. El vecino ya pago — lo que
+    trackea este campo es si Contaduria/Tesoreria cargo el asiento en
+    su sistema tributario interno.
+    """
+    NO_APLICA = "no_aplica"                      # pago no requiere imputacion (ej: tramite 100% digital sin contrapartida contable)
+    PENDIENTE = "pendiente"                      # default — aprobado pero nadie lo cargo aun en RAFAM
+    IMPUTADO = "imputado"                        # contaduria lo cargo + dejo referencia externa
+    RECHAZADO_IMPUTACION = "rechazado_imputacion"  # contaduria no pudo imputarlo; queda visible para retry
+
+
 class MedioPagoGateway(str, enum.Enum):
     TARJETA = "tarjeta"                    # credito/debito
     QR = "qr"                              # QR interoperable (tipo MODO/MP/BNA)
@@ -89,11 +102,29 @@ class PagoSesion(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # CUT (Codigo Unico de Tramite) — hash corto humanamente dictable que
+    # el operador de ventanilla escanea/tipea para verificar el pago.
+    # Ej: "CUT-A3F2B1". Se genera al pasar a APPROVED.
+    codigo_cut_qr = Column(String(30), nullable=True, unique=True, index=True)
+
+    # Imputacion contable (ver EstadoImputacion). Se popula al aprobar.
+    imputacion_estado = Column(
+        SQLEnum(EstadoImputacion, values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+        index=True,
+    )
+    imputado_at = Column(DateTime(timezone=True), nullable=True)
+    imputado_por_usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    imputacion_observacion = Column(String(500), nullable=True)
+    imputacion_referencia_externa = Column(String(100), nullable=True)  # N° asiento RAFAM
+
     # Relaciones
     deuda = relationship("Deuda")
     municipio = relationship("Municipio")
     vecino = relationship("User", foreign_keys=[vecino_user_id])
+    imputado_por = relationship("User", foreign_keys=[imputado_por_usuario_id])
 
     __table_args__ = (
         Index("ix_pago_sesiones_vecino_estado", "vecino_user_id", "estado"),
+        Index("ix_pago_sesiones_imputacion", "municipio_id", "imputacion_estado", "completed_at"),
     )

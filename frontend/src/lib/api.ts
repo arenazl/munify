@@ -1408,6 +1408,23 @@ export const pagosContaduriaApi = {
     api.get('/pagos/contaduria/resumen', { params, paramsSerializer: { indexes: null } }),
   exportar: (params: Record<string, unknown>) =>
     api.get('/pagos/contaduria/exportar', { params, paramsSerializer: { indexes: null }, responseType: 'blob' }),
+
+  // Fase 1 — Cola de imputacion contable
+  imputacion: {
+    cola: (params: Record<string, unknown>) =>
+      api.get('/pagos/contaduria/imputacion/pendientes', { params, paramsSerializer: { indexes: null } }),
+    marcar: (sessionId: string, referencia_externa: string, observacion?: string) =>
+      api.post(`/pagos/contaduria/imputacion/${sessionId}/marcar`, { referencia_externa, observacion }),
+    rechazar: (sessionId: string, motivo: string) =>
+      api.post(`/pagos/contaduria/imputacion/${sessionId}/rechazar`, { motivo }),
+    bulkMarcar: (items: Array<{ session_id: string; referencia_externa: string }>, observacion_comun?: string) =>
+      api.post('/pagos/contaduria/imputacion/bulk-marcar', { items, observacion_comun }),
+  },
+};
+
+// Consulta publica por CUT (operador de ventanilla)
+export const cutApi = {
+  consultar: (codigo: string) => api.get(`/pagos/cut/${codigo}`),
 };
 
 export interface Recomendacion {
