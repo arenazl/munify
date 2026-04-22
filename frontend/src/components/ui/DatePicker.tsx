@@ -87,6 +87,40 @@ export function DatePicker({
     color: theme.text,
   } as React.CSSProperties;
 
+  // react-day-picker v9 por default solo pinta un borde en los seleccionados.
+  // Forzamos fondo lleno con theme.primary y demás estados coherentes al tema.
+  const rdpThemedCss = `
+    .rdp-themed .rdp-day.rdp-selected > .rdp-day_button {
+      background-color: ${theme.primary};
+      color: #ffffff;
+      border: 1px solid ${theme.primary};
+      font-weight: 600;
+    }
+    .rdp-themed .rdp-day.rdp-today:not(.rdp-selected) > .rdp-day_button {
+      color: ${theme.primary};
+      font-weight: 700;
+    }
+    .rdp-themed .rdp-day:not(.rdp-selected):not(.rdp-disabled):not(.rdp-outside) > .rdp-day_button:hover {
+      background-color: ${theme.primary}22;
+      color: ${theme.text};
+    }
+    .rdp-themed .rdp-chevron {
+      fill: ${theme.textSecondary};
+    }
+    .rdp-themed .rdp-button_previous:hover .rdp-chevron,
+    .rdp-themed .rdp-button_next:hover .rdp-chevron {
+      fill: ${theme.primary};
+    }
+    .rdp-themed .rdp-month_caption,
+    .rdp-themed .rdp-caption_label {
+      color: ${theme.text};
+      font-weight: 600;
+    }
+    .rdp-themed .rdp-weekday {
+      color: ${theme.textSecondary};
+    }
+  `;
+
   return (
     <div ref={ref} className={`relative ${className}`}>
       {label && (
@@ -138,7 +172,8 @@ export function DatePicker({
             border: `1px solid ${theme.border}`,
           }}
         >
-          <div className="p-2" style={rdpVars}>
+          <style>{rdpThemedCss}</style>
+          <div className="p-2 rdp-themed" style={rdpVars}>
             <DayPicker
               mode="single"
               locale={es}

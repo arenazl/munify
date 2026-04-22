@@ -165,6 +165,53 @@ export function DateRangePicker({
     color: theme.text,
   } as React.CSSProperties;
 
+  // react-day-picker v9 por default deja estados medios sin fondo coherente.
+  // Override completo para que todo el calendario hable el idioma del tema.
+  const rdpThemedCss = `
+    .rdp-themed .rdp-day.rdp-range_start > .rdp-day_button,
+    .rdp-themed .rdp-day.rdp-range_end > .rdp-day_button {
+      background-color: ${theme.primary};
+      color: #ffffff;
+      border: 1px solid ${theme.primary};
+      font-weight: 600;
+    }
+    .rdp-themed .rdp-day.rdp-range_middle > .rdp-day_button {
+      background-color: ${theme.primary}22;
+      color: ${theme.text};
+      border-radius: 0;
+      border: none;
+    }
+    .rdp-themed .rdp-day.rdp-selected:not(.rdp-range_start):not(.rdp-range_end):not(.rdp-range_middle) > .rdp-day_button {
+      background-color: ${theme.primary};
+      color: #ffffff;
+      border: 1px solid ${theme.primary};
+      font-weight: 600;
+    }
+    .rdp-themed .rdp-day.rdp-today:not(.rdp-selected) > .rdp-day_button {
+      color: ${theme.primary};
+      font-weight: 700;
+    }
+    .rdp-themed .rdp-day:not(.rdp-selected):not(.rdp-disabled):not(.rdp-outside):not(.rdp-range_middle) > .rdp-day_button:hover {
+      background-color: ${theme.primary}22;
+      color: ${theme.text};
+    }
+    .rdp-themed .rdp-chevron {
+      fill: ${theme.textSecondary};
+    }
+    .rdp-themed .rdp-button_previous:hover .rdp-chevron,
+    .rdp-themed .rdp-button_next:hover .rdp-chevron {
+      fill: ${theme.primary};
+    }
+    .rdp-themed .rdp-month_caption,
+    .rdp-themed .rdp-caption_label {
+      color: ${theme.text};
+      font-weight: 600;
+    }
+    .rdp-themed .rdp-weekday {
+      color: ${theme.textSecondary};
+    }
+  `;
+
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
@@ -230,7 +277,8 @@ export function DateRangePicker({
           </div>
 
           {/* Calendario range */}
-          <div className="p-2" style={rdpVars}>
+          <style>{rdpThemedCss}</style>
+          <div className="p-2 rdp-themed" style={rdpVars}>
             <DayPicker
               mode="range"
               locale={es}

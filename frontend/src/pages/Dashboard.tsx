@@ -442,22 +442,6 @@ export default function Dashboard() {
   const rawNombre = municipioActual?.nombre || localStorage.getItem('municipio_nombre') || 'Tu Municipio';
   const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
 
-  // DEBUG v3 — ayuda a detectar si el bundle deployado es el nuevo
-  // (buscar este log en la consola del navegador)
-  if (typeof window !== 'undefined') {
-    console.log('[Dashboard banner v3]', {
-      bundleVersion: 'v3-white-text',
-      theme_sidebarText: theme.sidebarText,
-      theme_sidebarTextSecondary: theme.sidebarTextSecondary,
-      theme_backgroundSecondary: theme.backgroundSecondary,
-      currentPresetId: theme.name,
-      variant: theme.label,
-      municipioNombre,
-      municipio_tema_config: municipioActual?.tema_config,
-      expectedTitleColor: '#ffffff',
-    });
-  }
-
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
@@ -607,40 +591,20 @@ export default function Dashboard() {
         <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
           {/* Info principal */}
           <div className="mt-auto">
-            {/* DEBUG BANNER v3 — si ves este chip verde, el bundle nuevo cargó */}
-            <div
-              data-banner-version="v3-white-text"
-              className="inline-block mb-2 px-2 py-0.5 rounded text-[10px] font-mono font-bold"
-              style={{ backgroundColor: '#22c55e', color: '#000000' }}
-            >
-              BUNDLE v3 · texto blanco · {new Date().toISOString().slice(11, 19)}
-            </div>
             {/* El banner tiene imagen + overlay oscuro, el texto debe ser SIEMPRE
                 claro con drop-shadow — no depende del tema porque no se apoya
                 en la sidebar. En temas claros, sidebarText es oscuro y quedaba
                 invisible sobre el gradiente que se funde a backgroundSecondary. */}
-            <h1
-              data-debug="banner-title-v3"
-              className="!text-white text-3xl md:text-4xl mb-2 drop-shadow-lg"
-              style={{ color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}
-            >
+            <h1 className="text-3xl md:text-4xl mb-2 drop-shadow-lg" style={{ color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
               <span className="font-light">Municipalidad de </span>
               <span className="font-bold">{municipioNombre}</span>
             </h1>
-            <p
-              data-debug="banner-subtitle-v3"
-              className="!text-white/90 text-sm md:text-base mb-4"
-              style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
-            >
+            <p className="text-sm md:text-base mb-4" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
               Monitoreo en tiempo real de gestión municipal
             </p>
 
             {/* Stats rápidos estilo Wok */}
-            <div
-              data-debug="banner-stats-v3"
-              className="!text-white/90 flex flex-wrap items-center gap-4 text-sm"
-              style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}
-            >
+            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
               <div className="flex items-center gap-1.5">
                 <ClipboardList className="w-4 h-4" />
                 <span>{stats?.total || 0} reclamos</span>
