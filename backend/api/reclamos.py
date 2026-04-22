@@ -2266,6 +2266,46 @@ async def confirmar_reclamo_vecino(
     }
 
 
+@router.post("/{reclamo_id}/descartar-feedback-vecino")
+async def descartar_feedback_vecino(
+    reclamo_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Permite al supervisor descartar un feedback negativo del vecino (cuando
+    indicó que el problema sigue sin resolverse pero el supervisor considera
+    que sí está solucionado). Limpia confirmado_vecino y queda registrado
+    en el historial.
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor puede descartar feedback")
+
+    r = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
+    reclamo = r.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+
+    if reclamo.confirmado_vecino is not False:
+        raise HTTPException(status_code=400, detail="No hay feedback negativo del vecino para descartar")
+
+    comentario_vecino = reclamo.comentario_confirmacion_vecino or "(sin comentario)"
+    reclamo.confirmado_vecino = None
+    reclamo.comentario_confirmacion_vecino = None
+    reclamo.fecha_confirmacion_vecino = None
+
+    db.add(HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=current_user.id,
+        estado_anterior=reclamo.estado,
+        estado_nuevo=reclamo.estado,
+        accion="feedback_descartado",
+        comentario=f"Supervisor descartó el feedback del vecino: \"{comentario_vecino}\". El trabajo se considera correcto.",
+    ))
+    await db.commit()
+    return {"success": True, "message": "Feedback descartado"}
+
+
 # ===========================================
 # SISTEMA DE "SUMARSE" A RECLAMOS DUPLICADOS
 # ===========================================

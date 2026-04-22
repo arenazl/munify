@@ -1387,6 +1387,39 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
+  // Reabrir un reclamo finalizado tras feedback negativo del vecino
+  const handleReabrirPorFeedback = async () => {
+    if (!selectedReclamo) return;
+    if (!window.confirm('¿Reabrir el reclamo? Volverá a estado "En Curso" para retrabajar la solución.')) return;
+    try {
+      await reclamosApi.cambiarEstado(
+        selectedReclamo.id,
+        'en_curso',
+        'Reabierto por supervisor tras feedback negativo del vecino.',
+      );
+      toast.success('Reclamo reabierto — vuelve a En Curso');
+      fetchReclamos();
+      closeSheet();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo reabrir el reclamo');
+    }
+  };
+
+  // Descartar feedback negativo: el supervisor considera que el trabajo estuvo bien
+  const handleDescartarFeedback = async () => {
+    if (!selectedReclamo) return;
+    if (!window.confirm('¿Descartar el comentario del vecino? El reclamo queda finalizado y el feedback se marca como revisado.')) return;
+    try {
+      await reclamosApi.descartarFeedbackVecino(selectedReclamo.id);
+      toast.success('Feedback descartado. El reclamo queda finalizado.');
+      fetchReclamos();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo descartar');
+    }
+  };
+
   const handleAsignar = async () => {
     if (!selectedReclamo || !dependenciaSeleccionada) return;
 
@@ -3601,22 +3634,34 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           {getCategoryIcon(selectedReclamo.categoria.nombre)}
           {selectedReclamo.categoria.nombre}
         </span>
-        {/* Historial */}
+        {/* Historial — con badge rojo si el vecino rechazó la resolución */}
         <button
           onClick={() => {
             closeSheet();
             navigate(`/gestion/reclamos/${selectedReclamo.id}`);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
+          className="relative inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
           style={{
-            backgroundColor: theme.backgroundSecondary,
-            color: theme.primary,
-            border: `1px solid ${theme.border}`
+            backgroundColor: selectedReclamo.confirmado_vecino === false ? '#ef444415' : theme.backgroundSecondary,
+            color: selectedReclamo.confirmado_vecino === false ? '#ef4444' : theme.primary,
+            border: `1px solid ${selectedReclamo.confirmado_vecino === false ? '#ef444460' : theme.border}`,
           }}
-          title="Ver historial completo"
+          title={selectedReclamo.confirmado_vecino === false
+            ? 'El vecino marcó que el problema persiste — ver historial'
+            : 'Ver historial completo'}
         >
           <Clock className="h-3.5 w-3.5" />
           Historial
+          {selectedReclamo.confirmado_vecino === false && (
+            <>
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"
+                style={{ boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.25)' }}
+              />
+              <span className="ml-0.5 text-[10px] font-bold px-1 rounded" style={{ backgroundColor: '#ef444430' }}>
+                !
+              </span>
+            </>
+          )}
         </button>
       </div>
     );
@@ -3845,6 +3890,65 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </div>
         )}
         </div>
+
+        {/* Feedback negativo del vecino — bloque visible con 2 acciones */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') &&
+         selectedReclamo.confirmado_vecino === false && (
+          <div
+            className="rounded-xl p-4 space-y-3"
+            style={{
+              backgroundColor: '#ef444412',
+              border: '1.5px solid #ef444460',
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <span className="text-xl flex-shrink-0">⚠️</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm" style={{ color: '#991b1b' }}>
+                  El vecino indica que el problema persiste
+                </p>
+                {selectedReclamo.comentario_confirmacion_vecino && (
+                  <p className="text-sm mt-1 italic" style={{ color: '#b91c1c' }}>
+                    «{selectedReclamo.comentario_confirmacion_vecino}»
+                  </p>
+                )}
+                {selectedReclamo.fecha_confirmacion_vecino && (
+                  <p className="text-xs mt-1 opacity-80" style={{ color: '#dc2626' }}>
+                    {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleString('es-AR', {
+                      day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleReabrirPorFeedback}
+                className="px-3 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-[1.02] active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 12px #ef444440',
+                }}
+                title="Devuelve el reclamo a En Curso para retrabajar"
+              >
+                🔄 Reabrir caso
+              </button>
+              <button
+                onClick={handleDescartarFeedback}
+                className="px-3 py-2 rounded-lg font-medium text-sm transition-all hover:scale-[1.02] active:scale-95"
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '1.5px solid #ef444460',
+                  color: '#ef4444',
+                }}
+                title="Marca el feedback como revisado y deja el caso finalizado"
+              >
+                ✓ Descartar comentario
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Botón Reasignar — disponible en cualquier estado posterior a "recibido"
             para devolver el reclamo y que otro empleado lo pueda tomar */}
