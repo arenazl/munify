@@ -188,6 +188,18 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
         icon: 'ClipboardList',
       },
       {
+        title: 'Requiere CENAT (licencias de conducir)',
+        description:
+          'Activá este toggle para trámites de licencia. El vecino sube el comprobante del CENAT nacional (Agencia Nacional de Seguridad Vial) como documento aparte, antes de que el operador cierre el legajo. El pago del CENAT es externo a Munify — solo trackeamos el adjunto.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Requiere verificación biométrica (KYC)',
+        description:
+          'Para trámites sensibles. Si lo activás, el vecino debe tener su identidad verificada por Didit (nivel 2 = DNI + selfie) antes de iniciar. Si llega sin KYC, el sistema lo rechaza con un 403 y un link para verificarse. El operador de ventanilla puede validar presencialmente (kyc_modo=assisted).',
+        icon: 'Users',
+      },
+      {
         title: 'Cómo se asigna la dependencia',
         description:
           'Los trámites se enrutan por su categoría (igual que los reclamos). Ej: un trámite de categoría "Habilitaciones Comerciales" cae en la Dirección de Habilitaciones. Configurás el mapeo en "Dependencias".',
