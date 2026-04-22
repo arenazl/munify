@@ -503,6 +503,50 @@ export default function ReclamoDetalle() {
 
         {/* Contenido */}
         <div className="p-6 space-y-6">
+            {/* Banner de confirmación del vecino (positivo o negativo) */}
+            {reclamo.confirmado_vecino !== null && reclamo.confirmado_vecino !== undefined && (
+              <div
+                className="rounded-xl p-4 flex items-start gap-3"
+                style={{
+                  backgroundColor: reclamo.confirmado_vecino ? '#10b98115' : '#ef444415',
+                  border: `1.5px solid ${reclamo.confirmado_vecino ? '#10b98160' : '#ef444460'}`,
+                }}
+              >
+                <span className="text-2xl flex-shrink-0">
+                  {reclamo.confirmado_vecino ? '✅' : '⚠️'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="font-bold text-sm"
+                    style={{ color: reclamo.confirmado_vecino ? '#065f46' : '#991b1b' }}
+                  >
+                    {reclamo.confirmado_vecino
+                      ? 'El vecino confirmó que el problema fue solucionado'
+                      : 'El vecino indica que el problema NO fue solucionado'}
+                  </p>
+                  {reclamo.comentario_confirmacion_vecino && (
+                    <p
+                      className="text-sm mt-1 italic"
+                      style={{ color: reclamo.confirmado_vecino ? '#047857' : '#b91c1c' }}
+                    >
+                      "{reclamo.comentario_confirmacion_vecino}"
+                    </p>
+                  )}
+                  {reclamo.fecha_confirmacion_vecino && (
+                    <p
+                      className="text-xs mt-1.5 opacity-80"
+                      style={{ color: reclamo.confirmado_vecino ? '#059669' : '#dc2626' }}
+                    >
+                      {new Date(reclamo.fecha_confirmacion_vecino).toLocaleString('es-AR', {
+                        day: '2-digit', month: 'long', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Descripción */}
             <div>
               <h3 className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>

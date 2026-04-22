@@ -2201,11 +2201,15 @@ async def confirmar_reclamo_vecino(
             detail=f"El reclamo debe estar finalizado para confirmar. Estado actual: {reclamo.estado.value}"
         )
 
-    # Verificar que no fue confirmado antes
-    if reclamo.confirmado_vecino is not None:
+    # El vecino puede actualizar su confirmación (ej: se equivocó, o el
+    # problema volvió a aparecer). Solo bloqueamos si marca lo mismo dos veces.
+    if reclamo.confirmado_vecino == data.solucionado:
         raise HTTPException(
             status_code=400,
-            detail="Este reclamo ya fue confirmado anteriormente"
+            detail=(
+                "Ya marcaste el reclamo como solucionado." if data.solucionado
+                else "Ya indicaste que el problema persiste."
+            )
         )
 
     # Guardar confirmación (el estado no cambia — queda finalizado)
