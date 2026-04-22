@@ -1509,6 +1509,8 @@ export const operadorApi = {
       session_id: string | null;
       monto: number | null;
     }>('/operador/tramite-presencial/iniciar', body),
+  reenviarWhatsapp: (solicitudId: number) =>
+    api.post<{ ok: boolean }>('/operador/tramite-presencial/reenviar-whatsapp', { solicitud_id: solicitudId }),
 };
 
 // CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial

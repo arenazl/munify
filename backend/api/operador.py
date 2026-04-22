@@ -256,6 +256,23 @@ async def iniciar_tramite_presencial(
     await db.commit()
     await db.refresh(solicitud)
 
+    # F7 — mandar link por WhatsApp si el vecino tiene telefono + hay pago
+    if requiere_pago and user.telefono and checkout_url:
+        try:
+            from services.whatsapp_pagos import notificar_link_pago
+            await notificar_link_pago(
+                db,
+                municipio_id=body.municipio_id,
+                telefono=user.telefono,
+                nombre_vecino=f"{user.nombre or ''} {user.apellido or ''}".strip(),
+                tramite_nombre=tramite.nombre,
+                checkout_url=checkout_url,
+                numero_tramite=numero_tramite,
+                usuario_id=user.id,
+            )
+        except Exception:
+            pass  # no bloquea el flujo si WhatsApp falla
+
     return IniciarTramiteResponse(
         solicitud_id=solicitud.id,
         numero_tramite=numero_tramite,
@@ -273,6 +290,62 @@ class MostradorMetricas(BaseModel):
     pagados_hoy: int
     monto_hoy: str
     operador_nombre: str
+
+
+class ReenviarWhatsappRequest(BaseModel):
+    solicitud_id: int
+
+
+@router.post("/tramite-presencial/reenviar-whatsapp")
+async def reenviar_whatsapp(
+    body: ReenviarWhatsappRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reenvia el link de pago por WhatsApp al vecino (por si no lo vio)."""
+    _asegurar_operador(current_user)
+
+    sol_q = await db.execute(
+        select(Solicitud)
+        .options(
+            selectinload(Solicitud.tramite),
+            selectinload(Solicitud.solicitante),
+        )
+        .where(Solicitud.id == body.solicitud_id)
+    )
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _asegurar_muni(current_user, solicitud.municipio_id)
+
+    vecino = solicitud.solicitante
+    if not vecino or not vecino.telefono:
+        raise HTTPException(status_code=400, detail="El vecino no tiene telefono cargado")
+
+    # Buscar la ultima sesion PENDING o APPROVED de esta solicitud
+    from models.pago_sesion import PagoSesion, EstadoSesionPago
+    s_q = await db.execute(
+        select(PagoSesion)
+        .where(PagoSesion.solicitud_id == solicitud.id)
+        .order_by(PagoSesion.created_at.desc())
+        .limit(1)
+    )
+    sesion = s_q.scalar_one_or_none()
+    if not sesion or not sesion.checkout_url:
+        raise HTTPException(status_code=400, detail="No hay link de pago activo para reenviar")
+
+    from services.whatsapp_pagos import notificar_link_pago
+    ok = await notificar_link_pago(
+        db,
+        municipio_id=solicitud.municipio_id,
+        telefono=vecino.telefono,
+        nombre_vecino=f"{vecino.nombre or ''} {vecino.apellido or ''}".strip(),
+        tramite_nombre=solicitud.tramite.nombre if solicitud.tramite else "tu tramite",
+        checkout_url=sesion.checkout_url,
+        numero_tramite=solicitud.numero_tramite,
+        usuario_id=vecino.id,
+    )
+    return {"ok": ok}
 
 
 @router.get("/mostrador/home", response_model=MostradorMetricas)

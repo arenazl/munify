@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { User as UserIcon, FileText, CheckCircle2, AlertTriangle, Copy, ExternalLink, Clock, Receipt } from 'lucide-react';
+import { User as UserIcon, FileText, CheckCircle2, AlertTriangle, Copy, ExternalLink, Clock, Receipt, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -304,8 +304,28 @@ export default function Mostrador() {
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
+                  {telefono && (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await operadorApi.reenviarWhatsapp(result.solicitud_id);
+                          toast.success('Link enviado por WhatsApp');
+                        } catch (e: unknown) {
+                          const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+                          toast.error(msg || 'No se pudo enviar por WhatsApp');
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded"
+                      style={{ backgroundColor: '#25d36620', color: '#25d366', border: '1px solid #25d36660' }}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Enviar por WhatsApp a {telefono}
+                    </button>
+                  )}
                   <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-                    Podés abrir el link en el monitor para que el vecino escanee, o copiarlo y mandarlo por WhatsApp.
+                    {telefono
+                      ? 'Si el vecino no tiene WhatsApp, puede escanear el link desde el monitor.'
+                      : 'Sin teléfono — mostrá el link en el monitor para que el vecino lo escanee.'}
                   </p>
                 </div>
               )}

@@ -458,6 +458,25 @@ async def confirmar_pago(
 
     await db.commit()
 
+    # F7 — notificar vecino por WhatsApp si tiene telefono
+    try:
+        from services.whatsapp_pagos import notificar_pago_confirmado
+        vq = await db.execute(select(User).where(User.id == sesion.vecino_user_id))
+        vecino = vq.scalar_one_or_none()
+        if vecino and vecino.telefono:
+            await notificar_pago_confirmado(
+                db,
+                municipio_id=sesion.municipio_id,
+                telefono=vecino.telefono,
+                nombre_vecino=f"{vecino.nombre or ''} {vecino.apellido or ''}".strip(),
+                concepto=sesion.concepto,
+                monto=sesion.monto,
+                cut=sesion.codigo_cut_qr,
+                usuario_id=vecino.id,
+            )
+    except Exception:
+        pass  # no bloquea
+
     return ConfirmarPagoResponse(
         session_id=sesion.id,
         estado=sesion.estado,
