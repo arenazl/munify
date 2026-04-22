@@ -471,16 +471,20 @@ export default function Dashboard() {
             className="w-full h-full object-cover"
             style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
           />
-          {/* Gradiente oscuro que baja al color del tema - solo si NO está sin filtro */}
+          {/* Gradiente oscuro - solo si NO está sin filtro.
+              Antes la base se fundía a theme.backgroundSecondary, lo que en
+              temas claros (sand/arctic) dejaba el fondo casi blanco justo
+              donde se apoya el texto blanco — ilegible. Ahora el gradiente
+              permanece oscuro todo el alto del banner independiente del tema. */}
           {!municipioActual?.tema_config?.portadaSinFiltro && (
             <>
               <div
                 className="absolute inset-0"
                 style={{
                   background: `linear-gradient(180deg,
-                    rgba(15, 23, 42, 0.7) 0%,
-                    rgba(15, 23, 42, 0.85) 40%,
-                    ${theme.backgroundSecondary}90 100%
+                    rgba(15, 23, 42, 0.65) 0%,
+                    rgba(15, 23, 42, 0.8) 50%,
+                    rgba(15, 23, 42, 0.85) 100%
                   )`,
                 }}
               />
