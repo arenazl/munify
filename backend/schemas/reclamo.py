@@ -180,6 +180,10 @@ class ReclamoResponse(BaseModel):
     tiempo_estimado_horas: Optional[int] = 0
     fecha_estimada_resolucion: Optional[datetime] = None
     fecha_recibido: Optional[datetime] = None
+    # Confirmación del vecino tras finalizar (None=sin respuesta, True=ok, False=sigue problema)
+    confirmado_vecino: Optional[bool] = None
+    fecha_confirmacion_vecino: Optional[datetime] = None
+    comentario_confirmacion_vecino: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
