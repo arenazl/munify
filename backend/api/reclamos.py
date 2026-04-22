@@ -919,7 +919,7 @@ async def create_reclamo(
         **reclamo_data,
         creador_id=creador_id,
         municipio_id=current_user.municipio_id,
-        estado=EstadoReclamo.NUEVO
+        estado=EstadoReclamo.RECIBIDO
     )
 
     # Detectar barrio automáticamente desde la dirección

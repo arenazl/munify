@@ -587,16 +587,20 @@ export default function Dashboard() {
         <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
           {/* Info principal */}
           <div className="mt-auto">
-            <h1 className="text-3xl md:text-4xl mb-2 drop-shadow-lg" style={{ color: theme.sidebarText }}>
+            {/* El banner tiene imagen + overlay oscuro, el texto debe ser SIEMPRE
+                claro con drop-shadow — no depende del tema porque no se apoya
+                en la sidebar. En temas claros, sidebarText es oscuro y quedaba
+                invisible sobre el gradiente que se funde a backgroundSecondary. */}
+            <h1 className="text-3xl md:text-4xl mb-2 drop-shadow-lg" style={{ color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
               <span className="font-light">Municipalidad de </span>
               <span className="font-bold">{municipioNombre}</span>
             </h1>
-            <p className="text-sm md:text-base mb-4" style={{ color: theme.sidebarTextSecondary }}>
+            <p className="text-sm md:text-base mb-4" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
               Monitoreo en tiempo real de gestión municipal
             </p>
 
             {/* Stats rápidos estilo Wok */}
-            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: theme.sidebarTextSecondary }}>
+            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
               <div className="flex items-center gap-1.5">
                 <ClipboardList className="w-4 h-4" />
                 <span>{stats?.total || 0} reclamos</span>
