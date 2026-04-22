@@ -2814,18 +2814,24 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               />
               {estadoLabels[r.estado]}
             </span>
-            {tieneActividadReciente && (
-              <span
-                className="w-6 h-6 rounded-full flex items-center justify-center animate-bounce"
-                style={{
-                  backgroundColor: '#3b82f6',
-                  boxShadow: '0 0 10px #3b82f6, 0 0 20px #3b82f680'
-                }}
-                title="Actividad reciente"
-              >
-                <MessageCircle className="h-3.5 w-3.5" style={{ color: '#ffffff' }} />
-              </span>
-            )}
+            {tieneActividadReciente && (() => {
+              const vecinoRechazo = r.confirmado_vecino === false;
+              const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
+              return (
+                <span
+                  className={`w-6 h-6 rounded-full flex items-center justify-center ${vecinoRechazo ? 'animate-pulse' : 'animate-bounce'}`}
+                  style={{
+                    backgroundColor: bg,
+                    boxShadow: `0 0 10px ${bg}, 0 0 20px ${bg}80`
+                  }}
+                  title={vecinoRechazo
+                    ? 'El vecino marcó que el problema NO se solucionó'
+                    : 'Actividad reciente'}
+                >
+                  <MessageCircle className="h-3.5 w-3.5" style={{ color: '#ffffff' }} />
+                </span>
+              );
+            })()}
           </div>
         );
       },
