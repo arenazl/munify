@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import {
   themePresets,
@@ -44,58 +44,90 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Las preferencias de tema se guardan por usuario para no mezclarlas entre
+// logins en el mismo navegador. Las claves globales quedan como fallback para
+// sesiones anónimas / previos al login.
+const userScopedKey = (userId: number | undefined, key: string) =>
+  userId ? `user_${userId}:${key}` : key;
+
+const readTheme = (userId: number | undefined) => {
+  const preset = localStorage.getItem(userScopedKey(userId, 'themePresetId'));
+  const variant = localStorage.getItem(userScopedKey(userId, 'themeVariant')) as ThemeVariant | null;
+  const sidebarBg = localStorage.getItem(userScopedKey(userId, 'sidebarBgImage'));
+  const sidebarOp = localStorage.getItem(userScopedKey(userId, 'sidebarBgOpacity'));
+  const contentBg = localStorage.getItem(userScopedKey(userId, 'contentBgImage'));
+  const contentOp = localStorage.getItem(userScopedKey(userId, 'contentBgOpacity'));
+  return { preset, variant, sidebarBg, sidebarOp, contentBg, contentOp };
+};
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Get municipio from AuthContext to load its theme config
-  const { municipioActual } = useAuth();
+  // Get user + municipio from AuthContext to load per-user theme config
+  const { user, municipioActual } = useAuth();
 
-  // Estado del preset y variante seleccionados
-  const [currentPresetId, setCurrentPresetId] = useState<string>(() => {
-    const saved = localStorage.getItem('themePresetId');
-    return saved || defaultThemeConfig.presetId;
-  });
+  // Estado del preset y variante seleccionados — inicialmente desde el usuario
+  // actual (si ya hay sesión) o las claves globales como fallback
+  const initial = readTheme(user?.id);
 
-  const [currentVariant, setCurrentVariant] = useState<ThemeVariant>(() => {
-    const saved = localStorage.getItem('themeVariant') as ThemeVariant;
-    return saved || defaultThemeConfig.variant;
-  });
+  const [currentPresetId, setCurrentPresetId] = useState<string>(
+    initial.preset || defaultThemeConfig.presetId
+  );
+  const [currentVariant, setCurrentVariant] = useState<ThemeVariant>(
+    initial.variant || defaultThemeConfig.variant
+  );
+  const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(
+    initial.sidebarBg && initial.sidebarBg !== 'null' ? initial.sidebarBg : null
+  );
+  const [sidebarBgOpacity, setSidebarBgOpacityState] = useState<number>(
+    initial.sidebarOp ? parseFloat(initial.sidebarOp) : 0.3
+  );
+  const [contentBgImage, setContentBgImageState] = useState<string | null>(
+    initial.contentBg && initial.contentBg !== 'null' ? initial.contentBg : null
+  );
+  const [contentBgOpacity, setContentBgOpacityState] = useState<number>(
+    initial.contentOp ? parseFloat(initial.contentOp) : 0.1
+  );
 
-  // Estados de imágenes de fondo
-  const [sidebarBgImage, setSidebarBgImageState] = useState<string | null>(() => {
-    const saved = localStorage.getItem('sidebarBgImage');
-    return saved && saved !== 'null' ? saved : null;
-  });
+  // Flag para evitar guardar en localStorage durante la hidratación inicial
+  // al cambiar de usuario/municipio (sobrescribiría la preferencia recién leída).
+  const hydratingRef = useRef(true);
 
-  const [sidebarBgOpacity, setSidebarBgOpacityState] = useState<number>(() => {
-    const saved = localStorage.getItem('sidebarBgOpacity');
-    return saved ? parseFloat(saved) : 0.3;
-  });
-
-  const [contentBgImage, setContentBgImageState] = useState<string | null>(() => {
-    const saved = localStorage.getItem('contentBgImage');
-    return saved && saved !== 'null' ? saved : null;
-  });
-
-  const [contentBgOpacity, setContentBgOpacityState] = useState<number>(() => {
-    const saved = localStorage.getItem('contentBgOpacity');
-    return saved ? parseFloat(saved) : 0.1;
-  });
-
-  // Cargar configuración del tema desde el municipio cuando cambie
+  // Al cambiar el usuario logueado (o el municipio) rehidratar el tema:
+  // 1° preferencia guardada del usuario, 2° default del municipio, 3° default global.
   useEffect(() => {
-    if (municipioActual?.tema_config) {
-      const config = municipioActual.tema_config;
+    hydratingRef.current = true;
 
-      // Aplicar preset y variante
-      if (config.presetId) setCurrentPresetId(config.presetId);
-      if (config.variant) setCurrentVariant(config.variant as ThemeVariant);
+    const saved = readTheme(user?.id);
+    const muniConfig = municipioActual?.tema_config;
 
-      // Aplicar imágenes de fondo
-      if (config.sidebarBgImage !== undefined) setSidebarBgImageState(config.sidebarBgImage);
-      if (config.sidebarBgOpacity !== undefined) setSidebarBgOpacityState(config.sidebarBgOpacity);
-      if (config.contentBgImage !== undefined) setContentBgImageState(config.contentBgImage);
-      if (config.contentBgOpacity !== undefined) setContentBgOpacityState(config.contentBgOpacity);
-    }
-  }, [municipioActual]);
+    const preset = saved.preset || muniConfig?.presetId || defaultThemeConfig.presetId;
+    const variant = (saved.variant || (muniConfig?.variant as ThemeVariant) || defaultThemeConfig.variant) as ThemeVariant;
+
+    const sidebarBg = saved.sidebarBg !== null
+      ? (saved.sidebarBg && saved.sidebarBg !== 'null' ? saved.sidebarBg : null)
+      : (muniConfig?.sidebarBgImage ?? null);
+    const sidebarOp = saved.sidebarOp !== null
+      ? parseFloat(saved.sidebarOp)
+      : (muniConfig?.sidebarBgOpacity ?? 0.3);
+    const contentBg = saved.contentBg !== null
+      ? (saved.contentBg && saved.contentBg !== 'null' ? saved.contentBg : null)
+      : (muniConfig?.contentBgImage ?? null);
+    const contentOp = saved.contentOp !== null
+      ? parseFloat(saved.contentOp)
+      : (muniConfig?.contentBgOpacity ?? 0.1);
+
+    setCurrentPresetId(preset);
+    setCurrentVariant(variant);
+    setSidebarBgImageState(sidebarBg);
+    setSidebarBgOpacityState(sidebarOp);
+    setContentBgImageState(contentBg);
+    setContentBgOpacityState(contentOp);
+
+    // Dejamos de hidratar en el próximo microtask, después de que los setState
+    // hagan flush — así los effects que persisten en localStorage ignoran este
+    // ciclo y sólo guardan cambios originados por el usuario.
+    const t = setTimeout(() => { hydratingRef.current = false; }, 0);
+    return () => clearTimeout(t);
+  }, [user?.id, municipioActual]);
 
   // Obtener los colores del tema actual
   const themeColors = getThemeColors(currentPresetId, currentVariant);
@@ -130,39 +162,48 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.body.style.color = theme.text;
   }, [theme]);
 
-  // Guardar preset en localStorage
+  // Guardar preset/variante/fondos en localStorage con scope por usuario.
+  // Durante la hidratación inicial (switch de usuario/municipio) no guardamos
+  // para no pisar la preferencia recién leída con los defaults.
   useEffect(() => {
-    localStorage.setItem('themePresetId', currentPresetId);
-  }, [currentPresetId]);
+    if (hydratingRef.current) return;
+    localStorage.setItem(userScopedKey(user?.id, 'themePresetId'), currentPresetId);
+  }, [currentPresetId, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem('themeVariant', currentVariant);
-  }, [currentVariant]);
+    if (hydratingRef.current) return;
+    localStorage.setItem(userScopedKey(user?.id, 'themeVariant'), currentVariant);
+  }, [currentVariant, user?.id]);
 
-  // Guardar imágenes de fondo en localStorage
   useEffect(() => {
+    if (hydratingRef.current) return;
+    const key = userScopedKey(user?.id, 'sidebarBgImage');
     if (sidebarBgImage) {
-      localStorage.setItem('sidebarBgImage', sidebarBgImage);
+      localStorage.setItem(key, sidebarBgImage);
     } else {
-      localStorage.removeItem('sidebarBgImage');
+      localStorage.removeItem(key);
     }
-  }, [sidebarBgImage]);
+  }, [sidebarBgImage, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem('sidebarBgOpacity', String(sidebarBgOpacity));
-  }, [sidebarBgOpacity]);
+    if (hydratingRef.current) return;
+    localStorage.setItem(userScopedKey(user?.id, 'sidebarBgOpacity'), String(sidebarBgOpacity));
+  }, [sidebarBgOpacity, user?.id]);
 
   useEffect(() => {
+    if (hydratingRef.current) return;
+    const key = userScopedKey(user?.id, 'contentBgImage');
     if (contentBgImage) {
-      localStorage.setItem('contentBgImage', contentBgImage);
+      localStorage.setItem(key, contentBgImage);
     } else {
-      localStorage.removeItem('contentBgImage');
+      localStorage.removeItem(key);
     }
-  }, [contentBgImage]);
+  }, [contentBgImage, user?.id]);
 
   useEffect(() => {
-    localStorage.setItem('contentBgOpacity', String(contentBgOpacity));
-  }, [contentBgOpacity]);
+    if (hydratingRef.current) return;
+    localStorage.setItem(userScopedKey(user?.id, 'contentBgOpacity'), String(contentBgOpacity));
+  }, [contentBgOpacity, user?.id]);
 
   // Función para cambiar preset y variante
   const setPreset = (presetId: string, variant: ThemeVariant) => {
