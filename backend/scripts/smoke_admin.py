@@ -156,7 +156,7 @@ def run():
 
         # ============ PORTAL PUBLICO ============
         print("\n--- PORTAL PUBLICO ---")
-        r = c.get(f"{BASE}/portal-publico/categorias?municipio_id={MUNI_ID}")
+        r = c.get(f"{BASE}/publico/categorias?municipio_id={MUNI_ID}")
         log("portal-publico.categorias", "OK" if r.status_code == 200 else "FAIL",
             f"{r.status_code} count={len(r.json()) if r.status_code == 200 else '?'}")
 
@@ -185,23 +185,27 @@ def run():
         r = c.get(f"{BASE}/empleados-gestion/ausencias?municipio_id={MUNI_ID}", headers=h(adm))
         log("ausencias", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
 
-        r = c.get(f"{BASE}/planificacion/semana?municipio_id={MUNI_ID}", headers=h(adm))
-        log("planificacion.semana", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
+        r = c.get(f"{BASE}/planificacion/semanal?municipio_id={MUNI_ID}", headers=h(adm))
+        log("planificacion.semanal", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}: {r.text[:100] if r.status_code != 200 else ''}")
 
         # ============ SLA ============
         print("\n--- SLA ---")
-        r = c.get(f"{BASE}/sla?municipio_id={MUNI_ID}", headers=h(adm))
-        log("sla.list", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
+        r = c.get(f"{BASE}/sla/config?municipio_id={MUNI_ID}", headers=h(adm))
+        log("sla.config", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
+        r = c.get(f"{BASE}/sla/resumen?municipio_id={MUNI_ID}", headers=h(adm))
+        log("sla.resumen", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
 
         # ============ REPORTES / EXPORTAR ============
         print("\n--- REPORTES / EXPORTAR ---")
-        r = c.get(f"{BASE}/reportes/resumen?municipio_id={MUNI_ID}", headers=h(adm))
-        log("reportes.resumen", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
+        r = c.get(f"{BASE}/reportes/ejecutivo?municipio_id={MUNI_ID}", headers=h(adm))
+        log("reportes.ejecutivo", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}: {r.text[:100] if r.status_code != 200 else ''}")
 
         # ============ GAMIFICACION ============
         print("\n--- GAMIFICACION ---")
-        r = c.get(f"{BASE}/gamificacion/ranking?municipio_id={MUNI_ID}")
-        log("gamificacion.ranking", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
+        r = c.get(f"{BASE}/gamificacion/leaderboard", headers=h(adm))
+        log("gamificacion.leaderboard", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
+        r = c.get(f"{BASE}/gamificacion/mi-perfil", headers=h(adm))
+        log("gamificacion.mi-perfil", "OK" if r.status_code == 200 else "WARN", f"{r.status_code}")
 
         # ==============================
         print("\n" + "=" * 60)
