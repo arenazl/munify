@@ -12,6 +12,7 @@ import { pagosContaduriaApi } from '../lib/api';
 import { dependenciasApi } from '../lib/api';
 import ColaImputacion from '../components/pagos/ColaImputacion';
 import DashboardOmnicanal from '../components/pagos/DashboardOmnicanal';
+import PageHint from '../components/ui/PageHint';
 
 // ------------------------------------------------------------
 // Tipos
@@ -562,10 +563,12 @@ export default function GestionPagos() {
   ) : null;
 
   const tabsSwitcher = (
-    <div
-      className="inline-flex items-center rounded-lg p-1 gap-1"
-      style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-    >
+    <div className="space-y-3 w-full">
+      <PageHint pageId="gestion-pagos" />
+      <div
+        className="inline-flex items-center rounded-lg p-1 gap-1"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+      >
       {([
         { key: 'historial', label: 'Historial', icon: History },
         { key: 'imputacion', label: 'Cola de imputación', icon: ClipboardCheck },
@@ -589,6 +592,7 @@ export default function GestionPagos() {
           </button>
         );
       })}
+      </div>
     </div>
   );
 

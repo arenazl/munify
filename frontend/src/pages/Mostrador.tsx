@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { operadorApi, tramitesApi } from '../lib/api';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import PageHint from '../components/ui/PageHint';
 import type { Tramite } from '../types';
 
 interface MostradorMetricas {
@@ -161,6 +162,8 @@ export default function Mostrador() {
         title="Mostrador — Ventanilla"
         subtitle="Iniciar trámite presencial para vecino sin app"
       />
+
+      <PageHint pageId="mostrador" />
 
       {/* Métricas del día */}
       {metricas && (

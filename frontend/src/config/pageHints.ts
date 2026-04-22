@@ -279,4 +279,125 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
     description:
       'Logs en tiempo real de cada request HTTP relevante en el sistema. Filtrá por municipio, endpoint, latencia, status o usuario para investigar incidentes y entender la carga. Activá el "Modo debug" para capturar también GETs y request bodies (aumenta el volumen ~5×). Los logs viejos se borran manualmente con el botón "Limpiar >30d".',
   },
+
+  // ========================================================================
+  // BUNDLE DE PAGOS (9 fases)
+  // ========================================================================
+
+  'gestion-pagos': {
+    title: 'Gestión de Pagos',
+    accent: 'emerald',
+    steps: [
+      {
+        title: 'Tres vistas en una sola pantalla',
+        description:
+          'Historial te muestra todos los pagos aprobados, rechazados o pendientes del checkout. Cola de imputación es donde Contaduría trabaja los pagos que faltan cargar en RAFAM. Dashboard omnicanal muestra cuánto entra por App vs Ventanilla día a día.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Cola de imputación (uso diario)',
+        description:
+          'Cada pago aprobado queda "pendiente de imputar" hasta que alguien le pone el N° de asiento del sistema tributario. Desde acá lo marcás imputado uno por uno, lo rechazás con motivo, o seleccionás varios y los imputás en lote pegando las referencias.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Exportar batch',
+        description:
+          'El botón "Exportar batch" arriba te baja un archivo CSV, JSON o TXT RAFAM con todos los pagos del filtro actual. Pegalo en tu sistema contable y los referenciás con el bulk-marcar para cerrar el circuito en segundos.',
+        icon: 'FileText',
+      },
+      {
+        title: 'Dashboard omnicanal',
+        description:
+          'El tablero que le mostrás al intendente: cuánto cobraste hoy por la App, cuánto por Ventanilla, ranking de operadores de mostrador y serie diaria. Ideal para justificar la inversión en digitalización.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'CUT — Código Único de Trámite',
+        description:
+          'Cada pago aprobado genera un código corto tipo CUT-A3F2B1. El operador lo escanea o lo tipea para verificar contra el backend que el vecino efectivamente pagó. Evita capturas de WhatsApp editadas.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'proveedores-pago': {
+    title: 'Proveedores de pago',
+    accent: 'blue',
+    steps: [
+      {
+        title: 'Un proveedor = un rail de cobro',
+        description:
+          'GIRE, MercadoPago y MODO son los tres canales habilitados. Activás los que tu municipio tenga convenio, y dentro de cada uno elegís qué productos usar (botón de pago web, cupón Rapipago, débito automático, QR interoperable).',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Conectar credenciales reales',
+        description:
+          'Cada proveedor tiene un botón "Conectar credenciales reales". Ahí pegás el Access Token (se cifra en DB con Fernet antes de guardarse), la Public Key y el CUIT del municipio. Con eso los pagos entran DIRECTO a tu cuenta — Munify nunca custodia fondos.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Modo sandbox primero',
+        description:
+          'Arrancá con el toggle "Modo sandbox" activo y probá TEST-tokens de MP. Cuando todo funcione end-to-end, desactivás sandbox y pegás los tokens APP- reales. La UI muestra un warning grande cuando estás en producción.',
+        icon: 'Rocket',
+      },
+      {
+        title: 'Webhook para confirmación automática',
+        description:
+          'El webhook secret sirve para validar la firma HMAC de los avisos del proveedor. Cuando un pago se aprueba, MP nos avisa, validamos firma y marcamos el pago como aprobado sin intervención del operador.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Importar padrón',
+        description:
+          'Una vez conectado, importá el padrón de cuentas/contribuyentes desde el proveedor. Ese listado se usa para matchear deudas del muni con lo que cobra el proveedor externamente.',
+        icon: 'FileText',
+      },
+    ],
+  },
+
+  'mostrador': {
+    title: 'Mostrador — Ventanilla asistida',
+    accent: 'amber',
+    steps: [
+      {
+        title: '¿Para qué sirve?',
+        description:
+          'Para vecinos que NO tienen la app: típicamente adultos mayores. El operador de mostrador carga el trámite a nombre del vecino desde la PC de ventanilla, valida la identidad con el DNI físico y le entrega (o envía) el link de pago.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Completar el formulario',
+        description:
+          'DNI, nombre, apellido y trámite son obligatorios. Teléfono y email son opcionales (pero el teléfono es ideal para mandar el link de pago por WhatsApp). Si el vecino ya existe en el sistema, sus datos se precargan solos.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Firmar la Declaración Jurada',
+        description:
+          'Antes de iniciar tenés que tildar "Confirmo validación presencial". Esa DJ queda grabada con tu usuario y timestamp, y el vecino queda marcado como KYC assisted — verificado por vos, no por la app. Es la huella legal de que viste el DNI.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Enviar link por WhatsApp',
+        description:
+          'Si el trámite tiene costo, el sistema arma un link wa.me con el mensaje pre-cargado. Lo abrís en tu WhatsApp Web (o celular del muni) y el mensaje aparece listo para vos apretar "Enviar". El vecino lo recibe en su WhatsApp y paga desde su celular (o un familiar lo hace por él).',
+        icon: 'Rocket',
+      },
+      {
+        title: 'Alternativa: pago en efectivo',
+        description:
+          'Si el vecino paga en la caja física del municipio, después volvé al Mostrador, tocá "El vecino paga en efectivo" y cargás el N° de comprobante del ticket + una foto. Queda como pago aprobado con medio "efectivo_ventanilla" y canal "ventanilla_asistida".',
+        icon: 'FileText',
+      },
+      {
+        title: 'Métricas del día',
+        description:
+          'Arriba ves tu contador personal: cuántos trámites cargaste, cuántos se pagaron, cuánto recaudaste. El Dashboard Omnicanal agrega todos los operadores para el intendente.',
+        icon: 'TrendingUp',
+      },
+    ],
+  },
 };
