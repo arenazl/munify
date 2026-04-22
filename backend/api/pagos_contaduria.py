@@ -752,6 +752,173 @@ async def rechazar_imputacion(
 
 
 # ============================================================
+# 6. Metricas por canal (Fase 9 bundle) — dashboard omnicanal
+# ============================================================
+
+
+class MetricaCanalItem(BaseModel):
+    canal: str
+    cantidad: int
+    monto: str
+
+
+class MetricaSerieItem(BaseModel):
+    fecha: str           # YYYY-MM-DD
+    app: int
+    ventanilla_asistida: int
+    otros: int
+    monto_app: str
+    monto_ventanilla: str
+
+
+class OperadorRankingItem(BaseModel):
+    operador_id: int
+    operador_nombre: str
+    tramites: int
+    monto: str
+
+
+class DashboardOmnicanalResponse(BaseModel):
+    rango: dict
+    por_canal: List[MetricaCanalItem]
+    serie_temporal: List[MetricaSerieItem]
+    ranking_operadores: List[OperadorRankingItem]
+    total_aprobado_monto: str
+    total_aprobado_cantidad: int
+    ticket_promedio: str
+
+
+@router.get("/metricas-canal", response_model=DashboardOmnicanalResponse)
+async def metricas_canal(
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Agregados por canal (app / ventanilla_asistida / otros) + serie diaria
+    + ranking de operadores. Para el tablero que le vende al intendente."""
+    _asegurar_permisos(current_user)
+    municipio_id = _resolver_municipio_id(current_user)
+
+    if not fecha_desde and not fecha_hasta:
+        fecha_desde, fecha_hasta = _rango_default_mes_actual()
+
+    ts_col = func.coalesce(PagoSesion.completed_at, PagoSesion.created_at)
+    conds = [
+        PagoSesion.municipio_id == municipio_id,
+        PagoSesion.estado == EstadoSesionPago.APPROVED,
+    ]
+    if fecha_desde:
+        conds.append(ts_col >= datetime.combine(fecha_desde, datetime.min.time()))
+    if fecha_hasta:
+        conds.append(ts_col <= datetime.combine(fecha_hasta, datetime.max.time()))
+
+    # Totales globales
+    tot_q = await db.execute(
+        select(func.count(), func.coalesce(func.sum(PagoSesion.monto), 0))
+        .where(and_(*conds))
+    )
+    cant_tot, monto_tot = tot_q.one()
+    cant_tot = int(cant_tot or 0)
+    monto_tot_d = Decimal(str(monto_tot or 0))
+    ticket = (monto_tot_d / cant_tot) if cant_tot else Decimal("0")
+
+    # Por canal (NULL -> "app" por default)
+    canal_col = func.coalesce(PagoSesion.canal, "app")
+    pc_q = await db.execute(
+        select(canal_col, func.count(), func.coalesce(func.sum(PagoSesion.monto), 0))
+        .where(and_(*conds))
+        .group_by(canal_col)
+    )
+    por_canal: list[MetricaCanalItem] = []
+    for canal, cant, monto in pc_q.all():
+        por_canal.append(MetricaCanalItem(
+            canal=str(canal),
+            cantidad=int(cant or 0),
+            monto=str(Decimal(str(monto or 0))),
+        ))
+
+    # Serie temporal por dia
+    fecha_col = func.date(ts_col)
+    ser_q = await db.execute(
+        select(fecha_col, canal_col, func.count(), func.coalesce(func.sum(PagoSesion.monto), 0))
+        .where(and_(*conds))
+        .group_by(fecha_col, canal_col)
+        .order_by(fecha_col)
+    )
+    serie_map: dict[str, dict] = {}
+    for fecha, canal, cant, monto in ser_q.all():
+        key = str(fecha)
+        if key not in serie_map:
+            serie_map[key] = {"app": 0, "ventanilla_asistida": 0, "otros": 0, "monto_app": Decimal("0"), "monto_ventanilla": Decimal("0")}
+        if canal == "app":
+            serie_map[key]["app"] += int(cant or 0)
+            serie_map[key]["monto_app"] += Decimal(str(monto or 0))
+        elif canal == "ventanilla_asistida":
+            serie_map[key]["ventanilla_asistida"] += int(cant or 0)
+            serie_map[key]["monto_ventanilla"] += Decimal(str(monto or 0))
+        else:
+            serie_map[key]["otros"] += int(cant or 0)
+    serie: list[MetricaSerieItem] = [
+        MetricaSerieItem(
+            fecha=k,
+            app=v["app"],
+            ventanilla_asistida=v["ventanilla_asistida"],
+            otros=v["otros"],
+            monto_app=str(v["monto_app"]),
+            monto_ventanilla=str(v["monto_ventanilla"]),
+        )
+        for k, v in sorted(serie_map.items())
+    ]
+
+    # Ranking operadores de ventanilla
+    rank_q = await db.execute(
+        select(
+            PagoSesion.operador_user_id,
+            func.count(),
+            func.coalesce(func.sum(PagoSesion.monto), 0),
+        )
+        .where(
+            and_(*conds),
+            PagoSesion.operador_user_id.isnot(None),
+        )
+        .group_by(PagoSesion.operador_user_id)
+        .order_by(func.sum(PagoSesion.monto).desc())
+        .limit(10)
+    )
+    rank_rows = rank_q.all()
+    op_ids = [r[0] for r in rank_rows]
+    op_nombres: dict[int, str] = {}
+    if op_ids:
+        u_q = await db.execute(select(User).where(User.id.in_(op_ids)))
+        for u in u_q.scalars().all():
+            op_nombres[u.id] = f"{u.nombre or ''} {u.apellido or ''}".strip() or u.email
+
+    ranking: list[OperadorRankingItem] = [
+        OperadorRankingItem(
+            operador_id=int(op_id),
+            operador_nombre=op_nombres.get(int(op_id), f"Operador #{op_id}"),
+            tramites=int(cant or 0),
+            monto=str(Decimal(str(monto or 0))),
+        )
+        for op_id, cant, monto in rank_rows
+    ]
+
+    return DashboardOmnicanalResponse(
+        rango={
+            "desde": fecha_desde.isoformat() if fecha_desde else None,
+            "hasta": fecha_hasta.isoformat() if fecha_hasta else None,
+        },
+        por_canal=por_canal,
+        serie_temporal=serie,
+        ranking_operadores=ranking,
+        total_aprobado_monto=str(monto_tot_d),
+        total_aprobado_cantidad=cant_tot,
+        ticket_promedio=f"{ticket:.2f}",
+    )
+
+
+# ============================================================
 # 5. Exports contables (Fase 4 bundle) — motor de plantillas batch
 # ============================================================
 

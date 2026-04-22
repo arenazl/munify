@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, CheckCircle2, Clock, XCircle, TrendingUp, Download,
   CreditCard, QrCode, Receipt, ArrowRightLeft, Repeat2, Building2, FileText,
-  History, ClipboardCheck,
+  History, ClipboardCheck, BarChart3,
 } from 'lucide-react';
 import { ABMPage, ABMTable, ABMTableColumn } from '../components/ui/ABMPage';
 import { DateRangePicker, DateRange, currentMonthRange } from '../components/ui/DateRangePicker';
@@ -11,6 +11,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { pagosContaduriaApi } from '../lib/api';
 import { dependenciasApi } from '../lib/api';
 import ColaImputacion from '../components/pagos/ColaImputacion';
+import DashboardOmnicanal from '../components/pagos/DashboardOmnicanal';
 
 // ------------------------------------------------------------
 // Tipos
@@ -130,7 +131,7 @@ function formatDate(iso: string | null): string {
 // ------------------------------------------------------------
 // Componente
 // ------------------------------------------------------------
-type TabKey = 'historial' | 'imputacion';
+type TabKey = 'historial' | 'imputacion' | 'dashboard';
 
 export default function GestionPagos() {
   const { theme } = useTheme();
@@ -568,6 +569,7 @@ export default function GestionPagos() {
       {([
         { key: 'historial', label: 'Historial', icon: History },
         { key: 'imputacion', label: 'Cola de imputación', icon: ClipboardCheck },
+        { key: 'dashboard', label: 'Dashboard omnicanal', icon: BarChart3 },
       ] as const).map((t) => {
         const active = tab === t.key;
         const Icon = t.icon;
@@ -606,6 +608,26 @@ export default function GestionPagos() {
         tableView={<ColaImputacion />}
       >
         <ColaImputacion />
+      </ABMPage>
+    );
+  }
+
+  if (tab === 'dashboard') {
+    return (
+      <ABMPage
+        title="Gestión de Pagos"
+        icon={<Wallet className="w-5 h-5" />}
+        searchPlaceholder=""
+        searchValue=""
+        onSearchChange={() => {}}
+        secondaryFilters={tabsSwitcher}
+        headerActions={null}
+        loading={false}
+        isEmpty={false}
+        emptyMessage=""
+        tableView={<DashboardOmnicanal />}
+      >
+        <DashboardOmnicanal />
       </ABMPage>
     );
   }

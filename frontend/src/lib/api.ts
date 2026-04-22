@@ -1472,6 +1472,30 @@ export const pagosContaduriaApi = {
         created_at: string;
       }>>('/pagos/contaduria/exports/historial'),
   },
+
+  // Fase 9 — dashboard omnicanal
+  metricasCanal: (params: { fecha_desde?: string; fecha_hasta?: string }) =>
+    api.get<{
+      rango: { desde: string | null; hasta: string | null };
+      por_canal: Array<{ canal: string; cantidad: number; monto: string }>;
+      serie_temporal: Array<{
+        fecha: string;
+        app: number;
+        ventanilla_asistida: number;
+        otros: number;
+        monto_app: string;
+        monto_ventanilla: string;
+      }>;
+      ranking_operadores: Array<{
+        operador_id: number;
+        operador_nombre: string;
+        tramites: number;
+        monto: string;
+      }>;
+      total_aprobado_monto: string;
+      total_aprobado_cantidad: number;
+      ticket_promedio: string;
+    }>('/pagos/contaduria/metricas-canal', { params }),
 };
 
 // Consulta publica por CUT (operador de ventanilla)
