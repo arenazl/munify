@@ -95,6 +95,30 @@ switch(estado) {
 - Ese lugar exporta todo lo necesario: `estadoColors`, `estadoLabels`, `estadoIcons`
 - Todos los demás archivos importan de ahí, NO duplican definiciones
 
+### 8. Dropdowns/Selects - SIEMPRE el componente custom
+- **PROHIBIDO** usar `<select>` nativo de HTML para filtros o formularios.
+  El popup nativo lo dibuja el navegador, rompe el dark mode y no respeta el theme.
+- **SIEMPRE** usar `ModernSelect` (`components/ui/ModernSelect.tsx`) para cualquier
+  select — filtros, wizards, forms, modales.
+- Para rangos de fecha usar `DateRangePicker` (`components/ui/DateRangePicker.tsx`).
+- Si necesitás multi-select con chips, extender `ModernSelect` — NO volver al `<select>` nativo.
+
+```tsx
+// ✅ CORRECTO
+<ModernSelect
+  value={origen}
+  onChange={setOrigen}
+  options={[{ value: 'all', label: 'Todos' }, ...]}
+  placeholder="Origen"
+  searchable={opciones.length > 8}
+/>
+
+// ❌ INCORRECTO — rompe el theme en dark mode
+<select value={origen} onChange={e => setOrigen(e.target.value)}>
+  <option value="all">Todos</option>
+</select>
+```
+
 ---
 
 ## ESTADO ACTUAL DE DESARROLLO (2025-02-04)

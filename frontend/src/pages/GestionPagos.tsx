@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { ABMPage, ABMTable, ABMTableColumn } from '../components/ui/ABMPage';
 import { DateRangePicker, DateRange, currentMonthRange } from '../components/ui/DateRangePicker';
+import { ModernSelect } from '../components/ui/ModernSelect';
 import { useTheme } from '../contexts/ThemeContext';
 import { pagosContaduriaApi } from '../lib/api';
 import { dependenciasApi } from '../lib/api';
@@ -369,36 +370,27 @@ export default function GestionPagos() {
       <div className="flex flex-wrap items-center gap-2">
         <DateRangePicker value={range} onChange={setRange} />
 
-        <select
-          value={origen}
-          onChange={(e) => setOrigen(e.target.value as 'all' | 'tramite' | 'tasa')}
-          className="px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all"
-          style={{
-            background: `linear-gradient(135deg, ${theme.backgroundSecondary} 0%, ${theme.card} 100%)`,
-            border: `1px solid ${theme.border}`,
-            color: theme.text,
-          }}
-        >
-          {ORIGEN_OPCIONES.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <div className="min-w-[140px]">
+          <ModernSelect
+            value={origen}
+            onChange={(v) => setOrigen((v || 'all') as 'all' | 'tramite' | 'tasa')}
+            options={ORIGEN_OPCIONES.map((o) => ({ value: o.value, label: o.label }))}
+            placeholder="Origen"
+          />
+        </div>
 
-        <select
-          value={dependenciaId}
-          onChange={(e) => setDependenciaId(e.target.value ? Number(e.target.value) : '')}
-          className="px-3 py-2 rounded-lg text-sm font-medium cursor-pointer transition-all max-w-[200px]"
-          style={{
-            background: `linear-gradient(135deg, ${theme.backgroundSecondary} 0%, ${theme.card} 100%)`,
-            border: `1px solid ${theme.border}`,
-            color: theme.text,
-          }}
-        >
-          <option value="">Todas las dependencias</option>
-          {dependencias.map((d) => (
-            <option key={d.id} value={d.id}>{d.nombre}</option>
-          ))}
-        </select>
+        <div className="min-w-[220px]">
+          <ModernSelect
+            value={dependenciaId === '' ? '' : String(dependenciaId)}
+            onChange={(v) => setDependenciaId(v ? Number(v) : '')}
+            options={[
+              { value: '', label: 'Todas las dependencias' },
+              ...dependencias.map((d) => ({ value: String(d.id), label: d.nombre })),
+            ]}
+            placeholder="Todas las dependencias"
+            searchable={dependencias.length > 8}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
