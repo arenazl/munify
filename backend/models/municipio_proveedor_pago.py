@@ -8,7 +8,7 @@ El flujo de activacion incluye un paso de "importar metadata" que
 simula traer el padron de cuentas/contribuyentes del proveedor.
 """
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, JSON,
+    Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -60,6 +60,19 @@ class MunicipioProveedorPago(Base):
     # { "padron_cuentas": 2456, "categorias": 89, "importado_at": "2026-04-17T..." }
     # Null = todavia no se importo nada.
     metadata_importada = Column(JSON, nullable=True)
+
+    # ---- Fase 2 — conexion real a MP / MODO / GIRE ----
+    # Access token privado del muni, cifrado con Fernet (key en env FERNET_KEY).
+    # Nunca se devuelve al frontend en claro.
+    access_token_encriptado = Column(Text, nullable=True)
+    # Public key (safe para frontend, ej. MP public_key).
+    public_key = Column(String(200), nullable=True)
+    # Secreto para validar la firma HMAC del webhook entrante.
+    webhook_secret = Column(String(100), nullable=True)
+    # CUIT de la cuenta receptora (va al comprobante del vecino).
+    cuit_cobranza = Column(String(11), nullable=True)
+    # Sandbox vs produccion. UI muestra warning grande en produccion.
+    test_mode = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

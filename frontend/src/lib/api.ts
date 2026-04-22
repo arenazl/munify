@@ -700,6 +700,32 @@ export const proveedoresPagoApi = {
   update: (proveedor: string, data: { activo: boolean; productos_activos?: Record<string, boolean> }) =>
     api.put(`/proveedores-pago/${proveedor}`, data),
 
+  // Fase 2 — credenciales reales (MP / MODO / GIRE)
+  getCredenciales: (proveedor: string) =>
+    api.get<{
+      proveedor: string;
+      tiene_access_token: boolean;
+      public_key: string | null;
+      webhook_secret_set: boolean;
+      cuit_cobranza: string | null;
+      test_mode: boolean;
+    }>(`/proveedores-pago/${proveedor}/credenciales`),
+  setCredenciales: (
+    proveedor: string,
+    data: {
+      access_token?: string;
+      public_key?: string;
+      webhook_secret?: string;
+      cuit_cobranza?: string;
+      test_mode?: boolean;
+    },
+  ) => api.put(`/proveedores-pago/${proveedor}/credenciales`, data),
+  probarCredenciales: (proveedor: string, access_token: string, test_mode: boolean) =>
+    api.post<{
+      ok: boolean;
+      cuenta: { nickname?: string; email?: string; id?: number; country_id?: string };
+    }>(`/pagos/proveedores/probar-credenciales`, { proveedor, access_token, test_mode }),
+
   /** Stream SSE con progreso de importacion. Callback invocado por cada evento. */
   importarPadron: async (
     proveedor: string,

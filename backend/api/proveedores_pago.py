@@ -50,6 +50,24 @@ class ActivarProveedorRequest(BaseModel):
     productos_activos: Optional[Dict[str, bool]] = None
 
 
+class CredencialesProveedorRequest(BaseModel):
+    """Credenciales reales para conectar con el provider (Fase 2 bundle)."""
+    access_token: Optional[str] = None       # se cifra con Fernet antes de persistir
+    public_key: Optional[str] = None         # se guarda en claro (es publica)
+    webhook_secret: Optional[str] = None
+    cuit_cobranza: Optional[str] = None
+    test_mode: Optional[bool] = None
+
+
+class CredencialesProveedorResponse(BaseModel):
+    proveedor: str
+    tiene_access_token: bool                 # NO devolvemos el token en claro
+    public_key: Optional[str]
+    webhook_secret_set: bool
+    cuit_cobranza: Optional[str]
+    test_mode: bool
+
+
 # ============ Catalogo de proveedores (estatico) ============
 
 CATALOGO_PROVEEDORES = {
@@ -205,6 +223,81 @@ async def actualizar_proveedor(
         productos_activos=row.productos_activos or _default_productos(proveedor),
         metadata_importada=row.metadata_importada,
         requiere_importacion=meta["requiere_importacion"],
+    )
+
+
+# ============ Credenciales reales (Fase 2 bundle) ============
+
+@router.get("/{proveedor}/credenciales", response_model=CredencialesProveedorResponse)
+async def get_credenciales(
+    proveedor: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """Devuelve estado de las credenciales (NUNCA el access_token en claro)."""
+    if proveedor not in PROVEEDORES_VALIDOS:
+        raise HTTPException(status_code=400, detail=f"Proveedor invalido: {proveedor}")
+    municipio_id = resolve_municipio_id(request, current_user)
+    if municipio_id is None:
+        raise HTTPException(status_code=400, detail="Municipio no resuelto")
+
+    from services.cifrado import es_placeholder
+    row = await _upsert_proveedor(db, municipio_id, proveedor)
+    await db.commit()
+    return CredencialesProveedorResponse(
+        proveedor=proveedor,
+        tiene_access_token=not es_placeholder(row.access_token_encriptado),
+        public_key=row.public_key,
+        webhook_secret_set=bool(row.webhook_secret),
+        cuit_cobranza=row.cuit_cobranza,
+        test_mode=bool(row.test_mode) if row.test_mode is not None else True,
+    )
+
+
+@router.put("/{proveedor}/credenciales", response_model=CredencialesProveedorResponse)
+async def put_credenciales(
+    proveedor: str,
+    data: CredencialesProveedorRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """Guarda credenciales reales del provider. Cifra el access_token."""
+    if proveedor not in PROVEEDORES_VALIDOS:
+        raise HTTPException(status_code=400, detail=f"Proveedor invalido: {proveedor}")
+    municipio_id = resolve_municipio_id(request, current_user)
+    if municipio_id is None:
+        raise HTTPException(status_code=400, detail="Municipio no resuelto")
+
+    from services.cifrado import cifrar, es_placeholder
+    row = await _upsert_proveedor(db, municipio_id, proveedor)
+
+    if data.access_token is not None:
+        # Solo actualizamos si el caller mandó algo distinto de placeholder.
+        # Asi el frontend puede enviar un PUT para cambiar otros campos
+        # sin tener que re-pegar el token.
+        if data.access_token and data.access_token != "***":
+            row.access_token_encriptado = cifrar(data.access_token)
+    if data.public_key is not None:
+        row.public_key = data.public_key.strip() or None
+    if data.webhook_secret is not None:
+        row.webhook_secret = data.webhook_secret.strip() or None
+    if data.cuit_cobranza is not None:
+        row.cuit_cobranza = data.cuit_cobranza.strip() or None
+    if data.test_mode is not None:
+        row.test_mode = bool(data.test_mode)
+
+    await db.commit()
+    await db.refresh(row)
+
+    return CredencialesProveedorResponse(
+        proveedor=proveedor,
+        tiene_access_token=not es_placeholder(row.access_token_encriptado),
+        public_key=row.public_key,
+        webhook_secret_set=bool(row.webhook_secret),
+        cuit_cobranza=row.cuit_cobranza,
+        test_mode=bool(row.test_mode) if row.test_mode is not None else True,
     )
 
 
