@@ -143,7 +143,7 @@ def run():
             # Feedback negativo del vecino
             r = c.post(
                 f"{BASE}/reclamos/{reclamo_id}/confirmar-vecino",
-                json={"confirmado": False, "comentario": "smoke - rechazo"},
+                json={"solucionado": False, "comentario": "smoke - rechazo"},
                 headers=h(vec),
             )
             if r.status_code == 200:
@@ -157,7 +157,7 @@ def run():
                 headers=h(adm),
             )
             if r.status_code == 200:
-                log("reclamos.reabrir-post-feedback", "OK", "FINALIZADO→EN_CURSO")
+                log("reclamos.reabrir-post-feedback", "OK", "FINALIZADO -> EN_CURSO")
             else:
                 log("reclamos.reabrir-post-feedback", "FAIL", f"{r.status_code}: {r.text[:150]}")
 
