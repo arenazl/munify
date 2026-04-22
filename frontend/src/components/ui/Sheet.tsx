@@ -61,6 +61,21 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
   // Usar portal para renderizar fuera del DOM normal y evitar problemas de contexto de posicionamiento
   const sheetContent = (
     <>
+      {/* Compact sizing: todo el contenido del Sheet escala al 85% vs resto de la app */}
+      <style>{`
+        .sheet-compact .text-xs     { font-size: 0.638rem; line-height: 0.85rem; }
+        .sheet-compact .text-sm     { font-size: 0.744rem; line-height: 1.063rem; }
+        .sheet-compact .text-base   { font-size: 0.85rem;  line-height: 1.275rem; }
+        .sheet-compact .text-lg     { font-size: 0.956rem; line-height: 1.488rem; }
+        .sheet-compact .text-xl     { font-size: 1.063rem; line-height: 1.488rem; }
+        .sheet-compact .text-2xl    { font-size: 1.275rem; line-height: 1.700rem; }
+        .sheet-compact .text-3xl    { font-size: 1.594rem; line-height: 1.913rem; }
+        .sheet-compact .text-\\[10px\\]   { font-size: 8.5px; }
+        .sheet-compact .text-\\[11px\\]   { font-size: 9.35px; }
+        .sheet-compact .text-\\[13px\\]   { font-size: 11.05px; }
+        .sheet-compact h1, .sheet-compact h2, .sheet-compact h3 { font-size: 0.9em; }
+      `}</style>
+
       {/* Backdrop con fade y blur — en mobile respeta la topbar del Layout */}
       <div
         className="sheet-backdrop"
@@ -81,7 +96,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
       {/* Side Panel — en mobile arranca debajo de la topbar (56px) */}
       <div
-        className="sheet-panel"
+        className="sheet-panel sheet-compact"
         style={{
           position: 'fixed',
           top: topOffset,
