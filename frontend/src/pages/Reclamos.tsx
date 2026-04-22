@@ -3096,20 +3096,31 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 icon={<Clock className="h-4 w-4" style={{ color: theme.primary }} />}
               />
             )}
+          </ABMInfoPanel>
+        )}
 
-            {/* Asignación de empleado — botón chico + combo, solo en estados activos */}
-            {(user?.rol === 'admin' || user?.rol === 'supervisor') && ['recibido', 'en_curso', 'pospuesto'].includes(selectedReclamo.estado) && (() => {
-              const empleadosDependencia = empleados.filter(e =>
-                e.tipo === 'operario' && (
-                  e.categoria_principal_id === selectedReclamo.categoria.id ||
-                  e.categorias?.some(c => c.id === selectedReclamo.categoria.id)
-                )
-              );
-              return (
-                <div className="flex items-center gap-2 pt-1">
+        {/* Asignar empleado — panel separado, colapsado por defecto cuando no hay candidatos */}
+        {selectedReclamo.dependencia_asignada?.nombre &&
+          (user?.rol === 'admin' || user?.rol === 'supervisor') &&
+          ['recibido', 'en_curso', 'pospuesto'].includes(selectedReclamo.estado) && (() => {
+            const empleadosDependencia = empleados.filter(e =>
+              e.tipo === 'operario' && (
+                e.categoria_principal_id === selectedReclamo.categoria.id ||
+                e.categorias?.some(c => c.id === selectedReclamo.categoria.id)
+              )
+            );
+            const hayCandidatos = empleadosDependencia.length > 0;
+            return (
+              <ABMCollapsible
+                key={`empleado-${selectedReclamo.id}-${hayCandidatos ? 'o' : 'c'}`}
+                title={hayCandidatos ? 'Asignar empleado (opcional)' : 'Asignar empleado — sin candidatos'}
+                icon={<UserPlus className="h-4 w-4" />}
+                defaultOpen={hayCandidatos}
+              >
+                <div className="flex items-center gap-2">
                   <button
                     onClick={handleAutoAsignar}
-                    disabled={asignandoEmpleado}
+                    disabled={asignandoEmpleado || !hayCandidatos}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
                     style={{
                       backgroundColor: `${theme.primary}15`,
@@ -3124,7 +3135,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   <select
                     value={empleadoSeleccionadoId}
                     onChange={(e) => handleAsignarEmpleadoManual(e.target.value)}
-                    disabled={asignandoEmpleado || empleadosDependencia.length === 0}
+                    disabled={asignandoEmpleado || !hayCandidatos}
                     className="flex-1 min-w-0 rounded-lg text-xs px-2 py-1.5 transition-colors focus:outline-none"
                     style={{
                       backgroundColor: theme.backgroundSecondary,
@@ -3133,9 +3144,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     }}
                   >
                     <option value="">
-                      {empleadosDependencia.length === 0
-                        ? 'Sin empleados en esta dependencia'
-                        : 'Seleccionar empleado…'}
+                      {hayCandidatos ? 'Seleccionar empleado…' : 'Sin empleados asignables en la dependencia'}
                     </option>
                     {empleadosDependencia.map(emp => (
                       <option key={emp.id} value={emp.id}>
@@ -3144,10 +3153,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     ))}
                   </select>
                 </div>
-              );
-            })()}
-          </ABMInfoPanel>
-        )}
+                {!hayCandidatos && (
+                  <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
+                    Esta dependencia no tiene empleados cargados para la categoría del reclamo. La asignación de empleado es opcional — podés avanzar sin ella.
+                  </p>
+                )}
+              </ABMCollapsible>
+            );
+          })()}
 
         {/* Tiempo estimado de resolución - Solo para aceptar reclamos nuevos */}
         {selectedReclamo.estado === 'nuevo' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (
