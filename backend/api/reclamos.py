@@ -494,6 +494,14 @@ async def cambiar_estado_reclamo_drag(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
+    # Verificar permisos de usuario de dependencia ANTES de la transicion,
+    # asi no filtramos info del estado actual de un reclamo ajeno.
+    # El rol EMPLEADO fue eliminado; ahora los usuarios de area son SUPERVISOR
+    # con municipio_dependencia_id asignado. Admin sin dep ve todo su muni.
+    if current_user.municipio_dependencia_id:
+        if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
+
     # Validar transiciones permitidas
     # Flujo: nuevo → recibido → en_curso → (finalizado | pospuesto | rechazado)
     transiciones_validas = {
@@ -513,14 +521,6 @@ async def cambiar_estado_reclamo_drag(
             status_code=400,
             detail=f"No se puede cambiar de {reclamo.estado.value} a {estado_enum.value}"
         )
-
-    # Verificar permisos de usuario de dependencia.
-    # El rol EMPLEADO fue eliminado; ahora los usuarios de area son SUPERVISOR
-    # con municipio_dependencia_id asignado. Si el reclamo no esta asignado a
-    # su dep, no puede tocarlo. Admin sin dep asignada puede tocar todo su muni.
-    if current_user.municipio_dependencia_id:
-        if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
-            raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
 
     estado_anterior = reclamo.estado
     reclamo.estado = estado_enum

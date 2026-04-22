@@ -44,7 +44,7 @@ def run():
         md_id = u.get("municipio_dependencia_id")
 
         # 1. Ver reclamos — deberia filtrar solo los de su dependencia
-        r = c.get(f"{BASE}/reclamos?municipio_id={MUNI_ID}&limit=200", headers=h(tok))
+        r = c.get(f"{BASE}/reclamos?municipio_id={MUNI_ID}&limit=100", headers=h(tok))
         if r.status_code == 200:
             reclamos = r.json()
             # Contar cuantos son de su dep vs otros
