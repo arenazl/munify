@@ -2,9 +2,9 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
-  CheckCircle, XCircle, AlertCircle, PlayCircle, FileText,
+  CheckCircle, XCircle, AlertCircle, AlertTriangle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown, ClipboardList
+  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, whatsappApi } from '../lib/api';
@@ -725,36 +725,83 @@ export default function ReclamoDetalle() {
                       }
 
                       const item = event.data as HistorialReclamo;
-                      const ActionIcon = accionIcons[item.accion.toLowerCase()] || AlertCircle;
+                      const accionLower = item.accion.toLowerCase();
+
+                      // Detectar acciones especiales del vecino
+                      const isRechazoVecino = accionLower === 'confirmado_sigue_problema' ||
+                                              accionLower.includes('sigue_problema') ||
+                                              accionLower.includes('no_solucion');
+                      const isOkVecino = accionLower === 'confirmado_solucionado';
+                      const isRechazoGeneral = accionLower === 'rechazado' ||
+                                                item.estado_nuevo === 'rechazado';
+                      const isNegativo = isRechazoVecino || isRechazoGeneral;
+
+                      // Elegir icono y color según tipo
+                      let ActionIcon = accionIcons[accionLower] || AlertCircle;
+                      let dotBg = isFirst ? theme.primary : theme.card;
+                      let dotIconColor = isFirst ? '#ffffff' : theme.textSecondary;
+                      let dotBorder = isFirst ? 'none' : `2px solid ${theme.border}`;
+                      let titleColor = isFirst ? theme.primary : theme.text;
+                      let commentBg: string | undefined;
+                      let commentBorder: string | undefined;
+                      let commentColor = theme.textSecondary;
+
+                      if (isRechazoVecino) {
+                        ActionIcon = AlertTriangle;
+                        dotBg = '#ef4444';
+                        dotIconColor = '#ffffff';
+                        dotBorder = 'none';
+                        titleColor = '#ef4444';
+                        commentBg = '#ef444412';
+                        commentBorder = '1px solid #ef444440';
+                        commentColor = '#b91c1c';
+                      } else if (isOkVecino) {
+                        ActionIcon = ThumbsUp;
+                        dotBg = '#10b981';
+                        dotIconColor = '#ffffff';
+                        dotBorder = 'none';
+                        titleColor = '#10b981';
+                      } else if (isRechazoGeneral) {
+                        ActionIcon = ThumbsDown;
+                        dotBg = '#ef4444';
+                        dotIconColor = '#ffffff';
+                        dotBorder = 'none';
+                        titleColor = '#ef4444';
+                      }
+
+                      // Label más humano
+                      const labelBonito = isRechazoVecino
+                        ? 'Vecino rechazó la resolución'
+                        : isOkVecino
+                          ? 'Vecino confirmó la resolución'
+                          : item.accion.replace(/_/g, ' ');
 
                       return (
                         <div key={event.id} className="relative flex gap-3">
                           <div
                             className="relative z-10 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
                             style={{
-                              backgroundColor: isFirst ? theme.primary : theme.card,
-                              border: isFirst ? 'none' : `2px solid ${theme.border}`
+                              backgroundColor: dotBg,
+                              border: dotBorder,
+                              boxShadow: isNegativo ? '0 0 0 3px #ef444425' : undefined,
                             }}
                           >
-                            <ActionIcon
-                              className="h-3 w-3"
-                              style={{ color: isFirst ? '#ffffff' : theme.textSecondary }}
-                            />
+                            <ActionIcon className="h-3 w-3" style={{ color: dotIconColor }} />
                           </div>
                           <div className="flex-1 pb-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span
-                                className="font-medium text-sm capitalize"
-                                style={{ color: isFirst ? theme.primary : theme.text }}
+                                className="font-semibold text-sm capitalize"
+                                style={{ color: titleColor }}
                               >
-                                {item.accion}
+                                {labelBonito}
                               </span>
-                              {item.estado_nuevo && (
+                              {item.estado_nuevo && !isRechazoVecino && !isOkVecino && (
                                 <span
                                   className="px-1.5 py-0.5 text-xs rounded"
                                   style={{
                                     backgroundColor: estadoConfig[item.estado_nuevo]?.bg || theme.backgroundSecondary,
-                                    color: estadoConfig[item.estado_nuevo]?.color || theme.text
+                                    color: estadoConfig[item.estado_nuevo]?.color || theme.text,
                                   }}
                                 >
                                   {estadoConfig[item.estado_nuevo]?.label || item.estado_nuevo}
@@ -762,12 +809,23 @@ export default function ReclamoDetalle() {
                               )}
                             </div>
                             {item.comentario && (
-                              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                              <p
+                                className="text-sm mt-1.5"
+                                style={{
+                                  color: commentColor,
+                                  backgroundColor: commentBg,
+                                  border: commentBorder,
+                                  padding: commentBg ? '8px 12px' : undefined,
+                                  borderRadius: commentBg ? '8px' : undefined,
+                                  fontStyle: isRechazoVecino ? 'italic' : undefined,
+                                }}
+                              >
+                                {isRechazoVecino && <span className="mr-1">⚠️</span>}
                                 {item.comentario}
                               </p>
                             )}
                             <div className="flex items-center gap-2 mt-1 text-xs" style={{ color: theme.textSecondary }}>
-                              <span>{formatEmpleadoNombre(`${item.usuario.nombre} ${item.usuario.apellido}`)}</span>
+                              <span>{item.usuario ? formatEmpleadoNombre(`${item.usuario.nombre} ${item.usuario.apellido}`) : 'Sistema'}</span>
                               <span>•</span>
                               <span>
                                 {new Date(item.created_at).toLocaleDateString('es-AR', {
