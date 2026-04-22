@@ -58,6 +58,9 @@ class TramiteBase(BaseModel):
     # Configuracion de pago (cuando costo > 0)
     tipo_pago: Optional[str] = None       # boton_pago | rapipago | adhesion_debito | qr
     momento_pago: Optional[str] = None    # inicio | fin
+    # CENAT (Fase 3 bundle) — tramites de licencia de conducir
+    requiere_cenat: bool = False
+    monto_cenat_referencia: Optional[float] = None
     activo: bool = True
     orden: int = 0
 
@@ -79,6 +82,8 @@ class TramiteUpdate(BaseModel):
     requiere_validacion_facial: Optional[bool] = None
     tipo_pago: Optional[str] = None
     momento_pago: Optional[str] = None
+    requiere_cenat: Optional[bool] = None
+    monto_cenat_referencia: Optional[float] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
 
@@ -93,6 +98,8 @@ class TramiteSimple(BaseModel):
     momento_pago: Optional[str] = None
     requiere_validacion_dni: bool = False
     requiere_validacion_facial: bool = False
+    requiere_cenat: bool = False
+    monto_cenat_referencia: Optional[float] = None
     categoria_tramite_id: Optional[int] = None
     categoria_tramite: Optional[CategoriaTramiteSimple] = None
 

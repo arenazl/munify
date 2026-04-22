@@ -77,6 +77,13 @@ class Tramite(Base):
     #   (al retirar). Default "inicio" si tiene costo.
     momento_pago = Column(String(10), nullable=True)
 
+    # Licencias de conducir (y otros tramites con componente nacional):
+    # si requiere CENAT (Agencia Nacional de Seguridad Vial), el vecino tiene
+    # que adjuntar el comprobante antes de que el operador cierre el legajo.
+    # El pago del CENAT es externo a Munify — acá solo trackeamos el adjunto.
+    requiere_cenat = Column(Boolean, nullable=False, default=False)
+    monto_cenat_referencia = Column(Float, nullable=True)  # solo informativo
+
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)
 

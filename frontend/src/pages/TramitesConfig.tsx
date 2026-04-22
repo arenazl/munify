@@ -34,6 +34,8 @@ interface TramiteForm {
   requiere_validacion_facial: boolean;
   tipo_pago: string;        // '' | 'boton_pago' | 'rapipago' | 'adhesion_debito' | 'qr'
   momento_pago: string;     // '' | 'inicio' | 'fin'
+  requiere_cenat: boolean;            // Fase 3 — licencias de conducir
+  monto_cenat_referencia: string;
   documentos_requeridos: DocRequeridoDraft[];
 }
 
@@ -48,6 +50,8 @@ const EMPTY_FORM: TramiteForm = {
   requiere_validacion_facial: false,
   tipo_pago: '',
   momento_pago: '',
+  requiere_cenat: false,
+  monto_cenat_referencia: '',
   documentos_requeridos: [],
 };
 
@@ -120,6 +124,8 @@ export default function TramitesConfig() {
         requiere_validacion_facial: !!t.requiere_validacion_facial,
         tipo_pago: (t as any).tipo_pago || '',
         momento_pago: (t as any).momento_pago || '',
+        requiere_cenat: !!t.requiere_cenat,
+        monto_cenat_referencia: t.monto_cenat_referencia != null ? String(t.monto_cenat_referencia) : '',
         documentos_requeridos: (t.documentos_requeridos || []).map(d => ({
           id: d.id,
           nombre: d.nombre,
@@ -160,6 +166,8 @@ export default function TramitesConfig() {
           requiere_validacion_facial: form.requiere_validacion_facial,
           tipo_pago: form.tipo_pago || undefined,
           momento_pago: form.momento_pago || undefined,
+          requiere_cenat: form.requiere_cenat,
+          monto_cenat_referencia: form.monto_cenat_referencia ? parseFloat(form.monto_cenat_referencia) : undefined,
         });
 
         // Sincronizar documentos requeridos
@@ -994,6 +1002,31 @@ export default function TramitesConfig() {
               />
               Requiere validación facial (selfie)
             </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: theme.text }}>
+              <input
+                type="checkbox"
+                checked={form.requiere_cenat}
+                onChange={e => setForm({ ...form, requiere_cenat: e.target.checked })}
+              />
+              Requiere comprobante CENAT (licencias — ANSV)
+            </label>
+            {form.requiere_cenat && (
+              <div className="ml-6 mt-1">
+                <label className="block text-[11px] mb-1" style={{ color: theme.textSecondary }}>
+                  Monto CENAT de referencia (solo informativo)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.monto_cenat_referencia}
+                  onChange={e => setForm({ ...form, monto_cenat_referencia: e.target.value })}
+                  placeholder="Ej: 2500"
+                  className="w-40 px-3 py-1.5 rounded-lg text-sm outline-none"
+                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>

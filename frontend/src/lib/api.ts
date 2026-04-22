@@ -1453,6 +1453,30 @@ export const cutApi = {
   consultar: (codigo: string) => api.get(`/pagos/cut/${codigo}`),
 };
 
+// CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial
+export const cenatApi = {
+  status: (solicitudId: number) =>
+    api.get<{
+      solicitud_id: number;
+      requiere_cenat: boolean;
+      monto_cenat_referencia: number | null;
+      tiene_adjunto: boolean;
+      verificado: boolean;
+      adjunto_url: string | null;
+      adjunto_nombre: string | null;
+      adjunto_subido_at: string | null;
+    }>(`/tramites/solicitudes/${solicitudId}/cenat-status`),
+  subir: (solicitudId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post(
+      `/tramites/solicitudes/${solicitudId}/documentos?tipo_documento=comprobante_cenat&etapa=proceso`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+};
+
 export interface Recomendacion {
   tipo: string;
   icono: string;

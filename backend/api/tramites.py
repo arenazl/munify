@@ -1889,3 +1889,76 @@ async def listar_solicitudes_gestion(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+# ============================================================
+# CENAT status (Fase 3 bundle de pagos)
+# ============================================================
+#
+# Los tramites de licencia de conducir tienen dos componentes de pago:
+#   - Tasa municipal (Munify maneja).
+#   - CENAT (Agencia Nacional de Seguridad Vial — externo).
+#
+# El vecino paga el CENAT afuera y sube el comprobante aca como un
+# DocumentoSolicitud con tipo_documento='comprobante_cenat'. Este endpoint
+# devuelve el estado (si ya hay comprobante, quien lo verifico, etc.)
+# para que la UI muestre el checklist del legajo completo.
+# ============================================================
+
+CENAT_DOC_TIPO = "comprobante_cenat"
+
+
+class CenatStatusResponse(BaseModel):
+    solicitud_id: int
+    requiere_cenat: bool
+    monto_cenat_referencia: Optional[float] = None
+    tiene_adjunto: bool
+    verificado: bool
+    adjunto_url: Optional[str] = None
+    adjunto_nombre: Optional[str] = None
+    adjunto_subido_at: Optional[str] = None
+
+
+@router.get("/solicitudes/{solicitud_id}/cenat-status", response_model=CenatStatusResponse)
+async def cenat_status(
+    solicitud_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    sol_q = await db.execute(
+        select(Solicitud)
+        .options(selectinload(Solicitud.tramite))
+        .where(Solicitud.id == solicitud_id)
+    )
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    if current_user.rol == RolUsuario.VECINO and solicitud.solicitante_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tiene permiso")
+
+    tramite = solicitud.tramite
+    requiere = bool(tramite and tramite.requiere_cenat)
+    monto_ref = float(tramite.monto_cenat_referencia) if tramite and tramite.monto_cenat_referencia else None
+
+    # Buscar el ultimo doc CENAT de esta solicitud
+    doc_q = await db.execute(
+        select(DocumentoSolicitud)
+        .where(
+            DocumentoSolicitud.solicitud_id == solicitud_id,
+            DocumentoSolicitud.tipo_documento == CENAT_DOC_TIPO,
+        )
+        .order_by(DocumentoSolicitud.created_at.desc())
+        .limit(1)
+    )
+    doc = doc_q.scalar_one_or_none()
+
+    return CenatStatusResponse(
+        solicitud_id=solicitud_id,
+        requiere_cenat=requiere,
+        monto_cenat_referencia=monto_ref,
+        tiene_adjunto=doc is not None,
+        verificado=bool(doc and doc.verificado),
+        adjunto_url=doc.url if doc else None,
+        adjunto_nombre=doc.nombre_original if doc else None,
+        adjunto_subido_at=doc.created_at.isoformat() if (doc and doc.created_at) else None,
+    )

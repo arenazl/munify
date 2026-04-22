@@ -268,6 +268,9 @@ export interface Tramite {
   url_externa?: string;
   requiere_validacion_dni?: boolean;
   requiere_validacion_facial?: boolean;
+  // CENAT — Fase 3 bundle pagos
+  requiere_cenat?: boolean;
+  monto_cenat_referencia?: number;
   activo: boolean;
   orden: number;
   documentos_requeridos: TramiteDocumentoRequerido[];
