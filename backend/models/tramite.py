@@ -171,6 +171,13 @@ class Solicitud(Base):
     respuesta = Column(Text, nullable=True)
     observaciones = Column(Text, nullable=True)
 
+    # Canal de origen (Fase 6 bundle pagos):
+    #   "app" (default) | "ventanilla_asistida" | "whatsapp" | "web_publica"
+    canal = Column(String(30), nullable=True)
+    operador_user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    validacion_presencial_at = Column(DateTime(timezone=True), nullable=True)
+    dj_validacion_presencial = Column(Text, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

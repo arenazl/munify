@@ -1479,6 +1479,38 @@ export const cutApi = {
   consultar: (codigo: string) => api.get(`/pagos/cut/${codigo}`),
 };
 
+// Operador de Ventanilla (Fase 6)
+export const operadorApi = {
+  home: () =>
+    api.get<{
+      tramites_hoy: number;
+      pagados_hoy: number;
+      monto_hoy: string;
+      operador_nombre: string;
+    }>('/operador/mostrador/home'),
+  iniciarTramite: (body: {
+    municipio_id: number;
+    tramite_id: number;
+    dni: string;
+    nombre: string;
+    apellido: string;
+    email?: string;
+    telefono?: string;
+    dj_firmada: boolean;
+    dj_texto?: string;
+  }) =>
+    api.post<{
+      solicitud_id: number;
+      numero_tramite: string;
+      user_id: number;
+      requiere_pago: boolean;
+      checkout_url: string | null;
+      codigo_cut_qr: string | null;
+      session_id: string | null;
+      monto: number | null;
+    }>('/operador/tramite-presencial/iniciar', body),
+};
+
 // CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial
 export const cenatApi = {
   status: (solicitudId: number) =>

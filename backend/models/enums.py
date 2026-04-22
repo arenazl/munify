@@ -6,6 +6,7 @@ class RolUsuario(str, enum.Enum):
     EMPLEADO = "empleado"
     SUPERVISOR = "supervisor"
     ADMIN = "admin"
+    OPERADOR_VENTANILLA = "operador_ventanilla"
 
 class EstadoReclamo(str, enum.Enum):
     # Estados activos

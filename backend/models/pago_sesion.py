@@ -118,6 +118,11 @@ class PagoSesion(Base):
     imputacion_observacion = Column(String(500), nullable=True)
     imputacion_referencia_externa = Column(String(100), nullable=True)  # N° asiento RAFAM
 
+    # Canal (Fase 6 bundle) — omnicanalidad: distingue pagos iniciados en
+    # app vs ventanilla asistida vs whatsapp. Feeds el dashboard F9.
+    canal = Column(String(30), nullable=True)
+    operador_user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
     # Relaciones
     deuda = relationship("Deuda")
     municipio = relationship("Municipio")
