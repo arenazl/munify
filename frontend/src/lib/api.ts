@@ -1532,9 +1532,21 @@ export const operadorApi = {
       codigo_cut_qr: string | null;
       session_id: string | null;
       monto: number | null;
+      wa_me_url: string | null;
+      wa_me_mensaje: string | null;
+      telefono_vecino: string | null;
     }>('/operador/tramite-presencial/iniciar', body),
-  reenviarWhatsapp: (solicitudId: number) =>
-    api.post<{ ok: boolean }>('/operador/tramite-presencial/reenviar-whatsapp', { solicitud_id: solicitudId }),
+  generarWaMeUrl: (solicitudId: number, telefonoOverride?: string) =>
+    api.post<{
+      wa_me_url: string | null;
+      mensaje: string;
+      telefono: string | null;
+      ok: boolean;
+      motivo_error: string | null;
+    }>('/operador/tramite-presencial/wa-me-url', {
+      solicitud_id: solicitudId,
+      telefono_override: telefonoOverride,
+    }),
   registrarPagoEfectivo: (solicitudId: number, monto: number, numeroComprobante: string, foto: File | null) => {
     const form = new FormData();
     form.append('solicitud_id', String(solicitudId));

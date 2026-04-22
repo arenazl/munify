@@ -91,6 +91,14 @@ class Settings(BaseSettings):
     # Si vacia, los secretos se guardan en base64 plano (dev only).
     FERNET_KEY: str = ""
 
+    # WhatsApp — modo de envio (Fase 7 bundle pagos).
+    # "wa_me" (default): genera links click-to-chat que el operador envia
+    #   manualmente desde su WhatsApp Web o celular. No requiere Business API.
+    # "business_api": envia automaticamente usando la config del muni
+    #   (Meta/Twilio). Requiere templates aprobados — hoy dormido, se habilita
+    #   cuando algun muni quiera automatizar con numero oficial verificado.
+    WHATSAPP_AUTOSEND_MODE: str = "wa_me"
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Retorna lista de origenes CORS permitidos"""

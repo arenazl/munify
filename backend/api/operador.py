@@ -77,6 +77,11 @@ class IniciarTramiteResponse(BaseModel):
     codigo_cut_qr: Optional[str] = None
     session_id: Optional[str] = None
     monto: Optional[float] = None
+    # F7 wa.me: link pre-armado para que el operador abra desde su WhatsApp
+    # Web y envie manualmente. None si el vecino no tiene telefono cargado.
+    wa_me_url: Optional[str] = None
+    wa_me_mensaje: Optional[str] = None
+    telefono_vecino: Optional[str] = None
 
 
 DJ_DEFAULT_TEXTO = (
@@ -256,22 +261,37 @@ async def iniciar_tramite_presencial(
     await db.commit()
     await db.refresh(solicitud)
 
-    # F7 — mandar link por WhatsApp si el vecino tiene telefono + hay pago
+    # F7 — notificar al vecino segun WHATSAPP_AUTOSEND_MODE
+    # - "business_api" (futuro, dormido por default): envia automatico.
+    # - "wa_me" (default): solo armamos el link, el operador lo envia manual.
+    wa_me_url: Optional[str] = None
+    wa_me_msg: Optional[str] = None
+    from core.config import settings as _cfg
     if requiere_pago and user.telefono and checkout_url:
-        try:
-            from services.whatsapp_pagos import notificar_link_pago
-            await notificar_link_pago(
-                db,
-                municipio_id=body.municipio_id,
-                telefono=user.telefono,
-                nombre_vecino=f"{user.nombre or ''} {user.apellido or ''}".strip(),
-                tramite_nombre=tramite.nombre,
-                checkout_url=checkout_url,
-                numero_tramite=numero_tramite,
-                usuario_id=user.id,
-            )
-        except Exception:
-            pass  # no bloquea el flujo si WhatsApp falla
+        from services.wa_me import armar_wa_me_url, mensaje_link_pago
+        wa_me_msg = mensaje_link_pago(
+            nombre_vecino=f"{user.nombre or ''} {user.apellido or ''}".strip(),
+            tramite_nombre=tramite.nombre,
+            checkout_url=checkout_url,
+            numero_tramite=numero_tramite,
+        )
+        wa_me_url = armar_wa_me_url(user.telefono, wa_me_msg)
+
+        if _cfg.WHATSAPP_AUTOSEND_MODE == "business_api":
+            try:
+                from services.whatsapp_pagos import notificar_link_pago
+                await notificar_link_pago(
+                    db,
+                    municipio_id=body.municipio_id,
+                    telefono=user.telefono,
+                    nombre_vecino=f"{user.nombre or ''} {user.apellido or ''}".strip(),
+                    tramite_nombre=tramite.nombre,
+                    checkout_url=checkout_url,
+                    numero_tramite=numero_tramite,
+                    usuario_id=user.id,
+                )
+            except Exception:
+                pass  # no bloquea el flujo si WhatsApp falla
 
     return IniciarTramiteResponse(
         solicitud_id=solicitud.id,
@@ -282,6 +302,9 @@ async def iniciar_tramite_presencial(
         codigo_cut_qr=codigo_cut_qr,
         session_id=session_id,
         monto=monto,
+        wa_me_url=wa_me_url,
+        wa_me_mensaje=wa_me_msg,
+        telefono_vecino=user.telefono,
     )
 
 
@@ -292,17 +315,32 @@ class MostradorMetricas(BaseModel):
     operador_nombre: str
 
 
-class ReenviarWhatsappRequest(BaseModel):
+class GenerarWaMeRequest(BaseModel):
     solicitud_id: int
+    # Si se pasa, sobreescribe el telefono del User y lo persiste — util
+    # cuando el operador carga trámite sin teléfono y lo completa después.
+    telefono_override: Optional[str] = None
 
 
-@router.post("/tramite-presencial/reenviar-whatsapp")
-async def reenviar_whatsapp(
-    body: ReenviarWhatsappRequest,
+class GenerarWaMeResponse(BaseModel):
+    wa_me_url: Optional[str] = None
+    mensaje: str
+    telefono: Optional[str] = None
+    ok: bool
+    motivo_error: Optional[str] = None
+
+
+@router.post("/tramite-presencial/wa-me-url", response_model=GenerarWaMeResponse)
+async def generar_wa_me_url(
+    body: GenerarWaMeRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Reenvia el link de pago por WhatsApp al vecino (por si no lo vio)."""
+    """Arma el link wa.me para que el operador abra en su WhatsApp y envie.
+
+    Si `telefono_override` viene, actualiza el telefono del vecino y
+    persiste — sirve para cuando el operador lo completo despues.
+    """
     _asegurar_operador(current_user)
 
     sol_q = await db.execute(
@@ -319,11 +357,18 @@ async def reenviar_whatsapp(
     _asegurar_muni(current_user, solicitud.municipio_id)
 
     vecino = solicitud.solicitante
-    if not vecino or not vecino.telefono:
-        raise HTTPException(status_code=400, detail="El vecino no tiene telefono cargado")
+    if not vecino:
+        raise HTTPException(status_code=400, detail="Solicitud sin solicitante vinculado")
 
-    # Buscar la ultima sesion PENDING o APPROVED de esta solicitud
-    from models.pago_sesion import PagoSesion, EstadoSesionPago
+    # Si el operador paso un telefono override, lo persistimos en el user
+    if body.telefono_override:
+        vecino.telefono = body.telefono_override.strip()
+        await db.flush()
+
+    telefono = vecino.telefono
+
+    # Buscar la ultima sesion con checkout_url
+    from models.pago_sesion import PagoSesion
     s_q = await db.execute(
         select(PagoSesion)
         .where(PagoSesion.solicitud_id == solicitud.id)
@@ -332,20 +377,44 @@ async def reenviar_whatsapp(
     )
     sesion = s_q.scalar_one_or_none()
     if not sesion or not sesion.checkout_url:
-        raise HTTPException(status_code=400, detail="No hay link de pago activo para reenviar")
+        raise HTTPException(status_code=400, detail="No hay link de pago activo")
 
-    from services.whatsapp_pagos import notificar_link_pago
-    ok = await notificar_link_pago(
-        db,
-        municipio_id=solicitud.municipio_id,
-        telefono=vecino.telefono,
+    from services.wa_me import armar_wa_me_url, mensaje_link_pago
+    mensaje = mensaje_link_pago(
         nombre_vecino=f"{vecino.nombre or ''} {vecino.apellido or ''}".strip(),
         tramite_nombre=solicitud.tramite.nombre if solicitud.tramite else "tu tramite",
         checkout_url=sesion.checkout_url,
         numero_tramite=solicitud.numero_tramite,
-        usuario_id=vecino.id,
     )
-    return {"ok": ok}
+
+    if not telefono:
+        await db.commit()
+        return GenerarWaMeResponse(
+            wa_me_url=None,
+            mensaje=mensaje,
+            telefono=None,
+            ok=False,
+            motivo_error="El vecino no tiene teléfono cargado",
+        )
+
+    url = armar_wa_me_url(telefono, mensaje)
+    await db.commit()
+
+    if not url:
+        return GenerarWaMeResponse(
+            wa_me_url=None,
+            mensaje=mensaje,
+            telefono=telefono,
+            ok=False,
+            motivo_error="No pude normalizar el teléfono (formato inválido)",
+        )
+
+    return GenerarWaMeResponse(
+        wa_me_url=url,
+        mensaje=mensaje,
+        telefono=telefono,
+        ok=True,
+    )
 
 
 # ============================================================

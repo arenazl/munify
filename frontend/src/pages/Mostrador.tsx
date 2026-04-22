@@ -24,6 +24,9 @@ interface InicioResult {
   codigo_cut_qr: string | null;
   session_id: string | null;
   monto: number | null;
+  wa_me_url: string | null;
+  wa_me_mensaje: string | null;
+  telefono_vecino: string | null;
 }
 
 /**
@@ -305,29 +308,10 @@ export default function Mostrador() {
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   </div>
-                  {telefono && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          await operadorApi.reenviarWhatsapp(result.solicitud_id);
-                          toast.success('Link enviado por WhatsApp');
-                        } catch (e: unknown) {
-                          const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-                          toast.error(msg || 'No se pudo enviar por WhatsApp');
-                        }
-                      }}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded"
-                      style={{ backgroundColor: '#25d36620', color: '#25d366', border: '1px solid #25d36660' }}
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      Enviar por WhatsApp a {telefono}
-                    </button>
-                  )}
-                  <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-                    {telefono
-                      ? 'Si el vecino no tiene WhatsApp, puede escanear el link desde el monitor.'
-                      : 'Sin teléfono — mostrá el link en el monitor para que el vecino lo escanee.'}
-                  </p>
+                  <WaMeEnviar
+                    result={result}
+                    telefonoForm={telefono}
+                  />
                 </div>
               )}
 
@@ -490,6 +474,116 @@ function EfectivoModal({
     </div>
   );
 }
+
+/**
+ * Botón/bloque para que el operador abra el chat de WhatsApp en su propia
+ * cuenta (WhatsApp Web o celular) con el mensaje pre-cargado al vecino.
+ *
+ * Flow:
+ *   - Si el backend devolvió wa_me_url al crear el trámite → muestra botón
+ *     "Abrir WhatsApp" directo.
+ *   - Si el vecino no tenía teléfono cargado → muestra input inline para
+ *     completarlo y persistirlo antes de armar el link.
+ *   - El backend persiste el teléfono en User cuando se pasa como override,
+ *     así el próximo trámite ya lo tiene.
+ */
+function WaMeEnviar({ result, telefonoForm }: { result: InicioResult; telefonoForm: string }) {
+  const { theme } = useTheme();
+  const [url, setUrl] = useState<string | null>(result.wa_me_url);
+  const [mensaje, setMensaje] = useState<string | null>(result.wa_me_mensaje);
+  const [telefono, setTelefono] = useState(result.telefono_vecino || telefonoForm || '');
+  const [editando, setEditando] = useState(!result.wa_me_url);
+  const [generando, setGenerando] = useState(false);
+
+  const handleGenerar = async () => {
+    if (!telefono.trim()) {
+      toast.error('Ingresá un teléfono para armar el link');
+      return;
+    }
+    setGenerando(true);
+    try {
+      const r = await operadorApi.generarWaMeUrl(result.solicitud_id, telefono.trim());
+      setMensaje(r.data.mensaje);
+      if (r.data.ok && r.data.wa_me_url) {
+        setUrl(r.data.wa_me_url);
+        setEditando(false);
+        toast.success('Link listo para enviar');
+      } else {
+        setUrl(null);
+        toast.error(r.data.motivo_error || 'No se pudo armar el link');
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'Error');
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  const abrirWhatsapp = () => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <div className="space-y-2">
+      {url && !editando ? (
+        <>
+          <button
+            onClick={abrirWhatsapp}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95"
+            style={{ backgroundColor: '#25d366' }}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Abrir WhatsApp y enviar a {result.telefono_vecino || telefono}
+          </button>
+          <button
+            onClick={() => setEditando(true)}
+            className="text-[11px] underline hover:no-underline"
+            style={{ color: theme.textSecondary }}
+          >
+            Cambiar número
+          </button>
+          {mensaje && (
+            <details className="text-[11px]" style={{ color: theme.textSecondary }}>
+              <summary className="cursor-pointer">Ver mensaje que se va a enviar</summary>
+              <pre className="mt-1 p-2 rounded whitespace-pre-wrap" style={{ backgroundColor: theme.backgroundSecondary }}>{mensaje}</pre>
+            </details>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="rounded p-2 text-xs" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
+            <MessageSquare className="w-3.5 h-3.5 inline mr-1" />
+            Ingresá el teléfono del vecino para armar el link de WhatsApp
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="tel"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="+54 9 11 1234-5678"
+              className="flex-1 px-3 py-1.5 rounded-lg text-sm outline-none"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+            />
+            <button
+              onClick={handleGenerar}
+              disabled={generando || !telefono.trim()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              style={{ backgroundColor: '#25d366' }}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              {generando ? 'Armando…' : 'Armar link'}
+            </button>
+          </div>
+        </>
+      )}
+      <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+        El link abre tu WhatsApp (Web o celular) con el mensaje listo. Vos apretás “Enviar”.
+      </p>
+    </div>
+  );
+}
+
 
 function Input({ label, value, onChange, theme, placeholder }: { label: string; value: string; onChange: (v: string) => void; theme: ReturnType<typeof useTheme>['theme']; placeholder?: string }) {
   return (
