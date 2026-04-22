@@ -36,6 +36,8 @@ interface TramiteForm {
   momento_pago: string;     // '' | 'inicio' | 'fin'
   requiere_cenat: boolean;            // Fase 3 — licencias de conducir
   monto_cenat_referencia: string;
+  requiere_kyc: boolean;              // Fase 5 — tramites sensibles
+  nivel_kyc_minimo: string;           // "" | "1" | "2"
   documentos_requeridos: DocRequeridoDraft[];
 }
 
@@ -52,6 +54,8 @@ const EMPTY_FORM: TramiteForm = {
   momento_pago: '',
   requiere_cenat: false,
   monto_cenat_referencia: '',
+  requiere_kyc: false,
+  nivel_kyc_minimo: '',
   documentos_requeridos: [],
 };
 
@@ -126,6 +130,10 @@ export default function TramitesConfig() {
         momento_pago: (t as any).momento_pago || '',
         requiere_cenat: !!t.requiere_cenat,
         monto_cenat_referencia: t.monto_cenat_referencia != null ? String(t.monto_cenat_referencia) : '',
+        requiere_kyc: !!(t as { requiere_kyc?: boolean }).requiere_kyc,
+        nivel_kyc_minimo: (t as { nivel_kyc_minimo?: number }).nivel_kyc_minimo != null
+          ? String((t as { nivel_kyc_minimo?: number }).nivel_kyc_minimo)
+          : '',
         documentos_requeridos: (t.documentos_requeridos || []).map(d => ({
           id: d.id,
           nombre: d.nombre,
@@ -168,6 +176,8 @@ export default function TramitesConfig() {
           momento_pago: form.momento_pago || undefined,
           requiere_cenat: form.requiere_cenat,
           monto_cenat_referencia: form.monto_cenat_referencia ? parseFloat(form.monto_cenat_referencia) : undefined,
+          requiere_kyc: form.requiere_kyc,
+          nivel_kyc_minimo: form.nivel_kyc_minimo ? parseInt(form.nivel_kyc_minimo, 10) : undefined,
         });
 
         // Sincronizar documentos requeridos
@@ -1010,6 +1020,30 @@ export default function TramitesConfig() {
               />
               Requiere comprobante CENAT (licencias — ANSV)
             </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: theme.text }}>
+              <input
+                type="checkbox"
+                checked={form.requiere_kyc}
+                onChange={e => setForm({ ...form, requiere_kyc: e.target.checked, nivel_kyc_minimo: e.target.checked && !form.nivel_kyc_minimo ? '2' : form.nivel_kyc_minimo })}
+              />
+              Requiere verificación biométrica (KYC)
+            </label>
+            {form.requiere_kyc && (
+              <div className="ml-6 mt-1">
+                <label className="block text-[11px] mb-1" style={{ color: theme.textSecondary }}>
+                  Nivel mínimo exigido
+                </label>
+                <select
+                  value={form.nivel_kyc_minimo}
+                  onChange={e => setForm({ ...form, nivel_kyc_minimo: e.target.value })}
+                  className="px-3 py-1.5 rounded-lg text-sm outline-none"
+                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                >
+                  <option value="1">Nivel 1 — Email verificado</option>
+                  <option value="2">Nivel 2 — DNI + selfie (biometría)</option>
+                </select>
+              </div>
+            )}
             {form.requiere_cenat && (
               <div className="ml-6 mt-1">
                 <label className="block text-[11px] mb-1" style={{ color: theme.textSecondary }}>

@@ -82,6 +82,12 @@ class User(Base):
     didit_session_id = Column(String(100), nullable=True, index=True)
     verificado_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Fase 5 bundle — modo de verificacion KYC:
+    #   "self_service": el vecino hizo el flow desde la app
+    #   "assisted":     un operador de ventanilla lo verifico presencialmente
+    kyc_modo = Column(String(20), nullable=True)  # None si aun no verificado
+    kyc_operador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
     rol = Column(Enum(RolUsuario, values_callable=lambda x: [e.value for e in x]), default=RolUsuario.VECINO, nullable=False)
     activo = Column(Boolean, default=True)
 

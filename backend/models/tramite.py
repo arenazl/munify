@@ -84,6 +84,11 @@ class Tramite(Base):
     requiere_cenat = Column(Boolean, nullable=False, default=False)
     monto_cenat_referencia = Column(Float, nullable=True)  # solo informativo
 
+    # KYC visible (Fase 5 bundle) — tramites sensibles piden biometria.
+    # Si requiere_kyc=True, el vecino debe tener nivel_verificacion >= 2.
+    requiere_kyc = Column(Boolean, nullable=False, default=False)
+    nivel_kyc_minimo = Column(Integer, nullable=True)  # 1=email / 2=biometria
+
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)
 

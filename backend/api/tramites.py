@@ -689,6 +689,27 @@ async def crear_solicitud(
     if not tramite:
         raise HTTPException(status_code=404, detail="Trámite no disponible para este municipio")
 
+    # Gating KYC (Fase 5 bundle): si el tramite lo exige, el user debe
+    # cumplir nivel_verificacion >= nivel_kyc_minimo (o >=2 si no se
+    # especifico el minimo). Operador de ventanilla en F6 podra bypass
+    # con kyc_modo='assisted' antes de crear.
+    if getattr(tramite, "requiere_kyc", False):
+        min_nivel = int(getattr(tramite, "nivel_kyc_minimo", None) or 2)
+        actual = int(getattr(current_user, "nivel_verificacion", 0) or 0) if current_user else 0
+        if actual < min_nivel:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "kyc_insuficiente",
+                    "mensaje": (
+                        "Este tramite requiere verificacion biometrica "
+                        f"(nivel {min_nivel}). Tu nivel actual es {actual}."
+                    ),
+                    "nivel_requerido": min_nivel,
+                    "nivel_actual": actual,
+                },
+            )
+
     # ================================================================
     # Resolver el solicitante (dueño real del trámite, no quien lo cargó)
     # ================================================================

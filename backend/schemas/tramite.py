@@ -61,6 +61,9 @@ class TramiteBase(BaseModel):
     # CENAT (Fase 3 bundle) — tramites de licencia de conducir
     requiere_cenat: bool = False
     monto_cenat_referencia: Optional[float] = None
+    # KYC visible (Fase 5 bundle) — tramites sensibles piden biometria
+    requiere_kyc: bool = False
+    nivel_kyc_minimo: Optional[int] = None
     activo: bool = True
     orden: int = 0
 
@@ -84,6 +87,8 @@ class TramiteUpdate(BaseModel):
     momento_pago: Optional[str] = None
     requiere_cenat: Optional[bool] = None
     monto_cenat_referencia: Optional[float] = None
+    requiere_kyc: Optional[bool] = None
+    nivel_kyc_minimo: Optional[int] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
 
@@ -100,6 +105,8 @@ class TramiteSimple(BaseModel):
     requiere_validacion_facial: bool = False
     requiere_cenat: bool = False
     monto_cenat_referencia: Optional[float] = None
+    requiere_kyc: bool = False
+    nivel_kyc_minimo: Optional[int] = None
     categoria_tramite_id: Optional[int] = None
     categoria_tramite: Optional[CategoriaTramiteSimple] = None
 

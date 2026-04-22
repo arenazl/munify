@@ -271,6 +271,9 @@ export interface Tramite {
   // CENAT — Fase 3 bundle pagos
   requiere_cenat?: boolean;
   monto_cenat_referencia?: number;
+  // KYC visible — Fase 5 bundle pagos
+  requiere_kyc?: boolean;
+  nivel_kyc_minimo?: number;
   activo: boolean;
   orden: number;
   documentos_requeridos: TramiteDocumentoRequerido[];
