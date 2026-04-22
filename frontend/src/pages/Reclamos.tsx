@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
+import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
 import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
 import { MapPicker } from '../components/ui/MapPicker';
@@ -212,6 +213,20 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [selectedReclamo, setSelectedReclamo] = useState<Reclamo | null>(null);
   const [historial, setHistorial] = useState<HistorialReclamo[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  // Estado para el ConfirmModal reutilizable (reemplaza window.confirm/prompt)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText: string;
+    variant: ConfirmVariant;
+    promptLabel?: string;
+    promptPlaceholder?: string;
+    loading?: boolean;
+    onConfirm: (value?: string) => void;
+  } | null>(null);
+  const closeConfirmModal = () => setConfirmModal(prev => prev ? { ...prev, isOpen: false } : null);
 
   // Form state for create
   const [formData, setFormData] = useState({
@@ -1370,54 +1385,92 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
-  const handleReasignar = async () => {
+  const handleReasignar = () => {
     if (!selectedReclamo) return;
-    const motivo = window.prompt('Motivo de la reasignación (queda en historial):');
-    if (!motivo || !motivo.trim()) return;
-    try {
-      await reclamosApi.reasignar(selectedReclamo.id, motivo.trim());
-      toast.success('Reclamo devuelto a Recibido. Ya puede tomarlo otro empleado.');
-      setEmpleadoSeleccionadoId('');
-      setFechaProgramada('');
-      setHoraInicio('09:00');
-      fetchReclamos();
-    } catch (err) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      toast.error(e.response?.data?.detail || 'No se pudo reasignar');
-    }
+    const reclamoId = selectedReclamo.id;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Reasignar reclamo',
+      message: 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Contanos el motivo (queda en historial).',
+      confirmText: 'Reasignar',
+      variant: 'warning',
+      promptLabel: 'Motivo de la reasignación',
+      promptPlaceholder: 'Ej: el empleado no pudo completar el trabajo',
+      onConfirm: async (motivo) => {
+        if (!motivo) return;
+        setConfirmModal(prev => prev ? { ...prev, loading: true } : null);
+        try {
+          await reclamosApi.reasignar(reclamoId, motivo);
+          toast.success('Reclamo devuelto a Recibido. Ya puede tomarlo otro empleado.');
+          setEmpleadoSeleccionadoId('');
+          setFechaProgramada('');
+          setHoraInicio('09:00');
+          fetchReclamos();
+          closeConfirmModal();
+        } catch (err) {
+          const e = err as { response?: { data?: { detail?: string } } };
+          toast.error(e.response?.data?.detail || 'No se pudo reasignar');
+          setConfirmModal(prev => prev ? { ...prev, loading: false } : null);
+        }
+      },
+    });
   };
 
   // Reabrir un reclamo finalizado tras feedback negativo del vecino
-  const handleReabrirPorFeedback = async () => {
+  const handleReabrirPorFeedback = () => {
     if (!selectedReclamo) return;
-    if (!window.confirm('¿Reabrir el reclamo? Volverá a estado "En Curso" para retrabajar la solución.')) return;
-    try {
-      await reclamosApi.cambiarEstado(
-        selectedReclamo.id,
-        'en_curso',
-        'Reabierto por supervisor tras feedback negativo del vecino.',
-      );
-      toast.success('Reclamo reabierto — vuelve a En Curso');
-      fetchReclamos();
-      closeSheet();
-    } catch (err) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      toast.error(e.response?.data?.detail || 'No se pudo reabrir el reclamo');
-    }
+    const reclamoId = selectedReclamo.id;
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Reabrir el reclamo?',
+      message: 'El reclamo volverá a estado "En Curso" para retrabajar la solución. El vecino será notificado.',
+      confirmText: 'Reabrir caso',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmModal(prev => prev ? { ...prev, loading: true } : null);
+        try {
+          await reclamosApi.cambiarEstado(
+            reclamoId,
+            'en_curso',
+            'Reabierto por supervisor tras feedback negativo del vecino.',
+          );
+          toast.success('Reclamo reabierto — vuelve a En Curso');
+          fetchReclamos();
+          closeSheet();
+          closeConfirmModal();
+        } catch (err) {
+          const e = err as { response?: { data?: { detail?: string } } };
+          toast.error(e.response?.data?.detail || 'No se pudo reabrir el reclamo');
+          setConfirmModal(prev => prev ? { ...prev, loading: false } : null);
+        }
+      },
+    });
   };
 
   // Descartar feedback negativo: el supervisor considera que el trabajo estuvo bien
-  const handleDescartarFeedback = async () => {
+  const handleDescartarFeedback = () => {
     if (!selectedReclamo) return;
-    if (!window.confirm('¿Descartar el comentario del vecino? El reclamo queda finalizado y el feedback se marca como revisado.')) return;
-    try {
-      await reclamosApi.descartarFeedbackVecino(selectedReclamo.id);
-      toast.success('Feedback descartado. El reclamo queda finalizado.');
-      fetchReclamos();
-    } catch (err) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      toast.error(e.response?.data?.detail || 'No se pudo descartar');
-    }
+    const reclamoId = selectedReclamo.id;
+    setConfirmModal({
+      isOpen: true,
+      title: '¿Descartar el comentario del vecino?',
+      message: 'El reclamo queda finalizado y el feedback se marca como revisado. Esta acción queda registrada en el historial.',
+      confirmText: 'Descartar comentario',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmModal(prev => prev ? { ...prev, loading: true } : null);
+        try {
+          await reclamosApi.descartarFeedbackVecino(reclamoId);
+          toast.success('Feedback descartado. El reclamo queda finalizado.');
+          fetchReclamos();
+          closeConfirmModal();
+        } catch (err) {
+          const e = err as { response?: { data?: { detail?: string } } };
+          toast.error(e.response?.data?.detail || 'No se pudo descartar');
+          setConfirmModal(prev => prev ? { ...prev, loading: false } : null);
+        }
+      },
+    });
   };
 
   const handleAsignar = async () => {
@@ -4408,6 +4461,22 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           fetchReclamos();
         }}
       />
+
+      {/* Confirm modal reutilizable (reemplaza window.confirm/prompt) */}
+      {confirmModal && (
+        <ConfirmModal
+          isOpen={confirmModal.isOpen}
+          onClose={closeConfirmModal}
+          onConfirm={confirmModal.onConfirm}
+          title={confirmModal.title}
+          message={confirmModal.message}
+          confirmText={confirmModal.confirmText}
+          variant={confirmModal.variant}
+          promptLabel={confirmModal.promptLabel}
+          promptPlaceholder={confirmModal.promptPlaceholder}
+          loading={confirmModal.loading}
+        />
+      )}
 
     </PullToRefresh>
   );
