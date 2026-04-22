@@ -171,10 +171,11 @@ export default function GestionPagos() {
 
   const buildParams = useMemo(() => {
     return () => {
-      const p: Record<string, unknown> = {
-        fecha_desde: range.desde,
-        fecha_hasta: range.hasta,
-      };
+      const p: Record<string, unknown> = {};
+      // Solo incluir fechas si tienen valor — mandar string vacío rompe
+      // el parseo de Optional[date] en Pydantic con 422.
+      if (range.desde) p.fecha_desde = range.desde;
+      if (range.hasta) p.fecha_hasta = range.hasta;
       if (estados.length) p.estado = estados;
       if (medios.length) p.medio_pago = medios;
       if (origen !== 'all') p.origen = origen;

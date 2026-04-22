@@ -154,9 +154,34 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     } else if (status && status >= 400 && status < 500 && detail) {
-      // Mostrar errores de validación como toast
+      // FastAPI 422 devuelve `detail` como array de objetos
+      // {type, loc, msg, input, ctx, url}. Si lo pasamos crudo, sonner lo
+      // renderiza como React child y tira React error #31. Normalizamos a string.
+      const normalizeDetail = (d: unknown): string => {
+        if (typeof d === 'string') return d;
+        if (Array.isArray(d)) {
+          return d
+            .map((item) => {
+              if (typeof item === 'string') return item;
+              if (item && typeof item === 'object' && 'msg' in item) {
+                const loc = Array.isArray((item as { loc?: unknown[] }).loc)
+                  ? (item as { loc: unknown[] }).loc.join('.')
+                  : '';
+                return loc ? `${loc}: ${(item as { msg: string }).msg}` : (item as { msg: string }).msg;
+              }
+              return JSON.stringify(item);
+            })
+            .join(' · ');
+        }
+        if (d && typeof d === 'object') {
+          if ('msg' in d) return String((d as { msg: unknown }).msg);
+          return JSON.stringify(d);
+        }
+        return String(d);
+      };
+      const message = normalizeDetail(detail);
       import('sonner').then(({ toast }) => {
-        toast.error(detail, { duration: 5000 });
+        toast.error(message, { duration: 5000 });
       });
     }
     return Promise.reject(error);
