@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   CheckCircle2, XCircle, Clock, FileText, Receipt, Building2,
-  ClipboardCheck, Layers, Search, RotateCw,
+  ClipboardCheck, Layers, Search, RotateCw, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -229,6 +229,11 @@ export default function ColaImputacion() {
           <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
         </button>
+        <ExportBatchButton
+          range={range}
+          estadoFiltro={estadoFiltro}
+          cantidad={items.length}
+        />
       </div>
 
       {/* Acciones bulk */}
@@ -447,6 +452,97 @@ export default function ColaImputacion() {
     </div>
   );
 }
+
+// ------------------------------------------------------------
+// Botón de export batch (CSV / JSON / RAFAM TXT)
+// ------------------------------------------------------------
+function ExportBatchButton({
+  range,
+  estadoFiltro,
+  cantidad,
+}: {
+  range: DateRange;
+  estadoFiltro: string;
+  cantidad: number;
+}) {
+  const { theme } = useTheme();
+  const [open, setOpen] = useState(false);
+  const [formatos, setFormatos] = useState<Array<{ clave: string; descripcion: string }>>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    pagosContaduriaApi.exports
+      .formatos()
+      .then((r) => setFormatos(r.data.formatos))
+      .catch(() => setFormatos([]));
+  }, []);
+
+  const handleExportar = async (formato: string) => {
+    setLoading(true);
+    try {
+      const r = await pagosContaduriaApi.exports.generar({
+        formato,
+        fecha_desde: range.desde,
+        fecha_hasta: range.hasta,
+        imputacion_estado: [estadoFiltro],
+      });
+      const blob = new Blob([r.data as BlobPart]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ext = formato === 'csv' ? 'csv' : formato === 'json' ? 'json' : 'txt';
+      a.download = `pagos_${formato}_${range.desde || 'start'}_${range.hasta || 'end'}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exportado: ${cantidad} pagos`);
+      setOpen(false);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'No se pudo exportar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        disabled={cantidad === 0}
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+        style={{ backgroundColor: theme.primary }}
+      >
+        <Download className="w-3.5 h-3.5" />
+        Exportar batch
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-20 rounded-lg overflow-hidden shadow-xl min-w-[280px]"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          {formatos.map((f) => (
+            <button
+              key={f.clave}
+              onClick={() => handleExportar(f.clave)}
+              disabled={loading}
+              className="w-full text-left px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+            >
+              <p className="text-xs font-semibold" style={{ color: theme.text }}>
+                {f.clave.toUpperCase()}
+              </p>
+              <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                {f.descripcion}
+              </p>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ------------------------------------------------------------
 // Modal: imputar un pago individual

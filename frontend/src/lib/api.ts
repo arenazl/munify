@@ -1446,6 +1446,32 @@ export const pagosContaduriaApi = {
     bulkMarcar: (items: Array<{ session_id: string; referencia_externa: string }>, observacion_comun?: string) =>
       api.post('/pagos/contaduria/imputacion/bulk-marcar', { items, observacion_comun }),
   },
+
+  // Fase 4 — exports contables
+  exports: {
+    formatos: () =>
+      api.get<{ formatos: Array<{ clave: string; descripcion: string }> }>('/pagos/contaduria/formatos-export'),
+    generar: (body: {
+      formato: string;
+      fecha_desde?: string;
+      fecha_hasta?: string;
+      estado?: string[];
+      imputacion_estado?: string[];
+      session_ids?: string[];
+      mapeo_rubros?: Record<string, string>;
+    }) => api.post('/pagos/contaduria/imputacion/export', body, { responseType: 'blob' }),
+    historial: () =>
+      api.get<Array<{
+        id: number;
+        formato: string;
+        fecha_desde: string | null;
+        fecha_hasta: string | null;
+        cantidad_pagos: number;
+        monto_total: string;
+        generado_por_nombre: string | null;
+        created_at: string;
+      }>>('/pagos/contaduria/exports/historial'),
+  },
 };
 
 // Consulta publica por CUT (operador de ventanilla)

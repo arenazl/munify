@@ -751,6 +751,180 @@ async def rechazar_imputacion(
     }
 
 
+# ============================================================
+# 5. Exports contables (Fase 4 bundle) — motor de plantillas batch
+# ============================================================
+
+
+class ExportRequest(BaseModel):
+    formato: str = "csv"             # csv | json | rafam_ba
+    fecha_desde: Optional[date] = None
+    fecha_hasta: Optional[date] = None
+    estado: Optional[List[str]] = None  # estados de sesion (default approved)
+    imputacion_estado: Optional[List[str]] = None
+    session_ids: Optional[List[str]] = None  # si viene, sobrescribe otros filtros
+    mapeo_rubros: Optional[dict] = None      # { tipo_tasa_codigo: codigo_rubro }
+
+
+class ExportHistorialItem(BaseModel):
+    id: int
+    formato: str
+    fecha_desde: Optional[str]
+    fecha_hasta: Optional[str]
+    cantidad_pagos: int
+    monto_total: str
+    generado_por_nombre: Optional[str]
+    created_at: str
+
+
+@router.get("/formatos-export")
+async def formatos_export(current_user: User = Depends(get_current_user)):
+    _asegurar_permisos(current_user)
+    from services.exports_contables import FORMATOS_DISPONIBLES
+    return {
+        "formatos": [
+            {"clave": k, "descripcion": v} for k, v in FORMATOS_DISPONIBLES.items()
+        ],
+    }
+
+
+@router.post("/imputacion/export")
+async def exportar_imputacion(
+    body: ExportRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Genera un archivo batch con los pagos filtrados y lo descarga.
+
+    Queda log en `exportaciones_imputacion` para audit trail.
+    """
+    from services.exports_contables import generar, FORMATOS_DISPONIBLES
+    from models.exportacion_imputacion import ExportacionImputacion
+
+    _asegurar_permisos(current_user)
+    municipio_id = _resolver_municipio_id(current_user)
+
+    if body.formato not in FORMATOS_DISPONIBLES:
+        raise HTTPException(status_code=400, detail=f"Formato invalido: {body.formato}")
+
+    # Armar filtros iguales que en /listar, default approved + fecha del mes
+    fecha_desde = body.fecha_desde
+    fecha_hasta = body.fecha_hasta
+    if not fecha_desde and not fecha_hasta and not body.session_ids:
+        fecha_desde, fecha_hasta = _rango_default_mes_actual()
+
+    conds = [PagoSesion.municipio_id == municipio_id]
+
+    if body.session_ids:
+        conds.append(PagoSesion.id.in_(body.session_ids))
+    else:
+        estados_enum: list[EstadoSesionPago] = []
+        for e in (body.estado or ["approved"]):
+            try:
+                estados_enum.append(EstadoSesionPago(e))
+            except ValueError:
+                continue
+        if estados_enum:
+            conds.append(PagoSesion.estado.in_(estados_enum))
+        if fecha_desde or fecha_hasta:
+            ts = func.coalesce(PagoSesion.completed_at, PagoSesion.created_at)
+            if fecha_desde:
+                conds.append(ts >= datetime.combine(fecha_desde, datetime.min.time()))
+            if fecha_hasta:
+                conds.append(ts <= datetime.combine(fecha_hasta, datetime.max.time()))
+        if body.imputacion_estado:
+            estados_imp: list[EstadoImputacion] = []
+            for e in body.imputacion_estado:
+                try:
+                    estados_imp.append(EstadoImputacion(e))
+                except ValueError:
+                    continue
+            if estados_imp:
+                conds.append(PagoSesion.imputacion_estado.in_(estados_imp))
+
+    stmt = (
+        select(PagoSesion)
+        .options(
+            selectinload(PagoSesion.deuda).selectinload(Deuda.partida).selectinload(Partida.tipo_tasa),
+        )
+        .where(and_(*conds))
+        .order_by(func.coalesce(PagoSesion.completed_at, PagoSesion.created_at).asc())
+    )
+    res = await db.execute(stmt)
+    sesiones = res.scalars().all()
+
+    if not sesiones:
+        raise HTTPException(status_code=404, detail="No hay pagos para exportar con esos filtros")
+
+    # Resolver nombre muni para el filename
+    from models.municipio import Municipio
+    muni_q = await db.execute(select(Municipio.nombre).where(Municipio.id == municipio_id))
+    muni_nombre = (muni_q.scalar() or "muni").replace("Municipalidad de ", "")
+
+    out = generar(body.formato, sesiones, muni_nombre=muni_nombre, mapeo_rubros=body.mapeo_rubros)
+
+    monto_total = sum((Decimal(str(s.monto or 0)) for s in sesiones), Decimal("0"))
+
+    db.add(ExportacionImputacion(
+        municipio_id=municipio_id,
+        formato=body.formato,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        cantidad_pagos=len(sesiones),
+        monto_total=monto_total,
+        session_ids=[s.id for s in sesiones],
+        filtros={
+            "estado": body.estado,
+            "imputacion_estado": body.imputacion_estado,
+        },
+        generado_por_usuario_id=current_user.id,
+    ))
+    await db.commit()
+
+    return StreamingResponse(
+        iter([out.body]),
+        media_type=out.content_type,
+        headers={"Content-Disposition": f'attachment; filename="{out.filename}"'},
+    )
+
+
+@router.get("/exports/historial", response_model=List[ExportHistorialItem])
+async def historial_exports(
+    limit: int = Query(default=50, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Historial de los ultimos N archivos batch generados."""
+    from models.exportacion_imputacion import ExportacionImputacion
+    _asegurar_permisos(current_user)
+    municipio_id = _resolver_municipio_id(current_user)
+
+    q = await db.execute(
+        select(ExportacionImputacion)
+        .options(selectinload(ExportacionImputacion.generado_por))
+        .where(ExportacionImputacion.municipio_id == municipio_id)
+        .order_by(ExportacionImputacion.created_at.desc())
+        .limit(limit)
+    )
+    rows = q.scalars().all()
+    out: list[ExportHistorialItem] = []
+    for r in rows:
+        nombre = None
+        if r.generado_por:
+            nombre = f"{r.generado_por.nombre or ''} {r.generado_por.apellido or ''}".strip() or r.generado_por.email
+        out.append(ExportHistorialItem(
+            id=r.id,
+            formato=r.formato,
+            fecha_desde=r.fecha_desde.isoformat() if r.fecha_desde else None,
+            fecha_hasta=r.fecha_hasta.isoformat() if r.fecha_hasta else None,
+            cantidad_pagos=r.cantidad_pagos,
+            monto_total=str(r.monto_total or 0),
+            generado_por_nombre=nombre,
+            created_at=r.created_at.isoformat() if r.created_at else "",
+        ))
+    return out
+
+
 @router.post("/imputacion/bulk-marcar")
 async def bulk_marcar_imputado(
     body: BulkMarcarRequest,
