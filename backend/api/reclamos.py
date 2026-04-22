@@ -503,7 +503,7 @@ async def cambiar_estado_reclamo_drag(
         EstadoReclamo.EN_CURSO: [EstadoReclamo.FINALIZADO, EstadoReclamo.POSPUESTO, EstadoReclamo.RECHAZADO],
         EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.FINALIZADO, EstadoReclamo.EN_CURSO],  # Legacy
         EstadoReclamo.RESUELTO: [EstadoReclamo.EN_CURSO],  # Legacy
-        EstadoReclamo.FINALIZADO: [],  # Estado final
+        EstadoReclamo.FINALIZADO: [EstadoReclamo.EN_CURSO],  # Reabrir si el vecino rechaza la resolución
         EstadoReclamo.POSPUESTO: [EstadoReclamo.EN_CURSO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Puede retomar
         EstadoReclamo.RECHAZADO: [],  # Estado final
     }
