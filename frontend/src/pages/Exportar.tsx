@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { exportarApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { DateRangePicker } from '../components/ui/DateRangePicker';
 
 interface ExportOption {
   id: string;
@@ -219,7 +220,7 @@ export default function Exportar() {
           {/* Reclamos Filters */}
           {option.hasFilters && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label
                     className="block text-xs font-medium mb-1.5"
@@ -251,38 +252,13 @@ export default function Exportar() {
                     style={{ color: theme.textSecondary }}
                   >
                     <Calendar className="h-3.5 w-3.5 inline mr-1" />
-                    Fecha desde
+                    Rango de fechas
                   </label>
-                  <input
-                    type="date"
-                    value={filters.fecha_desde}
-                    onChange={(e) => setFilters({ ...filters, fecha_desde: e.target.value })}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      border: `1px solid ${theme.border}`,
-                      color: theme.text,
-                    }}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-xs font-medium mb-1.5"
-                    style={{ color: theme.textSecondary }}
-                  >
-                    <Calendar className="h-3.5 w-3.5 inline mr-1" />
-                    Fecha hasta
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.fecha_hasta}
-                    onChange={(e) => setFilters({ ...filters, fecha_hasta: e.target.value })}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      border: `1px solid ${theme.border}`,
-                      color: theme.text,
-                    }}
+                  <DateRangePicker
+                    value={{ desde: filters.fecha_desde, hasta: filters.fecha_hasta }}
+                    onChange={(r) => setFilters({ ...filters, fecha_desde: r.desde, fecha_hasta: r.hasta })}
+                    placeholder="Todas las fechas"
+                    allowClear
                   />
                 </div>
               </div>

@@ -14,6 +14,7 @@ import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
 import { MapPicker } from '../components/ui/MapPicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { DatePicker } from '../components/ui/DatePicker';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
@@ -3427,25 +3428,17 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     <>
                       {/* Fecha programada - renglón completo */}
                       <div>
-                        <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
-                          Fecha programada
-                        </label>
-                        <input
-                          type="date"
+                        <DatePicker
+                          label="Fecha programada"
                           value={fechaProgramada}
-                          min={new Date().toISOString().split('T')[0]}
-                          onChange={(e) => {
-                            setFechaProgramada(e.target.value);
-                            if (dependenciaSeleccionada && e.target.value) {
-                              fetchDisponibilidad(dependenciaSeleccionada, e.target.value, true);
+                          minDate={new Date().toISOString().split('T')[0]}
+                          onChange={(iso) => {
+                            setFechaProgramada(iso);
+                            if (dependenciaSeleccionada && iso) {
+                              fetchDisponibilidad(dependenciaSeleccionada, iso, true);
                             }
                           }}
-                          className="w-full rounded-xl px-4 py-3 focus:ring-2 focus:outline-none transition-all"
-                          style={{
-                            backgroundColor: theme.backgroundSecondary,
-                            color: theme.text,
-                            border: `1px solid ${theme.border}`,
-                          }}
+                          placeholder="Seleccionar fecha"
                         />
                       </div>
 

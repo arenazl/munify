@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Search, GripVertical, Columns3, Calendar, X, Filter } from 'lucide-react';
+import { Search, GripVertical, Columns3, Filter } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { Reclamo, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { toast } from 'sonner';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
+import { DateRangePicker } from '../components/ui/DateRangePicker';
 
 interface Columna {
   id: EstadoReclamo;
@@ -186,11 +187,6 @@ export default function Tablero() {
       });
   };
 
-  const limpiarFiltrosFecha = () => {
-    setFechaDesde('');
-    setFechaHasta('');
-  };
-
   const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
 
   if (loading) {
@@ -207,39 +203,13 @@ export default function Tablero() {
       {/* Filtros de fecha expandibles en mobile */}
       {showMobileFilters && (
         <div className="flex items-center gap-2 mb-2">
-          <Calendar className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-          <input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
+          <DateRangePicker
+            className="flex-1"
+            value={{ desde: fechaDesde, hasta: fechaHasta }}
+            onChange={(r) => { setFechaDesde(r.desde); setFechaHasta(r.hasta); }}
+            placeholder="Rango de fechas"
+            allowClear
           />
-          <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
-          <input
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="flex-1 px-2 py-1.5 rounded-lg text-sm min-w-0"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
-          />
-          {(fechaDesde || fechaHasta) && (
-            <button
-              onClick={limpiarFiltrosFecha}
-              className="p-1.5 rounded-lg flex-shrink-0"
-              style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
       )}
 
@@ -291,42 +261,12 @@ export default function Tablero() {
 
         {/* Filtros de fecha - Desktop */}
         <div className="hidden md:flex items-center gap-2 flex-shrink-0">
-          <Calendar className="w-4 h-4" style={{ color: theme.textSecondary }} />
-          <input
-            type="date"
-            value={fechaDesde}
-            onChange={(e) => setFechaDesde(e.target.value)}
-            className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
-            title="Desde"
+          <DateRangePicker
+            value={{ desde: fechaDesde, hasta: fechaHasta }}
+            onChange={(r) => { setFechaDesde(r.desde); setFechaHasta(r.hasta); }}
+            placeholder="Rango de fechas"
+            allowClear
           />
-          <span className="text-xs" style={{ color: theme.textSecondary }}>-</span>
-          <input
-            type="date"
-            value={fechaHasta}
-            onChange={(e) => setFechaHasta(e.target.value)}
-            className="px-2 py-1.5 rounded-lg text-sm w-[130px]"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              border: `1px solid ${theme.border}`,
-              color: theme.text,
-            }}
-            title="Hasta"
-          />
-          {(fechaDesde || fechaHasta) && (
-            <button
-              onClick={limpiarFiltrosFecha}
-              className="p-1.5 rounded-lg hover:opacity-80 transition-opacity"
-              style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-              title="Limpiar filtros de fecha"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         <HeaderSeparator />

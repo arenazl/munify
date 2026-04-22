@@ -4,9 +4,10 @@ import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import {
-  ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea,
+  ABMPage, ABMBadge, ABMSheetFooter, ABMTextarea,
   ABMSelect, ABMTable, ABMTableAction, ABMCardActions
 } from '../components/ui/ABMPage';
+import { DatePicker } from '../components/ui/DatePicker';
 
 interface Empleado {
   id: number;
@@ -326,19 +327,18 @@ export default function GestionAusencias() {
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <ABMInput
+            <DatePicker
               label="Fecha Inicio"
-              type="date"
-              required
               value={formData.fecha_inicio}
-              onChange={(e) => setFormData({ ...formData, fecha_inicio: e.target.value })}
+              onChange={(iso) => setFormData({ ...formData, fecha_inicio: iso })}
+              placeholder="Seleccionar fecha"
             />
-            <ABMInput
+            <DatePicker
               label="Fecha Fin"
-              type="date"
-              required
               value={formData.fecha_fin}
-              onChange={(e) => setFormData({ ...formData, fecha_fin: e.target.value })}
+              onChange={(iso) => setFormData({ ...formData, fecha_fin: iso })}
+              minDate={formData.fecha_inicio || undefined}
+              placeholder="Seleccionar fecha"
             />
           </div>
 

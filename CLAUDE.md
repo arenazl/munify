@@ -95,29 +95,35 @@ switch(estado) {
 - Ese lugar exporta todo lo necesario: `estadoColors`, `estadoLabels`, `estadoIcons`
 - Todos los demás archivos importan de ahí, NO duplican definiciones
 
-### 8. Dropdowns/Selects - SIEMPRE el componente custom
-- **PROHIBIDO** usar `<select>` nativo de HTML para filtros o formularios.
-  El popup nativo lo dibuja el navegador, rompe el dark mode y no respeta el theme.
-- **SIEMPRE** usar `ModernSelect` (`components/ui/ModernSelect.tsx`) para cualquier
-  select — filtros, wizards, forms, modales.
-- Para rangos de fecha usar `DateRangePicker` (`components/ui/DateRangePicker.tsx`).
-- Si necesitás multi-select con chips, extender `ModernSelect` — NO volver al `<select>` nativo.
+### 8. Controles nativos vetados - SIEMPRE el componente custom
+Los controles nativos de HTML (`<select>`, `<input type="date">`, `<input type="time">`,
+`<input type="color">`) dibujan su popup con el navegador, **rompen el dark mode**
+y no respetan el theme. Están **PROHIBIDOS** en toda la app.
+
+**Reemplazos obligatorios:**
+
+| Nativo ❌ | Usar ✅ | Archivo |
+|-----------|---------|---------|
+| `<select>` | `ModernSelect` | `components/ui/ModernSelect.tsx` |
+| `<input type="date">` (fecha única) | `DatePicker` | `components/ui/DatePicker.tsx` |
+| `<input type="date">` x2 (rango) | `DateRangePicker` | `components/ui/DateRangePicker.tsx` |
+
+Ambos `DatePicker` y `DateRangePicker` están construidos con `react-day-picker`
++ `date-fns` y se estilan con el theme vía CSS variables. El `DateRangePicker`
+además trae presets (Hoy / Semana / Mes / Mes anterior / Trimestre / Año).
 
 ```tsx
 // ✅ CORRECTO
-<ModernSelect
-  value={origen}
-  onChange={setOrigen}
-  options={[{ value: 'all', label: 'Todos' }, ...]}
-  placeholder="Origen"
-  searchable={opciones.length > 8}
-/>
+<ModernSelect value={origen} onChange={setOrigen} options={[...]} placeholder="Origen" />
+<DatePicker value={fecha} onChange={setFecha} minDate={hoy} label="Fecha programada" />
+<DateRangePicker value={{desde, hasta}} onChange={r => { setDesde(r.desde); setHasta(r.hasta); }} allowClear />
 
-// ❌ INCORRECTO — rompe el theme en dark mode
-<select value={origen} onChange={e => setOrigen(e.target.value)}>
-  <option value="all">Todos</option>
-</select>
+// ❌ INCORRECTO — todos estos rompen el theme en dark mode
+<select value={x} onChange={e => setX(e.target.value)}>...</select>
+<input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
 ```
+
+Si necesitás multi-select con chips, extender `ModernSelect` — NO volver al nativo.
 
 ---
 
