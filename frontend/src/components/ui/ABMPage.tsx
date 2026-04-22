@@ -846,7 +846,7 @@ export function ABMCollapsible({ title, icon, children, defaultOpen = false, var
     >
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-4 py-2 transition-colors duration-200 hover:opacity-90"
+        className="w-full flex items-center justify-between px-3 py-1.5 transition-colors duration-200 hover:opacity-90"
         style={{ backgroundColor: `${theme.background}ee`, color: theme.primary }}
         type="button"
       >
@@ -865,7 +865,7 @@ export function ABMCollapsible({ title, icon, children, defaultOpen = false, var
           ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}
         `}
       >
-        <div className="px-4 py-3" style={{ backgroundColor: theme.card }}>
+        <div className="px-3 py-2.5" style={{ backgroundColor: theme.card }}>
           {children}
         </div>
       </div>
@@ -909,14 +909,14 @@ export function ABMInfoPanel({ title, icon, children, variant = 'default' }: ABM
     >
       {title && (
         <div
-          className="flex items-center gap-2 font-bold text-sm px-4 py-2"
+          className="flex items-center gap-2 font-bold text-sm px-3 py-1.5"
           style={{ backgroundColor: `${theme.background}ee`, color: theme.primary }}
         >
           {icon}
           {title}
         </div>
       )}
-      <div className="p-4" style={{ backgroundColor: bgColor, color: theme.text }}>
+      <div className="px-3 py-2" style={{ backgroundColor: bgColor, color: theme.text }}>
         {children}
       </div>
     </div>
@@ -935,17 +935,17 @@ export function ABMField({ label, value, icon, fullWidth = false }: ABMFieldProp
   const { theme } = useTheme();
 
   return (
-    <div className={`flex items-center gap-3 py-2 ${fullWidth ? 'w-full' : ''}`}>
+    <div className={`flex items-center gap-2.5 py-1 ${fullWidth ? 'w-full' : ''}`}>
       {icon && (
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: theme.backgroundSecondary }}
         >
           {icon}
         </div>
       )}
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium" style={{ color: theme.textSecondary }}>{label}</p>
+      <div className="flex-1 min-w-0 leading-tight">
+        <p className="text-[11px] font-medium" style={{ color: theme.textSecondary }}>{label}</p>
         <p className="text-sm font-medium truncate" style={{ color: theme.text }}>{value}</p>
       </div>
     </div>

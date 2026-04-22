@@ -1453,7 +1453,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       {/* Sheet de detalle */}
       <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite" stickyFooter={renderTramiteFooter()}>
         {selectedTramite && (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* Número y estado */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1493,15 +1493,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
               const colorDetalle = tipoDetalle?.color || theme.primary;
               return (
                 <div
-                  className="p-4 rounded-xl"
+                  className="p-3 rounded-xl"
                   style={{
                     backgroundColor: `${colorDetalle}10`,
                     border: `1px solid ${colorDetalle}30`
                   }}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: `${colorDetalle}20` }}
                     >
                       <DynamicIcon
@@ -1511,7 +1511,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                         fallback={<FileText className="h-5 w-5" style={{ color: colorDetalle }} />}
                       />
                     </div>
-                    <div>
+                    <div className="leading-tight">
                       <p className="font-medium" style={{ color: theme.text }}>
                         {tipoDetalle?.nombre || selectedTramite.tramite?.nombre || 'Sin tipo'}
                       </p>
@@ -1526,14 +1526,14 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Asunto y descripción */}
             <div>
-              <h3 className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+              <h3 className="text-xs font-medium mb-1 uppercase tracking-wide" style={{ color: theme.textSecondary }}>
                 Asunto
               </h3>
               <p className="font-medium" style={{ color: theme.text }}>
                 {selectedTramite.asunto}
               </p>
               {selectedTramite.descripcion && (
-                <p className="text-sm mt-2" style={{ color: theme.textSecondary }}>
+                <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
                   {selectedTramite.descripcion}
                 </p>
               )}
@@ -1541,13 +1541,13 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Datos del solicitante */}
             <div
-              className="p-4 rounded-xl"
+              className="px-3 py-2.5 rounded-xl"
               style={{ backgroundColor: theme.backgroundSecondary }}
             >
-              <h3 className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+              <h3 className="text-sm font-medium mb-2" style={{ color: theme.text }}>
                 Datos del Solicitante
               </h3>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {(selectedTramite.nombre_solicitante || selectedTramite.apellido_solicitante) && (
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4" style={{ color: theme.textSecondary }} />
@@ -1600,8 +1600,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             </div>
 
             {/* Checklist de verificación de documentos requeridos */}
-            <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
-              <div className="flex items-center justify-between mb-3">
+            <div className="px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+              <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium" style={{ color: theme.text }}>
                   Verificación de documentos
                 </h3>
@@ -1646,10 +1646,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
               return (
                 <div
-                  className="p-4 rounded-xl"
+                  className="px-3 py-2.5 rounded-xl"
                   style={{ backgroundColor: theme.backgroundSecondary }}
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium" style={{ color: theme.text }}>
                       Dependencia Asignada
                     </h3>
@@ -1903,7 +1903,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Responsable asignado (opcional) — empleado especifico segun carga/horarios */}
             {selectedTramite && !['finalizado', 'rechazado'].includes(normalizeEstado(selectedTramite.estado)) && (
-              <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
+              <div className="px-3 py-2.5 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary }}>
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="text-sm font-medium" style={{ color: theme.text }}>
                     Responsable
@@ -1912,12 +1912,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     Opcional
                   </span>
                 </div>
-                <p className="text-xs mb-3" style={{ color: theme.textSecondary }}>
+                <p className="text-xs mb-2" style={{ color: theme.textSecondary }}>
                   Empleado específico a cargo. Si no se asigna, el trámite queda a cargo colectivo de la dependencia.
                 </p>
 
                 {/* Separador visual */}
-                <div className="h-px mb-3" style={{ backgroundColor: theme.border }} />
+                <div className="h-px mb-2" style={{ backgroundColor: theme.border }} />
 
                 {/* Responsable actual */}
                 {responsableId && (() => {
@@ -2032,7 +2032,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
               return (
                 <div
-                  className="p-4 rounded-xl space-y-3"
+                  className="px-3 py-2.5 rounded-xl space-y-2"
                   style={{
                     backgroundColor: pagado ? '#10b98110' : '#f59e0b10',
                     border: `1px solid ${pagado ? '#10b98140' : '#f59e0b40'}`,
@@ -2134,7 +2134,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
             {/* Historial */}
             <div
-              className="p-4 rounded-xl"
+              className="px-3 py-2.5 rounded-xl"
               style={{ backgroundColor: theme.backgroundSecondary }}
             >
               <button
@@ -2157,11 +2157,11 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
               </button>
 
               {showHistorial && historial.length > 0 && (
-                <div className="mt-4 space-y-3">
+                <div className="mt-3 space-y-2">
                   {historial.map(h => (
                     <div
                       key={h.id}
-                      className="p-3 rounded-lg"
+                      className="px-2.5 py-2 rounded-lg"
                       style={{ backgroundColor: theme.card }}
                     >
                       <div className="flex items-start justify-between">
@@ -2170,7 +2170,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                             {h.accion}
                           </p>
                           {h.comentario && (
-                            <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+                            <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
                               {h.comentario}
                             </p>
                           )}
@@ -2180,7 +2180,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                         </span>
                       </div>
                       {h.estado_anterior && h.estado_nuevo && (
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-1.5">
                           <span
                             className="text-xs px-2 py-0.5 rounded"
                             style={{
@@ -2217,12 +2217,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             {/* Respuesta/observaciones existentes */}
             {(selectedTramite.respuesta || selectedTramite.observaciones) && (
               <div
-                className="p-4 rounded-xl"
+                className="px-3 py-2.5 rounded-xl"
                 style={{ backgroundColor: theme.backgroundSecondary }}
               >
                 {selectedTramite.respuesta && (
-                  <div className="mb-3">
-                    <h4 className="text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                  <div className={selectedTramite.observaciones ? 'mb-2' : ''}>
+                    <h4 className="text-xs font-medium mb-0.5" style={{ color: theme.textSecondary }}>
                       Respuesta
                     </h4>
                     <p className="text-sm" style={{ color: theme.text }}>
@@ -2232,7 +2232,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 )}
                 {selectedTramite.observaciones && (
                   <div>
-                    <h4 className="text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+                    <h4 className="text-xs font-medium mb-0.5" style={{ color: theme.textSecondary }}>
                       Observaciones
                     </h4>
                     <p className="text-sm" style={{ color: theme.text }}>

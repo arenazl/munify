@@ -226,16 +226,31 @@ export function ReclamoCard({
               </span>
             )}
 
-            {/* Indicador de actividad reciente - sutil y orgánico */}
-            {tieneActividadReciente && (
-              <span
-                className="flex items-center gap-1 text-[10px] font-medium"
-                style={{ color: theme.primary }}
-                title="Actividad reciente"
-              >
-                <MessageCircle className="h-3 w-3" />
-              </span>
-            )}
+            {/* Indicador de actividad reciente — rojo si el vecino rechazó la resolución */}
+            {tieneActividadReciente && (() => {
+              const vecinoRechazo = r.confirmado_vecino === false;
+              const iconColor = vecinoRechazo ? '#ef4444' : theme.primary;
+              return (
+                <span
+                  className={`flex items-center gap-1 text-[10px] font-medium ${vecinoRechazo ? 'animate-pulse' : ''}`}
+                  style={{ color: iconColor }}
+                  title={vecinoRechazo
+                    ? 'El vecino marcó que el problema NO se solucionó'
+                    : 'Actividad reciente'}
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  {vecinoRechazo && (
+                    <span
+                      className="inline-block w-1.5 h-1.5 rounded-full"
+                      style={{
+                        backgroundColor: '#ef4444',
+                        boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.3)',
+                      }}
+                    />
+                  )}
+                </span>
+              );
+            })()}
 
             {/* #ID del reclamo */}
             <span

@@ -148,18 +148,18 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
             <MobilePageHeader title={title} subtitle={description} onBack={onClose} />
           ) : (
             <div
-              className="flex items-center justify-between px-6 py-4"
+              className="flex items-center justify-between px-5 py-3"
               style={{
                 borderBottom: `1px solid ${theme.border}`,
                 backgroundColor: `${theme.background}cc`,
               }}
             >
               <div>
-                <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
+                <h2 className="text-lg font-semibold leading-tight" style={{ color: theme.text }}>
                   {title}
                 </h2>
                 {description && (
-                  <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+                  <p className="text-sm mt-0.5" style={{ color: theme.textSecondary }}>
                     {description}
                   </p>
                 )}
@@ -179,7 +179,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         {/* Sticky Header adicional (ej: estado y categoría) */}
         {stickyHeader && (
           <div
-            className="px-6 py-3"
+            className="px-5 py-2"
             style={{
               borderBottom: `1px solid ${theme.border}`,
               backgroundColor: theme.backgroundSecondary,
@@ -196,7 +196,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
         {/* Content con scroll interno */}
         <div
-          className="px-6 py-4"
+          className="px-5 py-3"
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -214,7 +214,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         {/* Footer - pegado al fondo del panel */}
         {(footer || stickyFooter) && (
           <div
-            className="px-6 py-4"
+            className="px-5 py-3"
             style={{
               borderTop: `1px solid ${theme.border}`,
               backgroundColor: `${theme.background}cc`,

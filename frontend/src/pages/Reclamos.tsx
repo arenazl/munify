@@ -2937,7 +2937,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo) return null;
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* Zona si existe */}
         {selectedReclamo.zona && (
           <ABMField
@@ -3634,13 +3634,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           {getCategoryIcon(selectedReclamo.categoria.nombre)}
           {selectedReclamo.categoria.nombre}
         </span>
-        {/* Historial — con badge rojo si el vecino rechazó la resolución */}
+        {/* Historial — con badge inline rojo si el vecino rechazó la resolución */}
         <button
           onClick={() => {
             closeSheet();
             navigate(`/gestion/reclamos/${selectedReclamo.id}`);
           }}
-          className="relative inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors hover:opacity-80"
           style={{
             backgroundColor: selectedReclamo.confirmado_vecino === false ? '#ef444415' : theme.backgroundSecondary,
             color: selectedReclamo.confirmado_vecino === false ? '#ef4444' : theme.primary,
@@ -3653,14 +3653,18 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <Clock className="h-3.5 w-3.5" />
           Historial
           {selectedReclamo.confirmado_vecino === false && (
-            <>
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"
-                style={{ boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.25)' }}
-              />
-              <span className="ml-0.5 text-[10px] font-bold px-1 rounded" style={{ backgroundColor: '#ef444430' }}>
-                !
-              </span>
-            </>
+            <span
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full font-bold animate-pulse"
+              style={{
+                backgroundColor: '#ef4444',
+                color: '#ffffff',
+                fontSize: '9px',
+                lineHeight: 1,
+                boxShadow: '0 0 0 2px rgba(239, 68, 68, 0.35)',
+              }}
+            >
+              !
+            </span>
           )}
         </button>
       </div>
