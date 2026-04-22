@@ -126,7 +126,9 @@ class MunicipioDependenciaResponse(BaseModel):
     direccion_efectiva: Optional[str] = None
     telefono_efectivo: Optional[str] = None
     email_efectivo: Optional[str] = None
-    categorias_asignadas: Optional[List[CategoriaSimple]] = None
+    # Relacion cargada como MuniDepCategoria (tabla intermedia), no CategoriaReclamo directo.
+    # Por eso usamos MuniDepCategoriaResponse que sabe extraer .categoria → CategoriaSimple.
+    categorias_asignadas: Optional[List["MuniDepCategoriaResponse"]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -190,6 +192,10 @@ class MuniDepCategoriaResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# Resolver forward reference de MunicipioDependenciaResponse → MuniDepCategoriaResponse.
+MunicipioDependenciaResponse.model_rebuild()
 
 
 # ============ Bulk operations ============
