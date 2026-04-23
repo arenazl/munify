@@ -110,6 +110,10 @@ class User(Base):
     reclamos_creados = relationship("Reclamo", back_populates="creador", foreign_keys="Reclamo.creador_id")
     reclamos_unidos = relationship("ReclamoPersona", back_populates="usuario")
     notificaciones = relationship("Notificacion", back_populates="usuario")
-    solicitudes = relationship("Solicitud", back_populates="solicitante")
+    solicitudes = relationship(
+        "Solicitud",
+        back_populates="solicitante",
+        foreign_keys="Solicitud.solicitante_id",
+    )
     push_subscriptions = relationship("PushSubscription", back_populates="user")
     consultas_guardadas = relationship("ConsultaGuardada", back_populates="usuario")

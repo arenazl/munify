@@ -137,7 +137,7 @@ class Solicitud(Base):
 
     # Solicitante (usuario registrado o anónimo)
     solicitante_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
-    solicitante = relationship("User", back_populates="solicitudes")
+    solicitante = relationship("User", back_populates="solicitudes", foreign_keys=[solicitante_id])
 
     # Datos del solicitante (para anónimos o para guardar snapshot)
     nombre_solicitante = Column(String(100), nullable=True)
