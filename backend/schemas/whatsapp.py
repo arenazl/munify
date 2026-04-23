@@ -19,6 +19,9 @@ class WhatsAppConfigBase(BaseModel):
     habilitado: bool = False
     provider: WhatsAppProviderEnum = WhatsAppProviderEnum.META
 
+    # Numero saliente del muni (modo wa.me manual desde Mostrador)
+    telefono_wa_me_saliente: Optional[str] = None
+
     # Meta Cloud API
     meta_phone_number_id: Optional[str] = None
     meta_access_token: Optional[str] = None
@@ -63,6 +66,8 @@ class WhatsAppConfigUpdate(BaseModel):
     """Schema para actualizar configuración (todos campos opcionales)"""
     habilitado: Optional[bool] = None
     provider: Optional[WhatsAppProviderEnum] = None
+
+    telefono_wa_me_saliente: Optional[str] = None
 
     meta_phone_number_id: Optional[str] = None
     meta_access_token: Optional[str] = None
@@ -112,6 +117,9 @@ class WhatsAppConfigPublic(BaseModel):
     municipio_id: int
     habilitado: bool
     provider: WhatsAppProviderEnum
+
+    # Numero saliente del muni (para mostrarlo en el Mostrador)
+    telefono_wa_me_saliente: Optional[str] = None
 
     # Solo indicamos si están configuradas, no mostramos los valores
     meta_configurado: bool = False

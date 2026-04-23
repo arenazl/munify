@@ -27,6 +27,12 @@ class WhatsAppConfig(Base):
     # Proveedor
     provider = Column(SQLEnum(WhatsAppProvider), default=WhatsAppProvider.META)
 
+    # Numero de WhatsApp del muni usado para enviar cupones desde el
+    # Mostrador (modo wa.me manual). Es puramente informativo/auditable —
+    # el envio real sale de la cuenta de WhatsApp Web vinculada en la PC
+    # del mostrador. Formato internacional: +54 9 11 1234-5678.
+    telefono_wa_me_saliente = Column(String(30), nullable=True)
+
     # Configuración Meta Cloud API
     meta_phone_number_id = Column(String(100), nullable=True)
     meta_access_token = Column(String(500), nullable=True)

@@ -39,6 +39,7 @@ interface WhatsAppConfig {
 }
 
 interface WhatsAppConfigFull extends WhatsAppConfig {
+  telefono_wa_me_saliente: string | null;
   meta_phone_number_id: string | null;
   meta_access_token: string | null;
   meta_business_account_id: string | null;
@@ -78,6 +79,7 @@ export default function WhatsAppConfigPage() {
   const [formData, setFormData] = useState({
     habilitado: false,
     provider: 'meta' as Provider,
+    telefono_wa_me_saliente: '',  // N° del muni para cupones wa.me (modo manual)
     // Meta
     meta_phone_number_id: '',
     meta_access_token: '',
@@ -149,6 +151,7 @@ export default function WhatsAppConfigPage() {
           setFormData({
             habilitado: fullRes.data.habilitado,
             provider: fullRes.data.provider,
+            telefono_wa_me_saliente: fullRes.data.telefono_wa_me_saliente || '',
             meta_phone_number_id: fullRes.data.meta_phone_number_id || '',
             meta_access_token: fullRes.data.meta_access_token || '',
             meta_business_account_id: fullRes.data.meta_business_account_id || '',
@@ -392,6 +395,43 @@ export default function WhatsAppConfigPage() {
       {/* Tab Content */}
       {activeTab === 'config' && (
         <div className="space-y-6">
+          {/* ===== Numero saliente del Mostrador (modo wa.me) ===== */}
+          <div
+            className="rounded-xl p-5"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Phone className="h-5 w-5" style={{ color: '#25D366' }} />
+              <h3 className="font-medium" style={{ color: theme.text }}>
+                Número saliente del Mostrador (modo wa.me)
+              </h3>
+            </div>
+            <p className="text-sm mb-3" style={{ color: theme.textSecondary }}>
+              Número desde el que la ventanilla envía los cupones de pago. Es informativo:
+              los mensajes wa.me salen desde la cuenta de WhatsApp Web que el operador tenga
+              vinculada en la PC del mostrador. Acá dejás constancia de cuál es el número
+              oficial del municipio.
+            </p>
+            <div className="flex items-center gap-2 max-w-md">
+              <input
+                type="tel"
+                value={formData.telefono_wa_me_saliente}
+                onChange={(e) => setFormData({ ...formData, telefono_wa_me_saliente: e.target.value })}
+                placeholder="+54 9 11 1234-5678"
+                className="flex-1 px-3 py-2 rounded-lg text-sm font-mono outline-none"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  color: theme.text,
+                  border: `1px solid ${theme.border}`,
+                }}
+              />
+            </div>
+            <p className="text-[11px] mt-2" style={{ color: theme.textSecondary }}>
+              Para activarlo en la PC: abrí <code>web.whatsapp.com</code> y escaneá el QR desde
+              el celular con este número.
+            </p>
+          </div>
+
           {/* Datos de la Cuenta - Resumen */}
           <div
             className="rounded-xl p-5"

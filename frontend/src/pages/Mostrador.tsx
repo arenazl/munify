@@ -7,7 +7,7 @@ import {
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { operadorApi, tramitesApi } from '../lib/api';
+import { operadorApi, tramitesApi, whatsappApi } from '../lib/api';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import PageHint from '../components/ui/PageHint';
@@ -67,6 +67,7 @@ export default function Mostrador() {
   const { user } = useAuth();
   const [metricas, setMetricas] = useState<MostradorMetricas | null>(null);
   const [tramites, setTramites] = useState<Tramite[]>([]);
+  const [telefonoSaliente, setTelefonoSaliente] = useState<string | null>(null);
 
   const [paso, setPaso] = useState<Paso>('biometria');
 
@@ -106,6 +107,22 @@ export default function Mostrador() {
         setMetricas(r.data);
       } catch {
         setMetricas(null);
+      }
+    };
+    load();
+  }, []);
+
+  // Traigo el telefono saliente del muni para avisarle al operador desde
+  // que linea se envia el cupon (es informativo — el envio real sale de
+  // la cuenta WhatsApp Web vinculada en la PC del mostrador).
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await whatsappApi.getConfig();
+        const d = r.data as { telefono_wa_me_saliente?: string | null };
+        setTelefonoSaliente(d.telefono_wa_me_saliente || null);
+      } catch {
+        setTelefonoSaliente(null);
       }
     };
     load();
@@ -261,6 +278,7 @@ export default function Mostrador() {
         <ResultadoPanel
           result={result}
           telefonoForm={telefono}
+          telefonoSaliente={telefonoSaliente}
           onNuevoTramite={resetWizard}
           onPagoEfectivo={() => setEfectivoOpen(true)}
         />
@@ -910,10 +928,11 @@ function PasoConfirmar({
 // Resultado panel
 // ============================================================
 function ResultadoPanel({
-  result, telefonoForm, onNuevoTramite, onPagoEfectivo,
+  result, telefonoForm, telefonoSaliente, onNuevoTramite, onPagoEfectivo,
 }: {
   result: InicioResult;
   telefonoForm: string;
+  telefonoSaliente: string | null;
   onNuevoTramite: () => void;
   onPagoEfectivo: () => void;
 }) {
@@ -960,7 +979,7 @@ function ResultadoPanel({
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
-          <WaMeEnviar result={result} telefonoForm={telefonoForm} />
+          <WaMeEnviar result={result} telefonoForm={telefonoForm} telefonoSaliente={telefonoSaliente} />
         </div>
       )}
 
@@ -1030,7 +1049,7 @@ function PagoDiferidoBoton({ solicitudId }: { solicitudId: number }) {
 // ============================================================
 // WaMeEnviar (reusado) — link wa.me para operador
 // ============================================================
-function WaMeEnviar({ result, telefonoForm }: { result: InicioResult; telefonoForm: string }) {
+function WaMeEnviar({ result, telefonoForm, telefonoSaliente }: { result: InicioResult; telefonoForm: string; telefonoSaliente: string | null }) {
   const { theme } = useTheme();
   const [url, setUrl] = useState<string | null>(result.wa_me_url);
   const [mensaje, setMensaje] = useState<string | null>(result.wa_me_mensaje);
@@ -1068,6 +1087,12 @@ function WaMeEnviar({ result, telefonoForm }: { result: InicioResult; telefonoFo
             <MessageSquare className="w-4 h-4" />
             Abrir WhatsApp y enviar a {result.telefono_vecino || telefono}
           </button>
+          {telefonoSaliente && (
+            <p className="text-[11px] flex items-center gap-1" style={{ color: theme.textSecondary }}>
+              <Sparkles className="w-3 h-3" />
+              Envío desde la línea del muni: <span className="font-mono">{telefonoSaliente}</span>
+            </p>
+          )}
           <button onClick={() => setEditando(true)} className="text-[11px] underline" style={{ color: theme.textSecondary }}>Cambiar número</button>
           {mensaje && (
             <details className="text-[11px]" style={{ color: theme.textSecondary }}>

@@ -1173,6 +1173,7 @@ export const whatsappApi = {
   createConfig: (data: {
     habilitado?: boolean;
     provider?: 'meta' | 'twilio';
+    telefono_wa_me_saliente?: string;
     meta_phone_number_id?: string;
     meta_access_token?: string;
     meta_business_account_id?: string;
@@ -1189,6 +1190,7 @@ export const whatsappApi = {
   updateConfig: (data: {
     habilitado?: boolean;
     provider?: 'meta' | 'twilio';
+    telefono_wa_me_saliente?: string;
     meta_phone_number_id?: string;
     meta_access_token?: string;
     meta_business_account_id?: string;
