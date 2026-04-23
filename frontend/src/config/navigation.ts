@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap, Receipt, Wallet
+  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -106,6 +106,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: Wallet,
       show: isAdminOrSupervisor,
       description: 'Histórico transaccional para contaduría'
+    },
+    {
+      name: 'Mostrador',
+      href: '/gestion/mostrador',
+      icon: ScanLine,
+      show: isAdminOrSupervisor,
+      description: 'Ventanilla asistida — biometría + trámite presencial'
     },
     {
       name: 'Mapa',
