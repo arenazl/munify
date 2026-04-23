@@ -1505,6 +1505,21 @@ export const cutApi = {
   consultar: (codigo: string) => api.get(`/pagos/cut/${codigo}`),
 };
 
+// Config del sidebar (superadmin oculta items por muni)
+export const sidebarAdminApi = {
+  get: (municipioId: number) =>
+    api.get<{
+      municipio_id: number;
+      ocultos: Array<{ href: string; updated_at: string | null; updated_by_nombre: string | null }>;
+    }>(`/admin/sidebar-items/${municipioId}`),
+  put: (municipioId: number, hrefsOcultos: string[]) =>
+    api.put(`/admin/sidebar-items/${municipioId}`, { hrefs_ocultos: hrefsOcultos }),
+};
+
+export const navegacionApi = {
+  misHrefsOcultos: () => api.get<string[]>('/navigation/hrefs-ocultos'),
+};
+
 // Operador de Ventanilla (Fase 6)
 export const operadorApi = {
   home: () =>

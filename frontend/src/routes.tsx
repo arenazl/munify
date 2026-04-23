@@ -36,6 +36,7 @@ import MisTasas from './pages/MisTasas';
 import GestionTasas from './pages/GestionTasas';
 import GestionPagos from './pages/GestionPagos';
 import Mostrador from './pages/Mostrador';
+import SidebarConfig from './pages/SidebarConfig';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -282,6 +283,11 @@ export const router = createBrowserRouter([
       {
         path: 'mostrador',
         element: <ProtectedRoute roles={['admin', 'supervisor', 'operador_ventanilla']}><Mostrador /></ProtectedRoute>
+      },
+      // Config del sidebar por muni (solo superadmin)
+      {
+        path: 'sidebar-config',
+        element: <ProtectedRoute roles={['admin']}><SidebarConfig /></ProtectedRoute>
       },
       // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
       {

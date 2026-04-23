@@ -155,6 +155,7 @@ from .pago_sesion import (
 from .municipio_proveedor_pago import MunicipioProveedorPago
 from .pago_webhook_evento import PagoWebhookEvento
 from .exportacion_imputacion import ExportacionImputacion
+from .municipio_sidebar_item import MunicipioSidebarItem
 
 __all__ += [
     "PagoSesion",
@@ -164,4 +165,5 @@ __all__ += [
     "MunicipioProveedorPago",
     "PagoWebhookEvento",
     "ExportacionImputacion",
+    "MunicipioSidebarItem",
 ]
