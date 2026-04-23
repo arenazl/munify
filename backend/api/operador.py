@@ -26,7 +26,7 @@ Permisos: OPERADOR_VENTANILLA | SUPERVISOR | ADMIN del muni.
 from datetime import datetime
 from decimal import Decimal
 from secrets import token_hex
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
@@ -116,6 +116,88 @@ class EstadoKycResponse(BaseModel):
     aprobado: bool
     datos: Optional[dict] = None        # dni, nombre, apellido, sexo, fecha_nac, etc.
     motivo_rechazo: Optional[str] = None
+
+
+# ============================================================
+# Búsqueda de cliente pre-existente (Mostrador)
+# ============================================================
+
+
+class VecinoEncontrado(BaseModel):
+    user_id: int
+    dni: str
+    nombre: Optional[str]
+    apellido: Optional[str]
+    email: Optional[str]
+    telefono: Optional[str]
+    direccion: Optional[str]
+    nivel_verificacion: int
+    kyc_modo: Optional[str]
+    verificado_at: Optional[str]
+
+
+@router.get("/vecinos/buscar", response_model=List[VecinoEncontrado])
+async def buscar_vecino(
+    dni: Optional[str] = None,
+    q: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Busca vecinos del muni del operador para iniciar un tramite presencial.
+
+    Params:
+      - dni: match exacto por DNI (caso mas comun)
+      - q:   busqueda parcial por nombre/apellido/email (fallback)
+
+    Devuelve hasta 8 resultados. Si el operador ingresa DNI que no existe,
+    la lista viene vacia y el frontend ofrece biometria o carga manual.
+    """
+    _asegurar_operador(current_user)
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
+
+    conds = [
+        User.rol == RolUsuario.VECINO,
+        (User.municipio_id == current_user.municipio_id) | (User.municipio_id.is_(None)),
+    ]
+
+    if dni and dni.strip():
+        conds.append(User.dni == dni.strip())
+    elif q and q.strip():
+        like = f"%{q.strip()}%"
+        conds.append(
+            (User.nombre.ilike(like))
+            | (User.apellido.ilike(like))
+            | (User.email.ilike(like))
+            | (User.dni.ilike(like))
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Pasá dni o q para buscar")
+
+    from sqlalchemy import and_
+    stmt = (
+        select(User)
+        .where(and_(*conds))
+        .limit(8)
+    )
+    r = await db.execute(stmt)
+    users = r.scalars().all()
+
+    return [
+        VecinoEncontrado(
+            user_id=u.id,
+            dni=u.dni or "",
+            nombre=u.nombre,
+            apellido=u.apellido,
+            email=u.email,
+            telefono=u.telefono,
+            direccion=getattr(u, "direccion", None),
+            nivel_verificacion=u.nivel_verificacion or 0,
+            kyc_modo=u.kyc_modo,
+            verificado_at=u.verificado_at.isoformat() if u.verificado_at else None,
+        )
+        for u in users
+    ]
 
 
 @router.post("/kyc/iniciar", response_model=IniciarKycResponse)

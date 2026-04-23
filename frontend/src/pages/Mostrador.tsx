@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
   User as UserIcon, FileText, CheckCircle2, AlertTriangle, Copy, ExternalLink,
   Clock, Receipt, MessageSquare, Banknote, Upload, Camera, ScanLine, ShieldCheck,
-  Loader2, RefreshCcw, ChevronRight, Sparkles,
+  Loader2, RefreshCcw, ChevronRight, Sparkles, UserPlus, Search, UserCheck, Edit3,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -38,10 +38,13 @@ interface KycDatos {
   dni: string | null;
   nombre: string | null;
   apellido: string | null;
-  sexo: string | null;
-  fecha_nacimiento: string | null;
-  nacionalidad: string | null;
-  direccion: string | null;
+  sexo?: string | null;
+  fecha_nacimiento?: string | null;
+  nacionalidad?: string | null;
+  direccion?: string | null;
+  // Extras para cliente pre-existente (Didit no los trae):
+  email?: string | null;
+  telefono?: string | null;
 }
 
 type Paso = 'biometria' | 'datos' | 'confirmar';
@@ -203,10 +206,22 @@ export default function Mostrador() {
 
       {/* Contenido segun paso */}
       {!result && paso === 'biometria' && municipioId && (
-        <PasoBiometria
+        <PasoIdentificar
           municipioId={municipioId}
-          onApproved={handleBiometriaOk}
+          onBiometriaOk={handleBiometriaOk}
           onManual={handleCargaManual}
+          onClienteRegistrado={(datosVecino) => {
+            // Cliente pre-existente: prellenamos todos los datos y saltamos
+            // al Paso 2. kyc_session_id queda null (no es biometria nueva).
+            setKycSessionId(null);
+            setKycDatos(datosVecino);
+            setDni(datosVecino.dni || '');
+            setNombre(datosVecino.nombre || '');
+            setApellido(datosVecino.apellido || '');
+            setEmail(datosVecino.email || '');
+            setTelefono(datosVecino.telefono || '');
+            setPaso('datos');
+          }}
         />
       )}
 
@@ -307,15 +322,45 @@ function StepsBar({ paso }: { paso: Paso }) {
 }
 
 // ============================================================
-// Paso 1 — Biometría
+// Paso 1 — Identificar al vecino
+// Dos caminos: Cliente nuevo (Didit o manual) vs Cliente registrado (buscar)
 // ============================================================
-function PasoBiometria({
+function PasoIdentificar({
   municipioId,
-  onApproved,
+  onBiometriaOk,
+  onManual,
+  onClienteRegistrado,
+}: {
+  municipioId: number;
+  onBiometriaOk: (datos: KycDatos, sessionId: string) => void;
+  onManual: () => void;
+  onClienteRegistrado: (datos: KycDatos) => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <CardClienteNuevo
+        municipioId={municipioId}
+        onBiometriaOk={onBiometriaOk}
+        onManual={onManual}
+      />
+      <CardClienteRegistrado
+        onUsar={onClienteRegistrado}
+      />
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Card izquierda — Cliente nuevo (biometría o manual)
+// ------------------------------------------------------------
+function CardClienteNuevo({
+  municipioId,
+  onBiometriaOk,
   onManual,
 }: {
   municipioId: number;
-  onApproved: (datos: KycDatos, sessionId: string) => void;
+  onBiometriaOk: (datos: KycDatos, sessionId: string) => void;
   onManual: () => void;
 }) {
   const { theme } = useTheme();
@@ -369,7 +414,7 @@ function PasoBiometria({
             detenerPolling();
             setStatus('approved');
             if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
-            onApproved(e.data.datos as KycDatos, r.data.session_id);
+            onBiometriaOk(e.data.datos as KycDatos, r.data.session_id);
           } else if (e.data.status === 'Declined') {
             detenerPolling();
             setStatus('declined');
@@ -420,6 +465,9 @@ function PasoBiometria({
       {status === 'idle' && (
         <>
           <div>
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full mb-2" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+              <UserPlus className="w-3 h-3" /> Cliente nuevo
+            </div>
             <h3 className="text-lg font-bold" style={{ color: theme.text }}>Validar identidad del vecino</h3>
             <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
               Activá la webcam y el escaneo de DNI. El vecino se para delante y el sistema valida contra RENAPER automáticamente.
@@ -523,6 +571,156 @@ function PasoBiometria({
     </div>
   );
 }
+
+// ------------------------------------------------------------
+// Card derecha — Cliente ya registrado (buscar por DNI)
+// ------------------------------------------------------------
+interface VecinoEncontrado {
+  user_id: number;
+  dni: string;
+  nombre: string | null;
+  apellido: string | null;
+  email: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  nivel_verificacion: number;
+  kyc_modo: string | null;
+  verificado_at: string | null;
+}
+
+function CardClienteRegistrado({
+  onUsar,
+}: {
+  onUsar: (datos: KycDatos) => void;
+}) {
+  const { theme } = useTheme();
+  const [dni, setDni] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState<VecinoEncontrado[] | null>(null);
+  const [sinResultados, setSinResultados] = useState(false);
+
+  const buscar = async () => {
+    if (!dni.trim()) return;
+    setBuscando(true);
+    setSinResultados(false);
+    setResultados(null);
+    try {
+      const r = await operadorApi.buscarVecino(dni.trim());
+      if (r.data.length === 0) {
+        setSinResultados(true);
+      } else {
+        setResultados(r.data);
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'Error buscando vecino');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  const usar = (v: VecinoEncontrado) => {
+    onUsar({
+      dni: v.dni,
+      nombre: v.nombre,
+      apellido: v.apellido,
+      email: v.email,
+      telefono: v.telefono,
+      direccion: v.direccion,
+    });
+  };
+
+  return (
+    <div className="rounded-xl p-6 space-y-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+      <div>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full mb-2" style={{ backgroundColor: '#22c55e15', color: '#22c55e' }}>
+          <UserCheck className="w-3 h-3" /> Cliente registrado
+        </div>
+        <h3 className="text-lg font-bold" style={{ color: theme.text }}>Buscar por DNI</h3>
+        <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+          Si el vecino ya usó el sistema antes, ingresá su DNI y lo traemos con los datos cargados.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          inputMode="numeric"
+          value={dni}
+          onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
+          onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
+          placeholder="DNI del vecino"
+          autoFocus
+          className="flex-1 px-3 py-2 rounded-lg text-sm font-mono outline-none"
+          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+        />
+        <button
+          onClick={buscar}
+          disabled={buscando || !dni.trim()}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: theme.primary }}
+        >
+          {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Buscar
+        </button>
+      </div>
+
+      {resultados && (
+        <div className="space-y-2">
+          {resultados.map((v) => {
+            const verificado = v.nivel_verificacion >= 2;
+            const isAssisted = v.kyc_modo === 'assisted';
+            return (
+              <div
+                key={v.user_id}
+                className="rounded-lg p-3"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold truncate">{v.nombre} {v.apellido}</p>
+                    <p className="text-xs font-mono" style={{ color: theme.textSecondary }}>DNI {v.dni}</p>
+                  </div>
+                  {verificado && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: isAssisted ? '#8b5cf620' : '#22c55e20', color: isAssisted ? '#8b5cf6' : '#22c55e' }}>
+                      <ShieldCheck className="w-3 h-3" />
+                      {isAssisted ? 'Asistido' : 'Verificado'}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] mb-2" style={{ color: theme.textSecondary }}>
+                  {v.telefono && <div>📱 {v.telefono}</div>}
+                  {v.email && <div className="truncate" title={v.email}>✉️ {v.email}</div>}
+                </div>
+                <button
+                  onClick={() => usar(v)}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.01] active:scale-95"
+                  style={{ backgroundColor: theme.primary }}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  Usar este cliente
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {sinResultados && (
+        <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: '#f59e0b15', border: '1px solid #f59e0b40' }}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
+          <div className="text-xs">
+            <p className="font-semibold" style={{ color: theme.text }}>No se encontró vecino con ese DNI</p>
+            <p style={{ color: theme.textSecondary }}>
+              Es cliente nuevo → usá la biometría de la izquierda o cargá los datos a mano.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 // ============================================================
 // Paso 2 — Datos (contacto + trámite)

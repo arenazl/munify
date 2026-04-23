@@ -1548,6 +1548,21 @@ export const operadorApi = {
       solicitud_id: solicitudId,
       telefono_override: telefonoOverride,
     }),
+  // Buscador de cliente ya registrado (Mostrador)
+  buscarVecino: (dni?: string, q?: string) =>
+    api.get<Array<{
+      user_id: number;
+      dni: string;
+      nombre: string | null;
+      apellido: string | null;
+      email: string | null;
+      telefono: string | null;
+      direccion: string | null;
+      nivel_verificacion: number;
+      kyc_modo: string | null;
+      verificado_at: string | null;
+    }>>('/operador/vecinos/buscar', { params: dni ? { dni } : { q } }),
+
   // Fase 6 v2 — biometria presencial via Didit
   kycIniciar: (municipioId: number, callbackUrl?: string) =>
     api.post<{ session_id: string; url: string }>('/operador/kyc/iniciar', {
