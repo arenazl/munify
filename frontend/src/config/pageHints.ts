@@ -377,20 +377,26 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
       {
         title: '¿Para qué sirve?',
         description:
-          'Para vecinos que NO tienen la app: típicamente adultos mayores. El operador de mostrador carga el trámite a nombre del vecino desde la PC de ventanilla, valida la identidad con el DNI físico y le entrega (o envía) el link de pago.',
+          'Para vecinos que NO tienen la app: típicamente adultos mayores. El operador de mostrador carga el trámite a nombre del vecino con asistencia biométrica, y le entrega (o envía) el link de pago.',
         icon: 'Sparkles',
       },
       {
-        title: 'Completar el formulario',
+        title: 'Paso 1 — Validación biométrica (webcam + DNI)',
         description:
-          'DNI, nombre, apellido y trámite son obligatorios. Teléfono y email son opcionales (pero el teléfono es ideal para mandar el link de pago por WhatsApp). Si el vecino ya existe en el sistema, sus datos se precargan solos.',
+          'Clickeás "Iniciar validación biométrica" y se abre Didit en una ventana. El vecino se escanea el DNI y se saca una selfie frente a la webcam del mostrador. En ~1 minuto el sistema valida contra RENAPER y prellena DNI, nombre y apellido automáticamente. Si Didit no está disponible, podés cargar los datos a mano con tu DJ como respaldo.',
         icon: 'ClipboardList',
       },
       {
-        title: 'Firmar la Declaración Jurada',
+        title: 'Paso 2 — Contacto + trámite',
         description:
-          'Antes de iniciar tenés que tildar "Confirmo validación presencial". Esa DJ queda grabada con tu usuario y timestamp, y el vecino queda marcado como KYC assisted — verificado por vos, no por la app. Es la huella legal de que viste el DNI.',
+          'Los datos filiatorios ya vienen de RENAPER (no editables). Completás teléfono (clave para el link WhatsApp) y email. Seleccionás el trámite del catálogo. Si el trámite exige CENAT o KYC, el paso avisa.',
         icon: 'Lightbulb',
+      },
+      {
+        title: 'Paso 3 — Declaración Jurada',
+        description:
+          'Firmás la DJ de validación presencial. Si ya se hizo biometría, la DJ complementa el KYC; si fue carga manual, la DJ es la huella legal única. Queda grabada con tu usuario + timestamp.',
+        icon: 'ClipboardList',
       },
       {
         title: 'Enviar link por WhatsApp',

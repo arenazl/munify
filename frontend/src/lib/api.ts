@@ -1522,6 +1522,7 @@ export const operadorApi = {
     telefono?: string;
     dj_firmada: boolean;
     dj_texto?: string;
+    kyc_session_id?: string;
   }) =>
     api.post<{
       solicitud_id: number;
@@ -1547,6 +1548,29 @@ export const operadorApi = {
       solicitud_id: solicitudId,
       telefono_override: telefonoOverride,
     }),
+  // Fase 6 v2 — biometria presencial via Didit
+  kycIniciar: (municipioId: number, callbackUrl?: string) =>
+    api.post<{ session_id: string; url: string }>('/operador/kyc/iniciar', {
+      municipio_id: municipioId,
+      callback_url: callbackUrl,
+    }),
+  kycEstado: (sessionId: string) =>
+    api.get<{
+      session_id: string;
+      status: string;
+      aprobado: boolean;
+      datos: {
+        dni: string | null;
+        nombre: string | null;
+        apellido: string | null;
+        sexo: string | null;
+        fecha_nacimiento: string | null;
+        nacionalidad: string | null;
+        direccion: string | null;
+      } | null;
+      motivo_rechazo: string | null;
+    }>(`/operador/kyc/${sessionId}/estado`),
+
   registrarPagoEfectivo: (solicitudId: number, monto: number, numeroComprobante: string, foto: File | null) => {
     const form = new FormData();
     form.append('solicitud_id', String(solicitudId));

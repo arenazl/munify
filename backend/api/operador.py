@@ -66,6 +66,10 @@ class IniciarTramiteRequest(BaseModel):
     telefono: Optional[str] = None
     dj_firmada: bool = False       # operador tilda DJ de validacion presencial
     dj_texto: Optional[str] = None  # texto custom de la DJ (por si el muni tiene una propia)
+    # Si el operador valido con Didit presencialmente, viene el session_id.
+    # Los datos filiatorios (DNI, nombre, apellido) se pueden leer tambien
+    # desde Didit — si el form los trae, se validan contra el KYC.
+    kyc_session_id: Optional[str] = None
 
 
 class IniciarTramiteResponse(BaseModel):
@@ -89,6 +93,122 @@ DJ_DEFAULT_TEXTO = (
     "público. El operador confirma haber verificado el DNI del solicitante "
     "en persona al momento de iniciar el trámite."
 )
+
+
+# ============================================================
+# KYC presencial — biometria via Didit desde la consola del operador
+# ============================================================
+
+
+class IniciarKycRequest(BaseModel):
+    municipio_id: int
+    callback_url: Optional[str] = None  # a donde volver cuando Didit termine
+
+
+class IniciarKycResponse(BaseModel):
+    session_id: str
+    url: str                            # URL hosted de Didit (abrir en popup)
+
+
+class EstadoKycResponse(BaseModel):
+    session_id: str
+    status: str                         # "Not Started" / "In Progress" / "Approved" / "Declined"
+    aprobado: bool
+    datos: Optional[dict] = None        # dni, nombre, apellido, sexo, fecha_nac, etc.
+    motivo_rechazo: Optional[str] = None
+
+
+@router.post("/kyc/iniciar", response_model=IniciarKycResponse)
+async def iniciar_kyc_presencial(
+    body: IniciarKycRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Crea una sesion Didit para validar biometricamente al vecino en ventanilla.
+
+    El operador abre la URL devuelta en popup desde la PC del mostrador.
+    El SDK Didit toma la webcam + (opcional) scanner de DNI. Cuando termina,
+    el frontend hace polling a /kyc/{session_id}/estado para saber si
+    aprobo y cargar los datos filiatorios prellenados.
+    """
+    _asegurar_operador(current_user)
+    _asegurar_muni(current_user, body.municipio_id)
+
+    from services.didit import crear_sesion as didit_crear_sesion, DiditNotConfigured, DiditError
+    try:
+        # vendor_data marca que es un KYC asistido (mostrador) con operador.
+        vendor = f"mostrador:{body.municipio_id}:op{current_user.id}"
+        data = await didit_crear_sesion(
+            vendor_data=vendor,
+            callback_url=body.callback_url,
+        )
+    except DiditNotConfigured as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Biometría no disponible: {e}. Cargá los datos a mano.",
+        )
+    except DiditError as e:
+        raise HTTPException(status_code=502, detail=f"Didit: {e}")
+
+    session_id = data.get("session_id") or data.get("id")
+    url = data.get("url") or data.get("session_url")
+    if not session_id or not url:
+        raise HTTPException(status_code=502, detail="Didit no devolvio session_id/url")
+
+    return IniciarKycResponse(session_id=session_id, url=url)
+
+
+@router.get("/kyc/{session_id}/estado", response_model=EstadoKycResponse)
+async def estado_kyc_presencial(
+    session_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Consulta el estado de una sesion Didit — para polling desde el frontend.
+
+    Mientras status != Approved/Declined, devolve "In Progress" y el
+    frontend reintenta cada 2s. Al aprobar devuelve los datos filiatorios
+    ya extraidos, listos para prellenar el form.
+    """
+    _asegurar_operador(current_user)
+    from services.didit import (
+        consultar_sesion as didit_consultar,
+        extraer_datos_filiatorios,
+        DiditNotConfigured, DiditError,
+    )
+    try:
+        decision = await didit_consultar(session_id)
+    except DiditNotConfigured as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except DiditError as e:
+        raise HTTPException(status_code=502, detail=f"Didit: {e}")
+
+    status = decision.get("status") or "In Progress"
+    aprobado = status == "Approved"
+
+    datos = None
+    motivo = None
+    if aprobado:
+        raw = extraer_datos_filiatorios(decision)
+        # Serializar date a string ISO
+        fn = raw.get("fecha_nacimiento")
+        datos = {
+            "dni": raw.get("dni"),
+            "nombre": raw.get("nombre"),
+            "apellido": raw.get("apellido"),
+            "sexo": raw.get("sexo"),
+            "fecha_nacimiento": fn.isoformat() if fn else None,
+            "nacionalidad": raw.get("nacionalidad"),
+            "direccion": raw.get("direccion"),
+        }
+    elif status == "Declined":
+        motivo = decision.get("decline_reason") or decision.get("reason") or "Rechazada"
+
+    return EstadoKycResponse(
+        session_id=session_id,
+        status=status,
+        aprobado=aprobado,
+        datos=datos,
+        motivo_rechazo=motivo,
+    )
 
 
 @router.post("/tramite-presencial/iniciar", response_model=IniciarTramiteResponse)
@@ -159,10 +279,17 @@ async def iniciar_tramite_presencial(
         db.add(user)
         await db.flush()
 
-    # Marcar al user con kyc_modo=assisted + operador (si estaba en 0, sube a 2)
+    # Marcar al user con kyc_modo=assisted + operador.
     user.kyc_modo = "assisted"
     user.kyc_operador_id = current_user.id
-    if (user.nivel_verificacion or 0) < 2:
+    # Si vino una sesion Didit aprobada, persistimos referencia + sube nivel.
+    if body.kyc_session_id:
+        user.didit_session_id = body.kyc_session_id
+        user.nivel_verificacion = 2
+        user.verificado_at = datetime.utcnow()
+    elif (user.nivel_verificacion or 0) < 2:
+        # Fallback: el operador firma DJ presencial sin biometria (ej. Didit
+        # no disponible). Queda como assisted pero sin session_id Didit.
         user.nivel_verificacion = 2
         user.verificado_at = datetime.utcnow()
 
