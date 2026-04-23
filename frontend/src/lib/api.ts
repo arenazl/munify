@@ -1533,10 +1533,21 @@ export const operadorApi = {
       codigo_cut_qr: string | null;
       session_id: string | null;
       monto: number | null;
+      pago_diferido: boolean;
+      momento_pago: string | null;
       wa_me_url: string | null;
       wa_me_mensaje: string | null;
       telefono_vecino: string | null;
     }>('/operador/tramite-presencial/iniciar', body),
+  generarPagoDiferido: (solicitudId: number) =>
+    api.post<{
+      session_id: string;
+      codigo_cut_qr: string | null;
+      checkout_url: string;
+      monto: number;
+      wa_me_url: string | null;
+      wa_me_mensaje: string | null;
+    }>(`/operador/pagos/generar-para-solicitud/${solicitudId}`),
   generarWaMeUrl: (solicitudId: number, telefonoOverride?: string) =>
     api.post<{
       wa_me_url: string | null;

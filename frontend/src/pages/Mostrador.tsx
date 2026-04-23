@@ -25,6 +25,8 @@ interface InicioResult {
   numero_tramite: string;
   user_id: number;
   requiere_pago: boolean;
+  pago_diferido: boolean;
+  momento_pago: string | null;
   checkout_url: string | null;
   codigo_cut_qr: string | null;
   session_id: string | null;
@@ -927,7 +929,22 @@ function ResultadoPanel({
         <p className="text-2xl font-bold tabular-nums" style={{ color: theme.primary }}>{result.numero_tramite}</p>
       </div>
 
-      {result.requiere_pago && result.checkout_url && (
+      {result.requiere_pago && result.pago_diferido && (
+        <div className="rounded-lg p-3 space-y-2" style={{ backgroundColor: '#f59e0b10', border: '1px dashed #f59e0b60' }}>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4" style={{ color: '#d97706' }} />
+            <p className="text-xs font-semibold" style={{ color: '#d97706' }}>
+              Pago diferido — ${(result.monto ?? 0).toLocaleString('es-AR')}
+            </p>
+          </div>
+          <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+            Este trámite se cobra al finalizar. Cuando esté listo para retirar, clickeá "Generar cupón ahora" para enviarle el link de pago al vecino.
+          </p>
+          <PagoDiferidoBoton solicitudId={result.solicitud_id} />
+        </div>
+      )}
+
+      {result.requiere_pago && !result.pago_diferido && result.checkout_url && (
         <div className="rounded-lg p-3 space-y-2" style={{ backgroundColor: `${theme.primary}10`, border: `1px dashed ${theme.primary}60` }}>
           <p className="text-xs font-semibold" style={{ color: theme.primary }}>
             Link de pago — ${(result.monto ?? 0).toLocaleString('es-AR')}
@@ -948,7 +965,7 @@ function ResultadoPanel({
       )}
 
       <div className="flex items-center gap-2">
-        {result.requiere_pago && (
+        {result.requiere_pago && !result.pago_diferido && (
           <button onClick={onPagoEfectivo} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-[1.01] active:scale-95" style={{ backgroundColor: '#f59e0b20', color: '#d97706', border: '1px solid #f59e0b60' }}>
             <Banknote className="w-4 h-4" />
             Paga en efectivo (caja)
@@ -961,6 +978,54 @@ function ResultadoPanel({
     </div>
   );
 }
+
+// ============================================================
+// PagoDiferidoBoton — dispara la sesion cuando el tramite esta listo
+// ============================================================
+function PagoDiferidoBoton({ solicitudId }: { solicitudId: number }) {
+  const { theme } = useTheme();
+  const [generando, setGenerando] = useState(false);
+  const [resultado, setResultado] = useState<{ checkout_url: string; wa_me_url: string | null; monto: number } | null>(null);
+
+  const generar = async () => {
+    setGenerando(true);
+    try {
+      const r = await operadorApi.generarPagoDiferido(solicitudId);
+      setResultado({ checkout_url: r.data.checkout_url, wa_me_url: r.data.wa_me_url, monto: r.data.monto });
+      toast.success('Cupón generado');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'No se pudo generar');
+    } finally {
+      setGenerando(false);
+    }
+  };
+
+  if (!resultado) {
+    return (
+      <button onClick={generar} disabled={generando} className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50" style={{ backgroundColor: '#d97706' }}>
+        {generando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+        {generando ? 'Generando…' : 'Generar cupón de pago ahora'}
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <a href={resultado.checkout_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-xs font-mono px-2 py-1.5 rounded truncate" style={{ backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` }}>
+        <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+        <span className="truncate">{resultado.checkout_url}</span>
+      </a>
+      {resultado.wa_me_url && (
+        <button onClick={() => window.open(resultado.wa_me_url!, '_blank', 'noopener,noreferrer')} className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: '#25d366' }}>
+          <MessageSquare className="w-4 h-4" />
+          Enviar por WhatsApp
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 // ============================================================
 // WaMeEnviar (reusado) — link wa.me para operador

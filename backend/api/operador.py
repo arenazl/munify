@@ -77,6 +77,12 @@ class IniciarTramiteResponse(BaseModel):
     numero_tramite: str
     user_id: int
     requiere_pago: bool
+    # Si el tramite tiene momento_pago='fin', pago_diferido=True y NO se
+    # genera sesion de pago al iniciar — la solicitud avanza sin cobrar,
+    # y cuando el tramite esta listo para retirar se llama al endpoint
+    # /operador/pagos/generar-para-solicitud/{id}.
+    pago_diferido: bool = False
+    momento_pago: Optional[str] = None   # "inicio" | "fin" | None si gratis
     checkout_url: Optional[str] = None
     codigo_cut_qr: Optional[str] = None
     session_id: Optional[str] = None
@@ -418,22 +424,26 @@ async def iniciar_tramite_presencial(
         comentario=f"Operador {current_user.email} — DJ firmada — Vecino {user.nombre} {user.apellido} (DNI {user.dni})",
     ))
 
-    # Si el tramite tiene costo, creamos PagoSesion ya mismo para que el
-    # operador muestre el QR / envie por WhatsApp / cobre en efectivo.
+    # El tramite puede configurarse con momento_pago='inicio' (cobrar antes
+    # de procesar) o 'fin' (cobrar cuando el tramite esta listo para retirar).
+    # Si es 'fin', no creamos sesion aca — el operador la dispara despues
+    # llamando a /operador/pagos/generar-para-solicitud/{id}.
     requiere_pago = bool(tramite.costo and float(tramite.costo) > 0)
+    momento_pago_tramite = (tramite.momento_pago or "inicio") if requiere_pago else None
+    pago_diferido = requiere_pago and momento_pago_tramite == "fin"
+
     checkout_url: Optional[str] = None
     codigo_cut_qr: Optional[str] = None
     session_id: Optional[str] = None
-    monto: Optional[float] = None
+    monto: Optional[float] = float(tramite.costo) if requiere_pago else None
 
-    if requiere_pago:
+    if requiere_pago and not pago_diferido:
         from models.pago_sesion import PagoSesion, EstadoSesionPago
         from services.pagos import get_provider_para_muni
 
         session_id = f"PB-{token_hex(7).upper()}"
         provider = await get_provider_para_muni(db, body.municipio_id)
         concepto = f"{tramite.nombre} — Solicitud {numero_tramite}"
-        monto = float(tramite.costo)
 
         sesion_ext = await provider.crear_sesion(
             concepto=concepto,
@@ -463,8 +473,16 @@ async def iniciar_tramite_presencial(
         db.add(HistorialSolicitud(
             solicitud_id=solicitud.id,
             usuario_id=current_user.id,
-            accion="💳 Link de pago generado",
+            accion="💳 Link de pago generado (al inicio)",
             comentario=f"Sesión {session_id} · ${monto:.2f} · vía {provider.nombre}",
+        ))
+    elif pago_diferido:
+        # Dejamos rastro en historial de que el pago esta diferido
+        db.add(HistorialSolicitud(
+            solicitud_id=solicitud.id,
+            usuario_id=current_user.id,
+            accion="⏳ Pago diferido al fin del trámite",
+            comentario=f"Se generará el cupón al finalizar · costo ${monto:.2f}",
         ))
 
     await db.commit()
@@ -473,10 +491,11 @@ async def iniciar_tramite_presencial(
     # F7 — notificar al vecino segun WHATSAPP_AUTOSEND_MODE
     # - "business_api" (futuro, dormido por default): envia automatico.
     # - "wa_me" (default): solo armamos el link, el operador lo envia manual.
+    # Si el pago es diferido (momento='fin'), aun no hay link para enviar.
     wa_me_url: Optional[str] = None
     wa_me_msg: Optional[str] = None
     from core.config import settings as _cfg
-    if requiere_pago and user.telefono and checkout_url:
+    if requiere_pago and not pago_diferido and user.telefono and checkout_url:
         from services.wa_me import armar_wa_me_url, mensaje_link_pago
         wa_me_msg = mensaje_link_pago(
             nombre_vecino=f"{user.nombre or ''} {user.apellido or ''}".strip(),
@@ -507,6 +526,8 @@ async def iniciar_tramite_presencial(
         numero_tramite=numero_tramite,
         user_id=user.id,
         requiere_pago=requiere_pago,
+        pago_diferido=pago_diferido,
+        momento_pago=momento_pago_tramite,
         checkout_url=checkout_url,
         codigo_cut_qr=codigo_cut_qr,
         session_id=session_id,
@@ -522,6 +543,97 @@ class MostradorMetricas(BaseModel):
     pagados_hoy: int
     monto_hoy: str
     operador_nombre: str
+
+
+class GenerarPagoDiferidoResponse(BaseModel):
+    session_id: str
+    codigo_cut_qr: Optional[str]
+    checkout_url: str
+    monto: float
+    wa_me_url: Optional[str] = None
+    wa_me_mensaje: Optional[str] = None
+
+
+@router.post("/pagos/generar-para-solicitud/{solicitud_id}", response_model=GenerarPagoDiferidoResponse)
+async def generar_pago_diferido(
+    solicitud_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Genera la PagoSesion para una solicitud con momento_pago='fin'.
+
+    Se llama cuando el tramite esta listo para retirar y el operador/
+    supervisor decide cobrar. Si ya hay sesion PENDING/APPROVED para esta
+    solicitud, la devuelve en vez de crear otra (idempotente).
+    """
+    _asegurar_operador(current_user)
+    sol_q = await db.execute(
+        select(Solicitud)
+        .options(selectinload(Solicitud.tramite), selectinload(Solicitud.solicitante))
+        .where(Solicitud.id == solicitud_id)
+    )
+    solicitud = sol_q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    _asegurar_muni(current_user, solicitud.municipio_id)
+
+    tramite = solicitud.tramite
+    if not tramite or not tramite.costo or float(tramite.costo) <= 0:
+        raise HTTPException(status_code=400, detail="El tramite no tiene costo")
+
+    from models.pago_sesion import PagoSesion, EstadoSesionPago
+    from services.pagos import get_provider_para_muni
+    from services.wa_me import armar_wa_me_url, mensaje_link_pago
+
+    vecino = solicitud.solicitante
+    nombre = f"{vecino.nombre or ''} {vecino.apellido or ''}".strip() if vecino else ''
+    tel = vecino.telefono if vecino else None
+
+    # Ya hay sesion viva? idempotente
+    sq = await db.execute(
+        select(PagoSesion).where(
+            PagoSesion.solicitud_id == solicitud.id,
+            PagoSesion.estado.in_([EstadoSesionPago.PENDING, EstadoSesionPago.IN_CHECKOUT, EstadoSesionPago.APPROVED]),
+        ).order_by(PagoSesion.created_at.desc()).limit(1)
+    )
+    existente = sq.scalar_one_or_none()
+    if existente and existente.checkout_url:
+        msg_exist = mensaje_link_pago(nombre, tramite.nombre, existente.checkout_url, solicitud.numero_tramite)
+        return GenerarPagoDiferidoResponse(
+            session_id=existente.id,
+            codigo_cut_qr=existente.codigo_cut_qr,
+            checkout_url=existente.checkout_url,
+            monto=float(existente.monto),
+            wa_me_url=armar_wa_me_url(tel, msg_exist) if tel else None,
+            wa_me_mensaje=msg_exist,
+        )
+
+    session_id = f"PB-{token_hex(7).upper()}"
+    provider = await get_provider_para_muni(db, solicitud.municipio_id)
+    concepto = f"{tramite.nombre} — Solicitud {solicitud.numero_tramite}"
+    monto = float(tramite.costo)
+    sesion_ext = await provider.crear_sesion(
+        concepto=concepto, monto=Decimal(str(monto)), sesion_id=session_id, return_url="/mostrador",
+    )
+    db.add(PagoSesion(
+        id=session_id, solicitud_id=solicitud.id, municipio_id=solicitud.municipio_id,
+        vecino_user_id=solicitud.solicitante_id, concepto=concepto, monto=Decimal(str(monto)),
+        estado=EstadoSesionPago.PENDING, provider=provider.nombre, external_id=sesion_ext.external_id,
+        checkout_url=sesion_ext.checkout_url, return_url="/mostrador",
+        canal=solicitud.canal or "ventanilla_asistida", operador_user_id=current_user.id,
+    ))
+    db.add(HistorialSolicitud(
+        solicitud_id=solicitud.id, usuario_id=current_user.id,
+        accion="💳 Cupón de pago generado (al finalizar)",
+        comentario=f"Sesión {session_id} · ${monto:.2f} · vía {provider.nombre}",
+    ))
+    await db.commit()
+
+    msg = mensaje_link_pago(nombre, tramite.nombre, sesion_ext.checkout_url, solicitud.numero_tramite)
+    return GenerarPagoDiferidoResponse(
+        session_id=session_id, codigo_cut_qr=None, checkout_url=sesion_ext.checkout_url, monto=monto,
+        wa_me_url=armar_wa_me_url(tel, msg) if tel else None, wa_me_mensaje=msg,
+    )
 
 
 class GenerarWaMeRequest(BaseModel):
