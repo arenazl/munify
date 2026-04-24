@@ -128,7 +128,6 @@ export default function SidebarConfig() {
       <StickyPageHeader
         icon={<Layers className="h-5 w-5" />}
         title="Configuración del sidebar por municipio"
-        subtitle="Superadmin — elegí qué items del menú lateral ve cada muni"
       />
 
       <div className="rounded-xl p-4 space-y-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>

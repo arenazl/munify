@@ -204,8 +204,7 @@ export default function Mostrador() {
     <div className="space-y-4">
       <StickyPageHeader
         icon={<UserIcon className="h-5 w-5" />}
-        title="Mostrador — Ventanilla"
-        subtitle="Iniciar trámite presencial para vecino sin app"
+        title="Mostrador — Ventanilla asistida"
       />
 
       <PageHint pageId="mostrador" />
