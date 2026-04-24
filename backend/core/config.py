@@ -79,6 +79,26 @@ class Settings(BaseSettings):
     # Si vacío, no se permite iniciar sesiones.
     DIDIT_WORKFLOW_ID: str = ""
 
+    # ---- Gateway de pagos (Fase 2 bundle) ----
+    # Provider global por defecto ('mock' sigue funcionando para dev).
+    # La resolucion real es por muni (ver services/pagos/__init__.py).
+    GATEWAY_PAGO_PROVIDER: str = "mock"
+    # Base URL publica del backend para que los providers manden webhooks.
+    # Ej: "https://api.munify.ar". Se usa al crear preferences de MP.
+    WEBHOOK_BASE_URL: str = ""
+    # Clave para cifrar access_tokens de providers en DB (Fernet).
+    # Generar con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Si vacia, los secretos se guardan en base64 plano (dev only).
+    FERNET_KEY: str = ""
+
+    # WhatsApp — modo de envio (Fase 7 bundle pagos).
+    # "wa_me" (default): genera links click-to-chat que el operador envia
+    #   manualmente desde su WhatsApp Web o celular. No requiere Business API.
+    # "business_api": envia automaticamente usando la config del muni
+    #   (Meta/Twilio). Requiere templates aprobados — hoy dormido, se habilita
+    #   cuando algun muni quiera automatizar con numero oficial verificado.
+    WHATSAPP_AUTOSEND_MODE: str = "wa_me"
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Retorna lista de origenes CORS permitidos"""

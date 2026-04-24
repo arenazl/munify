@@ -42,6 +42,8 @@ from .pagos_contaduria import router as pagos_contaduria_router
 from .proveedores_pago import router as proveedores_pago_router
 from .vecino import router as vecino_router
 from .mock_padron import router as mock_padron_router
+from .operador import router as operador_router
+from .sidebar_config import admin_router as sidebar_admin_router, public_router as sidebar_public_router
 
 api_router = APIRouter()
 
@@ -87,6 +89,9 @@ api_router.include_router(pagos_contaduria_router, tags=["Pagos - Contaduria"]) 
 api_router.include_router(proveedores_pago_router, prefix="/proveedores-pago", tags=["Proveedores Pago"])
 api_router.include_router(vecino_router, tags=["Vecino"])  # ya tiene prefix /vecino
 api_router.include_router(mock_padron_router)  # ya tiene prefix /mock
+api_router.include_router(operador_router, tags=["Operador Ventanilla"])  # ya tiene prefix /operador
+api_router.include_router(sidebar_admin_router)   # ya tiene prefix /admin/sidebar-items
+api_router.include_router(sidebar_public_router)  # ya tiene prefix /navigation
 
 # WebSockets
 from .ws import router as ws_router

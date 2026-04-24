@@ -10,7 +10,7 @@ import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { Sheet } from './ui/Sheet';
-import { usersApi, municipiosApi, API_URL as apiUrl_ } from '../lib/api';
+import { usersApi, municipiosApi, navegacionApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
 import NotificationSettings from './NotificationSettings';
 import { subscribeToPush } from '../lib/pushNotifications';
@@ -78,6 +78,8 @@ export default function Layout() {
   const [uploadingSidebarBg, setUploadingSidebarBg] = useState(false);
   const [emailValidationOpen, setEmailValidationOpen] = useState(false);
   const [emailValidationCode, setEmailValidationCode] = useState('');
+  // Items del sidebar ocultos por el superadmin para el muni actual
+  const [hrefsOcultos, setHrefsOcultos] = useState<string[]>([]);
   const [pendingEmail, setPendingEmail] = useState('');
   const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
@@ -152,6 +154,17 @@ export default function Layout() {
       setPushSubscribing(false);
     }
   };
+
+  // Cargar items del sidebar ocultos (config del superadmin por muni)
+  useEffect(() => {
+    if (!user) {
+      setHrefsOcultos([]);
+      return;
+    }
+    navegacionApi.misHrefsOcultos()
+      .then((r) => setHrefsOcultos(r.data || []))
+      .catch(() => setHrefsOcultos([]));
+  }, [user?.id, user?.municipio_id]);
 
   // Cargar datos del usuario cuando se abre el sheet de perfil
   useEffect(() => {
@@ -302,6 +315,7 @@ export default function Layout() {
     // (Categorías Reclamo, Categorías Trámite, Tipos de Trámite) se ocultan
     // del sidebar. Quedan accesibles sólo desde /gestion/ajustes.
     abmEnSidebar: municipioActual?.abm_en_sidebar ?? true,
+    hrefsOcultos,
   });
   const mobileTabs = getMobileTabs(user.rol);
 

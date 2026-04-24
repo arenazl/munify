@@ -77,6 +77,18 @@ class Tramite(Base):
     #   (al retirar). Default "inicio" si tiene costo.
     momento_pago = Column(String(10), nullable=True)
 
+    # Licencias de conducir (y otros tramites con componente nacional):
+    # si requiere CENAT (Agencia Nacional de Seguridad Vial), el vecino tiene
+    # que adjuntar el comprobante antes de que el operador cierre el legajo.
+    # El pago del CENAT es externo a Munify — acá solo trackeamos el adjunto.
+    requiere_cenat = Column(Boolean, nullable=False, default=False)
+    monto_cenat_referencia = Column(Float, nullable=True)  # solo informativo
+
+    # KYC visible (Fase 5 bundle) — tramites sensibles piden biometria.
+    # Si requiere_kyc=True, el vecino debe tener nivel_verificacion >= 2.
+    requiere_kyc = Column(Boolean, nullable=False, default=False)
+    nivel_kyc_minimo = Column(Integer, nullable=True)  # 1=email / 2=biometria
+
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)
 
@@ -125,7 +137,7 @@ class Solicitud(Base):
 
     # Solicitante (usuario registrado o anónimo)
     solicitante_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
-    solicitante = relationship("User", back_populates="solicitudes")
+    solicitante = relationship("User", back_populates="solicitudes", foreign_keys=[solicitante_id])
 
     # Datos del solicitante (para anónimos o para guardar snapshot)
     nombre_solicitante = Column(String(100), nullable=True)
@@ -158,6 +170,13 @@ class Solicitud(Base):
     # Resolución
     respuesta = Column(Text, nullable=True)
     observaciones = Column(Text, nullable=True)
+
+    # Canal de origen (Fase 6 bundle pagos):
+    #   "app" (default) | "ventanilla_asistida" | "whatsapp" | "web_publica"
+    canal = Column(String(30), nullable=True)
+    operador_user_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    validacion_presencial_at = Column(DateTime(timezone=True), nullable=True)
+    dj_validacion_presencial = Column(Text, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

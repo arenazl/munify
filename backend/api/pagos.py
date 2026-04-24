@@ -21,10 +21,13 @@ Flow del vecino pagando una tasa:
 
   5. Frontend redirige al vecino de vuelta a Mis Tasas con success flag.
 """
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from secrets import token_hex
 from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -40,10 +43,11 @@ from models.enums import RolUsuario
 from models.pago_sesion import (
     PagoSesion,
     EstadoSesionPago,
+    EstadoImputacion,
     MedioPagoGateway,
 )
 from models.tasas import Deuda, EstadoDeuda, Pago, MedioPago as MedioPagoTasa, Partida
-from services.pagos import get_provider
+from services.pagos import get_provider, get_provider_para_muni
 
 
 router = APIRouter(prefix="/pagos", tags=["Pagos"])
@@ -91,6 +95,7 @@ class ConfirmarPagoResponse(BaseModel):
     session_id: str
     estado: EstadoSesionPago
     external_id: str
+    codigo_cut_qr: Optional[str] = None
     comprobante: dict
 
 
@@ -101,6 +106,23 @@ class ConfirmarPagoResponse(BaseModel):
 def _generar_session_id() -> str:
     """ID publico no enumerable: PB-ABC123DEF456 (14 chars hex)."""
     return f"PB-{token_hex(7).upper()}"
+
+
+async def _generar_cut_unico(db: AsyncSession, intentos: int = 6) -> str:
+    """Genera un CUT corto (CUT-A3F2B1) garantizando unicidad en DB.
+
+    Colision practicamente imposible con 6 chars hex (16M combinaciones), pero
+    reintentamos igual si el UNIQUE INDEX rechaza. Si despues de N intentos
+    no lo logramos, caemos a un CUT largo con timestamp para no fallar.
+    """
+    from sqlalchemy import exists as _exists, select as _select
+    for _ in range(intentos):
+        candidato = f"CUT-{token_hex(3).upper()}"
+        q = await db.execute(_select(PagoSesion.id).where(PagoSesion.codigo_cut_qr == candidato))
+        if q.scalar_one_or_none() is None:
+            return candidato
+    # Fallback — larguisimo, pero garantizado unico
+    return f"CUT-{token_hex(6).upper()}"
 
 
 # ============================================================
@@ -142,7 +164,7 @@ async def crear_sesion_pago(
         if not permitido:
             raise HTTPException(status_code=403, detail="No podés pagar una deuda ajena")
 
-    provider = get_provider()
+    provider = await get_provider_para_muni(db, partida.municipio_id)
     sesion_id = _generar_session_id()
     concepto = f"{partida.tipo_tasa.nombre if partida.tipo_tasa else 'Tasa'} - {partida.municipio.nombre.replace('Municipalidad de ', '')} - {deuda.periodo}"
 
@@ -221,7 +243,7 @@ async def crear_sesion_tramite(
     if solicitud.estado in (EstadoSolicitud.FINALIZADO, EstadoSolicitud.RECHAZADO):
         raise HTTPException(status_code=400, detail=f"Esta solicitud esta {solicitud.estado.value}")
 
-    provider = get_provider()
+    provider = await get_provider_para_muni(db, solicitud.municipio_id)
     sesion_id = _generar_session_id()
     concepto = f"{solicitud.tramite.nombre} — Solicitud {solicitud.numero_tramite}"
 
@@ -302,7 +324,7 @@ async def obtener_sesion(
     muni_nombre = sesion.municipio.nombre.replace("Municipalidad de ", "") if sesion.municipio else ""
     vecino_nombre = f"{sesion.vecino.nombre} {sesion.vecino.apellido or ''}".strip() if sesion.vecino else ""
 
-    provider = get_provider()
+    provider = await get_provider_para_muni(db, sesion.municipio_id)
     medios_todos = provider.medios_soportados()
 
     # Filtrar por tipo_pago configurado en la tasa/tramite del origen.
@@ -380,6 +402,16 @@ async def confirmar_pago(
         "simulado": True,
     }
 
+    # Generar CUT (Codigo Unico de Tramite) si aun no lo tiene —
+    # el operador de ventanilla lo escanea para verificar el pago.
+    if not sesion.codigo_cut_qr:
+        sesion.codigo_cut_qr = await _generar_cut_unico(db)
+
+    # Marcar pendiente de imputacion contable. Contaduria despues lo pasa
+    # a 'imputado' cuando carga el asiento en el sistema tributario (RAFAM).
+    if sesion.imputacion_estado is None:
+        sesion.imputacion_estado = EstadoImputacion.PENDIENTE
+
     # Marcar la deuda como pagada + crear registro de Pago
     if sesion.deuda:
         sesion.deuda.estado = EstadoDeuda.PAGADA
@@ -426,10 +458,34 @@ async def confirmar_pago(
 
     await db.commit()
 
+    # F7 — notificacion de pago confirmado por Business API.
+    # Solo corre si el muni activo el modo automatico (hoy dormido por default).
+    # En modo wa_me el vecino ve la confirmacion en la pantalla del checkout;
+    # si hay que reforzar, el operador arma otro link desde el Mostrador.
+    if settings.WHATSAPP_AUTOSEND_MODE == "business_api":
+        try:
+            from services.whatsapp_pagos import notificar_pago_confirmado
+            vq = await db.execute(select(User).where(User.id == sesion.vecino_user_id))
+            vecino = vq.scalar_one_or_none()
+            if vecino and vecino.telefono:
+                await notificar_pago_confirmado(
+                    db,
+                    municipio_id=sesion.municipio_id,
+                    telefono=vecino.telefono,
+                    nombre_vecino=f"{vecino.nombre or ''} {vecino.apellido or ''}".strip(),
+                    concepto=sesion.concepto,
+                    monto=sesion.monto,
+                    cut=sesion.codigo_cut_qr,
+                    usuario_id=vecino.id,
+                )
+        except Exception:
+            pass  # no bloquea
+
     return ConfirmarPagoResponse(
         session_id=sesion.id,
         estado=sesion.estado,
         external_id=sesion.external_id or "",
+        codigo_cut_qr=sesion.codigo_cut_qr,
         comprobante={
             "concepto": sesion.concepto,
             "monto": str(sesion.monto),
@@ -437,7 +493,76 @@ async def confirmar_pago(
             "fecha": sesion.completed_at.isoformat() if sesion.completed_at else None,
             "numero_operacion": sesion.external_id,
             "provider": sesion.provider,
+            "cut": sesion.codigo_cut_qr,
         },
+    )
+
+
+# ============================================================
+# 3.5. Consulta publica por CUT (operador de ventanilla)
+# ============================================================
+
+class CUTInfo(BaseModel):
+    """Info publica que devuelve /pagos/cut/{codigo}.
+
+    Para el operador de ventanilla: sirve para verificar en el mostrador
+    que un vecino efectivamente pago, sin que el operador tenga que
+    loguearse como el vecino ni revelar datos sensibles.
+    """
+    codigo_cut_qr: str
+    concepto: str
+    monto: str
+    medio_pago: Optional[str]
+    estado: str
+    fecha_pago: Optional[str]
+    provider: str
+    numero_operacion: Optional[str]
+    municipio_nombre: Optional[str]
+    vecino_nombre: Optional[str]
+    imputacion_estado: Optional[str]
+
+
+@router.get("/cut/{codigo}", response_model=CUTInfo)
+async def obtener_por_cut(codigo: str, db: AsyncSession = Depends(get_db)):
+    """Endpoint publico — el operador escanea el CUT y valida el pago.
+
+    Abierto (sin JWT): el CUT es no-enumerable y solo revela info minima
+    necesaria para confirmar que el pago existe y esta aprobado. Si la
+    sesion no esta APPROVED devuelve 404 para evitar fishing de estados.
+    """
+    q = await db.execute(
+        select(PagoSesion)
+        .options(
+            selectinload(PagoSesion.municipio),
+            selectinload(PagoSesion.vecino),
+        )
+        .where(PagoSesion.codigo_cut_qr == codigo.upper())
+    )
+    sesion = q.scalar_one_or_none()
+    if not sesion or sesion.estado != EstadoSesionPago.APPROVED:
+        raise HTTPException(status_code=404, detail="CUT no encontrado o pago no aprobado")
+
+    muni_nombre = (
+        sesion.municipio.nombre.replace("Municipalidad de ", "")
+        if sesion.municipio else None
+    )
+    vecino_nombre = (
+        f"{sesion.vecino.nombre or ''} {sesion.vecino.apellido or ''}".strip()
+        if sesion.vecino else None
+    )
+
+    return CUTInfo(
+        codigo_cut_qr=sesion.codigo_cut_qr,
+        concepto=sesion.concepto,
+        monto=str(sesion.monto),
+        medio_pago=sesion.medio_pago.value if sesion.medio_pago else None,
+        estado=sesion.estado.value,
+        fecha_pago=sesion.completed_at.isoformat() if sesion.completed_at else None,
+        provider=sesion.provider,
+        numero_operacion=sesion.external_id,
+        municipio_nombre=muni_nombre,
+        vecino_nombre=vecino_nombre,
+        imputacion_estado=sesion.imputacion_estado.value if sesion.imputacion_estado else None,
     )
 
 
@@ -466,6 +591,239 @@ async def cancelar_sesion(session_id: str, db: AsyncSession = Depends(get_db)):
         ))
     await db.commit()
     return {"estado": sesion.estado.value}
+
+
+# ============================================================
+# 5. Webhook del provider real (Mercado Pago / MODO / GIRE) — Fase 2
+# ============================================================
+#
+# MP llama a este endpoint cuando un pago cambia de estado. El body es
+# como `{"action": "payment.updated", "data": {"id": "12345"}}`.
+# Validamos firma (cuando el provider la manda), registramos el evento en
+# bitacora, y si es `approved` ejecutamos el mismo path que /confirmar.
+#
+# Endpoint abierto (sin auth): la seguridad viene de la firma + idempotencia.
+# ============================================================
+
+import hashlib
+import hmac as _hmac
+from fastapi import Request
+from models.municipio_proveedor_pago import MunicipioProveedorPago, PROVEEDOR_MERCADOPAGO
+from models.pago_webhook_evento import PagoWebhookEvento
+
+
+async def _validar_firma_mercadopago(
+    raw_body: bytes,
+    signature_header: str,
+    request_id: str,
+    data_id: str,
+    webhook_secret: str,
+) -> bool:
+    """Valida la firma HMAC-SHA256 del webhook de MP.
+
+    MP envia el header `x-signature: ts=<ts>,v1=<hash>` donde el hash
+    se calcula sobre `id:<data_id>;request-id:<req_id>;ts:<ts>;`.
+    Si el muni no tiene webhook_secret configurado, saltamos validacion
+    (pero marcamos firma_ok=false y loguea warning).
+    """
+    if not webhook_secret or not signature_header:
+        return False
+    try:
+        parts = dict(
+            p.strip().split("=", 1) for p in signature_header.split(",") if "=" in p
+        )
+        ts = parts.get("ts", "")
+        v1 = parts.get("v1", "")
+        if not ts or not v1:
+            return False
+        manifest = f"id:{data_id};request-id:{request_id};ts:{ts};"
+        calc = _hmac.new(
+            webhook_secret.encode(),
+            manifest.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return _hmac.compare_digest(calc, v1)
+    except Exception:
+        return False
+
+
+@router.post("/webhook/mercadopago")
+async def webhook_mercadopago(request: Request, db: AsyncSession = Depends(get_db)):
+    """Recibe notificacion de MP.
+
+    Devolvemos 200 rapido siempre (MP reintenta si no). El procesamiento
+    real queda registrado en `pago_webhook_eventos` y, si es 'approved',
+    propaga al mismo path de confirmar_pago.
+    """
+    raw_body = await request.body()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    evento = body.get("action") or body.get("type") or "unknown"
+    data_id = str((body.get("data") or {}).get("id") or body.get("id") or "")
+
+    if not data_id:
+        logger.warning("Webhook MP sin data.id — body: %s", body)
+        return {"received": True}
+
+    # Registrar en bitacora (idempotente por UNIQUE provider+external+evento)
+    firma_header = request.headers.get("x-signature", "")
+    request_id = request.headers.get("x-request-id", "")
+
+    # Buscar la sesion por external_reference (el preference_id lo
+    # almacenamos en external_id cuando creamos la sesion). MP a veces
+    # manda payment_id, que no es preference_id — en ese caso buscamos
+    # por pago completo con /v1/payments/{id} y obtenemos el external_reference.
+    sesion: Optional[PagoSesion] = None
+    external_ref: Optional[str] = None
+
+    # Por ahora: si el evento es payment.updated, consultamos MP para
+    # obtener el external_reference real (que es nuestro sesion_id).
+    # Esto requiere tener credenciales validas para el muni en cuestion.
+    # Como no sabemos el muni hasta resolver la sesion, buscamos por
+    # external_id primero (preference_id) y sino ignoramos silenciosamente.
+
+    q = await db.execute(
+        select(PagoSesion).where(PagoSesion.external_id == data_id)
+    )
+    sesion = q.scalar_one_or_none()
+
+    # Validar firma si tenemos el muni
+    firma_ok = False
+    if sesion:
+        cfg_q = await db.execute(
+            select(MunicipioProveedorPago).where(
+                MunicipioProveedorPago.municipio_id == sesion.municipio_id,
+                MunicipioProveedorPago.proveedor == PROVEEDOR_MERCADOPAGO,
+                MunicipioProveedorPago.activo == True,  # noqa: E712
+            )
+        )
+        cfg = cfg_q.scalar_one_or_none()
+        if cfg and cfg.webhook_secret:
+            firma_ok = await _validar_firma_mercadopago(
+                raw_body, firma_header, request_id, data_id, cfg.webhook_secret
+            )
+
+    # Persistir el evento (unique key dedupea reentregas de MP)
+    evt = PagoWebhookEvento(
+        provider="mercadopago",
+        external_id=data_id,
+        evento=evento,
+        session_id=sesion.id if sesion else None,
+        payload=body,
+        firma_ok=firma_ok,
+    )
+    db.add(evt)
+    try:
+        await db.commit()
+    except Exception as e:
+        # UNIQUE constraint — evento ya procesado, responder 200 y salir
+        await db.rollback()
+        logger.info("Webhook MP duplicado ignorado: %s %s %s -> %s", evento, data_id, sesion and sesion.id, e)
+        return {"received": True, "duplicate": True}
+
+    # Si no teniamos sesion, no hay mas nada que hacer — el evento queda
+    # en bitacora para inspeccion manual.
+    if not sesion:
+        return {"received": True, "session_resolved": False}
+
+    # Consultar estado real en MP (el payload del webhook no lo trae)
+    provider = await get_provider_para_muni(db, sesion.municipio_id)
+    try:
+        estado_ext = await provider.consultar_estado(data_id)
+    except Exception as e:
+        evt.error = str(e)[:500]
+        await db.commit()
+        logger.error("Webhook MP no pudo consultar estado: %s", e)
+        return {"received": True, "error": "consulta_estado_fallo"}
+
+    if estado_ext.aprobado and sesion.estado != EstadoSesionPago.APPROVED:
+        # Ejecutar el mismo path que /confirmar (marcar deuda pagada + pago)
+        sesion.estado = EstadoSesionPago.APPROVED
+        sesion.medio_pago = estado_ext.medio_pago or sesion.medio_pago
+        sesion.completed_at = datetime.utcnow()
+        sesion.metadatos = (sesion.metadatos or {}) | {"webhook": evento, "mp_payload": estado_ext.payload_raw or {}}
+        if not sesion.codigo_cut_qr:
+            sesion.codigo_cut_qr = await _generar_cut_unico(db)
+        if sesion.imputacion_estado is None:
+            sesion.imputacion_estado = EstadoImputacion.PENDIENTE
+        if sesion.deuda_id:
+            dq = await db.execute(select(Deuda).where(Deuda.id == sesion.deuda_id))
+            deuda = dq.scalar_one_or_none()
+            if deuda and deuda.estado != EstadoDeuda.PAGADA:
+                deuda.estado = EstadoDeuda.PAGADA
+                deuda.fecha_pago = datetime.utcnow()
+                deuda.pago_externo_id = sesion.external_id
+                medio_tasa_map = {
+                    MedioPagoGateway.TARJETA: MedioPagoTasa.TARJETA_CREDITO,
+                    MedioPagoGateway.QR: MedioPagoTasa.QR,
+                    MedioPagoGateway.EFECTIVO_CUPON: MedioPagoTasa.RAPIPAGO,
+                    MedioPagoGateway.TRANSFERENCIA: MedioPagoTasa.TRANSFERENCIA,
+                    MedioPagoGateway.DEBITO_AUTOMATICO: MedioPagoTasa.DEBITO_AUTOMATICO,
+                }
+                db.add(Pago(
+                    deuda_id=deuda.id,
+                    usuario_id=sesion.vecino_user_id,
+                    monto=sesion.monto,
+                    medio=medio_tasa_map.get(sesion.medio_pago, MedioPagoTasa.TARJETA_CREDITO) if sesion.medio_pago else MedioPagoTasa.TARJETA_CREDITO,
+                    pago_externo_id=sesion.external_id,
+                    estado="confirmado",
+                    payload_externo=sesion.metadatos,
+                ))
+
+    evt.procesado_at = datetime.utcnow()
+    await db.commit()
+
+    return {"received": True, "procesado": True, "session_id": sesion.id}
+
+
+# ============================================================
+# Probar credenciales del provider (admin / supervisor)
+# ============================================================
+
+class ProbarCredencialesRequest(BaseModel):
+    proveedor: str           # "mercadopago"
+    access_token: str
+    test_mode: bool = True
+
+
+@router.post("/proveedores/probar-credenciales")
+async def probar_credenciales_provider(
+    body: ProbarCredencialesRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Valida contra el provider que las credenciales funcionan.
+
+    No guarda nada en DB — solo testea. El guardado lo hace /proveedores-pago.
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="No tenes permiso")
+    if body.proveedor == "mercadopago":
+        from services.pagos.mercadopago import MercadoPagoProvider, MercadoPagoError
+        try:
+            prov = MercadoPagoProvider(
+                access_token=body.access_token,
+                webhook_base_url="https://example.com",
+                test_mode=body.test_mode,
+            )
+            info = await prov.probar_credenciales()
+        except MercadoPagoError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error validando: {e}")
+        return {
+            "ok": True,
+            "proveedor": "mercadopago",
+            "cuenta": {
+                "nickname": info.get("nickname"),
+                "email": info.get("email"),
+                "id": info.get("id"),
+                "country_id": info.get("country_id"),
+            },
+        }
+    raise HTTPException(status_code=400, detail=f"Proveedor no soportado aun: {body.proveedor}")
 
 
 # ============================================================

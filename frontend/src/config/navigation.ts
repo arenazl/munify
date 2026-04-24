@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap, Receipt, Wallet
+  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -16,6 +16,12 @@ interface NavigationOptions {
    * Default true para no romper munis existentes.
    */
   abmEnSidebar?: boolean;
+  /**
+   * Hrefs ocultos por el superadmin del municipio actual. Los items
+   * con href en este set no se muestran (aun si el rol los permitiría).
+   * Viene de GET /api/navigation/hrefs-ocultos al loguearse.
+   */
+  hrefsOcultos?: string[];
 }
 
 export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => {
@@ -26,6 +32,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   const abmEnSidebar = typeof userRoleOrOptions === 'object'
     ? (userRoleOrOptions.abmEnSidebar ?? true)
     : true;
+  const hrefsOcultos = (() => {
+    if (typeof userRoleOrOptions !== 'object') return new Set<string>();
+    const raw = userRoleOrOptions.hrefsOcultos;
+    if (!Array.isArray(raw)) return new Set<string>();
+    return new Set<string>(raw.filter((h): h is string => typeof h === 'string'));
+  })();
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
@@ -106,6 +118,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: Wallet,
       show: isAdminOrSupervisor,
       description: 'Histórico transaccional para contaduría'
+    },
+    {
+      name: 'Mostrador',
+      href: '/gestion/mostrador',
+      icon: ScanLine,
+      show: isAdminOrSupervisor,
+      description: 'Ventanilla asistida — biometría + trámite presencial'
     },
     {
       name: 'Mapa',
@@ -190,6 +209,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Consola de auditoría cross-municipio (resumen + logs)'
     },
     {
+      name: 'Config sidebar',
+      href: '/gestion/sidebar-config',
+      icon: Layers,
+      show: isSuperAdmin,
+      description: 'Configurar qué items del menú ve cada municipio'
+    },
+    {
       name: 'Ajustes',
       href: '/gestion/ajustes',
       icon: Settings,
@@ -243,7 +269,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isVecino,
       description: 'Tus logros y puntos'
     },
-  ].filter(item => item.show);
+  ].filter(item => item.show && !hrefsOcultos.has(item.href));
 };
 
 /**

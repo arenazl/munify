@@ -227,8 +227,14 @@ class Pago(Base):
     # Payload crudo del webhook del proveedor (Aura/MP) — auditoría.
     payload_externo = Column(JSON, nullable=True)
 
+    # Pago en efectivo en caja del muni (Fase 8 bundle pagos):
+    # foto del ticket fisico + quien lo registro.
+    foto_comprobante_url = Column(String(500), nullable=True)
+    registrado_por_operador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relaciones
     deuda = relationship("Deuda", back_populates="pagos")
     usuario = relationship("User", foreign_keys=[usuario_id])
+    operador = relationship("User", foreign_keys=[registrado_por_operador_id])

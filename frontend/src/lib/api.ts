@@ -700,6 +700,32 @@ export const proveedoresPagoApi = {
   update: (proveedor: string, data: { activo: boolean; productos_activos?: Record<string, boolean> }) =>
     api.put(`/proveedores-pago/${proveedor}`, data),
 
+  // Fase 2 — credenciales reales (MP / MODO / GIRE)
+  getCredenciales: (proveedor: string) =>
+    api.get<{
+      proveedor: string;
+      tiene_access_token: boolean;
+      public_key: string | null;
+      webhook_secret_set: boolean;
+      cuit_cobranza: string | null;
+      test_mode: boolean;
+    }>(`/proveedores-pago/${proveedor}/credenciales`),
+  setCredenciales: (
+    proveedor: string,
+    data: {
+      access_token?: string;
+      public_key?: string;
+      webhook_secret?: string;
+      cuit_cobranza?: string;
+      test_mode?: boolean;
+    },
+  ) => api.put(`/proveedores-pago/${proveedor}/credenciales`, data),
+  probarCredenciales: (proveedor: string, access_token: string, test_mode: boolean) =>
+    api.post<{
+      ok: boolean;
+      cuenta: { nickname?: string; email?: string; id?: number; country_id?: string };
+    }>(`/pagos/proveedores/probar-credenciales`, { proveedor, access_token, test_mode }),
+
   /** Stream SSE con progreso de importacion. Callback invocado por cada evento. */
   importarPadron: async (
     proveedor: string,
@@ -1147,6 +1173,7 @@ export const whatsappApi = {
   createConfig: (data: {
     habilitado?: boolean;
     provider?: 'meta' | 'twilio';
+    telefono_wa_me_saliente?: string;
     meta_phone_number_id?: string;
     meta_access_token?: string;
     meta_business_account_id?: string;
@@ -1163,6 +1190,7 @@ export const whatsappApi = {
   updateConfig: (data: {
     habilitado?: boolean;
     provider?: 'meta' | 'twilio';
+    telefono_wa_me_saliente?: string;
     meta_phone_number_id?: string;
     meta_access_token?: string;
     meta_business_account_id?: string;
@@ -1408,6 +1436,221 @@ export const pagosContaduriaApi = {
     api.get('/pagos/contaduria/resumen', { params, paramsSerializer: { indexes: null } }),
   exportar: (params: Record<string, unknown>) =>
     api.get('/pagos/contaduria/exportar', { params, paramsSerializer: { indexes: null }, responseType: 'blob' }),
+
+  // Fase 1 — Cola de imputacion contable
+  imputacion: {
+    cola: (params: Record<string, unknown>) =>
+      api.get('/pagos/contaduria/imputacion/pendientes', { params, paramsSerializer: { indexes: null } }),
+    marcar: (sessionId: string, referencia_externa: string, observacion?: string) =>
+      api.post(`/pagos/contaduria/imputacion/${sessionId}/marcar`, { referencia_externa, observacion }),
+    rechazar: (sessionId: string, motivo: string) =>
+      api.post(`/pagos/contaduria/imputacion/${sessionId}/rechazar`, { motivo }),
+    bulkMarcar: (items: Array<{ session_id: string; referencia_externa: string }>, observacion_comun?: string) =>
+      api.post('/pagos/contaduria/imputacion/bulk-marcar', { items, observacion_comun }),
+  },
+
+  // Fase 4 — exports contables
+  exports: {
+    formatos: () =>
+      api.get<{ formatos: Array<{ clave: string; descripcion: string }> }>('/pagos/contaduria/formatos-export'),
+    generar: (body: {
+      formato: string;
+      fecha_desde?: string;
+      fecha_hasta?: string;
+      estado?: string[];
+      imputacion_estado?: string[];
+      session_ids?: string[];
+      mapeo_rubros?: Record<string, string>;
+    }) => api.post('/pagos/contaduria/imputacion/export', body, { responseType: 'blob' }),
+    historial: () =>
+      api.get<Array<{
+        id: number;
+        formato: string;
+        fecha_desde: string | null;
+        fecha_hasta: string | null;
+        cantidad_pagos: number;
+        monto_total: string;
+        generado_por_nombre: string | null;
+        created_at: string;
+      }>>('/pagos/contaduria/exports/historial'),
+  },
+
+  // Fase 9 — dashboard omnicanal
+  metricasCanal: (params: { fecha_desde?: string; fecha_hasta?: string }) =>
+    api.get<{
+      rango: { desde: string | null; hasta: string | null };
+      por_canal: Array<{ canal: string; cantidad: number; monto: string }>;
+      serie_temporal: Array<{
+        fecha: string;
+        app: number;
+        ventanilla_asistida: number;
+        otros: number;
+        monto_app: string;
+        monto_ventanilla: string;
+      }>;
+      ranking_operadores: Array<{
+        operador_id: number;
+        operador_nombre: string;
+        tramites: number;
+        monto: string;
+      }>;
+      total_aprobado_monto: string;
+      total_aprobado_cantidad: number;
+      ticket_promedio: string;
+    }>('/pagos/contaduria/metricas-canal', { params }),
+};
+
+// Consulta publica por CUT (operador de ventanilla)
+export const cutApi = {
+  consultar: (codigo: string) => api.get(`/pagos/cut/${codigo}`),
+};
+
+// Config del sidebar (superadmin oculta items por muni)
+export const sidebarAdminApi = {
+  get: (municipioId: number) =>
+    api.get<{
+      municipio_id: number;
+      ocultos: Array<{ href: string; updated_at: string | null; updated_by_nombre: string | null }>;
+    }>(`/admin/sidebar-items/${municipioId}`),
+  put: (municipioId: number, hrefsOcultos: string[]) =>
+    api.put(`/admin/sidebar-items/${municipioId}`, { hrefs_ocultos: hrefsOcultos }),
+};
+
+export const navegacionApi = {
+  misHrefsOcultos: () => api.get<string[]>('/navigation/hrefs-ocultos'),
+};
+
+// Operador de Ventanilla (Fase 6)
+export const operadorApi = {
+  home: () =>
+    api.get<{
+      tramites_hoy: number;
+      pagados_hoy: number;
+      monto_hoy: string;
+      operador_nombre: string;
+    }>('/operador/mostrador/home'),
+  iniciarTramite: (body: {
+    municipio_id: number;
+    tramite_id: number;
+    dni: string;
+    nombre: string;
+    apellido: string;
+    email?: string;
+    telefono?: string;
+    dj_firmada: boolean;
+    dj_texto?: string;
+    kyc_session_id?: string;
+  }) =>
+    api.post<{
+      solicitud_id: number;
+      numero_tramite: string;
+      user_id: number;
+      requiere_pago: boolean;
+      checkout_url: string | null;
+      codigo_cut_qr: string | null;
+      session_id: string | null;
+      monto: number | null;
+      pago_diferido: boolean;
+      momento_pago: string | null;
+      wa_me_url: string | null;
+      wa_me_mensaje: string | null;
+      telefono_vecino: string | null;
+    }>('/operador/tramite-presencial/iniciar', body),
+  generarPagoDiferido: (solicitudId: number) =>
+    api.post<{
+      session_id: string;
+      codigo_cut_qr: string | null;
+      checkout_url: string;
+      monto: number;
+      wa_me_url: string | null;
+      wa_me_mensaje: string | null;
+    }>(`/operador/pagos/generar-para-solicitud/${solicitudId}`),
+  generarWaMeUrl: (solicitudId: number, telefonoOverride?: string) =>
+    api.post<{
+      wa_me_url: string | null;
+      mensaje: string;
+      telefono: string | null;
+      ok: boolean;
+      motivo_error: string | null;
+    }>('/operador/tramite-presencial/wa-me-url', {
+      solicitud_id: solicitudId,
+      telefono_override: telefonoOverride,
+    }),
+  // Buscador de cliente ya registrado (Mostrador)
+  buscarVecino: (dni?: string, q?: string) =>
+    api.get<Array<{
+      user_id: number;
+      dni: string;
+      nombre: string | null;
+      apellido: string | null;
+      email: string | null;
+      telefono: string | null;
+      direccion: string | null;
+      nivel_verificacion: number;
+      kyc_modo: string | null;
+      verificado_at: string | null;
+    }>>('/operador/vecinos/buscar', { params: dni ? { dni } : { q } }),
+
+  // Fase 6 v2 — biometria presencial via Didit
+  kycIniciar: (municipioId: number, callbackUrl?: string) =>
+    api.post<{ session_id: string; url: string }>('/operador/kyc/iniciar', {
+      municipio_id: municipioId,
+      callback_url: callbackUrl,
+    }),
+  kycEstado: (sessionId: string) =>
+    api.get<{
+      session_id: string;
+      status: string;
+      aprobado: boolean;
+      datos: {
+        dni: string | null;
+        nombre: string | null;
+        apellido: string | null;
+        sexo: string | null;
+        fecha_nacimiento: string | null;
+        nacionalidad: string | null;
+        direccion: string | null;
+      } | null;
+      motivo_rechazo: string | null;
+    }>(`/operador/kyc/${sessionId}/estado`),
+
+  registrarPagoEfectivo: (solicitudId: number, monto: number, numeroComprobante: string, foto: File | null) => {
+    const form = new FormData();
+    form.append('solicitud_id', String(solicitudId));
+    form.append('monto', String(monto));
+    form.append('numero_comprobante', numeroComprobante);
+    if (foto) form.append('foto', foto);
+    return api.post<{
+      session_id: string;
+      codigo_cut_qr: string;
+      monto: number;
+      foto_comprobante_url: string | null;
+    }>('/operador/pagos/efectivo/registrar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+};
+
+// CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial
+export const cenatApi = {
+  status: (solicitudId: number) =>
+    api.get<{
+      solicitud_id: number;
+      requiere_cenat: boolean;
+      monto_cenat_referencia: number | null;
+      tiene_adjunto: boolean;
+      verificado: boolean;
+      adjunto_url: string | null;
+      adjunto_nombre: string | null;
+      adjunto_subido_at: string | null;
+    }>(`/tramites/solicitudes/${solicitudId}/cenat-status`),
+  subir: (solicitudId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return api.post(
+      `/tramites/solicitudes/${solicitudId}/documentos?tipo_documento=comprobante_cenat&etapa=proceso`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
 };
 
 export interface Recomendacion {

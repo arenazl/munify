@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Wallet, CreditCard, Banknote, QrCode, RefreshCcw, Check, Loader2, Download, Sparkles, AlertCircle } from 'lucide-react';
+import { Wallet, CreditCard, Banknote, QrCode, RefreshCcw, Check, Loader2, Download, Sparkles, AlertCircle, Key, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { proveedoresPagoApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { Modal } from '../components/ui/Modal';
+import PageHint from '../components/ui/PageHint';
 
 interface Proveedor {
   proveedor: string;
@@ -56,6 +58,7 @@ export default function ProveedoresPago() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [importing, setImporting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<{ step: string; progress: number } | null>(null);
+  const [credencialesProv, setCredencialesProv] = useState<Proveedor | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -133,6 +136,8 @@ export default function ProveedoresPago() {
         icon={<Wallet className="h-5 w-5" />}
         title="Proveedores de Pago"
       />
+
+      <PageHint pageId="proveedores-pago" />
 
       {loading ? (
         <div className="flex items-center justify-center h-48">
@@ -258,6 +263,20 @@ export default function ProveedoresPago() {
                     </div>
                   </div>
 
+                  {/* Credenciales reales (Fase 2) — visible para todos los proveedores */}
+                  <button
+                    onClick={() => setCredencialesProv(prov)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.01] active:scale-95"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Conectar credenciales reales
+                  </button>
+
                   {/* Metadata importada / Botón importar */}
                   {prov.requiere_importacion && (
                     <div
@@ -356,6 +375,278 @@ export default function ProveedoresPago() {
           })}
         </div>
       )}
+
+      <CredencialesModal
+        prov={credencialesProv}
+        onClose={() => setCredencialesProv(null)}
+      />
     </div>
+  );
+}
+
+// ============================================================
+// Modal: credenciales reales del provider
+// ============================================================
+interface CredencialesState {
+  access_token: string;
+  public_key: string;
+  webhook_secret: string;
+  cuit_cobranza: string;
+  test_mode: boolean;
+  tiene_access_token: boolean;
+  webhook_secret_set: boolean;
+}
+
+function CredencialesModal({ prov, onClose }: { prov: Proveedor | null; onClose: () => void }) {
+  const { theme } = useTheme();
+  const [state, setState] = useState<CredencialesState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    if (!prov) {
+      setState(null);
+      return;
+    }
+    const load = async () => {
+      setLoading(true);
+      try {
+        const r = await proveedoresPagoApi.getCredenciales(prov.proveedor);
+        setState({
+          access_token: '',
+          public_key: r.data.public_key || '',
+          webhook_secret: '',
+          cuit_cobranza: r.data.cuit_cobranza || '',
+          test_mode: r.data.test_mode,
+          tiene_access_token: r.data.tiene_access_token,
+          webhook_secret_set: r.data.webhook_secret_set,
+        });
+      } catch {
+        toast.error('No se pudieron cargar las credenciales');
+        setState(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [prov]);
+
+  if (!prov) return null;
+
+  const handleProbar = async () => {
+    if (!state?.access_token) {
+      toast.error('Pegá el access token primero');
+      return;
+    }
+    setTesting(true);
+    try {
+      const r = await proveedoresPagoApi.probarCredenciales(prov.proveedor, state.access_token, state.test_mode);
+      if (r.data.ok) {
+        toast.success(`Conectado como ${r.data.cuenta.nickname || r.data.cuenta.email || r.data.cuenta.id}`);
+      }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'Credenciales inválidas');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleGuardar = async () => {
+    if (!state) return;
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        public_key: state.public_key,
+        cuit_cobranza: state.cuit_cobranza,
+        test_mode: state.test_mode,
+      };
+      if (state.access_token) body.access_token = state.access_token;
+      if (state.webhook_secret) body.webhook_secret = state.webhook_secret;
+      await proveedoresPagoApi.setCredenciales(prov.proveedor, body);
+      toast.success('Credenciales guardadas');
+      onClose();
+    } catch {
+      toast.error('Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={!!prov}
+      onClose={onClose}
+      title={`Conectar ${prov.nombre_display}`}
+      description="Los secretos se cifran en DB con Fernet. Nunca se devuelven en claro al frontend."
+      size="2xl"
+      footer={
+        <div className="flex items-center justify-between gap-2 w-full">
+          <button
+            onClick={handleProbar}
+            disabled={testing || !state?.access_token}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            {testing ? 'Probando…' : 'Probar credenciales'}
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="px-3 py-2 rounded-lg text-sm font-medium"
+              style={{ color: theme.textSecondary }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleGuardar}
+              disabled={saving || !state}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              style={{ backgroundColor: theme.primary }}
+            >
+              {saving ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      {loading || !state ? (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="w-5 h-5 animate-spin" style={{ color: theme.primary }} />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Warning en producción */}
+          {!state.test_mode && (
+            <div
+              className="flex items-start gap-2 p-3 rounded-lg"
+              style={{ backgroundColor: '#fef3c7', border: '1px solid #f59e0b' }}
+            >
+              <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: '#92400e' }}>
+                  Modo producción activo
+                </p>
+                <p className="text-xs" style={{ color: '#92400e' }}>
+                  Los pagos se procesan con plata real. Asegurate de que el CUIT sea el correcto del municipio.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Test mode toggle */}
+          <div
+            className="flex items-center justify-between p-3 rounded-lg"
+            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            <div>
+              <p className="text-sm font-semibold">Modo sandbox (test_mode)</p>
+              <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                Recomendado hasta verificar flujo end-to-end en producción.
+              </p>
+            </div>
+            <button
+              onClick={() => setState({ ...state, test_mode: !state.test_mode })}
+              className="relative inline-flex h-6 w-11 rounded-full transition-colors"
+              style={{ backgroundColor: state.test_mode ? '#22c55e' : '#9ca3af' }}
+            >
+              <span
+                className="inline-block h-5 w-5 rounded-full bg-white transition-transform"
+                style={{ transform: state.test_mode ? 'translateX(22px)' : 'translateX(2px)', marginTop: '2px' }}
+              />
+            </button>
+          </div>
+
+          {/* Access token */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">
+              Access Token <span style={{ color: '#ef4444' }}>*</span>
+              {state.tiene_access_token && (
+                <span className="ml-2 text-[10px] font-normal" style={{ color: '#22c55e' }}>
+                  ✓ Ya hay uno guardado (dejalo vacío para conservarlo)
+                </span>
+              )}
+            </label>
+            <input
+              type="password"
+              value={state.access_token}
+              onChange={(e) => setState({ ...state, access_token: e.target.value })}
+              placeholder={state.tiene_access_token ? 'Pegá uno nuevo para reemplazar…' : 'TEST-xxxxxxxxxxxxxxxxxxxx…'}
+              className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+          </div>
+
+          {/* Public key */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Public Key</label>
+            <input
+              type="text"
+              value={state.public_key}
+              onChange={(e) => setState({ ...state, public_key: e.target.value })}
+              placeholder="APP_USR-xxxx…"
+              className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+          </div>
+
+          {/* CUIT */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">CUIT del municipio (cobranza)</label>
+            <input
+              type="text"
+              value={state.cuit_cobranza}
+              onChange={(e) => setState({ ...state, cuit_cobranza: e.target.value.replace(/\D/g, '').slice(0, 11) })}
+              placeholder="30710000000"
+              maxLength={11}
+              className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+          </div>
+
+          {/* Webhook secret */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">
+              Webhook Secret
+              {state.webhook_secret_set && (
+                <span className="ml-2 text-[10px] font-normal" style={{ color: '#22c55e' }}>
+                  ✓ Configurado
+                </span>
+              )}
+            </label>
+            <input
+              type="password"
+              value={state.webhook_secret}
+              onChange={(e) => setState({ ...state, webhook_secret: e.target.value })}
+              placeholder={state.webhook_secret_set ? 'Pegá uno nuevo para reemplazar…' : 'Secret del webhook MP'}
+              className="w-full px-3 py-2 rounded-lg text-sm font-mono outline-none"
+              style={{
+                backgroundColor: theme.backgroundSecondary,
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            />
+            <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+              Para validar la firma HMAC del webhook entrante. Configuralo en el dashboard del provider.
+            </p>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
