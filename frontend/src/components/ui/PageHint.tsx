@@ -176,7 +176,7 @@ export default function PageHint({ pageId }: PageHintProps) {
 
   return (
     <div
-      className="relative mb-4 overflow-hidden rounded-2xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400"
+      className="relative mb-3 overflow-hidden rounded-xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400"
       style={{
         background: `linear-gradient(135deg, ${primary}12 0%, ${primary}06 60%, ${theme.card} 100%)`,
         border: `1px solid ${primary}30`,
@@ -185,14 +185,14 @@ export default function PageHint({ pageId }: PageHintProps) {
       {/* Barra de acento decorativa arriba */}
       <div className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: primary }} />
 
-      <div className="p-5 md:p-6">
-        <div className="flex items-start gap-4">
+      <div className="p-2.5 md:p-3">
+        <div className="flex items-start gap-2.5">
           {/* Ícono */}
           <div
-            className="flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center shadow-sm"
+            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center shadow-sm"
             style={{ backgroundColor: `${primary}20`, color: primary }}
           >
-            <IconComponent className="h-5 w-5" strokeWidth={2.2} />
+            <IconComponent className="h-3.5 w-3.5" strokeWidth={2.2} />
           </div>
 
           {/* Contenido */}
@@ -200,18 +200,18 @@ export default function PageHint({ pageId }: PageHintProps) {
             {/* Chip superior (solo en wizard) */}
             {isWizard && (
               <div
-                className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mb-2"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full mb-1"
                 style={{ backgroundColor: `${primary}20`, color: primary }}
               >
-                <Sparkles className="h-3 w-3" />
-                Tutorial · {stepIdx + 1} de {steps.length}
+                <Sparkles className="h-2.5 w-2.5" />
+                Tutorial · {stepIdx + 1}/{steps.length}
               </div>
             )}
 
-            <h3 className="text-base md:text-lg font-bold mb-1.5 leading-tight" style={{ color: theme.text }}>
+            <h3 className="text-sm font-bold mb-0.5 leading-tight" style={{ color: theme.text }}>
               {isWizard ? currentStep?.title : hint.title}
             </h3>
-            <p className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
+            <p className="text-xs leading-snug" style={{ color: theme.textSecondary }}>
               {isWizard ? currentStep?.description : hint.description}
             </p>
 
@@ -219,7 +219,7 @@ export default function PageHint({ pageId }: PageHintProps) {
             {isWizard && currentStep?.cta && (
               <Link
                 to={currentStep.cta.href}
-                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                className="inline-flex items-center gap-1 mt-1.5 px-2 py-1 rounded-md text-[11px] font-semibold transition-colors"
                 style={{
                   backgroundColor: `${primary}15`,
                   color: primary,
@@ -233,7 +233,7 @@ export default function PageHint({ pageId }: PageHintProps) {
 
             {/* Navegación del wizard */}
             {isWizard && (
-              <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="mt-2 flex items-center justify-between gap-2">
                 {/* Indicador de progreso con puntos */}
                 <div className="flex items-center gap-1.5">
                   {steps.map((_, idx) => (
@@ -251,20 +251,20 @@ export default function PageHint({ pageId }: PageHintProps) {
                 </div>
 
                 {/* Botones */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   {stepIdx > 0 && (
                     <button
                       onClick={handleBack}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition hover:scale-[1.02]"
+                      className="flex items-center gap-0.5 px-2 py-1 rounded-md text-[11px] font-medium transition hover:scale-[1.02]"
                       style={{ backgroundColor: `${primary}12`, color: primary }}
                     >
-                      <ChevronLeft className="h-3.5 w-3.5" />
+                      <ChevronLeft className="h-3 w-3" />
                       Atrás
                     </button>
                   )}
                   <button
                     onClick={handleNext}
-                    className="flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm hover:scale-[1.02]"
+                    className="flex items-center gap-0.5 px-2.5 py-1 rounded-md text-[11px] font-semibold transition shadow-sm hover:scale-[1.02]"
                     style={{
                       background: `linear-gradient(135deg, ${primary}, ${primary}dd)`,
                       color: theme.primaryText || '#ffffff',
@@ -273,12 +273,12 @@ export default function PageHint({ pageId }: PageHintProps) {
                     {isLastStep ? (
                       <>
                         Empezar
-                        <Rocket className="h-3.5 w-3.5" />
+                        <Rocket className="h-3 w-3" />
                       </>
                     ) : (
                       <>
                         Siguiente
-                        <ChevronRight className="h-3.5 w-3.5" />
+                        <ChevronRight className="h-3 w-3" />
                       </>
                     )}
                   </button>
@@ -290,11 +290,11 @@ export default function PageHint({ pageId }: PageHintProps) {
           {/* Botón cerrar */}
           <button
             onClick={handleDismiss}
-            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:brightness-125"
+            className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:brightness-125"
             style={{ backgroundColor: `${primary}15`, color: primary }}
             aria-label="Ocultar sugerencia"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
