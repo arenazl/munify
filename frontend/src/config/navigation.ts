@@ -32,9 +32,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   const abmEnSidebar = typeof userRoleOrOptions === 'object'
     ? (userRoleOrOptions.abmEnSidebar ?? true)
     : true;
-  const hrefsOcultos = typeof userRoleOrOptions === 'object'
-    ? new Set(userRoleOrOptions.hrefsOcultos ?? [])
-    : new Set<string>();
+  const hrefsOcultos = (() => {
+    if (typeof userRoleOrOptions !== 'object') return new Set<string>();
+    const raw = userRoleOrOptions.hrefsOcultos;
+    if (!Array.isArray(raw)) return new Set<string>();
+    return new Set<string>(raw.filter((h): h is string => typeof h === 'string'));
+  })();
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
