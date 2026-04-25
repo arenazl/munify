@@ -4,7 +4,7 @@ import {
   FileText, CheckCircle2, AlertTriangle, Receipt,
   ClipboardList, ScanLine, Camera, ShieldCheck,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search,
-  UserCheck, Sparkles, X, Edit3,
+  UserCheck, Sparkles, X, Edit3, IdCard,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -43,15 +43,17 @@ interface VecinoEncontrado {
 }
 
 type Paso = 'identificar' | 'hub';
+type TabId = 'dni' | 'biometria';
 
 /**
- * Mostrador — consola de operador de ventanilla (rediseño v2).
+ * Mostrador — consola de operador de ventanilla (rediseño v3).
  *
- * Layout search-first: el operador entra y lo único que ve es un input grande
- * de DNI con autofocus + chips de acciones secundarias (biometría, carga
- * manual). Métricas como barra horizontal compacta arriba, sin steps bar.
- *
- * Lógica idéntica a la versión anterior — sólo cambia el layout.
+ * Layout:
+ *   - Header con título + 3 cards de métricas grandes.
+ *   - 2 tabs animados: "Por DNI" / "Por biometría". Slide al cambiar.
+ *   - Búsqueda secundaria por nombre/apellido (inline, expandible) para
+ *     casos donde no se sabe el DNI exacto.
+ *   - "Cargar a mano" como ultima opcion cuando no se encuentra vecino.
  */
 export default function Mostrador() {
   const { theme } = useTheme();
@@ -62,7 +64,6 @@ export default function Mostrador() {
   const [vecino, setVecino] = useState<KycDatos | null>(null);
   const [kycSessionId, setKycSessionId] = useState<string | null>(null);
   const [metricas, setMetricas] = useState<MostradorMetricas | null>(null);
-  const [biometriaAbierta, setBiometriaAbierta] = useState(false);
 
   const municipioId = user?.municipio_id ?? null;
 
@@ -116,77 +117,63 @@ export default function Mostrador() {
   );
 
   return (
-    <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 80px)' }}>
-      {/* === Topbar compacto: título + métricas inline === */}
-      <div
-        className="flex items-center justify-between gap-4 px-1 py-3 mb-2"
-        style={{ borderBottom: `1px solid ${theme.border}` }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-          >
-            <ScanLine className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base font-bold leading-tight truncate" style={{ color: theme.text }}>
-              Mostrador
-            </h1>
-            <p className="text-[11px] leading-tight truncate" style={{ color: theme.textSecondary }}>
-              Ventanilla asistida · {operadorLabel}
-            </p>
-          </div>
+    <div className="space-y-4">
+      {/* === Header === */}
+      <div className="flex items-center gap-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+        >
+          <ScanLine className="w-5 h-5" />
         </div>
-
-        {metricas && (
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <MetricaChip color="#3b82f6" icon={<FileText className="w-3.5 h-3.5" />} label="hoy" value={metricas.tramites_hoy} />
-            <MetricaChip color="#22c55e" icon={<CheckCircle2 className="w-3.5 h-3.5" />} label="pagados" value={metricas.pagados_hoy} />
-            <MetricaChip color="#8b5cf6" icon={<Receipt className="w-3.5 h-3.5" />} label="recaudado" value={metricas.monto_hoy} formatMoney />
-          </div>
-        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-bold leading-tight truncate" style={{ color: theme.text }}>
+            Mostrador
+          </h1>
+          <p className="text-xs leading-tight truncate" style={{ color: theme.textSecondary }}>
+            Ventanilla asistida · {operadorLabel}
+          </p>
+        </div>
       </div>
+
+      {/* === Métricas (cards grandes) === */}
+      {metricas && (
+        <div className="grid grid-cols-3 gap-3">
+          <MetricaCard color="#3b82f6" icon={<FileText className="w-4 h-4" />} label="Trámites hoy" value={metricas.tramites_hoy} />
+          <MetricaCard color="#22c55e" icon={<CheckCircle2 className="w-4 h-4" />} label="Pagados" value={metricas.pagados_hoy} />
+          <MetricaCard color="#8b5cf6" icon={<Receipt className="w-4 h-4" />} label="Recaudado" value={metricas.monto_hoy} formatMoney />
+        </div>
+      )}
 
       <PageHint pageId="mostrador" />
 
       {/* === Cuerpo === */}
       {paso === 'identificar' && municipioId && (
-        biometriaAbierta ? (
-          <BiometriaPanel
-            municipioId={municipioId}
-            onCerrar={() => setBiometriaAbierta(false)}
-            onAprobado={(d, sid) =>
-              handleVecinoListo({
-                user_id: undefined,
-                dni: d.dni,
-                nombre: d.nombre,
-                apellido: d.apellido,
-              }, sid)
-            }
-            onCargarManual={() =>
-              handleVecinoListo({ user_id: undefined, dni: null, nombre: null, apellido: null }, null)
-            }
-          />
-        ) : (
-          <BuscadorVecino
-            onAbrirBiometria={() => setBiometriaAbierta(true)}
-            onClienteRegistrado={(v) =>
-              handleVecinoListo({
-                user_id: v.user_id,
-                dni: v.dni,
-                nombre: v.nombre,
-                apellido: v.apellido,
-                email: v.email,
-                telefono: v.telefono,
-                direccion: v.direccion,
-              }, null)
-            }
-            onCargarManual={() =>
-              handleVecinoListo({ user_id: undefined, dni: null, nombre: null, apellido: null }, null)
-            }
-          />
-        )
+        <PasoIdentificar
+          municipioId={municipioId}
+          onClienteRegistrado={(v) =>
+            handleVecinoListo({
+              user_id: v.user_id,
+              dni: v.dni,
+              nombre: v.nombre,
+              apellido: v.apellido,
+              email: v.email,
+              telefono: v.telefono,
+              direccion: v.direccion,
+            }, null)
+          }
+          onBiometriaOk={(d, sid) =>
+            handleVecinoListo({
+              user_id: undefined,
+              dni: d.dni,
+              nombre: d.nombre,
+              apellido: d.apellido,
+            }, sid)
+          }
+          onCargarManual={() =>
+            handleVecinoListo({ user_id: undefined, dni: null, nombre: null, apellido: null }, null)
+          }
+        />
       )}
 
       {paso === 'hub' && vecino && (
@@ -204,9 +191,9 @@ export default function Mostrador() {
 }
 
 // ============================================================
-// MetricaChip — versión inline compacta para el topbar
+// MetricaCard — versión card grande (volvió)
 // ============================================================
-function MetricaChip({ color, icon, label, value, formatMoney }: {
+function MetricaCard({ color, icon, label, value, formatMoney }: {
   color: string;
   icon: React.ReactNode;
   label: string;
@@ -219,26 +206,136 @@ function MetricaChip({ color, icon, label, value, formatMoney }: {
     : String(value);
   return (
     <div
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-      style={{ backgroundColor: `${color}15`, border: `1px solid ${color}30` }}
-      title={label}
+      className="rounded-xl p-3 transition-all hover:scale-[1.02]"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
-      <span style={{ color }}>{icon}</span>
-      <span className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>{display}</span>
-      <span className="text-[10px] uppercase tracking-wider" style={{ color: theme.textSecondary }}>{label}</span>
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: theme.textSecondary }}>
+          {label}
+        </span>
+        <span
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{ backgroundColor: `${color}20`, color }}
+        >
+          {icon}
+        </span>
+      </div>
+      <p className="text-xl font-bold tabular-nums mt-1" style={{ color: theme.text }}>{display}</p>
     </div>
   );
 }
 
 // ============================================================
-// BuscadorVecino — pantalla principal de identificación
-// "Search-first": input DNI dominante en el centro
+// PasoIdentificar — Tabs animados (DNI / Biometría) + búsqueda libre
 // ============================================================
-function BuscadorVecino({ onAbrirBiometria, onClienteRegistrado, onCargarManual }: {
-  onAbrirBiometria: () => void;
+function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCargarManual }: {
+  municipioId: number;
   onClienteRegistrado: (v: VecinoEncontrado) => void;
+  onBiometriaOk: (datos: KycDatos, sessionId: string) => void;
   onCargarManual: () => void;
 }) {
+  const { theme } = useTheme();
+  const [tab, setTab] = useState<TabId>('dni');
+  const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
+
+  const tabs: Array<{ id: TabId; label: string; sublabel: string; icon: React.ReactNode; color: string }> = [
+    { id: 'dni',        label: 'Por DNI',     sublabel: 'Cliente registrado', icon: <IdCard className="w-4 h-4" />, color: theme.primary },
+    { id: 'biometria',  label: 'Por biometría', sublabel: 'RENAPER · DNI físico', icon: <Camera className="w-4 h-4" />, color: '#8b5cf6' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {/* === Tabs animados === */}
+      <div
+        className="relative rounded-2xl p-1 flex"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+      >
+        {/* Indicador deslizante de pestaña activa */}
+        <div
+          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out"
+          style={{
+            left: `calc(${tabs.findIndex(t => t.id === tab) * 50}% + 4px)`,
+            width: 'calc(50% - 8px)',
+            backgroundColor: theme.card,
+            boxShadow: `0 4px 12px ${tabs.find(t => t.id === tab)?.color}20`,
+            border: `1px solid ${tabs.find(t => t.id === tab)?.color}40`,
+          }}
+        />
+        {tabs.map((t) => {
+          const activo = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className="relative z-10 flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                color: activo ? t.color : theme.textSecondary,
+              }}
+            >
+              <span className="transition-transform duration-300" style={{ transform: activo ? 'scale(1.1)' : 'scale(1)' }}>
+                {t.icon}
+              </span>
+              <div className="text-left hidden sm:block">
+                <p className="text-sm font-bold leading-tight">{t.label}</p>
+                <p className="text-[10px] font-normal leading-tight opacity-70">{t.sublabel}</p>
+              </div>
+              <span className="sm:hidden">{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* === Contenido del tab con animación === */}
+      <div className="relative overflow-hidden">
+        <div
+          key={tab}
+          className="animate-tab-slide"
+        >
+          {tab === 'dni' ? (
+            <TabDni onUsar={onClienteRegistrado} />
+          ) : (
+            <TabBiometria
+              municipioId={municipioId}
+              onAprobado={onBiometriaOk}
+              onCargarManual={onCargarManual}
+            />
+          )}
+        </div>
+
+        <style>{`
+          @keyframes tabSlide {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-tab-slide { animation: tabSlide 0.25s ease-out; }
+        `}</style>
+      </div>
+
+      {/* === Búsqueda libre + cargar a mano (link sutil) === */}
+      <div className="text-center pt-2">
+        <button
+          onClick={() => setBusquedaLibreAbierta((v) => !v)}
+          className="text-xs underline-offset-2 hover:underline"
+          style={{ color: theme.textSecondary }}
+        >
+          ¿No tenés el DNI exacto? Buscá por nombre / apellido
+        </button>
+      </div>
+
+      {busquedaLibreAbierta && (
+        <BusquedaLibre
+          onUsar={onClienteRegistrado}
+          onCargarManual={onCargarManual}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// TabDni — input DNI grande con autofocus + Enter + resultados
+// ============================================================
+function TabDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
   const { theme } = useTheme();
   const [dni, setDni] = useState('');
   const [buscando, setBuscando] = useState(false);
@@ -246,9 +343,8 @@ function BuscadorVecino({ onAbrirBiometria, onClienteRegistrado, onCargarManual 
   const [sinResultados, setSinResultados] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Autofocus al montar y al hacer ESC para resetear
   useEffect(() => {
-    const t = setTimeout(() => inputRef.current?.focus(), 100);
+    const t = setTimeout(() => inputRef.current?.focus(), 150);
     return () => clearTimeout(t);
   }, []);
 
@@ -282,140 +378,86 @@ function BuscadorVecino({ onAbrirBiometria, onClienteRegistrado, onCargarManual 
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 gap-6">
-      {/* Hero centrado */}
-      <div className="text-center max-w-xl w-full">
-        <div
-          className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
-          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-        >
-          <Search className="w-7 h-7" />
-        </div>
-        <h2 className="text-2xl font-bold mb-1" style={{ color: theme.text }}>
-          Identificar al vecino
-        </h2>
-        <p className="text-sm" style={{ color: theme.textSecondary }}>
-          Tipeá el DNI y apretá <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>Enter</kbd> para buscar
+    <div
+      className="rounded-2xl p-6"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="text-center mb-4">
+        <p className="text-sm font-semibold" style={{ color: theme.text }}>
+          Identificar por DNI
         </p>
-
-        {/* Input gigante */}
-        <div
-          className="mt-5 flex items-center gap-2 p-2 rounded-2xl shadow-lg"
-          style={{
-            backgroundColor: theme.card,
-            border: `2px solid ${theme.primary}40`,
-            boxShadow: `0 8px 32px ${theme.primary}15`,
-          }}
-        >
-          <Search className="w-5 h-5 ml-2 flex-shrink-0" style={{ color: theme.textSecondary }} />
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="numeric"
-            value={dni}
-            onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
-            onKeyDown={handleKeyDown}
-            placeholder="DNI del vecino"
-            className="flex-1 bg-transparent outline-none text-xl font-mono tracking-wide py-2"
-            style={{ color: theme.text }}
-          />
-          {dni && !buscando && (
-            <button
-              onClick={limpiar}
-              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5"
-              style={{ color: theme.textSecondary }}
-              title="Limpiar (ESC)"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-          <button
-            onClick={buscar}
-            disabled={buscando || !dni.trim()}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 flex-shrink-0"
-            style={{ backgroundColor: theme.primary }}
-          >
-            {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-            Buscar
-          </button>
-        </div>
-
-        {/* Acciones secundarias */}
-        <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
-          <button
-            onClick={onAbrirBiometria}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-[1.03] active:scale-95"
-            style={{
-              backgroundColor: `${theme.primary}10`,
-              color: theme.primary,
-              border: `1px solid ${theme.primary}40`,
-            }}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            Validar con biometría
-            <span className="text-[9px] opacity-70 ml-1">(RENAPER · Cliente nuevo)</span>
-          </button>
-          <button
-            onClick={onCargarManual}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-[1.03] active:scale-95"
-            style={{
-              backgroundColor: theme.backgroundSecondary,
-              color: theme.textSecondary,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            Cargar a mano
-          </button>
-        </div>
+        <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+          Tipeá el DNI y apretá <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>Enter</kbd>
+        </p>
       </div>
 
-      {/* Resultados de búsqueda */}
+      <div
+        className="flex items-center gap-2 p-2 rounded-2xl"
+        style={{
+          backgroundColor: theme.backgroundSecondary,
+          border: `2px solid ${theme.primary}40`,
+        }}
+      >
+        <Search className="w-5 h-5 ml-2 flex-shrink-0" style={{ color: theme.textSecondary }} />
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          value={dni}
+          onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
+          onKeyDown={handleKeyDown}
+          placeholder="DNI del vecino"
+          className="flex-1 bg-transparent outline-none text-lg font-mono tracking-wide py-1.5"
+          style={{ color: theme.text }}
+        />
+        {dni && !buscando && (
+          <button
+            onClick={limpiar}
+            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5"
+            style={{ color: theme.textSecondary }}
+            title="Limpiar (ESC)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={buscar}
+          disabled={buscando || !dni.trim()}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 flex-shrink-0"
+          style={{ backgroundColor: theme.primary }}
+        >
+          {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Buscar
+        </button>
+      </div>
+
+      {/* Resultados */}
       {resultados && resultados.length > 0 && (
-        <div className="w-full max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2 px-1" style={{ color: theme.textSecondary }}>
+        <div className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wider mb-2" style={{ color: theme.textSecondary }}>
             {resultados.length} resultado{resultados.length !== 1 ? 's' : ''}
           </p>
           <div className="space-y-2">
             {resultados.map((v) => (
-              <ResultadoVecino key={v.user_id} vecino={v} onUsar={onClienteRegistrado} />
+              <ResultadoVecino key={v.user_id} vecino={v} onUsar={onUsar} />
             ))}
           </div>
         </div>
       )}
 
       {sinResultados && (
-        <div className="w-full max-w-xl">
-          <div
-            className="flex items-start gap-3 p-4 rounded-xl"
-            style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b40' }}
-          >
-            <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
-            <div className="flex-1">
-              <p className="text-sm font-semibold" style={{ color: theme.text }}>
-                No encontramos vecino con DNI {dni}
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
-                Probablemente sea cliente nuevo. Validalo con biometría o cargá los datos a mano.
-              </p>
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={onAbrirBiometria}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
-                  style={{ backgroundColor: theme.primary }}
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  Iniciar biometría
-                </button>
-                <button
-                  onClick={onCargarManual}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-                >
-                  Cargar a mano
-                </button>
-              </div>
-            </div>
+        <div
+          className="mt-4 flex items-start gap-3 p-3 rounded-xl"
+          style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b40' }}
+        >
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
+          <div className="flex-1 text-xs">
+            <p className="font-semibold" style={{ color: theme.text }}>
+              No encontramos vecino con DNI {dni}
+            </p>
+            <p style={{ color: theme.textSecondary }}>
+              Probá con biometría (cliente nuevo) o cargá los datos a mano.
+            </p>
           </div>
         </div>
       )}
@@ -424,7 +466,7 @@ function BuscadorVecino({ onAbrirBiometria, onClienteRegistrado, onCargarManual 
 }
 
 // ============================================================
-// ResultadoVecino — card más compacta en una sola fila
+// ResultadoVecino — fila compacta clickeable
 // ============================================================
 function ResultadoVecino({ vecino: v, onUsar }: {
   vecino: VecinoEncontrado;
@@ -437,7 +479,7 @@ function ResultadoVecino({ vecino: v, onUsar }: {
     <button
       onClick={() => onUsar(v)}
       className="w-full text-left p-3 rounded-xl flex items-center gap-3 transition-all hover:scale-[1.005] active:scale-[0.99] hover:shadow-md"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
     >
       <div
         className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
@@ -463,7 +505,7 @@ function ResultadoVecino({ vecino: v, onUsar }: {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[11px] mt-0.5" style={{ color: theme.textSecondary }}>
+        <div className="flex items-center gap-3 text-[11px] mt-0.5 flex-wrap" style={{ color: theme.textSecondary }}>
           <span className="font-mono">DNI {v.dni}</span>
           {v.telefono && <span>📱 {v.telefono}</span>}
           {v.email && <span className="truncate">✉️ {v.email}</span>}
@@ -481,11 +523,10 @@ function ResultadoVecino({ vecino: v, onUsar }: {
 }
 
 // ============================================================
-// BiometriaPanel — el flujo Didit (popup) en una card centrada
+// TabBiometria — auto-inicia popup Didit + polling
 // ============================================================
-function BiometriaPanel({ municipioId, onCerrar, onAprobado, onCargarManual }: {
+function TabBiometria({ municipioId, onAprobado, onCargarManual }: {
   municipioId: number;
-  onCerrar: () => void;
   onAprobado: (datos: KycDatos, sessionId: string) => void;
   onCargarManual: () => void;
 }) {
@@ -534,7 +575,7 @@ function BiometriaPanel({ municipioId, onCerrar, onAprobado, onCargarManual }: {
             setError(e.data.motivo_rechazo || 'Verificación rechazada');
             if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
           }
-        } catch { /* retry */ }
+        } catch { /* retry silencioso */ }
       }, 2500);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -551,105 +592,222 @@ function BiometriaPanel({ municipioId, onCerrar, onAprobado, onCargarManual }: {
     popupRef.current = window.open(didurl, 'didit-kyc', `width=${w},height=${h},left=${x},top=${y}`);
   };
 
-  // Auto-iniciar al montar el panel — el operador ya hizo click "biometría" arriba.
-  useEffect(() => {
-    if (status === 'idle') iniciar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
-    <div className="flex-1 flex items-center justify-center px-4 py-8">
-      <div
-        className="rounded-2xl p-6 max-w-md w-full text-center space-y-4"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, boxShadow: `0 8px 32px ${theme.primary}10` }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
-            <Camera className="w-3 h-3" /> Validación biométrica
-          </div>
-          <button onClick={onCerrar} className="text-xs underline" style={{ color: theme.textSecondary }}>
-            Cancelar
-          </button>
-        </div>
-
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto" style={{ backgroundColor: `${theme.primary}15` }}>
-          {status === 'waiting' || status === 'starting' ? (
-            <Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.primary }} />
-          ) : status === 'approved' ? (
-            <CheckCircle2 className="w-8 h-8" style={{ color: '#22c55e' }} />
-          ) : status === 'declined' || status === 'error' ? (
-            <AlertTriangle className="w-8 h-8" style={{ color: '#ef4444' }} />
-          ) : (
-            <ScanLine className="w-8 h-8" style={{ color: theme.primary }} />
-          )}
-        </div>
-
-        {status === 'starting' && (
-          <div>
-            <h3 className="text-base font-semibold" style={{ color: theme.text }}>Abriendo Didit…</h3>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>Creando sesión de verificación</p>
-          </div>
-        )}
-
-        {status === 'waiting' && (
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-base font-semibold" style={{ color: theme.text }}>Esperando al vecino…</h3>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>
-                Escaneo del DNI + selfie en la ventana abierta. Tarda ~1 minuto.
-              </p>
-              <p className="text-[11px] font-mono mt-2" style={{ color: theme.textSecondary }}>
-                Sesión: {sessionId}
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <button
-                onClick={reAbrirPopup}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-                style={{ color: theme.primary, backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}40` }}
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Re-abrir ventana
-              </button>
-            </div>
-          </div>
-        )}
-
-        {status === 'declined' && (
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-base font-semibold" style={{ color: '#ef4444' }}>Verificación rechazada</h3>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>{error}</p>
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              <button onClick={iniciar} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: theme.primary }}>
-                <RefreshCcw className="w-3.5 h-3.5" /> Reintentar
-              </button>
-              <button onClick={onCargarManual} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-                Cargar a mano
-              </button>
-            </div>
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-base font-semibold" style={{ color: '#ef4444' }}>No se pudo iniciar la biometría</h3>
-              <p className="text-xs" style={{ color: theme.textSecondary }}>{error}</p>
-            </div>
-            <button onClick={onCargarManual} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-              Seguir con carga manual
-            </button>
-          </div>
+    <div
+      className="rounded-2xl p-6 text-center"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto mb-3" style={{ backgroundColor: `${theme.primary}15` }}>
+        {status === 'waiting' || status === 'starting' ? (
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.primary }} />
+        ) : status === 'approved' ? (
+          <CheckCircle2 className="w-8 h-8" style={{ color: '#22c55e' }} />
+        ) : status === 'declined' || status === 'error' ? (
+          <AlertTriangle className="w-8 h-8" style={{ color: '#ef4444' }} />
+        ) : (
+          <Camera className="w-8 h-8" style={{ color: theme.primary }} />
         )}
       </div>
+
+      {status === 'idle' && (
+        <div className="space-y-3">
+          <h3 className="text-base font-bold" style={{ color: theme.text }}>Validar identidad del vecino</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            Activá la webcam y el escaneo de DNI. RENAPER valida automáticamente.
+          </p>
+          <div className="flex items-center justify-center gap-3 text-[11px]" style={{ color: theme.textSecondary }}>
+            <span className="inline-flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> webcam</span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1"><ScanLine className="w-3.5 h-3.5" /> scan DNI</span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> RENAPER</span>
+          </div>
+          <button
+            onClick={iniciar}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
+            style={{ backgroundColor: theme.primary }}
+          >
+            <Camera className="w-4 h-4" />
+            Iniciar biometría
+          </button>
+        </div>
+      )}
+
+      {status === 'starting' && (
+        <div>
+          <h3 className="text-base font-semibold" style={{ color: theme.text }}>Abriendo Didit…</h3>
+          <p className="text-xs" style={{ color: theme.textSecondary }}>Creando sesión de verificación</p>
+        </div>
+      )}
+
+      {status === 'waiting' && (
+        <div className="space-y-3">
+          <div>
+            <h3 className="text-base font-semibold" style={{ color: theme.text }}>Esperando al vecino…</h3>
+            <p className="text-xs" style={{ color: theme.textSecondary }}>
+              Escaneo del DNI + selfie en la ventana abierta. ~1 minuto.
+            </p>
+            <p className="text-[11px] font-mono mt-2" style={{ color: theme.textSecondary }}>Sesión: {sessionId}</p>
+          </div>
+          <button
+            onClick={reAbrirPopup}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ color: theme.primary, backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}40` }}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Re-abrir ventana
+          </button>
+        </div>
+      )}
+
+      {status === 'declined' && (
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold" style={{ color: '#ef4444' }}>Verificación rechazada</h3>
+          <p className="text-xs" style={{ color: theme.textSecondary }}>{error}</p>
+          <div className="flex items-center justify-center gap-2">
+            <button onClick={iniciar} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: theme.primary }}>
+              <RefreshCcw className="w-3.5 h-3.5" /> Reintentar
+            </button>
+            <button onClick={onCargarManual} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+              Cargar a mano
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="space-y-3">
+          <h3 className="text-base font-semibold" style={{ color: '#ef4444' }}>No se pudo iniciar la biometría</h3>
+          <p className="text-xs" style={{ color: theme.textSecondary }}>{error}</p>
+          <button onClick={onCargarManual} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+            Seguir con carga manual
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 // ============================================================
-// Hub — 3 cards grandes con el vecino confirmado arriba
+// BusquedaLibre — buscar por nombre/apellido/DNI parcial (q)
+// ============================================================
+function BusquedaLibre({ onUsar, onCargarManual }: {
+  onUsar: (v: VecinoEncontrado) => void;
+  onCargarManual: () => void;
+}) {
+  const { theme } = useTheme();
+  const [q, setQ] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState<VecinoEncontrado[] | null>(null);
+  const [sinResultados, setSinResultados] = useState(false);
+
+  const buscar = async () => {
+    const term = q.trim();
+    if (term.length < 2) {
+      toast.error('Mínimo 2 caracteres');
+      return;
+    }
+    setBuscando(true);
+    setSinResultados(false);
+    setResultados(null);
+    try {
+      const r = await operadorApi.buscarVecino(undefined, term);
+      if (r.data.length === 0) setSinResultados(true);
+      else setResultados(r.data);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(msg || 'Error buscando vecino');
+    } finally {
+      setBuscando(false);
+    }
+  };
+
+  return (
+    <div
+      className="rounded-2xl p-4 space-y-3"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div>
+        <p className="text-sm font-semibold" style={{ color: theme.text }}>
+          Buscar por nombre, apellido o DNI parcial
+        </p>
+        <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+          Útil cuando el vecino no se acuerda el DNI completo.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') buscar(); }}
+          placeholder="Ej: Pérez · Juan · 30217"
+          className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.text,
+            border: `1px solid ${theme.border}`,
+          }}
+        />
+        <button
+          onClick={buscar}
+          disabled={buscando || q.trim().length < 2}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: theme.primary }}
+        >
+          {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          Buscar
+        </button>
+      </div>
+
+      {resultados && resultados.length > 0 && (
+        <div className="space-y-2">
+          {resultados.map((v) => (
+            <ResultadoVecino key={v.user_id} vecino={v} onUsar={onUsar} />
+          ))}
+        </div>
+      )}
+
+      {sinResultados && (
+        <div
+          className="flex items-start gap-3 p-3 rounded-xl"
+          style={{ backgroundColor: '#f59e0b10', border: '1px solid #f59e0b40' }}
+        >
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#d97706' }} />
+          <div className="flex-1 text-xs">
+            <p className="font-semibold" style={{ color: theme.text }}>Sin coincidencias</p>
+            <p style={{ color: theme.textSecondary }}>Probá otra palabra o cargalo a mano si es nuevo.</p>
+            <button
+              onClick={onCargarManual}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
+              style={{ backgroundColor: theme.primary }}
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+              Cargar a mano
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Atajo de carga manual sin buscar */}
+      {!resultados && !sinResultados && (
+        <div className="text-center pt-1">
+          <button
+            onClick={onCargarManual}
+            className="text-xs underline-offset-2 hover:underline"
+            style={{ color: theme.textSecondary }}
+          >
+            Es vecino nuevo · cargar a mano
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Hub — banner del vecino + 3 BigCards (igual que la versión anterior)
 // ============================================================
 function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onReset }: {
   vecino: KycDatos;
@@ -662,7 +820,6 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
   const { theme } = useTheme();
   return (
     <div className="space-y-4">
-      {/* Banner del vecino */}
       <div
         className="rounded-2xl p-4 flex items-center justify-between gap-3"
         style={{
@@ -702,7 +859,6 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
         </button>
       </div>
 
-      {/* 3 cards grandes */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider mb-2 px-1" style={{ color: theme.textSecondary }}>
           ¿Qué gestión vamos a iniciar?
@@ -739,9 +895,6 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
   );
 }
 
-// ============================================================
-// BigCard
-// ============================================================
 function BigCard({ color, icon, title, desc, actionLabel, onAction, highlight }: {
   color: string;
   icon: React.ReactNode;
