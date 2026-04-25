@@ -861,10 +861,21 @@ async def crear_solicitud(
         solicitud_dump = solicitud_data.model_dump(
             exclude={"actuando_como_user_id", "dj_validacion_presencial"}
         )
+        # Si el trámite cobra al inicio (momento_pago == 'inicio'), la
+        # solicitud arranca en PENDIENTE_PAGO y NO se asigna a la dependencia
+        # hasta que el webhook MP la apruebe. Si momento_pago es 'fin' (o no
+        # hay costo), arranca en RECIBIDO y la dependencia trabaja directo.
+        cobra_al_inicio = (
+            (tramite.momento_pago or "").lower() == "inicio"
+            and (tramite.costo or 0) > 0
+        )
+        estado_inicial = (
+            EstadoSolicitud.PENDIENTE_PAGO if cobra_al_inicio else EstadoSolicitud.RECIBIDO
+        )
         solicitud = Solicitud(
             municipio_id=municipio_id,
             numero_tramite=numero_tramite,
-            estado=EstadoSolicitud.RECIBIDO,
+            estado=estado_inicial,
             solicitante_id=solicitante_id,
             **solicitud_dump,
         )
@@ -923,14 +934,23 @@ async def crear_solicitud(
     if auto_dep_id:
         solicitud.municipio_dependencia_id = auto_dep_id
 
-    # La solicitud SIEMPRE arranca en RECIBIDO. El pago es opcional durante el
-    # flujo, pero obligatorio para finalizar (chequeado en actualizar_solicitud).
+    # Historial inicial — ajustamos el accion segun momento_pago para que la
+    # auditoria deje claro por que arranco en PENDIENTE_PAGO en lugar de RECIBIDO.
+    if cobra_al_inicio:
+        historial_accion = "Solicitud creada (pendiente de pago inicial)"
+        historial_comentario = (
+            f"Trámite: {tramite.nombre} · cobro al inicio · "
+            f"costo ${tramite.costo:.2f}"
+        )
+    else:
+        historial_accion = "Solicitud creada"
+        historial_comentario = f"Trámite: {tramite.nombre}"
     historial = HistorialSolicitud(
         solicitud_id=solicitud.id,
         usuario_id=current_user.id if current_user else None,
-        estado_nuevo=EstadoSolicitud.RECIBIDO,
-        accion="Solicitud creada",
-        comentario=f"Trámite: {tramite.nombre}",
+        estado_nuevo=estado_inicial,
+        accion=historial_accion,
+        comentario=historial_comentario,
     )
     db.add(historial)
     await db.commit()

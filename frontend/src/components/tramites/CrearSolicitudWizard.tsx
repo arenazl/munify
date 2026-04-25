@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
   User,
@@ -21,7 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { DynamicIcon } from '../ui/DynamicIcon';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
-import { tramitesApi, categoriasTramiteApi, usersApi, type VecinoPorDni } from '../../lib/api';
+import { tramitesApi, categoriasTramiteApi, usersApi, pagosApi, type VecinoPorDni } from '../../lib/api';
 import type { Tramite, CategoriaTramite } from '../../types';
 import { useMostradorContext } from '../mostrador/BannerActuandoComo';
 import { armarWaMeUrl, mensajeRequisitosTramite, generarPdfRequisitos } from '../../lib/mostradorRequisitos';
@@ -390,6 +391,22 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         payload.actuando_como_user_id = ctxMostrador.user_id;
       }
       const res = await tramitesApi.createSolicitud(payload);
+      // Si el trámite cobra al inicio + tenemos contexto Mostrador, en vez
+      // de cerrar mostramos el modal del cupón con WhatsApp/copiar/abrir.
+      // Backend marcó la solicitud como PENDIENTE_PAGO y necesitamos un
+      // cupón antes de que la dependencia pueda trabajar.
+      const cobraAlInicio =
+        tramiteSeleccionado?.momento_pago === 'inicio' &&
+        (tramiteSeleccionado?.costo || 0) > 0;
+      if (ctxMostrador && cobraAlInicio) {
+        setSolicitudCreada({ id: res.data.id, numero: res.data.numero_tramite });
+        toast.success(`Solicitud ${res.data.numero_tramite} creada — pendiente de pago.`, {
+          duration: 4000,
+        });
+        onSuccess?.(res.data);
+        // No cerramos el wizard: setSolicitudCreada dispara el modal de cupón.
+        return;
+      }
       toast.success(`Solicitud ${res.data.numero_tramite} creada. Cargá los documentos desde el detalle.`, {
         duration: 6000,
       });
@@ -401,6 +418,9 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
       setSaving(false);
     }
   };
+
+  // Estado del modal de cupón post-creación (modo Mostrador, cobro al inicio).
+  const [solicitudCreada, setSolicitudCreada] = useState<{ id: number; numero: string } | null>(null);
 
   // ============================================================
   // Step 1: elegir trámite
@@ -1140,7 +1160,189 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
           }}
         />
       )}
+      {ctxMostrador && solicitudCreada && tramiteSeleccionado && (
+        <CuponPagoModal
+          solicitudId={solicitudCreada.id}
+          numeroTramite={solicitudCreada.numero}
+          tramiteNombre={tramiteSeleccionado.nombre}
+          montoTramite={tramiteSeleccionado.costo || 0}
+          onClose={() => {
+            setSolicitudCreada(null);
+            onClose();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+// ============================================================
+// Modal del cupon de pago post-creacion (modo Mostrador, cobro al inicio)
+// ============================================================
+function CuponPagoModal({
+  solicitudId, numeroTramite, tramiteNombre, montoTramite, onClose,
+}: {
+  solicitudId: number;
+  numeroTramite: string;
+  tramiteNombre: string;
+  montoTramite: number;
+  onClose: () => void;
+}) {
+  const { theme } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<{
+    checkout_url: string;
+    wa_me_url: string | null;
+    mensaje_wa: string;
+    vecino_telefono: string | null;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    pagosApi.cuponTramiteWa(solicitudId)
+      .then((r) => {
+        if (cancelled) return;
+        setData({
+          checkout_url: r.data.checkout_url,
+          wa_me_url: r.data.wa_me_url,
+          mensaje_wa: r.data.mensaje_wa,
+          vecino_telefono: r.data.vecino_telefono,
+        });
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e?.response?.data?.detail || 'No se pudo generar el cupón');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [solicitudId]);
+
+  const handleWhatsApp = () => {
+    if (!data?.wa_me_url) {
+      toast.error('Falta teléfono del vecino para WhatsApp');
+      return;
+    }
+    window.open(data.wa_me_url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopiar = async () => {
+    if (!data?.checkout_url) return;
+    try {
+      await navigator.clipboard.writeText(data.checkout_url);
+      toast.success('Link copiado al portapapeles');
+    } catch {
+      toast.error('No se pudo copiar');
+    }
+  };
+
+  const handleAbrirCheckout = () => {
+    if (!data?.checkout_url) return;
+    window.open(data.checkout_url, '_blank', 'noopener,noreferrer');
+  };
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-2xl p-5 max-w-md w-full shadow-2xl"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: '#22c55e25', color: '#22c55e' }}
+          >
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+              Solicitud {numeroTramite} creada
+            </p>
+            <p className="text-base font-bold" style={{ color: theme.text }}>
+              Pendiente de pago
+            </p>
+          </div>
+        </div>
+        <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+          <span className="font-semibold" style={{ color: theme.text }}>{tramiteNombre}</span> requiere pago{' '}
+          de <span className="font-semibold" style={{ color: theme.text }}>${montoTramite.toLocaleString('es-AR')}</span>{' '}
+          antes de que la dependencia tome el trámite. Mandale el cupón al vecino:
+        </p>
+
+        {loading && (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.primary }} />
+          </div>
+        )}
+
+        {error && (
+          <div className="p-3 rounded-lg mb-4" style={{ backgroundColor: '#ef444415', border: '1px solid #ef444440' }}>
+            <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && data && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={handleWhatsApp}
+              disabled={!data.wa_me_url}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+              style={{ backgroundColor: '#25d366' }}
+              title={data.wa_me_url ? `Abrir WhatsApp para ${data.vecino_telefono}` : 'El vecino no tiene teléfono cargado'}
+            >
+              <MessageSquare className="w-5 h-5" />
+              Mandar cupón por WhatsApp
+              {data.vecino_telefono && (
+                <span className="text-xs opacity-80 ml-1">({data.vecino_telefono})</span>
+              )}
+            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleCopiar}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] active:scale-95"
+                style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+              >
+                Copiar link
+              </button>
+              <button
+                type="button"
+                onClick={handleAbrirCheckout}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] active:scale-95"
+                style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+              >
+                Abrir checkout
+              </button>
+            </div>
+            {!data.vecino_telefono && (
+              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                El vecino no tiene teléfono cargado. Cargalo en el detalle del trámite si querés mandarle el cupón después.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center justify-end mt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02] active:scale-95"
+            style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

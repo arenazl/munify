@@ -1396,6 +1396,16 @@ export const pagosApi = {
   crearSesionTramite: (solicitud_id: number, return_url?: string) =>
     api.post<{ session_id: string; checkout_url: string }>(
       '/pagos/sesion-tramite', { solicitud_id, return_url }),
+  cuponTramiteWa: (solicitud_id: number) =>
+    api.post<{
+      session_id: string;
+      checkout_url: string;
+      wa_me_url: string | null;
+      mensaje_wa: string;
+      monto: string;
+      vecino_telefono: string | null;
+      expires_at: string;
+    }>(`/pagos/cupon-tramite-wa/${solicitud_id}`),
   obtenerSesion: (sessionId: string) =>
     api.get(`/pagos/sesiones/${sessionId}`),
   confirmarPago: (sessionId: string, medio_pago: string, metadatos?: Record<string, unknown>) =>

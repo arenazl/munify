@@ -274,6 +274,9 @@ export interface Tramite {
   // KYC visible — Fase 5 bundle pagos
   requiere_kyc?: boolean;
   nivel_kyc_minimo?: number;
+  // Configuración de cobro
+  tipo_pago?: string;        // 'boton_pago' | 'rapipago' | 'adhesion_debito' | 'qr'
+  momento_pago?: string;     // 'inicio' | 'fin'
   activo: boolean;
   orden: number;
   documentos_requeridos: TramiteDocumentoRequerido[];

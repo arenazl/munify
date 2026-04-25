@@ -289,6 +289,137 @@ async def crear_sesion_tramite(
     )
 
 
+# ============================================================
+# 2.b Cupon WhatsApp para una solicitud (modo Mostrador)
+# ============================================================
+
+class CuponWaResponse(BaseModel):
+    session_id: str
+    checkout_url: str
+    wa_me_url: Optional[str]
+    mensaje_wa: str
+    monto: str
+    vecino_telefono: Optional[str]
+    expires_at: datetime
+
+
+@router.post("/cupon-tramite-wa/{solicitud_id}", response_model=CuponWaResponse)
+async def cupon_tramite_wa(
+    solicitud_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Genera un cupon de pago para una solicitud y arma la URL `wa.me`
+    con el mensaje pre-cargado para que el operador del Mostrador lo abra
+    desde la PC con WhatsApp Web logueado en el numero del muni.
+
+    El operador clickea, WA Web abre el chat al telefono del vecino con
+    el texto listo, presiona Enviar y le llega el cupon. Cuando el vecino
+    paga, el webhook del provider marca la solicitud como pagada y la
+    saca de PENDIENTE_PAGO.
+    """
+    from models.tramite import Solicitud, EstadoSolicitud, Tramite, HistorialSolicitud
+    from sqlalchemy.orm import selectinload as _sl
+    from services.wa_me import armar_wa_me_url, mensaje_link_pago
+
+    q = await db.execute(
+        select(Solicitud)
+        .options(
+            _sl(Solicitud.tramite),
+            _sl(Solicitud.solicitante),
+        )
+        .where(Solicitud.id == solicitud_id)
+    )
+    solicitud = q.scalar_one_or_none()
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Permisos: vecino solo lo suyo; admin/supervisor/operador del mismo muni.
+    if current_user.rol == RolUsuario.VECINO and solicitud.solicitante_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No podes pagar una solicitud ajena")
+    if current_user.rol != RolUsuario.VECINO and current_user.municipio_id != solicitud.municipio_id:
+        raise HTTPException(status_code=403, detail="No podes operar sobre otro municipio")
+
+    if not solicitud.tramite or not solicitud.tramite.costo or solicitud.tramite.costo <= 0:
+        raise HTTPException(status_code=400, detail="Este tramite no tiene costo")
+    if solicitud.estado in (EstadoSolicitud.FINALIZADO, EstadoSolicitud.RECHAZADO):
+        raise HTTPException(status_code=400, detail=f"Esta solicitud esta {solicitud.estado.value}")
+
+    # Si ya hay una sesion PENDING activa para esta solicitud, la reusamos
+    # en vez de crear duplicados (idempotencia simple).
+    q_sesion = await db.execute(
+        select(PagoSesion)
+        .where(
+            PagoSesion.solicitud_id == solicitud.id,
+            PagoSesion.estado.in_([EstadoSesionPago.PENDING, EstadoSesionPago.IN_CHECKOUT]),
+        )
+        .order_by(PagoSesion.created_at.desc())
+        .limit(1)
+    )
+    sesion = q_sesion.scalar_one_or_none()
+
+    if sesion is None:
+        provider = await get_provider_para_muni(db, solicitud.municipio_id)
+        sesion_id = _generar_session_id()
+        concepto = f"{solicitud.tramite.nombre} — Solicitud {solicitud.numero_tramite}"
+
+        sesion_ext = await provider.crear_sesion(
+            concepto=concepto,
+            monto=Decimal(str(solicitud.tramite.costo)),
+            sesion_id=sesion_id,
+            return_url="/gestion/mis-tramites",
+        )
+
+        expires_at = datetime.utcnow() + timedelta(seconds=sesion_ext.expires_in_seconds)
+        sesion = PagoSesion(
+            id=sesion_id,
+            solicitud_id=solicitud.id,
+            municipio_id=solicitud.municipio_id,
+            vecino_user_id=solicitud.solicitante_id,
+            concepto=concepto,
+            monto=Decimal(str(solicitud.tramite.costo)),
+            estado=EstadoSesionPago.PENDING,
+            provider=provider.nombre,
+            external_id=sesion_ext.external_id,
+            checkout_url=sesion_ext.checkout_url,
+            return_url="/gestion/mis-tramites",
+            expires_at=expires_at,
+            canal="ventanilla_asistida" if current_user.rol != RolUsuario.VECINO else "app",
+            operador_user_id=current_user.id if current_user.rol != RolUsuario.VECINO else None,
+        )
+        db.add(sesion)
+        db.add(HistorialSolicitud(
+            solicitud_id=solicitud.id,
+            usuario_id=current_user.id,
+            accion="Cupón de pago generado",
+            comentario=f"Sesión {sesion_id} · ${solicitud.tramite.costo:.2f} · vía {provider.nombre} (cupón WhatsApp)",
+        ))
+        await db.commit()
+        await db.refresh(sesion)
+
+    # Armar mensaje + wa.me url
+    vecino = solicitud.solicitante
+    nombre_vecino = (vecino.nombre or "").strip() if vecino else ""
+    telefono = (vecino.telefono or "").strip() if vecino else ""
+    mensaje = mensaje_link_pago(
+        nombre_vecino=nombre_vecino,
+        tramite_nombre=solicitud.tramite.nombre,
+        checkout_url=sesion.checkout_url or "",
+        numero_tramite=solicitud.numero_tramite,
+    )
+    wa_url = armar_wa_me_url(telefono, mensaje) if telefono else None
+
+    return CuponWaResponse(
+        session_id=sesion.id,
+        checkout_url=sesion.checkout_url or "",
+        wa_me_url=wa_url,
+        mensaje_wa=mensaje,
+        monto=str(sesion.monto),
+        vecino_telefono=telefono or None,
+        expires_at=sesion.expires_at or datetime.utcnow(),
+    )
+
+
 @router.get("/sesiones/{session_id}", response_model=SesionPagoPublica)
 async def obtener_sesion(
     session_id: str,
