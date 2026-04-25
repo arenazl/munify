@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+// useRef ya importado arriba; createPortal sigue usándose en ConfirmCrearVentanilla
 import {
   Search,
   User,
@@ -391,20 +392,16 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         payload.actuando_como_user_id = ctxMostrador.user_id;
       }
       const res = await tramitesApi.createSolicitud(payload);
-      // Si el trámite cobra al inicio + tenemos contexto Mostrador, en vez
-      // de cerrar mostramos el modal del cupón con WhatsApp/copiar/abrir.
-      // Backend marcó la solicitud como PENDIENTE_PAGO y necesitamos un
-      // cupón antes de que la dependencia pueda trabajar.
-      const cobraAlInicio =
-        tramiteSeleccionado?.momento_pago === 'inicio' &&
-        (tramiteSeleccionado?.costo || 0) > 0;
+      // Si el trámite cobra al inicio + tenemos contexto Mostrador, NO cerramos
+      // el wizard ni llamamos onSuccess (eso navegaria afuera). En vez de eso
+      // activamos el paso "pago" con el cupón + polling, y el operador sigue
+      // dentro del mismo flujo hasta que el pago se confirma.
       if (ctxMostrador && cobraAlInicio) {
-        setSolicitudCreada({ id: res.data.id, numero: res.data.numero_tramite });
-        toast.success(`Solicitud ${res.data.numero_tramite} creada — pendiente de pago.`, {
-          duration: 4000,
+        setSolicitudCreadaInfo({ id: res.data.id, numero: res.data.numero_tramite });
+        setPasoPagoActivo(true);
+        toast.success(`Solicitud ${res.data.numero_tramite} creada — esperando pago.`, {
+          duration: 3000,
         });
-        onSuccess?.(res.data);
-        // No cerramos el wizard: setSolicitudCreada dispara el modal de cupón.
         return;
       }
       toast.success(`Solicitud ${res.data.numero_tramite} creada. Cargá los documentos desde el detalle.`, {
@@ -419,8 +416,20 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
     }
   };
 
-  // Estado del modal de cupón post-creación (modo Mostrador, cobro al inicio).
-  const [solicitudCreada, setSolicitudCreada] = useState<{ id: number; numero: string } | null>(null);
+  // Modo Mostrador con cobro al inicio: agregamos un 4º paso "Pago" después
+  // de "Confirmar". Cuando se crea la solicitud, en lugar de cerrar el wizard
+  // avanzamos a este paso con el cupón + polling al estado del pago.
+  const cobraAlInicio =
+    tramiteSeleccionado?.momento_pago === 'inicio' &&
+    (tramiteSeleccionado?.costo || 0) > 0;
+  const [pasoPagoActivo, setPasoPagoActivo] = useState(false);
+  const [solicitudCreadaInfo, setSolicitudCreadaInfo] = useState<{ id: number; numero: string } | null>(null);
+  const [pagoAprobado, setPagoAprobado] = useState(false);
+
+  // Una vez que pasoPagoActivo se enciende, avanzamos al step pago (índice 3).
+  useEffect(() => {
+    if (pasoPagoActivo) setStep(3);
+  }, [pasoPagoActivo]);
 
   // ============================================================
   // Step 1: elegir trámite
@@ -1101,6 +1110,39 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
   // Steps config
   // ============================================================
 
+  // Contenido del 4º paso "Pago" — solo se renderiza si pasoPagoActivo.
+  const stepPagoContent = pasoPagoActivo && solicitudCreadaInfo && tramiteSeleccionado ? (
+    <PasoPago
+      solicitudId={solicitudCreadaInfo.id}
+      numeroTramite={solicitudCreadaInfo.numero}
+      tramiteNombre={tramiteSeleccionado.nombre}
+      monto={tramiteSeleccionado.costo || 0}
+      vecinoNombre={
+        `${ctxMostrador?.nombre || form.nombre_solicitante} ${ctxMostrador?.apellido || form.apellido_solicitante}`.trim()
+        || 'el vecino'
+      }
+      onPagoAprobado={() => setPagoAprobado(true)}
+    />
+  ) : null;
+
+  const stepConfirmar: WizardStep = {
+    id: 'confirmar',
+    title: 'Confirmar',
+    description: cobraAlInicio && ctxMostrador ? 'Revisá y creá para cobrar' : 'Revisá y creá la solicitud',
+    icon: <CheckCircle2 className="h-4 w-4" />,
+    content: step3Content,
+    isValid: !!form.tramite_id,
+  };
+
+  const stepPago: WizardStep = {
+    id: 'pago',
+    title: 'Pago',
+    description: pagoAprobado ? '¡Pago confirmado!' : 'Esperando pago del vecino…',
+    icon: <CreditCard className="h-4 w-4" />,
+    content: stepPagoContent,
+    isValid: true,
+  };
+
   const steps: WizardStep[] = [
     {
       id: 'tramite',
@@ -1122,15 +1164,27 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         form.dni_solicitante.trim().length > 0 &&
         form.asunto.trim().length >= 10,
     },
-    {
-      id: 'confirmar',
-      title: 'Confirmar',
-      description: 'Revisá y creá la solicitud',
-      icon: <CheckCircle2 className="h-4 w-4" />,
-      content: step3Content,
-      isValid: !!form.tramite_id,
-    },
+    stepConfirmar,
+    ...(pasoPagoActivo ? [stepPago] : []),
   ];
+
+  // Lógica del botón final del wizard:
+  //   - paso confirmar (sin pasoPagoActivo): "Crear y cobrar" o "Crear solicitud"
+  //   - paso pago: "Finalizar" cuando el pago ya está aprobado, "Cerrar" si el
+  //     operador quiere salir antes (la solicitud queda pendiente).
+  const enPasoPago = pasoPagoActivo && step === 3;
+  const completeLabel = enPasoPago
+    ? (pagoAprobado ? 'Finalizar' : 'Cerrar (queda pendiente)')
+    : (cobraAlInicio && ctxMostrador ? 'Crear y cobrar' : 'Crear solicitud');
+
+  const handleComplete = enPasoPago
+    ? () => {
+        if (solicitudCreadaInfo) {
+          onSuccess?.({ id: solicitudCreadaInfo.id, numero_tramite: solicitudCreadaInfo.numero });
+        }
+        onClose();
+      }
+    : (ctxMostrador ? () => setConfirmAbierto(true) : guardar);
 
   return (
     <>
@@ -1140,11 +1194,15 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         title="Nueva solicitud de trámite"
         steps={steps}
         currentStep={step}
-        onStepChange={setStep}
-        onComplete={ctxMostrador ? () => setConfirmAbierto(true) : guardar}
+        onStepChange={(s) => {
+          // No permitir volver atrás una vez creada la solicitud
+          if (pasoPagoActivo && s < 3) return;
+          setStep(s);
+        }}
+        onComplete={handleComplete}
         loading={saving}
-        completeLabel="Crear solicitud"
-        primaryButtonColor={categoriaDelTramite?.color}
+        completeLabel={completeLabel}
+        primaryButtonColor={pagoAprobado ? '#22c55e' : categoriaDelTramite?.color}
       />
       {ctxMostrador && (
         <ConfirmCrearVentanilla
@@ -1160,53 +1218,45 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
           }}
         />
       )}
-      {ctxMostrador && solicitudCreada && tramiteSeleccionado && (
-        <CuponPagoModal
-          solicitudId={solicitudCreada.id}
-          numeroTramite={solicitudCreada.numero}
-          tramiteNombre={tramiteSeleccionado.nombre}
-          montoTramite={tramiteSeleccionado.costo || 0}
-          onClose={() => {
-            setSolicitudCreada(null);
-            onClose();
-          }}
-        />
-      )}
     </>
   );
 }
 
 // ============================================================
-// Modal del cupon de pago post-creacion (modo Mostrador, cobro al inicio)
+// Paso 4 — Pago: cupon WhatsApp + polling del estado
 // ============================================================
-function CuponPagoModal({
-  solicitudId, numeroTramite, tramiteNombre, montoTramite, onClose,
+function PasoPago({
+  solicitudId, numeroTramite, tramiteNombre, monto, vecinoNombre, onPagoAprobado,
 }: {
   solicitudId: number;
   numeroTramite: string;
   tramiteNombre: string;
-  montoTramite: number;
-  onClose: () => void;
+  monto: number;
+  vecinoNombre: string;
+  onPagoAprobado: () => void;
 }) {
   const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<{
+    session_id: string;
     checkout_url: string;
     wa_me_url: string | null;
-    mensaje_wa: string;
     vecino_telefono: string | null;
   } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [estado, setEstado] = useState<string>('pending');
+  const aprobadoRef = useRef(false);
 
+  // Crear cupón al entrar al paso (idempotente: el endpoint reusa PagoSesion PENDING).
   useEffect(() => {
     let cancelled = false;
     pagosApi.cuponTramiteWa(solicitudId)
       .then((r) => {
         if (cancelled) return;
         setData({
+          session_id: r.data.session_id,
           checkout_url: r.data.checkout_url,
           wa_me_url: r.data.wa_me_url,
-          mensaje_wa: r.data.mensaje_wa,
           vecino_telefono: r.data.vecino_telefono,
         });
       })
@@ -1219,6 +1269,28 @@ function CuponPagoModal({
       });
     return () => { cancelled = true; };
   }, [solicitudId]);
+
+  // Polling cada 3s al estado de la PagoSesion. Para cuando aprobado/rechazado/expira.
+  useEffect(() => {
+    if (!data?.session_id) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled || aprobadoRef.current) return;
+      try {
+        const r = await pagosApi.obtenerSesion(data.session_id);
+        const st = (r.data?.estado || '').toString().toLowerCase();
+        if (cancelled) return;
+        setEstado(st);
+        if (st === 'approved' && !aprobadoRef.current) {
+          aprobadoRef.current = true;
+          onPagoAprobado();
+        }
+      } catch { /* retry silencioso */ }
+    };
+    tick();
+    const id = setInterval(tick, 3000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [data?.session_id, onPagoAprobado]);
 
   const handleWhatsApp = () => {
     if (!data?.wa_me_url) {
@@ -1243,106 +1315,162 @@ function CuponPagoModal({
     window.open(data.checkout_url, '_blank', 'noopener,noreferrer');
   };
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-      onClick={onClose}
-    >
+  const aprobado = estado === 'approved';
+  const rechazado = estado === 'rejected';
+  const expirado = estado === 'expired';
+  const cancelado = estado === 'cancelled';
+
+  return (
+    <div className="space-y-4">
+      {/* Resumen del cobro */}
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="rounded-2xl p-5 max-w-md w-full shadow-2xl"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        className="p-4 rounded-xl"
+        style={{
+          backgroundColor: aprobado ? '#22c55e15' : theme.backgroundSecondary,
+          border: `1px solid ${aprobado ? '#22c55e60' : theme.border}`,
+        }}
       >
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-start gap-3">
           <div
             className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: '#22c55e25', color: '#22c55e' }}
+            style={{ backgroundColor: aprobado ? '#22c55e25' : `${theme.primary}20`, color: aprobado ? '#22c55e' : theme.primary }}
           >
-            <CheckCircle2 className="w-6 h-6" />
+            {aprobado ? <CheckCircle2 className="w-6 h-6" /> : <CreditCard className="w-6 h-6" />}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
-              Solicitud {numeroTramite} creada
+              Solicitud {numeroTramite} — {aprobado ? 'pagada' : 'pendiente de pago'}
             </p>
-            <p className="text-base font-bold" style={{ color: theme.text }}>
-              Pendiente de pago
+            <p className="text-base font-bold" style={{ color: theme.text }}>{tramiteNombre}</p>
+            <p className="text-sm mt-0.5" style={{ color: theme.textSecondary }}>
+              Cobrar a <span className="font-semibold" style={{ color: theme.text }}>{vecinoNombre}</span> · {' '}
+              <span className="font-semibold" style={{ color: theme.text }}>${monto.toLocaleString('es-AR')}</span>
             </p>
           </div>
         </div>
-        <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
-          <span className="font-semibold" style={{ color: theme.text }}>{tramiteNombre}</span> requiere pago{' '}
-          de <span className="font-semibold" style={{ color: theme.text }}>${montoTramite.toLocaleString('es-AR')}</span>{' '}
-          antes de que la dependencia tome el trámite. Mandale el cupón al vecino:
-        </p>
+      </div>
 
-        {loading && (
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.primary }} />
-          </div>
-        )}
+      {loading && (
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-6 h-6 animate-spin" style={{ color: theme.primary }} />
+        </div>
+      )}
 
-        {error && (
-          <div className="p-3 rounded-lg mb-4" style={{ backgroundColor: '#ef444415', border: '1px solid #ef444440' }}>
-            <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
-          </div>
-        )}
+      {error && (
+        <div className="p-3 rounded-lg" style={{ backgroundColor: '#ef444415', border: '1px solid #ef444440' }}>
+          <p className="text-xs" style={{ color: '#ef4444' }}>{error}</p>
+        </div>
+      )}
 
-        {!loading && !error && data && (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={handleWhatsApp}
-              disabled={!data.wa_me_url}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
-              style={{ backgroundColor: '#25d366' }}
-              title={data.wa_me_url ? `Abrir WhatsApp para ${data.vecino_telefono}` : 'El vecino no tiene teléfono cargado'}
-            >
-              <MessageSquare className="w-5 h-5" />
-              Mandar cupón por WhatsApp
-              {data.vecino_telefono && (
-                <span className="text-xs opacity-80 ml-1">({data.vecino_telefono})</span>
-              )}
-            </button>
-            <div className="grid grid-cols-2 gap-2">
+      {!loading && !error && data && (
+        <>
+          {/* Botones del cupón — disable si ya está aprobado */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: theme.textSecondary }}>
+              Mandar cupón al vecino
+            </p>
+            <div className="space-y-2">
               <button
                 type="button"
-                onClick={handleCopiar}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] active:scale-95"
-                style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                onClick={handleWhatsApp}
+                disabled={!data.wa_me_url || aprobado}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                style={{ backgroundColor: '#25d366' }}
+                title={data.wa_me_url ? `Abrir WhatsApp para ${data.vecino_telefono}` : 'El vecino no tiene teléfono cargado'}
               >
-                Copiar link
+                <MessageSquare className="w-5 h-5" />
+                Mandar cupón por WhatsApp
+                {data.vecino_telefono && (
+                  <span className="text-xs opacity-80 ml-1">({data.vecino_telefono})</span>
+                )}
               </button>
-              <button
-                type="button"
-                onClick={handleAbrirCheckout}
-                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] active:scale-95"
-                style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-              >
-                Abrir checkout
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopiar}
+                  disabled={aprobado}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                >
+                  Copiar link
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAbrirCheckout}
+                  disabled={aprobado}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                >
+                  Abrir checkout
+                </button>
+              </div>
             </div>
-            {!data.vecino_telefono && (
-              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
-                El vecino no tiene teléfono cargado. Cargalo en el detalle del trámite si querés mandarle el cupón después.
+            {!data.vecino_telefono && !aprobado && (
+              <p className="text-[11px] mt-2" style={{ color: theme.textSecondary }}>
+                El vecino no tiene teléfono cargado. Podés copiar el link y dárselo igual.
               </p>
             )}
           </div>
-        )}
 
-        <div className="flex items-center justify-end mt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02] active:scale-95"
-            style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          {/* Estado del pago — banner que cambia según el polling */}
+          <div
+            className="p-3 rounded-xl flex items-center gap-3"
+            style={{
+              backgroundColor: aprobado
+                ? '#22c55e15'
+                : rechazado || expirado || cancelado
+                  ? '#ef444415'
+                  : `${theme.primary}10`,
+              border: `1px solid ${aprobado ? '#22c55e60' : rechazado || expirado || cancelado ? '#ef444460' : `${theme.primary}40`}`,
+            }}
           >
-            Cerrar
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
+            {aprobado ? (
+              <>
+                <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: '#22c55e' }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: '#22c55e' }}>¡Pago confirmado!</p>
+                  <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    El trámite ya pasó a "Recibido" y la dependencia puede empezar a trabajarlo.
+                  </p>
+                </div>
+              </>
+            ) : rechazado ? (
+              <>
+                <AlertCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#ef4444' }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: '#ef4444' }}>Pago rechazado</p>
+                  <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    El vecino puede reintentar — abrí de nuevo el link de checkout o mandalo por WhatsApp.
+                  </p>
+                </div>
+              </>
+            ) : expirado || cancelado ? (
+              <>
+                <AlertCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#ef4444' }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: '#ef4444' }}>
+                    {expirado ? 'Cupón expirado' : 'Pago cancelado'}
+                  </p>
+                  <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    Generá uno nuevo desde el detalle del trámite.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-5 h-5 flex-shrink-0 animate-spin" style={{ color: theme.primary }} />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: theme.text }}>Esperando pago…</p>
+                  <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    Estamos consultando el estado cada 3 segundos. Apenas el vecino pague, te avisamos acá.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
