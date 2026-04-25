@@ -2316,6 +2316,7 @@ MUNICIPIO_ID ACTUAL: {municipio_id}
 REGLAS CRÍTICAS:
 0. La tabla de categorías de reclamo se llama `categorias_reclamo` (NO `categorias`). Los estados de reclamos son SIEMPRE en minúsculas. Estados ACTIVOS (los que existen hoy): 'recibido', 'en_curso', 'pospuesto', 'finalizado', 'rechazado'. Para "pendientes" o "atrasados" usá: estado IN ('recibido', 'en_curso', 'pospuesto'). NUNCA uses 'nuevo', 'asignado', 'en_proceso' — son legacy y no hay datos con esos valores.
 1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. Para filtrar por municipio: verificá en el schema si la tabla tiene columna "municipio_id". Si NO la tiene, buscá "multi_tenant_note" que te indica qué tabla pivote usar.
+1.b TABLAS DE HISTORIAL — `historial_reclamos` e `historial_solicitudes` NO tienen columna `municipio_id`. Para filtrar por muni, SIEMPRE hacé JOIN con `reclamos` o `solicitudes` y filtrá `r.municipio_id = {{municipio_id}}` (o `s.municipio_id`). Lo mismo aplica para CUALQUIER consulta que toque comentarios, cambios de estado o etapas de la gestión.
 2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
 3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()
 4. **IMPORTANTE - GROUP BY**: MySQL tiene `only_full_group_by` activado. Cuando uses GROUP BY, TODAS las columnas en SELECT que NO sean funciones de agregación (COUNT, SUM, AVG, MAX, MIN) DEBEN estar en el GROUP BY. Si querés contar + mostrar detalles, usá una subquery o dos consultas separadas. Ejemplo INCORRECTO: `SELECT m.nombre, COUNT(r.id), r.estado FROM ... GROUP BY m.id`. Ejemplo CORRECTO: `SELECT m.id, m.nombre, COUNT(r.id) as cantidad FROM ... GROUP BY m.id, m.nombre`.
@@ -2359,6 +2360,12 @@ Usuario: "proceso de la solicitud 1" o "etapas de la solicitud 1" o "historial d
 
 Usuario: "historial del reclamo 5"
 {{"sql": "SELECT hr.id, hr.accion, hr.estado_anterior, hr.estado_nuevo, hr.comentario, hr.created_at, u.nombre as usuario FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id LEFT JOIN usuarios u ON hr.usuario_id = u.id WHERE r.id = 5 AND r.municipio_id = {municipio_id} ORDER BY hr.created_at ASC", "descripcion": "Historial del Reclamo 5"}}
+
+Usuario: "cuántos reclamos tienen comentarios" o "reclamos comentados"
+{{"sql": "SELECT COUNT(DISTINCT hr.reclamo_id) as cantidad FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id WHERE r.municipio_id = {municipio_id} AND hr.comentario IS NOT NULL AND hr.comentario != ''", "descripcion": "Reclamos con al menos un comentario"}}
+
+Usuario: "reclamos con cambios de estado este mes"
+{{"sql": "SELECT COUNT(DISTINCT hr.reclamo_id) as cantidad FROM historial_reclamos hr JOIN reclamos r ON hr.reclamo_id = r.id WHERE r.municipio_id = {municipio_id} AND hr.estado_nuevo IS NOT NULL AND hr.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)", "descripcion": "Reclamos con cambios de estado en el último mes"}}
 
 Usuario: "ranking de empleados por reclamos resueltos"
 {{"sql": "SELECT e.id, e.nombre, COUNT(*) as cantidad FROM empleados e JOIN reclamos r ON r.empleado_id = e.id WHERE e.municipio_id = {municipio_id} AND r.estado = 'resuelto' GROUP BY e.id ORDER BY cantidad DESC", "descripcion": "Ranking de empleados por reclamos resueltos"}}
