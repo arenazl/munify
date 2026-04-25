@@ -317,15 +317,21 @@ async def get_empleado_stats(
 @router.get("/stats")
 async def get_stats(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
 
+    # Filtro base: municipio (+ dependencia opcional)
+    base_filters = [Reclamo.municipio_id == municipio_id]
+    if dependencia_id:
+        base_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
     # Total de reclamos por estado
     estados_query = await db.execute(
         select(Reclamo.estado, func.count(Reclamo.id))
-        .where(Reclamo.municipio_id == municipio_id)
+        .where(*base_filters)
         .group_by(Reclamo.estado)
     )
     estados = {estado.value: count for estado, count in estados_query.all()}
@@ -338,7 +344,7 @@ async def get_stats(
     hoy_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base_filters,
             func.date(Reclamo.created_at) == hoy
         )
     )
@@ -349,7 +355,7 @@ async def get_stats(
     semana_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base_filters,
             func.date(Reclamo.created_at) >= inicio_semana
         )
     )
@@ -363,7 +369,7 @@ async def get_stats(
                 func.datediff(Reclamo.fecha_resolucion, Reclamo.created_at)
             )
         ).where(
-            Reclamo.municipio_id == municipio_id,
+            *base_filters,
             Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
             Reclamo.fecha_resolucion.is_not(None),
         )
@@ -382,6 +388,7 @@ async def get_stats(
 @router.get("/tramites-stats")
 async def get_tramites_stats(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -396,7 +403,7 @@ async def get_tramites_stats(
         municipio_id = current_user.municipio_id
 
     # Log para debug
-    print(f"[tramites-stats] municipio_id={municipio_id}, user={current_user.email}, header={request.headers.get('X-Municipio-ID')}")
+    print(f"[tramites-stats] municipio_id={municipio_id}, dep={dependencia_id}, user={current_user.email}, header={request.headers.get('X-Municipio-ID')}")
 
     # Si aún no hay municipio_id, retornar 0s
     if not municipio_id:
@@ -408,10 +415,15 @@ async def get_tramites_stats(
             "tiempo_promedio_dias": 0
         }
 
+    # Filtro base: municipio (+ dependencia opcional)
+    base_filters = [Solicitud.municipio_id == municipio_id]
+    if dependencia_id:
+        base_filters.append(Solicitud.municipio_dependencia_id == dependencia_id)
+
     # Total de solicitudes por estado
     estados_query = await db.execute(
         select(Solicitud.estado, func.count(Solicitud.id))
-        .where(Solicitud.municipio_id == municipio_id)
+        .where(*base_filters)
         .group_by(Solicitud.estado)
     )
     estados = {estado.value if hasattr(estado, 'value') else str(estado): count for estado, count in estados_query.all()}
@@ -424,7 +436,7 @@ async def get_tramites_stats(
     hoy_query = await db.execute(
         select(func.count(Solicitud.id))
         .where(
-            Solicitud.municipio_id == municipio_id,
+            *base_filters,
             func.date(Solicitud.created_at) == hoy
         )
     )
@@ -435,7 +447,7 @@ async def get_tramites_stats(
     semana_query = await db.execute(
         select(func.count(Solicitud.id))
         .where(
-            Solicitud.municipio_id == municipio_id,
+            *base_filters,
             func.date(Solicitud.created_at) >= inicio_semana
         )
     )
@@ -448,7 +460,7 @@ async def get_tramites_stats(
                 func.datediff(Solicitud.fecha_resolucion, Solicitud.created_at)
             )
         ).where(
-            Solicitud.municipio_id == municipio_id,
+            *base_filters,
             or_(
                 Solicitud.estado == EstadoSolicitud.FINALIZADO,
                 Solicitud.estado == "FINALIZADO"  # Estado legacy en mayúsculas
@@ -472,16 +484,21 @@ async def get_tramites_stats(
 @router.get("/por-categoria")
 async def get_por_categoria(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     from models.categoria_reclamo import CategoriaReclamo as Categoria
     municipio_id = get_effective_municipio_id(request, current_user)
 
+    filters = [Reclamo.municipio_id == municipio_id]
+    if dependencia_id:
+        filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
     query = await db.execute(
         select(Categoria.nombre, func.count(Reclamo.id))
         .join(Reclamo, Reclamo.categoria_id == Categoria.id)
-        .where(Reclamo.municipio_id == municipio_id)
+        .where(*filters)
         .group_by(Categoria.nombre)
         .order_by(func.count(Reclamo.id).desc())
     )
@@ -632,6 +649,7 @@ async def get_conteo_dependencias(
 @router.get("/por-zona")
 async def get_por_zona(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -639,14 +657,18 @@ async def get_por_zona(
     from sqlalchemy import and_
     municipio_id = get_effective_municipio_id(request, current_user)
 
+    join_conds = [
+        Reclamo.zona_id == Zona.id,
+        Reclamo.municipio_id == municipio_id,
+    ]
+    if dependencia_id:
+        join_conds.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
     # LEFT JOIN para incluir todas las zonas activas del municipio, incluso sin reclamos
     query = await db.execute(
         select(Zona.nombre, func.count(Reclamo.id))
         .select_from(Zona)
-        .outerjoin(Reclamo, and_(
-            Reclamo.zona_id == Zona.id,
-            Reclamo.municipio_id == municipio_id
-        ))
+        .outerjoin(Reclamo, and_(*join_conds))
         .where(and_(Zona.activo == True, Zona.municipio_id == municipio_id))
         .group_by(Zona.nombre)
         .order_by(func.count(Reclamo.id).desc())
@@ -659,21 +681,26 @@ async def get_por_zona(
 async def get_tendencia(
     request: Request,
     dias: int = 30,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)
 
+    filters = [
+        Reclamo.municipio_id == municipio_id,
+        func.date(Reclamo.created_at) >= fecha_inicio,
+    ]
+    if dependencia_id:
+        filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
     query = await db.execute(
         select(
             func.date(Reclamo.created_at).label('fecha'),
             func.count(Reclamo.id)
         )
-        .where(
-            Reclamo.municipio_id == municipio_id,
-            func.date(Reclamo.created_at) >= fecha_inicio
-        )
+        .where(*filters)
         .group_by(func.date(Reclamo.created_at))
         .order_by(func.date(Reclamo.created_at))
     )
@@ -686,6 +713,7 @@ async def get_tendencia(
 @router.get("/metricas-accion")
 async def get_metricas_accion(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -699,11 +727,15 @@ async def get_metricas_accion(
     hace_7_dias = hoy - timedelta(days=7)
     hace_14_dias = hoy - timedelta(days=14)
 
+    base = [Reclamo.municipio_id == municipio_id]
+    if dependencia_id:
+        base.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
     # 1. Reclamos urgentes (prioridad alta, no resueltos, más de 3 días)
     urgentes_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.prioridad >= 4,
             Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
@@ -715,7 +747,7 @@ async def get_metricas_accion(
     sin_asignar_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado == EstadoReclamo.NUEVO,
             func.date(Reclamo.created_at) < hoy
         )
@@ -726,7 +758,7 @@ async def get_metricas_accion(
     vencidos_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             Reclamo.fecha_programada != None,
             func.date(Reclamo.fecha_programada) < hoy
@@ -738,7 +770,7 @@ async def get_metricas_accion(
     para_hoy_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
@@ -749,7 +781,7 @@ async def get_metricas_accion(
     resueltos_semana_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado == EstadoReclamo.RESUELTO,
             func.date(Reclamo.fecha_resolucion) >= hace_7_dias
         )
@@ -759,7 +791,7 @@ async def get_metricas_accion(
     resueltos_semana_ant_query = await db.execute(
         select(func.count(Reclamo.id))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado == EstadoReclamo.RESUELTO,
             func.date(Reclamo.fecha_resolucion) >= hace_14_dias,
             func.date(Reclamo.fecha_resolucion) < hace_7_dias
@@ -812,6 +844,7 @@ class ReclamoResumen(BaseModel):
 @router.get("/metricas-detalle")
 async def get_metricas_detalle(
     request: Request,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -823,6 +856,10 @@ async def get_metricas_detalle(
     municipio_id = get_effective_municipio_id(request, current_user)
     hoy = datetime.utcnow().date()
     hace_7_dias = hoy - timedelta(days=7)
+
+    base = [Reclamo.municipio_id == municipio_id]
+    if dependencia_id:
+        base.append(Reclamo.municipio_dependencia_id == dependencia_id)
 
     async def get_reclamos_resumen(query_result) -> List[dict]:
         """Convierte resultados de query a resumen"""
@@ -845,7 +882,7 @@ async def get_metricas_detalle(
         select(Reclamo)
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.prioridad >= 4,
             Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
@@ -860,7 +897,7 @@ async def get_metricas_detalle(
         select(Reclamo)
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado == EstadoReclamo.NUEVO,
             func.date(Reclamo.created_at) < hoy
         )
@@ -874,7 +911,7 @@ async def get_metricas_detalle(
         select(Reclamo)
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
@@ -888,7 +925,7 @@ async def get_metricas_detalle(
         select(Reclamo)
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
         .where(
-            Reclamo.municipio_id == municipio_id,
+            *base,
             Reclamo.estado == EstadoReclamo.RESUELTO,
             func.date(Reclamo.fecha_resolucion) >= hace_7_dias
         )
@@ -910,6 +947,7 @@ async def get_recurrentes(
     request: Request,
     dias: int = 90,
     min_reclamos: int = 2,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -920,6 +958,15 @@ async def get_recurrentes(
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow().date() - timedelta(days=dias)
 
+    sub_filters = [
+        Reclamo.municipio_id == municipio_id,
+        Reclamo.direccion != None,
+        Reclamo.direccion != '',
+        func.date(Reclamo.created_at) >= fecha_inicio,
+    ]
+    if dependencia_id:
+        sub_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
     # Buscar direcciones con múltiples reclamos
     subquery = (
         select(
@@ -927,12 +974,7 @@ async def get_recurrentes(
             Reclamo.zona_id,
             func.count(Reclamo.id).label('cantidad')
         )
-        .where(
-            Reclamo.municipio_id == municipio_id,
-            Reclamo.direccion != None,
-            Reclamo.direccion != '',
-            func.date(Reclamo.created_at) >= fecha_inicio
-        )
+        .where(*sub_filters)
         .group_by(Reclamo.direccion, Reclamo.zona_id)
         .having(func.count(Reclamo.id) >= min_reclamos)
         .subquery()
@@ -954,13 +996,16 @@ async def get_recurrentes(
             zona_nombre = zona_query.scalar() or "Sin zona"
 
         # Obtener categorías de esos reclamos
+        cat_filters = [
+            Reclamo.direccion == direccion,
+            Reclamo.municipio_id == municipio_id,
+        ]
+        if dependencia_id:
+            cat_filters.append(Reclamo.municipio_dependencia_id == dependencia_id)
         cat_query = await db.execute(
             select(Categoria.nombre)
             .join(Reclamo, Reclamo.categoria_id == Categoria.id)
-            .where(
-                Reclamo.direccion == direccion,
-                Reclamo.municipio_id == municipio_id
-            )
+            .where(*cat_filters)
             .distinct()
         )
         categorias = [c[0] for c in cat_query.all()]

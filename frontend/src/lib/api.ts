@@ -568,18 +568,32 @@ export const usersApi = {
 };
 
 // Dashboard
+// Helper interno: arma `{ dependencia_id }` solo si viene seteado, así no
+// mandamos el query param vacío (FastAPI lo valida como int y rechaza "").
+const depParam = (id?: number) => (id ? { dependencia_id: id } : {});
+
 export const dashboardApi = {
   getConfig: () => api.get('/dashboard/config'),
-  getStats: () => api.get('/dashboard/stats'),
-  getTramitesStats: () => api.get('/dashboard/tramites-stats'),
+  getStats: (dependenciaId?: number) =>
+    api.get('/dashboard/stats', { params: depParam(dependenciaId) }),
+  getTramitesStats: (dependenciaId?: number) =>
+    api.get('/dashboard/tramites-stats', { params: depParam(dependenciaId) }),
   getMisStats: () => api.get('/dashboard/mis-stats'),
   getEmpleadoStats: () => api.get('/dashboard/empleado-stats'),
-  getPorCategoria: () => api.get('/dashboard/por-categoria'),
-  getPorZona: () => api.get('/dashboard/por-zona'),
-  getTendencia: (dias?: number) => api.get('/dashboard/tendencia', { params: dias ? { dias } : {} }),
-  getMetricasAccion: () => api.get('/dashboard/metricas-accion'),
-  getMetricasDetalle: () => api.get('/dashboard/metricas-detalle'),
-  getRecurrentes: (dias?: number, minReclamos?: number) => api.get('/dashboard/recurrentes', { params: { dias: dias || 90, min_reclamos: minReclamos || 2 } }),
+  getPorCategoria: (dependenciaId?: number) =>
+    api.get('/dashboard/por-categoria', { params: depParam(dependenciaId) }),
+  getPorZona: (dependenciaId?: number) =>
+    api.get('/dashboard/por-zona', { params: depParam(dependenciaId) }),
+  getTendencia: (dias?: number, dependenciaId?: number) =>
+    api.get('/dashboard/tendencia', { params: { ...(dias ? { dias } : {}), ...depParam(dependenciaId) } }),
+  getMetricasAccion: (dependenciaId?: number) =>
+    api.get('/dashboard/metricas-accion', { params: depParam(dependenciaId) }),
+  getMetricasDetalle: (dependenciaId?: number) =>
+    api.get('/dashboard/metricas-detalle', { params: depParam(dependenciaId) }),
+  getRecurrentes: (dias?: number, minReclamos?: number, dependenciaId?: number) =>
+    api.get('/dashboard/recurrentes', {
+      params: { dias: dias || 90, min_reclamos: minReclamos || 2, ...depParam(dependenciaId) },
+    }),
   getConteoCategorias: (params?: { estado?: string; dependencia_id?: number }) =>
     api.get('/dashboard/conteo-categorias', { params: params || {} }),
   getConteoEstados: (dependencia_id?: number) =>
@@ -1083,16 +1097,22 @@ export const publicApi = publicoApi;
 
 // Analytics avanzados
 export const analyticsApi = {
-  getHeatmap: (dias?: number, categoriaId?: number) =>
-    api.get('/analytics/heatmap', { params: { dias, categoria_id: categoriaId } }),
+  getHeatmap: (dias?: number, categoriaId?: number, dependenciaId?: number) =>
+    api.get('/analytics/heatmap', {
+      params: { dias, categoria_id: categoriaId, ...(dependenciaId ? { dependencia_id: dependenciaId } : {}) },
+    }),
   getClusters: (radioKm?: number, minReclamos?: number, dias?: number) =>
     api.get('/analytics/clusters', { params: { radio_km: radioKm, min_reclamos: minReclamos, dias } }),
   getDistancias: (dias?: number) =>
     api.get('/analytics/distancias', { params: { dias } }),
-  getCobertura: (dias?: number) =>
-    api.get('/analytics/cobertura', { params: { dias } }),
-  getTiempoResolucion: (dias?: number) =>
-    api.get('/analytics/tiempo-resolucion', { params: { dias } }),
+  getCobertura: (dias?: number, dependenciaId?: number) =>
+    api.get('/analytics/cobertura', {
+      params: { dias, ...(dependenciaId ? { dependencia_id: dependenciaId } : {}) },
+    }),
+  getTiempoResolucion: (dias?: number, dependenciaId?: number) =>
+    api.get('/analytics/tiempo-resolucion', {
+      params: { dias, ...(dependenciaId ? { dependencia_id: dependenciaId } : {}) },
+    }),
   getRendimientoEmpleados: (semanas?: number) =>
     api.get('/analytics/rendimiento-empleados', { params: { semanas } }),
 };

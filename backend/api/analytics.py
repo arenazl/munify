@@ -46,6 +46,7 @@ async def get_heatmap_data(
     request: Request,
     dias: int = Query(30, description="Últimos N días"),
     categoria_id: Optional[int] = None,
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -73,6 +74,8 @@ async def get_heatmap_data(
 
     if categoria_id:
         query = query.where(Reclamo.categoria_id == categoria_id)
+    if dependencia_id:
+        query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
 
     result = await db.execute(query)
     reclamos = result.all()
@@ -214,6 +217,7 @@ async def get_distancias_empleados(
 async def get_cobertura_zonas(
     request: Request,
     dias: int = Query(30, description="Últimos N días"),
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -223,6 +227,14 @@ async def get_cobertura_zonas(
     """
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
+
+    join_conds = [
+        Reclamo.zona_id == Zona.id,
+        Reclamo.created_at >= fecha_inicio,
+        Reclamo.municipio_id == municipio_id,
+    ]
+    if dependencia_id:
+        join_conds.append(Reclamo.municipio_dependencia_id == dependencia_id)
 
     # Reclamos por zona con estados (filtrado por municipio)
     result = await db.execute(
@@ -236,11 +248,7 @@ async def get_cobertura_zonas(
             func.avg(Reclamo.prioridad).label('prioridad_promedio')
         )
         .select_from(Zona)
-        .outerjoin(Reclamo, and_(
-            Reclamo.zona_id == Zona.id,
-            Reclamo.created_at >= fecha_inicio,
-            Reclamo.municipio_id == municipio_id
-        ))
+        .outerjoin(Reclamo, and_(*join_conds))
         .where(and_(Zona.activo == True, Zona.municipio_id == municipio_id))
         .group_by(Zona.id, Zona.nombre)
     )
@@ -307,6 +315,7 @@ async def get_cobertura_zonas(
 async def get_tiempo_resolucion_por_categoria(
     request: Request,
     dias: int = Query(90, description="Últimos N días"),
+    dependencia_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
@@ -315,6 +324,16 @@ async def get_tiempo_resolucion_por_categoria(
     """
     municipio_id = get_effective_municipio_id(request, current_user)
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
+
+    where_conds = [
+        # Incluye ambos estados "resueltos": finalizado (nuevo) y resuelto (legacy)
+        Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
+        Reclamo.fecha_resolucion.isnot(None),
+        Reclamo.fecha_resolucion >= fecha_inicio,
+        Reclamo.municipio_id == municipio_id,
+    ]
+    if dependencia_id:
+        where_conds.append(Reclamo.municipio_dependencia_id == dependencia_id)
 
     result = await db.execute(
         select(
@@ -326,15 +345,7 @@ async def get_tiempo_resolucion_por_categoria(
             ).label('dias_promedio')
         )
         .join(Reclamo, Reclamo.categoria_id == Categoria.id)
-        .where(
-            and_(
-                # Incluye ambos estados "resueltos": finalizado (nuevo) y resuelto (legacy)
-                Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
-                Reclamo.fecha_resolucion.isnot(None),
-                Reclamo.fecha_resolucion >= fecha_inicio,
-                Reclamo.municipio_id == municipio_id
-            )
-        )
+        .where(and_(*where_conds))
         .group_by(Categoria.id, Categoria.nombre, Categoria.color)
         .order_by(func.avg(func.datediff(Reclamo.fecha_resolucion, Reclamo.created_at)))
     )

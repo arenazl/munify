@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays } from 'lucide-react';
-import { dashboardApi, analyticsApi, reclamosApi } from '../lib/api';
+import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays, Filter } from 'lucide-react';
+import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ChartSkeleton, DashboardStatSkeleton } from '../components/ui/Skeleton';
+import { ModernSelect } from '../components/ui/ModernSelect';
 import {
   XAxis,
   YAxis,
@@ -153,14 +154,88 @@ export default function Dashboard() {
     await new Promise(r => setTimeout(r, 800));
   }, []);
 
+  // ====================================================================
+  // Filtro por dependencia — el dashboard NUNCA muestra todas las
+  // dependencias mezcladas: arranca pre-seleccionando la primera activa
+  // y la persiste en localStorage por municipio. El admin puede cambiarla.
+  // ====================================================================
+  type DependenciaItem = { id: number; nombre: string; color?: string; icono?: string };
+  const [dependencias, setDependencias] = useState<DependenciaItem[]>([]);
+  const [selectedDependenciaId, setSelectedDependenciaId] = useState<number | null>(null);
+  const [dependenciasLoaded, setDependenciasLoaded] = useState(false);
+
+  const lsKey = useMemo(
+    () => (municipioActual?.id ? `dashboard_dep_${municipioActual.id}` : null),
+    [municipioActual?.id],
+  );
+
+  // Cargar dependencias activas del municipio y resolver selección inicial
   useEffect(() => {
+    let cancel = false;
+    const loadDeps = async () => {
+      try {
+        const res = await dependenciasApi.getMunicipio({ activo: true });
+        if (cancel) return;
+        const items: DependenciaItem[] = (res.data || []).map((d: any) => ({
+          id: d.id,
+          nombre: d.nombre,
+          color: d.color,
+          icono: d.icono,
+        }));
+        setDependencias(items);
+
+        // Resolver selección: localStorage > primera activa > null
+        let nextId: number | null = null;
+        if (lsKey) {
+          const stored = localStorage.getItem(lsKey);
+          if (stored) {
+            const parsed = parseInt(stored, 10);
+            if (items.some(i => i.id === parsed)) nextId = parsed;
+          }
+        }
+        if (nextId === null && items.length > 0) {
+          nextId = items[0].id;
+        }
+        setSelectedDependenciaId(nextId);
+      } catch (err) {
+        console.error('Error cargando dependencias del municipio:', err);
+      } finally {
+        if (!cancel) setDependenciasLoaded(true);
+      }
+    };
+    loadDeps();
+    return () => { cancel = true; };
+  }, [lsKey]);
+
+  // Persistir selección
+  const handleDependenciaChange = useCallback((value: string) => {
+    const id = value ? parseInt(value, 10) : null;
+    setSelectedDependenciaId(id);
+    if (lsKey) {
+      if (id) localStorage.setItem(lsKey, String(id));
+      else localStorage.removeItem(lsKey);
+    }
+  }, [lsKey]);
+
+  // Indicador sutil mientras refrescamos por cambio de dependencia
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    // No fetchear nada hasta que sepamos qué dependencia mostrar
+    if (!dependenciasLoaded) return;
     const fetchData = async () => {
       try {
+        const depId = selectedDependenciaId ?? undefined;
+
+        // Si ya tenemos un primer render, no rompemos el layout con el
+        // skeleton: sólo marcamos un refresh sutil y actualizamos en lugar.
+        if (stats) setRefreshing(true);
+
         // Paso 1: Cargar datos básicos primero (más rápido)
         try {
           const [statsRes, tramitesRes] = await Promise.all([
-            dashboardApi.getStats(),
-            dashboardApi.getTramitesStats().catch((err) => {
+            dashboardApi.getStats(depId),
+            dashboardApi.getTramitesStats(depId).catch((err) => {
               console.error('Error cargando tramites stats:', err);
               return { data: null };
             }),
@@ -178,9 +253,9 @@ export default function Dashboard() {
         // Paso 2: Cargar gráficos básicos (independientemente)
         try {
           const [categoriaRes, zonasRes, metricasRes] = await Promise.all([
-            dashboardApi.getPorCategoria().catch(e => ({ data: [] })),
-            dashboardApi.getPorZona().catch(e => ({ data: [] })),
-            dashboardApi.getMetricasAccion().catch(e => ({ data: null })),
+            dashboardApi.getPorCategoria(depId).catch(e => ({ data: [] })),
+            dashboardApi.getPorZona(depId).catch(e => ({ data: [] })),
+            dashboardApi.getMetricasAccion(depId).catch(e => ({ data: null })),
           ]);
           setPorCategoria(categoriaRes.data || []);
           setPorZona((zonasRes.data || []).slice(0, 5));
@@ -191,11 +266,13 @@ export default function Dashboard() {
         setLoadingCharts(false);
 
         // Paso 3: Cargar datos para la vista de métricas (livianos)
+        // Nota: `reclamosApi.getRecurrentes` es público (no autenticado) y no
+        // soporta dependencia_id — se mantiene por municipio.
         try {
           const muniId = municipioActual?.id;
           const [tendenciasRes, recurrentesRes, similaresRes] = await Promise.all([
-            dashboardApi.getTendencia(30).catch(e => ({ data: [] })),
-            dashboardApi.getRecurrentes(90, 2).catch(e => ({ data: [] })),
+            dashboardApi.getTendencia(30, depId).catch(e => ({ data: [] })),
+            dashboardApi.getRecurrentes(90, 2, depId).catch(e => ({ data: [] })),
             muniId ? reclamosApi.getRecurrentes({ limit: 10, dias_atras: 30, min_similares: 2, municipio_id: muniId }).catch(e => ({ data: [] })) : Promise.resolve({ data: [] }),
           ]);
           setTendencias(tendenciasRes.data || []);
@@ -208,7 +285,7 @@ export default function Dashboard() {
         // Paso 4: Cargar analytics avanzados (más pesados) de a uno
         try {
           // Traer 90 días para el mapa de calor (más representativo)
-          const heatmapRes = await analyticsApi.getHeatmap(90).catch(e => ({ data: { puntos: [] } }));
+          const heatmapRes = await analyticsApi.getHeatmap(90, undefined, depId).catch(e => ({ data: { puntos: [] } }));
           setHeatmapData(heatmapRes.data.puntos || []);
         } catch (error) {
           console.error('Error cargando heatmap:', error);
@@ -225,7 +302,7 @@ export default function Dashboard() {
         }
 
         try {
-          const coberturaRes = await analyticsApi.getCobertura(30).catch(e => ({ data: { zonas: [], resumen: null } }));
+          const coberturaRes = await analyticsApi.getCobertura(30, depId).catch(e => ({ data: { zonas: [], resumen: null } }));
           setCobertura(coberturaRes.data.zonas || []);
           setCoberturaResumen(coberturaRes.data.resumen || null);
         } catch (error) {
@@ -233,7 +310,7 @@ export default function Dashboard() {
         }
 
         try {
-          const tiempoRes = await analyticsApi.getTiempoResolucion(90).catch(e => ({ data: { categorias: [] } }));
+          const tiempoRes = await analyticsApi.getTiempoResolucion(90, depId).catch(e => ({ data: { categorias: [] } }));
           setTiempoResolucion(tiempoRes.data.categorias || []);
         } catch (error) {
           console.error('Error cargando tiempo resolución:', error);
@@ -248,22 +325,27 @@ export default function Dashboard() {
         }
 
         try {
-          const metricasDetalleRes = await dashboardApi.getMetricasDetalle().catch(e => ({ data: null }));
+          const metricasDetalleRes = await dashboardApi.getMetricasDetalle(depId).catch(e => ({ data: null }));
           setMetricasDetalle(metricasDetalleRes.data || null);
         } catch (error) {
           console.error('Error cargando métricas detalle:', error);
         }
 
         setLoadingAnalytics(false);
+        setRefreshing(false);
       } catch (error) {
         console.error('Error general cargando dashboard:', error);
         setLoading(false);
         setLoadingCharts(false);
         setLoadingAnalytics(false);
+        setRefreshing(false);
       }
     };
     fetchData();
-  }, [refreshKey]);
+    // `stats` intencionalmente fuera de deps: solo lo leemos para decidir si
+    // marcamos el refresh sutil; agregarlo causaría loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey, selectedDependenciaId, dependenciasLoaded, municipioActual?.id]);
 
   if (loading) {
     return (
@@ -442,6 +524,23 @@ export default function Dashboard() {
   const rawNombre = municipioActual?.nombre || localStorage.getItem('municipio_nombre') || 'Tu Municipio';
   const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
 
+  // Opciones del selector de dependencia. Incluye "Todas" como opción
+  // explícita para que el admin pueda ver el agregado cuando lo necesite,
+  // pero el default arranca en la primera dependencia (no en "Todas").
+  const showDepFilter = user?.rol === 'admin' || user?.rol === 'supervisor';
+  const dependenciaOptions = useMemo(() => [
+    { value: '', label: 'Todas las dependencias' },
+    ...dependencias.map(d => ({
+      value: String(d.id),
+      label: d.nombre,
+      color: d.color,
+    })),
+  ], [dependencias]);
+  const selectedDepNombre = useMemo(() => {
+    if (!selectedDependenciaId) return null;
+    return dependencias.find(d => d.id === selectedDependenciaId)?.nombre || null;
+  }, [selectedDependenciaId, dependencias]);
+
   return (
     <PullToRefresh onRefresh={handleRefresh}>
     <div className="space-y-6">
@@ -600,7 +699,9 @@ export default function Dashboard() {
               <span className="font-bold">{municipioNombre}</span>
             </h1>
             <p className="text-sm md:text-base mb-4" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-              Monitoreo en tiempo real de gestión municipal
+              {selectedDepNombre
+                ? <>Vista de la dependencia <strong>{selectedDepNombre}</strong></>
+                : 'Vista consolidada de todas las dependencias'}
             </p>
 
             {/* Stats rápidos estilo Wok */}
@@ -621,6 +722,51 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Filtro por dependencia — gobierna toda la información del tablero.
+          A nivel admin no tiene sentido un dashboard "global" sin foco; por
+          eso arranca pre-seleccionando la primera dependencia activa. */}
+      {showDepFilter && dependencias.length > 0 && (
+        <div
+          className="flex items-center gap-3 rounded-2xl px-4 py-3"
+          style={{
+            backgroundColor: theme.card,
+            border: `1px solid ${theme.border}`,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+          }}
+        >
+          <div
+            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: `${theme.primary}18` }}
+          >
+            <Filter className="h-5 w-5" style={{ color: theme.primary }} />
+          </div>
+          <div className="flex-shrink-0 min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+              Filtrar tablero
+            </p>
+            <p className="text-xs" style={{ color: theme.text }}>Dependencia</p>
+          </div>
+          <div className="flex-1 min-w-0 max-w-md">
+            <ModernSelect
+              value={selectedDependenciaId ? String(selectedDependenciaId) : ''}
+              onChange={handleDependenciaChange}
+              options={dependenciaOptions}
+              placeholder="Elegir dependencia..."
+              searchable
+            />
+          </div>
+          {refreshing && (
+            <div className="flex items-center gap-2 text-xs flex-shrink-0" style={{ color: theme.textSecondary }}>
+              <div
+                className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: `${theme.primary}50`, borderTopColor: 'transparent' }}
+              />
+              <span className="hidden sm:inline">Actualizando…</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Stats cards - Dos filas: Reclamos y Trámites */}
       <div className="space-y-4">
