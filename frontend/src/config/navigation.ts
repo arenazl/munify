@@ -41,9 +41,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
-  const isAdminOrSupervisor = isAdmin || isSupervisor;
   const isVecino = userRole === 'vecino';
   const isDependencia = hasDependencia && isSupervisor; // Un usuario de dependencia tiene rol supervisor con dependencia asignada
+  // "Gestor" general del municipio = admin o supervisor SIN dependencia.
+  // Los supervisores de dependencia tienen su propia sección "Mi Área" y no
+  // deben ver el menú general (si no, Reclamos/Trámites/Mapa aparecen duplicados).
+  const isAdminOrSupervisor = (isAdmin || isSupervisor) && !isDependencia;
 
   return [
     // === SECCIÓN DEPENDENCIA (usuarios de dependencia) ===
