@@ -592,8 +592,10 @@ async def confirmar_pago(
             payload_externo=sesion.metadatos,
         ))
 
-    # Si era pago de un tramite, dejar registro en historial y eventualmente
-    # auto-finalizar si ya estaba en_curso/pendiente_pago.
+    # Si era pago de un tramite: registrar el evento y, si estaba en
+    # PENDIENTE_PAGO (cobro al inicio), pasar la solicitud a RECIBIDO ahora
+    # que el dinero ya entró. Las dependencias recién la pueden trabajar.
+    solicitud_pasa_a_recibido = False
     if sesion.solicitud_id:
         from models.tramite import Solicitud, EstadoSolicitud, HistorialSolicitud
         sol_q = await db.execute(
@@ -603,11 +605,18 @@ async def confirmar_pago(
         if solicitud:
             estado_previo = solicitud.estado
             costo_fmt = f"${sesion.monto:,.2f}".replace(",", ".") if sesion.monto else ""
+
+            estado_nuevo = estado_previo
+            if estado_previo == EstadoSolicitud.PENDIENTE_PAGO:
+                solicitud.estado = EstadoSolicitud.RECIBIDO
+                estado_nuevo = EstadoSolicitud.RECIBIDO
+                solicitud_pasa_a_recibido = True
+
             db.add(HistorialSolicitud(
                 solicitud_id=solicitud.id,
                 usuario_id=sesion.vecino_user_id,
                 estado_anterior=estado_previo,
-                estado_nuevo=estado_previo,  # el pago no fuerza cambio de estado, solo registra
+                estado_nuevo=estado_nuevo,
                 accion=f"💳 Pago aprobado · {body.medio_pago.value if hasattr(body.medio_pago, 'value') else body.medio_pago}",
                 comentario=f"Sesión {sesion.id} · {costo_fmt} · N° operación {sesion.external_id}",
             ))

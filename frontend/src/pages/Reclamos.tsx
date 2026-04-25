@@ -557,10 +557,22 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       }
     };
 
-    const pollingInterval = setInterval(checkForUpdates, 30000);
+    const pollingInterval = setInterval(checkForUpdates, 10000);
     return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch, soloMiArea, user?.dependencia?.id]);
+
+  // Mantener actualizado el reclamo del modal abierto cuando la lista cambia
+  // (después del polling). Si el reclamo seleccionado se modificó en backend,
+  // refrescamos la card del modal sin cerrarlo.
+  useEffect(() => {
+    if (!selectedReclamo) return;
+    const fresh = reclamos.find(r => r.id === selectedReclamo.id);
+    if (fresh && JSON.stringify(fresh) !== JSON.stringify(selectedReclamo)) {
+      setSelectedReclamo(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reclamos]);
 
   // Recargar conteos de categorías y estados cuando cambia el filtro de dependencia
   useEffect(() => {

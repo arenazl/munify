@@ -199,6 +199,30 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
 
+  // Autorefresh cada 10s — la lista se actualiza sola para reflejar pagos
+  // confirmados, cambios de estado por otros operadores, etc. Si el modal
+  // está abierto, también refrescamos la solicitud seleccionada.
+  useEffect(() => {
+    if (loading) return;
+    const id = setInterval(async () => {
+      // Si el usuario está escribiendo en la búsqueda evitamos sobreescribir.
+      if (document.activeElement?.tagName === 'INPUT') return;
+      await loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite);
+    }, 10000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, filtroTipo, filtroEstado, searchTerm, filtroTramite, soloMiArea]);
+
+  // Mantener actualizado el trámite del modal abierto cuando la lista cambia.
+  useEffect(() => {
+    if (!selectedTramite) return;
+    const fresh = tramites.find(t => t.id === selectedTramite.id);
+    if (fresh && JSON.stringify(fresh) !== JSON.stringify(selectedTramite)) {
+      setSelectedTramite(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tramites]);
+
   // Abrir trámite desde URL o wizard para crear nuevo
   useEffect(() => {
     const tramiteId = searchParams.get('id');
