@@ -218,7 +218,11 @@ export default function AsignacionDependencias() {
     if (!result.destination) return;
 
     const { source, destination, draggableId } = result;
-    const itemId = parseInt(draggableId.split('-')[1]);
+    // El draggableId ahora puede ser "disponible-3" o "dep-7-3". Sacamos
+    // el itemId del último segmento numérico para soportar ambos formatos.
+    const idMatch = draggableId.match(/-(\d+)$/);
+    const itemId = idMatch ? parseInt(idMatch[1]) : NaN;
+    if (Number.isNaN(itemId)) return;
 
     // Identificar origen y destino
     const sourceDepId = source.droppableId === 'disponibles' ? null : parseInt(source.droppableId.replace('dep-', ''));
@@ -566,8 +570,8 @@ export default function AsignacionDependencias() {
                   >
                     {itemsDisponibles.map((item, index) => (
                       <Draggable
-                        key={`item-${item.id}`}
-                        draggableId={`item-${item.id}`}
+                        key={`disponible-${item.id}`}
+                        draggableId={`disponible-${item.id}`}
                         index={index}
                       >
                         {(provided, snapshot) => (
@@ -671,7 +675,7 @@ export default function AsignacionDependencias() {
                               return (
                                 <div key={item.id}>
                                   <Draggable
-                                    draggableId={`item-${item.id}`}
+                                    draggableId={`dep-${dep.id}-${item.id}`}
                                     index={index}
                                   >
                                     {(provided, snapshot) => (
