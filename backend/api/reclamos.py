@@ -751,14 +751,13 @@ async def buscar_reclamos_similares(
 @router.get("/mis-estadisticas")
 async def get_mis_estadisticas(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["empleado"]))
+    current_user: User = Depends(require_roles(["supervisor", "admin"]))
 ):
     """
-    Obtiene estadísticas de rendimiento del empleado logueado.
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
+    Estadísticas de rendimiento de la dependencia del supervisor logueado.
+    Filtra Reclamos por current_user.municipio_dependencia_id.
     """
-    # Por ahora retorna 0s ya que no hay empleado_id en reclamos
-    return {
+    empty = {
         "total_asignados": 0,
         "resueltos": 0,
         "en_curso": 0,
@@ -767,7 +766,106 @@ async def get_mis_estadisticas(
         "tiempo_promedio_resolucion": 0,
         "por_categoria": [],
         "ultimos_resueltos": [],
-        "mensaje": "Pendiente migración a dependencias"
+    }
+
+    # Sin dependencia asignada -> no hay nada que medir
+    if not current_user.municipio_dependencia_id:
+        return {**empty, "mensaje": "Tu usuario no tiene una dependencia asignada."}
+
+    estados_resueltos = [EstadoReclamo.FINALIZADO.value, EstadoReclamo.RESUELTO.value]
+    estados_en_curso = [EstadoReclamo.EN_CURSO.value, EstadoReclamo.EN_PROCESO.value, EstadoReclamo.ASIGNADO.value]
+
+    base_filter = Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id
+    if current_user.municipio_id:
+        base_filter = base_filter & (Reclamo.municipio_id == current_user.municipio_id)
+
+    # Total + breakdown por estado en una sola query
+    total_q = await db.execute(select(func.count(Reclamo.id)).where(base_filter))
+    total_asignados = total_q.scalar() or 0
+
+    if total_asignados == 0:
+        return empty
+
+    estado_q = await db.execute(
+        select(Reclamo.estado, func.count(Reclamo.id)).where(base_filter).group_by(Reclamo.estado)
+    )
+    counts_by_estado = {(e.value if hasattr(e, "value") else e): c for e, c in estado_q.all()}
+
+    resueltos = sum(counts_by_estado.get(e, 0) for e in estados_resueltos)
+    en_curso = sum(counts_by_estado.get(e, 0) for e in estados_en_curso)
+    pendientes = max(total_asignados - resueltos - en_curso, 0)
+
+    # Resueltos este mes
+    ahora = datetime.now(timezone.utc)
+    inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    mes_q = await db.execute(
+        select(func.count(Reclamo.id)).where(
+            base_filter,
+            Reclamo.estado.in_(estados_resueltos),
+            Reclamo.fecha_resolucion >= inicio_mes,
+        )
+    )
+    resueltos_este_mes = mes_q.scalar() or 0
+
+    # Tiempo promedio de resolución (días) sobre reclamos resueltos con fecha_resolucion
+    tiempo_promedio = 0.0
+    tiempos_q = await db.execute(
+        select(Reclamo.created_at, Reclamo.fecha_resolucion).where(
+            base_filter,
+            Reclamo.estado.in_(estados_resueltos),
+            Reclamo.fecha_resolucion.isnot(None),
+        )
+    )
+    diffs = []
+    for created, resuelto in tiempos_q.all():
+        if created and resuelto:
+            diffs.append((resuelto - created).total_seconds() / 86400.0)
+    if diffs:
+        tiempo_promedio = round(sum(diffs) / len(diffs), 1)
+
+    # Por categoría (top 10)
+    from models.categoria_reclamo import CategoriaReclamo as Categoria
+    cat_q = await db.execute(
+        select(Categoria.nombre, func.count(Reclamo.id))
+        .join(Categoria, Categoria.id == Reclamo.categoria_id)
+        .where(base_filter)
+        .group_by(Categoria.nombre)
+        .order_by(func.count(Reclamo.id).desc())
+        .limit(10)
+    )
+    por_categoria = [{"categoria": nombre, "cantidad": cantidad} for nombre, cantidad in cat_q.all()]
+
+    # Últimos 5 resueltos
+    ult_q = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria))
+        .where(
+            base_filter,
+            Reclamo.estado.in_(estados_resueltos),
+            Reclamo.fecha_resolucion.isnot(None),
+        )
+        .order_by(Reclamo.fecha_resolucion.desc())
+        .limit(5)
+    )
+    ultimos_resueltos = [
+        {
+            "id": r.id,
+            "titulo": r.titulo,
+            "categoria": r.categoria.nombre if r.categoria else "—",
+            "fecha_resolucion": r.fecha_resolucion.strftime("%d/%m/%Y") if r.fecha_resolucion else "",
+        }
+        for r in ult_q.scalars().all()
+    ]
+
+    return {
+        "total_asignados": total_asignados,
+        "resueltos": resueltos,
+        "en_curso": en_curso,
+        "pendientes": pendientes,
+        "resueltos_este_mes": resueltos_este_mes,
+        "tiempo_promedio_resolucion": tiempo_promedio,
+        "por_categoria": por_categoria,
+        "ultimos_resueltos": ultimos_resueltos,
     }
 
 
@@ -777,19 +875,49 @@ async def get_mi_historial(
     limit: int = Query(20, le=50),
     estado: Optional[str] = Query(None, description="Filtrar por estado"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["empleado"]))
+    current_user: User = Depends(require_roles(["supervisor", "admin"]))
 ):
     """
-    Obtiene el historial completo de trabajos del empleado.
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
+    Historial de reclamos asignados a la dependencia del supervisor logueado.
     """
-    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
-    return {
-        "data": [],
-        "total": 0,
-        "skip": skip,
-        "limit": limit
-    }
+    if not current_user.municipio_dependencia_id:
+        return {"data": [], "total": 0, "skip": skip, "limit": limit}
+
+    filtros = [Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id]
+    if current_user.municipio_id:
+        filtros.append(Reclamo.municipio_id == current_user.municipio_id)
+    if estado:
+        filtros.append(Reclamo.estado == estado)
+
+    total_q = await db.execute(select(func.count(Reclamo.id)).where(*filtros))
+    total = total_q.scalar() or 0
+
+    rows_q = await db.execute(
+        select(Reclamo)
+        .options(selectinload(Reclamo.categoria), selectinload(Reclamo.creador))
+        .where(*filtros)
+        .order_by(Reclamo.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    data = [
+        {
+            "id": r.id,
+            "titulo": r.titulo,
+            "estado": r.estado.value if hasattr(r.estado, "value") else r.estado,
+            "categoria": r.categoria.nombre if r.categoria else None,
+            "direccion": r.direccion,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "fecha_resolucion": r.fecha_resolucion.isoformat() if r.fecha_resolucion else None,
+            "creador": {
+                "nombre": r.creador.nombre,
+                "apellido": r.creador.apellido,
+            } if r.creador else None,
+        }
+        for r in rows_q.scalars().all()
+    ]
+
+    return {"data": data, "total": total, "skip": skip, "limit": limit}
 
 
 # ===========================================
