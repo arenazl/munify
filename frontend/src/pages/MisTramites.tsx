@@ -197,9 +197,11 @@ export default function MisTramites() {
 
   const filteredTramites = tramites
     .filter(t => {
-      const matchSearch = t.numero_tramite.toLowerCase().includes(search.toLowerCase()) ||
-        t.asunto.toLowerCase().includes(search.toLowerCase()) ||
-        (t.tramite?.nombre.toLowerCase().includes(search.toLowerCase()) ?? false);
+      const q = search.toLowerCase();
+      const matchSearch =
+        (t.numero_tramite || '').toLowerCase().includes(q) ||
+        (t.asunto || '').toLowerCase().includes(q) ||
+        (t.tramite?.nombre || '').toLowerCase().includes(q);
       const matchEstado = filtroEstado === 'todos' || t.estado === filtroEstado;
       return matchSearch && matchEstado;
     })

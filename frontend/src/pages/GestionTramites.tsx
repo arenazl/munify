@@ -1071,7 +1071,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           sortValue: (t) => t.numero_tramite,
           render: (t) => (
             <span className="font-mono text-xs font-medium" style={{ color: theme.primary }}>
-              #{t.numero_tramite.slice(-4)}
+              #{(t.numero_tramite || '').slice(-4) || '—'}
             </span>
           ),
         },
