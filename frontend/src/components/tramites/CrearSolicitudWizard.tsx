@@ -1362,9 +1362,9 @@ function ConfirmCrearVentanilla({
 }) {
   const { theme } = useTheme();
   if (!open) return null;
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
       onClick={onCancel}
     >
@@ -1416,6 +1416,7 @@ function ConfirmCrearVentanilla({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

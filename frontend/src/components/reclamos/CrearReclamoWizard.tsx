@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search,
   MapPin,
@@ -1255,9 +1256,9 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         completeLabel="Crear reclamo"
         primaryButtonColor={categoriaSeleccionada?.color}
       />
-      {ctxMostrador && confirmAbierto && (
+      {ctxMostrador && confirmAbierto && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
           style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
           onClick={() => setConfirmAbierto(false)}
         >
@@ -1314,7 +1315,8 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
