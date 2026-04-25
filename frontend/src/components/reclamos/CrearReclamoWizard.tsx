@@ -30,6 +30,7 @@ import {
   type VecinoPorDni,
 } from '../../lib/api';
 import type { CategoriaReclamo } from '../../types';
+import { useMostradorContext } from '../mostrador/BannerActuandoComo';
 
 interface SugerenciaIA {
   categoria_id: number;
@@ -113,6 +114,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
 
+  const ctxMostrador = useMostradorContext();
   // Detectar si el wizard se abre desde el ABM de gestión (empleado/admin
   // cargando en ventanilla) o desde el portal del vecino. En el primer caso
   // hay que pedir los datos del solicitante; en el segundo, el current_user
@@ -194,6 +196,19 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       if (dniSearchTimeoutRef.current) clearTimeout(dniSearchTimeoutRef.current);
       return;
     }
+    // Modo Mostrador: el operador ya identificó al vecino — prellenar con
+    // los datos del contexto, NO con los del current_user (que es el operador).
+    if (ctxMostrador) {
+      setForm(prev => ({
+        ...prev,
+        nombre_solicitante: prev.nombre_solicitante || ctxMostrador.nombre || '',
+        apellido_solicitante: prev.apellido_solicitante || ctxMostrador.apellido || '',
+        dni_solicitante: prev.dni_solicitante || ctxMostrador.dni || '',
+        email_solicitante: prev.email_solicitante || ctxMostrador.email || '',
+        telefono_solicitante: prev.telefono_solicitante || ctxMostrador.telefono || '',
+      }));
+      return;
+    }
     if (user?.rol === 'vecino') {
       // Si el vecino esta verificado por Didit (nivel 2), pisamos los
       // datos filiatorios con los oficiales para evitar que esten stale.
@@ -208,7 +223,7 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         direccion: prev.direccion || user.direccion || '',
       }));
     }
-  }, [open, user]);
+  }, [open, user, ctxMostrador]);
 
   // Cleanup al desmontar
   useEffect(() => {
@@ -433,6 +448,13 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         payload.dni_solicitante = form.dni_solicitante.trim();
         payload.email_solicitante = form.email_solicitante.trim() || undefined;
         payload.telefono_solicitante = form.telefono_solicitante.trim() || undefined;
+      }
+      // Modo Mostrador: vecino ya identificado, mandamos user_id directo + DJ
+      if (ctxMostrador) {
+        payload.actuando_como_user_id = ctxMostrador.user_id;
+        if (ctxMostrador.dj_validacion_presencial) {
+          payload.dj_validacion_presencial = ctxMostrador.dj_validacion_presencial;
+        }
       }
       const res = await reclamosApi.create(payload);
       // Si el vecino adjunto una foto, la subimos ahora. Si falla la foto

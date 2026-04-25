@@ -1,34 +1,29 @@
 import { useNavigate } from 'react-router-dom';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
+import { useMostradorContext, BannerActuandoComo } from '../components/mostrador/BannerActuandoComo';
 
-/**
- * Página que renderiza el `CrearReclamoWizard` como pantalla completa.
- *
- * El wizard es un modal (usa `WizardModal`) — esta página lo abre en modo
- * "siempre abierto". Al cerrar o al crear exitosamente, redirige a
- * `/app/mis-reclamos` (si el vecino está logueado) o al home.
- *
- * Reemplaza al `NuevoReclamo.tsx` viejo (2000 líneas, 6 pasos con layout
- * custom) que seguía ruteando con el patrón viejo. Ahora usa el mismo
- * WizardModal que el wizard de trámites, con el mismo look & feel.
- */
 export default function NuevoReclamoPage() {
   const navigate = useNavigate();
+  const ctxMostrador = useMostradorContext();
 
-  const handleClose = () => {
-    // Volvemos al listado dentro del Layout (con topbar).
-    navigate('/gestion/mis-reclamos');
-  };
+  const volverAlMostrador = () => navigate('/gestion/mostrador');
+  const volverAMisReclamos = () => navigate('/gestion/mis-reclamos');
 
-  const handleSuccess = () => {
-    navigate('/gestion/mis-reclamos');
-  };
+  const handleClose = ctxMostrador ? volverAlMostrador : volverAMisReclamos;
+  const handleSuccess = ctxMostrador ? volverAlMostrador : volverAMisReclamos;
 
   return (
-    <CrearReclamoWizard
-      open={true}
-      onClose={handleClose}
-      onSuccess={handleSuccess}
-    />
+    <>
+      {ctxMostrador && (
+        <div className="px-3 sm:px-6 pt-3">
+          <BannerActuandoComo ctx={ctxMostrador} onSalir={volverAlMostrador} />
+        </div>
+      )}
+      <CrearReclamoWizard
+        open={true}
+        onClose={handleClose}
+        onSuccess={handleSuccess}
+      />
+    </>
   );
 }

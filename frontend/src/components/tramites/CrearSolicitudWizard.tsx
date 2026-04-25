@@ -20,6 +20,7 @@ import { DynamicIcon } from '../ui/DynamicIcon';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { tramitesApi, categoriasTramiteApi, usersApi, type VecinoPorDni } from '../../lib/api';
 import type { Tramite, CategoriaTramite } from '../../types';
+import { useMostradorContext, BannerActuandoComo } from '../mostrador/BannerActuandoComo';
 
 interface Props {
   open: boolean;
@@ -70,6 +71,7 @@ const EMPTY_FORM: SolicitudForm = {
 export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial }: Props) {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const ctxMostrador = useMostradorContext();
   const esVecino = user?.rol === 'vecino';
   const nivelVerif = user?.nivel_verificacion ?? 0;
   // KYC verificado por Didit → DNI/nombre/apellido son read-only.
@@ -132,6 +134,19 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
       setSelectedCategoriaId(null);
       return;
     }
+    // Modo Mostrador: el operador ya identificó al vecino, prellenar todo
+    // con los datos del contexto (no del current_user, que es el operador).
+    if (ctxMostrador) {
+      setForm(prev => ({
+        ...prev,
+        nombre_solicitante: prev.nombre_solicitante || ctxMostrador.nombre || '',
+        apellido_solicitante: prev.apellido_solicitante || ctxMostrador.apellido || '',
+        dni_solicitante: prev.dni_solicitante || ctxMostrador.dni || '',
+        email_solicitante: prev.email_solicitante || ctxMostrador.email || '',
+        telefono_solicitante: prev.telefono_solicitante || ctxMostrador.telefono || '',
+      }));
+      return;
+    }
     if (esVecino && user) {
       setForm(prev => ({
         ...prev,
@@ -143,7 +158,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         direccion_solicitante: prev.direccion_solicitante || user.direccion || '',
       }));
     }
-  }, [open, esVecino, user]);
+  }, [open, esVecino, user, ctxMostrador]);
 
   // Pre-seleccionar trámite si viene uno inicial
   useEffect(() => {
@@ -310,7 +325,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
 
     setSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         tramite_id: form.tramite_id,
         asunto: form.asunto.trim(),
         descripcion: form.descripcion.trim() || undefined,
@@ -321,6 +336,13 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         telefono_solicitante: form.telefono_solicitante.trim() || undefined,
         direccion_solicitante: form.direccion_solicitante.trim() || undefined,
       };
+      // Modo Mostrador: mandar referencia al vecino + DJ del operador
+      if (ctxMostrador) {
+        payload.actuando_como_user_id = ctxMostrador.user_id;
+        if (ctxMostrador.dj_validacion_presencial) {
+          payload.dj_validacion_presencial = ctxMostrador.dj_validacion_presencial;
+        }
+      }
       const res = await tramitesApi.createSolicitud(payload);
       toast.success(`Solicitud ${res.data.numero_tramite} creada. Cargá los documentos desde el detalle.`, {
         duration: 6000,

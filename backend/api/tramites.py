@@ -743,14 +743,40 @@ async def crear_solicitud(
     solicitante_id: Optional[int] = None
     overrides_perfil: dict = {}
 
-    if current_user is None:
+    # Escenario 4: ventanilla asistida (operador firmando para vecino ya identificado).
+    # Si viene `actuando_como_user_id` Y el current_user tiene permisos
+    # operativos, usamos ese user_id directo (sin pasar por DNI lookup) y
+    # marcamos el rastro de canal/operador/DJ.
+    es_ventanilla_asistida = False
+    if (
+        solicitud_data.actuando_como_user_id is not None
+        and current_user is not None
+        and current_user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.OPERADOR_VENTANILLA)
+    ):
+        from models.user import User as _User
+        vq = await db.execute(select(_User).where(_User.id == solicitud_data.actuando_como_user_id))
+        vecino = vq.scalar_one_or_none()
+        if not vecino:
+            raise HTTPException(status_code=404, detail="Vecino (actuando_como) no encontrado")
+        # Defensa: solo vecinos de este muni o sin muni asignado
+        if vecino.municipio_id and vecino.municipio_id != municipio_id:
+            raise HTTPException(status_code=403, detail="El vecino no pertenece a este municipio")
+        solicitante_id = vecino.id
+        es_ventanilla_asistida = True
+        # Prellenar campos del solicitante con datos del User
+        for campo in ["nombre", "apellido", "email", "telefono", "dni", "direccion"]:
+            campo_sol = f"{campo}_solicitante"
+            if not getattr(solicitud_data, campo_sol, None):
+                overrides_perfil[campo_sol] = getattr(vecino, campo, None)
+
+    elif current_user is None:
         # Escenario 1: anónimo
         if not solicitud_data.email_solicitante and not solicitud_data.telefono_solicitante:
             raise HTTPException(
                 status_code=400,
                 detail="Debe proporcionar email o teléfono para seguimiento",
             )
-    elif current_user.rol == RolUsuario.VECINO:
+    elif current_user is not None and current_user.rol == RolUsuario.VECINO:
         # Escenario 2: vecino cargando su propia solicitud
         solicitante_id = current_user.id
         for campo in ["nombre", "apellido", "email", "telefono", "dni", "direccion"]:
@@ -829,15 +855,28 @@ async def crear_solicitud(
             f"max_numero={max_numero!r} -> numero_tramite={numero_tramite}"
         )
 
+        # Filtrar campos que no van directo a la columna de Solicitud
+        # (actuando_como_user_id y dj_validacion_presencial los manejamos
+        # aparte para marcar canal/operador).
+        solicitud_dump = solicitud_data.model_dump(
+            exclude={"actuando_como_user_id", "dj_validacion_presencial"}
+        )
         solicitud = Solicitud(
             municipio_id=municipio_id,
             numero_tramite=numero_tramite,
             estado=EstadoSolicitud.RECIBIDO,
             solicitante_id=solicitante_id,
-            **solicitud_data.model_dump(),
+            **solicitud_dump,
         )
         for campo_sol, valor in overrides_perfil.items():
             setattr(solicitud, campo_sol, valor)
+        # Marcar trazabilidad de ventanilla asistida (Fase 6)
+        if es_ventanilla_asistida and current_user:
+            solicitud.canal = "ventanilla_asistida"
+            solicitud.operador_user_id = current_user.id
+            solicitud.validacion_presencial_at = datetime.utcnow()
+            if solicitud_data.dj_validacion_presencial:
+                solicitud.dj_validacion_presencial = solicitud_data.dj_validacion_presencial
 
         try:
             async with db.begin_nested():

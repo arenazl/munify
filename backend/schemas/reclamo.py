@@ -30,6 +30,13 @@ class ReclamoCreate(BaseModel):
     telefono_solicitante: Optional[str] = None
     direccion_solicitante: Optional[str] = None
 
+    # Modo Mostrador (ventanilla asistida): vecino ya identificado con
+    # biometria + DJ. Solo valido si current_user es admin/supervisor/
+    # operador_ventanilla. Hace el lookup directo por user_id sin pasar
+    # por DNI/email.
+    actuando_como_user_id: Optional[int] = None
+    dj_validacion_presencial: Optional[str] = None
+
 class ReclamoUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None

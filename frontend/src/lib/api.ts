@@ -1521,6 +1521,9 @@ export const navegacionApi = {
 };
 
 // Operador de Ventanilla (Fase 6)
+// Solo lo que el Mostrador usa: home + buscador + KYC presencial.
+// La creación de gestiones (trámite/reclamo/tasa) se hace contra los
+// endpoints existentes con `actuando_como_user_id`, no contra /operador.
 export const operadorApi = {
   home: () =>
     api.get<{
@@ -1529,54 +1532,8 @@ export const operadorApi = {
       monto_hoy: string;
       operador_nombre: string;
     }>('/operador/mostrador/home'),
-  iniciarTramite: (body: {
-    municipio_id: number;
-    tramite_id: number;
-    dni: string;
-    nombre: string;
-    apellido: string;
-    email?: string;
-    telefono?: string;
-    dj_firmada: boolean;
-    dj_texto?: string;
-    kyc_session_id?: string;
-  }) =>
-    api.post<{
-      solicitud_id: number;
-      numero_tramite: string;
-      user_id: number;
-      requiere_pago: boolean;
-      checkout_url: string | null;
-      codigo_cut_qr: string | null;
-      session_id: string | null;
-      monto: number | null;
-      pago_diferido: boolean;
-      momento_pago: string | null;
-      wa_me_url: string | null;
-      wa_me_mensaje: string | null;
-      telefono_vecino: string | null;
-    }>('/operador/tramite-presencial/iniciar', body),
-  generarPagoDiferido: (solicitudId: number) =>
-    api.post<{
-      session_id: string;
-      codigo_cut_qr: string | null;
-      checkout_url: string;
-      monto: number;
-      wa_me_url: string | null;
-      wa_me_mensaje: string | null;
-    }>(`/operador/pagos/generar-para-solicitud/${solicitudId}`),
-  generarWaMeUrl: (solicitudId: number, telefonoOverride?: string) =>
-    api.post<{
-      wa_me_url: string | null;
-      mensaje: string;
-      telefono: string | null;
-      ok: boolean;
-      motivo_error: string | null;
-    }>('/operador/tramite-presencial/wa-me-url', {
-      solicitud_id: solicitudId,
-      telefono_override: telefonoOverride,
-    }),
-  // Buscador de cliente ya registrado (Mostrador)
+
+  // Buscador de cliente ya registrado (por DNI / nombre / email)
   buscarVecino: (dni?: string, q?: string) =>
     api.get<Array<{
       user_id: number;
@@ -1591,7 +1548,7 @@ export const operadorApi = {
       verificado_at: string | null;
     }>>('/operador/vecinos/buscar', { params: dni ? { dni } : { q } }),
 
-  // Fase 6 v2 — biometria presencial via Didit
+  // Biometria presencial via Didit
   kycIniciar: (municipioId: number, callbackUrl?: string) =>
     api.post<{ session_id: string; url: string }>('/operador/kyc/iniciar', {
       municipio_id: municipioId,
@@ -1613,20 +1570,6 @@ export const operadorApi = {
       } | null;
       motivo_rechazo: string | null;
     }>(`/operador/kyc/${sessionId}/estado`),
-
-  registrarPagoEfectivo: (solicitudId: number, monto: number, numeroComprobante: string, foto: File | null) => {
-    const form = new FormData();
-    form.append('solicitud_id', String(solicitudId));
-    form.append('monto', String(monto));
-    form.append('numero_comprobante', numeroComprobante);
-    if (foto) form.append('foto', foto);
-    return api.post<{
-      session_id: string;
-      codigo_cut_qr: string;
-      monto: number;
-      foto_comprobante_url: string | null;
-    }>('/operador/pagos/efectivo/registrar', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-  },
 };
 
 // CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial

@@ -875,7 +875,22 @@ async def create_reclamo(
     # al empleado. El empleado queda trazado sólo en logs.
     from models.enums import RolUsuario
 
-    if current_user.rol == RolUsuario.VECINO:
+    es_ventanilla_asistida = False
+
+    if (
+        data.actuando_como_user_id is not None
+        and current_user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR, RolUsuario.OPERADOR_VENTANILLA)
+    ):
+        # Modo Mostrador: vecino ya identificado, lookup directo por user_id
+        vq = await db.execute(select(User).where(User.id == data.actuando_como_user_id))
+        vecino = vq.scalar_one_or_none()
+        if not vecino:
+            raise HTTPException(status_code=404, detail="Vecino (actuando_como) no encontrado")
+        if vecino.municipio_id and vecino.municipio_id != current_user.municipio_id:
+            raise HTTPException(status_code=403, detail="El vecino no pertenece a este municipio")
+        creador_id = vecino.id
+        es_ventanilla_asistida = True
+    elif current_user.rol == RolUsuario.VECINO:
         # Vecino cargando su propio reclamo — flujo viejo
         # Si el user esta verificado por KYC (nivel 2), no pisamos nombre/apellido
         # porque vienen verificados de Didit.
@@ -916,6 +931,7 @@ async def create_reclamo(
         'nombre_contacto', 'telefono_contacto', 'email_contacto', 'recibir_notificaciones',
         'nombre_solicitante', 'apellido_solicitante', 'dni_solicitante',
         'email_solicitante', 'telefono_solicitante', 'direccion_solicitante',
+        'actuando_como_user_id', 'dj_validacion_presencial',
     })
 
     reclamo = Reclamo(
@@ -965,13 +981,22 @@ async def create_reclamo(
     db.add(reclamo)
     await db.flush()
 
-    # Crear historial
+    # Crear historial. Si fue cargado por ventanilla asistida, dejamos el
+    # rastro del operador y la DJ en el comentario para auditoria.
+    comentario_hist = "Reclamo creado"
+    if es_ventanilla_asistida:
+        operador = f"{current_user.nombre or ''} {current_user.apellido or ''}".strip() or current_user.email
+        dj_extra = ""
+        if data.dj_validacion_presencial:
+            dj_extra = f" — DJ: {data.dj_validacion_presencial[:200]}"
+        comentario_hist = f"🧑‍💼 Reclamo creado en ventanilla por operador {operador}{dj_extra}"
+
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
         usuario_id=current_user.id,
         estado_nuevo=EstadoReclamo.NUEVO,
         accion="creado",
-        comentario="Reclamo creado"
+        comentario=comentario_hist,
     )
     db.add(historial)
 

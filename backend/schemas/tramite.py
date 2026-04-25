@@ -140,6 +140,11 @@ class SolicitudCreate(BaseModel):
     email_solicitante: Optional[str] = None
     telefono_solicitante: Optional[str] = None
     direccion_solicitante: Optional[str] = None
+    # Modo Mostrador (ventanilla asistida): cuando el operador crea la
+    # solicitud a nombre de un vecino ya identificado (biometria + DJ).
+    # Solo valido si current_user es admin/supervisor/operador_ventanilla.
+    actuando_como_user_id: Optional[int] = None
+    dj_validacion_presencial: Optional[str] = None
 
 
 class SolicitudUpdate(BaseModel):
