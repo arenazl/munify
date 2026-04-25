@@ -347,6 +347,23 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey, selectedDependenciaId, dependenciasLoaded, municipioActual?.id]);
 
+  // Opciones del selector de dependencia. Deben declararse ANTES de cualquier
+  // early return — si no, el primer render (loading=true) salta estos hooks
+  // y el segundo (loading=false) los ejecuta → React #310 (more hooks).
+  const showDepFilter = user?.rol === 'admin' || user?.rol === 'supervisor';
+  const dependenciaOptions = useMemo(() => [
+    { value: '', label: 'Todas las dependencias' },
+    ...dependencias.map(d => ({
+      value: String(d.id),
+      label: d.nombre,
+      color: d.color,
+    })),
+  ], [dependencias]);
+  const selectedDepNombre = useMemo(() => {
+    if (!selectedDependenciaId) return null;
+    return dependencias.find(d => d.id === selectedDependenciaId)?.nombre || null;
+  }, [selectedDependenciaId, dependencias]);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -523,23 +540,6 @@ export default function Dashboard() {
   // Limpiar el nombre si ya incluye "Municipalidad de"
   const rawNombre = municipioActual?.nombre || localStorage.getItem('municipio_nombre') || 'Tu Municipio';
   const municipioNombre = rawNombre.replace(/^Municipalidad de\s*/i, '');
-
-  // Opciones del selector de dependencia. Incluye "Todas" como opción
-  // explícita para que el admin pueda ver el agregado cuando lo necesite,
-  // pero el default arranca en la primera dependencia (no en "Todas").
-  const showDepFilter = user?.rol === 'admin' || user?.rol === 'supervisor';
-  const dependenciaOptions = useMemo(() => [
-    { value: '', label: 'Todas las dependencias' },
-    ...dependencias.map(d => ({
-      value: String(d.id),
-      label: d.nombre,
-      color: d.color,
-    })),
-  ], [dependencias]);
-  const selectedDepNombre = useMemo(() => {
-    if (!selectedDependenciaId) return null;
-    return dependencias.find(d => d.id === selectedDependenciaId)?.nombre || null;
-  }, [selectedDependenciaId, dependencias]);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
