@@ -1243,6 +1243,7 @@ function PasoPago({
     checkout_url: string;
     wa_me_url: string | null;
     vecino_telefono: string | null;
+    monto: number;
   } | null>(null);
   const [estado, setEstado] = useState<string>('pending');
   const aprobadoRef = useRef(false);
@@ -1258,6 +1259,7 @@ function PasoPago({
           checkout_url: r.data.checkout_url,
           wa_me_url: r.data.wa_me_url,
           vecino_telefono: r.data.vecino_telefono,
+          monto: parseFloat(r.data.monto || '0'),
         });
       })
       .catch((e) => {
@@ -1344,7 +1346,14 @@ function PasoPago({
             <p className="text-base font-bold" style={{ color: theme.text }}>{tramiteNombre}</p>
             <p className="text-sm mt-0.5" style={{ color: theme.textSecondary }}>
               Cobrar a <span className="font-semibold" style={{ color: theme.text }}>{vecinoNombre}</span> · {' '}
-              <span className="font-semibold" style={{ color: theme.text }}>${monto.toLocaleString('es-AR')}</span>
+              <span className="font-semibold" style={{ color: theme.text }}>
+                ${(data?.monto ?? monto).toLocaleString('es-AR')}
+              </span>
+              {data && data.monto !== monto && (
+                <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded" style={{ backgroundColor: '#f59e0b25', color: '#f59e0b' }}>
+                  TEST
+                </span>
+              )}
             </p>
           </div>
         </div>

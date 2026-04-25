@@ -78,13 +78,33 @@ def mensaje_link_pago(
     tramite_nombre: str,
     checkout_url: str,
     numero_tramite: Optional[str] = None,
+    monto: Optional[Decimal] = None,
 ) -> str:
-    nro = f" ({numero_tramite})" if numero_tramite else ""
-    nombre = nombre_vecino or "vecino/a"
+    """Arma un mensaje tipo 'cupón de pago' para enviar por WhatsApp.
+
+    Formato con monto destacado, número de trámite, link clickeable y
+    cierre cordial. WhatsApp respeta `*negrita*` y `_italica_` en wa.me.
+    """
+    # Tomar solo el primer nombre para que el saludo no sea muy largo
+    primer_nombre = (nombre_vecino or "vecino/a").split()[0] if nombre_vecino else "vecino/a"
+    nro_linea = f"🆔 N° {numero_tramite}\n" if numero_tramite else ""
+    monto_linea = ""
+    if monto is not None:
+        monto_fmt = f"${float(monto):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        monto_linea = f"💰 *Monto: {monto_fmt}*\n"
+
     return (
-        f"Hola {nombre}, inicié tu trámite de {tramite_nombre}{nro}. "
-        f"Pagá acá: {checkout_url}\n\n"
-        "Cuando confirmes el pago, te lo registramos desde el municipio."
+        f"🧾 *CUPÓN DE PAGO MUNICIPAL*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Hola {primer_nombre},\n\n"
+        f"📋 Trámite: {tramite_nombre}\n"
+        f"{nro_linea}"
+        f"{monto_linea}"
+        f"\n"
+        f"Pagá ahora con tarjeta:\n"
+        f"👉 {checkout_url}\n\n"
+        f"Cuando confirmes el pago, el municipio recibe el aviso automático y "
+        f"el trámite arranca."
     )
 
 

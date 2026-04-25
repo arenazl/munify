@@ -293,6 +293,12 @@ async def crear_sesion_tramite(
 # 2.b Cupon WhatsApp para una solicitud (modo Mostrador)
 # ============================================================
 
+# PARCHE TESTING — fuerza que todos los cupones del Mostrador salgan a $1.
+# Permite validar el flujo end-to-end con MP real sin gastar plata real.
+# Quitar (poner en None) antes de produccion.
+CUPON_TEST_OVERRIDE_MONTO: Optional[Decimal] = Decimal("1.00")
+
+
 class CuponWaResponse(BaseModel):
     session_id: str
     checkout_url: str
@@ -361,11 +367,17 @@ async def cupon_tramite_wa(
     if sesion is None:
         provider = await get_provider_para_muni(db, solicitud.municipio_id)
         sesion_id = _generar_session_id()
-        concepto = f"{solicitud.tramite.nombre} — Solicitud {solicitud.numero_tramite}"
+        # PARCHE TESTING: si CUPON_TEST_OVERRIDE_MONTO esta seteado, el cupon
+        # cobra ese monto en lugar del costo real del tramite. La DB queda
+        # intacta — solo afecta a la PagoSesion creada para este cobro.
+        monto_real = Decimal(str(solicitud.tramite.costo))
+        monto_a_cobrar = CUPON_TEST_OVERRIDE_MONTO or monto_real
+        suffix_test = " (TEST $1)" if CUPON_TEST_OVERRIDE_MONTO else ""
+        concepto = f"{solicitud.tramite.nombre} — Solicitud {solicitud.numero_tramite}{suffix_test}"
 
         sesion_ext = await provider.crear_sesion(
             concepto=concepto,
-            monto=Decimal(str(solicitud.tramite.costo)),
+            monto=monto_a_cobrar,
             sesion_id=sesion_id,
             return_url="/gestion/mis-tramites",
         )
@@ -377,7 +389,7 @@ async def cupon_tramite_wa(
             municipio_id=solicitud.municipio_id,
             vecino_user_id=solicitud.solicitante_id,
             concepto=concepto,
-            monto=Decimal(str(solicitud.tramite.costo)),
+            monto=monto_a_cobrar,
             estado=EstadoSesionPago.PENDING,
             provider=provider.nombre,
             external_id=sesion_ext.external_id,
@@ -392,26 +404,39 @@ async def cupon_tramite_wa(
             solicitud_id=solicitud.id,
             usuario_id=current_user.id,
             accion="Cupón de pago generado",
-            comentario=f"Sesión {sesion_id} · ${solicitud.tramite.costo:.2f} · vía {provider.nombre} (cupón WhatsApp)",
+            comentario=(
+                f"Sesión {sesion_id} · ${monto_a_cobrar:.2f}"
+                + (f" (real ${monto_real:.2f}, override testing)" if CUPON_TEST_OVERRIDE_MONTO else "")
+                + f" · vía {provider.nombre} (cupón WhatsApp)"
+            ),
         ))
         await db.commit()
         await db.refresh(sesion)
 
-    # Armar mensaje + wa.me url
+    # Armar mensaje + wa.me url. El checkout_url puede venir relativo (mock
+    # provider) — para wa.me + clipboard necesitamos URL absoluta.
+    checkout_raw = sesion.checkout_url or ""
+    if checkout_raw.startswith("/"):
+        base = settings.FRONTEND_URL.rstrip("/")
+        checkout_absoluto = f"{base}{checkout_raw}"
+    else:
+        checkout_absoluto = checkout_raw
+
     vecino = solicitud.solicitante
     nombre_vecino = (vecino.nombre or "").strip() if vecino else ""
     telefono = (vecino.telefono or "").strip() if vecino else ""
     mensaje = mensaje_link_pago(
         nombre_vecino=nombre_vecino,
         tramite_nombre=solicitud.tramite.nombre,
-        checkout_url=sesion.checkout_url or "",
+        checkout_url=checkout_absoluto,
         numero_tramite=solicitud.numero_tramite,
+        monto=sesion.monto,
     )
     wa_url = armar_wa_me_url(telefono, mensaje) if telefono else None
 
     return CuponWaResponse(
         session_id=sesion.id,
-        checkout_url=sesion.checkout_url or "",
+        checkout_url=checkout_absoluto,
         wa_me_url=wa_url,
         mensaje_wa=mensaje,
         monto=str(sesion.monto),
