@@ -21,30 +21,120 @@ from models.categoria_tramite import CategoriaTramite
 
 
 CATEGORIAS_RECLAMO_DEFAULT = [
-    {"nombre": "Alumbrado público",          "icono": "Lightbulb",     "color": "#f59e0b", "orden": 1},
-    {"nombre": "Bacheo y calles",            "icono": "Construction",  "color": "#78716c", "orden": 2},
-    {"nombre": "Recolección de residuos",    "icono": "Trash2",        "color": "#10b981", "orden": 3},
-    {"nombre": "Higiene urbana",             "icono": "Sparkles",      "color": "#06b6d4", "orden": 4},
-    {"nombre": "Arbolado y espacios verdes", "icono": "TreeDeciduous", "color": "#22c55e", "orden": 5},
-    {"nombre": "Tránsito y señalización",    "icono": "TrafficCone",   "color": "#ef4444", "orden": 6},
-    {"nombre": "Agua y cloacas",             "icono": "Droplets",      "color": "#3b82f6", "orden": 7},
-    {"nombre": "Plagas y control",           "icono": "Bug",           "color": "#84cc16", "orden": 8},
-    {"nombre": "Animales sueltos",           "icono": "Dog",           "color": "#a855f7", "orden": 9},
-    {"nombre": "Ruidos y convivencia",       "icono": "Volume2",       "color": "#ec4899", "orden": 10},
+    {
+        "nombre": "Alumbrado público",
+        "descripcion": "Luminarias apagadas o intermitentes, postes caídos, cables sueltos y zonas sin cobertura de iluminación.",
+        "icono": "Lightbulb", "color": "#f59e0b", "orden": 1,
+        "tiempo_resolucion_estimado": 48, "prioridad_default": 3,
+    },
+    {
+        "nombre": "Bacheo y calles",
+        "descripcion": "Deterioro de pavimento y asfalto: baches, hundimientos, pozos profundos y rotura de badenes.",
+        "icono": "Construction", "color": "#78716c", "orden": 2,
+        "tiempo_resolucion_estimado": 72, "prioridad_default": 3,
+    },
+    {
+        "nombre": "Recolección de residuos",
+        "descripcion": "Fallas en el servicio: basura no retirada, contenedores desbordados o rotos y basurales clandestinos.",
+        "icono": "Trash2", "color": "#10b981", "orden": 3,
+        "tiempo_resolucion_estimado": 48, "prioridad_default": 3,
+    },
+    {
+        "nombre": "Higiene urbana",
+        "descripcion": "Barrido de calles, limpieza de desagües pluviales, retiro de graffitis y cartelería ilegal.",
+        "icono": "Sparkles", "color": "#06b6d4", "orden": 4,
+        "tiempo_resolucion_estimado": 120, "prioridad_default": 4,
+    },
+    {
+        "nombre": "Arbolado y espacios verdes",
+        "descripcion": "Mantenimiento de plazas, parques y juegos; árboles caídos, ramas, poda, riego y bancos dañados.",
+        "icono": "TreeDeciduous", "color": "#22c55e", "orden": 5,
+        "tiempo_resolucion_estimado": 96, "prioridad_default": 3,
+    },
+    {
+        "nombre": "Tránsito y señalización",
+        "descripcion": "Semáforos con fallas, carteles caídos, señalización borrosa y demarcación horizontal faltante.",
+        "icono": "TrafficCone", "color": "#ef4444", "orden": 6,
+        "tiempo_resolucion_estimado": 12, "prioridad_default": 1,
+    },
+    {
+        "nombre": "Agua y cloacas",
+        "descripcion": "Pérdidas de agua en vía pública, cortes de suministro, cloacas desbordadas, tapas faltantes y baja presión.",
+        "icono": "Droplets", "color": "#3b82f6", "orden": 7,
+        "tiempo_resolucion_estimado": 6, "prioridad_default": 1,
+    },
+    {
+        "nombre": "Plagas y control",
+        "descripcion": "Roedores, insectos, palomas y situaciones que requieran fumigación o control sanitario en vía pública.",
+        "icono": "Bug", "color": "#84cc16", "orden": 8,
+        "tiempo_resolucion_estimado": 48, "prioridad_default": 3,
+    },
+    {
+        "nombre": "Animales sueltos",
+        "descripcion": "Perros sueltos, animales heridos o muertos en vía pública, maltrato animal y control de zoonosis.",
+        "icono": "Dog", "color": "#a855f7", "orden": 9,
+        "tiempo_resolucion_estimado": 24, "prioridad_default": 2,
+    },
+    {
+        "nombre": "Ruidos y convivencia",
+        "descripcion": "Ruidos excesivos de viviendas, comercios, obras o vehículos que afecten la convivencia vecinal.",
+        "icono": "Volume2", "color": "#ec4899", "orden": 10,
+        "tiempo_resolucion_estimado": 24, "prioridad_default": 3,
+    },
 ]
 
 
 CATEGORIAS_TRAMITE_DEFAULT = [
-    {"nombre": "Tránsito y Transporte",        "icono": "Car",         "color": "#3b82f6", "orden": 1},
-    {"nombre": "Habilitaciones Comerciales",   "icono": "Store",       "color": "#8b5cf6", "orden": 2},
-    {"nombre": "Obras Particulares",           "icono": "HardHat",     "color": "#f59e0b", "orden": 3},
-    {"nombre": "Catastro",                     "icono": "Map",         "color": "#0ea5e9", "orden": 4},
-    {"nombre": "Tasas y Tributos",             "icono": "CreditCard",  "color": "#10b981", "orden": 5},
-    {"nombre": "Salud y Bromatología",         "icono": "HeartPulse",  "color": "#ef4444", "orden": 6},
-    {"nombre": "Espacios Públicos",            "icono": "Trees",       "color": "#22c55e", "orden": 7},
-    {"nombre": "Certificados y Documentación", "icono": "FileText",    "color": "#6366f1", "orden": 8},
-    {"nombre": "Desarrollo Social",            "icono": "Users",       "color": "#ec4899", "orden": 9},
-    {"nombre": "Cementerios",                  "icono": "Cross",       "color": "#64748b", "orden": 10},
+    {
+        "nombre": "Tránsito y Transporte",
+        "descripcion": "Licencias de conducir, libre deuda de patentes, infracciones, transporte público y permisos de circulación.",
+        "icono": "Car", "color": "#3b82f6", "orden": 1,
+    },
+    {
+        "nombre": "Habilitaciones Comerciales",
+        "descripcion": "Apertura, transferencia, cese y renovación de habilitaciones de comercios, industrias y servicios.",
+        "icono": "Store", "color": "#8b5cf6", "orden": 2,
+    },
+    {
+        "nombre": "Obras Particulares",
+        "descripcion": "Aprobación de planos, certificados de obra, finales de obra y registros de propietario y construcción.",
+        "icono": "HardHat", "color": "#f59e0b", "orden": 3,
+    },
+    {
+        "nombre": "Catastro",
+        "descripcion": "Cédulas catastrales, planos, mensuras, certificados de dominio y subdivisión de parcelas.",
+        "icono": "Map", "color": "#0ea5e9", "orden": 4,
+    },
+    {
+        "nombre": "Tasas y Tributos",
+        "descripcion": "Boletas de ABL, patente, libres deuda, planes de pago, exenciones y descuentos por buen contribuyente.",
+        "icono": "CreditCard", "color": "#10b981", "orden": 5,
+    },
+    {
+        "nombre": "Salud y Bromatología",
+        "descripcion": "Carnet sanitario, libreta sanitaria, habilitación de consultorios y vehículos de transporte de alimentos.",
+        "icono": "HeartPulse", "color": "#ef4444", "orden": 6,
+    },
+    {
+        "nombre": "Espacios Públicos",
+        "descripcion": "Permisos para uso de plazas, ferias, eventos, podas, ocupación de vereda y calzada.",
+        "icono": "Trees", "color": "#22c55e", "orden": 7,
+    },
+    {
+        "nombre": "Certificados y Documentación",
+        "descripcion": "Certificados de residencia, supervivencia, libre deuda, antecedentes y constancias varias.",
+        "icono": "FileText", "color": "#6366f1", "orden": 8,
+    },
+    {
+        "nombre": "Desarrollo Social",
+        "descripcion": "Solicitud de programas sociales, becas, ayudas económicas, módulos alimentarios y tarjetas de asistencia.",
+        "icono": "Users", "color": "#ec4899", "orden": 9,
+    },
+    {
+        "nombre": "Cementerios",
+        "descripcion": "Adquisición de parcelas, traslados, exhumaciones, mantenimiento y trámites funerarios municipales.",
+        "icono": "Cross", "color": "#64748b", "orden": 10,
+    },
 ]
 
 
@@ -61,9 +151,12 @@ async def seed_categorias_municipio(municipio_id: int, db: AsyncSession) -> None
         db.add(CategoriaReclamo(
             municipio_id=municipio_id,
             nombre=c["nombre"],
+            descripcion=c.get("descripcion"),
             icono=c["icono"],
             color=c["color"],
             orden=c["orden"],
+            tiempo_resolucion_estimado=c.get("tiempo_resolucion_estimado", 48),
+            prioridad_default=c.get("prioridad_default", 3),
             activo=True,
         ))
 
@@ -71,6 +164,7 @@ async def seed_categorias_municipio(municipio_id: int, db: AsyncSession) -> None
         db.add(CategoriaTramite(
             municipio_id=municipio_id,
             nombre=c["nombre"],
+            descripcion=c.get("descripcion"),
             icono=c["icono"],
             color=c["color"],
             orden=c["orden"],
