@@ -449,12 +449,11 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         payload.email_solicitante = form.email_solicitante.trim() || undefined;
         payload.telefono_solicitante = form.telefono_solicitante.trim() || undefined;
       }
-      // Modo Mostrador: vecino ya identificado, mandamos user_id directo + DJ
+      // Modo Mostrador: vecino ya identificado, mandamos user_id directo. El
+      // backend marca canal=ventanilla_asistida y arma el audit trail con
+      // operador_user_id + timestamp + RENAPER session si aplica.
       if (ctxMostrador) {
         payload.actuando_como_user_id = ctxMostrador.user_id;
-        if (ctxMostrador.dj_validacion_presencial) {
-          payload.dj_validacion_presencial = ctxMostrador.dj_validacion_presencial;
-        }
       }
       const res = await reclamosApi.create(payload);
       // Si el vecino adjunto una foto, la subimos ahora. Si falla la foto
@@ -1239,18 +1238,84 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
     },
   ];
 
+  // Modal liviano de confirmación cuando se crea desde el Mostrador.
+  const [confirmAbierto, setConfirmAbierto] = useState(false);
+
   return (
-    <WizardModal
-      open={open}
-      onClose={onClose}
-      title="Nuevo reclamo"
-      steps={steps}
-      currentStep={step}
-      onStepChange={setStep}
-      onComplete={guardar}
-      loading={saving}
-      completeLabel="Crear reclamo"
-      primaryButtonColor={categoriaSeleccionada?.color}
-    />
+    <>
+      <WizardModal
+        open={open}
+        onClose={onClose}
+        title="Nuevo reclamo"
+        steps={steps}
+        currentStep={step}
+        onStepChange={setStep}
+        onComplete={ctxMostrador ? () => setConfirmAbierto(true) : guardar}
+        loading={saving}
+        completeLabel="Crear reclamo"
+        primaryButtonColor={categoriaSeleccionada?.color}
+      />
+      {ctxMostrador && confirmAbierto && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+          onClick={() => setConfirmAbierto(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="rounded-2xl p-5 max-w-md w-full shadow-2xl"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ backgroundColor: `${categoriaSeleccionada?.color || '#3b82f6'}25`, color: categoriaSeleccionada?.color || '#3b82f6' }}
+              >
+                <UserCheck className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                  Modo ventanilla
+                </p>
+                <p className="text-base font-bold" style={{ color: theme.text }}>
+                  ¿Confirmás crear el reclamo?
+                </p>
+              </div>
+            </div>
+            <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+              Vas a crear el reclamo a nombre de{' '}
+              <span className="font-semibold" style={{ color: theme.text }}>
+                {`${ctxMostrador.nombre || ''} ${ctxMostrador.apellido || ''}`.trim() || 'el vecino'}
+              </span>
+              . Queda registrado con tu usuario como operador.
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmAbierto(false)}
+                disabled={saving}
+                className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setConfirmAbierto(false);
+                  await guardar();
+                }}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                style={{ backgroundColor: categoriaSeleccionada?.color || '#3b82f6' }}
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                Crear reclamo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

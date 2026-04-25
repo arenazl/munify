@@ -11,6 +11,9 @@ import {
   AlertCircle,
   UserCheck,
   History,
+  Printer,
+  MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -20,7 +23,8 @@ import { DynamicIcon } from '../ui/DynamicIcon';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { tramitesApi, categoriasTramiteApi, usersApi, type VecinoPorDni } from '../../lib/api';
 import type { Tramite, CategoriaTramite } from '../../types';
-import { useMostradorContext, BannerActuandoComo } from '../mostrador/BannerActuandoComo';
+import { useMostradorContext } from '../mostrador/BannerActuandoComo';
+import { armarWaMeUrl, mensajeRequisitosTramite, generarPdfRequisitos } from '../../lib/mostradorRequisitos';
 
 interface Props {
   open: boolean;
@@ -299,8 +303,51 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
       tramite_id: t.id,
       asunto: prev.asunto || `Solicitud: ${t.nombre}`,
     }));
-    // Avanzar automáticamente al siguiente step
-    setStep(1);
+    // En modo Mostrador, no avanzamos: mostramos primero los botones de
+    // PDF / WhatsApp para mandar requisitos al vecino, y dejamos un
+    // "Continuar" explícito.
+    if (!ctxMostrador) setStep(1);
+  };
+
+  // ============ PDF / WhatsApp de requisitos (modo Mostrador) ============
+
+  const [generandoPdf, setGenerandoPdf] = useState(false);
+  const [confirmAbierto, setConfirmAbierto] = useState(false);
+
+  const handlePdfRequisitos = async () => {
+    if (!tramiteSeleccionado || !ctxMostrador) return;
+    setGenerandoPdf(true);
+    try {
+      await generarPdfRequisitos(tramiteSeleccionado, {
+        nombre: ctxMostrador.nombre,
+        apellido: ctxMostrador.apellido,
+        dni: ctxMostrador.dni,
+      });
+    } catch {
+      toast.error('No se pudo generar el PDF');
+    } finally {
+      setGenerandoPdf(false);
+    }
+  };
+
+  const handleWhatsAppRequisitos = () => {
+    if (!tramiteSeleccionado || !ctxMostrador) return;
+    const tel = ctxMostrador.telefono;
+    if (!tel) {
+      toast.error('El vecino no tiene teléfono cargado');
+      return;
+    }
+    const mensaje = mensajeRequisitosTramite(tramiteSeleccionado, {
+      nombre: ctxMostrador.nombre,
+      apellido: ctxMostrador.apellido,
+      dni: ctxMostrador.dni,
+    });
+    const url = armarWaMeUrl(tel, mensaje);
+    if (!url) {
+      toast.error('Teléfono inválido para WhatsApp');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // ============ Guardar ============
@@ -336,12 +383,11 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         telefono_solicitante: form.telefono_solicitante.trim() || undefined,
         direccion_solicitante: form.direccion_solicitante.trim() || undefined,
       };
-      // Modo Mostrador: mandar referencia al vecino + DJ del operador
+      // Modo Mostrador: mandar referencia al vecino. El audit trail
+      // (operador_user_id + canal=ventanilla_asistida + timestamp + RENAPER
+      // session si aplica) lo arma el backend.
       if (ctxMostrador) {
         payload.actuando_como_user_id = ctxMostrador.user_id;
-        if (ctxMostrador.dj_validacion_presencial) {
-          payload.dj_validacion_presencial = ctxMostrador.dj_validacion_presencial;
-        }
       }
       const res = await tramitesApi.createSolicitud(payload);
       toast.success(`Solicitud ${res.data.numero_tramite} creada. Cargá los documentos desde el detalle.`, {
@@ -360,7 +406,99 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
   // Step 1: elegir trámite
   // ============================================================
 
-  const step1Content = (
+  // En modo Mostrador, una vez elegido el trámite, el step 1 muestra los
+  // requisitos + acciones (PDF / WhatsApp / Continuar). El operador
+  // puede mandar los requisitos antes de seguir cargando los datos.
+  const step1ContentMostrador = ctxMostrador && tramiteSeleccionado ? (
+    <div className="space-y-4">
+      <div
+        className="p-4 rounded-xl flex items-start gap-3"
+        style={{
+          backgroundColor: `${categoriaDelTramite?.color || theme.primary}15`,
+          border: `2px solid ${categoriaDelTramite?.color || theme.primary}`,
+        }}
+      >
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${categoriaDelTramite?.color || theme.primary}30` }}
+        >
+          <DynamicIcon name={categoriaDelTramite?.icono || 'FileText'} className="h-6 w-6" style={{ color: categoriaDelTramite?.color || theme.primary }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: theme.textSecondary }}>
+            Trámite elegido
+          </p>
+          <p className="text-base font-bold" style={{ color: theme.text }}>{tramiteSeleccionado.nombre}</p>
+          <div className="flex items-center gap-3 mt-1 text-[11px]" style={{ color: theme.textSecondary }}>
+            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {tramiteSeleccionado.tiempo_estimado_dias} días</span>
+            <span className="flex items-center gap-1"><CreditCard className="h-3 w-3" /> {tramiteSeleccionado.costo ? `$${tramiteSeleccionado.costo.toLocaleString('es-AR')}` : 'Gratis'}</span>
+            {tramiteSeleccionado.documentos_requeridos && tramiteSeleccionado.documentos_requeridos.length > 0 && (
+              <span>📋 {tramiteSeleccionado.documentos_requeridos.length} documentos</span>
+            )}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setForm(prev => ({ ...prev, tramite_id: null, asunto: '' }))}
+          className="text-[11px] underline flex-shrink-0"
+          style={{ color: theme.textSecondary }}
+        >
+          Cambiar
+        </button>
+      </div>
+
+      {/* Acciones de requisitos: PDF + WhatsApp */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: theme.textSecondary }}>
+          ¿Querés mandar los requisitos al vecino antes de continuar?
+        </p>
+        <p className="text-[11px] mb-3" style={{ color: theme.textSecondary }}>
+          Útil si vino sólo a averiguar y no trajo los documentos. Podés imprimirle la lista o mandársela por WhatsApp y seguir cuando vuelva.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={handlePdfRequisitos}
+            disabled={generandoPdf}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+          >
+            {generandoPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+            Imprimir PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleWhatsAppRequisitos}
+            disabled={!ctxMostrador.telefono}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: '#25d366' }}
+            title={ctxMostrador.telefono ? `Enviar a ${ctxMostrador.telefono}` : 'Falta teléfono del vecino'}
+          >
+            <MessageSquare className="w-4 h-4" />
+            WhatsApp
+          </button>
+        </div>
+        {!ctxMostrador.telefono && (
+          <p className="text-[10px] mt-1.5" style={{ color: theme.textSecondary }}>
+            El vecino no tiene teléfono cargado. Cargalo en el paso 2 si querés mandarle el comprobante después.
+          </p>
+        )}
+      </div>
+
+      {/* Continuar */}
+      <button
+        type="button"
+        onClick={() => setStep(1)}
+        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95"
+        style={{ backgroundColor: categoriaDelTramite?.color || theme.primary }}
+      >
+        <Sparkles className="w-4 h-4" />
+        Continuar a cargar el trámite
+      </button>
+    </div>
+  ) : null;
+
+  const step1Content = step1ContentMostrador ?? (
     <div className="space-y-4">
       {/* Input de búsqueda */}
       <div>
@@ -975,17 +1113,107 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
   ];
 
   return (
-    <WizardModal
-      open={open}
-      onClose={onClose}
-      title="Nueva solicitud de trámite"
-      steps={steps}
-      currentStep={step}
-      onStepChange={setStep}
-      onComplete={guardar}
-      loading={saving}
-      completeLabel="Crear solicitud"
-      primaryButtonColor={categoriaDelTramite?.color}
-    />
+    <>
+      <WizardModal
+        open={open}
+        onClose={onClose}
+        title="Nueva solicitud de trámite"
+        steps={steps}
+        currentStep={step}
+        onStepChange={setStep}
+        onComplete={ctxMostrador ? () => setConfirmAbierto(true) : guardar}
+        loading={saving}
+        completeLabel="Crear solicitud"
+        primaryButtonColor={categoriaDelTramite?.color}
+      />
+      {ctxMostrador && (
+        <ConfirmCrearVentanilla
+          open={confirmAbierto}
+          vecinoNombre={`${ctxMostrador.nombre || ''} ${ctxMostrador.apellido || ''}`.trim() || 'el vecino'}
+          tramiteNombre={tramiteSeleccionado?.nombre || 'este trámite'}
+          loading={saving}
+          color={categoriaDelTramite?.color || '#22c55e'}
+          onCancel={() => setConfirmAbierto(false)}
+          onConfirm={async () => {
+            setConfirmAbierto(false);
+            await guardar();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// ============================================================
+// Modal de confirmación al crear desde el Mostrador
+// ============================================================
+function ConfirmCrearVentanilla({
+  open, vecinoNombre, tramiteNombre, loading, color, onCancel, onConfirm,
+}: {
+  open: boolean;
+  vecinoNombre: string;
+  tramiteNombre: string;
+  loading: boolean;
+  color: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { theme } = useTheme();
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-2xl p-5 max-w-md w-full shadow-2xl"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${color}25`, color }}
+          >
+            <UserCheck className="w-6 h-6" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+              Modo ventanilla
+            </p>
+            <p className="text-base font-bold" style={{ color: theme.text }}>
+              ¿Confirmás crear el trámite?
+            </p>
+          </div>
+        </div>
+        <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+          Vas a crear <span className="font-semibold" style={{ color: theme.text }}>{tramiteNombre}</span>{' '}
+          a nombre de <span className="font-semibold" style={{ color: theme.text }}>{vecinoNombre}</span>.
+          Queda registrado con tu usuario como operador.
+        </p>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="px-3 py-2 rounded-lg text-sm font-medium transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+            style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: color }}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            Crear trámite
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -3,12 +3,12 @@
  * cuando vienen con `?actuando_como=<user_id>` desde el Mostrador.
  *
  * Sirve para que el operador vea claramente: "estás cargando esto a nombre
- * de Lucas Arenaz, no de vos mismo. La DJ ya está firmada."
+ * de Lucas Arenaz, no de vos mismo".
  *
  * El hook useMostradorContext() lee el query param + sessionStorage para
  * armar el contexto. Los wizards lo usan para:
  *   1. Renderizar este banner.
- *   2. Mandar `actuando_como_user_id` y `dj_validacion_presencial` al backend.
+ *   2. Mandar `actuando_como_user_id` al backend (canal=ventanilla_asistida).
  */
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -25,8 +25,6 @@ export interface MostradorContext {
   kyc_session_id: string | null;
   operador_id: number;
   operador_nombre: string;
-  dj_validacion_presencial: string | null;
-  dj_firmada_at: string | null;
 }
 
 /**
@@ -84,11 +82,6 @@ export function BannerActuandoComo({ ctx, onSalir }: BannerProps) {
           {ctx.kyc_session_id && (
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#22c55e20', color: '#22c55e' }}>
               <ShieldCheck className="w-3 h-3" /> RENAPER
-            </span>
-          )}
-          {ctx.dj_validacion_presencial && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
-              ✍️ DJ firmada
             </span>
           )}
         </div>

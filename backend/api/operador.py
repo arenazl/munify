@@ -10,10 +10,14 @@ La creacion de gestiones (reclamo / tramite / sesion de pago) NO vive aca.
 El Mostrador identifica al vecino y redirige a las pantallas existentes
 (/gestion/crear-reclamo, /gestion/crear-tramite, /gestion/mis-tasas) con
 el query param `?actuando_como=<user_id>`. Esos endpoints aceptan
-`actuando_como_user_id` + `dj_validacion_presencial` para marcar la
-solicitud/reclamo como `canal=ventanilla_asistida` con audit trail del
-operador. Asi reusamos toda la logica de wizards (validaciones, IA,
-geolocalizacion, etc) sin duplicar codigo.
+`actuando_como_user_id` para marcar la solicitud/reclamo como
+`canal=ventanilla_asistida` con audit trail del operador (operador_user_id,
+validacion_presencial_at, kyc session si aplica). Asi reusamos toda la
+logica de wizards (validaciones, IA, geolocalizacion) sin duplicar codigo.
+
+`dj_validacion_presencial` queda como Optional en los schemas para no romper
+clientes viejos, pero ya no se exige: el audit trail (quien + cuando + RENAPER
+session) cubre la trazabilidad legal sin necesidad de un check redundante.
 
 Permisos: OPERADOR_VENTANILLA | SUPERVISOR | ADMIN del muni.
 """

@@ -1,20 +1,17 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User as UserIcon, FileText, CheckCircle2, AlertTriangle, Receipt,
-  ClipboardList, Clock, MessageSquare, ScanLine, Camera, ShieldCheck,
+  ClipboardList, ScanLine, Camera, ShieldCheck,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search, UserPlus,
-  UserCheck, Printer, Banknote, Sparkles,
+  UserCheck, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { operadorApi, tramitesApi, whatsappApi } from '../lib/api';
-import { ModernSelect } from '../components/ui/ModernSelect';
+import { operadorApi } from '../lib/api';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import PageHint from '../components/ui/PageHint';
-import { armarWaMeUrl, mensajeRequisitosTramite, generarPdfRequisitos } from '../lib/mostradorRequisitos';
-import type { Tramite } from '../types';
 
 interface MostradorMetricas {
   tramites_hoy: number;
@@ -48,35 +45,26 @@ interface VecinoEncontrado {
 
 type Paso = 'identificar' | 'hub';
 
-const DJ_TEXTO_DEFAULT =
-  'Se realiza validación presencial de identidad frente a funcionario público. ' +
-  'El operador confirma haber verificado el DNI del solicitante en persona ' +
-  'al momento de iniciar la gestión.';
-
 /**
  * Mostrador — consola de operador de ventanilla.
  *
  * Dos pasos:
  *   1. Identificar al vecino (biometría Didit, buscador por DNI o carga manual).
- *   2. Hub con 3 caminos: Reclamo · Trámite · Tasas. Reutilizan las pantallas
- *      del vecino (NuevoReclamoPage, NuevoTramitePage, MisTasas) pasándoles
- *      `?actuando_como=<user_id>` por query param.
+ *   2. Hub con 3 cards: Reclamo · Trámite · Tasas. Clic → wizard del vecino con
+ *      `?actuando_como=<user_id>`. El wizard maneja PDF/WhatsApp de requisitos
+ *      y muestra un modal de confirmación al crear.
  *
- * La DJ presencial se firma una sola vez al pasar de Paso 1 al Hub y queda
- * en sessionStorage para que las pantallas hijas la mandén al backend.
+ * No hay DJ: el audit trail (operador_user_id + canal=ventanilla_asistida +
+ * timestamp + RENAPER session_id si aplica) ya cubre la trazabilidad.
  */
 export default function Mostrador() {
-  const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [paso, setPaso] = useState<Paso>('identificar');
   const [vecino, setVecino] = useState<KycDatos | null>(null);
   const [kycSessionId, setKycSessionId] = useState<string | null>(null);
-  const [djFirmada, setDjFirmada] = useState(false);
-
   const [metricas, setMetricas] = useState<MostradorMetricas | null>(null);
-  const [telefonoSaliente, setTelefonoSaliente] = useState<string | null>(null);
 
   const municipioId = user?.municipio_id ?? null;
 
@@ -84,17 +72,6 @@ export default function Mostrador() {
     operadorApi.home().then((r) => setMetricas(r.data)).catch(() => setMetricas(null));
   }, []);
 
-  useEffect(() => {
-    whatsappApi.getConfig()
-      .then((r) => {
-        const d = r.data as { telefono_wa_me_saliente?: string | null };
-        setTelefonoSaliente(d.telefono_wa_me_saliente || null);
-      })
-      .catch(() => setTelefonoSaliente(null));
-  }, []);
-
-  // Persistir contexto de ventanilla en sessionStorage para que las
-  // pantallas hijas (NuevoTramitePage etc) lo lean y armen el banner.
   const persistirContexto = useCallback((v: KycDatos, sessionId: string | null) => {
     if (!v.user_id) return;
     const ctx = {
@@ -107,11 +84,9 @@ export default function Mostrador() {
       kyc_session_id: sessionId,
       operador_id: user?.id,
       operador_nombre: `${user?.nombre || ''} ${user?.apellido || ''}`.trim() || user?.email,
-      dj_validacion_presencial: djFirmada ? DJ_TEXTO_DEFAULT : null,
-      dj_firmada_at: djFirmada ? new Date().toISOString() : null,
     };
     sessionStorage.setItem('mostrador_ctx', JSON.stringify(ctx));
-  }, [user, djFirmada]);
+  }, [user]);
 
   const handleVecinoListo = (datos: KycDatos, sessionId: string | null) => {
     setVecino(datos);
@@ -119,23 +94,14 @@ export default function Mostrador() {
     setPaso('hub');
   };
 
-  const irA = (path: string, extraParams?: Record<string, string | number | undefined>) => {
+  const irA = (path: string) => {
     if (!vecino?.user_id) {
       toast.error('Falta identificar al vecino');
-      return;
-    }
-    if (!djFirmada) {
-      toast.error('Tildá la DJ de validación presencial antes de continuar');
       return;
     }
     persistirContexto(vecino, kycSessionId);
     const params = new URLSearchParams();
     params.set('actuando_como', String(vecino.user_id));
-    if (extraParams) {
-      for (const [k, v] of Object.entries(extraParams)) {
-        if (v != null && v !== '') params.set(k, String(v));
-      }
-    }
     navigate(`${path}?${params.toString()}`);
   };
 
@@ -143,7 +109,6 @@ export default function Mostrador() {
     sessionStorage.removeItem('mostrador_ctx');
     setVecino(null);
     setKycSessionId(null);
-    setDjFirmada(false);
     setPaso('identificar');
   };
 
@@ -197,13 +162,8 @@ export default function Mostrador() {
         <Hub
           vecino={vecino}
           kycSessionId={kycSessionId}
-          djFirmada={djFirmada}
-          setDjFirmada={setDjFirmada}
-          telefonoSaliente={telefonoSaliente}
           onIrReclamo={() => irA('/gestion/crear-reclamo')}
-          onIrTramite={(tramiteId) =>
-            irA('/gestion/crear-tramite', tramiteId ? { tramite_id: tramiteId } : undefined)
-          }
+          onIrTramite={() => irA('/gestion/crear-tramite')}
           onIrTasas={() => irA('/gestion/mis-tasas')}
           onReset={reset}
         />
@@ -255,16 +215,12 @@ function StepsBar({ paso }: { paso: Paso }) {
 // Hub — 3 cards principales (Reclamo / Trámite / Tasas)
 // ============================================================
 function Hub({
-  vecino, kycSessionId, djFirmada, setDjFirmada, telefonoSaliente,
-  onIrReclamo, onIrTramite, onIrTasas, onReset,
+  vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onReset,
 }: {
   vecino: KycDatos;
   kycSessionId: string | null;
-  djFirmada: boolean;
-  setDjFirmada: (v: boolean) => void;
-  telefonoSaliente: string | null;
   onIrReclamo: () => void;
-  onIrTramite: (tramiteId?: number) => void;
+  onIrTramite: () => void;
   onIrTasas: () => void;
   onReset: () => void;
 }) {
@@ -307,29 +263,7 @@ function Hub({
         </button>
       </div>
 
-      {/* DJ */}
-      <label
-        className="flex items-start gap-2 cursor-pointer p-3 rounded-xl"
-        style={{
-          backgroundColor: djFirmada ? '#22c55e10' : theme.backgroundSecondary,
-          border: `1px solid ${djFirmada ? '#22c55e60' : theme.border}`,
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={djFirmada}
-          onChange={(e) => setDjFirmada(e.target.checked)}
-          className="mt-0.5 flex-shrink-0"
-        />
-        <div className="text-xs" style={{ color: theme.text }}>
-          <strong>Declaración Jurada de validación presencial:</strong>{' '}
-          confirmo haber verificado la identidad del vecino con su DNI físico
-          {kycSessionId ? ' (complementa la verificación biométrica de Didit/RENAPER).' : '.'}
-          {' '}Esta DJ queda registrada con tu usuario al crear la gestión.
-        </div>
-      </label>
-
-      {/* 3 cards grandes */}
+      {/* 3 cards iguales */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <BigCard
           color="#3b82f6"
@@ -338,13 +272,14 @@ function Hub({
           desc="Reportar un problema urbano (bache, alumbrado, residuos)"
           actionLabel="Cargar reclamo"
           onAction={onIrReclamo}
-          disabled={!djFirmada}
         />
-        <CardTramite
-          vecino={vecino}
-          telefonoSaliente={telefonoSaliente}
-          djFirmada={djFirmada}
-          onIniciar={onIrTramite}
+        <BigCard
+          color="#22c55e"
+          icon={<FileText className="w-7 h-7" />}
+          title="Trámite"
+          desc="Iniciar un trámite. Podés mandar requisitos por WhatsApp o imprimir el PDF antes de cargarlo."
+          actionLabel="Iniciar trámite"
+          onAction={onIrTramite}
         />
         <BigCard
           color="#8b5cf6"
@@ -353,7 +288,6 @@ function Hub({
           desc="Pagar tasas pendientes (ABL, patente, multas, etc.)"
           actionLabel="Ver deudas y pagar"
           onAction={onIrTasas}
-          disabled={!djFirmada}
         />
       </div>
     </div>
@@ -361,166 +295,10 @@ function Hub({
 }
 
 // ============================================================
-// Card Trámite — selector + 3 acciones (Iniciar / PDF / WhatsApp)
-// ============================================================
-function CardTramite({
-  vecino, telefonoSaliente, djFirmada, onIniciar,
-}: {
-  vecino: KycDatos;
-  telefonoSaliente: string | null;
-  djFirmada: boolean;
-  onIniciar: (tramiteId: number) => void;
-}) {
-  const { theme } = useTheme();
-  const [tramites, setTramites] = useState<Tramite[]>([]);
-  const [tramiteId, setTramiteId] = useState<number | null>(null);
-  const [generandoPdf, setGenerandoPdf] = useState(false);
-
-  useEffect(() => {
-    tramitesApi.getAll()
-      .then((r) => setTramites((r.data as Tramite[]).filter((t) => t.activo)))
-      .catch(() => setTramites([]));
-  }, []);
-
-  const tramiteSel = useMemo(
-    () => tramites.find((t) => t.id === tramiteId) || null,
-    [tramites, tramiteId],
-  );
-
-  const handlePdf = async () => {
-    if (!tramiteSel) return;
-    setGenerandoPdf(true);
-    try {
-      await generarPdfRequisitos(tramiteSel, vecino);
-    } catch (e) {
-      toast.error('No se pudo generar el PDF');
-    } finally {
-      setGenerandoPdf(false);
-    }
-  };
-
-  const handleWhatsApp = () => {
-    if (!tramiteSel) return;
-    const tel = vecino.telefono;
-    if (!tel) {
-      toast.error('El vecino no tiene teléfono cargado');
-      return;
-    }
-    const mensaje = mensajeRequisitosTramite(tramiteSel, vecino);
-    const url = armarWaMeUrl(tel, mensaje);
-    if (!url) {
-      toast.error('Teléfono inválido para WhatsApp');
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  };
-
-  const color = '#22c55e';
-
-  return (
-    <div
-      className="rounded-xl p-4 flex flex-col"
-      style={{ backgroundColor: theme.card, border: `1.5px solid ${color}40` }}
-    >
-      <div className="flex items-center gap-2 mb-2">
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: `${color}20`, color }}
-        >
-          <FileText className="w-7 h-7" />
-        </div>
-        <div>
-          <h3 className="text-base font-bold" style={{ color: theme.text }}>Trámite</h3>
-          <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-            Iniciar gestión, imprimir requisitos o mandarlos por WhatsApp
-          </p>
-        </div>
-      </div>
-
-      <ModernSelect
-        value={tramiteId === null ? '' : String(tramiteId)}
-        onChange={(v) => setTramiteId(v ? Number(v) : null)}
-        options={tramites.map((t) => ({
-          value: String(t.id),
-          label: t.costo ? `${t.nombre} — $${t.costo.toLocaleString('es-AR')}` : `${t.nombre} — Gratis`,
-        }))}
-        placeholder="Seleccioná un trámite del catálogo"
-        searchable
-      />
-
-      {tramiteSel && (
-        <div
-          className="rounded-lg p-2 mt-2 text-[11px] space-y-1"
-          style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
-        >
-          <div className="flex items-center gap-2">
-            <Clock className="w-3 h-3" />
-            <span>{tramiteSel.tiempo_estimado_dias} días estimados</span>
-            {tramiteSel.costo ? (
-              <>
-                <span>·</span>
-                <span className="font-semibold" style={{ color: theme.text }}>
-                  ${tramiteSel.costo.toLocaleString('es-AR')}
-                </span>
-              </>
-            ) : null}
-          </div>
-          {tramiteSel.requiere_cenat && (
-            <p className="flex items-center gap-1" style={{ color: '#f59e0b' }}>
-              <AlertTriangle className="w-3 h-3" /> Requiere CENAT (ANSV)
-            </p>
-          )}
-          <p>📋 {tramiteSel.documentos_requeridos?.length || 0} documentos a presentar</p>
-        </div>
-      )}
-
-      <div className="mt-3 grid grid-cols-1 gap-1.5">
-        <button
-          onClick={() => tramiteId && onIniciar(tramiteId)}
-          disabled={!tramiteId || !djFirmada}
-          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-          style={{ backgroundColor: color }}
-        >
-          <Sparkles className="w-4 h-4" />
-          Iniciar trámite ahora
-        </button>
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            onClick={handlePdf}
-            disabled={!tramiteSel || generandoPdf}
-            className="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-            title="Imprimir lista de requisitos para entregar al vecino"
-          >
-            {generandoPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
-            PDF requisitos
-          </button>
-          <button
-            onClick={handleWhatsApp}
-            disabled={!tramiteSel || !vecino.telefono}
-            className="inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
-            style={{ backgroundColor: '#25d366' }}
-            title={vecino.telefono ? 'Enviar requisitos al WhatsApp del vecino' : 'Falta teléfono del vecino'}
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            WhatsApp
-          </button>
-        </div>
-        {telefonoSaliente && (
-          <p className="text-[10px] text-center" style={{ color: theme.textSecondary }}>
-            Línea muni: <span className="font-mono">{telefonoSaliente}</span>
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// BigCard — card genérica para Reclamo / Tasas
+// BigCard — card genérica para Reclamo / Trámite / Tasas
 // ============================================================
 function BigCard({
-  color, icon, title, desc, actionLabel, onAction, disabled,
+  color, icon, title, desc, actionLabel, onAction,
 }: {
   color: string;
   icon: React.ReactNode;
@@ -528,7 +306,6 @@ function BigCard({
   desc: string;
   actionLabel: string;
   onAction: () => void;
-  disabled?: boolean;
 }) {
   const { theme } = useTheme();
   return (
@@ -552,8 +329,7 @@ function BigCard({
       </p>
       <button
         onClick={onAction}
-        disabled={disabled}
-        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95"
         style={{ backgroundColor: color }}
       >
         {actionLabel}
