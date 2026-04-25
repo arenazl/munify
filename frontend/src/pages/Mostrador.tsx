@@ -119,7 +119,7 @@ export default function Mostrador() {
     setPaso('hub');
   };
 
-  const irA = (path: string) => {
+  const irA = (path: string, extraParams?: Record<string, string | number | undefined>) => {
     if (!vecino?.user_id) {
       toast.error('Falta identificar al vecino');
       return;
@@ -129,7 +129,14 @@ export default function Mostrador() {
       return;
     }
     persistirContexto(vecino, kycSessionId);
-    navigate(`${path}?actuando_como=${vecino.user_id}`);
+    const params = new URLSearchParams();
+    params.set('actuando_como', String(vecino.user_id));
+    if (extraParams) {
+      for (const [k, v] of Object.entries(extraParams)) {
+        if (v != null && v !== '') params.set(k, String(v));
+      }
+    }
+    navigate(`${path}?${params.toString()}`);
   };
 
   const reset = () => {
@@ -195,7 +202,7 @@ export default function Mostrador() {
           telefonoSaliente={telefonoSaliente}
           onIrReclamo={() => irA('/gestion/crear-reclamo')}
           onIrTramite={(tramiteId) =>
-            irA(`/gestion/crear-tramite${tramiteId ? `?tramite_id=${tramiteId}&from=mostrador&` : '?'}`.replace('?&', '?'))
+            irA('/gestion/crear-tramite', tramiteId ? { tramite_id: tramiteId } : undefined)
           }
           onIrTasas={() => irA('/gestion/mis-tasas')}
           onReset={reset}
