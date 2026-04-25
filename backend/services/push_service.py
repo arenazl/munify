@@ -21,7 +21,8 @@ async def crear_notificacion_db(
     mensaje: str,
     tipo: str = "info",
     reclamo_id: Optional[int] = None,
-    solicitud_id: Optional[int] = None
+    solicitud_id: Optional[int] = None,
+    accion_url: Optional[str] = None,
 ) -> Optional[Notificacion]:
     """
     Crea una notificación en la base de datos para mostrar en la campanita.
@@ -46,6 +47,7 @@ async def crear_notificacion_db(
             tipo=tipo,
             reclamo_id=reclamo_id,
             solicitud_id=solicitud_id,
+            accion_url=accion_url,
             leida=False
         )
         db.add(notificacion)
@@ -267,16 +269,20 @@ async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
         return 0
 
     titulo = "Reclamo Resuelto"
-    mensaje = f"Tu reclamo #{reclamo.id} ha sido resuelto. ¡Gracias por tu paciencia!"
+    mensaje = f"Tu reclamo #{reclamo.id} fue finalizado. Calificá la atención recibida."
+    # URL a la pantalla de calificación (no al detalle) — el usuario llega
+    # ahí, califica con estrellas + comentario y vuelve.
+    url_calificar = f"/calificar/{reclamo.id}"
 
-    # Crear notificación en BD
+    # Crear notificación en BD con accion_url explícita
     await crear_notificacion_db(
         db=db,
         usuario_id=reclamo.creador_id,
         titulo=titulo,
         mensaje=mensaje,
         tipo="success",
-        reclamo_id=reclamo.id
+        reclamo_id=reclamo.id,
+        accion_url=url_calificar,
     )
 
     return await send_push_to_user(
@@ -284,7 +290,7 @@ async def notificar_reclamo_resuelto(db: AsyncSession, reclamo) -> int:
         user_id=reclamo.creador_id,
         title=titulo,
         body=mensaje,
-        url=f"/reclamos/{reclamo.id}",
+        url=url_calificar,
         data={"tipo": "reclamo_resuelto", "reclamo_id": reclamo.id}
     )
 
@@ -639,8 +645,12 @@ async def notificar_sla_vencido(db: AsyncSession, supervisor_user_ids: List[int]
 # ============================================
 
 async def notificar_solicitud_recibida(db: AsyncSession, solicitud, tramite_nombre: str = None) -> int:
-    """Notifica al vecino que su solicitud fue recibida.
-    Crea notificación en BD + push al navegador."""
+    """Notifica al vecino que su solicitud fue creada.
+
+    Si la solicitud cobra al inicio (estado=pendiente_pago), genera el
+    cupon automaticamente y la notificacion lleva al checkout en lugar
+    de al detalle del tramite.
+    """
     if not solicitud.solicitante_id:
         logger.info(f"Solicitud #{solicitud.id} no tiene solicitante_id, no se envía notificación")
         return 0
@@ -649,18 +659,37 @@ async def notificar_solicitud_recibida(db: AsyncSession, solicitud, tramite_nomb
         logger.info(f"Usuario {solicitud.solicitante_id} tiene deshabilitada la notificación tramite_creado")
         return 0
 
-    tramite_info = f" ({tramite_nombre})" if tramite_nombre else ""
-    titulo = f"Trámite #{solicitud.numero_tramite} Generado"
-    mensaje = f"Su trámite{tramite_info} fue generado exitosamente y será procesado a la brevedad."
+    from models.tramite import EstadoSolicitud
+    pendiente_pago = solicitud.estado == EstadoSolicitud.PENDIENTE_PAGO
 
-    # Crear notificación en BD
+    tramite_info = f" ({tramite_nombre})" if tramite_nombre else ""
+    if pendiente_pago:
+        titulo = f"Trámite #{solicitud.numero_tramite} — Pagá para continuar"
+        mensaje = f"Tu trámite{tramite_info} fue creado. Para que la dependencia lo tome, primero tenés que abonarlo."
+    else:
+        titulo = f"Trámite #{solicitud.numero_tramite} Generado"
+        mensaje = f"Su trámite{tramite_info} fue generado exitosamente y será procesado a la brevedad."
+
+    # Si está pendiente de pago, generamos el cupón ya y armamos el link al
+    # checkout. La notificación lleva ahí directo (en vez del detalle).
+    accion_url = f"/tramites/{solicitud.id}"
+    if pendiente_pago:
+        try:
+            checkout_url = await _generar_cupon_y_link(db, solicitud)
+            if checkout_url:
+                accion_url = checkout_url
+        except Exception as e:
+            logger.warning(f"[CUPON] No se pudo pre-generar el cupón al notificar: {e}")
+
+    # Crear notificación en BD con accion_url explicita
     await crear_notificacion_db(
         db=db,
         usuario_id=solicitud.solicitante_id,
         titulo=titulo,
         mensaje=mensaje,
-        tipo="success",
-        solicitud_id=solicitud.id
+        tipo="warning" if pendiente_pago else "success",
+        solicitud_id=solicitud.id,
+        accion_url=accion_url,
     )
 
     return await send_push_to_user(
@@ -668,9 +697,93 @@ async def notificar_solicitud_recibida(db: AsyncSession, solicitud, tramite_nomb
         user_id=solicitud.solicitante_id,
         title=titulo,
         body=mensaje,
-        url=f"/tramites/{solicitud.id}",
-        data={"tipo": "tramite_creado", "solicitud_id": solicitud.id}
+        url=accion_url,
+        data={
+            "tipo": "tramite_pendiente_pago" if pendiente_pago else "tramite_creado",
+            "solicitud_id": solicitud.id,
+        },
     )
+
+
+async def _generar_cupon_y_link(db: AsyncSession, solicitud) -> Optional[str]:
+    """Crea (o reusa) la PagoSesion para una solicitud pendiente de pago y
+    devuelve la URL absoluta del checkout. Retorna None si no se puede.
+    """
+    from models.pago_sesion import PagoSesion, EstadoSesionPago
+    from models.tramite import HistorialSolicitud
+    from services.pagos import get_provider_para_muni
+    from sqlalchemy import select
+    from decimal import Decimal
+    from datetime import datetime, timedelta
+    from secrets import token_hex
+    from core.config import settings
+
+    if not solicitud.tramite or not solicitud.tramite.costo or solicitud.tramite.costo <= 0:
+        return None
+
+    # Reusar PagoSesion PENDING si existe (idempotencia)
+    q = await db.execute(
+        select(PagoSesion)
+        .where(
+            PagoSesion.solicitud_id == solicitud.id,
+            PagoSesion.estado.in_([EstadoSesionPago.PENDING, EstadoSesionPago.IN_CHECKOUT]),
+        )
+        .order_by(PagoSesion.created_at.desc())
+        .limit(1)
+    )
+    sesion = q.scalar_one_or_none()
+
+    if sesion is None:
+        provider = await get_provider_para_muni(db, solicitud.municipio_id)
+        sesion_id = f"PB-{token_hex(7).upper()}"
+        # Mismo override de testing que /pagos/cupon-tramite-wa
+        try:
+            from api.pagos import CUPON_TEST_OVERRIDE_MONTO
+        except Exception:
+            CUPON_TEST_OVERRIDE_MONTO = None
+        monto_real = Decimal(str(solicitud.tramite.costo))
+        monto_a_cobrar = CUPON_TEST_OVERRIDE_MONTO or monto_real
+        suffix_test = " (TEST $1)" if CUPON_TEST_OVERRIDE_MONTO else ""
+        concepto = f"{solicitud.tramite.nombre} — Solicitud {solicitud.numero_tramite}{suffix_test}"
+
+        sesion_ext = await provider.crear_sesion(
+            concepto=concepto,
+            monto=monto_a_cobrar,
+            sesion_id=sesion_id,
+            return_url="/gestion/mis-tramites",
+        )
+        expires_at = datetime.utcnow() + timedelta(seconds=sesion_ext.expires_in_seconds)
+        sesion = PagoSesion(
+            id=sesion_id,
+            solicitud_id=solicitud.id,
+            municipio_id=solicitud.municipio_id,
+            vecino_user_id=solicitud.solicitante_id,
+            concepto=concepto,
+            monto=monto_a_cobrar,
+            estado=EstadoSesionPago.PENDING,
+            provider=provider.nombre,
+            external_id=sesion_ext.external_id,
+            checkout_url=sesion_ext.checkout_url,
+            return_url="/gestion/mis-tramites",
+            expires_at=expires_at,
+            canal="app",
+        )
+        db.add(sesion)
+        db.add(HistorialSolicitud(
+            solicitud_id=solicitud.id,
+            usuario_id=solicitud.solicitante_id,
+            accion="Cupón de pago generado",
+            comentario=f"Sesión {sesion_id} · ${monto_a_cobrar:.2f} · auto al notificar al vecino",
+        ))
+        await db.commit()
+        await db.refresh(sesion)
+
+    # URL absoluta para que el push/notif funcione fuera de la app
+    raw = sesion.checkout_url or ""
+    if raw.startswith("/"):
+        base = settings.FRONTEND_URL.rstrip("/")
+        return f"{base}{raw}"
+    return raw
 
 
 async def notificar_dependencia_solicitud_nueva(

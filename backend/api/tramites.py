@@ -969,10 +969,18 @@ async def crear_solicitud(
     )
     solicitud_full = result.scalar_one()
 
-    # Las notificaciones en background quedaron deshabilitadas porque
-    # el `db` session se cierra al terminar este request y romperia las tasks
-    # asyncio. Si se reactivan, hay que crear una sesion nueva dentro de cada
-    # task usando `async with AsyncSessionLocal() as fresh_db:`.
+    # Notificar al vecino y a la dependencia. Si el tramite cobra al inicio,
+    # `notificar_solicitud_recibida` genera el cupon automaticamente y
+    # incluye el link al checkout en la notificacion.
+    try:
+        await enviar_notificacion_solicitud(db, solicitud_full, tramite.nombre)
+    except Exception as e:
+        logger.warning(f"[NOTIF] Error notificando vecino: {e}")
+    try:
+        await enviar_notificacion_supervisores_solicitud(db, solicitud_full, tramite.nombre)
+    except Exception as e:
+        logger.warning(f"[NOTIF] Error notificando supervisores: {e}")
+
     return solicitud_full
 
 

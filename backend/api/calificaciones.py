@@ -70,8 +70,9 @@ async def crear_calificacion(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.RESUELTO:
-        raise HTTPException(status_code=400, detail="Solo se pueden calificar reclamos resueltos")
+    # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
+    if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):
+        raise HTTPException(status_code=400, detail="Solo se pueden calificar reclamos finalizados")
 
     if reclamo.creador_id != current_user.id:
         raise HTTPException(status_code=403, detail="Solo el creador del reclamo puede calificarlo")

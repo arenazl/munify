@@ -24,6 +24,10 @@ class Notificacion(Base):
     solicitud_id = Column(Integer, ForeignKey("solicitudes.id"), nullable=True)
     solicitud = relationship("Solicitud")
 
+    # URL a la que se navega al hacer click (override del patrón por reclamo_id/solicitud_id).
+    # Útil para notificaciones que necesitan ir a una pantalla específica como /calificar/{id}.
+    accion_url = Column(String(500), nullable=True)
+
     # Estado
     leida = Column(Boolean, default=False)
 

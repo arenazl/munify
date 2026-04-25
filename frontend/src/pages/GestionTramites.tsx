@@ -28,7 +28,7 @@ import {
   FileSearch,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { tramitesApi, empleadosApi, categoriasTramiteApi } from '../lib/api';
+import { tramitesApi, empleadosApi, categoriasTramiteApi, dependenciasApi, pagosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Sheet } from '../components/ui/Sheet';
@@ -41,7 +41,7 @@ import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import PageHint from '../components/ui/PageHint';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
-import type { Solicitud, Tramite, CategoriaTramite, Empleado, EmpleadoDisponibilidad } from '../types';
+import type { Solicitud, Tramite, CategoriaTramite, Empleado, EmpleadoDisponibilidad, TipoEmpleado } from '../types';
 import {
   getEstadoInfo,
   normalizarEstado,
@@ -381,14 +381,34 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     }
   };
 
-  // Cargar empleados administrativos con disponibilidad
+  // Cargar dependencias del muni para el selector "Cambiar dependencia".
+  // Antes cargaba empleados — los trámites se asignan a dependencias, no a
+  // empleados. Mapeamos la respuesta a la forma de EmpleadoDisponibilidad
+  // para no tener que reescribir el dropdown entero.
   const loadEmpleadosDisponibilidad = async () => {
     setLoadingEmpleados(true);
     try {
-      const res = await empleadosApi.getDisponibilidad('administrativo');
-      setEmpleadosDisponibilidad(res.data);
+      const res = await dependenciasApi.getMunicipio({ activo: true, tipo_gestion: 'TRAMITE' });
+      const deps = (res.data || []) as Array<{
+        id: number;
+        nombre: string;
+        descripcion?: string;
+      }>;
+      setEmpleadosDisponibilidad(deps.map((d) => ({
+        id: d.id,
+        nombre: d.nombre,
+        apellido: '',
+        especialidad: d.descripcion || '',
+        tipo: 'administrativo' as TipoEmpleado,
+        capacidad_maxima: 0,
+        carga_actual: 0,
+        disponibilidad: 0,
+        porcentaje_ocupacion: 0,
+        horarios: [],
+        horario_texto: d.descripcion || '',
+      })));
     } catch (error) {
-      console.error('Error cargando disponibilidad:', error);
+      console.error('Error cargando dependencias:', error);
     } finally {
       setLoadingEmpleados(false);
     }
@@ -2110,6 +2130,36 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                     <p className="text-xs" style={{ color: theme.textSecondary }}>
                       El vecino todavía no inició el pago. No se puede finalizar el trámite hasta que pague.
                     </p>
+                  )}
+
+                  {/* Botón "Mandar cupón por WhatsApp" — siempre visible mientras
+                      el pago esté pendiente, idempotente (reusa PagoSesion PENDING). */}
+                  {!pagado && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!selectedTramite) return;
+                        try {
+                          const r = await pagosApi.cuponTramiteWa(selectedTramite.id);
+                          if (r.data.wa_me_url) {
+                            window.open(r.data.wa_me_url, '_blank', 'noopener,noreferrer');
+                          } else {
+                            toast.error('El vecino no tiene teléfono cargado. Copiá el link y mandalo manualmente.');
+                            try {
+                              await navigator.clipboard.writeText(r.data.checkout_url);
+                              toast.success('Link de pago copiado al portapapeles');
+                            } catch { /* ignore */ }
+                          }
+                        } catch (e: unknown) {
+                          const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+                          toast.error(msg || 'No se pudo generar el cupón');
+                        }
+                      }}
+                      className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-95"
+                      style={{ backgroundColor: '#25d366' }}
+                    >
+                      📱 Mandar cupón de pago por WhatsApp
+                    </button>
                   )}
 
                   {!pagado && estadoPago.intentos_total > 0 && (

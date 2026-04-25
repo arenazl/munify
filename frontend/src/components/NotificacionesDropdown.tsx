@@ -16,6 +16,7 @@ interface Notificacion {
   created_at: string;
   reclamo_id?: number;
   solicitud_id?: number;
+  accion_url?: string;
 }
 
 interface NotificacionesDropdownProps {
@@ -109,16 +110,18 @@ export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarH
     // Cerrar dropdown
     setIsOpen(false);
 
-    // URL varía según el rol del usuario
-    const isGestion = user?.rol === 'supervisor' || user?.rol === 'admin';
+    // 1) Si la notificación trae accion_url explícita, prevalece (ej. /calificar/{id}).
+    if (notif.accion_url) {
+      navigate(notif.accion_url);
+      return;
+    }
 
-    // Navegar al reclamo si tiene reclamo_id
+    // 2) Fallback al patrón por rol + reclamo_id / solicitud_id.
+    const isGestion = user?.rol === 'supervisor' || user?.rol === 'admin';
     if (notif.reclamo_id) {
       const basePath = isGestion ? '/gestion/reclamos' : '/reclamos';
       navigate(`${basePath}/${notif.reclamo_id}`);
-    }
-    // Navegar al trámite si tiene solicitud_id
-    else if (notif.solicitud_id) {
+    } else if (notif.solicitud_id) {
       const basePath = isGestion ? '/gestion/tramites' : '/tramites';
       navigate(`${basePath}/${notif.solicitud_id}`);
     }
