@@ -918,6 +918,13 @@ function TabCapturaMovil({ onAprobado, onCargarManual }: {
   const [diditUrl, setDiditUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number>(600);
+  // Cuando la sesión se completa, guardo el payload acá. Un effect separado
+  // lo observa y dispara onAprobado tras 900ms — así el cleanup del polling
+  // (que se corre cuando phase pasa a 'completed') no cancela el timer.
+  const [resultadoAprobado, setResultadoAprobado] = useState<{
+    datos: KycDatos;
+    sessionId: string;
+  } | null>(null);
 
   // Polling de estado
   useEffect(() => {
@@ -938,20 +945,15 @@ function TabCapturaMovil({ onAprobado, onCargarManual }: {
         if (e.estado === 'en_curso' && phase === 'awaiting') {
           setPhase('in_progress');
         } else if (e.estado === 'completada' && e.payload && e.payload.dni) {
+          setResultadoAprobado({
+            datos: {
+              dni: e.payload.dni,
+              nombre: e.payload.nombre,
+              apellido: e.payload.apellido,
+            },
+            sessionId: e.didit_session_id || handoffToken,
+          });
           setPhase('completed');
-          // Pequeño delay para que el operador vea el "verificado" antes del salto
-          setTimeout(() => {
-            if (!cancelado) {
-              onAprobado(
-                {
-                  dni: e.payload!.dni,
-                  nombre: e.payload!.nombre,
-                  apellido: e.payload!.apellido,
-                },
-                e.didit_session_id || handoffToken,
-              );
-            }
-          }, 900);
         } else if (e.estado === 'rechazada') {
           setPhase('rejected');
           setError(e.motivo_rechazo || 'Verificación rechazada');
@@ -971,7 +973,17 @@ function TabCapturaMovil({ onAprobado, onCargarManual }: {
       cancelado = true;
       clearInterval(id);
     };
-  }, [handoffToken, phase, onAprobado]);
+  }, [handoffToken, phase]);
+
+  // Effect dedicado al hand-off: cuando hay resultado aprobado, espero 900ms
+  // y disparo onAprobado. Independiente del polling, así no se cancela.
+  useEffect(() => {
+    if (!resultadoAprobado) return;
+    const t = setTimeout(() => {
+      onAprobado(resultadoAprobado.datos, resultadoAprobado.sessionId);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [resultadoAprobado, onAprobado]);
 
   // Cleanup: si se desmonta mientras hay sesión abierta, la cancelo en el server
   useEffect(() => {
@@ -1017,6 +1029,7 @@ function TabCapturaMovil({ onAprobado, onCargarManual }: {
     setQrValue(null);
     setDiditUrl(null);
     setError(null);
+    setResultadoAprobado(null);
     setPhase('idle');
   };
 
