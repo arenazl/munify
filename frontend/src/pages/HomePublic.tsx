@@ -31,7 +31,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useMunicipioFromUrl } from '../hooks/useSubdomain';
 import PWAOnboarding from '../components/PWAOnboarding';
-import NotificationPrompt from '../components/NotificationPrompt';
 import {
   isPushSupported,
   getNotificationPermission,
@@ -316,8 +315,8 @@ export default function HomePublic() {
         />
       )}
 
-      {/* Prompt para activar notificaciones */}
-      <NotificationPrompt delay={3000} />
+      {/* Notificaciones se gestionan desde NotificationActivationSheet en el
+          Layout autenticado — no tiene sentido pedirlas en la landing publica. */}
 
       {/* Header - Desktop */}
       <header

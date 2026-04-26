@@ -13,6 +13,7 @@ import { Sheet } from './ui/Sheet';
 import { usersApi, municipiosApi, navegacionApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
 import NotificationSettings from './NotificationSettings';
+import { NotificationActivationSheet } from './NotificationActivationSheet';
 import { subscribeToPush } from '../lib/pushNotifications';
 import { toast } from 'sonner';
 
@@ -1187,45 +1188,9 @@ export default function Layout() {
           );
           })()}
 
-          {/* Banner de activar notificaciones - visible para todos si no están activas */}
-          {!pushSubscribed && (
-            <div
-              className="mb-4 p-4 rounded-xl flex items-center justify-between gap-4"
-              style={{
-                backgroundColor: `${theme.primary}15`,
-                border: `1px solid ${theme.primary}30`,
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="p-2 rounded-full"
-                  style={{ backgroundColor: theme.primary }}
-                >
-                  <BellRing className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-medium text-sm" style={{ color: theme.text }}>
-                    Activá las notificaciones
-                  </p>
-                  <p className="text-xs" style={{ color: theme.textSecondary }}>
-                    Recibí alertas de novedades en tus reclamos
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleTopBarPushSubscribe}
-                disabled={pushSubscribing}
-                className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:opacity-90 active:scale-95 whitespace-nowrap"
-                style={{
-                  backgroundColor: theme.primary,
-                  color: '#ffffff',
-                  opacity: pushSubscribing ? 0.7 : 1,
-                }}
-              >
-                {pushSubscribing ? 'Activando...' : 'Activar'}
-              </button>
-            </div>
-          )}
+          {/* El banner de "Activá las notificaciones" se reemplazo por
+              NotificationActivationSheet (bottom-sheet 35vh con copy escalado).
+              El nuevo sheet se monta una sola vez al final del Layout. */}
 
           <PageTransition>
             <Outlet />
@@ -2130,6 +2095,10 @@ export default function Layout() {
           </div>
         </div>
       )}
+
+      {/* Bottom-sheet de activacion de notificaciones — auto-trigger al login
+          + listener para post-creacion de reclamos/tramites. */}
+      <NotificationActivationSheet />
     </div>
   );
 }

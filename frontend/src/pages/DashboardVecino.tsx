@@ -22,7 +22,6 @@ function RecIcono({ nombre, color }: { nombre: string; color: string }) {
 }
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import NotificationPrompt from '../components/NotificationPrompt';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import type { Reclamo, EstadoReclamo } from '../types';
 
@@ -332,8 +331,6 @@ export default function DashboardVecino() {
   return (
     <PullToRefresh onRefresh={async () => { await fetchData(); }}>
     <div className="space-y-6">
-      <NotificationPrompt delay={2000} />
-
       {/* Hero Banner */}
       <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '180px' }}>
         <div className="absolute inset-0">

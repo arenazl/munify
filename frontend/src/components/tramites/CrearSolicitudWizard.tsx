@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { triggerNotificationPostCreation } from '../NotificationActivationSheet';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
@@ -412,6 +413,9 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
       });
       onSuccess?.(res.data);
       onClose();
+      // Bottom-sheet de notificaciones (solo entra una vez total).
+      // Pequeño delay para que el toast y la transicion se vean primero.
+      setTimeout(() => triggerNotificationPostCreation('tramite'), 700);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Error creando solicitud');
     } finally {

@@ -18,6 +18,7 @@ import {
   X as XIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { triggerNotificationPostCreation } from '../NotificationActivationSheet';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
@@ -470,6 +471,9 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
       toast.success('Reclamo creado correctamente', { duration: 4000 });
       onSuccess?.(res.data);
       onClose();
+      // Disparar bottom-sheet de notificaciones (solo entra una vez total).
+      // Pequeño delay para que el toast y la transicion de cierre se vean primero.
+      setTimeout(() => triggerNotificationPostCreation('reclamo'), 700);
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Error creando reclamo');
     } finally {
