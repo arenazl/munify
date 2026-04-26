@@ -1693,22 +1693,25 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       </ABMPage>
       )}
 
-      {/* Sentinel para infinite scroll + spinner de carga */}
-      <div ref={loadMoreRef} className="py-4">
-        {loadingMore && (
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
-            <span className="text-sm" style={{ color: theme.textSecondary }}>
-              Cargando más trámites...
-            </span>
-          </div>
-        )}
-        {!hasMore && tramites.length > 0 && !loadingMore && (
-          <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
-            No hay más trámites para mostrar
-          </p>
-        )}
-      </div>
+      {/* Sentinel para infinite scroll + spinner de carga.
+          Solo en vista clásica — en vista Inbox la lista no se pagina. */}
+      {!vistaInbox && (
+        <div ref={loadMoreRef} className="py-4">
+          {loadingMore && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+              <span className="text-sm" style={{ color: theme.textSecondary }}>
+                Cargando más trámites...
+              </span>
+            </div>
+          )}
+          {!hasMore && tramites.length > 0 && !loadingMore && (
+            <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+              No hay más trámites para mostrar
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Sheet de detalle */}
       <Sheet open={sheetOpen} onClose={closeSheet} title="Detalle del Trámite" stickyFooter={renderTramiteFooter()}>

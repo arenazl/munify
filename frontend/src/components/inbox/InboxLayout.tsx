@@ -159,14 +159,18 @@ function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: num
   const { theme } = useTheme();
   const [colapsada, setColapsada] = useState(seccion.colapsable || false);
   const isEmpty = seccion.items.length === 0;
+  const toggle = () => seccion.colapsable && setColapsada((v) => !v);
 
   return (
     <div
       className="inbox-section"
       style={{ animationDelay: `${(indexBase + 1) * 80}ms` }}
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3 px-1">
+      {/* Header — todo clickeable cuando es colapsable */}
+      <div
+        className={`flex items-center gap-3 mb-3 px-1 rounded-lg ${seccion.colapsable ? 'cursor-pointer hover:opacity-80' : ''}`}
+        onClick={seccion.colapsable ? toggle : undefined}
+      >
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${seccion.color}20`, color: seccion.color }}
@@ -195,7 +199,7 @@ function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: num
         {seccion.accion && !isEmpty && (
           <button
             type="button"
-            onClick={seccion.accion.onClick}
+            onClick={(e) => { e.stopPropagation(); seccion.accion!.onClick(); }}
             className="text-xs font-medium px-3 py-1.5 rounded-lg transition-all hover:scale-105 active:scale-95"
             style={{
               backgroundColor: `${seccion.color}15`,
@@ -207,14 +211,12 @@ function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: num
           </button>
         )}
         {seccion.colapsable && (
-          <button
-            type="button"
-            onClick={() => setColapsada((v) => !v)}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-black/5"
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ color: theme.textSecondary }}
           >
             {colapsada ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-          </button>
+          </div>
         )}
       </div>
 
