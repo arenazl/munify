@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText, CheckCircle2, AlertTriangle, Receipt,
-  ClipboardList, ScanLine, Camera, ShieldCheck,
+  ClipboardList, ScanLine, ShieldCheck,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search,
   UserCheck, Sparkles, X, Edit3, IdCard, Smartphone, QrCode,
 } from 'lucide-react';
@@ -44,7 +44,7 @@ interface VecinoEncontrado {
 }
 
 type Paso = 'identificar' | 'hub';
-type TabId = 'dni' | 'biometria' | 'celular';
+type TabId = 'dni' | 'celular';
 
 /**
  * Mostrador — consola de operador de ventanilla (rediseño v3).
@@ -151,7 +151,6 @@ export default function Mostrador() {
       {/* === Cuerpo === */}
       {paso === 'identificar' && municipioId && (
         <PasoIdentificar
-          municipioId={municipioId}
           onClienteRegistrado={(v) =>
             handleVecinoListo({
               user_id: v.user_id,
@@ -229,8 +228,7 @@ function MetricaCard({ color, icon, label, value, formatMoney }: {
 // ============================================================
 // PasoIdentificar — Tabs animados (DNI / Biometría) + búsqueda libre
 // ============================================================
-function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCargarManual }: {
-  municipioId: number;
+function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }: {
   onClienteRegistrado: (v: VecinoEncontrado) => void;
   onBiometriaOk: (datos: KycDatos, sessionId: string) => void;
   onCargarManual: () => void;
@@ -240,9 +238,8 @@ function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCa
   const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
 
   const tabs: Array<{ id: TabId; label: string; sublabel: string; icon: React.ReactNode; color: string }> = [
-    { id: 'dni',        label: 'Por DNI',     sublabel: 'Cliente registrado', icon: <IdCard className="w-4 h-4" />, color: theme.primary },
-    { id: 'biometria',  label: 'Por biometría', sublabel: 'RENAPER · webcam', icon: <Camera className="w-4 h-4" />, color: '#8b5cf6' },
-    { id: 'celular',    label: 'Por celular',  sublabel: 'RENAPER · QR al celu', icon: <Smartphone className="w-4 h-4" />, color: '#22c55e' },
+    { id: 'dni',     label: 'Por DNI',     sublabel: 'Cliente registrado',  icon: <IdCard className="w-4 h-4" />,     color: theme.primary },
+    { id: 'celular', label: 'Por celular', sublabel: 'RENAPER · QR al celu', icon: <Smartphone className="w-4 h-4" />, color: '#22c55e' },
   ];
 
   return (
@@ -294,13 +291,6 @@ function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCa
           className="animate-tab-slide"
         >
           {tab === 'dni' && <TabDni onUsar={onClienteRegistrado} />}
-          {tab === 'biometria' && (
-            <TabBiometria
-              municipioId={municipioId}
-              onAprobado={onBiometriaOk}
-              onCargarManual={onCargarManual}
-            />
-          )}
           {tab === 'celular' && (
             <TabCapturaMovil
               onAprobado={onBiometriaOk}
@@ -526,172 +516,6 @@ function ResultadoVecino({ vecino: v, onUsar }: {
         <ChevronRight className="w-3.5 h-3.5" />
       </div>
     </button>
-  );
-}
-
-// ============================================================
-// TabBiometria — auto-inicia popup Didit + polling
-// ============================================================
-function TabBiometria({ municipioId, onAprobado, onCargarManual }: {
-  municipioId: number;
-  onAprobado: (datos: KycDatos, sessionId: string) => void;
-  onCargarManual: () => void;
-}) {
-  const { theme } = useTheme();
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [didurl, setDidurl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const popupRef = useRef<Window | null>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const detenerPolling = useCallback(() => {
-    if (pollingRef.current) { clearInterval(pollingRef.current); pollingRef.current = null; }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      detenerPolling();
-      if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
-    };
-  }, [detenerPolling]);
-
-  const iniciar = async () => {
-    setStatus('starting');
-    setError(null);
-    try {
-      const r = await operadorApi.kycIniciar(municipioId);
-      setSessionId(r.data.session_id);
-      setDidurl(r.data.url);
-      const w = 480, h = 720;
-      const x = window.screenX + (window.outerWidth - w) / 2;
-      const y = window.screenY + (window.outerHeight - h) / 2;
-      popupRef.current = window.open(r.data.url, 'didit-kyc', `width=${w},height=${h},left=${x},top=${y}`);
-      setStatus('waiting');
-      pollingRef.current = setInterval(async () => {
-        try {
-          const e = await operadorApi.kycEstado(r.data.session_id);
-          if (e.data.aprobado && e.data.datos) {
-            detenerPolling();
-            setStatus('approved');
-            if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
-            onAprobado(e.data.datos as KycDatos, r.data.session_id);
-          } else if (e.data.status === 'Declined') {
-            detenerPolling();
-            setStatus('declined');
-            setError(e.data.motivo_rechazo || 'Verificación rechazada');
-            if (popupRef.current && !popupRef.current.closed) popupRef.current.close();
-          }
-        } catch { /* retry silencioso */ }
-      }, 2500);
-    } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setStatus('error');
-      setError(msg || 'No se pudo iniciar la biometría');
-    }
-  };
-
-  const reAbrirPopup = () => {
-    if (!didurl) return;
-    const w = 480, h = 720;
-    const x = window.screenX + (window.outerWidth - w) / 2;
-    const y = window.screenY + (window.outerHeight - h) / 2;
-    popupRef.current = window.open(didurl, 'didit-kyc', `width=${w},height=${h},left=${x},top=${y}`);
-  };
-
-  return (
-    <div
-      className="rounded-2xl p-6 text-center"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto mb-3" style={{ backgroundColor: `${theme.primary}15` }}>
-        {status === 'waiting' || status === 'starting' ? (
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: theme.primary }} />
-        ) : status === 'approved' ? (
-          <CheckCircle2 className="w-8 h-8" style={{ color: '#22c55e' }} />
-        ) : status === 'declined' || status === 'error' ? (
-          <AlertTriangle className="w-8 h-8" style={{ color: '#ef4444' }} />
-        ) : (
-          <Camera className="w-8 h-8" style={{ color: theme.primary }} />
-        )}
-      </div>
-
-      {status === 'idle' && (
-        <div className="space-y-3">
-          <h3 className="text-base font-bold" style={{ color: theme.text }}>Validar identidad del vecino</h3>
-          <p className="text-sm" style={{ color: theme.textSecondary }}>
-            Activá la webcam y el escaneo de DNI. RENAPER valida automáticamente.
-          </p>
-          <div className="flex items-center justify-center gap-3 text-[11px]" style={{ color: theme.textSecondary }}>
-            <span className="inline-flex items-center gap-1"><Camera className="w-3.5 h-3.5" /> webcam</span>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1"><ScanLine className="w-3.5 h-3.5" /> scan DNI</span>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> RENAPER</span>
-          </div>
-          <button
-            onClick={iniciar}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
-            style={{ backgroundColor: theme.primary }}
-          >
-            <Camera className="w-4 h-4" />
-            Iniciar biometría
-          </button>
-        </div>
-      )}
-
-      {status === 'starting' && (
-        <div>
-          <h3 className="text-base font-semibold" style={{ color: theme.text }}>Abriendo Didit…</h3>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>Creando sesión de verificación</p>
-        </div>
-      )}
-
-      {status === 'waiting' && (
-        <div className="space-y-3">
-          <div>
-            <h3 className="text-base font-semibold" style={{ color: theme.text }}>Esperando al vecino…</h3>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>
-              Escaneo del DNI + selfie en la ventana abierta. ~1 minuto.
-            </p>
-            <p className="text-[11px] font-mono mt-2" style={{ color: theme.textSecondary }}>Sesión: {sessionId}</p>
-          </div>
-          <button
-            onClick={reAbrirPopup}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
-            style={{ color: theme.primary, backgroundColor: `${theme.primary}15`, border: `1px solid ${theme.primary}40` }}
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Re-abrir ventana
-          </button>
-        </div>
-      )}
-
-      {status === 'declined' && (
-        <div className="space-y-3">
-          <h3 className="text-base font-semibold" style={{ color: '#ef4444' }}>Verificación rechazada</h3>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>{error}</p>
-          <div className="flex items-center justify-center gap-2">
-            <button onClick={iniciar} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white" style={{ backgroundColor: theme.primary }}>
-              <RefreshCcw className="w-3.5 h-3.5" /> Reintentar
-            </button>
-            <button onClick={onCargarManual} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-              Cargar a mano
-            </button>
-          </div>
-        </div>
-      )}
-
-      {status === 'error' && (
-        <div className="space-y-3">
-          <h3 className="text-base font-semibold" style={{ color: '#ef4444' }}>No se pudo iniciar la biometría</h3>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>{error}</p>
-          <button onClick={onCargarManual} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-            Seguir con carga manual
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
 
