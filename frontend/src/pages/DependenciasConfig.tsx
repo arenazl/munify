@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Building2, FolderKanban, FileText, Save, RefreshCw,
   Check, X, Plus, ChevronDown, ChevronUp, AlertCircle, Pencil, MapPin,
-  Eye, ClipboardList, FileCheck, BookOpen
+  Eye, FileCheck, BookOpen, Landmark, Sparkles, ListTree,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { dependenciasApi, categoriasReclamoApi, categoriasTramiteApi, tramitesApi } from '../lib/api';
@@ -14,12 +14,16 @@ import { StickyPageHeader, FilterChipRow, FilterChip } from '../components/ui/St
 import { MapPicker } from '../components/ui/MapPicker';
 import PageHint from '../components/ui/PageHint';
 
+type TipoJerarquico = 'SECRETARIA' | 'DIRECCION';
+
 interface Dependencia {
   id: number;
   nombre: string;
   codigo: string;
   descripcion: string;
   tipo_gestion: 'RECLAMO' | 'TRAMITE' | 'AMBOS';
+  tipo_jerarquico?: TipoJerarquico;
+  dependencia_padre_id?: number | null;
   horario_atencion: string;
   direccion: string;
   latitud: number | null;
@@ -37,12 +41,16 @@ interface MunicipioDependencia {
   nombre: string;
   codigo: string;
   tipo_gestion: string;
+  tipo_jerarquico?: TipoJerarquico;
+  dependencia_padre_id?: number | null;
   activo: boolean;
   orden: number;
   color?: string;
   icono?: string;
   categorias_count: number;
   tipos_tramite_count: number;
+  tramites_count?: number;
+  direcciones_count?: number;
   // Campos locales (pueden venir del detalle)
   direccion_local?: string;
   localidad_local?: string;
@@ -51,6 +59,13 @@ interface MunicipioDependencia {
   horario_atencion_local?: string;
   latitud_local?: number | null;
   longitud_local?: number | null;
+}
+
+interface SugerenciaJerarquica {
+  nombre: string;
+  descripcion?: string | null;
+  icono?: string | null;
+  color?: string | null;
 }
 
 interface MunicipioDependenciaDetail extends MunicipioDependencia {
@@ -147,6 +162,19 @@ export default function DependenciasConfig() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedToAdd, setSelectedToAdd] = useState<number[]>([]);
   const [editingDep, setEditingDep] = useState<MunicipioDependenciaDetail | null>(null);
+
+  // Vista jerarquica: que Secretarias tienen sus Direcciones desplegadas.
+  const [direccionesAbiertas, setDireccionesAbiertas] = useState<Set<number>>(new Set());
+
+  // Asistente IA — sugerir Secretarias o Direcciones (con fallback a template).
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiNivel, setAiNivel] = useState<TipoJerarquico>('SECRETARIA');
+  // Cuando aiNivel === 'DIRECCION', guardamos la Secretaria padre (md_id + nombre).
+  const [aiSecretariaPadre, setAiSecretariaPadre] = useState<{ id: number; nombre: string; color?: string } | null>(null);
+  const [aiSugerencias, setAiSugerencias] = useState<SugerenciaJerarquica[]>([]);
+  const [aiFuente, setAiFuente] = useState<'ia' | 'template' | 'fallback' | null>(null);
+  const [aiCargando, setAiCargando] = useState(false);
+  const [aiAplicandoNombre, setAiAplicandoNombre] = useState<string | null>(null);
 
   // Asignaciones para la dependencia expandida
   const [categoriasAsignadas, setCategoriasAsignadas] = useState<number[]>([]);
@@ -509,6 +537,148 @@ export default function DependenciasConfig() {
     );
   };
 
+  // ============================================================
+  // Computed: arbol Secretaria -> Direcciones a partir del listado plano.
+  // ============================================================
+  const { secretarias, direccionesPorSecretariaDepId } = useMemo(() => {
+    const secs: MunicipioDependencia[] = [];
+    const dirsByPadreDepId = new Map<number, MunicipioDependencia[]>();
+    for (const md of dependenciasMunicipio) {
+      const tj = (md.tipo_jerarquico || 'SECRETARIA') as TipoJerarquico;
+      if (tj === 'SECRETARIA') {
+        secs.push(md);
+      } else if (md.dependencia_padre_id) {
+        const arr = dirsByPadreDepId.get(md.dependencia_padre_id) || [];
+        arr.push(md);
+        dirsByPadreDepId.set(md.dependencia_padre_id, arr);
+      } else {
+        // Direccion huerfana — la dejamos visible al final como pseudo-secretaria.
+        secs.push(md);
+      }
+    }
+    return { secretarias: secs, direccionesPorSecretariaDepId: dirsByPadreDepId };
+  }, [dependenciasMunicipio]);
+
+  const toggleDireccionesAbiertas = (secMdId: number) => {
+    setDireccionesAbiertas(prev => {
+      const next = new Set(prev);
+      if (next.has(secMdId)) next.delete(secMdId); else next.add(secMdId);
+      return next;
+    });
+  };
+
+  // ============================================================
+  // Asistente IA — sugerencias de Secretarias / Direcciones.
+  // ============================================================
+  const abrirAiSecretarias = async () => {
+    setAiNivel('SECRETARIA');
+    setAiSecretariaPadre(null);
+    setAiOpen(true);
+    setAiCargando(true);
+    setAiSugerencias([]);
+    setAiFuente(null);
+    try {
+      const res = await dependenciasApi.sugerirJerarquicas({
+        nivel: 'SECRETARIA',
+        excluir_nombres: secretarias.map(s => s.nombre),
+      });
+      setAiSugerencias(res.data.items || []);
+      setAiFuente(res.data.fuente || null);
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudieron obtener sugerencias');
+    } finally {
+      setAiCargando(false);
+    }
+  };
+
+  const abrirAiDirecciones = async (secretaria: MunicipioDependencia) => {
+    setAiNivel('DIRECCION');
+    setAiSecretariaPadre({ id: secretaria.id, nombre: secretaria.nombre, color: secretaria.color });
+    setAiOpen(true);
+    setAiCargando(true);
+    setAiSugerencias([]);
+    setAiFuente(null);
+    try {
+      const yaCargadas = (direccionesPorSecretariaDepId.get(secretaria.dependencia_id) || []).map(d => d.nombre);
+      const res = await dependenciasApi.sugerirJerarquicas({
+        nivel: 'DIRECCION',
+        secretaria_nombre: secretaria.nombre,
+        excluir_nombres: yaCargadas,
+      });
+      setAiSugerencias(res.data.items || []);
+      setAiFuente(res.data.fuente || null);
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudieron obtener sugerencias');
+    } finally {
+      setAiCargando(false);
+    }
+  };
+
+  const aplicarSugerenciaSecretaria = async (sug: SugerenciaJerarquica) => {
+    setAiAplicandoNombre(sug.nombre);
+    try {
+      // 1) Crear (o reusar) en catalogo global como Secretaria.
+      const cat = await dependenciasApi.createCatalogo({
+        nombre: sug.nombre,
+        descripcion: sug.descripcion || undefined,
+        tipo_gestion: 'AMBOS',
+        tipo_jerarquico: 'SECRETARIA',
+        color: sug.color || undefined,
+        icono: sug.icono || 'Landmark',
+      });
+      // 2) Habilitar para el municipio.
+      await dependenciasApi.habilitarDependencias([cat.data.id]);
+      toast.success(`${sug.nombre} agregada`);
+      setAiSugerencias(prev => prev.filter(s => s.nombre !== sug.nombre));
+      await fetchData();
+    } catch (err: any) {
+      // Si ya existia en el catalogo global, intentamos solo habilitarla.
+      const detail = err?.response?.data?.detail || '';
+      if (detail.toLowerCase().includes('ya existe')) {
+        try {
+          // buscarla en el catalogo y habilitar
+          const cat = await dependenciasApi.getCatalogo();
+          const found = (cat.data as Dependencia[]).find(d => d.nombre.toLowerCase() === sug.nombre.toLowerCase());
+          if (found) {
+            await dependenciasApi.habilitarDependencias([found.id]);
+            toast.success(`${sug.nombre} habilitada`);
+            setAiSugerencias(prev => prev.filter(s => s.nombre !== sug.nombre));
+            await fetchData();
+            return;
+          }
+        } catch (_) { /* fall through */ }
+      }
+      toast.error(detail || 'Error agregando secretaria');
+    } finally {
+      setAiAplicandoNombre(null);
+    }
+  };
+
+  const aplicarSugerenciaDireccion = async (sug: SugerenciaJerarquica) => {
+    if (!aiSecretariaPadre) return;
+    setAiAplicandoNombre(sug.nombre);
+    try {
+      await dependenciasApi.crearDireccionMunicipio({
+        municipio_dependencia_padre_id: aiSecretariaPadre.id,
+        nombre: sug.nombre,
+        descripcion: sug.descripcion || undefined,
+        icono: sug.icono || 'Building2',
+        color: sug.color || aiSecretariaPadre.color || undefined,
+      });
+      toast.success(`${sug.nombre} agregada bajo ${aiSecretariaPadre.nombre}`);
+      setAiSugerencias(prev => prev.filter(s => s.nombre !== sug.nombre));
+      // Asegurar que la Secretaria quede expandida para que se vea la nueva Direccion.
+      setDireccionesAbiertas(prev => new Set(prev).add(aiSecretariaPadre.id));
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || 'Error agregando direccion');
+    } finally {
+      setAiAplicandoNombre(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: theme.background }}>
@@ -657,8 +827,45 @@ export default function DependenciasConfig() {
               </div>
             )}
 
-            {/* Lista de dependencias */}
-            {dependenciasFiltradas.map(dep => {
+            {/* CTA — Asistente IA para sugerir Secretarias (solo supervisor) */}
+            {!isSuperAdmin && (
+              <div
+                className="flex items-center justify-between gap-3 p-4 rounded-xl"
+                style={{
+                  backgroundColor: theme.primary + '0d',
+                  border: `1px dashed ${theme.primary}55`,
+                }}
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: theme.primary + '20' }}
+                  >
+                    <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold" style={{ color: theme.text }}>
+                      Asistente IA — Estructura Organizacional
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+                      Sugiere las <strong>Secretarías</strong> tipicas y, dentro de cada una, sus <strong>Direcciones</strong>.
+                      Empieza simple y complejiza cuando lo necesites.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={abrirAiSecretarias}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 transition-all hover:scale-105 active:scale-95"
+                  style={{ backgroundColor: theme.primary, color: '#fff' }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Sugerir Secretarías
+                </button>
+              </div>
+            )}
+
+            {/* === SUPERADMIN: lista plana del catalogo (sin vista jerarquica). === */}
+            {isSuperAdmin && dependenciasFiltradas.map(dep => {
           // Detectar si es item del catálogo (Dependencia) o del municipio (MunicipioDependencia)
           const isCatalogoItem = isSuperAdmin;
           const muniDep = dep as MunicipioDependencia;
@@ -846,8 +1053,356 @@ export default function DependenciasConfig() {
           );
         })}
 
+            {/* === SUPERVISOR: vista jerarquica Secretaria -> Direcciones === */}
+            {!isSuperAdmin && secretarias
+              .filter(sec => {
+                if (filtroActivo === 'reclamos' && sec.tipo_gestion !== 'RECLAMO' && sec.tipo_gestion !== 'AMBOS') return false;
+                if (filtroActivo === 'tramites' && sec.tipo_gestion !== 'TRAMITE' && sec.tipo_gestion !== 'AMBOS') return false;
+                if (searchTerm) {
+                  const term = searchTerm.toLowerCase();
+                  const enSecretaria = sec.nombre.toLowerCase().includes(term);
+                  const enDirecciones = (direccionesPorSecretariaDepId.get(sec.dependencia_id) || [])
+                    .some(d => d.nombre.toLowerCase().includes(term));
+                  return enSecretaria || enDirecciones;
+                }
+                return true;
+              })
+              .map(sec => {
+                const direcciones = direccionesPorSecretariaDepId.get(sec.dependencia_id) || [];
+                const isExpanded = expandedDep === sec.id;
+                const direccionesAbierta = direccionesAbiertas.has(sec.id);
+                const secColor = sec.color || theme.primary;
+
+                return (
+                  <div
+                    key={sec.id}
+                    className="rounded-xl overflow-hidden transition-shadow"
+                    style={{
+                      backgroundColor: theme.backgroundSecondary,
+                      border: `2px solid ${isExpanded ? secColor : theme.border}`,
+                      borderLeftWidth: '4px',
+                      borderLeftColor: secColor,
+                    }}
+                  >
+                    {/* Header de Secretaria */}
+                    <div className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: secColor }}
+                        >
+                          <DynamicIcon name={sec.icono || 'Landmark'} size={20} color="#fff" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold truncate" style={{ color: theme.text }}>
+                              {sec.nombre}
+                            </h3>
+                            <span
+                              className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                              style={{ backgroundColor: secColor + '20', color: secColor }}
+                            >
+                              Secretaría
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {getTipoGestionBadge(sec.tipo_gestion)}
+                            <span className="text-xs" style={{ color: theme.textSecondary }}>
+                              {sec.categorias_count} categorías · {sec.tramites_count ?? 0} trámites
+                            </span>
+                            {direcciones.length > 0 && (
+                              <span
+                                className="text-xs px-2 py-0.5 rounded-full font-medium"
+                                style={{ backgroundColor: secColor + '15', color: secColor }}
+                              >
+                                {direcciones.length} {direcciones.length === 1 ? 'dirección' : 'direcciones'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEditModal(sec); }}
+                          className="p-2 rounded-lg transition-colors hover:scale-105"
+                          style={{ backgroundColor: secColor + '15' }}
+                          title="Editar ubicación"
+                        >
+                          <Pencil className="h-4 w-4" style={{ color: secColor }} />
+                        </button>
+                        {direcciones.length > 0 ? (
+                          <button
+                            onClick={() => toggleDireccionesAbiertas(sec.id)}
+                            className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors hover:scale-105"
+                            style={{ backgroundColor: theme.background, color: theme.textSecondary }}
+                            title={direccionesAbierta ? 'Ocultar direcciones' : 'Ver direcciones'}
+                          >
+                            <ListTree className="h-4 w-4" />
+                            {direccionesAbierta ? 'Ocultar' : 'Direcciones'}
+                          </button>
+                        ) : null}
+                        <button
+                          onClick={() => toggleExpand(sec.id)}
+                          className="p-2 rounded-lg transition-colors"
+                          style={{ backgroundColor: theme.background }}
+                          title="Asignar categorías y trámites"
+                        >
+                          {isExpanded
+                            ? <ChevronUp className="h-5 w-5" style={{ color: theme.textSecondary }} />
+                            : <ChevronDown className="h-5 w-5" style={{ color: theme.textSecondary }} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sub-lista de Direcciones (progressive disclosure). */}
+                    {direccionesAbierta && (
+                      <div
+                        className="px-4 pb-4 pt-2 space-y-2"
+                        style={{ borderTop: `1px dashed ${theme.border}` }}
+                      >
+                        {direcciones.length === 0 ? (
+                          <p className="text-xs italic py-2" style={{ color: theme.textSecondary }}>
+                            Esta secretaría todavía no tiene direcciones cargadas.
+                          </p>
+                        ) : (
+                          direcciones.map(dir => {
+                            const dirColor = dir.color || secColor;
+                            const dirExpanded = expandedDep === dir.id;
+                            return (
+                              <div
+                                key={dir.id}
+                                className="rounded-lg ml-4"
+                                style={{
+                                  backgroundColor: theme.background,
+                                  border: `1px solid ${dirExpanded ? dirColor : theme.border}`,
+                                  borderLeft: `3px solid ${dirColor}`,
+                                }}
+                              >
+                                <div className="flex items-center justify-between p-3">
+                                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                    <div
+                                      className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0"
+                                      style={{ backgroundColor: dirColor + '20' }}
+                                    >
+                                      <DynamicIcon name={dir.icono || 'Building2'} size={16} color={dirColor} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium truncate" style={{ color: theme.text }}>
+                                        {dir.nombre}
+                                      </p>
+                                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                        {getTipoGestionBadge(dir.tipo_gestion)}
+                                        <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+                                          {dir.categorias_count} cat · {dir.tramites_count ?? 0} trám
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); openEditModal(dir); }}
+                                      className="p-1.5 rounded-md hover:scale-105 transition-transform"
+                                      style={{ backgroundColor: dirColor + '15' }}
+                                      title="Editar ubicación"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" style={{ color: dirColor }} />
+                                    </button>
+                                    <button
+                                      onClick={() => toggleExpand(dir.id)}
+                                      className="p-1.5 rounded-md transition-colors"
+                                      style={{ backgroundColor: theme.backgroundSecondary }}
+                                      title="Asignar categorías y trámites"
+                                    >
+                                      {dirExpanded
+                                        ? <ChevronUp className="h-4 w-4" style={{ color: theme.textSecondary }} />
+                                        : <ChevronDown className="h-4 w-4" style={{ color: theme.textSecondary }} />}
+                                    </button>
+                                  </div>
+                                </div>
+                                {/* Panel de asignaciones inline para esta Direccion */}
+                                {dirExpanded && (
+                                  <div
+                                    className="border-t p-4"
+                                    style={{ borderColor: theme.border }}
+                                  >
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                      {(dir.tipo_gestion === 'RECLAMO' || dir.tipo_gestion === 'AMBOS') && (
+                                        <div>
+                                          <h4 className="flex items-center gap-2 font-medium mb-3 text-sm" style={{ color: theme.text }}>
+                                            <FolderKanban className="h-4 w-4" style={{ color: dirColor }} />
+                                            Categorías
+                                          </h4>
+                                          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                                            {categorias.map(cat => (
+                                              <label
+                                                key={cat.id}
+                                                className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors text-sm"
+                                                style={{
+                                                  backgroundColor: categoriasAsignadas.includes(cat.id) ? dirColor + '15' : 'transparent',
+                                                }}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={categoriasAsignadas.includes(cat.id)}
+                                                  onChange={() => toggleCategoria(cat.id)}
+                                                  className="w-4 h-4 rounded"
+                                                  style={{ accentColor: dirColor }}
+                                                />
+                                                <DynamicIcon name={cat.icono || 'Folder'} size={16} color={cat.color || dirColor} />
+                                                <span style={{ color: theme.text }}>{cat.nombre}</span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                      {(dir.tipo_gestion === 'TRAMITE' || dir.tipo_gestion === 'AMBOS') && (
+                                        <div>
+                                          <h4 className="flex items-center gap-2 font-medium mb-3 text-sm" style={{ color: theme.text }}>
+                                            <FileText className="h-4 w-4" style={{ color: dirColor }} />
+                                            Tipos de Trámite
+                                          </h4>
+                                          <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                                            {tiposTramite.map(tipo => (
+                                              <label
+                                                key={tipo.id}
+                                                className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors text-sm"
+                                                style={{
+                                                  backgroundColor: tiposTramiteAsignados.includes(tipo.id) ? dirColor + '15' : 'transparent',
+                                                }}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={tiposTramiteAsignados.includes(tipo.id)}
+                                                  onChange={() => toggleTipoTramite(tipo.id)}
+                                                  className="w-4 h-4 rounded"
+                                                  style={{ accentColor: dirColor }}
+                                                />
+                                                <DynamicIcon name={tipo.icono || 'FileText'} size={16} color={tipo.color || dirColor} />
+                                                <span style={{ color: theme.text }}>{tipo.nombre}</span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex justify-end mt-4 pt-3 border-t" style={{ borderColor: theme.border }}>
+                                      <button
+                                        onClick={saveAsignaciones}
+                                        disabled={saving}
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg font-medium text-white text-sm disabled:opacity-50"
+                                        style={{ backgroundColor: dirColor }}
+                                      >
+                                        {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        Guardar
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+
+                        {/* Botón "+ Sugerir direcciones con IA" */}
+                        <button
+                          onClick={() => abrirAiDirecciones(sec)}
+                          className="ml-4 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border-2 border-dashed transition-all hover:scale-[1.01]"
+                          style={{
+                            borderColor: secColor + '55',
+                            color: secColor,
+                            backgroundColor: 'transparent',
+                          }}
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                          Sugerir direcciones con IA
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Panel de asignaciones de la PROPIA Secretaria (categorias/tramites). */}
+                    {isExpanded && (
+                      <div className="border-t p-4" style={{ borderColor: theme.border }}>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                          {(sec.tipo_gestion === 'RECLAMO' || sec.tipo_gestion === 'AMBOS') && (
+                            <div>
+                              <h4 className="flex items-center gap-2 font-medium mb-3" style={{ color: theme.text }}>
+                                <FolderKanban className="h-4 w-4" style={{ color: secColor }} />
+                                Categorías de Reclamos
+                              </h4>
+                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {categorias.map(cat => (
+                                  <label
+                                    key={cat.id}
+                                    className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
+                                    style={{
+                                      backgroundColor: categoriasAsignadas.includes(cat.id) ? secColor + '15' : 'transparent',
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={categoriasAsignadas.includes(cat.id)}
+                                      onChange={() => toggleCategoria(cat.id)}
+                                      className="w-4 h-4 rounded"
+                                      style={{ accentColor: secColor }}
+                                    />
+                                    <DynamicIcon name={cat.icono || 'Folder'} size={18} color={cat.color || secColor} />
+                                    <span style={{ color: theme.text }}>{cat.nombre}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {(sec.tipo_gestion === 'TRAMITE' || sec.tipo_gestion === 'AMBOS') && (
+                            <div>
+                              <h4 className="flex items-center gap-2 font-medium mb-3" style={{ color: theme.text }}>
+                                <FileText className="h-4 w-4" style={{ color: secColor }} />
+                                Tipos de Trámite
+                              </h4>
+                              <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {tiposTramite.map(tipo => (
+                                  <label
+                                    key={tipo.id}
+                                    className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors"
+                                    style={{
+                                      backgroundColor: tiposTramiteAsignados.includes(tipo.id) ? secColor + '15' : 'transparent',
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={tiposTramiteAsignados.includes(tipo.id)}
+                                      onChange={() => toggleTipoTramite(tipo.id)}
+                                      className="w-4 h-4 rounded"
+                                      style={{ accentColor: secColor }}
+                                    />
+                                    <DynamicIcon name={tipo.icono || 'FileText'} size={18} color={tipo.color || secColor} />
+                                    <span style={{ color: theme.text }}>{tipo.nombre}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
+                          <button
+                            onClick={saveAsignaciones}
+                            disabled={saving}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: secColor }}
+                          >
+                            {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                            Guardar Asignaciones
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
             {/* Mensaje si no hay resultados filtrados */}
-            {dependenciasFiltradas.length === 0 && datosParaMostrar.length > 0 && (
+            {((isSuperAdmin && dependenciasFiltradas.length === 0 && datosParaMostrar.length > 0) ||
+              (!isSuperAdmin && secretarias.length === 0 && dependenciasMunicipio.length === 0 && datosParaMostrar.length === 0)) && (
               <div
                 className="text-center py-8 rounded-xl"
                 style={{ backgroundColor: theme.backgroundSecondary }}
@@ -1372,6 +1927,139 @@ export default function DependenciasConfig() {
                   <Save className="h-4 w-4" />
                 )}
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal del Asistente IA — sugerencias de Secretarias o Direcciones. */}
+      {aiOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div
+            className="w-full max-w-xl rounded-2xl p-6 max-h-[85vh] overflow-y-auto"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <div className="flex items-start justify-between mb-4 gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: theme.primary + '20' }}
+                >
+                  <Sparkles className="h-5 w-5" style={{ color: theme.primary }} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold" style={{ color: theme.text }}>
+                    {aiNivel === 'SECRETARIA' ? 'Sugerencias de Secretarías' : 'Sugerencias de Direcciones'}
+                  </h2>
+                  <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
+                    {aiNivel === 'SECRETARIA'
+                      ? 'Tocá una sugerencia para agregarla a tu municipio.'
+                      : <>Sugerencias para <strong>{aiSecretariaPadre?.nombre}</strong>.</>}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setAiOpen(false); setAiSugerencias([]); }}
+                className="p-2 rounded-lg hover:bg-opacity-80 flex-shrink-0"
+                style={{ backgroundColor: theme.background }}
+              >
+                <X className="h-5 w-5" style={{ color: theme.textSecondary }} />
+              </button>
+            </div>
+
+            {aiCargando ? (
+              <div className="py-12 flex flex-col items-center gap-3">
+                <RefreshCw className="h-6 w-6 animate-spin" style={{ color: theme.primary }} />
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  Pensando sugerencias…
+                </p>
+              </div>
+            ) : aiSugerencias.length === 0 ? (
+              <div
+                className="text-center py-10 rounded-xl"
+                style={{ backgroundColor: theme.background }}
+              >
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  No hay sugerencias nuevas. Ya cargaste todas las habituales.
+                </p>
+              </div>
+            ) : (
+              <>
+                {aiFuente && (
+                  <div
+                    className="mb-3 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                    style={{
+                      backgroundColor: (aiFuente === 'ia' ? '#10b981' : '#6366f1') + '15',
+                      color: aiFuente === 'ia' ? '#10b981' : '#6366f1',
+                    }}
+                  >
+                    {aiFuente === 'ia' ? '✦ Generado por IA' : '✓ Plantilla estándar'}
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {aiSugerencias.map(sug => {
+                    const isApplying = aiAplicandoNombre === sug.nombre;
+                    return (
+                      <div
+                        key={sug.nombre}
+                        className="flex items-center gap-3 p-3 rounded-xl transition-all"
+                        style={{
+                          backgroundColor: theme.background,
+                          border: `1px solid ${theme.border}`,
+                        }}
+                      >
+                        <div
+                          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{
+                            backgroundColor: (sug.color || aiSecretariaPadre?.color || theme.primary) + '20',
+                          }}
+                        >
+                          <DynamicIcon
+                            name={sug.icono || (aiNivel === 'SECRETARIA' ? 'Landmark' : 'Building2')}
+                            size={18}
+                            color={sug.color || aiSecretariaPadre?.color || theme.primary}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: theme.text }}>
+                            {sug.nombre}
+                          </p>
+                          {sug.descripcion && (
+                            <p className="text-xs mt-0.5 truncate" style={{ color: theme.textSecondary }}>
+                              {sug.descripcion}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => aiNivel === 'SECRETARIA'
+                            ? aplicarSugerenciaSecretaria(sug)
+                            : aplicarSugerenciaDireccion(sug)}
+                          disabled={isApplying || !!aiAplicandoNombre}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white disabled:opacity-50 transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            backgroundColor: sug.color || aiSecretariaPadre?.color || theme.primary,
+                          }}
+                        >
+                          {isApplying
+                            ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            : <Plus className="h-3.5 w-3.5" />}
+                          Agregar
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end mt-5 pt-4 border-t" style={{ borderColor: theme.border }}>
+              <button
+                onClick={() => { setAiOpen(false); setAiSugerencias([]); }}
+                className="px-4 py-2 rounded-lg font-medium text-sm"
+                style={{ backgroundColor: theme.background, color: theme.text }}
+              >
+                Listo
               </button>
             </div>
           </div>

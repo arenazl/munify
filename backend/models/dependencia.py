@@ -12,6 +12,21 @@ class TipoGestionDependencia(str, enum.Enum):
     AMBOS = "AMBOS"
 
 
+class TipoJerarquicoDependencia(str, enum.Enum):
+    """
+    Nivel jerarquico dentro del organigrama municipal.
+
+    Convencion en la administracion publica argentina:
+        SECRETARIA   -> nivel politico (agrupa direcciones)
+        DIRECCION    -> nivel ejecutivo (recibe el laburo, hijo de una secretaria)
+
+    Las dependencias creadas sin definir tipo se asumen como SECRETARIA por
+    defecto (compat con datos previos al cambio jerarquico).
+    """
+    SECRETARIA = "SECRETARIA"
+    DIRECCION = "DIRECCION"
+
+
 class Dependencia(Base):
     """
     Catálogo global de dependencias/unidades organizativas municipales.
@@ -61,7 +76,14 @@ class Dependencia(Base):
         nullable=False
     )
 
-    # Jerarquía (para futuro uso)
+    # Nivel jerarquico (Secretaria agrupa Direcciones; ambas pueden recibir reclamos/tramites).
+    tipo_jerarquico = Column(
+        Enum(TipoJerarquicoDependencia),
+        default=TipoJerarquicoDependencia.SECRETARIA,
+        nullable=False,
+    )
+
+    # Jerarquía: una Direccion tiene como padre a una Secretaria.
     dependencia_padre_id = Column(Integer, ForeignKey("dependencias.id"), nullable=True, index=True)
     dependencia_padre = relationship("Dependencia", remote_side=[id], backref="sub_dependencias")
 

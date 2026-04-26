@@ -6,6 +6,7 @@ from datetime import datetime
 # ============ Enums ============
 
 TipoGestionLiteral = Literal["RECLAMO", "TRAMITE", "AMBOS"]
+TipoJerarquicoLiteral = Literal["SECRETARIA", "DIRECCION"]
 
 
 # ============ Schemas para Dependencia (Template Global) ============
@@ -23,7 +24,10 @@ class DependenciaCreate(BaseModel):
     email: Optional[str] = None
     horario_atencion: Optional[str] = None
     tipo_gestion: TipoGestionLiteral = "AMBOS"
+    tipo_jerarquico: TipoJerarquicoLiteral = "SECRETARIA"
     dependencia_padre_id: Optional[int] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
     latitud: Optional[float] = None
     longitud: Optional[float] = None
     orden: int = 0
@@ -41,7 +45,10 @@ class DependenciaUpdate(BaseModel):
     email: Optional[str] = None
     horario_atencion: Optional[str] = None
     tipo_gestion: Optional[TipoGestionLiteral] = None
+    tipo_jerarquico: Optional[TipoJerarquicoLiteral] = None
     dependencia_padre_id: Optional[int] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
     latitud: Optional[float] = None
     longitud: Optional[float] = None
     activo: Optional[bool] = None
@@ -61,7 +68,10 @@ class DependenciaResponse(BaseModel):
     email: Optional[str] = None
     horario_atencion: Optional[str] = None
     tipo_gestion: str
+    tipo_jerarquico: str = "SECRETARIA"
     dependencia_padre_id: Optional[int] = None
+    color: Optional[str] = "#6366f1"
+    icono: Optional[str] = "Building2"
     latitud: Optional[float] = None
     longitud: Optional[float] = None
     activo: bool
@@ -155,12 +165,15 @@ class MunicipioDependenciaListResponse(BaseModel):
     nombre: str
     codigo: Optional[str] = None
     tipo_gestion: str
+    tipo_jerarquico: str = "SECRETARIA"
+    dependencia_padre_id: Optional[int] = None
     activo: bool
     orden: int
     color: Optional[str] = "#6366f1"
     icono: Optional[str] = "Building2"
     categorias_count: int = 0
     tramites_count: int = 0
+    direcciones_count: int = 0
     categorias: Optional[List[CategoriaSimple]] = None
     tramites: Optional[List[TramiteSimple]] = None
 

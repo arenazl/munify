@@ -39,6 +39,8 @@ from schemas.dependencia import (
     AsignarCategoriasRequest,
     AsignarTramitesRequest,
     HabilitarDependenciasRequest,
+    TipoGestionLiteral,
+    TipoJerarquicoLiteral,
 )
 
 router = APIRouter(prefix="/dependencias", tags=["Dependencias"])
@@ -51,12 +53,16 @@ logger = logging.getLogger(__name__)
 async def listar_catalogo_dependencias(
     activo: Optional[bool] = None,
     tipo_gestion: Optional[str] = None,
+    tipo_jerarquico: Optional[str] = None,
+    dependencia_padre_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Lista el catálogo global de dependencias.
     Accesible para admin/supervisor para ver qué dependencias pueden habilitar.
+    Filtros opcionales: tipo_jerarquico (SECRETARIA/DIRECCION) y dependencia_padre_id
+    para listar Direcciones de una Secretaria especifica.
     """
     query = select(Dependencia).order_by(Dependencia.orden, Dependencia.nombre)
 
@@ -70,6 +76,12 @@ async def listar_catalogo_dependencias(
             (Dependencia.tipo_gestion == tipo_upper) |
             (Dependencia.tipo_gestion == TipoGestionDependencia.AMBOS)
         )
+
+    if tipo_jerarquico:
+        query = query.where(Dependencia.tipo_jerarquico == tipo_jerarquico.upper())
+
+    if dependencia_padre_id is not None:
+        query = query.where(Dependencia.dependencia_padre_id == dependencia_padre_id)
 
     result = await db.execute(query)
     dependencias = result.scalars().all()
@@ -102,6 +114,18 @@ async def crear_dependencia_catalogo(
     if not codigo:
         codigo = data.nombre.upper().replace(" ", "_").replace("Á", "A").replace("É", "E").replace("Í", "I").replace("Ó", "O").replace("Ú", "U")[:50]
 
+    # Si es DIRECCION, validar que el padre exista y sea SECRETARIA.
+    if data.tipo_jerarquico == "DIRECCION":
+        if not data.dependencia_padre_id:
+            raise HTTPException(status_code=400, detail="Una Direccion requiere indicar la Secretaria padre")
+        padre_q = await db.execute(select(Dependencia).where(Dependencia.id == data.dependencia_padre_id))
+        padre = padre_q.scalar_one_or_none()
+        if not padre:
+            raise HTTPException(status_code=400, detail="La Secretaria padre indicada no existe")
+        padre_tj = padre.tipo_jerarquico.value if hasattr(padre.tipo_jerarquico, "value") else padre.tipo_jerarquico
+        if padre_tj != "SECRETARIA":
+            raise HTTPException(status_code=400, detail="El padre debe ser una Secretaria")
+
     dependencia = Dependencia(
         nombre=data.nombre,
         codigo=codigo,
@@ -114,7 +138,10 @@ async def crear_dependencia_catalogo(
         email=data.email,
         horario_atencion=data.horario_atencion,
         tipo_gestion=data.tipo_gestion,
+        tipo_jerarquico=data.tipo_jerarquico,
         dependencia_padre_id=data.dependencia_padre_id,
+        color=data.color or "#6366f1",
+        icono=data.icono or ("Landmark" if data.tipo_jerarquico == "SECRETARIA" else "Building2"),
         latitud=data.latitud,
         longitud=data.longitud,
         orden=data.orden,
@@ -161,6 +188,8 @@ async def listar_dependencias_municipio(
     request: Request,
     activo: Optional[bool] = None,
     tipo_gestion: Optional[str] = None,
+    tipo_jerarquico: Optional[str] = None,
+    dependencia_padre_id: Optional[int] = None,
     include_assignments: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -216,6 +245,25 @@ async def listar_dependencias_municipio(
     result = await db.execute(query)
     municipio_deps = result.scalars().all()
 
+    # Pre-calcular cuantas Direcciones (hijos) tiene cada Secretaria del municipio,
+    # contando solo las que efectivamente estan habilitadas para este municipio.
+    direcciones_por_padre: dict[int, int] = {}
+    if municipio_deps:
+        from sqlalchemy import func as sa_func
+        muni_ids_for_count = {md.municipio_id for md in municipio_deps}
+        dep_padre_alias = Dependencia
+        count_q = (
+            select(dep_padre_alias.dependencia_padre_id, sa_func.count(MunicipioDependencia.id))
+            .join(MunicipioDependencia, MunicipioDependencia.dependencia_id == dep_padre_alias.id)
+            .where(
+                MunicipioDependencia.municipio_id.in_(muni_ids_for_count),
+                dep_padre_alias.dependencia_padre_id.is_not(None),
+            )
+            .group_by(dep_padre_alias.dependencia_padre_id)
+        )
+        cnt_res = await db.execute(count_q)
+        direcciones_por_padre = {row[0]: row[1] for row in cnt_res.all()}
+
     # Transformar a response
     response = []
     logger.info(f"[Dependencias] Total dependencias encontradas: {len(municipio_deps)}, include_assignments={include_assignments}, tipo_gestion={tipo_gestion}")
@@ -233,6 +281,17 @@ async def listar_dependencias_municipio(
                 logger.info(f"[Dependencias] Filtrada: {dep.nombre} (tipo={dep_tipo} != {tipo_upper})")
                 continue
 
+        # Filtrar por nivel jerarquico (SECRETARIA / DIRECCION).
+        if tipo_jerarquico:
+            dep_tj = dep.tipo_jerarquico.value if hasattr(dep.tipo_jerarquico, 'value') else (dep.tipo_jerarquico or "SECRETARIA")
+            if dep_tj != tipo_jerarquico.upper():
+                continue
+
+        # Filtrar por padre (para listar Direcciones de una Secretaria).
+        if dependencia_padre_id is not None and dep.dependencia_padre_id != dependencia_padre_id:
+            continue
+
+        tj = dep.tipo_jerarquico.value if hasattr(dep.tipo_jerarquico, 'value') else (dep.tipo_jerarquico or "SECRETARIA")
         item = MunicipioDependenciaListResponse(
             id=md.id,
             municipio_id=md.municipio_id,
@@ -240,12 +299,15 @@ async def listar_dependencias_municipio(
             nombre=dep.nombre,
             codigo=dep.codigo,
             tipo_gestion=dep.tipo_gestion.value if hasattr(dep.tipo_gestion, 'value') else str(dep.tipo_gestion),
+            tipo_jerarquico=tj,
+            dependencia_padre_id=dep.dependencia_padre_id,
             activo=md.activo,
             orden=md.orden,
             color=getattr(dep, 'color', None) or "#6366f1",
-            icono=getattr(dep, 'icono', None) or "Building2",
+            icono=getattr(dep, 'icono', None) or ("Landmark" if tj == "SECRETARIA" else "Building2"),
             categorias_count=len(md.categorias_asignadas or []),
             tramites_count=len(md.tramites_asignados or []),
+            direcciones_count=direcciones_por_padre.get(dep.id, 0),
         )
 
         # Si se pidieron las asignaciones completas, incluirlas
@@ -909,3 +971,385 @@ async def auto_asignar_categorias_tramite_ia(
         "total_categorias": total_categorias,
         "total_tramites": total_tramites,
     }
+
+
+# ============ JERARQUIA: ARBOL SECRETARIA -> DIRECCIONES ============
+
+@router.get("/municipio-arbol")
+async def listar_arbol_jerarquico(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Devuelve las dependencias del municipio del usuario armadas como arbol:
+    cada Secretaria con sus Direcciones colgando.
+
+    Las Direcciones huerfanas (no enganchadas a una Secretaria habilitada en el
+    municipio) se devuelven al final bajo la clave `direcciones_huerfanas`.
+    """
+    municipio_id = current_user.municipio_id
+    if not municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
+
+    q = (
+        select(MunicipioDependencia)
+        .options(
+            selectinload(MunicipioDependencia.dependencia),
+            selectinload(MunicipioDependencia.categorias_asignadas),
+            selectinload(MunicipioDependencia.tramites_asignados),
+        )
+        .where(MunicipioDependencia.municipio_id == municipio_id)
+        .order_by(MunicipioDependencia.orden)
+    )
+    res = await db.execute(q)
+    todas = res.scalars().all()
+
+    secretarias_por_dep_id: dict[int, dict] = {}
+    direcciones: list[dict] = []
+
+    def serialize(md, *, incluir_padre=True):
+        dep = md.dependencia
+        tj = dep.tipo_jerarquico.value if hasattr(dep.tipo_jerarquico, 'value') else (dep.tipo_jerarquico or "SECRETARIA")
+        tg = dep.tipo_gestion.value if hasattr(dep.tipo_gestion, 'value') else str(dep.tipo_gestion)
+        item = {
+            "id": md.id,
+            "dependencia_id": dep.id,
+            "nombre": dep.nombre,
+            "codigo": dep.codigo,
+            "tipo_gestion": tg,
+            "tipo_jerarquico": tj,
+            "color": dep.color or "#6366f1",
+            "icono": dep.icono or ("Landmark" if tj == "SECRETARIA" else "Building2"),
+            "activo": md.activo,
+            "orden": md.orden,
+            "categorias_count": len(md.categorias_asignadas or []),
+            "tramites_count": len(md.tramites_asignados or []),
+        }
+        if incluir_padre:
+            item["dependencia_padre_id"] = dep.dependencia_padre_id
+        return item
+
+    for md in todas:
+        dep = md.dependencia
+        tj = dep.tipo_jerarquico.value if hasattr(dep.tipo_jerarquico, 'value') else (dep.tipo_jerarquico or "SECRETARIA")
+        if tj == "SECRETARIA":
+            payload = serialize(md)
+            payload["direcciones"] = []
+            secretarias_por_dep_id[dep.id] = payload
+        else:
+            direcciones.append((md, dep.dependencia_padre_id))
+
+    direcciones_huerfanas: list[dict] = []
+    for md, padre_id in direcciones:
+        item = serialize(md)
+        if padre_id and padre_id in secretarias_por_dep_id:
+            secretarias_por_dep_id[padre_id]["direcciones"].append(item)
+        else:
+            direcciones_huerfanas.append(item)
+
+    return {
+        "secretarias": list(secretarias_por_dep_id.values()),
+        "direcciones_huerfanas": direcciones_huerfanas,
+    }
+
+
+# ============ SUGERENCIAS IA: SECRETARIAS / DIRECCIONES ============
+
+class SugerenciaJerarquicaItem(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    icono: Optional[str] = None
+    color: Optional[str] = None
+
+
+class SugerenciasJerarquicasResponse(BaseModel):
+    items: List[SugerenciaJerarquicaItem]
+    fuente: str  # "template" | "ia" | "fallback"
+
+
+# Template estatico que sirve cuando no hay IA configurada o cuando se quiere
+# arrancar rapido. Es el "catalogo de organigramas tipicos" municipal argentino.
+SECRETARIAS_TEMPLATE: list[SugerenciaJerarquicaItem] = [
+    SugerenciaJerarquicaItem(nombre="Secretaria de Gobierno", descripcion="Coordinacion politica e institucional", icono="Landmark", color="#6366f1"),
+    SugerenciaJerarquicaItem(nombre="Secretaria de Hacienda", descripcion="Recaudacion, presupuesto y tesoreria", icono="Wallet", color="#10b981"),
+    SugerenciaJerarquicaItem(nombre="Secretaria de Obras y Servicios Publicos", descripcion="Infraestructura urbana y servicios", icono="HardHat", color="#f59e0b"),
+    SugerenciaJerarquicaItem(nombre="Secretaria de Salud", descripcion="Atencion sanitaria del vecino", icono="HeartPulse", color="#ef4444"),
+    SugerenciaJerarquicaItem(nombre="Secretaria de Desarrollo Social", descripcion="Asistencia y politicas sociales", icono="Users", color="#a855f7"),
+    SugerenciaJerarquicaItem(nombre="Secretaria de Seguridad", descripcion="Transito, defensa civil, monitoreo", icono="Shield", color="#0ea5e9"),
+    SugerenciaJerarquicaItem(nombre="Secretaria de Medio Ambiente", descripcion="Higiene urbana, arbolado, ambiente", icono="Leaf", color="#22c55e"),
+]
+
+DIRECCIONES_TEMPLATE_POR_SECRETARIA: dict[str, list[SugerenciaJerarquicaItem]] = {
+    "gobierno": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Mesa de Entradas", icono="Inbox"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Entidades de Bien Publico", icono="HandHeart"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Culto", icono="Church"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Instituciones Intermedias", icono="Network"),
+    ],
+    "hacienda": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Ingresos Publicos", icono="Receipt"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Compras y Suministros", icono="ShoppingCart"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Presupuesto", icono="Calculator"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Tesoreria", icono="Banknote"),
+    ],
+    "obras": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Catastro", icono="Map"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Obras Particulares", icono="HardHat"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Redes Pluviales", icono="Droplets"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Pavimentacion", icono="Construction"),
+    ],
+    "salud": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Atencion Primaria", icono="Stethoscope"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Discapacidad", icono="Accessibility"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Epidemiologia", icono="Activity"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Zoonosis", icono="Dog"),
+    ],
+    "desarrollo": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Ninez y Adolescencia", icono="Baby"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Politicas de Genero", icono="Heart"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Asistencia Directa", icono="HandHeart"),
+    ],
+    "seguridad": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Defensa Civil", icono="ShieldAlert"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Transito", icono="TrafficCone"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Transporte", icono="Bus"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Monitoreo", icono="Camera"),
+    ],
+    "ambiente": [
+        SugerenciaJerarquicaItem(nombre="Direccion de Higiene Urbana", icono="Trash2"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Arbolado Publico", icono="Trees"),
+        SugerenciaJerarquicaItem(nombre="Direccion de Educacion Ambiental", icono="BookOpen"),
+    ],
+}
+
+
+def _matchear_template_secretaria(nombre_secretaria: str) -> list[SugerenciaJerarquicaItem]:
+    """Mapea el nombre de una secretaria a su set de Direcciones tipicas."""
+    n = (nombre_secretaria or "").lower()
+    if "obras" in n or "servic" in n or "publ" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["obras"]
+    if "hacienda" in n or "econom" in n or "finan" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["hacienda"]
+    if "salud" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["salud"]
+    if "social" in n or "desarrollo" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["desarrollo"]
+    if "segur" in n or "transit" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["seguridad"]
+    if "ambient" in n or "ecolog" in n or "verde" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["ambiente"]
+    if "gobier" in n or "institu" in n:
+        return DIRECCIONES_TEMPLATE_POR_SECRETARIA["gobierno"]
+    return []
+
+
+class SugerirJerarquicasRequest(BaseModel):
+    """
+    Pide sugerencias para Secretarias o Direcciones.
+    Si nivel=DIRECCION, hay que mandar `secretaria_nombre` para contextualizar.
+    """
+    nivel: TipoJerarquicoLiteral
+    secretaria_nombre: Optional[str] = None
+    municipio_nombre: Optional[str] = None
+    excluir_nombres: List[str] = []  # ya cargados, no sugerir duplicados
+
+
+@router.post("/sugerir-jerarquicas", response_model=SugerenciasJerarquicasResponse)
+async def sugerir_jerarquicas(
+    data: SugerirJerarquicasRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Devuelve sugerencias de Secretarias o Direcciones para precargar la pantalla
+    de configuracion. Usa IA si esta configurada (Groq/Gemini), sino cae al
+    template estatico de organigrama municipal tipico.
+    """
+    excluir_lower = {n.strip().lower() for n in (data.excluir_nombres or [])}
+
+    def filtrar(items: list[SugerenciaJerarquicaItem]) -> list[SugerenciaJerarquicaItem]:
+        return [i for i in items if i.nombre.lower() not in excluir_lower]
+
+    # 1) Intento IA primero (si hay clave) — pero con timeout corto y fallback al template.
+    if (settings.GROQ_API_KEY or settings.GEMINI_API_KEY):
+        if data.nivel == "SECRETARIA":
+            ya_cargadas = ", ".join(data.excluir_nombres) if data.excluir_nombres else "ninguna"
+            prompt = f"""Sos un experto en organigramas municipales argentinos.
+Sugerí entre 5 y 8 SECRETARIAS tipicas para un municipio argentino{f' como {data.municipio_nombre}' if data.municipio_nombre else ''}.
+Ya estan cargadas: {ya_cargadas}. NO repitas ninguna.
+
+Respondé SOLO con JSON valido en este formato exacto:
+{{"items": [{{"nombre": "Secretaria de ...", "descripcion": "..."}}]}}"""
+        else:
+            if not data.secretaria_nombre:
+                raise HTTPException(status_code=400, detail="Para sugerir Direcciones se requiere `secretaria_nombre`")
+            ya_cargadas = ", ".join(data.excluir_nombres) if data.excluir_nombres else "ninguna"
+            prompt = f"""Sos un experto en organigramas municipales argentinos.
+Para la "{data.secretaria_nombre}", sugeri entre 3 y 6 DIRECCIONES tipicas que dependan de ella.
+Ya estan cargadas: {ya_cargadas}. NO repitas ninguna.
+
+Respondé SOLO con JSON valido en este formato exacto:
+{{"items": [{{"nombre": "Direccion de ...", "descripcion": "..."}}]}}"""
+
+        ia_items: Optional[list[SugerenciaJerarquicaItem]] = None
+        try:
+            if settings.GROQ_API_KEY:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    r = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"},
+                        json={"model": settings.GROQ_MODEL, "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 800},
+                    )
+                    if r.status_code == 200:
+                        body = r.json()
+                        text_resp = body.get('choices', [{}])[0].get('message', {}).get('content', '')
+                        m = re.search(r'\{[\s\S]*\}', text_resp)
+                        if m:
+                            parsed = json.loads(m.group())
+                            ia_items = [SugerenciaJerarquicaItem(**it) for it in parsed.get("items", []) if it.get("nombre")]
+        except Exception as e:
+            logger.warning(f"[Sugerencias IA] Groq fallo: {e}")
+
+        if not ia_items and settings.GEMINI_API_KEY:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    r = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                        headers={"Content-Type": "application/json"},
+                        json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.3, "maxOutputTokens": 800}},
+                    )
+                    if r.status_code == 200:
+                        body = r.json()
+                        text_resp = body.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                        m = re.search(r'\{[\s\S]*\}', text_resp)
+                        if m:
+                            parsed = json.loads(m.group())
+                            ia_items = [SugerenciaJerarquicaItem(**it) for it in parsed.get("items", []) if it.get("nombre")]
+            except Exception as e:
+                logger.warning(f"[Sugerencias IA] Gemini fallo: {e}")
+
+        if ia_items:
+            return SugerenciasJerarquicasResponse(items=filtrar(ia_items), fuente="ia")
+
+    # 2) Fallback al template estatico
+    if data.nivel == "SECRETARIA":
+        return SugerenciasJerarquicasResponse(items=filtrar(SECRETARIAS_TEMPLATE), fuente="template")
+
+    if not data.secretaria_nombre:
+        raise HTTPException(status_code=400, detail="Para sugerir Direcciones se requiere `secretaria_nombre`")
+    matched = _matchear_template_secretaria(data.secretaria_nombre)
+    return SugerenciasJerarquicasResponse(items=filtrar(matched), fuente="template")
+
+
+# ============ HABILITAR DIRECCION DE UNA SECRETARIA YA HABILITADA ============
+
+class CrearDireccionMunicipioRequest(BaseModel):
+    """
+    Crea una Direccion (en el catalogo global, si no existe) y la habilita
+    para el municipio del usuario, colgando de la Secretaria indicada (que ya
+    debe estar habilitada para el municipio).
+    """
+    municipio_dependencia_padre_id: int  # ID de la fila MunicipioDependencia de la Secretaria padre
+    nombre: str
+    descripcion: Optional[str] = None
+    icono: Optional[str] = "Building2"
+    color: Optional[str] = None
+    tipo_gestion: TipoGestionLiteral = "AMBOS"
+
+
+@router.post("/municipio-direcciones", response_model=MunicipioDependenciaListResponse, status_code=status.HTTP_201_CREATED)
+async def crear_direccion_para_municipio(
+    data: CrearDireccionMunicipioRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Crea una Direccion bajo una Secretaria ya habilitada en el municipio.
+    Si una Direccion con ese nombre ya existe en el catalogo, la reutiliza.
+    """
+    if current_user.rol not in ["admin", "supervisor"]:
+        raise HTTPException(status_code=403, detail="No tiene permisos")
+    if not current_user.municipio_id:
+        raise HTTPException(status_code=400, detail="Usuario sin municipio asignado")
+
+    municipio_id = current_user.municipio_id
+
+    # 1) Validar que la Secretaria padre exista para este municipio.
+    padre_q = await db.execute(
+        select(MunicipioDependencia)
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(
+            MunicipioDependencia.id == data.municipio_dependencia_padre_id,
+            MunicipioDependencia.municipio_id == municipio_id,
+        )
+    )
+    md_padre = padre_q.scalar_one_or_none()
+    if not md_padre:
+        raise HTTPException(status_code=404, detail="Secretaria padre no encontrada para tu municipio")
+
+    padre_tj = md_padre.dependencia.tipo_jerarquico.value if hasattr(md_padre.dependencia.tipo_jerarquico, 'value') else md_padre.dependencia.tipo_jerarquico
+    if padre_tj != "SECRETARIA":
+        raise HTTPException(status_code=400, detail="La dependencia padre no es una Secretaria")
+
+    # 2) Buscar/crear la Direccion en el catalogo global.
+    dep_q = await db.execute(select(Dependencia).where(Dependencia.nombre == data.nombre))
+    dep_existente = dep_q.scalar_one_or_none()
+
+    if dep_existente:
+        dependencia = dep_existente
+        # Si existe pero su padre no coincide, lo dejamos tal cual: es template global.
+        # El vinculo per-municipio lo va a manejar MunicipioDependencia.
+    else:
+        codigo = (data.nombre.upper()
+                  .replace(" ", "_")
+                  .replace("Á", "A").replace("É", "E").replace("Í", "I").replace("Ó", "O").replace("Ú", "U")
+                  .replace("Ñ", "N"))[:50]
+        dependencia = Dependencia(
+            nombre=data.nombre,
+            codigo=codigo,
+            descripcion=data.descripcion,
+            tipo_gestion=data.tipo_gestion,
+            tipo_jerarquico="DIRECCION",
+            dependencia_padre_id=md_padre.dependencia_id,
+            color=data.color or md_padre.dependencia.color or "#6366f1",
+            icono=data.icono or "Building2",
+            orden=0,
+        )
+        db.add(dependencia)
+        await db.flush()
+
+    # 3) Habilitarla para el municipio si todavia no esta.
+    md_q = await db.execute(
+        select(MunicipioDependencia).where(
+            MunicipioDependencia.municipio_id == municipio_id,
+            MunicipioDependencia.dependencia_id == dependencia.id,
+        )
+    )
+    md = md_q.scalar_one_or_none()
+    if not md:
+        md = MunicipioDependencia(
+            municipio_id=municipio_id,
+            dependencia_id=dependencia.id,
+            activo=True,
+            orden=0,
+        )
+        db.add(md)
+        await db.flush()
+
+    await db.commit()
+    await db.refresh(md)
+
+    return MunicipioDependenciaListResponse(
+        id=md.id,
+        municipio_id=md.municipio_id,
+        dependencia_id=dependencia.id,
+        nombre=dependencia.nombre,
+        codigo=dependencia.codigo,
+        tipo_gestion=dependencia.tipo_gestion.value if hasattr(dependencia.tipo_gestion, 'value') else str(dependencia.tipo_gestion),
+        tipo_jerarquico="DIRECCION",
+        dependencia_padre_id=dependencia.dependencia_padre_id,
+        activo=md.activo,
+        orden=md.orden,
+        color=dependencia.color or "#6366f1",
+        icono=dependencia.icono or "Building2",
+    )

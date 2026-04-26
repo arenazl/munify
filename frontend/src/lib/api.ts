@@ -514,6 +514,29 @@ export const dependenciasApi = {
       categorias_tramite: categoriasTramite,
       dependencias,
     }).then(res => { invalidateCache('/dependencias'); invalidateCache('/tramites'); return res; }),
+
+  // Arbol jerarquico: Secretarias del municipio con sus Direcciones colgando.
+  getArbolJerarquico: () => api.get('/dependencias/municipio-arbol'),
+
+  // Sugerencias IA (con fallback a template) para precargar Secretarias o Direcciones.
+  sugerirJerarquicas: (data: {
+    nivel: 'SECRETARIA' | 'DIRECCION';
+    secretaria_nombre?: string;
+    municipio_nombre?: string;
+    excluir_nombres?: string[];
+  }) => api.post('/dependencias/sugerir-jerarquicas', data),
+
+  // Crear (o reusar del catalogo) una Direccion bajo una Secretaria habilitada
+  // del municipio actual. Devuelve la fila MunicipioDependencia.
+  crearDireccionMunicipio: (data: {
+    municipio_dependencia_padre_id: number;
+    nombre: string;
+    descripcion?: string;
+    icono?: string;
+    color?: string;
+    tipo_gestion?: 'RECLAMO' | 'TRAMITE' | 'AMBOS';
+  }) => api.post('/dependencias/municipio-direcciones', data)
+    .then(res => { invalidateCache('/dependencias'); return res; }),
 };
 
 // Empleados
@@ -1600,6 +1623,90 @@ export const operadorApi = {
       } | null;
       motivo_rechazo: string | null;
     }>(`/operador/kyc/${sessionId}/estado`),
+};
+
+// Captura móvil — handoff PC ↔ celular para validar identidad con Didit.
+// El operador inicia la sesión, escanea el QR con su celu, Didit hace
+// selfie + DNI + RENAPER en el celular, y la PC recibe el resultado
+// por WebSocket (con polling como fallback).
+export interface CapturaMovilEstado {
+  handoff_token: string;
+  estado:
+    | 'esperando'
+    | 'en_curso'
+    | 'completada'
+    | 'rechazada'
+    | 'cancelada'
+    | 'expirada';
+  modo: 'kyc_completo';
+  vecino_label: string | null;
+  didit_session_id: string | null;
+  didit_url: string | null;
+  payload: {
+    dni: string | null;
+    nombre: string | null;
+    apellido: string | null;
+    sexo: string | null;
+    fecha_nacimiento: string | null;
+    nacionalidad: string | null;
+    direccion: string | null;
+    didit_status?: string;
+  } | null;
+  motivo_rechazo: string | null;
+  expires_at: string;
+  completed_at: string | null;
+}
+
+export const capturaMovilApi = {
+  iniciar: (data: {
+    vecino_user_id?: number;
+    vecino_dni?: string;
+    vecino_label?: string;
+  }) =>
+    api.post<{
+      handoff_token: string;
+      qr_value: string;
+      didit_url: string;
+      expires_at: string;
+    }>('/captura-movil/iniciar', data),
+
+  estado: (handoffToken: string) =>
+    api.get<CapturaMovilEstado>(`/captura-movil/${handoffToken}/estado`),
+
+  cancelar: (handoffToken: string) =>
+    api.post<CapturaMovilEstado>(`/captura-movil/${handoffToken}/cancelar`),
+
+  // Llamados desde la página móvil (públicos, autenticados por el token)
+  handoffPublico: (handoffToken: string) =>
+    api.get<{
+      handoff_token: string;
+      estado: CapturaMovilEstado['estado'];
+      modo: CapturaMovilEstado['modo'];
+      vecino_label: string | null;
+      didit_url: string | null;
+      expires_at: string;
+    }>(`/captura-movil/handoff/${handoffToken}`),
+
+  handoffAbrir: (handoffToken: string) =>
+    api.post<{
+      handoff_token: string;
+      estado: CapturaMovilEstado['estado'];
+      modo: CapturaMovilEstado['modo'];
+      vecino_label: string | null;
+      didit_url: string | null;
+      expires_at: string;
+    }>(`/captura-movil/handoff/${handoffToken}/abrir`),
+
+  // Modo DEMO únicamente — backend valida que VENTANILLA_SKIP_DIDIT esté activo
+  handoffFakeCompletar: (handoffToken: string) =>
+    api.post<{
+      handoff_token: string;
+      estado: CapturaMovilEstado['estado'];
+      modo: CapturaMovilEstado['modo'];
+      vecino_label: string | null;
+      didit_url: string | null;
+      expires_at: string;
+    }>(`/captura-movil/handoff/${handoffToken}/fake-completar`),
 };
 
 // CENAT (Fase 3) — comprobante de la Agencia Nacional de Seguridad Vial
