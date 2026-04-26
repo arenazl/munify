@@ -64,6 +64,9 @@ class TramiteBase(BaseModel):
     # KYC visible (Fase 5 bundle) — tramites sensibles piden biometria
     requiere_kyc: bool = False
     nivel_kyc_minimo: Optional[int] = None
+    # Turnero presencial
+    requiere_turno: bool = False
+    duracion_turno_min: Optional[int] = 30
     activo: bool = True
     orden: int = 0
 
@@ -89,6 +92,8 @@ class TramiteUpdate(BaseModel):
     monto_cenat_referencia: Optional[float] = None
     requiere_kyc: Optional[bool] = None
     nivel_kyc_minimo: Optional[int] = None
+    requiere_turno: Optional[bool] = None
+    duracion_turno_min: Optional[int] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
 

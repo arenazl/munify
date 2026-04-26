@@ -89,6 +89,12 @@ class Tramite(Base):
     requiere_kyc = Column(Boolean, nullable=False, default=False)
     nivel_kyc_minimo = Column(Integer, nullable=True)  # 1=email / 2=biometria
 
+    # Turnero — si el tramite es presencial, requiere reservar un slot de
+    # atencion en la dependencia. duracion_turno_min indica cuanto dura cada
+    # cupo (15/30/60min) para calcular disponibilidad.
+    requiere_turno = Column(Boolean, nullable=False, default=False)
+    duracion_turno_min = Column(Integer, nullable=True, default=30)
+
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)
 

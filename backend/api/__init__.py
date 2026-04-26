@@ -16,6 +16,7 @@ from .sla import router as sla_router
 from .exportar import router as exportar_router
 from .whatsapp import router as whatsapp_router
 from .turnos import router as turnos_router
+from .turnos_tramite import router as turnos_tramite_router
 from .calificaciones import router as calificaciones_router
 from .escalado import router as escalado_router
 from .emails import router as emails_router
@@ -67,6 +68,7 @@ api_router.include_router(sla_router, prefix="/sla", tags=["SLA"])
 api_router.include_router(exportar_router, prefix="/exportar", tags=["Exportar"])
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
 api_router.include_router(turnos_router, prefix="/turnos", tags=["Turnos"])
+api_router.include_router(turnos_tramite_router)  # prefix definido en el router
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["Calificaciones"])
 api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
 api_router.include_router(emails_router, prefix="/emails", tags=["Emails"])

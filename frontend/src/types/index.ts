@@ -277,6 +277,9 @@ export interface Tramite {
   // Configuración de cobro
   tipo_pago?: string;        // 'boton_pago' | 'rapipago' | 'adhesion_debito' | 'qr'
   momento_pago?: string;     // 'inicio' | 'fin'
+  // Turnero presencial
+  requiere_turno?: boolean;
+  duracion_turno_min?: number;  // 15 / 30 / 60
   activo: boolean;
   orden: number;
   documentos_requeridos: TramiteDocumentoRequerido[];

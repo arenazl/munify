@@ -1439,6 +1439,39 @@ export const pagosApi = {
   crearSesionTramite: (solicitud_id: number, return_url?: string) =>
     api.post<{ session_id: string; checkout_url: string }>(
       '/pagos/sesion-tramite', { solicitud_id, return_url }),
+  // Turnos del trámite (turnero presencial). Endpoint base: /turnos-tramite
+  turnoDisponibilidad: (params: { solicitud_id?: number; dependencia_id?: number; duracion_min?: number; desde?: string; hasta?: string }) =>
+    api.get<{
+      dependencia_id: number;
+      dependencia_nombre: string;
+      duracion_min: number;
+      slots: Array<{ fecha_hora: string; disponible: boolean; motivo?: string | null }>;
+    }>('/turnos-tramite/disponibilidad', { params }),
+  reservarTurno: (solicitud_id: number, fecha_hora: string) =>
+    api.post<{
+      id: number;
+      solicitud_id: number;
+      municipio_dependencia_id: number;
+      fecha_hora: string;
+      duracion_min: number;
+      estado: string;
+      dependencia_nombre?: string;
+    }>('/turnos-tramite/reservar', { solicitud_id, fecha_hora }),
+  turnoPorSolicitud: (solicitud_id: number) =>
+    api.get<{
+      id: number;
+      solicitud_id: number;
+      municipio_dependencia_id: number;
+      fecha_hora: string;
+      duracion_min: number;
+      estado: string;
+      dependencia_nombre?: string;
+    } | null>(`/turnos-tramite/por-solicitud/${solicitud_id}`),
+  agendaTurnos: (params: { dependencia_id?: number; fecha?: string }) =>
+    api.get('/turnos-tramite/agenda', { params }),
+  cancelarTurno: (turno_id: number) =>
+    api.delete(`/turnos-tramite/${turno_id}`),
+
   cuponTramiteWa: (solicitud_id: number) =>
     api.post<{
       session_id: string;

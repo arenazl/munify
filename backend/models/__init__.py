@@ -32,6 +32,7 @@ from .gamificacion import (
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .noticia import Noticia
 from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
+from .turno import Turno
 from .tramite_documento_requerido import TramiteDocumentoRequerido
 from .tramite_sugerido import TramiteSugerido
 from .documento_solicitud import DocumentoSolicitud
