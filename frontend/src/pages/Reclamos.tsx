@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef, useLayoutEffect } from 'react';
+import { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, Inbox } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -18,6 +18,8 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
+import { InboxLayout } from '../components/inbox/InboxLayout';
+import { InboxCard } from '../components/inbox/InboxCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
@@ -146,6 +148,16 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
+
+  // Vista guiada (Inbox) vs vista grilla clásica.
+  // Misma lógica que GestionTramites: clasifica reclamos en secciones por
+  // urgencia/estado y los muestra con InboxLayout. Persiste en localStorage.
+  const [vistaInbox, setVistaInbox] = useState<boolean>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('reclamos_vista_inbox') : null;
+    if (saved !== null) return saved === '1';
+    return false; // Por default, vista clásica (los usuarios actuales ya la conocen)
+  });
+
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
@@ -4129,7 +4141,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   {dependenciasDisponibles.length === 0 ? (
                     <FilterRowSkeleton count={4} height={28} widths={[100, 120, 110, 105]} />
                   ) : (
-                    dependenciasDisponibles.map((dep) => {
+                    dependenciasDisponibles
+                      .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
+                      .map((dep) => {
                       const isSelected = filtroDependencia === dep.id;
                       const count = conteosDependencias[dep.id] || 0;
                       const isLoadingThis = filterLoading === `dep-${dep.id}`;
