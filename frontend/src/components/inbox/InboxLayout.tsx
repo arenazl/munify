@@ -96,26 +96,31 @@ export function InboxLayout({
           </p>
         </div>
 
-        {metricasChips.length > 0 && (
-          <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            {metricasChips.map((chip, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all hover:scale-105 inbox-card"
-                style={{
-                  backgroundColor: `${chip.color}15`,
-                  border: `1px solid ${chip.color}40`,
-                  color: chip.color,
-                  animationDelay: `${i * 50}ms`,
-                }}
-              >
-                {chip.icon}
-                <span className="tabular-nums">{chip.value}</span>
-                <span className="opacity-75">{chip.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {(() => {
+          // Sólo chips con value > 0. Si todo es 0, no se renderiza nada.
+          const visibles = metricasChips.filter((c) => c.value > 0);
+          if (visibles.length === 0) return null;
+          return (
+            <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+              {visibles.map((chip, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all hover:scale-105 inbox-card"
+                  style={{
+                    backgroundColor: `${chip.color}15`,
+                    border: `1px solid ${chip.color}40`,
+                    color: chip.color,
+                    animationDelay: `${i * 50}ms`,
+                  }}
+                >
+                  {chip.icon}
+                  <span className="tabular-nums">{chip.value}</span>
+                  <span className="opacity-75">{chip.label}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
       </div>
 
       {/* === Secciones === */}
