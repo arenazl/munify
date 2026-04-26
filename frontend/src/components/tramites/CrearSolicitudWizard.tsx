@@ -10,6 +10,7 @@ import {
   Clock,
   CreditCard,
   FolderTree,
+  FileText,
   AlertCircle,
   UserCheck,
   History,

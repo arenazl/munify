@@ -30,6 +30,9 @@ import {
   ArrowUpDown,
   Calendar,
   FileSearch,
+  PlayCircle,
+  LayoutList,
+  LayoutGrid,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { tramitesApi, empleadosApi, categoriasTramiteApi, dependenciasApi, pagosApi } from '../lib/api';
@@ -45,6 +48,8 @@ import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import PageHint from '../components/ui/PageHint';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
+import { InboxLayout } from '../components/inbox/InboxLayout';
+import { InboxCard } from '../components/inbox/InboxCard';
 import type { Solicitud, Tramite, CategoriaTramite, Empleado, EmpleadoDisponibilidad, TipoEmpleado } from '../types';
 import {
   getEstadoInfo,
@@ -96,7 +101,7 @@ interface GestionTramitesProps {
 
 export default function GestionTramites({ soloMiArea = false }: GestionTramitesProps) {
   const { theme } = useTheme();
-  const { user } = useAuth();
+  const { user, municipioActual } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -106,6 +111,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Vista guiada (Inbox) vs vista grilla clásica.
+  // Default Inbox para supervisor de dependencia (lo guía por urgencia/nuevos/
+  // en curso), grilla para admin/supervisor general que necesita filtrar.
+  const [vistaInbox, setVistaInbox] = useState<boolean>(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('tramites_vista_inbox') : null;
+    if (saved !== null) return saved === '1';
+    return true; // Por default, todos arrancan en vista guiada
+  });
 
   // Filtros visuales estilo Reclamos
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
@@ -1431,9 +1445,180 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     />
   );
 
+  // ============================================================
+  // INBOX (vista guiada) — secciones por urgencia/estado
+  // ============================================================
+  const inboxData = useMemo(() => {
+    const ahora = Date.now();
+    const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
+
+    const urgentes: Solicitud[] = [];
+    const nuevos: Solicitud[] = [];
+    const enCurso: Solicitud[] = [];
+    const esperando: Solicitud[] = [];
+
+    for (const t of tramites) {
+      const estado = (t.estado || '').toLowerCase();
+      // Excluir cerrados de la vista guiada
+      if (estado === 'finalizado' || estado === 'rechazado') continue;
+
+      // Vencimiento estimado = created_at + tiempo_estimado_dias del trámite
+      const dias = t.tramite?.tiempo_estimado_dias || 15;
+      const fechaVence = t.created_at
+        ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+        : null;
+      const venceEn = fechaVence ? fechaVence - ahora : Infinity;
+      const esUrgente = venceEn > 0 && venceEn <= tresDiasMs;
+
+      if (esUrgente) {
+        urgentes.push(t);
+        continue;
+      }
+      if (estado === 'pendiente_pago' || estado === 'pospuesto') {
+        esperando.push(t);
+      } else if (estado === 'en_curso') {
+        enCurso.push(t);
+      } else {
+        // recibido (y otros legacy)
+        nuevos.push(t);
+      }
+    }
+    return { urgentes, nuevos, enCurso, esperando };
+  }, [tramites]);
+
+  const renderInboxCard = (t: Solicitud, opts?: { urgente?: boolean }) => {
+    const cat = t.tramite?.categoria_tramite;
+    const color = cat?.color || theme.primary;
+    const ahora = Date.now();
+    const dias = t.tramite?.tiempo_estimado_dias || 15;
+    const fechaVence = t.created_at
+      ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+      : null;
+    const venceMs = fechaVence ? fechaVence - ahora : null;
+    let tiempoLabel: string | undefined;
+    if (venceMs != null) {
+      const d = Math.ceil(venceMs / (1000 * 60 * 60 * 24));
+      if (d < 0) tiempoLabel = `Venció hace ${Math.abs(d)}d`;
+      else if (d === 0) tiempoLabel = 'Vence hoy';
+      else if (d === 1) tiempoLabel = 'Vence mañana';
+      else tiempoLabel = `Vence en ${d} días`;
+    } else if (t.created_at) {
+      const d = Math.floor((ahora - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      tiempoLabel = d === 0 ? 'Hoy' : d === 1 ? 'Ayer' : `Hace ${d} días`;
+    }
+    const badges: Array<{ label: string; color: string }> = [];
+    const estado = (t.estado || '').toLowerCase();
+    if (estado === 'pendiente_pago') badges.push({ label: 'Pago pendiente', color: '#f59e0b' });
+    if (estado === 'pospuesto') badges.push({ label: 'Pospuesto', color: '#8b5cf6' });
+    const solicitanteNombre = [t.nombre_solicitante, t.apellido_solicitante]
+      .filter(Boolean).join(' ').trim() || undefined;
+    return (
+      <InboxCard
+        numero={t.numero_tramite || `#${t.id}`}
+        titulo={t.tramite?.nombre || 'Trámite'}
+        subtitulo={t.asunto || undefined}
+        solicitante={solicitanteNombre}
+        tiempoLabel={tiempoLabel}
+        color={color}
+        icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+        badges={badges.length > 0 ? badges : undefined}
+        ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
+        onClick={() => openTramite(t)}
+        urgente={opts?.urgente}
+      />
+    );
+  };
+
+  const inboxView = vistaInbox ? (
+    <InboxLayout
+      saludoNombre={user?.nombre || ''}
+      contextoLabel={user?.dependencia?.nombre || municipioActual?.nombre || 'tu municipio'}
+      totalPendiente={
+        inboxData.urgentes.length + inboxData.nuevos.length + inboxData.enCurso.length + inboxData.esperando.length
+      }
+      metricasChips={[
+        { color: '#ef4444', icon: <AlertCircle className="w-3.5 h-3.5" />, label: 'urgentes', value: inboxData.urgentes.length },
+        { color: '#3b82f6', icon: <Inbox className="w-3.5 h-3.5" />, label: 'nuevos', value: inboxData.nuevos.length },
+        { color: '#f59e0b', icon: <PlayCircle className="w-3.5 h-3.5" />, label: 'en curso', value: inboxData.enCurso.length },
+        { color: '#8b5cf6', icon: <PauseCircle className="w-3.5 h-3.5" />, label: 'esperando', value: inboxData.esperando.length },
+      ]}
+      secciones={[
+        {
+          id: 'urgente',
+          titulo: 'Empecemos por lo urgente',
+          subtitulo: 'Trámites que vencen en los próximos 3 días',
+          icono: <AlertCircle className="w-5 h-5" />,
+          color: '#ef4444',
+          emptyMessage: '✨ Sin urgentes. Bandeja al día.',
+          items: inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true })),
+        },
+        {
+          id: 'nuevos',
+          titulo: 'Nuevos para tomar',
+          subtitulo: 'Trámites que llegaron y nadie empezó todavía',
+          icono: <Inbox className="w-5 h-5" />,
+          color: '#3b82f6',
+          emptyMessage: '🎉 No hay trámites nuevos sin tomar.',
+          items: inboxData.nuevos.map((t) => renderInboxCard(t)),
+        },
+        {
+          id: 'en-curso',
+          titulo: 'Estás trabajando en estos',
+          subtitulo: 'Trámites que ya tomaste — seguir avanzando',
+          icono: <PlayCircle className="w-5 h-5" />,
+          color: '#f59e0b',
+          emptyMessage: 'Nada en curso ahora mismo.',
+          items: inboxData.enCurso.map((t) => renderInboxCard(t)),
+          colapsable: inboxData.enCurso.length > 6,
+        },
+        {
+          id: 'esperando',
+          titulo: 'Esperando al vecino',
+          subtitulo: 'Pago pendiente, pospuestos, falta documentación',
+          icono: <PauseCircle className="w-5 h-5" />,
+          color: '#8b5cf6',
+          emptyMessage: 'Sin trámites esperando.',
+          items: inboxData.esperando.map((t) => renderInboxCard(t)),
+          colapsable: true,
+        },
+      ]}
+    />
+  ) : null;
+
+  // Toggle de vista (botón en headerActions)
+  const toggleVista = () => {
+    const nuevo = !vistaInbox;
+    setVistaInbox(nuevo);
+    try { localStorage.setItem('tramites_vista_inbox', nuevo ? '1' : '0'); } catch { /* ignore */ }
+  };
+
   return (
     <PullToRefresh onRefresh={async () => { await loadData(); }}>
       <PageHint pageId="tramites-list" />
+      {/* Toggle vista guiada / clásica */}
+      <div className="flex justify-end mb-3">
+        <button
+          type="button"
+          onClick={toggleVista}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
+          style={{
+            backgroundColor: vistaInbox ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `1px solid ${vistaInbox ? theme.primary + '60' : theme.border}`,
+            color: vistaInbox ? theme.primary : theme.textSecondary,
+          }}
+          title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
+        >
+          {vistaInbox ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
+          {vistaInbox ? 'Vista guiada' : 'Vista clásica'}
+        </button>
+      </div>
+
+      {vistaInbox ? (
+        <>
+          {inboxView}
+          {/* Sheet del trámite sigue funcionando con selectedTramite */}
+        </>
+      ) : (
       <ABMPage
         title="Trámites"
         buttonLabel="Nuevo Trámite"
@@ -1482,6 +1667,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       >
         {renderCards()}
       </ABMPage>
+      )}
 
       {/* Sentinel para infinite scroll + spinner de carga */}
       <div ref={loadMoreRef} className="py-4">
