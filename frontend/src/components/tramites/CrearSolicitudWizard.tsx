@@ -92,6 +92,9 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
   const [form, setForm] = useState<SolicitudForm>(EMPTY_FORM);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoriaId, setSelectedCategoriaId] = useState<number | null>(null);
+  // Modo "Ver todos": muestra todos los tramites del municipio agrupados por
+  // categoria. Para vecinos que no quieren escribir ni elegir un rubro.
+  const [verTodos, setVerTodos] = useState(false);
 
   // Búsqueda de vecino por DNI: cuando el empleado termina de cargar el DNI,
   // consultamos al backend para ver si ya existe un vecino con ese DNI en el
@@ -543,7 +546,7 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
             value={searchTerm}
             onChange={e => {
               setSearchTerm(e.target.value);
-              if (e.target.value.trim()) setSelectedCategoriaId(null);
+              if (e.target.value.trim()) { setSelectedCategoriaId(null); setVerTodos(false); }
             }}
             className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none focus:ring-2 transition-all"
             style={{
@@ -629,8 +632,8 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         </div>
       )}
 
-      {/* Grid de categorías (cuando no hay búsqueda) */}
-      {!loadingData && !searchTerm.trim() && !selectedCategoriaId && (
+      {/* Grid de categorías (cuando no hay búsqueda y no estamos en "Ver todos") */}
+      {!loadingData && !searchTerm.trim() && !selectedCategoriaId && !verTodos && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: theme.textSecondary }}>
             O elegí una categoría
@@ -640,6 +643,42 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
               No hay categorías de trámite cargadas. Creá primero desde "Categorías Trámite".
             </div>
           ) : (
+            <>
+              {/* Chip "Ver todos" — escape para vecinos que no saben en que categoria mirar. */}
+              {tramites.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setVerTodos(true); setSelectedCategoriaId(null); }}
+                  className="w-full mb-2 flex items-center justify-between gap-3 px-3 py-2 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99]"
+                  style={{
+                    backgroundColor: theme.backgroundSecondary,
+                    border: `1px dashed ${theme.primary}55`,
+                  }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${theme.primary}18` }}
+                    >
+                      <FileText className="h-4 w-4" style={{ color: theme.primary }} />
+                    </div>
+                    <div className="min-w-0 text-left">
+                      <p className="text-xs font-semibold" style={{ color: theme.text }}>
+                        Ver todos los trámites
+                      </p>
+                      <p className="text-[10px]" style={{ color: theme.textSecondary }}>
+                        Si no sabés en qué categoría está el que buscás
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: `${theme.primary}18`, color: theme.primary }}
+                  >
+                    {tramites.length}
+                  </span>
+                </button>
+              )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {categorias.map(c => {
                 const count = tramitesPorCategoria[c.id] || 0;
@@ -679,6 +718,107 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
                   </button>
                 );
               })}
+            </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Vista "Ver todos" — todos los tramites del municipio agrupados por categoria. */}
+      {!loadingData && !searchTerm.trim() && !selectedCategoriaId && verTodos && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => setVerTodos(false)}
+              className="flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-all hover:scale-105 active:scale-95"
+              style={{ color: theme.primary, backgroundColor: `${theme.primary}15` }}
+            >
+              <ArrowLeft className="h-3 w-3" />
+              Volver
+            </button>
+            <span
+              className="text-xs font-bold px-2.5 py-1 rounded-lg"
+              style={{
+                color: theme.primary,
+                backgroundColor: `${theme.primary}18`,
+                border: `1px solid ${theme.primary}40`,
+              }}
+            >
+              Todos los trámites · {tramites.length}
+            </span>
+          </div>
+          {tramites.length === 0 ? (
+            <div className="p-4 rounded-xl text-center text-sm italic" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
+              No hay trámites cargados en este municipio.
+            </div>
+          ) : (
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+              {categorias
+                .filter(c => (tramitesPorCategoria[c.id] || 0) > 0)
+                .map(c => {
+                  const catColor = c.color || theme.primary;
+                  const tramitesDeCat = tramites.filter(t => t.categoria_tramite_id === c.id);
+                  return (
+                    <div key={c.id}>
+                      {/* Header de categoria — sticky para que el vecino no pierda el contexto al scrollear. */}
+                      <div
+                        className="sticky top-0 z-10 flex items-center gap-2 mb-2 py-1.5 px-2 rounded-lg backdrop-blur-sm"
+                        style={{
+                          backgroundColor: `${catColor}15`,
+                          borderLeft: `3px solid ${catColor}`,
+                        }}
+                      >
+                        <DynamicIcon name={c.icono || 'Folder'} className="h-4 w-4" style={{ color: catColor }} />
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: catColor }}>
+                          {c.nombre}
+                        </p>
+                        <span
+                          className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-auto"
+                          style={{ backgroundColor: `${catColor}25`, color: catColor }}
+                        >
+                          {tramitesDeCat.length}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {tramitesDeCat.map(t => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => handleSelectTramite(t)}
+                            className="w-full text-left p-2.5 rounded-lg transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            style={{
+                              backgroundColor: theme.backgroundSecondary,
+                              border: `1px solid ${theme.border}`,
+                              borderLeft: `3px solid ${catColor}80`,
+                            }}
+                          >
+                            <p className="text-sm font-medium" style={{ color: theme.text }}>{t.nombre}</p>
+                            {t.descripcion && (
+                              <p className="text-[11px] mt-0.5 line-clamp-1" style={{ color: theme.textSecondary }}>
+                                {t.descripcion}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                              <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
+                                <Clock className="h-3 w-3" /> {t.tiempo_estimado_dias} días
+                              </span>
+                              <span
+                                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium"
+                                style={{
+                                  backgroundColor: t.costo ? '#f59e0b18' : '#10b98118',
+                                  color: t.costo ? '#f59e0b' : '#10b981',
+                                }}
+                              >
+                                <CreditCard className="h-3 w-3" /> {t.costo ? `$${t.costo}` : 'Gratis'}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
