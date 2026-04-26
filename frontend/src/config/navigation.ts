@@ -1,6 +1,6 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, FileDown, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
+  Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers
 } from 'lucide-react';
 
@@ -41,12 +41,18 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
+  const isOperadorVentanilla = userRole === 'operador_ventanilla';
   const isVecino = userRole === 'vecino';
   const isDependencia = hasDependencia && isSupervisor; // Un usuario de dependencia tiene rol supervisor con dependencia asignada
   // "Gestor" general del municipio = admin o supervisor SIN dependencia.
   // Los supervisores de dependencia tienen su propia sección "Mi Área" y no
   // deben ver el menú general (si no, Reclamos/Trámites/Mapa aparecen duplicados).
   const isAdminOrSupervisor = (isAdmin || isSupervisor) && !isDependencia;
+  // Funcionario del muni = cualquier rol que atiende ventanilla. Cubre admin,
+  // supervisor general, jefes de dependencia/secretarías y operadores de
+  // ventanilla. El Mostrador es la única sección que se muestra a todos por
+  // igual: cualquier funcionario con un vecino adelante puede iniciar el flow.
+  const esFuncionarioMuni = isAdmin || isSupervisor || isOperadorVentanilla;
 
   return [
     // === SECCIÓN DEPENDENCIA (usuarios de dependencia) ===
@@ -126,7 +132,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Mostrador',
       href: '/gestion/mostrador',
       icon: ScanLine,
-      show: isAdminOrSupervisor,
+      show: esFuncionarioMuni,
       description: 'Ventanilla asistida — biometría + trámite presencial'
     },
     {
@@ -156,13 +162,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: Clock,
       show: isAdminOrSupervisor,
       description: 'Gestión de SLA'
-    },
-    {
-      name: 'Exportar',
-      href: '/gestion/exportar',
-      icon: FileDown,
-      show: isAdminOrSupervisor,
-      description: 'Exportar informes CSV'
     },
     {
       name: 'Panel BI',
