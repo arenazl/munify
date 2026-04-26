@@ -101,3 +101,10 @@ class WSEvents:
     RECLAMO_RESUELTO = "reclamo_resuelto"
     NOTIFICACION = "notificacion"
     SLA_WARNING = "sla_warning"
+
+    # Captura móvil (handoff PC ↔ celular para validar identidad).
+    CAPTURA_MOVIL_INICIADA = "captura_movil_iniciada"
+    CAPTURA_MOVIL_PROGRESO = "captura_movil_progreso"
+    CAPTURA_MOVIL_COMPLETADA = "captura_movil_completada"
+    CAPTURA_MOVIL_RECHAZADA = "captura_movil_rechazada"
+    CAPTURA_MOVIL_CANCELADA = "captura_movil_cancelada"

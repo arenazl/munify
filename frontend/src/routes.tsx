@@ -47,6 +47,8 @@ import MiHistorial from './pages/MiHistorial';
 import ConfigDashboard from './pages/ConfigDashboard';
 import Onboarding from './pages/Onboarding';
 import MunicipioHome from './pages/MunicipioHome';
+import CapturaMovil from './pages/CapturaMovil';
+import CapturaMovilFake from './pages/CapturaMovilFake';
 import GestionCuadrillas from './pages/GestionCuadrillas';
 import GestionAusencias from './pages/GestionAusencias';
 import Planificacion from './pages/Planificacion';
@@ -117,6 +119,10 @@ export const router = createBrowserRouter([
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
+  // Handoff de captura móvil (DNI + selfie con Didit en el celu del operador)
+  { path: '/m/captura/:token', element: <CapturaMovil /> },
+  // Pantalla DEMO (VENTANILLA_SKIP_DIDIT=true) — flujo idéntico, datos random
+  { path: '/m/captura/:token/fake', element: <CapturaMovilFake /> },
   { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
   { path: '/register', element: <Register /> },

@@ -39,6 +39,11 @@ from .push_subscription import PushSubscription
 from .consulta_guardada import ConsultaGuardada
 from .email_validation import EmailValidation
 from .audit_log import AuditLog
+from .captura_movil_sesion import (
+    CapturaMovilSesion,
+    EstadoCapturaMovil,
+    ModoCapturaMovil,
+)
 
 __all__ = [
     "Municipio",
@@ -104,6 +109,10 @@ __all__ = [
     "EmailValidation",
     # Audit logs
     "AuditLog",
+    # Captura móvil (handoff PC ↔ celular)
+    "CapturaMovilSesion",
+    "EstadoCapturaMovil",
+    "ModoCapturaMovil",
 ]
 
 # Dependencias (modelo desacoplado del municipio)

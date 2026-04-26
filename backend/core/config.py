@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     # Si vacío, no se permite iniciar sesiones.
     DIDIT_WORKFLOW_ID: str = ""
 
+    # Modo DEMO de captura móvil — bypassa Didit y abre una pantalla fake
+    # en el celular que genera datos random. Útil para iterar/probar sin
+    # consumir verificaciones de Didit ni tener un vecino real al lado.
+    # NUNCA activar en producción.
+    VENTANILLA_SKIP_DIDIT: bool = False
+
     # ---- Gateway de pagos (Fase 2 bundle) ----
     # Provider global por defecto ('mock' sigue funcionando para dev).
     # La resolucion real es por muni (ver services/pagos/__init__.py).

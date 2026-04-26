@@ -4,12 +4,13 @@ import {
   FileText, CheckCircle2, AlertTriangle, Receipt,
   ClipboardList, ScanLine, Camera, ShieldCheck,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search,
-  UserCheck, Sparkles, X, Edit3, IdCard,
+  UserCheck, Sparkles, X, Edit3, IdCard, Smartphone, QrCode,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { operadorApi } from '../lib/api';
+import { operadorApi, capturaMovilApi, type CapturaMovilEstado } from '../lib/api';
 import PageHint from '../components/ui/PageHint';
 
 interface MostradorMetricas {
@@ -43,7 +44,7 @@ interface VecinoEncontrado {
 }
 
 type Paso = 'identificar' | 'hub';
-type TabId = 'dni' | 'biometria';
+type TabId = 'dni' | 'biometria' | 'celular';
 
 /**
  * Mostrador — consola de operador de ventanilla (rediseño v3).
@@ -240,7 +241,8 @@ function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCa
 
   const tabs: Array<{ id: TabId; label: string; sublabel: string; icon: React.ReactNode; color: string }> = [
     { id: 'dni',        label: 'Por DNI',     sublabel: 'Cliente registrado', icon: <IdCard className="w-4 h-4" />, color: theme.primary },
-    { id: 'biometria',  label: 'Por biometría', sublabel: 'RENAPER · DNI físico', icon: <Camera className="w-4 h-4" />, color: '#8b5cf6' },
+    { id: 'biometria',  label: 'Por biometría', sublabel: 'RENAPER · webcam', icon: <Camera className="w-4 h-4" />, color: '#8b5cf6' },
+    { id: 'celular',    label: 'Por celular',  sublabel: 'RENAPER · QR al celu', icon: <Smartphone className="w-4 h-4" />, color: '#22c55e' },
   ];
 
   return (
@@ -254,8 +256,8 @@ function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCa
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out"
           style={{
-            left: `calc(${tabs.findIndex(t => t.id === tab) * 50}% + 4px)`,
-            width: 'calc(50% - 8px)',
+            left: `calc(${(tabs.findIndex(t => t.id === tab) * 100) / tabs.length}% + 4px)`,
+            width: `calc(${100 / tabs.length}% - 8px)`,
             backgroundColor: theme.card,
             boxShadow: `0 4px 12px ${tabs.find(t => t.id === tab)?.color}20`,
             border: `1px solid ${tabs.find(t => t.id === tab)?.color}40`,
@@ -291,11 +293,16 @@ function PasoIdentificar({ municipioId, onClienteRegistrado, onBiometriaOk, onCa
           key={tab}
           className="animate-tab-slide"
         >
-          {tab === 'dni' ? (
-            <TabDni onUsar={onClienteRegistrado} />
-          ) : (
+          {tab === 'dni' && <TabDni onUsar={onClienteRegistrado} />}
+          {tab === 'biometria' && (
             <TabBiometria
               municipioId={municipioId}
+              onAprobado={onBiometriaOk}
+              onCargarManual={onCargarManual}
+            />
+          )}
+          {tab === 'celular' && (
+            <TabCapturaMovil
               onAprobado={onBiometriaOk}
               onCargarManual={onCargarManual}
             />
@@ -894,6 +901,337 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
     </div>
   );
 }
+
+// ============================================================
+// TabCapturaMovil — handoff PC ↔ celular: QR + Didit en el celu
+// ============================================================
+function TabCapturaMovil({ onAprobado, onCargarManual }: {
+  onAprobado: (datos: KycDatos, sessionId: string) => void;
+  onCargarManual: () => void;
+}) {
+  const { theme } = useTheme();
+  const [phase, setPhase] = useState<
+    'idle' | 'creating' | 'awaiting' | 'in_progress' | 'completed' | 'rejected' | 'cancelled' | 'expired' | 'error'
+  >('idle');
+  const [handoffToken, setHandoffToken] = useState<string | null>(null);
+  const [qrValue, setQrValue] = useState<string | null>(null);
+  const [diditUrl, setDiditUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number>(600);
+
+  // Polling de estado
+  useEffect(() => {
+    if (!handoffToken) return;
+    if (phase !== 'awaiting' && phase !== 'in_progress') return;
+
+    let cancelado = false;
+    const tick = async () => {
+      try {
+        const r = await capturaMovilApi.estado(handoffToken);
+        if (cancelado) return;
+        const e: CapturaMovilEstado = r.data;
+
+        // Actualizo el countdown
+        const exp = new Date(e.expires_at).getTime();
+        setSecondsLeft(Math.max(0, Math.floor((exp - Date.now()) / 1000)));
+
+        if (e.estado === 'en_curso' && phase === 'awaiting') {
+          setPhase('in_progress');
+        } else if (e.estado === 'completada' && e.payload && e.payload.dni) {
+          setPhase('completed');
+          // Pequeño delay para que el operador vea el "verificado" antes del salto
+          setTimeout(() => {
+            if (!cancelado) {
+              onAprobado(
+                {
+                  dni: e.payload!.dni,
+                  nombre: e.payload!.nombre,
+                  apellido: e.payload!.apellido,
+                },
+                e.didit_session_id || handoffToken,
+              );
+            }
+          }, 900);
+        } else if (e.estado === 'rechazada') {
+          setPhase('rejected');
+          setError(e.motivo_rechazo || 'Verificación rechazada');
+        } else if (e.estado === 'cancelada') {
+          setPhase('cancelled');
+        } else if (e.estado === 'expirada') {
+          setPhase('expired');
+        }
+      } catch {
+        // retry silencioso
+      }
+    };
+    // primer tick inmediato + cada 3s
+    tick();
+    const id = setInterval(tick, 3000);
+    return () => {
+      cancelado = true;
+      clearInterval(id);
+    };
+  }, [handoffToken, phase, onAprobado]);
+
+  // Cleanup: si se desmonta mientras hay sesión abierta, la cancelo en el server
+  useEffect(() => {
+    return () => {
+      if (handoffToken && (phase === 'awaiting' || phase === 'in_progress')) {
+        capturaMovilApi.cancelar(handoffToken).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const generar = async () => {
+    setPhase('creating');
+    setError(null);
+    try {
+      const r = await capturaMovilApi.iniciar({});
+      setHandoffToken(r.data.handoff_token);
+      setQrValue(r.data.qr_value);
+      setDiditUrl(r.data.didit_url);
+      const exp = new Date(r.data.expires_at).getTime();
+      setSecondsLeft(Math.max(0, Math.floor((exp - Date.now()) / 1000)));
+      setPhase('awaiting');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setPhase('error');
+      setError(msg || 'No se pudo generar el QR');
+    }
+  };
+
+  const cancelar = async () => {
+    if (!handoffToken) {
+      setPhase('idle');
+      return;
+    }
+    try {
+      await capturaMovilApi.cancelar(handoffToken);
+    } catch { /* swallow */ }
+    setPhase('cancelled');
+  };
+
+  const reset = () => {
+    setHandoffToken(null);
+    setQrValue(null);
+    setDiditUrl(null);
+    setError(null);
+    setPhase('idle');
+  };
+
+  return (
+    <div
+      className="rounded-2xl p-6"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      {phase === 'idle' && (
+        <div className="text-center space-y-4">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto"
+            style={{ backgroundColor: '#22c55e15' }}
+          >
+            <Smartphone className="w-8 h-8" style={{ color: '#22c55e' }} />
+          </div>
+          <div>
+            <h3 className="text-base font-bold" style={{ color: theme.text }}>
+              Validar identidad con tu celular
+            </h3>
+            <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
+              Generamos un QR. Lo escaneás con tu celular y validás al vecino con la cámara
+              del celu (DNI + selfie + RENAPER). Cuando termina, la PC se completa sola.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-3 text-[11px]" style={{ color: theme.textSecondary }}>
+            <span className="inline-flex items-center gap-1"><QrCode className="w-3.5 h-3.5" /> QR</span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1"><Smartphone className="w-3.5 h-3.5" /> celular</span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> RENAPER</span>
+          </div>
+          <button
+            onClick={generar}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95"
+            style={{ backgroundColor: '#22c55e' }}
+          >
+            <QrCode className="w-4 h-4" />
+            Generar QR
+          </button>
+        </div>
+      )}
+
+      {phase === 'creating' && (
+        <div className="text-center py-6 space-y-3">
+          <Loader2 className="w-10 h-10 mx-auto animate-spin" style={{ color: '#22c55e' }} />
+          <p className="text-sm" style={{ color: theme.textSecondary }}>Generando sesión…</p>
+        </div>
+      )}
+
+      {(phase === 'awaiting' || phase === 'in_progress') && qrValue && (
+        <div className="space-y-4">
+          <div className="text-center">
+            <h3 className="text-base font-bold" style={{ color: theme.text }}>
+              {phase === 'in_progress' ? 'Capturando en el celular…' : 'Escaneá con tu celular'}
+            </h3>
+            <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
+              {phase === 'in_progress'
+                ? 'No cierres esta ventana. La PC se completa sola al terminar.'
+                : 'Abrí la cámara del celu y apuntá al QR. Te lleva al flujo de captura.'}
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className="p-4 rounded-2xl bg-white"
+              style={{ border: `2px solid ${phase === 'in_progress' ? '#22c55e' : theme.border}` }}
+            >
+              <QRCodeSVG
+                value={qrValue}
+                size={220}
+                level="M"
+                includeMargin={false}
+                bgColor="#ffffff"
+                fgColor="#0f172a"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs" style={{ color: theme.textSecondary }}>
+              {phase === 'in_progress' ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: '#22c55e' }} />
+                  <span>El vecino está siendo verificado</span>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Esperando…</span>
+                </>
+              )}
+              <span>·</span>
+              <span className="font-mono tabular-nums">
+                {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+              </span>
+            </div>
+          </div>
+
+          {diditUrl && (
+            <div
+              className="rounded-xl p-3 text-xs"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
+            >
+              <p className="font-semibold mb-1" style={{ color: theme.text }}>¿No tenés el celu a mano?</p>
+              <a
+                href={diditUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 hover:underline"
+                style={{ color: theme.primary }}
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Abrir en esta misma PC
+              </a>
+            </div>
+          )}
+
+          <div className="flex items-center justify-center">
+            <button
+              onClick={cancelar}
+              className="text-xs px-3 py-1.5 rounded-lg"
+              style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === 'completed' && (
+        <div className="text-center py-6 space-y-3 animate-in fade-in zoom-in-95 duration-300">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto"
+            style={{ backgroundColor: '#22c55e20' }}
+          >
+            <CheckCircle2 className="w-9 h-9" style={{ color: '#22c55e' }} />
+          </div>
+          <h3 className="text-base font-bold" style={{ color: '#22c55e' }}>Identidad verificada</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>
+            RENAPER confirmó. Cargando datos del vecino…
+          </p>
+        </div>
+      )}
+
+      {phase === 'rejected' && (
+        <div className="text-center py-6 space-y-3">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto"
+            style={{ backgroundColor: '#ef444420' }}
+          >
+            <AlertTriangle className="w-9 h-9" style={{ color: '#ef4444' }} />
+          </div>
+          <h3 className="text-base font-bold" style={{ color: '#ef4444' }}>Verificación rechazada</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>{error}</p>
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button
+              onClick={() => { reset(); generar(); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+              style={{ backgroundColor: '#22c55e' }}
+            >
+              <RefreshCcw className="w-3.5 h-3.5" /> Reintentar
+            </button>
+            <button
+              onClick={onCargarManual}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium"
+              style={{ color: theme.textSecondary, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+            >
+              Cargar a mano
+            </button>
+          </div>
+        </div>
+      )}
+
+      {(phase === 'cancelled' || phase === 'expired') && (
+        <div className="text-center py-6 space-y-3">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto"
+            style={{ backgroundColor: '#f59e0b20' }}
+          >
+            <AlertTriangle className="w-9 h-9" style={{ color: '#d97706' }} />
+          </div>
+          <h3 className="text-base font-bold" style={{ color: theme.text }}>
+            {phase === 'cancelled' ? 'Sesión cancelada' : 'Sesión expirada'}
+          </h3>
+          <button
+            onClick={() => { reset(); generar(); }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+            style={{ backgroundColor: '#22c55e' }}
+          >
+            <RefreshCcw className="w-3.5 h-3.5" /> Generar nuevo QR
+          </button>
+        </div>
+      )}
+
+      {phase === 'error' && (
+        <div className="text-center py-6 space-y-3">
+          <div
+            className="inline-flex items-center justify-center w-16 h-16 rounded-full mx-auto"
+            style={{ backgroundColor: '#ef444420' }}
+          >
+            <AlertTriangle className="w-9 h-9" style={{ color: '#ef4444' }} />
+          </div>
+          <h3 className="text-base font-bold" style={{ color: '#ef4444' }}>No se pudo iniciar</h3>
+          <p className="text-sm" style={{ color: theme.textSecondary }}>{error}</p>
+          <button
+            onClick={onCargarManual}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium"
+            style={{ color: theme.text, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            Seguir con carga manual
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function BigCard({ color, icon, title, desc, actionLabel, onAction, highlight }: {
   color: string;
