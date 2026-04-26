@@ -4065,9 +4065,228 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     );
   };
 
+  // ============================================================
+  // INBOX (vista guiada) — secciones por urgencia/estado
+  // Mismo patrón que GestionTramites.tsx (líneas 1452-1632).
+  // ============================================================
+  const inboxData = useMemo(() => {
+    const ahora = Date.now();
+    const dia = 24 * 60 * 60 * 1000;
+
+    const urgentes: Reclamo[] = [];
+    const fosiles: Reclamo[] = [];   // vencidos hace > 30 días — para limpiar
+    const nuevos: Reclamo[] = [];
+    const enCurso: Reclamo[] = [];
+    const esperando: Reclamo[] = [];
+
+    for (const r of filteredReclamos) {
+      const estado = (r.estado || '').toLowerCase();
+      // Excluir cerrados de la vista guiada
+      if (estado === 'finalizado' || estado === 'rechazado' || estado === 'resuelto') continue;
+
+      // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
+      // (si no tiene, usar el SLA de la categoría; fallback 30 días).
+      const dias = r.tiempo_estimado_dias
+        ?? (r.categoria as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
+        ?? 30;
+      const fechaVence = r.created_at
+        ? new Date(r.created_at).getTime() + dias * dia
+        : null;
+      const diffMs = fechaVence ? fechaVence - ahora : null;
+
+      // Capa 1: fósil — venció hace más de 30 días.
+      if (diffMs != null && diffMs < -30 * dia) {
+        fosiles.push(r);
+        continue;
+      }
+
+      // Capa 2: urgente real — prioridad manual = 1 OR vence entre -7 y +3 días
+      const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
+      const esUrgente = r.prioridad === 1 || enZonaUrgente;
+
+      if (esUrgente) {
+        urgentes.push(r);
+        continue;
+      }
+      if (estado === 'pospuesto') {
+        esperando.push(r);
+      } else if (estado === 'en_curso') {
+        enCurso.push(r);
+      } else {
+        // nuevo, recibido, asignado (y otros legacy)
+        nuevos.push(r);
+      }
+    }
+    return { urgentes, fosiles, nuevos, enCurso, esperando };
+  }, [filteredReclamos]);
+
+  const renderInboxCard = (
+    r: Reclamo,
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row' },
+  ) => {
+    const cat = r.categoria;
+    const color = cat?.color || DEFAULT_CATEGORY_COLOR;
+    const ahora = Date.now();
+    const dia = 24 * 60 * 60 * 1000;
+    const dias = r.tiempo_estimado_dias
+      ?? (cat as unknown as { tiempo_resolucion_estimado?: number })?.tiempo_resolucion_estimado
+      ?? 30;
+    const fechaVence = r.created_at
+      ? new Date(r.created_at).getTime() + dias * dia
+      : null;
+    const venceMs = fechaVence ? fechaVence - ahora : null;
+    let tiempoLabel: string | undefined;
+    if (venceMs != null) {
+      const d = Math.ceil(venceMs / dia);
+      if (d < 0) tiempoLabel = `Venció hace ${Math.abs(d)}d`;
+      else if (d === 0) tiempoLabel = 'Vence hoy';
+      else if (d === 1) tiempoLabel = 'Vence mañana';
+      else tiempoLabel = `Vence en ${d} días`;
+    } else if (r.created_at) {
+      const d = Math.floor((ahora - new Date(r.created_at).getTime()) / dia);
+      tiempoLabel = d === 0 ? 'Hoy' : d === 1 ? 'Ayer' : `Hace ${d} días`;
+    }
+    // Antigüedad de creación (independiente del vencimiento)
+    let creadoLabel: string | undefined;
+    if (r.created_at) {
+      const d = Math.floor((ahora - new Date(r.created_at).getTime()) / dia);
+      if (d <= 0) creadoLabel = 'Hoy';
+      else if (d === 1) creadoLabel = 'Ayer';
+      else creadoLabel = `Hace ${d}d`;
+    }
+    const badges: Array<{ label: string; color: string }> = [];
+    const estado = (r.estado || '').toLowerCase();
+    if (estado === 'pospuesto') badges.push({ label: 'Pospuesto', color: '#8b5cf6' });
+    const solicitanteNombre = r.es_anonimo
+      ? 'Anónimo'
+      : ([r.creador?.nombre, r.creador?.apellido].filter(Boolean).join(' ').trim() || undefined);
+    return (
+      <InboxCard
+        numero={`#${r.id}`}
+        titulo={cat?.nombre || r.titulo || 'Reclamo'}
+        subtitulo={r.titulo || r.descripcion || undefined}
+        solicitante={solicitanteNombre}
+        tiempoLabel={tiempoLabel}
+        creadoLabel={creadoLabel}
+        color={color}
+        icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+        badges={badges.length > 0 ? badges : undefined}
+        ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
+        onClick={() => openViewSheet(r)}
+        urgente={opts?.urgente}
+        density={opts?.density}
+      />
+    );
+  };
+
+  const inboxView = vistaInbox ? (
+    <InboxLayout
+      saludoNombre={user?.nombre || ''}
+      contextoLabel={user?.dependencia?.nombre || 'tu municipio'}
+      totalPendiente={
+        inboxData.urgentes.length + inboxData.nuevos.length + inboxData.enCurso.length + inboxData.esperando.length
+      }
+      metricasChips={[
+        { color: '#ef4444', icon: <AlertCircle className="w-3.5 h-3.5" />, label: 'urgentes', value: inboxData.urgentes.length },
+        { color: '#3b82f6', icon: <Inbox className="w-3.5 h-3.5" />, label: 'nuevos', value: inboxData.nuevos.length },
+        { color: '#f59e0b', icon: <PlayCircle className="w-3.5 h-3.5" />, label: 'en curso', value: inboxData.enCurso.length },
+        { color: '#8b5cf6', icon: <PauseCircle className="w-3.5 h-3.5" />, label: 'esperando', value: inboxData.esperando.length },
+        ...(inboxData.fosiles.length > 0 ? [
+          { color: '#71717a', icon: <Calendar className="w-3.5 h-3.5" />, label: 'para limpiar', value: inboxData.fosiles.length },
+        ] : []),
+      ]}
+      secciones={[
+        {
+          id: 'urgente',
+          titulo: 'Empecemos por lo urgente',
+          subtitulo: 'Marcados con prioridad alta o vencen en los próximos 3 días',
+          icono: <AlertCircle className="w-5 h-5" />,
+          color: '#ef4444',
+          emptyMessage: '✨ Sin urgentes. Bandeja al día.',
+          count: inboxData.urgentes.length,
+          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density })),
+        },
+        {
+          id: 'nuevos',
+          titulo: 'Nuevos para tomar',
+          subtitulo: 'Reclamos que llegaron y nadie empezó todavía',
+          icono: <Inbox className="w-5 h-5" />,
+          color: '#3b82f6',
+          emptyMessage: '🎉 No hay reclamos nuevos sin tomar.',
+          count: inboxData.nuevos.length,
+          items: (density) => inboxData.nuevos.map((r) => renderInboxCard(r, { density })),
+        },
+        {
+          id: 'en-curso',
+          titulo: 'Estás trabajando en estos',
+          subtitulo: 'Reclamos que ya tomaste — seguir avanzando',
+          icono: <PlayCircle className="w-5 h-5" />,
+          color: '#f59e0b',
+          emptyMessage: 'Nada en curso ahora mismo.',
+          count: inboxData.enCurso.length,
+          items: (density) => inboxData.enCurso.map((r) => renderInboxCard(r, { density })),
+          colapsable: inboxData.enCurso.length > 6,
+        },
+        {
+          id: 'esperando',
+          titulo: 'Pospuestos',
+          subtitulo: 'Reclamos diferidos — esperando algo para retomarlos',
+          icono: <PauseCircle className="w-5 h-5" />,
+          color: '#8b5cf6',
+          emptyMessage: 'Sin reclamos pospuestos.',
+          count: inboxData.esperando.length,
+          items: (density) => inboxData.esperando.map((r) => renderInboxCard(r, { density })),
+          colapsable: true,
+        },
+        {
+          id: 'fosiles',
+          titulo: 'Para limpiar — vencidos hace mucho',
+          subtitulo: 'Reclamos que vencieron hace más de 30 días. Considerá rechazarlos o archivarlos.',
+          icono: <Calendar className="w-5 h-5" />,
+          color: '#71717a',
+          emptyMessage: 'No hay reclamos viejos sin atender.',
+          count: inboxData.fosiles.length,
+          items: (density) => inboxData.fosiles.map((r) => renderInboxCard(r, { density })),
+          colapsable: true,
+        },
+      ]}
+    />
+  ) : null;
+
+  // Toggle de vista (botón en headerActions)
+  const toggleVista = () => {
+    const nuevo = !vistaInbox;
+    setVistaInbox(nuevo);
+    try { localStorage.setItem('reclamos_vista_inbox', nuevo ? '1' : '0'); } catch { /* ignore */ }
+  };
+
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
       <PageHint pageId="reclamos-list" />
+      {/* Toggle vista guiada / clásica */}
+      <div className="flex justify-end mb-3">
+        <button
+          type="button"
+          onClick={toggleVista}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
+          style={{
+            backgroundColor: vistaInbox ? `${theme.primary}15` : theme.backgroundSecondary,
+            border: `1px solid ${vistaInbox ? theme.primary + '60' : theme.border}`,
+            color: vistaInbox ? theme.primary : theme.textSecondary,
+          }}
+          title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
+        >
+          {vistaInbox ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
+          {vistaInbox ? 'Vista guiada' : 'Vista clásica'}
+        </button>
+      </div>
+
+      {vistaInbox ? (
+        <>
+          {inboxView}
+          {/* Sheet del reclamo sigue funcionando con selectedReclamo más abajo */}
+        </>
+      ) : (
       <ABMPage
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
         buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
@@ -4455,23 +4674,27 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           })
         )}
       </ABMPage>
+      )}
 
-      {/* Sentinel para infinite scroll + spinner de carga */}
-      <div ref={observerTarget} className="py-4">
-        {loadingMore && (
-          <div className="flex items-center justify-center gap-2">
-            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
-            <span className="text-sm" style={{ color: theme.textSecondary }}>
-              Cargando más reclamos...
-            </span>
-          </div>
-        )}
-        {!hasMore && reclamos.length > 0 && !loadingMore && (
-          <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
-            No hay más reclamos para mostrar
-          </p>
-        )}
-      </div>
+      {/* Sentinel para infinite scroll + spinner de carga.
+          Solo en vista clásica — en vista Inbox la lista no se pagina igual. */}
+      {!vistaInbox && (
+        <div ref={observerTarget} className="py-4">
+          {loadingMore && (
+            <div className="flex items-center justify-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+              <span className="text-sm" style={{ color: theme.textSecondary }}>
+                Cargando más reclamos...
+              </span>
+            </div>
+          )}
+          {!hasMore && reclamos.length > 0 && !loadingMore && (
+            <p className="text-center text-sm" style={{ color: theme.textSecondary }}>
+              No hay más reclamos para mostrar
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Sheet separado para ver detalle */}
       <Sheet
