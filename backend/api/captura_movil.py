@@ -63,6 +63,108 @@ _FAKE_APELLIDOS = [
 ]
 
 
+async def _resolver_o_crear_vecino(
+    db: AsyncSession,
+    sesion: CapturaMovilSesion,
+    payload: dict,
+) -> Optional[int]:
+    """Tras una captura aprobada, encuentra o crea el User del vecino para
+    que el operador pueda iniciar reclamos/trámites/tasas en su nombre.
+
+    - Busca por DNI en el muni del operador (o sin muni asignado).
+    - Si existe: bump nivel_verificacion=2, kyc_modo=assisted, completa
+      filiatorios faltantes.
+    - Si no existe: crea ghost (cuenta_verificada=True, kyc_modo=assisted,
+      email placeholder único, password aleatorio no-recuperable). El
+      vecino real podrá "reclamar" la cuenta más adelante por DNI+email.
+
+    Devuelve el user_id o None si no hay DNI capturado.
+    """
+    dni = (payload.get("dni") or "").strip()
+    if not dni:
+        return None
+
+    # Buscar existente
+    q = await db.execute(
+        select(User).where(
+            User.dni == dni,
+            User.rol == RolUsuario.VECINO,
+            (User.municipio_id == sesion.municipio_id) | (User.municipio_id.is_(None)),
+        ).limit(1)
+    )
+    existente = q.scalar_one_or_none()
+
+    fn_date = None
+    fn_str = payload.get("fecha_nacimiento")
+    if fn_str:
+        try:
+            fn_date = date.fromisoformat(fn_str)
+        except (ValueError, TypeError):
+            fn_date = None
+
+    if existente:
+        cambios = False
+        if (existente.nivel_verificacion or 0) < 2:
+            existente.nivel_verificacion = 2
+            existente.kyc_modo = "assisted"
+            existente.kyc_operador_id = sesion.operador_user_id
+            existente.verificado_at = datetime.utcnow()
+            existente.cuenta_verificada = True
+            cambios = True
+        # Completar campos vacíos sin pisar lo que ya esté cargado
+        for campo, valor in (
+            ("nombre", payload.get("nombre")),
+            ("apellido", payload.get("apellido")),
+            ("sexo", payload.get("sexo")),
+            ("nacionalidad", payload.get("nacionalidad")),
+        ):
+            if valor and not getattr(existente, campo, None):
+                setattr(existente, campo, valor)
+                cambios = True
+        if fn_date and not existente.fecha_nacimiento:
+            existente.fecha_nacimiento = fn_date
+            cambios = True
+        if cambios:
+            await db.commit()
+            await db.refresh(existente)
+        return existente.id
+
+    # Crear ghost
+    from core.security import get_password_hash
+
+    placeholder_email = f"v-{dni}-{sesion.municipio_id or 0}@vecino.munify.local"
+    nuevo = User(
+        email=placeholder_email,
+        password_hash=get_password_hash(token_urlsafe(16)),
+        nombre=payload.get("nombre") or "",
+        apellido=payload.get("apellido") or "",
+        dni=dni,
+        sexo=payload.get("sexo"),
+        fecha_nacimiento=fn_date,
+        nacionalidad=payload.get("nacionalidad"),
+        rol=RolUsuario.VECINO,
+        municipio_id=sesion.municipio_id,
+        cuenta_verificada=True,
+        nivel_verificacion=2,
+        kyc_modo="assisted",
+        kyc_operador_id=sesion.operador_user_id,
+        verificado_at=datetime.utcnow(),
+    )
+    try:
+        db.add(nuevo)
+        await db.commit()
+        await db.refresh(nuevo)
+        return nuevo.id
+    except Exception:
+        # Colisión de email (mismo DNI ya tenía ghost). Rollback y re-buscar.
+        await db.rollback()
+        q2 = await db.execute(
+            select(User).where(User.email == placeholder_email).limit(1)
+        )
+        u = q2.scalar_one_or_none()
+        return u.id if u else None
+
+
 def _fake_filiatorios() -> dict:
     """Genera un set de datos filiatorios random pero coherente."""
     sexo = random.choice(["M", "F"])
@@ -220,6 +322,12 @@ async def _consultar_didit_y_persistir(
         # Conservo vecino_label si lo había
         if sesion.payload_json and "vecino_label" in sesion.payload_json:
             payload["vecino_label"] = sesion.payload_json["vecino_label"]
+
+        # Resolver/crear el User para que el operador pueda actuar en su nombre
+        user_id = await _resolver_o_crear_vecino(db, sesion, payload)
+        if user_id:
+            payload["user_id"] = user_id
+            sesion.vecino_user_id = user_id
 
         sesion.estado = EstadoCapturaMovil.COMPLETADA
         sesion.payload_json = payload
@@ -476,6 +584,12 @@ async def handoff_fake_completar(
     # Conservo vecino_label si lo había
     if sesion.payload_json and "vecino_label" in sesion.payload_json:
         payload["vecino_label"] = sesion.payload_json["vecino_label"]
+
+    # Resolver/crear el User para que el operador pueda actuar en su nombre
+    user_id = await _resolver_o_crear_vecino(db, sesion, payload)
+    if user_id:
+        payload["user_id"] = user_id
+        sesion.vecino_user_id = user_id
 
     sesion.estado = EstadoCapturaMovil.COMPLETADA
     sesion.payload_json = payload

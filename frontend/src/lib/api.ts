@@ -1684,6 +1684,8 @@ export interface CapturaMovilEstado {
     nacionalidad: string | null;
     direccion: string | null;
     didit_status?: string;
+    /** user_id del vecino resuelto/creado en el backend tras la captura. */
+    user_id?: number;
   } | null;
   motivo_rechazo: string | null;
   expires_at: string;

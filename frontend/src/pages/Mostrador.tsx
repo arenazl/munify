@@ -164,7 +164,7 @@ export default function Mostrador() {
           }
           onBiometriaOk={(d, sid) =>
             handleVecinoListo({
-              user_id: undefined,
+              user_id: d.user_id,
               dni: d.dni,
               nombre: d.nombre,
               apellido: d.apellido,
@@ -771,6 +771,7 @@ function TabCapturaMovil({ onAprobado, onCargarManual }: {
         } else if (e.estado === 'completada' && e.payload && e.payload.dni) {
           setResultadoAprobado({
             datos: {
+              user_id: e.payload.user_id,
               dni: e.payload.dni,
               nombre: e.payload.nombre,
               apellido: e.payload.apellido,
