@@ -4277,7 +4277,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
         >
           {vistaInbox ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
-          {vistaInbox ? 'Vista guiada' : 'Vista clásica'}
+          {vistaInbox ? 'Vista clásica' : 'Vista guiada'}
         </button>
       </div>
 
