@@ -1450,9 +1450,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // ============================================================
   const inboxData = useMemo(() => {
     const ahora = Date.now();
-    const tresDiasMs = 3 * 24 * 60 * 60 * 1000;
+    const dia = 24 * 60 * 60 * 1000;
 
     const urgentes: Solicitud[] = [];
+    const fosiles: Solicitud[] = [];   // vencidos hace > 30 días — para limpiar
     const nuevos: Solicitud[] = [];
     const enCurso: Solicitud[] = [];
     const esperando: Solicitud[] = [];
@@ -1465,10 +1466,20 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       // Vencimiento estimado = created_at + tiempo_estimado_dias del trámite
       const dias = t.tramite?.tiempo_estimado_dias || 15;
       const fechaVence = t.created_at
-        ? new Date(t.created_at).getTime() + dias * 24 * 60 * 60 * 1000
+        ? new Date(t.created_at).getTime() + dias * dia
         : null;
-      const venceEn = fechaVence ? fechaVence - ahora : Infinity;
-      const esUrgente = venceEn > 0 && venceEn <= tresDiasMs;
+      const diffMs = fechaVence ? fechaVence - ahora : null;
+
+      // Capa 1: fósil — venció hace más de 30 días. Se manda a "Para limpiar"
+      // y NO entra en urgente (probablemente nadie lo va a tomar igual).
+      if (diffMs != null && diffMs < -30 * dia) {
+        fosiles.push(t);
+        continue;
+      }
+
+      // Capa 2: urgente real — prioridad manual = 1 OR vence entre -7 y +3 días
+      const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
+      const esUrgente = t.prioridad === 1 || enZonaUrgente;
 
       if (esUrgente) {
         urgentes.push(t);
@@ -1483,7 +1494,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         nuevos.push(t);
       }
     }
-    return { urgentes, nuevos, enCurso, esperando };
+    return { urgentes, fosiles, nuevos, enCurso, esperando };
   }, [tramites]);
 
   const renderInboxCard = (t: Solicitud, opts?: { urgente?: boolean }) => {
@@ -1541,12 +1552,15 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         { color: '#3b82f6', icon: <Inbox className="w-3.5 h-3.5" />, label: 'nuevos', value: inboxData.nuevos.length },
         { color: '#f59e0b', icon: <PlayCircle className="w-3.5 h-3.5" />, label: 'en curso', value: inboxData.enCurso.length },
         { color: '#8b5cf6', icon: <PauseCircle className="w-3.5 h-3.5" />, label: 'esperando', value: inboxData.esperando.length },
+        ...(inboxData.fosiles.length > 0 ? [
+          { color: '#71717a', icon: <Calendar className="w-3.5 h-3.5" />, label: 'para limpiar', value: inboxData.fosiles.length },
+        ] : []),
       ]}
       secciones={[
         {
           id: 'urgente',
           titulo: 'Empecemos por lo urgente',
-          subtitulo: 'Trámites que vencen en los próximos 3 días',
+          subtitulo: 'Marcados con prioridad alta o vencen en los próximos 3 días',
           icono: <AlertCircle className="w-5 h-5" />,
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
@@ -1579,6 +1593,16 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#8b5cf6',
           emptyMessage: 'Sin trámites esperando.',
           items: inboxData.esperando.map((t) => renderInboxCard(t)),
+          colapsable: true,
+        },
+        {
+          id: 'fosiles',
+          titulo: 'Para limpiar — vencidos hace mucho',
+          subtitulo: 'Trámites que vencieron hace más de 30 días. Considerá rechazarlos o archivarlos.',
+          icono: <Calendar className="w-5 h-5" />,
+          color: '#71717a',
+          emptyMessage: 'No hay trámites viejos sin atender.',
+          items: inboxData.fosiles.map((t) => renderInboxCard(t)),
           colapsable: true,
         },
       ]}

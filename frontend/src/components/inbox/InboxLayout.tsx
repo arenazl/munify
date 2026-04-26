@@ -74,54 +74,44 @@ export function InboxLayout({
         }
       `}</style>
 
-      {/* === Hero === */}
+      {/* === Hero compacto: saludo inline + chips en la misma fila === */}
       <div
-        className="rounded-3xl p-6 inbox-section"
+        className="rounded-xl px-3 py-2 inbox-section flex items-center gap-3 flex-wrap"
         style={{
-          background: `linear-gradient(135deg, ${theme.primary}15 0%, ${theme.primary}05 100%)`,
-          border: `1px solid ${theme.primary}30`,
+          background: `linear-gradient(135deg, ${theme.primary}12 0%, ${theme.primary}03 100%)`,
+          border: `1px solid ${theme.primary}25`,
         }}
       >
-        <div className="flex items-start gap-3 mb-4">
-          <span className="text-3xl">{horaSaludo.emoji}</span>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold leading-tight" style={{ color: theme.text }}>
-              {horaSaludo.texto}, {saludoNombre || 'colega'}
-            </h1>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-lg">{horaSaludo.emoji}</span>
+          <p className="text-sm leading-tight truncate" style={{ color: theme.text }}>
+            <span className="font-semibold">{horaSaludo.texto}, {saludoNombre || 'colega'}.</span>{' '}
             {totalPendiente > 0 ? (
-              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-                Hoy tenés{' '}
-                <span className="font-bold" style={{ color: theme.primary }}>
-                  {totalPendiente}
-                </span>{' '}
-                {totalPendiente === 1 ? 'tarea' : 'tareas'} pendientes en{' '}
-                <span className="font-medium" style={{ color: theme.text }}>{contextoLabel}</span>
-              </p>
+              <span style={{ color: theme.textSecondary }}>
+                <span className="font-bold" style={{ color: theme.primary }}>{totalPendiente}</span> pendientes en {contextoLabel}
+              </span>
             ) : (
-              <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-                ¡Tenés la bandeja al día en {contextoLabel}! 🎉
-              </p>
+              <span style={{ color: theme.textSecondary }}>Bandeja al día en {contextoLabel} 🎉</span>
             )}
-          </div>
+          </p>
         </div>
 
-        {/* Chips de métricas */}
         {metricasChips.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 ml-auto flex-wrap">
             {metricasChips.map((chip, i) => (
               <div
                 key={i}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all hover:scale-105 inbox-card"
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all hover:scale-105 inbox-card"
                 style={{
                   backgroundColor: `${chip.color}15`,
                   border: `1px solid ${chip.color}40`,
                   color: chip.color,
-                  animationDelay: `${i * 60}ms`,
+                  animationDelay: `${i * 50}ms`,
                 }}
               >
                 {chip.icon}
                 <span className="tabular-nums">{chip.value}</span>
-                <span className="opacity-80">{chip.label}</span>
+                <span className="opacity-75">{chip.label}</span>
               </div>
             ))}
           </div>
@@ -129,9 +119,33 @@ export function InboxLayout({
       </div>
 
       {/* === Secciones === */}
-      {secciones.map((sec, idxSec) => (
-        <Seccion key={sec.id} seccion={sec} indexBase={idxSec} />
-      ))}
+      {(() => {
+        const conItems = secciones.filter((s) => s.items.length > 0);
+        // Si todas están vacías, mostramos empty state grande en lugar de
+        // 4 secciones con mensaje cariñoso (eso ocupa espacio al pedo).
+        if (conItems.length === 0 && totalPendiente === 0) {
+          return (
+            <div
+              className="rounded-2xl p-10 text-center inbox-section"
+              style={{
+                background: `linear-gradient(135deg, #22c55e10 0%, ${theme.card} 100%)`,
+                border: `1px dashed #22c55e40`,
+              }}
+            >
+              <div className="text-5xl mb-3">🎉</div>
+              <p className="text-lg font-bold mb-1" style={{ color: theme.text }}>
+                Bandeja al día
+              </p>
+              <p className="text-sm" style={{ color: theme.textSecondary }}>
+                No hay nada pendiente. Volvé en un rato.
+              </p>
+            </div>
+          );
+        }
+        return conItems.map((sec, idxSec) => (
+          <Seccion key={sec.id} seccion={sec} indexBase={idxSec} />
+        ));
+      })()}
     </div>
   );
 }
