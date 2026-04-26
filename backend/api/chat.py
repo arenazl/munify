@@ -1975,6 +1975,55 @@ def load_schema_json(force_refresh: bool = False) -> dict | None:
     return None
 
 
+def _derive_multi_tenant_chain(
+    entity_name: str,
+    entities: dict,
+    visited: set | None = None,
+) -> tuple[str, list[tuple[str, str]]]:
+    """Para una entidad, deriva como llegar a `municipio_id` recorriendo `relationships.belongs_to`.
+
+    Devuelve:
+      - ("direct", []) si la tabla tiene `municipio_id` propio
+      - ("via", [(fk, target), ...]) cadena de JOINs hasta una tabla con `municipio_id`
+      - ("global", []) si no hay forma de llegar (catalogo compartido)
+    """
+    if visited is None:
+        visited = set()
+    if entity_name in visited:
+        return ("global", [])
+    visited = visited | {entity_name}
+
+    entity = entities.get(entity_name) or {}
+    cols = entity.get("columns", {}) or {}
+
+    if "municipio_id" in cols:
+        return ("direct", [])
+
+    for rel in (entity.get("relationships") or {}).values():
+        if rel.get("type") != "belongs_to":
+            continue
+        target = rel.get("target")
+        fk = rel.get("fk")
+        if not target or not fk or target == entity_name:
+            continue
+        sub = _derive_multi_tenant_chain(target, entities, visited)
+        if sub[0] in ("direct", "via"):
+            return ("via", [(fk, target)] + sub[1])
+
+    return ("global", [])
+
+
+def _format_multi_tenant(chain: tuple[str, list[tuple[str, str]]]) -> str:
+    kind, steps = chain
+    if kind == "global":
+        return "multi_tenant: GLOBAL (sin municipio_id, NO filtrar por muni — es catalogo compartido)"
+    if kind == "direct":
+        return "multi_tenant: DIRECTO (filtrar `municipio_id` en esta tabla)"
+    chain_str = " → ".join(f"{fk}→{tgt}" for fk, tgt in steps)
+    last_table = steps[-1][1]
+    return f"multi_tenant: VIA {chain_str} (NO tiene municipio_id propio; JOIN hasta `{last_table}` y filtrar `{last_table}.municipio_id`)"
+
+
 def schema_json_to_text() -> str | None:
     """Convierte el schema JSON a texto legible para la IA (cacheado)"""
     global _SCHEMA_TEXT_CACHE
@@ -1986,25 +2035,27 @@ def schema_json_to_text() -> str | None:
     if not schema:
         return None
 
+    entities = schema.get("entities", {}) or {}
     lines = ["# Esquema de Base de Datos\n"]
 
     # Entidades principales
     lines.append("## Tablas Principales\n")
-    for entity_name, entity in schema.get("entities", {}).items():
+    for entity_name, entity in entities.items():
         table = entity.get("table", entity_name)
         desc = entity.get("description", "")
-        multi_tenant_note = entity.get("multi_tenant_note", "")
 
         lines.append(f"### {table}")
         if desc:
             lines.append(f"_{desc}_")
-        if multi_tenant_note:
-            lines.append(f"**NOTA**: {multi_tenant_note}")
+
+        # Multi-tenancy derivada del schema (no hardcodeada): camina belongs_to
+        # hasta encontrar municipio_id. Asi cualquier tabla nueva queda cubierta.
+        chain = _derive_multi_tenant_chain(entity_name, entities)
+        lines.append(f"- {_format_multi_tenant(chain)}")
 
         # Columnas
         cols = []
         for col_name, col_info in entity.get("columns", {}).items():
-            col_type = col_info.get("type", "")
             fk = col_info.get("foreign_key", "")
             if fk:
                 cols.append(f"{col_name} → {fk}")
@@ -2015,9 +2066,20 @@ def schema_json_to_text() -> str | None:
                 cols.append(col_name)
 
         # Agrupar columnas en líneas
-        lines.append("- " + ", ".join(cols[:8]))
+        lines.append("- columnas: " + ", ".join(cols[:8]))
         if len(cols) > 8:
-            lines.append("- " + ", ".join(cols[8:]))
+            lines.append("  " + ", ".join(cols[8:]))
+
+        # Relaciones explicitas para que el LLM JOINee bien
+        rels = entity.get("relationships") or {}
+        if rels:
+            rel_strs = []
+            for rel_name, rel in rels.items():
+                rtype = rel.get("type", "")
+                target = rel.get("target", "")
+                fk = rel.get("fk", "")
+                rel_strs.append(f"{rel_name}: {rtype} {target}" + (f" (fk: {fk})" if fk else ""))
+            lines.append("- relaciones: " + "; ".join(rel_strs))
         lines.append("")
 
     # Tablas pivote
@@ -2049,18 +2111,9 @@ def schema_json_to_text() -> str | None:
             lines.append("```")
             lines.append("")
 
-    # Reglas de filtrado multi-tenant
-    lines.append("## Reglas de Filtrado Multi-Tenant\n")
-    lines.append("Tablas con municipio_id directo: reclamos, empleados, zonas, usuarios, solicitudes")
-    lines.append("Todas las tablas son per-municipio: categorias_reclamo, categorias_tramite, tramites")
-    lines.append("")
-    lines.append("**IMPORTANTE para trámites:**")
-    lines.append("- `categorias_tramite` (per-municipio) = categorías de trámites")
-    lines.append("- `tramites` (per-municipio) tiene `categoria_tramite_id` → categorias_tramite.id")
-    lines.append("- `tramite_documentos_requeridos` = sub-tabla con docs que se piden por trámite")
-    lines.append("- `solicitudes` = trámites cargados por vecinos, tiene `tramite_id` → tramites.id")
-    lines.append("- `documentos_solicitudes` tiene campos `verificado`, `verificado_por_id`, `tramite_documento_requerido_id`")
-    lines.append("")
+    # Nota: la info de filtrado multi-tenant ya viene declarada por tabla
+    # arriba (linea `multi_tenant: ...`), derivada del schema. No hace falta
+    # duplicar aca con listas hardcodeadas.
 
     _SCHEMA_TEXT_CACHE = "\n".join(lines)
     return _SCHEMA_TEXT_CACHE
@@ -2315,7 +2368,7 @@ MUNICIPIO_ID ACTUAL: {municipio_id}
 
 REGLAS CRÍTICAS:
 0. La tabla de categorías de reclamo se llama `categorias_reclamo` (NO `categorias`). Los estados de reclamos son SIEMPRE en minúsculas. Estados ACTIVOS (los que existen hoy): 'recibido', 'en_curso', 'pospuesto', 'finalizado', 'rechazado'. Para "pendientes" o "atrasados" usá: estado IN ('recibido', 'en_curso', 'pospuesto'). NUNCA uses 'nuevo', 'asignado', 'en_proceso' — son legacy y no hay datos con esos valores.
-1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. Para filtrar por municipio: verificá en el schema si la tabla tiene columna "municipio_id". Si NO la tiene, buscá "multi_tenant_note" que te indica qué tabla pivote usar.
+1. EL SCHEMA ES TU ÚNICA FUENTE DE VERDAD. Leelo íntegramente antes de generar SQL. NUNCA inferir ni presuponer columnas o relaciones que no estén explícitas en el schema. Si no está documentado, no existe. **Para filtrar por municipio: cada tabla del schema declara una linea `multi_tenant: ...`** — DIRECTO (filtrá `tabla.municipio_id = {{municipio_id}}`), VIA fk→tabla→... (NO tiene columna municipio_id propia; JOIN siguiendo esa cadena y filtrá `municipio_id` en la última tabla), o GLOBAL (catálogo compartido, no filtres por muni). NUNCA inventes una columna `municipio_id` en una tabla que no la lista en sus columnas.
 1.b TABLAS DE HISTORIAL — `historial_reclamos` e `historial_solicitudes` NO tienen columna `municipio_id`. Para filtrar por muni, SIEMPRE hacé JOIN con `reclamos` o `solicitudes` y filtrá `r.municipio_id = {{municipio_id}}` (o `s.municipio_id`). Lo mismo aplica para CUALQUIER consulta que toque comentarios, cambios de estado o etapas de la gestión.
 2. **NUNCA** pongas LIMIT a menos que el usuario pida explícitamente una cantidad (ej: "traeme 10", "los primeros 5", "dame 20"). Si dice "traeme todos", "lista", "dame los X" sin número, NO pongas LIMIT.
 3. Para fechas: NOW(), DATE_SUB(), DATEDIFF()
