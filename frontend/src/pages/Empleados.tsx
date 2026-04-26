@@ -1,11 +1,26 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, User, Star, X, Check, Users, Clock } from 'lucide-react';
+import { Edit, Trash2, User as UserIcon, Star, X, Check, Users, Clock, Shield, Mail, Phone, Wrench, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { empleadosApi, zonasApi, categoriasApi, empleadosGestionApi, dependenciasApi } from '../lib/api';
+import { empleadosApi, zonasApi, categoriasApi, empleadosGestionApi, dependenciasApi, usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTextarea, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
-import type { Empleado, Zona, Categoria } from '../types';
+import type { Empleado, Zona, Categoria, User } from '../types';
+
+type VistaRol = 'admin' | 'supervisor' | 'empleado';
+type TipoEmpleado = 'todos' | 'administrativo' | 'operario';
+
+const VISTA_PILLS: Array<{ value: VistaRol; label: string; icon: typeof UserIcon; color: string }> = [
+  { value: 'admin', label: 'Administrador', icon: Shield, color: '#8b5cf6' },
+  { value: 'supervisor', label: 'Supervisor', icon: ShieldCheck, color: '#eab308' },
+  { value: 'empleado', label: 'Empleado', icon: Wrench, color: '#3b82f6' },
+];
+
+const TIPO_PILLS: Array<{ value: TipoEmpleado; label: string }> = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'administrativo', label: 'Administrativo' },
+  { value: 'operario', label: 'Técnico' },
+];
 
 const DIAS_SEMANA = [
   { value: 0, label: 'Lunes', short: 'Lun' },
@@ -29,7 +44,10 @@ const horariosDefault = (): Record<number, HorarioDia> => {
 
 export default function Empleados() {
   const { theme } = useTheme();
+  const [vistaRol, setVistaRol] = useState<VistaRol>('empleado');
+  const [tipoFiltro, setTipoFiltro] = useState<TipoEmpleado>('todos');
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [usuarios, setUsuarios] = useState<User[]>([]);
   const [zonas, setZonas] = useState<Zona[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [dependencias, setDependencias] = useState<Array<{ id: number; nombre: string; color?: string }>>([]);
@@ -38,6 +56,7 @@ export default function Empleados() {
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
+  const [selectedUsuario, setSelectedUsuario] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',
@@ -54,28 +73,46 @@ export default function Empleados() {
     categoria_principal_id: '',
     categoria_ids: [] as number[]
   });
+  const [userFormData, setUserFormData] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+    password: '',
+    telefono: '',
+    dni: '',
+    direccion: '',
+  });
   const [horariosSemana, setHorariosSemana] = useState<Record<number, HorarioDia>>(horariosDefault);
+
+  const isEmpleadoView = vistaRol === 'empleado';
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vistaRol]);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [empleadosRes, zonasRes, categoriasRes, dependenciasRes] = await Promise.all([
-        empleadosApi.getAll(),
-        zonasApi.getAll(true),
-        categoriasApi.getAll(true),
-        dependenciasApi.getMunicipio({ activo: true }).catch(() => ({ data: [] })),
-      ]);
-      setEmpleados(empleadosRes.data);
-      setZonas(zonasRes.data);
-      setCategorias(categoriasRes.data);
-      setDependencias((dependenciasRes.data || []).map((d: { id: number; dependencia?: { nombre: string; color?: string }; nombre?: string; color?: string }) => ({
-        id: d.id,
-        nombre: d.dependencia?.nombre || d.nombre || '',
-        color: d.dependencia?.color || d.color,
-      })));
+      if (vistaRol === 'empleado') {
+        const [empleadosRes, zonasRes, categoriasRes, dependenciasRes] = await Promise.all([
+          empleadosApi.getAll(),
+          zonasApi.getAll(true),
+          categoriasApi.getAll(true),
+          dependenciasApi.getMunicipio({ activo: true }).catch(() => ({ data: [] })),
+        ]);
+        setEmpleados(empleadosRes.data);
+        setZonas(zonasRes.data);
+        setCategorias(categoriasRes.data);
+        setDependencias((dependenciasRes.data || []).map((d: { id: number; dependencia?: { nombre: string; color?: string }; nombre?: string; color?: string }) => ({
+          id: d.id,
+          nombre: d.dependencia?.nombre || d.nombre || '',
+          color: d.dependencia?.color || d.color,
+        })));
+      } else {
+        const usersRes = await usersApi.getAll();
+        setUsuarios((usersRes.data || []).filter((u: User) => u.rol === vistaRol));
+      }
     } catch (error) {
       toast.error('Error al cargar datos');
       console.error('Error:', error);
@@ -144,6 +181,81 @@ export default function Empleados() {
   const closeSheet = () => {
     setSheetOpen(false);
     setSelectedEmpleado(null);
+    setSelectedUsuario(null);
+  };
+
+  const openUserSheet = (usuario: User | null = null) => {
+    if (usuario) {
+      setUserFormData({
+        nombre: usuario.nombre,
+        apellido: usuario.apellido || '',
+        email: usuario.email,
+        password: '',
+        telefono: usuario.telefono || '',
+        dni: usuario.dni || '',
+        direccion: usuario.direccion || '',
+      });
+      setSelectedUsuario(usuario);
+    } else {
+      setUserFormData({
+        nombre: '',
+        apellido: '',
+        email: '',
+        password: '',
+        telefono: '',
+        dni: '',
+        direccion: '',
+      });
+      setSelectedUsuario(null);
+    }
+    setSheetOpen(true);
+  };
+
+  const handleUserSubmit = async () => {
+    if (!selectedUsuario && !userFormData.password) {
+      toast.error('La contraseña es requerida');
+      return;
+    }
+    setSaving(true);
+    const payload: Record<string, unknown> = {
+      nombre: userFormData.nombre,
+      apellido: userFormData.apellido,
+      email: userFormData.email,
+      telefono: userFormData.telefono || null,
+      dni: userFormData.dni || null,
+      direccion: userFormData.direccion || null,
+      rol: vistaRol,
+    };
+    if (!selectedUsuario && userFormData.password) {
+      payload.password = userFormData.password;
+    }
+    try {
+      if (selectedUsuario) {
+        await usersApi.update(selectedUsuario.id, payload);
+        toast.success('Usuario actualizado correctamente');
+      } else {
+        await usersApi.create(payload);
+        toast.success('Usuario creado correctamente');
+      }
+      fetchData();
+      closeSheet();
+    } catch (error) {
+      toast.error('Error al guardar el usuario');
+      console.error('Error:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUserDelete = async (id: number) => {
+    try {
+      await usersApi.delete(id);
+      toast.success('Usuario desactivado');
+      fetchData();
+    } catch (error) {
+      toast.error('Error al desactivar el usuario');
+      console.error('Error:', error);
+    }
   };
 
   const handleSubmit = async () => {
@@ -255,12 +367,27 @@ export default function Empleados() {
     }
   };
 
-  const filteredEmpleados = empleados.filter(c =>
-    c.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    c.apellido?.toLowerCase().includes(search.toLowerCase()) ||
-    c.especialidad?.toLowerCase().includes(search.toLowerCase()) ||
-    c.descripcion?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredEmpleados = empleados.filter(c => {
+    const q = search.toLowerCase();
+    const matchSearch =
+      c.nombre.toLowerCase().includes(q) ||
+      (c.apellido?.toLowerCase().includes(q) ?? false) ||
+      (c.especialidad?.toLowerCase().includes(q) ?? false) ||
+      (c.descripcion?.toLowerCase().includes(q) ?? false);
+    const tipoEmp = ((c as { tipo?: string }).tipo || 'operario');
+    const matchTipo = tipoFiltro === 'todos' || tipoEmp === tipoFiltro;
+    return matchSearch && matchTipo;
+  });
+
+  const filteredUsuarios = usuarios.filter(u => {
+    const q = search.toLowerCase();
+    return (
+      u.nombre.toLowerCase().includes(q) ||
+      u.apellido.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.dni?.toLowerCase().includes(q) ?? false)
+    );
+  });
 
   const getNombreCompleto = (e: Empleado) => {
     if (e.apellido) {
@@ -277,7 +404,7 @@ export default function Empleados() {
       render: (c: Empleado) => (
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-            <User className="h-4 w-4 text-purple-600" />
+            <UserIcon className="h-4 w-4 text-purple-600" />
           </div>
           <span className="font-medium">{getNombreCompleto(c)}</span>
         </div>
@@ -377,6 +504,121 @@ export default function Empleados() {
     },
   ];
 
+  const userTableColumns = [
+    {
+      key: 'nombre',
+      header: vistaRol === 'admin' ? 'Administrador' : 'Supervisor',
+      sortValue: (u: User) => `${u.nombre} ${u.apellido}`,
+      render: (u: User) => {
+        const Icon = vistaRol === 'admin' ? Shield : ShieldCheck;
+        const bg = vistaRol === 'admin' ? 'bg-purple-500' : 'bg-yellow-500';
+        return (
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center`}>
+              <Icon className="h-4 w-4 text-white" />
+            </div>
+            <span className="font-medium">{u.nombre} {u.apellido}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'email',
+      header: 'Email',
+      sortValue: (u: User) => u.email,
+      render: (u: User) => (
+        <div className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
+          <Mail className="h-3 w-3" />
+          {u.email}
+        </div>
+      ),
+    },
+    {
+      key: 'telefono',
+      header: 'Teléfono',
+      sortValue: (u: User) => u.telefono || '',
+      render: (u: User) => (
+        <div className="flex items-center gap-1" style={{ color: theme.textSecondary }}>
+          {u.telefono ? (
+            <>
+              <Phone className="h-3 w-3" />
+              {u.telefono}
+            </>
+          ) : '-'}
+        </div>
+      ),
+    },
+    {
+      key: 'dni',
+      header: 'DNI',
+      sortValue: (u: User) => u.dni || '',
+      render: (u: User) => u.dni || '-',
+    },
+    {
+      key: 'activo',
+      header: 'Estado',
+      sortValue: (u: User) => u.activo,
+      render: (u: User) => <ABMBadge active={u.activo} />,
+    },
+  ];
+
+  const vistaActual = VISTA_PILLS.find(p => p.value === vistaRol)!;
+
+  const pillsBar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap gap-1.5">
+        {VISTA_PILLS.map(p => {
+          const active = vistaRol === p.value;
+          const Icon = p.icon;
+          return (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => {
+                setVistaRol(p.value);
+                if (p.value !== 'empleado') setTipoFiltro('todos');
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-95"
+              style={{
+                backgroundColor: active ? p.color : 'transparent',
+                color: active ? '#ffffff' : theme.textSecondary,
+                border: `1px solid ${active ? p.color : theme.border}`,
+              }}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+      {vistaRol === 'empleado' && (
+        <>
+          <span className="text-xs px-1" style={{ color: theme.textSecondary }}>·</span>
+          <div className="flex flex-wrap gap-1.5">
+            {TIPO_PILLS.map(t => {
+              const active = tipoFiltro === t.value;
+              return (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setTipoFiltro(t.value)}
+                  className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-all active:scale-95"
+                  style={{
+                    backgroundColor: active ? `${vistaActual.color}20` : 'transparent',
+                    color: active ? vistaActual.color : theme.textSecondary,
+                    border: `1px solid ${active ? vistaActual.color : theme.border}`,
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <>
       <PageHint pageId="empleados" />
@@ -384,49 +626,82 @@ export default function Empleados() {
       title="Empleados"
       icon={<Users className="h-5 w-5" />}
       backLink="/gestion/ajustes"
-      buttonLabel="Nuevo Empleado"
-      onAdd={() => openSheet()}
-      searchPlaceholder="Buscar empleados..."
+      buttonLabel={isEmpleadoView ? 'Nuevo Empleado' : `Nuevo ${vistaActual.label}`}
+      onAdd={() => (isEmpleadoView ? openSheet() : openUserSheet())}
+      searchPlaceholder={isEmpleadoView ? 'Buscar empleados...' : `Buscar ${vistaActual.label.toLowerCase()}es...`}
       searchValue={search}
       onSearchChange={setSearch}
       loading={loading}
-      isEmpty={filteredEmpleados.length === 0}
-      emptyMessage="No se encontraron empleados"
+      isEmpty={isEmpleadoView ? filteredEmpleados.length === 0 : filteredUsuarios.length === 0}
+      emptyMessage={isEmpleadoView ? 'No se encontraron empleados' : `No se encontraron ${vistaActual.label.toLowerCase()}es`}
       sheetOpen={sheetOpen}
-      sheetTitle={selectedEmpleado ? 'Editar Empleado' : 'Nuevo Empleado'}
-      sheetDescription={selectedEmpleado ? 'Modifica los datos del empleado' : 'Completa los datos para crear un nuevo empleado'}
+      sheetTitle={
+        isEmpleadoView
+          ? (selectedEmpleado ? 'Editar Empleado' : 'Nuevo Empleado')
+          : (selectedUsuario ? `Editar ${vistaActual.label}` : `Nuevo ${vistaActual.label}`)
+      }
+      sheetDescription={
+        isEmpleadoView
+          ? (selectedEmpleado ? 'Modifica los datos del empleado' : 'Completa los datos para crear un nuevo empleado')
+          : (selectedUsuario ? `Modifica los datos del ${vistaActual.label.toLowerCase()}` : `Completa los datos para crear un nuevo ${vistaActual.label.toLowerCase()}`)
+      }
       onSheetClose={closeSheet}
+      extraFilters={pillsBar}
       tableView={
-        <ABMTable
-          data={filteredEmpleados}
-          columns={tableColumns}
-          keyExtractor={(c) => c.id}
-          onRowClick={(c) => openSheet(c)}
-          actions={(c) => (
-            <>
-              <ABMTableAction
-                icon={<Edit className="h-4 w-4" />}
-                onClick={() => openSheet(c)}
-                title="Editar"
-              />
-              <ABMTableAction
-                icon={<Trash2 className="h-4 w-4" />}
-                onClick={() => handleDelete(c.id)}
-                title="Desactivar"
-                variant="danger"
-              />
-            </>
-          )}
-        />
+        isEmpleadoView ? (
+          <ABMTable
+            data={filteredEmpleados}
+            columns={tableColumns}
+            keyExtractor={(c) => c.id}
+            onRowClick={(c) => openSheet(c)}
+            actions={(c) => (
+              <>
+                <ABMTableAction
+                  icon={<Edit className="h-4 w-4" />}
+                  onClick={() => openSheet(c)}
+                  title="Editar"
+                />
+                <ABMTableAction
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={() => handleDelete(c.id)}
+                  title="Desactivar"
+                  variant="danger"
+                />
+              </>
+            )}
+          />
+        ) : (
+          <ABMTable
+            data={filteredUsuarios}
+            columns={userTableColumns}
+            keyExtractor={(u) => u.id}
+            onRowClick={(u) => openUserSheet(u)}
+            actions={(u) => (
+              <>
+                <ABMTableAction
+                  icon={<Edit className="h-4 w-4" />}
+                  onClick={() => openUserSheet(u)}
+                  title="Editar"
+                />
+                <ABMTableAction
+                  icon={<Trash2 className="h-4 w-4" />}
+                  onClick={() => handleUserDelete(u.id)}
+                  title="Desactivar"
+                  variant="danger"
+                />
+              </>
+            )}
+          />
+        )
       }
       sheetFooter={
         <ABMSheetFooter
           onCancel={closeSheet}
-          onSave={handleSubmit}
+          onSave={isEmpleadoView ? handleSubmit : handleUserSubmit}
           saving={saving}
         />
       }
-      sheetContent={
+      sheetContent={isEmpleadoView ? (
         <form className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <ABMInput
@@ -704,9 +979,67 @@ export default function Empleados() {
             </div>
           )}
         </form>
-      }
+      ) : (
+        <form className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <ABMInput
+              label="Nombre"
+              required
+              value={userFormData.nombre}
+              onChange={(e) => setUserFormData({ ...userFormData, nombre: e.target.value })}
+              placeholder="Nombre"
+            />
+            <ABMInput
+              label="Apellido"
+              required
+              value={userFormData.apellido}
+              onChange={(e) => setUserFormData({ ...userFormData, apellido: e.target.value })}
+              placeholder="Apellido"
+            />
+          </div>
+          <ABMInput
+            label="Email"
+            type="email"
+            required
+            value={userFormData.email}
+            onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
+            placeholder="email@ejemplo.com"
+          />
+          {!selectedUsuario && (
+            <ABMInput
+              label="Contraseña"
+              type="password"
+              required
+              value={userFormData.password}
+              onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
+              placeholder="Contraseña"
+            />
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <ABMInput
+              label="Teléfono"
+              type="tel"
+              value={userFormData.telefono}
+              onChange={(e) => setUserFormData({ ...userFormData, telefono: e.target.value })}
+              placeholder="Teléfono"
+            />
+            <ABMInput
+              label="DNI"
+              value={userFormData.dni}
+              onChange={(e) => setUserFormData({ ...userFormData, dni: e.target.value })}
+              placeholder="DNI"
+            />
+          </div>
+          <ABMInput
+            label="Dirección"
+            value={userFormData.direccion}
+            onChange={(e) => setUserFormData({ ...userFormData, direccion: e.target.value })}
+            placeholder="Dirección"
+          />
+        </form>
+      )}
     >
-      {filteredEmpleados.map((c) => {
+      {isEmpleadoView ? filteredEmpleados.map((c) => {
         // Usar el color de la categoría principal, o un gradiente morado por defecto
         const mainColor = c.categoria_principal?.color || '#8B5CF6';
         const zona = zonas.find(z => z.id === c.zona_id);
@@ -753,7 +1086,7 @@ export default function Empleados() {
                       boxShadow: `0 4px 14px ${mainColor}40`,
                     }}
                   >
-                    <User className="h-6 w-6 text-white" />
+                    <UserIcon className="h-6 w-6 text-white" />
                   </div>
                   <div className="ml-4">
                     <p className="font-semibold text-lg" style={{ color: theme.text }}>
@@ -831,6 +1164,49 @@ export default function Empleados() {
               </div>
             </div>
           </div>
+        );
+      }) : filteredUsuarios.map((u) => {
+        const Icon = vistaRol === 'admin' ? Shield : ShieldCheck;
+        const bg = vistaRol === 'admin' ? 'bg-purple-500' : 'bg-yellow-500';
+        return (
+          <ABMCard key={u.id} onClick={() => openUserSheet(u)}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center`}>
+                  <Icon className="h-5 w-5 text-white" />
+                </div>
+                <div className="ml-3">
+                  <p className="font-medium">{u.nombre} {u.apellido}</p>
+                  <p className="text-sm flex items-center" style={{ color: theme.textSecondary }}>
+                    <Mail className="h-3 w-3 mr-1" />
+                    {u.email}
+                  </p>
+                </div>
+              </div>
+              <ABMBadge active={u.activo} />
+            </div>
+
+            <div className="mt-3 space-y-1">
+              {u.telefono && (
+                <p className="text-sm flex items-center" style={{ color: theme.textSecondary }}>
+                  <Phone className="h-3 w-3 mr-1" />
+                  {u.telefono}
+                </p>
+              )}
+              {u.dni && (
+                <p className="text-sm" style={{ color: theme.textSecondary }}>
+                  DNI: {u.dni}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
+              <ABMCardActions
+                onEdit={() => openUserSheet(u)}
+                onDelete={() => handleUserDelete(u.id)}
+              />
+            </div>
+          </ABMCard>
         );
       })}
     </ABMPage>

@@ -296,8 +296,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // Cargar trámites con filtros (resetea la lista)
   const loadTramites = async (tipo?: number | null, estado?: string, search?: string, tramiteId?: number | null) => {
     try {
+      // En vista guiada (inbox) traemos todos los pendientes de un saque
+      // para que el algoritmo de densidad agrupe bien. En vista clásica
+      // mantenemos paginación tradicional.
+      const limitEfectivo = vistaInbox ? 500 : LIMIT;
       const params: Record<string, unknown> = {
-        limit: LIMIT,
+        limit: limitEfectivo,
         skip: 0,
       };
       // Usar parámetros explícitos o valores actuales del state
@@ -316,8 +320,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
       const res = await tramitesApi.getGestionSolicitudes(params as any);
       setTramites(res.data);
-      setSkip(LIMIT);
-      setHasMore(res.data.length >= LIMIT);
+      setSkip(limitEfectivo);
+      setHasMore(!vistaInbox && res.data.length >= LIMIT);
     } catch (error) {
       console.error('[GestionTramites] Error cargando trámites:', error);
     } finally {
@@ -1497,7 +1501,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return { urgentes, fosiles, nuevos, enCurso, esperando };
   }, [tramites]);
 
-  const renderInboxCard = (t: Solicitud, opts?: { urgente?: boolean }) => {
+  const renderInboxCard = (
+    t: Solicitud,
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row' },
+  ) => {
     const cat = t.tramite?.categoria_tramite;
     const color = cat?.color || theme.primary;
     const ahora = Date.now();
@@ -1517,6 +1524,14 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       const d = Math.floor((ahora - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
       tiempoLabel = d === 0 ? 'Hoy' : d === 1 ? 'Ayer' : `Hace ${d} días`;
     }
+    // Antigüedad de la solicitud (independiente del vencimiento)
+    let creadoLabel: string | undefined;
+    if (t.created_at) {
+      const d = Math.floor((ahora - new Date(t.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      if (d <= 0) creadoLabel = 'Hoy';
+      else if (d === 1) creadoLabel = 'Ayer';
+      else creadoLabel = `Hace ${d}d`;
+    }
     const badges: Array<{ label: string; color: string }> = [];
     const estado = (t.estado || '').toLowerCase();
     if (estado === 'pendiente_pago') badges.push({ label: 'Pago pendiente', color: '#f59e0b' });
@@ -1530,12 +1545,14 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         subtitulo={t.asunto || undefined}
         solicitante={solicitanteNombre}
         tiempoLabel={tiempoLabel}
+        creadoLabel={creadoLabel}
         color={color}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
         onClick={() => openTramite(t)}
         urgente={opts?.urgente}
+        density={opts?.density}
       />
     );
   };
@@ -1564,7 +1581,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           icono: <AlertCircle className="w-5 h-5" />,
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
-          items: inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true })),
+          count: inboxData.urgentes.length,
+          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density })),
         },
         {
           id: 'nuevos',
@@ -1573,7 +1591,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           icono: <Inbox className="w-5 h-5" />,
           color: '#3b82f6',
           emptyMessage: '🎉 No hay trámites nuevos sin tomar.',
-          items: inboxData.nuevos.map((t) => renderInboxCard(t)),
+          count: inboxData.nuevos.length,
+          items: (density) => inboxData.nuevos.map((t) => renderInboxCard(t, { density })),
         },
         {
           id: 'en-curso',
@@ -1582,7 +1601,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           icono: <PlayCircle className="w-5 h-5" />,
           color: '#f59e0b',
           emptyMessage: 'Nada en curso ahora mismo.',
-          items: inboxData.enCurso.map((t) => renderInboxCard(t)),
+          count: inboxData.enCurso.length,
+          items: (density) => inboxData.enCurso.map((t) => renderInboxCard(t, { density })),
           colapsable: inboxData.enCurso.length > 6,
         },
         {
@@ -1592,7 +1612,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           icono: <PauseCircle className="w-5 h-5" />,
           color: '#8b5cf6',
           emptyMessage: 'Sin trámites esperando.',
-          items: inboxData.esperando.map((t) => renderInboxCard(t)),
+          count: inboxData.esperando.length,
+          items: (density) => inboxData.esperando.map((t) => renderInboxCard(t, { density })),
           colapsable: true,
         },
         {
@@ -1602,7 +1623,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           icono: <Calendar className="w-5 h-5" />,
           color: '#71717a',
           emptyMessage: 'No hay trámites viejos sin atender.',
-          items: inboxData.fosiles.map((t) => renderInboxCard(t)),
+          count: inboxData.fosiles.length,
+          items: (density) => inboxData.fosiles.map((t) => renderInboxCard(t, { density })),
           colapsable: true,
         },
       ]}
@@ -1614,6 +1636,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     const nuevo = !vistaInbox;
     setVistaInbox(nuevo);
     try { localStorage.setItem('tramites_vista_inbox', nuevo ? '1' : '0'); } catch { /* ignore */ }
+    // El limit cambia según la vista (inbox=500, clásica=30) — recargar.
+    setTimeout(() => loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite), 0);
   };
 
   return (

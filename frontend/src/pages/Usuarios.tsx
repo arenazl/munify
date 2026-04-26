@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Edit, Trash2, User as UserIcon, Shield, Mail, Phone, Users } from 'lucide-react';
+import { Edit, Trash2, User as UserIcon, Mail, Phone, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { usersApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
-import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMSelect, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
-import type { User, RolUsuario } from '../types';
+import { ABMPage, ABMCard, ABMBadge, ABMSheetFooter, ABMInput, ABMTable, ABMTableAction, ABMCardActions } from '../components/ui/ABMPage';
+import type { User } from '../types';
 
 export default function Usuarios() {
   const { theme } = useTheme();
@@ -12,7 +12,6 @@ export default function Usuarios() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
-  const [filterRol, setFilterRol] = useState<RolUsuario | ''>('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedUsuario, setSelectedUsuario] = useState<User | null>(null);
   const [formData, setFormData] = useState({
@@ -23,7 +22,6 @@ export default function Usuarios() {
     telefono: '',
     dni: '',
     direccion: '',
-    rol: 'vecino' as RolUsuario
   });
 
   useEffect(() => {
@@ -33,7 +31,8 @@ export default function Usuarios() {
   const fetchData = async () => {
     try {
       const response = await usersApi.getAll();
-      setUsuarios(response.data);
+      const soloVecinos = (response.data || []).filter((u: User) => u.rol === 'vecino');
+      setUsuarios(soloVecinos);
     } catch (error) {
       toast.error('Error al cargar datos');
       console.error('Error:', error);
@@ -52,7 +51,6 @@ export default function Usuarios() {
         telefono: usuario.telefono || '',
         dni: usuario.dni || '',
         direccion: usuario.direccion || '',
-        rol: usuario.rol
       });
       setSelectedUsuario(usuario);
     } else {
@@ -64,7 +62,6 @@ export default function Usuarios() {
         telefono: '',
         dni: '',
         direccion: '',
-        rol: 'vecino'
       });
       setSelectedUsuario(null);
     }
@@ -86,7 +83,7 @@ export default function Usuarios() {
       telefono: formData.telefono || null,
       dni: formData.dni || null,
       direccion: formData.direccion || null,
-      rol: formData.rol
+      rol: 'vecino',
     };
 
     if (!selectedUsuario && formData.password) {
@@ -96,15 +93,15 @@ export default function Usuarios() {
     try {
       if (selectedUsuario) {
         await usersApi.update(selectedUsuario.id, payload);
-        toast.success('Usuario actualizado correctamente');
+        toast.success('Vecino actualizado correctamente');
       } else {
         await usersApi.create(payload);
-        toast.success('Usuario creado correctamente');
+        toast.success('Vecino creado correctamente');
       }
       fetchData();
       closeSheet();
     } catch (error) {
-      toast.error('Error al guardar el usuario');
+      toast.error('Error al guardar el vecino');
       console.error('Error:', error);
     } finally {
       setSaving(false);
@@ -114,43 +111,33 @@ export default function Usuarios() {
   const handleDelete = async (id: number) => {
     try {
       await usersApi.delete(id);
-      toast.success('Usuario desactivado');
+      toast.success('Vecino desactivado');
       fetchData();
     } catch (error) {
-      toast.error('Error al desactivar el usuario');
+      toast.error('Error al desactivar el vecino');
       console.error('Error:', error);
     }
   };
 
-  const rolColors: Record<RolUsuario, string> = {
-    vecino: 'bg-gray-500',
-    supervisor: 'bg-yellow-500',
-    admin: 'bg-purple-500',
-  };
-
   const filteredUsuarios = usuarios.filter(u => {
-    const matchSearch =
-      u.nombre.toLowerCase().includes(search.toLowerCase()) ||
-      u.apellido.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase()) ||
-      u.dni?.toLowerCase().includes(search.toLowerCase());
-    const matchRol = !filterRol || u.rol === filterRol;
-    return matchSearch && matchRol;
+    const q = search.toLowerCase();
+    return (
+      u.nombre.toLowerCase().includes(q) ||
+      u.apellido.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      u.dni?.toLowerCase().includes(q)
+    );
   });
 
   const tableColumns = [
     {
       key: 'nombre',
-      header: 'Usuario',
+      header: 'Vecino',
       sortValue: (u: User) => `${u.nombre} ${u.apellido}`,
       render: (u: User) => (
         <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-full ${rolColors[u.rol]} flex items-center justify-center`}>
-            {u.rol === 'admin' ? (
-              <Shield className="h-4 w-4 text-white" />
-            ) : (
-              <UserIcon className="h-4 w-4 text-white" />
-            )}
+          <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center">
+            <UserIcon className="h-4 w-4 text-white" />
           </div>
           <div>
             <span className="font-medium">{u.nombre} {u.apellido}</span>
@@ -191,16 +178,6 @@ export default function Usuarios() {
       render: (u: User) => u.dni || '-',
     },
     {
-      key: 'rol',
-      header: 'Rol',
-      sortValue: (u: User) => u.rol,
-      render: (u: User) => (
-        <span className={`px-2 py-1 text-xs rounded-full text-white capitalize ${rolColors[u.rol]}`}>
-          {u.rol}
-        </span>
-      ),
-    },
-    {
       key: 'activo',
       header: 'Estado',
       sortValue: (u: User) => u.activo,
@@ -210,20 +187,20 @@ export default function Usuarios() {
 
   return (
     <ABMPage
-      title="Usuarios"
+      title="Vecinos"
       icon={<Users className="h-5 w-5" />}
       backLink="/gestion/ajustes"
-      buttonLabel="Nuevo Usuario"
+      buttonLabel="Nuevo Vecino"
       onAdd={() => openSheet()}
-      searchPlaceholder="Buscar usuarios..."
+      searchPlaceholder="Buscar vecinos..."
       searchValue={search}
       onSearchChange={setSearch}
       loading={loading}
       isEmpty={filteredUsuarios.length === 0}
-      emptyMessage="No se encontraron usuarios"
+      emptyMessage="No se encontraron vecinos en el padrón"
       sheetOpen={sheetOpen}
-      sheetTitle={selectedUsuario ? 'Editar Usuario' : 'Nuevo Usuario'}
-      sheetDescription={selectedUsuario ? 'Modifica los datos del usuario' : 'Completa los datos para crear un nuevo usuario'}
+      sheetTitle={selectedUsuario ? 'Editar Vecino' : 'Nuevo Vecino'}
+      sheetDescription={selectedUsuario ? 'Modifica los datos del vecino' : 'Completa los datos para registrar un nuevo vecino'}
       onSheetClose={closeSheet}
       tableView={
         <ABMTable
@@ -247,23 +224,6 @@ export default function Usuarios() {
             </>
           )}
         />
-      }
-      extraFilters={
-        <select
-          value={filterRol}
-          onChange={(e) => setFilterRol(e.target.value as RolUsuario | '')}
-          className="rounded-lg px-3 py-2 focus:ring-2 focus:outline-none"
-          style={{
-            backgroundColor: theme.card,
-            color: theme.text,
-            border: `1px solid ${theme.border}`
-          }}
-        >
-          <option value="">Todos los roles</option>
-          <option value="vecino">Vecino</option>
-          <option value="supervisor">Supervisor</option>
-          <option value="admin">Admin</option>
-        </select>
       }
       sheetFooter={
         <ABMSheetFooter
@@ -333,17 +293,6 @@ export default function Usuarios() {
             onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
             placeholder="Dirección"
           />
-
-          <ABMSelect
-            label="Rol"
-            value={formData.rol}
-            onChange={(e) => setFormData({ ...formData, rol: e.target.value as RolUsuario })}
-            options={[
-              { value: 'vecino', label: 'Vecino' },
-              { value: 'supervisor', label: 'Supervisor' },
-              { value: 'admin', label: 'Admin' }
-            ]}
-          />
         </form>
       }
     >
@@ -351,12 +300,8 @@ export default function Usuarios() {
         <ABMCard key={u.id} onClick={() => openSheet(u)}>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className={`w-10 h-10 rounded-full ${rolColors[u.rol]} flex items-center justify-center`}>
-                {u.rol === 'admin' ? (
-                  <Shield className="h-5 w-5 text-white" />
-                ) : (
-                  <UserIcon className="h-5 w-5 text-white" />
-                )}
+              <div className="w-10 h-10 rounded-full bg-gray-500 flex items-center justify-center">
+                <UserIcon className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3">
                 <p className="font-medium">{u.nombre} {u.apellido}</p>
@@ -383,10 +328,7 @@ export default function Usuarios() {
             )}
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
-            <span className={`px-2 py-1 text-xs rounded-full text-white capitalize ${rolColors[u.rol]}`}>
-              {u.rol}
-            </span>
+          <div className="flex items-center justify-end mt-4 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <ABMCardActions
               onEdit={() => openSheet(u)}
               onDelete={() => handleDelete(u.id)}

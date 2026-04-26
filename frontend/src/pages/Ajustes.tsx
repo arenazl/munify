@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet
+  CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet, FileDown
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -111,6 +111,15 @@ export default function Ajustes() {
           color: '#8b5cf6',
           link: '/gestion/config-dashboard',
           show: isAdminOrSupervisor
+        },
+        {
+          id: 'exportar',
+          label: 'Exportar',
+          description: 'Exportar informes CSV de reclamos, trámites y métricas',
+          icon: FileDown,
+          color: '#10b981',
+          link: '/gestion/exportar',
+          show: isAdminOrSupervisor
         }
       ]
     },
@@ -150,8 +159,8 @@ export default function Ajustes() {
       items: [
         {
           id: 'usuarios',
-          label: 'Usuarios',
-          description: 'Vecinos, supervisores y administradores',
+          label: 'Vecinos',
+          description: 'Padrón de vecinos del municipio',
           icon: Users,
           color: '#3b82f6',
           link: '/gestion/usuarios',
@@ -160,7 +169,7 @@ export default function Ajustes() {
         {
           id: 'empleados',
           label: 'Empleados',
-          description: 'Equipos de trabajo y especialidades',
+          description: 'Administradores, supervisores y empleados',
           icon: Wrench,
           color: '#f59e0b',
           link: '/gestion/empleados',

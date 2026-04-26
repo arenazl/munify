@@ -1,27 +1,75 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
-import { X, MapPin, Calendar, User, Tag, Clock, Navigation, Map as MapIcon } from 'lucide-react';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Tooltip,
+  useMap,
+  Polygon,
+  Rectangle,
+  CircleMarker,
+} from 'react-leaflet';
+import {
+  X,
+  MapPin,
+  Calendar,
+  User,
+  Tag,
+  Clock,
+  Navigation,
+  Map as MapIcon,
+  Flame,
+  Layers,
+  Square,
+  Play,
+  Pause,
+  RotateCcw,
+  FileDown,
+  Building2,
+} from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-
-// URLs de tiles para tema claro y oscuro
-// light: Voyager (detalle de calles + nombres). dark: dark_matter (base negra con labels legibles).
-const TILE_URLS = {
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-};
 import { reclamosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import PageHint from '../components/ui/PageHint';
 import { Reclamo } from '../types';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.heat';
+import jsPDF from 'jspdf';
+
+import {
+  recurrentHotspots,
+  convexHull,
+  reclamosInBBox,
+  isResuelto,
+  computeKPIs,
+  topZonas,
+  Hotspot,
+  BBox,
+} from '../lib/mapaUtils';
+import MapaStats from '../components/mapa/MapaStats';
 
 // Fix para el icono de Leaflet en Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Tipo para leaflet.heat (no exporta tipos)
+declare module 'leaflet' {
+  function heatLayer(
+    latlngs: Array<[number, number, number?]>,
+    options?: {
+      minOpacity?: number;
+      maxZoom?: number;
+      max?: number;
+      radius?: number;
+      blur?: number;
+      gradient?: { [key: number]: string };
+    }
+  ): L.Layer;
+}
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -30,9 +78,16 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Crear iconos de pin con color por estado
-const createPinIcon = (color: string) => {
-  return L.divIcon({
+const TILE_URLS = {
+  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+};
+
+// =====================================================================
+// Pin con color por estado
+// =====================================================================
+const createPinIcon = (color: string) =>
+  L.divIcon({
     className: 'custom-pin-marker',
     html: `
       <div style="position: relative; width: 30px; height: 42px;">
@@ -46,28 +101,33 @@ const createPinIcon = (color: string) => {
     iconAnchor: [15, 42],
     popupAnchor: [0, -42],
   });
-};
 
-// Colores consistentes con Reclamos.tsx
 const STATUS_COLORS: Record<string, string> = {
   nuevo: '#6366f1',
+  recibido: '#6366f1',
   asignado: '#3b82f6',
   en_curso: '#f59e0b',
+  en_proceso: '#f59e0b',
+  pospuesto: '#a855f7',
   pendiente_confirmacion: '#8b5cf6',
+  finalizado: '#10b981',
   resuelto: '#10b981',
   rechazado: '#ef4444',
 };
 
 const STATUS_LABELS: Record<string, string> = {
   nuevo: 'Nuevo',
+  recibido: 'Recibido',
   asignado: 'Asignado',
-  en_curso: 'En Proceso',
+  en_curso: 'En Curso',
+  en_proceso: 'En Proceso',
+  pospuesto: 'Pospuesto',
   pendiente_confirmacion: 'Pend. Confirm.',
+  finalizado: 'Finalizado',
   resuelto: 'Resuelto',
   rechazado: 'Rechazado',
 };
 
-// Categorías con colores (sincronizado con HeatmapWidget)
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
   baches: { label: 'Baches', color: '#ef4444' },
   iluminacion: { label: 'Iluminación', color: '#f59e0b' },
@@ -86,7 +146,6 @@ const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
   otros: { label: 'Otros', color: '#64748b' },
 };
 
-// Mapear categoría real a key de filtro
 function getCategoryKey(categoria: string): string {
   const cat = categoria.toLowerCase();
   if (cat.includes('bache') || cat.includes('calzada')) return 'baches';
@@ -106,37 +165,223 @@ function getCategoryKey(categoria: string): string {
   return 'otros';
 }
 
-// Componente para ajustar el mapa a los bounds de los markers
-function FitBoundsToMarkers({ reclamos }: { reclamos: Reclamo[] }) {
+// =====================================================================
+// Componentes auxiliares dentro del mapa
+// =====================================================================
+function FitBoundsToMarkers({ reclamos, signal }: { reclamos: Reclamo[]; signal: number }) {
   const map = useMap();
+  const lastSignal = useRef(-1);
 
   useEffect(() => {
+    if (signal === lastSignal.current) return;
+    lastSignal.current = signal;
     if (reclamos.length === 0) return;
-
-    // Pequeño delay para asegurar que el mapa esté listo
     const timer = setTimeout(() => {
-      const validReclamos = reclamos.filter(r => r.latitud && r.longitud);
-
-      if (validReclamos.length === 0) return;
-
+      const valid = reclamos.filter(r => r.latitud != null && r.longitud != null);
+      if (valid.length === 0) return;
       map.invalidateSize();
-
-      if (validReclamos.length === 1) {
-        // Si hay solo un marker, centrar en él
-        map.setView([validReclamos[0].latitud!, validReclamos[0].longitud!], 15);
+      if (valid.length === 1) {
+        map.setView([valid[0].latitud!, valid[0].longitud!], 15);
       } else {
-        // Si hay múltiples markers, ajustar bounds para verlos todos
-        const latlngs = validReclamos.map(r => L.latLng(r.latitud!, r.longitud!));
-        const bounds = L.latLngBounds(latlngs);
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+        const latlngs = valid.map(r => L.latLng(r.latitud!, r.longitud!));
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 15 });
       }
     }, 100);
-
     return () => clearTimeout(timer);
+  }, [reclamos, map, signal]);
+
+  return null;
+}
+
+function HeatLayer({ reclamos }: { reclamos: Reclamo[] }) {
+  const map = useMap();
+  const layerRef = useRef<L.Layer | null>(null);
+
+  useEffect(() => {
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current);
+      layerRef.current = null;
+    }
+    const points = reclamos
+      .filter(r => r.latitud != null && r.longitud != null)
+      .map(r => [r.latitud!, r.longitud!, 1] as [number, number, number]);
+    if (points.length === 0) return;
+    const heat = L.heatLayer(points, {
+      radius: 28,
+      blur: 22,
+      maxZoom: 17,
+      max: 3,
+      minOpacity: 0.45,
+      gradient: {
+        0.0: '#1e3a8a',
+        0.2: '#3b82f6',
+        0.4: '#22c55e',
+        0.6: '#eab308',
+        0.8: '#f97316',
+        1.0: '#ef4444',
+      },
+    });
+    heat.addTo(map);
+    layerRef.current = heat;
+    return () => {
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+    };
   }, [reclamos, map]);
 
   return null;
 }
+
+function HotspotLayer({ hotspots }: { hotspots: Hotspot[] }) {
+  return (
+    <>
+      {hotspots.map((h, idx) => (
+        <CircleMarker
+          key={`hotspot-${idx}-${h.centerLat}`}
+          center={[h.centerLat, h.centerLng]}
+          radius={Math.min(8 + h.recientes * 2, 22)}
+          pathOptions={{
+            color: '#ef4444',
+            weight: 2,
+            fillColor: '#ef4444',
+            fillOpacity: 0.25,
+            className: 'hotspot-pulse',
+          }}
+        >
+          <Tooltip direction="top" permanent={false}>
+            <div className="text-xs">
+              <p className="font-bold text-red-600">🔥 Hotspot recurrente</p>
+              <p>{h.recientes} reclamos en 90 días</p>
+              {h.topDireccion && <p className="text-gray-600">{h.topDireccion}</p>}
+            </div>
+          </Tooltip>
+        </CircleMarker>
+      ))}
+    </>
+  );
+}
+
+function CoveragePolygon({ points, color }: { points: Array<[number, number]>; color: string }) {
+  const hull = useMemo(() => convexHull(points), [points]);
+  if (hull.length < 3) return null;
+  return (
+    <Polygon
+      positions={hull}
+      pathOptions={{
+        color,
+        weight: 2,
+        opacity: 0.8,
+        fillColor: color,
+        fillOpacity: 0.12,
+        dashArray: '6 4',
+      }}
+    />
+  );
+}
+
+interface DrawHandlerProps {
+  active: boolean;
+  onComplete: (bbox: BBox) => void;
+  onCancel: () => void;
+}
+
+function DrawHandler({ active, onComplete, onCancel }: DrawHandlerProps) {
+  const map = useMap();
+  const startRef = useRef<L.LatLng | null>(null);
+  const previewRef = useRef<L.Rectangle | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      // Restaurar mapa
+      map.dragging.enable();
+      map.boxZoom.disable();
+      map.getContainer().style.cursor = '';
+      if (previewRef.current) {
+        map.removeLayer(previewRef.current);
+        previewRef.current = null;
+      }
+      startRef.current = null;
+      return;
+    }
+    map.dragging.disable();
+    map.getContainer().style.cursor = 'crosshair';
+
+    const onDown = (e: L.LeafletMouseEvent) => {
+      startRef.current = e.latlng;
+      if (previewRef.current) {
+        map.removeLayer(previewRef.current);
+        previewRef.current = null;
+      }
+    };
+    const onMove = (e: L.LeafletMouseEvent) => {
+      if (!startRef.current) return;
+      const bounds = L.latLngBounds(startRef.current, e.latlng);
+      if (previewRef.current) {
+        previewRef.current.setBounds(bounds);
+      } else {
+        previewRef.current = L.rectangle(bounds, {
+          color: '#3b82f6',
+          weight: 2,
+          fillOpacity: 0.1,
+          dashArray: '4 4',
+        }).addTo(map);
+      }
+    };
+    const onUp = (e: L.LeafletMouseEvent) => {
+      if (!startRef.current) return;
+      const bounds = L.latLngBounds(startRef.current, e.latlng);
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      if (Math.abs(sw.lat - ne.lat) < 0.0005 || Math.abs(sw.lng - ne.lng) < 0.0005) {
+        // Click sin drag — cancelar
+        if (previewRef.current) {
+          map.removeLayer(previewRef.current);
+          previewRef.current = null;
+        }
+        startRef.current = null;
+        onCancel();
+        return;
+      }
+      onComplete({
+        minLat: sw.lat,
+        maxLat: ne.lat,
+        minLng: sw.lng,
+        maxLng: ne.lng,
+      });
+      startRef.current = null;
+    };
+
+    map.on('mousedown', onDown);
+    map.on('mousemove', onMove);
+    map.on('mouseup', onUp);
+
+    return () => {
+      map.off('mousedown', onDown);
+      map.off('mousemove', onMove);
+      map.off('mouseup', onUp);
+    };
+  }, [active, map, onComplete, onCancel]);
+
+  return null;
+}
+
+// Recentrar el mapa programáticamente
+function MapController({ target }: { target: { lat: number; lng: number; zoom?: number } | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!target) return;
+    map.flyTo([target.lat, target.lng], target.zoom ?? 16, { duration: 0.6 });
+  }, [target, map]);
+  return null;
+}
+
+// =====================================================================
+// Componente principal
+// =====================================================================
+type ViewMode = 'pins' | 'heat' | 'both';
+type TimePreset = '7' | '30' | '90' | '365' | 'all';
 
 export default function Mapa() {
   const { theme } = useTheme();
@@ -156,11 +401,34 @@ export default function Mapa() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selected, setSelected] = useState<Reclamo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Filtros de estado - null = todos, string = solo ese estado
-  const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
-  // Filtro de categoría desde URL
-  const filtroCategoria = searchParams.get('categoria');
 
+  // Filtros
+  const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
+  const filtroCategoria = searchParams.get('categoria');
+  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
+  const [timePreset, setTimePreset] = useState<TimePreset>('all');
+
+  // Vistas
+  const [viewMode, setViewMode] = useState<ViewMode>('pins');
+  const [showHotspots, setShowHotspots] = useState(true);
+  const [showCoverage, setShowCoverage] = useState(true);
+
+  // Time-lapse
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [animationDay, setAnimationDay] = useState<number>(0); // offset desde la fecha más vieja
+  const animationRef = useRef<number | null>(null);
+
+  // Dibujo
+  const [drawMode, setDrawMode] = useState(false);
+  const [drawnBBox, setDrawnBBox] = useState<BBox | null>(null);
+
+  // Recentrado programático
+  const [mapTarget, setMapTarget] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [fitSignal, setFitSignal] = useState(0);
+
+  // =================================================================
+  // Carga de datos en lotes
+  // =================================================================
   useEffect(() => {
     const fetchReclamosEnLotes = async () => {
       try {
@@ -170,52 +438,28 @@ export default function Mapa() {
         let hasMore = true;
         let isFirstBatch = true;
 
-        // Cargar en lotes hasta que no haya más
         while (hasMore) {
-          if (!isFirstBatch) {
-            setLoadingMore(true);
-          }
-
+          if (!isFirstBatch) setLoadingMore(true);
           const response = await reclamosApi.getAll({ skip, limit: BATCH_SIZE });
           const batch = response.data || [];
-
-          // Filtrar solo los que tienen ubicación
           const conUbicacion = batch.filter((r: Reclamo) => r.latitud && r.longitud);
           allReclamos = [...allReclamos, ...conUbicacion];
 
-          // Eliminar duplicados por ID (puede haber en la base de datos)
           const idsVistos = new Set<number>();
           const sinDuplicados = allReclamos.filter(r => {
             if (idsVistos.has(r.id)) return false;
             idsVistos.add(r.id);
             return true;
           });
-
-          // Actualizar estado parcialmente para mostrar progreso
           setReclamos(sinDuplicados);
 
-          // Después del primer lote, quitar loading principal para mostrar el mapa
           if (isFirstBatch) {
             setLoading(false);
             isFirstBatch = false;
           }
-
-          // Si trajo menos del límite, ya no hay más
-          if (batch.length < BATCH_SIZE) {
-            hasMore = false;
-          } else {
-            skip += BATCH_SIZE;
-          }
+          if (batch.length < BATCH_SIZE) hasMore = false;
+          else skip += BATCH_SIZE;
         }
-
-        // Obtener cantidad final sin duplicados
-        const idsFinales = new Set<number>();
-        const totalSinDuplicados = allReclamos.filter(r => {
-          if (idsFinales.has(r.id)) return false;
-          idsFinales.add(r.id);
-          return true;
-        }).length;
-        console.log(`[Mapa] Cargados ${totalSinDuplicados} reclamos con ubicación (sin duplicados)`);
       } catch (error) {
         console.error('Error cargando reclamos:', error);
         setLoading(false);
@@ -226,157 +470,639 @@ export default function Mapa() {
     fetchReclamosEnLotes();
   }, []);
 
-  // Calcular centro del mapa basado en reclamos
-  const getMapCenter = (): [number, number] => {
-    if (reclamos.length === 0) return [-34.6037, -58.3816]; // Buenos Aires default
-    const lat = reclamos.reduce((sum, r) => sum + (r.latitud || 0), 0) / reclamos.length;
-    const lng = reclamos.reduce((sum, r) => sum + (r.longitud || 0), 0) / reclamos.length;
-    return [lat, lng];
-  };
+  // =================================================================
+  // Universos derivados
+  // =================================================================
+  // Lista de dependencias presentes en los datos
+  const dependenciasDisponibles = useMemo(() => {
+    const map = new Map<number, { id: number; nombre: string; color: string; count: number }>();
+    for (const r of reclamos) {
+      const d = r.dependencia_asignada;
+      if (!d) continue;
+      const id = d.id;
+      const existing = map.get(id);
+      if (existing) existing.count += 1;
+      else
+        map.set(id, {
+          id,
+          nombre: d.nombre || `Dependencia #${id}`,
+          color: d.color || '#6366f1',
+          count: 1,
+        });
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [reclamos]);
 
-  const handleMarkerClick = (reclamo: Reclamo) => {
-    setSelected(reclamo);
+  // Rango temporal del dataset
+  const dateRange = useMemo(() => {
+    if (reclamos.length === 0) return null;
+    const ts = reclamos.map(r => new Date(r.created_at).getTime());
+    return { min: Math.min(...ts), max: Math.max(...ts) };
+  }, [reclamos]);
+
+  // =================================================================
+  // Pipeline de filtros
+  // =================================================================
+  // 1) Categoría
+  const reclamosPorCategoria = useMemo(() => {
+    if (!filtroCategoria) return reclamos;
+    return reclamos.filter(r => getCategoryKey(r.categoria?.nombre || 'Otros') === filtroCategoria);
+  }, [reclamos, filtroCategoria]);
+
+  // 2) Dependencia
+  const reclamosPorDependencia = useMemo(() => {
+    if (filtroDependencia == null) return reclamosPorCategoria;
+    return reclamosPorCategoria.filter(r => r.dependencia_asignada?.id === filtroDependencia);
+  }, [reclamosPorCategoria, filtroDependencia]);
+
+  // 3) Tiempo (preset o animación)
+  const reclamosPorTiempo = useMemo(() => {
+    if (isPlaying && dateRange) {
+      // Ventana móvil de 30 días desde animationDay
+      const winStart = dateRange.min + animationDay * 24 * 60 * 60 * 1000;
+      const winEnd = winStart + 30 * 24 * 60 * 60 * 1000;
+      return reclamosPorDependencia.filter(r => {
+        const t = new Date(r.created_at).getTime();
+        return t >= winStart && t <= winEnd;
+      });
+    }
+    if (timePreset === 'all') return reclamosPorDependencia;
+    const days = parseInt(timePreset, 10);
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    return reclamosPorDependencia.filter(r => new Date(r.created_at).getTime() >= cutoff);
+  }, [reclamosPorDependencia, timePreset, isPlaying, animationDay, dateRange]);
+
+  // 4) Estado
+  const reclamosPostEstado = useMemo(() => {
+    if (!filtroEstado) return reclamosPorTiempo;
+    return reclamosPorTiempo.filter(r => r.estado === filtroEstado);
+  }, [reclamosPorTiempo, filtroEstado]);
+
+  // 5) BBox dibujada (solo afecta lo que se muestra en stats popup, no en mapa)
+  const reclamosFiltrados = reclamosPostEstado;
+  const reclamosEnBBox = useMemo(
+    () => (drawnBBox ? reclamosInBBox(reclamosFiltrados, drawnBBox) : []),
+    [drawnBBox, reclamosFiltrados],
+  );
+
+  // Counts
+  const conteosPorCategoria = useMemo(() => {
+    return reclamos.reduce((acc, r) => {
+      const key = getCategoryKey(r.categoria?.nombre || 'Otros');
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [reclamos]);
+
+  const conteosPorEstado = useMemo(() => {
+    return reclamosPorTiempo.reduce((acc, r) => {
+      acc[r.estado] = (acc[r.estado] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+  }, [reclamosPorTiempo]);
+
+  // Hotspots (sobre los reclamos filtrados)
+  const hotspots = useMemo(() => {
+    if (!showHotspots) return [];
+    return recurrentHotspots(reclamosFiltrados, { radiusMeters: 80, minPoints: 3, daysBack: 90 });
+  }, [reclamosFiltrados, showHotspots]);
+
+  // Puntos para coverage por dependencia (sobre todos los reclamos de esa dependencia, sin filtro de tiempo)
+  const coveragePoints = useMemo(() => {
+    if (filtroDependencia == null || !showCoverage) return [];
+    return reclamos
+      .filter(r => r.dependencia_asignada?.id === filtroDependencia)
+      .filter(r => r.latitud != null && r.longitud != null)
+      .map(r => [r.latitud!, r.longitud!] as [number, number]);
+  }, [reclamos, filtroDependencia, showCoverage]);
+
+  const coverageColor = useMemo(() => {
+    if (filtroDependencia == null) return '#6366f1';
+    return dependenciasDisponibles.find(d => d.id === filtroDependencia)?.color || '#6366f1';
+  }, [filtroDependencia, dependenciasDisponibles]);
+
+  // =================================================================
+  // Time-lapse animation loop
+  // =================================================================
+  useEffect(() => {
+    if (!isPlaying || !dateRange) return;
+    const totalDays = Math.ceil((dateRange.max - dateRange.min) / (24 * 60 * 60 * 1000));
+    const STEP_DAYS = 7;
+    const INTERVAL_MS = 800;
+
+    const tick = () => {
+      setAnimationDay(prev => {
+        const next = prev + STEP_DAYS;
+        if (next > totalDays) {
+          setIsPlaying(false);
+          return totalDays;
+        }
+        return next;
+      });
+    };
+    animationRef.current = window.setInterval(tick, INTERVAL_MS);
+    return () => {
+      if (animationRef.current) window.clearInterval(animationRef.current);
+    };
+  }, [isPlaying, dateRange]);
+
+  const animationDate = useMemo(() => {
+    if (!dateRange) return null;
+    return new Date(dateRange.min + animationDay * 24 * 60 * 60 * 1000);
+  }, [dateRange, animationDay]);
+
+  // =================================================================
+  // Handlers
+  // =================================================================
+  const handleMarkerClick = (r: Reclamo) => {
+    setSelected(r);
     setSidebarOpen(true);
   };
-
   const closeSidebar = () => {
     setSidebarOpen(false);
     setSelected(null);
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('es-AR', {
+  const formatDate = (s: string) =>
+    new Date(s).toLocaleDateString('es-AR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
+
+  const toggleFiltroEstado = (e: string) => setFiltroEstado(prev => (prev === e ? null : e));
+  const toggleCategoria = (key: string) => {
+    if (filtroCategoria === key) setSearchParams({});
+    else setSearchParams({ categoria: key });
+    setFiltroEstado(null);
+  };
+  const toggleDependencia = (id: number) => {
+    setFiltroDependencia(prev => (prev === id ? null : id));
   };
 
-  // Primero filtrar por categoría si viene de la URL
-  // IMPORTANTE: Los hooks deben estar ANTES de cualquier early return
-  const reclamosPorCategoria = useMemo(() => {
-    if (!filtroCategoria) return reclamos;
-    return reclamos.filter(r => {
-      const catKey = getCategoryKey(r.categoria?.nombre || 'Otros');
-      return catKey === filtroCategoria;
-    });
-  }, [reclamos, filtroCategoria]);
+  const startPlay = () => {
+    if (!dateRange) return;
+    setAnimationDay(0);
+    setIsPlaying(true);
+  };
+  const pausePlay = () => setIsPlaying(false);
+  const resetPlay = () => {
+    setIsPlaying(false);
+    setAnimationDay(0);
+  };
 
-  // Contar reclamos por estado (sobre los ya filtrados por categoría)
-  const conteosPorEstado = useMemo(() => {
-    return reclamosPorCategoria.reduce((acc, r) => {
-      acc[r.estado] = (acc[r.estado] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [reclamosPorCategoria]);
+  const handleDrawComplete = useCallback((bbox: BBox) => {
+    setDrawnBBox(bbox);
+    setDrawMode(false);
+  }, []);
+  const handleDrawCancel = useCallback(() => setDrawMode(false), []);
+  const clearDrawnBBox = () => setDrawnBBox(null);
 
-  // Filtrar reclamos según el estado seleccionado (después de filtrar por categoría)
-  const reclamosFiltrados = useMemo(() => {
-    if (filtroEstado) {
-      return reclamosPorCategoria.filter(r => r.estado === filtroEstado);
+  const focusOnZona = (lat: number, lng: number) => {
+    setMapTarget({ lat, lng, zoom: 17 });
+  };
+
+  // =================================================================
+  // Export PDF de zona dibujada
+  // =================================================================
+  const exportZonaPdf = () => {
+    if (!drawnBBox || reclamosEnBBox.length === 0) return;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const kpis = computeKPIs(reclamosEnBBox);
+    const zonas = topZonas(reclamosEnBBox, 5, 150);
+
+    const W = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    let y = margin;
+
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Reporte de Zona — Mapa de Reclamos', margin, y);
+    y += 8;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Generado: ${new Date().toLocaleString('es-AR')}`, margin, y);
+    y += 6;
+    doc.text(
+      `Coordenadas: ${drawnBBox.minLat.toFixed(5)}, ${drawnBBox.minLng.toFixed(5)} → ${drawnBBox.maxLat.toFixed(5)}, ${drawnBBox.maxLng.toFixed(5)}`,
+      margin,
+      y,
+    );
+    y += 10;
+    doc.setTextColor(0);
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Indicadores principales', margin, y);
+    y += 7;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`• Total reclamos en la zona: ${kpis.total}`, margin, y); y += 6;
+    doc.text(`• Resueltos: ${kpis.resueltos} (${kpis.pctResueltos.toFixed(0)}%)`, margin, y); y += 6;
+    doc.text(
+      `• Tiempo medio de resolución: ${kpis.tiempoMedioDias != null ? kpis.tiempoMedioDias.toFixed(1) + ' días' : 's/d'}`,
+      margin,
+      y,
+    ); y += 6;
+    doc.text(`• Abiertos > 30 días: ${kpis.abiertos30dPlus}`, margin, y); y += 10;
+
+    if (zonas.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Top zonas dentro del área', margin, y);
+      y += 7;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      zonas.forEach((z, idx) => {
+        const dir = z.topDireccion || `${z.centerLat.toFixed(4)}, ${z.centerLng.toFixed(4)}`;
+        doc.text(`${idx + 1}. ${dir} — ${z.reclamos.length} reclamos`, margin, y);
+        y += 6;
+      });
+      y += 4;
     }
-    return reclamosPorCategoria;
-  }, [reclamosPorCategoria, filtroEstado]);
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Listado de reclamos', margin, y);
+    y += 7;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    reclamosEnBBox.slice(0, 40).forEach((r, idx) => {
+      if (y > 280) {
+        doc.addPage();
+        y = margin;
+      }
+      const linea = `${idx + 1}. #${r.id} — ${r.titulo} [${STATUS_LABELS[r.estado] || r.estado}] ${r.direccion || ''}`;
+      const split = doc.splitTextToSize(linea, W - margin * 2);
+      doc.text(split, margin, y);
+      y += split.length * 4 + 2;
+    });
+    if (reclamosEnBBox.length > 40) {
+      y += 3;
+      doc.setTextColor(150);
+      doc.text(`...y ${reclamosEnBBox.length - 40} reclamos más.`, margin, y);
+    }
+
+    doc.save(`reporte-zona-${Date.now()}.pdf`);
+  };
+
+  // =================================================================
+  // Universos para pills/centros
+  // =================================================================
+  const getMapCenter = (): [number, number] => {
+    if (reclamos.length === 0) return [-34.6037, -58.3816];
+    const lat = reclamos.reduce((s, r) => s + (r.latitud || 0), 0) / reclamos.length;
+    const lng = reclamos.reduce((s, r) => s + (r.longitud || 0), 0) / reclamos.length;
+    return [lat, lng];
+  };
+
+  const categoriasDisponibles = Object.entries(CATEGORY_CONFIG)
+    .map(([key, cfg]) => ({ key, ...cfg, count: conteosPorCategoria[key] || 0 }))
+    .filter(c => c.count > 0)
+    .sort((a, b) => b.count - a.count);
+
+  // Cuando cambian los filtros principales, refit del mapa (no en cada cambio de viewMode)
+  useEffect(() => {
+    setFitSignal(s => s + 1);
+  }, [filtroCategoria, filtroDependencia, filtroEstado, timePreset]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: theme.primary }}></div>
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-b-2"
+          style={{ borderColor: theme.primary }}
+        ></div>
       </div>
     );
   }
 
-  // Limpiar filtro de categoría
-  const clearCategoriaFilter = () => {
-    setSearchParams({});
-  };
-
-  // Toggle filtro: si ya está seleccionado, deseleccionar (mostrar todos)
-  const toggleFiltro = (estado: string) => {
-    setFiltroEstado(prev => prev === estado ? null : estado);
-  };
-
-  // Panel de filtros por estado
-  const categoryConfig = filtroCategoria ? CATEGORY_CONFIG[filtroCategoria] : null;
-
+  // =================================================================
+  // Filter Panel (4 filas)
+  // =================================================================
   const filterPanel = (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Badge de categoría activa (si hay filtro desde URL) */}
-      {filtroCategoria && categoryConfig && (
+    <div className="flex flex-col gap-2">
+      {/* Fila 1: Categorías */}
+      <div className="flex items-center gap-2 flex-wrap">
         <button
-          onClick={clearCategoriaFilter}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all group"
+          onClick={() => setSearchParams({})}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
           style={{
-            backgroundColor: `${categoryConfig.color}20`,
-            color: categoryConfig.color,
-            border: `1px solid ${categoryConfig.color}`,
+            backgroundColor: filtroCategoria === null ? theme.primary : `${theme.textSecondary}15`,
+            color: filtroCategoria === null ? '#ffffff' : theme.textSecondary,
+            border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
           }}
         >
-          <div
-            className="w-2.5 h-2.5 rounded-full"
-            style={{ backgroundColor: categoryConfig.color }}
-          />
-          <span className="text-xs font-medium">{categoryConfig.label}</span>
-          <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+          <Tag className="h-3 w-3" />
+          <span className="text-xs font-medium">Todas las categorías</span>
+          <span className="text-xs font-bold">({reclamos.length})</span>
         </button>
+        {categoriasDisponibles.map(cat => {
+          const isActive = filtroCategoria === cat.key;
+          return (
+            <button
+              key={cat.key}
+              onClick={() => toggleCategoria(cat.key)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                backgroundColor: isActive ? cat.color : `${cat.color}15`,
+                color: isActive ? '#ffffff' : cat.color,
+                border: `1px solid ${isActive ? cat.color : `${cat.color}40`}`,
+              }}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: isActive ? '#ffffff' : cat.color }}
+              />
+              <span className="text-xs font-medium">{cat.label}</span>
+              <span className="text-xs font-bold">({cat.count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="h-px w-full" style={{ backgroundColor: theme.border }} />
+
+      {/* Fila 2: Estados */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={() => setFiltroEstado(null)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+          style={{
+            backgroundColor: filtroEstado === null ? theme.primary : `${theme.textSecondary}15`,
+            color: filtroEstado === null ? '#ffffff' : theme.textSecondary,
+            border: `1px solid ${filtroEstado === null ? theme.primary : theme.border}`,
+          }}
+        >
+          <span className="text-xs font-medium">Todos los estados</span>
+          <span className="text-xs font-bold">({reclamosPorTiempo.length})</span>
+        </button>
+        {Object.entries(STATUS_COLORS).map(([estado, color]) => {
+          const count = conteosPorEstado[estado] || 0;
+          if (count === 0) return null;
+          const isActive = filtroEstado === estado;
+          return (
+            <button
+              key={estado}
+              onClick={() => toggleFiltroEstado(estado)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                backgroundColor: isActive ? color : `${color}15`,
+                color: isActive ? '#ffffff' : color,
+                border: `1px solid ${isActive ? color : `${color}40`}`,
+              }}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: isActive ? '#ffffff' : color }}
+              />
+              <span className="text-xs font-medium">{STATUS_LABELS[estado] || estado}</span>
+              <span className="text-xs font-bold">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {dependenciasDisponibles.length > 0 && (
+        <>
+          <div className="h-px w-full" style={{ backgroundColor: theme.border }} />
+          {/* Fila 3: Dependencias */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setFiltroDependencia(null)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+              style={{
+                backgroundColor:
+                  filtroDependencia === null ? theme.primary : `${theme.textSecondary}15`,
+                color: filtroDependencia === null ? '#ffffff' : theme.textSecondary,
+                border: `1px solid ${
+                  filtroDependencia === null ? theme.primary : theme.border
+                }`,
+              }}
+            >
+              <Building2 className="h-3 w-3" />
+              <span className="text-xs font-medium">Todas las dependencias</span>
+            </button>
+            {dependenciasDisponibles.map(d => {
+              const isActive = filtroDependencia === d.id;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => toggleDependencia(d.id)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+                  style={{
+                    backgroundColor: isActive ? d.color : `${d.color}15`,
+                    color: isActive ? '#ffffff' : d.color,
+                    border: `1px solid ${isActive ? d.color : `${d.color}40`}`,
+                  }}
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: isActive ? '#ffffff' : d.color }}
+                  />
+                  <span className="text-xs font-medium">{d.nombre}</span>
+                  <span className="text-xs font-bold">({d.count})</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
-      {/* Separador si hay filtro de categoría */}
-      {filtroCategoria && (
-        <div className="h-4 w-px" style={{ backgroundColor: theme.border }} />
-      )}
-      {/* Botón "Todos" */}
-      <button
-        onClick={() => setFiltroEstado(null)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-        style={{
-          backgroundColor: filtroEstado === null ? theme.primary : `${theme.textSecondary}15`,
-          color: filtroEstado === null ? '#ffffff' : theme.textSecondary,
-          border: `1px solid ${filtroEstado === null ? theme.primary : theme.border}`,
-        }}
-      >
-        <span className="text-xs font-medium">Todos</span>
-        <span className="text-xs font-bold">({reclamosPorCategoria.length})</span>
-      </button>
-      {/* Botones por estado */}
-      {Object.entries(STATUS_COLORS).map(([estado, color]) => {
-        const count = conteosPorEstado[estado] || 0;
-        if (count === 0) return null;
-        const isActive = filtroEstado === estado;
-        return (
+
+      <div className="h-px w-full" style={{ backgroundColor: theme.border }} />
+
+      {/* Fila 4: Tiempo + Vista + Hotspots + Dibujar */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Time presets */}
+        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}>
+          <Clock className="h-3 w-3 mx-1" style={{ color: theme.textSecondary }} />
+          {(['7', '30', '90', '365', 'all'] as TimePreset[]).map(p => {
+            const isActive = timePreset === p && !isPlaying;
+            return (
+              <button
+                key={p}
+                onClick={() => {
+                  setIsPlaying(false);
+                  setTimePreset(p);
+                }}
+                className="px-2 py-0.5 rounded text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: isActive ? theme.primary : 'transparent',
+                  color: isActive ? '#fff' : theme.textSecondary,
+                }}
+              >
+                {p === 'all' ? 'Todo' : p === '365' ? '1 año' : `${p}d`}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Time-lapse controls */}
+        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}>
+          {!isPlaying ? (
+            <button
+              onClick={startPlay}
+              disabled={!dateRange}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all"
+              style={{ color: theme.primary }}
+              title="Reproducir time-lapse"
+            >
+              <Play className="h-3 w-3" />
+              <span className="hidden sm:inline">Time-lapse</span>
+            </button>
+          ) : (
+            <button
+              onClick={pausePlay}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all"
+              style={{ color: theme.primary }}
+            >
+              <Pause className="h-3 w-3" />
+              <span className="hidden sm:inline">Pausar</span>
+            </button>
+          )}
           <button
-            key={estado}
-            onClick={() => toggleFiltro(estado)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
+            onClick={resetPlay}
+            className="px-1.5 py-0.5 rounded transition-all"
+            style={{ color: theme.textSecondary }}
+            title="Reiniciar"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* View mode toggle */}
+        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}>
+          <Layers className="h-3 w-3 mx-1" style={{ color: theme.textSecondary }} />
+          {(['pins', 'heat', 'both'] as ViewMode[]).map(m => {
+            const isActive = viewMode === m;
+            const label = m === 'pins' ? 'Pins' : m === 'heat' ? 'Calor' : 'Ambos';
+            return (
+              <button
+                key={m}
+                onClick={() => setViewMode(m)}
+                className="px-2 py-0.5 rounded text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: isActive ? theme.primary : 'transparent',
+                  color: isActive ? '#fff' : theme.textSecondary,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Hotspots toggle */}
+        <button
+          onClick={() => setShowHotspots(s => !s)}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          style={{
+            backgroundColor: showHotspots ? '#ef444420' : `${theme.textSecondary}10`,
+            color: showHotspots ? '#ef4444' : theme.textSecondary,
+            border: `1px solid ${showHotspots ? '#ef4444' : theme.border}`,
+          }}
+        >
+          <Flame className="h-3 w-3" />
+          Hotspots {hotspots.length > 0 && `(${hotspots.length})`}
+        </button>
+
+        {/* Cobertura toggle (solo si hay dependencia activa) */}
+        {filtroDependencia != null && (
+          <button
+            onClick={() => setShowCoverage(s => !s)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
             style={{
-              backgroundColor: isActive ? color : `${color}15`,
-              color: isActive ? '#ffffff' : color,
-              border: `1px solid ${isActive ? color : `${color}40`}`,
+              backgroundColor: showCoverage ? `${coverageColor}20` : `${theme.textSecondary}10`,
+              color: showCoverage ? coverageColor : theme.textSecondary,
+              border: `1px solid ${showCoverage ? coverageColor : theme.border}`,
             }}
           >
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: isActive ? '#ffffff' : color }}
-            />
-            <span className="text-xs font-medium">{STATUS_LABELS[estado]}</span>
-            <span className="text-xs font-bold">({count})</span>
+            <Building2 className="h-3 w-3" />
+            Cobertura
           </button>
-        );
-      })}
+        )}
+
+        {/* Dibujar zona */}
+        <button
+          onClick={() => {
+            setDrawnBBox(null);
+            setDrawMode(d => !d);
+          }}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+          style={{
+            backgroundColor: drawMode ? theme.primary : `${theme.primary}15`,
+            color: drawMode ? '#fff' : theme.primary,
+            border: `1px solid ${theme.primary}`,
+          }}
+          title="Dibujar zona en el mapa"
+        >
+          <Square className="h-3 w-3" />
+          {drawMode ? 'Dibujando…' : 'Dibujar zona'}
+        </button>
+      </div>
+
+      {/* Banda de animación: muestra fecha actual del time-lapse */}
+      {isPlaying && animationDate && dateRange && (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}40` }}>
+          <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
+          <span className="text-xs font-medium" style={{ color: theme.text }}>
+            Ventana: {animationDate.toLocaleDateString('es-AR')} →
+            {' '}
+            {new Date(animationDate.getTime() + 30 * 86400000).toLocaleDateString('es-AR')}
+          </span>
+          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
+            <div
+              className="h-full transition-all"
+              style={{
+                width: `${Math.min(
+                  100,
+                  (animationDay /
+                    Math.max(
+                      1,
+                      Math.ceil((dateRange.max - dateRange.min) / 86400000),
+                    )) *
+                    100,
+                )}%`,
+                backgroundColor: theme.primary,
+              }}
+            />
+          </div>
+          <span className="text-xs" style={{ color: theme.textSecondary }}>
+            {reclamosFiltrados.length} reclamos
+          </span>
+        </div>
+      )}
     </div>
   );
 
   return (
     <div className="space-y-6">
-      {/* Header Sticky con componente reutilizable */}
+      {/* CSS para animación de hotspots */}
+      <style>{`
+        @keyframes hotspot-pulse {
+          0%, 100% { opacity: 0.7; transform: scale(1); }
+          50% { opacity: 0.3; transform: scale(1.15); }
+        }
+        .leaflet-interactive.hotspot-pulse {
+          animation: hotspot-pulse 1.6s ease-in-out infinite;
+          transform-origin: center;
+        }
+      `}</style>
+
       <StickyPageHeader filterPanel={filterPanel}>
         <PageTitleIcon icon={<MapIcon className="h-4 w-4" />} />
         <PageTitle>Mapa de Reclamos</PageTitle>
         {loadingMore && (
           <>
             <HeaderSeparator />
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+            <div
+              className="flex items-center gap-2 px-3 py-1 rounded-full text-sm"
+              style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+            >
               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
               <span>Cargando más...</span>
             </div>
@@ -386,48 +1112,146 @@ export default function Mapa() {
 
       <PageHint pageId="mapa-reclamos" />
 
-      <div className="relative rounded-lg shadow overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        {/* Mapa */}
+      <div
+        className="relative rounded-lg shadow overflow-hidden"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
         <div style={{ height: '600px' }}>
           <MapContainer
             center={getMapCenter()}
             zoom={13}
             style={{ height: '100%', width: '100%' }}
           >
-            <TileLayer
-              attribution='&copy; OSM &copy; CARTO'
-              url={tileUrl}
-            />
-            <FitBoundsToMarkers reclamos={reclamosFiltrados} />
-            {reclamosFiltrados.map((reclamo) => (
-              <Marker
-                key={reclamo.id}
-                position={[reclamo.latitud!, reclamo.longitud!]}
-                icon={createPinIcon(STATUS_COLORS[reclamo.estado] || '#6b7280')}
-                eventHandlers={{
-                  click: () => handleMarkerClick(reclamo),
-                }}
-              >
-                <Tooltip
-                  direction="top"
-                  offset={[0, -42]}
-                  permanent={false}
-                  className="custom-tooltip"
+            <TileLayer attribution="&copy; OSM &copy; CARTO" url={tileUrl} />
+
+            <FitBoundsToMarkers reclamos={reclamosFiltrados} signal={fitSignal} />
+            <MapController target={mapTarget} />
+
+            {/* Coverage por dependencia */}
+            {filtroDependencia != null && showCoverage && coveragePoints.length >= 3 && (
+              <CoveragePolygon points={coveragePoints} color={coverageColor} />
+            )}
+
+            {/* Heat layer */}
+            {(viewMode === 'heat' || viewMode === 'both') && (
+              <HeatLayer reclamos={reclamosFiltrados} />
+            )}
+
+            {/* Pins */}
+            {(viewMode === 'pins' || viewMode === 'both') &&
+              reclamosFiltrados.map(r => (
+                <Marker
+                  key={r.id}
+                  position={[r.latitud!, r.longitud!]}
+                  icon={createPinIcon(STATUS_COLORS[r.estado] || '#6b7280')}
+                  eventHandlers={{ click: () => handleMarkerClick(r) }}
                 >
-                  <div className="font-medium text-sm">{reclamo.titulo}</div>
-                  <div className="text-xs text-gray-500">{reclamo.direccion}</div>
-                </Tooltip>
-              </Marker>
-            ))}
+                  <Tooltip direction="top" offset={[0, -42]} permanent={false}>
+                    <div className="font-medium text-sm">{r.titulo}</div>
+                    <div className="text-xs text-gray-500">{r.direccion}</div>
+                  </Tooltip>
+                </Marker>
+              ))}
+
+            {/* Hotspots */}
+            {showHotspots && <HotspotLayer hotspots={hotspots} />}
+
+            {/* Drawn rectangle */}
+            {drawnBBox && (
+              <Rectangle
+                bounds={[
+                  [drawnBBox.minLat, drawnBBox.minLng],
+                  [drawnBBox.maxLat, drawnBBox.maxLng],
+                ]}
+                pathOptions={{
+                  color: theme.primary,
+                  weight: 2,
+                  fillOpacity: 0.05,
+                  dashArray: '4 4',
+                }}
+              />
+            )}
+
+            {/* Draw handler */}
+            <DrawHandler
+              active={drawMode}
+              onComplete={handleDrawComplete}
+              onCancel={handleDrawCancel}
+            />
           </MapContainer>
         </div>
 
+        {/* Overlay popup para zona dibujada */}
+        {drawnBBox && (
+          <div
+            className="absolute top-4 right-4 z-[500] rounded-xl shadow-2xl p-4 w-80"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold flex items-center gap-2" style={{ color: theme.text }}>
+                <Square className="h-4 w-4" style={{ color: theme.primary }} />
+                Zona seleccionada
+              </h3>
+              <button
+                onClick={clearDrawnBBox}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                style={{ color: theme.textSecondary }}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <ZonaSnapshot reclamos={reclamosEnBBox} theme={theme} />
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={exportZonaPdf}
+                disabled={reclamosEnBBox.length === 0}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover})`,
+                  color: '#fff',
+                }}
+              >
+                <FileDown className="h-3.5 w-3.5" />
+                Exportar PDF
+              </button>
+              <button
+                onClick={clearDrawnBBox}
+                className="px-3 py-2 rounded-lg text-xs font-semibold"
+                style={{
+                  backgroundColor: `${theme.textSecondary}15`,
+                  color: theme.textSecondary,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Hint mientras dibujás */}
+        {drawMode && !drawnBBox && (
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] px-4 py-2 rounded-full text-xs font-medium shadow-lg pointer-events-none"
+            style={{ backgroundColor: theme.primary, color: '#fff' }}
+          >
+            ✏ Click + arrastrar para definir el área
+          </div>
+        )}
       </div>
 
-      {/* Side Drawer fijo al viewport — se abre desde la derecha, independiente del scroll */}
+      {/* === Sección de métricas debajo del mapa === */}
+      <MapaStats
+        reclamos={reclamosFiltrados}
+        totalUniverso={reclamos.length}
+        statusColors={STATUS_COLORS}
+        statusLabels={STATUS_LABELS}
+        onZonaClick={c => focusOnZona(c.centerLat, c.centerLng)}
+      />
+
+      {/* Side Drawer */}
       {createPortal(
         <>
-          {/* Backdrop */}
           <div
             onClick={closeSidebar}
             className={`fixed inset-0 bg-black/30 backdrop-blur-[2px] transition-opacity duration-300 z-[9998] ${
@@ -445,169 +1269,216 @@ export default function Mapa() {
             }}
           >
             {selected && (
-            <div className="h-full flex flex-col">
-              {/* Header del sidebar */}
-              <div
-                className="p-4 flex items-center justify-between"
-                style={{ borderBottom: `1px solid ${theme.border}` }}
-              >
-                <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
-                  Detalle del Reclamo
-                </h3>
-                <button
-                  onClick={closeSidebar}
-                  className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-                  style={{ color: theme.textSecondary }}
+              <div className="h-full flex flex-col">
+                <div
+                  className="p-4 flex items-center justify-between"
+                  style={{ borderBottom: `1px solid ${theme.border}` }}
                 >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              {/* Contenido del sidebar */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Estado */}
-                <div className="flex items-center justify-between">
-                  <span
-                    className="px-3 py-1 text-sm font-medium rounded-full text-white"
-                    style={{ backgroundColor: STATUS_COLORS[selected.estado] }}
+                  <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
+                    Detalle del Reclamo
+                  </h3>
+                  <button
+                    onClick={closeSidebar}
+                    className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{ color: theme.textSecondary }}
                   >
-                    {STATUS_LABELS[selected.estado] || selected.estado}
-                  </span>
-                  <span className="text-xs" style={{ color: theme.textSecondary }}>
-                    #{selected.id}
-                  </span>
+                    <X className="h-5 w-5" />
+                  </button>
                 </div>
 
-                {/* Título */}
-                <div>
-                  <h4 className="text-xl font-bold" style={{ color: theme.text }}>
-                    {selected.titulo}
-                  </h4>
-                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="px-3 py-1 text-sm font-medium rounded-full text-white"
+                      style={{ backgroundColor: STATUS_COLORS[selected.estado] || '#6b7280' }}
+                    >
+                      {STATUS_LABELS[selected.estado] || selected.estado}
+                    </span>
+                    <span className="text-xs" style={{ color: theme.textSecondary }}>
+                      #{selected.id}
+                    </span>
+                  </div>
 
-                {/* Descripción */}
-                {selected.descripcion && (
                   <div>
-                    <p className="text-sm" style={{ color: theme.textSecondary }}>
-                      {selected.descripcion}
-                    </p>
+                    <h4 className="text-xl font-bold" style={{ color: theme.text }}>
+                      {selected.titulo}
+                    </h4>
                   </div>
-                )}
 
-                {/* Información en cards */}
-                <div className="space-y-3">
-                  {/* Categoría */}
-                  <div
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ backgroundColor: theme.backgroundSecondary }}
-                  >
-                    <Tag className="h-5 w-5" style={{ color: selected.categoria?.color || theme.primary }} />
+                  {selected.descripcion && (
                     <div>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>Categoría</p>
-                      <p className="font-medium" style={{ color: theme.text }}>
-                        {selected.categoria?.nombre || 'Sin categoría'}
+                      <p className="text-sm" style={{ color: theme.textSecondary }}>
+                        {selected.descripcion}
                       </p>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Ubicación */}
-                  <div
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ backgroundColor: theme.backgroundSecondary }}
-                  >
-                    <MapPin className="h-5 w-5" style={{ color: theme.primary }} />
-                    <div>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>Dirección</p>
-                      <p className="font-medium" style={{ color: theme.text }}>
-                        {selected.direccion || 'Sin dirección'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Coordenadas */}
-                  <div
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ backgroundColor: theme.backgroundSecondary }}
-                  >
-                    <Navigation className="h-5 w-5" style={{ color: theme.primary }} />
-                    <div>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>Coordenadas</p>
-                      <p className="font-medium font-mono text-sm" style={{ color: theme.text }}>
-                        {selected.latitud?.toFixed(6)}, {selected.longitud?.toFixed(6)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Fecha de creación */}
-                  <div
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ backgroundColor: theme.backgroundSecondary }}
-                  >
-                    <Calendar className="h-5 w-5" style={{ color: theme.primary }} />
-                    <div>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>Fecha de creación</p>
-                      <p className="font-medium" style={{ color: theme.text }}>
-                        {formatDate(selected.created_at)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Creador */}
-                  {selected.creador && (
+                  <div className="space-y-3">
                     <div
                       className="flex items-center gap-3 p-3 rounded-lg"
                       style={{ backgroundColor: theme.backgroundSecondary }}
                     >
-                      <User className="h-5 w-5" style={{ color: theme.primary }} />
+                      <Tag className="h-5 w-5" style={{ color: selected.categoria?.color || theme.primary }} />
                       <div>
-                        <p className="text-xs" style={{ color: theme.textSecondary }}>Reportado por</p>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>Categoría</p>
                         <p className="font-medium" style={{ color: theme.text }}>
-                          {selected.creador.nombre} {selected.creador.apellido}
+                          {selected.categoria?.nombre || 'Sin categoría'}
                         </p>
                       </div>
                     </div>
-                  )}
 
-                  {/* Tiempo transcurrido */}
-                  <div
-                    className="flex items-center gap-3 p-3 rounded-lg"
-                    style={{ backgroundColor: theme.backgroundSecondary }}
-                  >
-                    <Clock className="h-5 w-5" style={{ color: theme.primary }} />
-                    <div>
-                      <p className="text-xs" style={{ color: theme.textSecondary }}>Tiempo transcurrido</p>
-                      <p className="font-medium" style={{ color: theme.text }}>
-                        {Math.floor((Date.now() - new Date(selected.created_at).getTime()) / (1000 * 60 * 60 * 24))} días
-                      </p>
+                    <div
+                      className="flex items-center gap-3 p-3 rounded-lg"
+                      style={{ backgroundColor: theme.backgroundSecondary }}
+                    >
+                      <MapPin className="h-5 w-5" style={{ color: theme.primary }} />
+                      <div>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>Dirección</p>
+                        <p className="font-medium" style={{ color: theme.text }}>
+                          {selected.direccion || 'Sin dirección'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className="flex items-center gap-3 p-3 rounded-lg"
+                      style={{ backgroundColor: theme.backgroundSecondary }}
+                    >
+                      <Navigation className="h-5 w-5" style={{ color: theme.primary }} />
+                      <div>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>Coordenadas</p>
+                        <p className="font-medium font-mono text-sm" style={{ color: theme.text }}>
+                          {selected.latitud?.toFixed(6)}, {selected.longitud?.toFixed(6)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className="flex items-center gap-3 p-3 rounded-lg"
+                      style={{ backgroundColor: theme.backgroundSecondary }}
+                    >
+                      <Calendar className="h-5 w-5" style={{ color: theme.primary }} />
+                      <div>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>Fecha de creación</p>
+                        <p className="font-medium" style={{ color: theme.text }}>
+                          {formatDate(selected.created_at)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {selected.creador && (
+                      <div
+                        className="flex items-center gap-3 p-3 rounded-lg"
+                        style={{ backgroundColor: theme.backgroundSecondary }}
+                      >
+                        <User className="h-5 w-5" style={{ color: theme.primary }} />
+                        <div>
+                          <p className="text-xs" style={{ color: theme.textSecondary }}>Reportado por</p>
+                          <p className="font-medium" style={{ color: theme.text }}>
+                            {selected.creador.nombre} {selected.creador.apellido}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div
+                      className="flex items-center gap-3 p-3 rounded-lg"
+                      style={{ backgroundColor: theme.backgroundSecondary }}
+                    >
+                      <Clock className="h-5 w-5" style={{ color: theme.primary }} />
+                      <div>
+                        <p className="text-xs" style={{ color: theme.textSecondary }}>Tiempo transcurrido</p>
+                        <p className="font-medium" style={{ color: theme.text }}>
+                          {Math.floor(
+                            (Date.now() - new Date(selected.created_at).getTime()) /
+                              (1000 * 60 * 60 * 24),
+                          )}{' '}
+                          días
+                        </p>
+                      </div>
                     </div>
                   </div>
+
+                  {selected.documentos &&
+                    selected.documentos.filter(d => d.tipo?.startsWith('image')).length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+                          Imágenes (
+                          {selected.documentos.filter(d => d.tipo?.startsWith('image')).length})
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {selected.documentos
+                            .filter(d => d.tipo?.startsWith('image'))
+                            .map((doc, idx) => (
+                              <img
+                                key={idx}
+                                src={doc.url}
+                                alt={`Imagen ${idx + 1}`}
+                                className="rounded-lg object-cover h-24 w-full"
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
-
-                {/* Imágenes si existen */}
-                {selected.documentos && selected.documentos.filter(d => d.tipo?.startsWith('image')).length > 0 && (
-                  <div>
-                    <p className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
-                      Imágenes ({selected.documentos.filter(d => d.tipo?.startsWith('image')).length})
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {selected.documentos.filter(d => d.tipo?.startsWith('image')).map((doc, idx) => (
-                        <img
-                          key={idx}
-                          src={doc.url}
-                          alt={`Imagen ${idx + 1}`}
-                          className="rounded-lg object-cover h-24 w-full"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-
-            </div>
-          )}
+            )}
           </div>
         </>,
-        document.body
+        document.body,
+      )}
+    </div>
+  );
+}
+
+// =====================================================================
+// Mini-snapshot para popup de zona dibujada
+// =====================================================================
+function ZonaSnapshot({
+  reclamos,
+  theme,
+}: {
+  reclamos: Reclamo[];
+  theme: ReturnType<typeof useTheme>['theme'];
+}) {
+  if (reclamos.length === 0) {
+    return (
+      <p className="text-sm text-center py-4" style={{ color: theme.textSecondary }}>
+        No hay reclamos en el área seleccionada.
+      </p>
+    );
+  }
+  const resueltos = reclamos.filter(r => isResuelto(r.estado)).length;
+  const abiertos = reclamos.length - resueltos;
+  // Top categoría
+  const catCounts: Record<string, number> = {};
+  for (const r of reclamos) {
+    const k = r.categoria?.nombre || 'Sin categoría';
+    catCounts[k] = (catCounts[k] || 0) + 1;
+  }
+  const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
+          <p className="text-xl font-bold" style={{ color: theme.text }}>{reclamos.length}</p>
+          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Total</p>
+        </div>
+        <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
+          <p className="text-xl font-bold" style={{ color: '#10b981' }}>{resueltos}</p>
+          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Resueltos</p>
+        </div>
+        <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
+          <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{abiertos}</p>
+          <p className="text-[10px]" style={{ color: theme.textSecondary }}>Abiertos</p>
+        </div>
+      </div>
+      {topCat && (
+        <div className="text-xs p-2 rounded-lg" style={{ backgroundColor: theme.background, color: theme.text }}>
+          <span style={{ color: theme.textSecondary }}>Top categoría: </span>
+          <span className="font-bold">{topCat[0]}</span> ({topCat[1]})
+        </div>
       )}
     </div>
   );

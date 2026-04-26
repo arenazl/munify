@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import type { InboxCardDensity } from './InboxCard';
 
 export interface InboxSeccion {
   id: string;
@@ -9,7 +10,15 @@ export interface InboxSeccion {
   icono: ReactNode;
   color: string;
   emptyMessage: string;
-  items: ReactNode[];
+  /**
+   * Items a renderizar. Puede ser:
+   *   - `ReactNode[]` — lista estática (usa density='large').
+   *   - `(density) => ReactNode[]` — función que recibe la densidad calculada
+   *     y devuelve los items renderizados acordes (cards, mini-cards o filas).
+   */
+  items: ReactNode[] | ((density: InboxCardDensity) => ReactNode[]);
+  /** Cantidad real de items (para calcular densidad cuando `items` es función). */
+  count?: number;
   /** Si true, arranca colapsada por default. Default: false. */
   colapsable?: boolean;
   /** Si la sección tiene una acción global (ej: "Marcar todo como leído"). */
@@ -30,6 +39,33 @@ interface InboxLayoutProps {
 }
 
 /**
+ * Calcula la densidad visual según la cantidad de items en la sección.
+ *   - 1-3   → large   (cards completas, 3 columnas)
+ *   - 4-8   → compact (mini-cards, 4-5 columnas)
+ *   - 9+    → row     (sub-tabla, una fila por item)
+ */
+function densityForCount(n: number): InboxCardDensity {
+  if (n <= 3) return 'large';
+  if (n <= 8) return 'compact';
+  return 'row';
+}
+
+/**
+ * Devuelve las clases de grilla acordes a la densidad.
+ */
+function gridClassForDensity(d: InboxCardDensity): string {
+  switch (d) {
+    case 'row':
+      return 'grid grid-cols-1 gap-2';
+    case 'compact':
+      return 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5';
+    case 'large':
+    default:
+      return 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3';
+  }
+}
+
+/**
  * Layout de la bandeja "Inbox" — vista guiada para supervisores.
  *
  * Se compone de:
@@ -38,8 +74,8 @@ interface InboxLayoutProps {
  *   - Secciones colapsables, cada una con su lista de cards.
  *   - Empty states cariñosos cuando una sección no tiene items.
  *
- * El que renderiza las cards individuales es el caller — este layout solo
- * maneja el scaffolding visual + animaciones de entrada en cascada.
+ * Cada sección adapta automáticamente la densidad de sus cards al cantidad
+ * de items: pocas → cards grandes; muchas → mini-cards o sub-tabla.
  */
 export function InboxLayout({
   saludoNombre,
@@ -125,7 +161,10 @@ export function InboxLayout({
 
       {/* === Secciones === */}
       {(() => {
-        const conItems = secciones.filter((s) => s.items.length > 0);
+        const conItems = secciones.filter((s) => {
+          const n = typeof s.items === 'function' ? (s.count ?? 0) : s.items.length;
+          return n > 0;
+        });
         // Si todas están vacías, mostramos empty state grande en lugar de
         // 4 secciones con mensaje cariñoso (eso ocupa espacio al pedo).
         if (conItems.length === 0 && totalPendiente === 0) {
@@ -158,7 +197,14 @@ export function InboxLayout({
 function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: number }) {
   const { theme } = useTheme();
   const [colapsada, setColapsada] = useState(seccion.colapsable || false);
-  const isEmpty = seccion.items.length === 0;
+  const itemCount = typeof seccion.items === 'function'
+    ? (seccion.count ?? 0)
+    : seccion.items.length;
+  const isEmpty = itemCount === 0;
+  const density = densityForCount(itemCount);
+  const items = typeof seccion.items === 'function'
+    ? seccion.items(density)
+    : seccion.items;
   const toggle = () => seccion.colapsable && setColapsada((v) => !v);
 
   return (
@@ -187,7 +233,7 @@ function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: num
               className="text-[11px] font-semibold px-2 py-0.5 rounded-full tabular-nums"
               style={{ backgroundColor: `${seccion.color}20`, color: seccion.color }}
             >
-              {seccion.items.length}
+              {itemCount}
             </span>
           </h2>
           {seccion.subtitulo && (
@@ -236,8 +282,8 @@ function Seccion({ seccion, indexBase }: { seccion: InboxSeccion; indexBase: num
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {seccion.items.map((item, i) => (
+            <div className={gridClassForDensity(density)}>
+              {items.map((item, i) => (
                 <div
                   key={i}
                   className="inbox-card"
