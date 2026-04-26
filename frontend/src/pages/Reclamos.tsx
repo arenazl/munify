@@ -4354,9 +4354,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   `conteosEstados` y pueden ser 0 (sin skeleton falso). */}
               {(
                 [
-                  { key: 'nuevo', label: 'Nuevo', icon: Sparkles, color: estadoColors.nuevo.bg, count: conteosEstados['nuevo'] || 0 },
-                  { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: conteosEstados['recibido'] || 0 },
-                  { key: 'en_curso', label: 'Curso', icon: Play, color: estadoColors.en_curso.bg, count: conteosEstados['en_curso'] || 0 },
+                  // 1-a-1 con los 5 estados activos de EstadoReclamo (backend/models/enums.py).
+                  // Los counts de los legacy se mergean en su sucesor activo:
+                  //   nuevo + asignado -> recibido
+                  //   en_proceso + pendiente_confirmacion -> en_curso
+                  //   resuelto -> finalizado
+                  { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
+                  { key: 'en_curso', label: 'Curso', icon: Play, color: estadoColors.en_curso.bg, count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
                   { key: 'finalizado', label: 'Final.', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
                   { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
                   { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },

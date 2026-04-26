@@ -8,6 +8,10 @@ import {
   AlertCircle,
   RefreshCw,
   FileCheck,
+  Inbox,
+  CreditCard,
+  PauseCircle,
+  Play,
   Eye,
   User,
   Phone,
@@ -1060,11 +1064,13 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             <FilterRowSkeleton count={6} height={28} widths={[55, 65, 60, 70, 55, 65]} />
           ) : (
             [
-              { key: 'iniciado', label: 'Nuevo', icon: Clock, color: '#6366f1', count: conteosEstados['iniciado'] || 0 },
-              { key: 'en_revision', label: 'Revisión', icon: FileCheck, color: '#3b82f6', count: conteosEstados['en_revision'] || 0 },
-              { key: 'en_proceso', label: 'Proceso', icon: RefreshCw, color: '#f59e0b', count: conteosEstados['en_proceso'] || 0 },
-              { key: 'aprobado', label: 'Aprobado', icon: CheckCircle2, color: '#10b981', count: conteosEstados['aprobado'] || 0 },
-              { key: 'finalizado', label: 'Final.', icon: CheckCircle2, color: '#059669', count: conteosEstados['finalizado'] || 0 },
+              // 1-a-1 con EstadoSolicitud (backend/models/tramite.py).
+              // El conteo de `recibido` absorbe el legacy `INICIADO`.
+              { key: 'recibido', label: 'Recib.', icon: Inbox, color: '#3b82f6', count: (conteosEstados['recibido'] || 0) + (conteosEstados['iniciado'] || 0) + (conteosEstados['INICIADO'] || 0) },
+              { key: 'pendiente_pago', label: 'Pago', icon: CreditCard, color: '#f59e0b', count: conteosEstados['pendiente_pago'] || 0 },
+              { key: 'en_curso', label: 'Curso', icon: Play, color: '#0ea5e9', count: conteosEstados['en_curso'] || 0 },
+              { key: 'finalizado', label: 'Final.', icon: CheckCircle2, color: '#10b981', count: conteosEstados['finalizado'] || 0 },
+              { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: '#6b7280', count: conteosEstados['pospuesto'] || 0 },
               { key: 'rechazado', label: 'Rech.', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
             ].map((estado) => {
               const Icon = estado.icon;
