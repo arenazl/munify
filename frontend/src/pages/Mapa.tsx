@@ -20,14 +20,8 @@ import {
   Clock,
   Navigation,
   Map as MapIcon,
-  Flame,
-  Layers,
   Square,
-  Play,
-  Pause,
-  RotateCcw,
   FileDown,
-  Building2,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { reclamosApi } from '../lib/api';
@@ -50,6 +44,7 @@ import {
   BBox,
 } from '../lib/mapaUtils';
 import MapaStats from '../components/mapa/MapaStats';
+import MapaFiltrosPanel, { ViewMode, TimePreset } from '../components/mapa/MapaFiltrosPanel';
 
 // Fix para el icono de Leaflet en Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -380,8 +375,70 @@ function MapController({ target }: { target: { lat: number; lng: number; zoom?: 
 // =====================================================================
 // Componente principal
 // =====================================================================
-type ViewMode = 'pins' | 'heat' | 'both';
-type TimePreset = '7' | '30' | '90' | '365' | 'all';
+// ViewMode y TimePreset se importan desde MapaFiltrosPanel
+
+const FILTROS_STORAGE_KEY = 'mapa_filtros_v1';
+
+interface FiltrosPersistidos {
+  filtroEstado: string | null;
+  filtroDependencia: number | null;
+  timePreset: TimePreset;
+  viewMode: ViewMode;
+  showHotspots: boolean;
+  showCoverage: boolean;
+}
+
+const DEFAULT_FILTROS: FiltrosPersistidos = {
+  filtroEstado: null,
+  filtroDependencia: null,
+  timePreset: 'all',
+  viewMode: 'pins',
+  showHotspots: true,
+  showCoverage: true,
+};
+
+function loadFiltrosFromStorage(): FiltrosPersistidos {
+  try {
+    const raw = localStorage.getItem(FILTROS_STORAGE_KEY);
+    if (!raw) return DEFAULT_FILTROS;
+    const parsed = JSON.parse(raw);
+    return {
+      filtroEstado:
+        typeof parsed.filtroEstado === 'string' || parsed.filtroEstado === null
+          ? parsed.filtroEstado
+          : DEFAULT_FILTROS.filtroEstado,
+      filtroDependencia:
+        typeof parsed.filtroDependencia === 'number' ||
+        parsed.filtroDependencia === null
+          ? parsed.filtroDependencia
+          : DEFAULT_FILTROS.filtroDependencia,
+      timePreset: ['7', '30', '90', '365', 'all'].includes(parsed.timePreset)
+        ? (parsed.timePreset as TimePreset)
+        : DEFAULT_FILTROS.timePreset,
+      viewMode: ['pins', 'heat', 'both'].includes(parsed.viewMode)
+        ? (parsed.viewMode as ViewMode)
+        : DEFAULT_FILTROS.viewMode,
+      showHotspots:
+        typeof parsed.showHotspots === 'boolean'
+          ? parsed.showHotspots
+          : DEFAULT_FILTROS.showHotspots,
+      showCoverage:
+        typeof parsed.showCoverage === 'boolean'
+          ? parsed.showCoverage
+          : DEFAULT_FILTROS.showCoverage,
+    };
+  } catch {
+    return DEFAULT_FILTROS;
+  }
+}
+
+function saveFiltrosToStorage(f: FiltrosPersistidos) {
+  try {
+    localStorage.setItem(FILTROS_STORAGE_KEY, JSON.stringify(f));
+  } catch {
+    /* noop */
+  }
+}
 
 export default function Mapa() {
   const { theme } = useTheme();
@@ -402,16 +459,29 @@ export default function Mapa() {
   const [selected, setSelected] = useState<Reclamo | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Filtros
-  const [filtroEstado, setFiltroEstado] = useState<string | null>(null);
+  // Filtros (con persistencia en localStorage)
+  const initialFiltros = useMemo(() => loadFiltrosFromStorage(), []);
+  const [filtroEstado, setFiltroEstado] = useState<string | null>(initialFiltros.filtroEstado);
   const filtroCategoria = searchParams.get('categoria');
-  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
-  const [timePreset, setTimePreset] = useState<TimePreset>('all');
+  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(initialFiltros.filtroDependencia);
+  const [timePreset, setTimePreset] = useState<TimePreset>(initialFiltros.timePreset);
 
   // Vistas
-  const [viewMode, setViewMode] = useState<ViewMode>('pins');
-  const [showHotspots, setShowHotspots] = useState(true);
-  const [showCoverage, setShowCoverage] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>(initialFiltros.viewMode);
+  const [showHotspots, setShowHotspots] = useState(initialFiltros.showHotspots);
+  const [showCoverage, setShowCoverage] = useState(initialFiltros.showCoverage);
+
+  // Persistir filtros cuando cambian
+  useEffect(() => {
+    saveFiltrosToStorage({
+      filtroEstado,
+      filtroDependencia,
+      timePreset,
+      viewMode,
+      showHotspots,
+      showCoverage,
+    });
+  }, [filtroEstado, filtroDependencia, timePreset, viewMode, showHotspots, showCoverage]);
 
   // Time-lapse
   const [isPlaying, setIsPlaying] = useState(false);
@@ -632,16 +702,6 @@ export default function Mapa() {
       minute: '2-digit',
     });
 
-  const toggleFiltroEstado = (e: string) => setFiltroEstado(prev => (prev === e ? null : e));
-  const toggleCategoria = (key: string) => {
-    if (filtroCategoria === key) setSearchParams({});
-    else setSearchParams({ categoria: key });
-    setFiltroEstado(null);
-  };
-  const toggleDependencia = (id: number) => {
-    setFiltroDependencia(prev => (prev === id ? null : id));
-  };
-
   const startPlay = () => {
     if (!dateRange) return;
     setAnimationDay(0);
@@ -659,6 +719,27 @@ export default function Mapa() {
   }, []);
   const handleDrawCancel = useCallback(() => setDrawMode(false), []);
   const clearDrawnBBox = () => setDrawnBBox(null);
+
+  const handleClearAllFiltros = () => {
+    setSearchParams({});
+    setFiltroEstado(null);
+    setFiltroDependencia(null);
+    setTimePreset('all');
+    setViewMode('pins');
+    setShowHotspots(true);
+    setShowCoverage(true);
+  };
+
+  const handleCategoriaChange = (key: string | null) => {
+    if (key == null) setSearchParams({});
+    else setSearchParams({ categoria: key });
+    setFiltroEstado(null);
+  };
+
+  const handleToggleDraw = () => {
+    setDrawnBBox(null);
+    setDrawMode((d) => !d);
+  };
 
   const focusOnZona = (lat: number, lng: number) => {
     setMapTarget({ lat, lng, zoom: 17 });
@@ -782,301 +863,52 @@ export default function Mapa() {
   }
 
   // =================================================================
-  // Filter Panel (4 filas)
+  // Filter Panel — colapsable, persistente, mobile/desktop friendly
   // =================================================================
+  const totalAnimationDays = dateRange
+    ? Math.ceil((dateRange.max - dateRange.min) / 86400000)
+    : 0;
+
   const filterPanel = (
-    <div className="flex flex-col gap-2">
-      {/* Fila 1: Categorías */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setSearchParams({})}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-          style={{
-            backgroundColor: filtroCategoria === null ? theme.primary : `${theme.textSecondary}15`,
-            color: filtroCategoria === null ? '#ffffff' : theme.textSecondary,
-            border: `1px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
-          }}
-        >
-          <Tag className="h-3 w-3" />
-          <span className="text-xs font-medium">Todas las categorías</span>
-          <span className="text-xs font-bold">({reclamos.length})</span>
-        </button>
-        {categoriasDisponibles.map(cat => {
-          const isActive = filtroCategoria === cat.key;
-          return (
-            <button
-              key={cat.key}
-              onClick={() => toggleCategoria(cat.key)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-              style={{
-                backgroundColor: isActive ? cat.color : `${cat.color}15`,
-                color: isActive ? '#ffffff' : cat.color,
-                border: `1px solid ${isActive ? cat.color : `${cat.color}40`}`,
-              }}
-            >
-              <div
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: isActive ? '#ffffff' : cat.color }}
-              />
-              <span className="text-xs font-medium">{cat.label}</span>
-              <span className="text-xs font-bold">({cat.count})</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="h-px w-full" style={{ backgroundColor: theme.border }} />
-
-      {/* Fila 2: Estados */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setFiltroEstado(null)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-          style={{
-            backgroundColor: filtroEstado === null ? theme.primary : `${theme.textSecondary}15`,
-            color: filtroEstado === null ? '#ffffff' : theme.textSecondary,
-            border: `1px solid ${filtroEstado === null ? theme.primary : theme.border}`,
-          }}
-        >
-          <span className="text-xs font-medium">Todos los estados</span>
-          <span className="text-xs font-bold">({reclamosPorTiempo.length})</span>
-        </button>
-        {Object.entries(STATUS_COLORS).map(([estado, color]) => {
-          const count = conteosPorEstado[estado] || 0;
-          if (count === 0) return null;
-          const isActive = filtroEstado === estado;
-          return (
-            <button
-              key={estado}
-              onClick={() => toggleFiltroEstado(estado)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-              style={{
-                backgroundColor: isActive ? color : `${color}15`,
-                color: isActive ? '#ffffff' : color,
-                border: `1px solid ${isActive ? color : `${color}40`}`,
-              }}
-            >
-              <div
-                className="w-2.5 h-2.5 rounded-full"
-                style={{ backgroundColor: isActive ? '#ffffff' : color }}
-              />
-              <span className="text-xs font-medium">{STATUS_LABELS[estado] || estado}</span>
-              <span className="text-xs font-bold">({count})</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {dependenciasDisponibles.length > 0 && (
-        <>
-          <div className="h-px w-full" style={{ backgroundColor: theme.border }} />
-          {/* Fila 3: Dependencias */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setFiltroDependencia(null)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-              style={{
-                backgroundColor:
-                  filtroDependencia === null ? theme.primary : `${theme.textSecondary}15`,
-                color: filtroDependencia === null ? '#ffffff' : theme.textSecondary,
-                border: `1px solid ${
-                  filtroDependencia === null ? theme.primary : theme.border
-                }`,
-              }}
-            >
-              <Building2 className="h-3 w-3" />
-              <span className="text-xs font-medium">Todas las dependencias</span>
-            </button>
-            {dependenciasDisponibles.map(d => {
-              const isActive = filtroDependencia === d.id;
-              return (
-                <button
-                  key={d.id}
-                  onClick={() => toggleDependencia(d.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-                  style={{
-                    backgroundColor: isActive ? d.color : `${d.color}15`,
-                    color: isActive ? '#ffffff' : d.color,
-                    border: `1px solid ${isActive ? d.color : `${d.color}40`}`,
-                  }}
-                >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: isActive ? '#ffffff' : d.color }}
-                  />
-                  <span className="text-xs font-medium">{d.nombre}</span>
-                  <span className="text-xs font-bold">({d.count})</span>
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      <div className="h-px w-full" style={{ backgroundColor: theme.border }} />
-
-      {/* Fila 4: Tiempo + Vista + Hotspots + Dibujar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Time presets */}
-        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}>
-          <Clock className="h-3 w-3 mx-1" style={{ color: theme.textSecondary }} />
-          {(['7', '30', '90', '365', 'all'] as TimePreset[]).map(p => {
-            const isActive = timePreset === p && !isPlaying;
-            return (
-              <button
-                key={p}
-                onClick={() => {
-                  setIsPlaying(false);
-                  setTimePreset(p);
-                }}
-                className="px-2 py-0.5 rounded text-xs font-medium transition-all"
-                style={{
-                  backgroundColor: isActive ? theme.primary : 'transparent',
-                  color: isActive ? '#fff' : theme.textSecondary,
-                }}
-              >
-                {p === 'all' ? 'Todo' : p === '365' ? '1 año' : `${p}d`}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Time-lapse controls */}
-        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}>
-          {!isPlaying ? (
-            <button
-              onClick={startPlay}
-              disabled={!dateRange}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all"
-              style={{ color: theme.primary }}
-              title="Reproducir time-lapse"
-            >
-              <Play className="h-3 w-3" />
-              <span className="hidden sm:inline">Time-lapse</span>
-            </button>
-          ) : (
-            <button
-              onClick={pausePlay}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all"
-              style={{ color: theme.primary }}
-            >
-              <Pause className="h-3 w-3" />
-              <span className="hidden sm:inline">Pausar</span>
-            </button>
-          )}
-          <button
-            onClick={resetPlay}
-            className="px-1.5 py-0.5 rounded transition-all"
-            style={{ color: theme.textSecondary }}
-            title="Reiniciar"
-          >
-            <RotateCcw className="h-3 w-3" />
-          </button>
-        </div>
-
-        {/* View mode toggle */}
-        <div className="flex items-center gap-1 p-1 rounded-lg" style={{ backgroundColor: `${theme.textSecondary}10`, border: `1px solid ${theme.border}` }}>
-          <Layers className="h-3 w-3 mx-1" style={{ color: theme.textSecondary }} />
-          {(['pins', 'heat', 'both'] as ViewMode[]).map(m => {
-            const isActive = viewMode === m;
-            const label = m === 'pins' ? 'Pins' : m === 'heat' ? 'Calor' : 'Ambos';
-            return (
-              <button
-                key={m}
-                onClick={() => setViewMode(m)}
-                className="px-2 py-0.5 rounded text-xs font-medium transition-all"
-                style={{
-                  backgroundColor: isActive ? theme.primary : 'transparent',
-                  color: isActive ? '#fff' : theme.textSecondary,
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Hotspots toggle */}
-        <button
-          onClick={() => setShowHotspots(s => !s)}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={{
-            backgroundColor: showHotspots ? '#ef444420' : `${theme.textSecondary}10`,
-            color: showHotspots ? '#ef4444' : theme.textSecondary,
-            border: `1px solid ${showHotspots ? '#ef4444' : theme.border}`,
-          }}
-        >
-          <Flame className="h-3 w-3" />
-          Hotspots {hotspots.length > 0 && `(${hotspots.length})`}
-        </button>
-
-        {/* Cobertura toggle (solo si hay dependencia activa) */}
-        {filtroDependencia != null && (
-          <button
-            onClick={() => setShowCoverage(s => !s)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-            style={{
-              backgroundColor: showCoverage ? `${coverageColor}20` : `${theme.textSecondary}10`,
-              color: showCoverage ? coverageColor : theme.textSecondary,
-              border: `1px solid ${showCoverage ? coverageColor : theme.border}`,
-            }}
-          >
-            <Building2 className="h-3 w-3" />
-            Cobertura
-          </button>
-        )}
-
-        {/* Dibujar zona */}
-        <button
-          onClick={() => {
-            setDrawnBBox(null);
-            setDrawMode(d => !d);
-          }}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-          style={{
-            backgroundColor: drawMode ? theme.primary : `${theme.primary}15`,
-            color: drawMode ? '#fff' : theme.primary,
-            border: `1px solid ${theme.primary}`,
-          }}
-          title="Dibujar zona en el mapa"
-        >
-          <Square className="h-3 w-3" />
-          {drawMode ? 'Dibujando…' : 'Dibujar zona'}
-        </button>
-      </div>
-
-      {/* Banda de animación: muestra fecha actual del time-lapse */}
-      {isPlaying && animationDate && dateRange && (
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg" style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}40` }}>
-          <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
-          <span className="text-xs font-medium" style={{ color: theme.text }}>
-            Ventana: {animationDate.toLocaleDateString('es-AR')} →
-            {' '}
-            {new Date(animationDate.getTime() + 30 * 86400000).toLocaleDateString('es-AR')}
-          </span>
-          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
-            <div
-              className="h-full transition-all"
-              style={{
-                width: `${Math.min(
-                  100,
-                  (animationDay /
-                    Math.max(
-                      1,
-                      Math.ceil((dateRange.max - dateRange.min) / 86400000),
-                    )) *
-                    100,
-                )}%`,
-                backgroundColor: theme.primary,
-              }}
-            />
-          </div>
-          <span className="text-xs" style={{ color: theme.textSecondary }}>
-            {reclamosFiltrados.length} reclamos
-          </span>
-        </div>
-      )}
-    </div>
+    <MapaFiltrosPanel
+      categoriasDisponibles={categoriasDisponibles}
+      dependenciasDisponibles={dependenciasDisponibles}
+      statusColors={STATUS_COLORS}
+      statusLabels={STATUS_LABELS}
+      conteosPorEstado={conteosPorEstado}
+      totalReclamos={reclamos.length}
+      totalEnRangoTiempo={reclamosPorTiempo.length}
+      hotspotsCount={hotspots.length}
+      filtroCategoria={filtroCategoria}
+      filtroEstado={filtroEstado}
+      filtroDependencia={filtroDependencia}
+      timePreset={timePreset}
+      viewMode={viewMode}
+      showHotspots={showHotspots}
+      showCoverage={showCoverage}
+      onCategoriaChange={handleCategoriaChange}
+      onEstadoChange={setFiltroEstado}
+      onDependenciaChange={setFiltroDependencia}
+      onTimePresetChange={(p) => {
+        setIsPlaying(false);
+        setTimePreset(p);
+      }}
+      onViewModeChange={setViewMode}
+      onToggleHotspots={() => setShowHotspots((s) => !s)}
+      onToggleCoverage={() => setShowCoverage((s) => !s)}
+      onClearAll={handleClearAllFiltros}
+      isPlaying={isPlaying}
+      hasDateRange={dateRange != null}
+      onPlay={startPlay}
+      onPause={pausePlay}
+      onReset={resetPlay}
+      drawMode={drawMode}
+      onToggleDraw={handleToggleDraw}
+      animationDate={animationDate}
+      animationDay={animationDay}
+      totalAnimationDays={totalAnimationDays}
+      reclamosFiltradosCount={reclamosFiltrados.length}
+    />
   );
 
   return (
