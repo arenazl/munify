@@ -119,32 +119,36 @@ export default function Mostrador() {
 
   return (
     <div className="space-y-4">
-      {/* === Header === */}
-      <div className="flex items-center gap-3">
-        <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
-        >
-          <ScanLine className="w-5 h-5" />
+      {/* === Header + Métricas — sticky arriba para que esten siempre visibles === */}
+      <div
+        className="sticky top-0 z-20 -mx-4 px-4 pt-2 pb-3 space-y-3 backdrop-blur-md"
+        style={{ backgroundColor: `${theme.background}cc` }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+          >
+            <ScanLine className="w-5 h-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-bold leading-tight truncate" style={{ color: theme.text }}>
+              Mostrador
+            </h1>
+            <p className="text-xs leading-tight truncate" style={{ color: theme.textSecondary }}>
+              Ventanilla asistida · {operadorLabel}
+            </p>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-bold leading-tight truncate" style={{ color: theme.text }}>
-            Mostrador
-          </h1>
-          <p className="text-xs leading-tight truncate" style={{ color: theme.textSecondary }}>
-            Ventanilla asistida · {operadorLabel}
-          </p>
-        </div>
-      </div>
 
-      {/* === Métricas (cards grandes) === */}
-      {metricas && (
-        <div className="grid grid-cols-3 gap-3">
-          <MetricaCard color="#3b82f6" icon={<FileText className="w-4 h-4" />} label="Trámites hoy" value={metricas.tramites_hoy} />
-          <MetricaCard color="#22c55e" icon={<CheckCircle2 className="w-4 h-4" />} label="Pagados" value={metricas.pagados_hoy} />
-          <MetricaCard color="#8b5cf6" icon={<Receipt className="w-4 h-4" />} label="Recaudado" value={metricas.monto_hoy} formatMoney />
-        </div>
-      )}
+        {metricas && (
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            <MetricaCard color="#3b82f6" icon={<FileText className="w-4 h-4" />} label="Trámites hoy" value={metricas.tramites_hoy} />
+            <MetricaCard color="#22c55e" icon={<CheckCircle2 className="w-4 h-4" />} label="Pagados" value={metricas.pagados_hoy} />
+            <MetricaCard color="#8b5cf6" icon={<Receipt className="w-4 h-4" />} label="Recaudado" value={metricas.monto_hoy} formatMoney />
+          </div>
+        )}
+      </div>
 
       <PageHint pageId="mostrador" />
 
@@ -206,21 +210,24 @@ function MetricaCard({ color, icon, label, value, formatMoney }: {
     : String(value);
   return (
     <div
-      className="rounded-xl p-3 transition-all hover:scale-[1.02]"
+      className="rounded-xl p-2.5 sm:p-3 transition-all hover:scale-[1.02] min-w-0"
       style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: theme.textSecondary }}>
+      <div className="flex items-start justify-between gap-1.5 min-w-0">
+        <span
+          className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold leading-tight min-w-0 flex-1"
+          style={{ color: theme.textSecondary }}
+        >
           {label}
         </span>
         <span
-          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${color}20`, color }}
         >
           {icon}
         </span>
       </div>
-      <p className="text-xl font-bold tabular-nums mt-1" style={{ color: theme.text }}>{display}</p>
+      <p className="text-base sm:text-xl font-bold tabular-nums mt-1 truncate" style={{ color: theme.text }}>{display}</p>
     </div>
   );
 }
@@ -388,39 +395,41 @@ function TabDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
         </p>
       </div>
 
-      <div
-        className="flex items-center gap-2 p-2 rounded-2xl"
-        style={{
-          backgroundColor: theme.backgroundSecondary,
-          border: `2px solid ${theme.primary}40`,
-        }}
-      >
-        <Search className="w-5 h-5 ml-2 flex-shrink-0" style={{ color: theme.textSecondary }} />
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="numeric"
-          value={dni}
-          onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
-          onKeyDown={handleKeyDown}
-          placeholder="DNI del vecino"
-          className="flex-1 bg-transparent outline-none text-lg font-mono tracking-wide py-1.5"
-          style={{ color: theme.text }}
-        />
-        {dni && !buscando && (
-          <button
-            onClick={limpiar}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5"
-            style={{ color: theme.textSecondary }}
-            title="Limpiar (ESC)"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div
+          className="flex items-center gap-2 p-2 rounded-2xl flex-1 min-w-0"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            border: `2px solid ${theme.primary}40`,
+          }}
+        >
+          <Search className="w-5 h-5 ml-2 flex-shrink-0" style={{ color: theme.textSecondary }} />
+          <input
+            ref={inputRef}
+            type="text"
+            inputMode="numeric"
+            value={dni}
+            onChange={(e) => setDni(e.target.value.replace(/\D/g, '').slice(0, 9))}
+            onKeyDown={handleKeyDown}
+            placeholder="DNI del vecino"
+            className="flex-1 min-w-0 bg-transparent outline-none text-base sm:text-lg font-mono py-1.5"
+            style={{ color: theme.text }}
+          />
+          {dni && !buscando && (
+            <button
+              onClick={limpiar}
+              className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-black/5 flex-shrink-0"
+              style={{ color: theme.textSecondary }}
+              title="Limpiar (ESC)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         <button
           onClick={buscar}
           disabled={buscando || !dni.trim()}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 flex-shrink-0"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:hover:scale-100 flex-shrink-0 w-full sm:w-auto"
           style={{ backgroundColor: theme.primary }}
         >
           {buscando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
