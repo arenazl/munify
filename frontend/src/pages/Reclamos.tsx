@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -4073,6 +4073,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     const ahora = Date.now();
     const dia = 24 * 60 * 60 * 1000;
 
+    const conFeedback: Reclamo[] = []; // vecino dijo "sigue el problema"
     const urgentes: Reclamo[] = [];
     const fosiles: Reclamo[] = [];   // vencidos hace > 30 días — para limpiar
     const nuevos: Reclamo[] = [];
@@ -4081,7 +4082,17 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
     for (const r of filteredReclamos) {
       const estado = (r.estado || '').toLowerCase();
-      // Excluir cerrados de la vista guiada
+
+      // Capa 0: feedback negativo del vecino. MAXIMA PRIORIDAD: aparecen
+      // aunque el reclamo este "finalizado", porque el vecino dice que el
+      // problema sigue y la dependencia tiene que retomarlo.
+      if (r.confirmado_vecino === false) {
+        conFeedback.push(r);
+        continue;
+      }
+
+      // Excluir cerrados de la vista guiada (los con feedback ya quedaron
+      // arriba; estos son cierres limpios sin disputa).
       if (estado === 'finalizado' || estado === 'rechazado' || estado === 'resuelto') continue;
 
       // Vencimiento estimado = created_at + tiempo_estimado_dias del reclamo
@@ -4126,7 +4137,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       // Resto: nuevos sin tomar
       nuevos.push(r);
     }
-    return { urgentes, fosiles, nuevos, enCurso, esperando };
+    return { conFeedback, urgentes, fosiles, nuevos, enCurso, esperando };
   }, [filteredReclamos]);
 
   const renderInboxCard = (
@@ -4194,9 +4205,12 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       saludoNombre={user?.nombre || ''}
       contextoLabel={user?.dependencia?.nombre || 'tu municipio'}
       totalPendiente={
-        inboxData.urgentes.length + inboxData.nuevos.length + inboxData.enCurso.length + inboxData.esperando.length
+        inboxData.conFeedback.length + inboxData.urgentes.length + inboxData.nuevos.length + inboxData.enCurso.length + inboxData.esperando.length
       }
       metricasChips={[
+        ...(inboxData.conFeedback.length > 0 ? [
+          { color: '#dc2626', icon: <ThumbsDown className="w-3.5 h-3.5" />, label: 'sigue el problema', value: inboxData.conFeedback.length },
+        ] : []),
         { color: '#ef4444', icon: <AlertCircle className="w-3.5 h-3.5" />, label: 'urgentes', value: inboxData.urgentes.length },
         { color: '#3b82f6', icon: <Inbox className="w-3.5 h-3.5" />, label: 'nuevos', value: inboxData.nuevos.length },
         { color: '#f59e0b', icon: <PlayCircle className="w-3.5 h-3.5" />, label: 'en curso', value: inboxData.enCurso.length },
@@ -4206,6 +4220,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         ] : []),
       ]}
       secciones={[
+        {
+          // Reclamos cerrados que el vecino disputo. Maxima prioridad:
+          // arriba de todo. Estan tecnicamente en estado finalizado pero
+          // requieren que la dependencia los retome.
+          id: 'feedback-negativo',
+          titulo: 'El vecino dice que sigue el problema',
+          subtitulo: 'Reclamos cerrados con feedback negativo — revisar y reabrir',
+          icono: <ThumbsDown className="w-5 h-5" />,
+          color: '#dc2626',
+          emptyMessage: 'Sin disputas del vecino — buen trabajo.',
+          count: inboxData.conFeedback.length,
+          items: (density) => inboxData.conFeedback.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#dc2626' })),
+        },
         {
           id: 'urgente',
           titulo: 'Empecemos por lo urgente',
