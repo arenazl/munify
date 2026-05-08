@@ -3021,7 +3021,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (!selectedReclamo) return null;
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         {/* Zona si existe */}
         {selectedReclamo.zona && (
           <ABMField
@@ -3049,16 +3049,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </p>
         </ABMCollapsible>
 
-        {/* Creador */}
-        <ABMInfoPanel
-          title="Datos del Vecino"
+        {/* Datos del vecino — colapsado por default. El supervisor rara
+            vez necesita los datos personales para avanzar el reclamo;
+            cuando los necesita (llamarlo, mandarle mail) los expande. */}
+        <ABMCollapsible
+          title={`Datos del Vecino · ${selectedReclamo.creador.nombre} ${selectedReclamo.creador.apellido}`}
           icon={<User className="h-4 w-4" />}
-          variant="default"
+          defaultOpen={false}
         >
-          <ABMField
-            label="Nombre"
-            value={`${selectedReclamo.creador.nombre} ${selectedReclamo.creador.apellido}`}
-          />
           <ABMField
             label="Email"
             value={selectedReclamo.creador.email}
@@ -3071,7 +3069,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               icon={<Phone className="h-4 w-4" style={{ color: theme.textSecondary }} />}
             />
           )}
-        </ABMInfoPanel>
+        </ABMCollapsible>
 
         {/* Dependencia asignada */}
         {selectedReclamo.dependencia_asignada?.nombre && (
@@ -3774,28 +3772,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     const esEstadoFinal = selectedReclamo.estado === 'finalizado' || selectedReclamo.estado === 'rechazado' || selectedReclamo.estado === 'resuelto';
 
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         {/* Campo de descripción obligatorio - siempre visible excepto estados finales */}
         {!esEstadoFinal && (
-          <div>
-            <textarea
-              value={descripcionInicio}
-              onChange={(e) => setDescripcionInicio(e.target.value)}
-              placeholder="Descripción del trabajo a realizar (obligatorio)..."
-              rows={2}
-              className="w-full px-3 py-2 rounded-xl text-sm resize-none transition-colors"
-              style={{
-                backgroundColor: theme.backgroundSecondary,
-                border: `1px solid ${descripcionInicio.trim() ? theme.primary : theme.border}`,
-                color: theme.text,
-              }}
-            />
-            {!descripcionInicio.trim() && (
-              <p className="text-xs mt-1" style={{ color: '#f59e0b' }}>
-                * Obligatorio para cambiar de estado
-              </p>
-            )}
-          </div>
+          <textarea
+            value={descripcionInicio}
+            onChange={(e) => setDescripcionInicio(e.target.value)}
+            placeholder={descripcionInicio.trim() ? 'Descripción del trabajo a realizar...' : 'Descripción del trabajo a realizar (obligatorio para cambiar de estado)...'}
+            rows={2}
+            className="w-full px-3 py-1.5 rounded-xl text-sm resize-none transition-colors"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px solid ${descripcionInicio.trim() ? theme.primary : '#f59e0b80'}`,
+              color: theme.text,
+            }}
+          />
         )}
 
         <div className="flex gap-2">

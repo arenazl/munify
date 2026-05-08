@@ -196,7 +196,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
 
         {/* Content con scroll interno */}
         <div
-          className="px-5 py-3"
+          className="px-4 py-2"
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -214,7 +214,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
         {/* Footer - pegado al fondo del panel */}
         {(footer || stickyFooter) && (
           <div
-            className="px-5 py-3"
+            className="px-4 py-2"
             style={{
               borderTop: `1px solid ${theme.border}`,
               backgroundColor: `${theme.background}cc`,
