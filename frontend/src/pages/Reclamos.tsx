@@ -4094,28 +4094,37 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         : null;
       const diffMs = fechaVence ? fechaVence - ahora : null;
 
-      // Capa 1: fósil — venció hace más de 30 días.
+      // Capa 1: fósil — venció hace más de 30 días, sin importar el estado.
       if (diffMs != null && diffMs < -30 * dia) {
         fosiles.push(r);
         continue;
       }
 
-      // Capa 2: urgente real — prioridad manual = 1 OR vence entre -7 y +3 días
+      // Capa 2: el ESTADO manda sobre la urgencia. Si el reclamo ya esta
+      // en curso o pospuesto, vive en su seccion correspondiente aunque
+      // sea urgente — la urgencia ya esta atendida (alguien lo esta
+      // trabajando o lo postergo concientemente).
+      if (estado === 'pospuesto') {
+        esperando.push(r);
+        continue;
+      }
+      if (estado === 'en_curso') {
+        enCurso.push(r);
+        continue;
+      }
+
+      // Capa 3: urgente real — solo entre los que aun no fueron tomados
+      // (recibido / nuevo / asignado / legacy). Prioridad manual = 1 OR
+      // vence entre -7 y +3 dias.
       const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
       const esUrgente = r.prioridad === 1 || enZonaUrgente;
-
       if (esUrgente) {
         urgentes.push(r);
         continue;
       }
-      if (estado === 'pospuesto') {
-        esperando.push(r);
-      } else if (estado === 'en_curso') {
-        enCurso.push(r);
-      } else {
-        // nuevo, recibido, asignado (y otros legacy)
-        nuevos.push(r);
-      }
+
+      // Resto: nuevos sin tomar
+      nuevos.push(r);
     }
     return { urgentes, fosiles, nuevos, enCurso, esperando };
   }, [filteredReclamos]);

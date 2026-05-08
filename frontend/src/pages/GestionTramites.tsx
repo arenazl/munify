@@ -1481,22 +1481,29 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         continue;
       }
 
-      // Capa 2: urgente real — prioridad manual = 1 OR vence entre -7 y +3 días
+      // Capa 2: el ESTADO manda sobre la urgencia. Si el tramite ya esta
+      // en curso o esperando algo, vive en su seccion correspondiente
+      // aunque sea urgente — la urgencia ya esta atendida.
+      if (estado === 'pendiente_pago' || estado === 'pospuesto') {
+        esperando.push(t);
+        continue;
+      }
+      if (estado === 'en_curso') {
+        enCurso.push(t);
+        continue;
+      }
+
+      // Capa 3: urgente real — solo entre los que aun no fueron tomados.
+      // Prioridad manual = 1 OR vence entre -7 y +3 dias.
       const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
       const esUrgente = t.prioridad === 1 || enZonaUrgente;
-
       if (esUrgente) {
         urgentes.push(t);
         continue;
       }
-      if (estado === 'pendiente_pago' || estado === 'pospuesto') {
-        esperando.push(t);
-      } else if (estado === 'en_curso') {
-        enCurso.push(t);
-      } else {
-        // recibido (y otros legacy)
-        nuevos.push(t);
-      }
+
+      // Resto: nuevos sin tomar
+      nuevos.push(t);
     }
     return { urgentes, fosiles, nuevos, enCurso, esperando };
   }, [tramites]);
