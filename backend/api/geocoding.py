@@ -24,12 +24,16 @@ rápido) está en el límite. Si se vuelve un problema podemos:
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 import httpx
+import math
+import re
 import time
+import unicodedata
 from typing import Any
 
 router = APIRouter()
 
 NOMINATIM_BASE = "https://nominatim.openstreetmap.org"
+OVERPASS_BASE = "https://overpass-api.de/api/interpreter"
 
 # User-Agent requerido oficialmente por la policy de uso de Nominatim.
 # Sin esto pueden bloquearnos.
@@ -140,6 +144,178 @@ async def geocoding_search(
         )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail=f"Error contactando Nominatim: {exc}")
+
+
+def _strip_accents(s: str) -> str:
+    """Quita tildes para que el regex de Overpass matchee 'centenario' con
+    'Centenário' o 'CENTENARIO' indistinto."""
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s)
+        if unicodedata.category(c) != "Mn"
+    )
+
+
+def _street_regex(nombre: str) -> str:
+    """Genera un regex para matchear nombres de calle en Overpass.
+
+    Acepta variaciones comunes (Av., Avenida, etc) y es case-insensitive.
+    Sanitizamos para evitar inyección en la query QL.
+    """
+    base = _strip_accents(nombre.strip().lower())
+    # Permitimos solo letras, espacios y números en el nombre — todo lo demás
+    # se descarta para que no se cuele un caracter regex peligroso.
+    base = re.sub(r"[^a-z0-9 ]", "", base)
+    # Cada palabra del nombre debe aparecer en la calle, en cualquier orden no,
+    # mejor: matcheamos el nombre como substring (.*nombre.*).
+    return f".*{re.escape(base)}.*"
+
+
+@router.get("/intersection")
+async def geocoding_intersection(
+    calle1: str = Query(..., min_length=2, description="Primer nombre de calle"),
+    calle2: str = Query(..., min_length=2, description="Segundo nombre de calle"),
+    lat: float = Query(..., description="Lat del centro del municipio"),
+    lon: float = Query(..., description="Lon del centro del municipio"),
+    radius_km: float = Query(15.0, gt=0, le=50),
+):
+    """Resuelve la intersección de dos calles usando Overpass API.
+
+    Estrategia:
+      1. Bounding box de `radius_km` alrededor del centro del municipio.
+      2. Query Overpass que devuelve los nodos compartidos por ambas calles
+         (`node.na.nb`) — esos nodos son la esquina real en OSM.
+      3. Si no hay nodos compartidos, fallback: traer las geometrías de ambas
+         y devolver el punto medio entre los dos puntos más cercanos. Esto
+         cubre el caso donde OSM tiene las calles cargadas pero sin un nodo
+         compartido en la intersección.
+
+    Devuelve `{ lat, lon, display_name }` con la coord de la esquina, o 404
+    si no se pudo resolver.
+    """
+    delta_lat = radius_km / 111.0
+    cos_lat = max(0.001, abs(math.cos(math.radians(lat))))
+    delta_lon = radius_km / (111.0 * cos_lat)
+    south = lat - delta_lat
+    north = lat + delta_lat
+    west = lon - delta_lon
+    east = lon + delta_lon
+    bbox = f"{south},{west},{north},{east}"
+
+    n1 = _street_regex(calle1)
+    n2 = _street_regex(calle2)
+
+    cache_key = f"intersection:{n1}|{n2}|{bbox}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return JSONResponse(content=cached)
+
+    # Query 1: nodos compartidos (intersección directa en OSM)
+    query_shared = (
+        "[out:json][timeout:20];"
+        f'way["highway"]["name"~"{n1}",i]({bbox});'
+        "node(w)->.na;"
+        f'way["highway"]["name"~"{n2}",i]({bbox});'
+        "node(w)->.nb;"
+        "node.na.nb;"
+        "out;"
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            resp = await client.post(
+                OVERPASS_BASE,
+                content=query_shared,
+                headers={"User-Agent": USER_AGENT, "Content-Type": "text/plain"},
+            )
+            resp.raise_for_status()
+            elements = resp.json().get("elements", [])
+
+            if elements:
+                # Tomar el nodo más cercano al centro del municipio
+                best = min(
+                    elements,
+                    key=lambda n: (n.get("lat", 0) - lat) ** 2 + (n.get("lon", 0) - lon) ** 2,
+                )
+                result = {
+                    "lat": float(best["lat"]),
+                    "lon": float(best["lon"]),
+                    "display_name": f"{calle1.strip()} y {calle2.strip()}",
+                    "fuente": "overpass_shared_node",
+                }
+                _cache_set(cache_key, result)
+                return JSONResponse(content=result)
+
+            # Fallback: traer geometrías y calcular el punto medio entre los
+            # dos puntos más cercanos de cada calle.
+            query_geom = (
+                "[out:json][timeout:25];"
+                f'(way["highway"]["name"~"{n1}",i]({bbox});); out geom;'
+                f'(way["highway"]["name"~"{n2}",i]({bbox});); out geom;'
+            )
+            resp2 = await client.post(
+                OVERPASS_BASE,
+                content=query_geom,
+                headers={"User-Agent": USER_AGENT, "Content-Type": "text/plain"},
+            )
+            resp2.raise_for_status()
+            data2 = resp2.json().get("elements", [])
+
+            # Separar puntos por nombre matcheado
+            puntos_a: list[tuple[float, float]] = []
+            puntos_b: list[tuple[float, float]] = []
+            re1 = re.compile(n1, re.IGNORECASE)
+            re2 = re.compile(n2, re.IGNORECASE)
+            for el in data2:
+                if el.get("type") != "way":
+                    continue
+                nombre = _strip_accents(el.get("tags", {}).get("name", "").lower())
+                geom = el.get("geometry", []) or []
+                pts = [(g["lat"], g["lon"]) for g in geom if "lat" in g and "lon" in g]
+                if re1.match(nombre):
+                    puntos_a.extend(pts)
+                if re2.match(nombre):
+                    puntos_b.extend(pts)
+
+            if not puntos_a or not puntos_b:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No se encontraron las calles en el área del municipio",
+                )
+
+            # Buscar el par (a, b) más cercano entre las dos calles
+            mejor_par: tuple[tuple[float, float], tuple[float, float]] | None = None
+            mejor_dist = float("inf")
+            for a in puntos_a:
+                for b in puntos_b:
+                    d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2
+                    if d < mejor_dist:
+                        mejor_dist = d
+                        mejor_par = (a, b)
+
+            if mejor_par is None:
+                raise HTTPException(status_code=404, detail="Sin intersección detectable")
+
+            mid_lat = (mejor_par[0][0] + mejor_par[1][0]) / 2
+            mid_lon = (mejor_par[0][1] + mejor_par[1][1]) / 2
+            result = {
+                "lat": mid_lat,
+                "lon": mid_lon,
+                "display_name": f"{calle1.strip()} y {calle2.strip()}",
+                "fuente": "overpass_closest_pair",
+            }
+            _cache_set(cache_key, result)
+            return JSONResponse(content=result)
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Timeout contactando Overpass")
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Overpass devolvió {exc.response.status_code}",
+        )
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Error contactando Overpass: {exc}")
 
 
 @router.get("/reverse")

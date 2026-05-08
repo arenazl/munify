@@ -222,7 +222,10 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         dni_solicitante: kyc ? (user.dni || '') : (prev.dni_solicitante || user.dni || ''),
         email_solicitante: prev.email_solicitante || user.email || '',
         telefono_solicitante: prev.telefono_solicitante || user.telefono || '',
-        direccion: prev.direccion || user.direccion || '',
+        // No precargamos `direccion` con el domicilio del vecino: la dirección
+        // del reclamo es donde está el problema (esquina, plaza, otra calle),
+        // raramente la casa del que lo reporta. El step "Dónde" muestra el
+        // domicilio como chip sugerido para click rápido si aplica.
       }));
     }
   }, [open, user, ctxMostrador]);
@@ -678,6 +681,39 @@ export function CrearReclamoWizard({ open, onClose, onSuccess }: Props) {
         <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: theme.textSecondary }}>
           Ubicación del problema
         </p>
+
+        {/* Chip sugerido: domicilio del vecino logueado. Útil cuando el
+            problema sí es en la cuadra de la casa, evita re-tipearla. NO
+            la precargamos porque el caso típico es reportar problemas en
+            otro lado. Click → llena el input. */}
+        {!isEmpleado && user?.direccion && user.direccion !== form.direccion && (
+          <button
+            type="button"
+            onClick={() =>
+              setForm(prev => ({
+                ...prev,
+                direccion: user.direccion || '',
+                latitud: null,
+                longitud: null,
+              }))
+            }
+            className="w-full mb-2 p-3 rounded-xl text-left transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center gap-3"
+            style={{
+              backgroundColor: theme.backgroundSecondary,
+              border: `1px dashed ${theme.border}`,
+            }}
+          >
+            <MapPin className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate" style={{ color: theme.text }}>
+                {user.direccion}
+              </p>
+              <p className="text-[10px]" style={{ color: theme.textSecondary }}>
+                Tu domicilio — tocá si el problema es acá
+              </p>
+            </div>
+          </button>
+        )}
 
         {/* Chip sugerido: cuando el wizard encontró al vecino por DNI y
             éste tiene un reclamo anterior, ofrecemos su última dirección

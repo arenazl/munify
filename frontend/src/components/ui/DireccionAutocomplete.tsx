@@ -41,6 +41,33 @@ interface DireccionSuggestion {
     state?: string;
   };
   _distancia?: number;
+  /** Marca interna: la sugerencia es una esquina resuelta vía Overpass. */
+  _esEsquina?: boolean;
+}
+
+/**
+ * Detecta el patrón "calle1 y calle2" (con o sin coma + ciudad). Devuelve
+ * los nombres de las dos calles si matchea, o null. Acepta variantes con
+ * "y/", " e " (eufónico para palabras que empiezan con "i") y la lista
+ * por coma — pero solo si claramente son DOS calles, no una calle con
+ * número o referencia.
+ */
+function detectarEsquina(query: string): { calle1: string; calle2: string } | null {
+  const trimmed = query.trim();
+  if (!trimmed || /\d/.test(trimmed.split(',')[0])) {
+    // Si la primera parte (antes de la coma) ya tiene un número, es una
+    // dirección normal con altura, no una esquina.
+    return null;
+  }
+  // Tomamos solo la parte antes de la primera coma para evitar que entren
+  // ciudades/provincias en el match.
+  const principal = trimmed.split(',')[0].trim();
+  const m = principal.match(/^(.+?)\s+(?:y|e)\s+(.+?)$/i);
+  if (!m) return null;
+  const calle1 = m[1].trim();
+  const calle2 = m[2].trim();
+  if (calle1.length < 2 || calle2.length < 2) return null;
+  return { calle1, calle2 };
 }
 
 interface DireccionAutocompleteProps {
@@ -251,6 +278,43 @@ export function DireccionAutocomplete({
             .slice(0, 8);
         }
 
+        // ==== ESQUINA: si el usuario escribió "calle1 y calle2", llamamos al
+        // endpoint de Overpass que resuelve la coord exacta del cruce. La
+        // metemos como PRIMERA sugerencia, marcada como esquina. Esto cubre
+        // el caso típico "Melgar y Centenario" que Nominatim no entiende.
+        const esquina = detectarEsquina(trimmed);
+        if (esquina && centroLat && centroLon) {
+          try {
+            const intRes = await api.get('/geocoding/intersection', {
+              params: {
+                calle1: esquina.calle1,
+                calle2: esquina.calle2,
+                lat: centroLat,
+                lon: centroLon,
+                radius_km: 15,
+              },
+              signal: controller.signal,
+            });
+            const intr = intRes.data;
+            if (intr?.lat && intr?.lon) {
+              const esquinaSug: DireccionSuggestion = {
+                display_name: `Esquina: ${intr.display_name}`,
+                lat: String(intr.lat),
+                lon: String(intr.lon),
+                _esEsquina: true,
+              };
+              data = [esquinaSug, ...data];
+            }
+          } catch (intErr: any) {
+            // 404 = no se encontró la intersección; lo ignoramos silencioso
+            // y dejamos solo los resultados de Nominatim. Otros errores
+            // tampoco rompen el flujo principal.
+            if (intErr?.name !== 'CanceledError' && intErr?.code !== 'ERR_CANCELED') {
+              console.debug('[DireccionAutocomplete] No se resolvió esquina:', intErr?.response?.status);
+            }
+          }
+        }
+
         // ==== OBSOLETE CHECK ====
         // Si mientras esperábamos el response el usuario siguió escribiendo,
         // la query actual ya no es esta — descartamos el resultado para no
@@ -305,24 +369,30 @@ export function DireccionAutocomplete({
 
   const selectSuggestion = (suggestion: DireccionSuggestion) => {
     let direccion = '';
-    const addr = suggestion.address;
 
-    if (addr) {
-      const parts: string[] = [];
-      if (addr.road) {
-        const numero = addr.house_number || userInputNumber;
-        parts.push(numero ? `${addr.road} ${numero}` : addr.road);
+    // Esquina resuelta por Overpass: el display_name viene como "Esquina: X y Y".
+    // Guardamos como dirección "X y Y" sin el prefijo "Esquina:".
+    if (suggestion._esEsquina) {
+      direccion = suggestion.display_name.replace(/^esquina:\s*/i, '').trim();
+    } else {
+      const addr = suggestion.address;
+      if (addr) {
+        const parts: string[] = [];
+        if (addr.road) {
+          const numero = addr.house_number || userInputNumber;
+          parts.push(numero ? `${addr.road} ${numero}` : addr.road);
+        }
+        const locality = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
+        if (locality) parts.push(locality);
+        if (addr.state && !addr.state.toLowerCase().includes('buenos aires')) {
+          parts.push(addr.state);
+        }
+        direccion = parts.join(', ');
       }
-      const locality = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
-      if (locality) parts.push(locality);
-      if (addr.state && !addr.state.toLowerCase().includes('buenos aires')) {
-        parts.push(addr.state);
-      }
-      direccion = parts.join(', ');
-    }
 
-    if (!direccion) {
-      direccion = suggestion.display_name.split(', ').slice(0, 4).join(', ');
+      if (!direccion) {
+        direccion = suggestion.display_name.split(', ').slice(0, 4).join(', ');
+      }
     }
 
     onChange(direccion, parseFloat(suggestion.lat), parseFloat(suggestion.lon));
@@ -408,6 +478,16 @@ export function DireccionAutocomplete({
           onChange={(e) => handleInputChange(e.target.value)}
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           onBlur={onBlur}
+          onKeyDown={(e) => {
+            // Si el input está vacío y el usuario aprieta Backspace, en algunos
+            // browsers/contextos el evento sigue burbujeando y dispara
+            // history.back() — eso desmonta la ruta del wizard y "cierra" el
+            // modal. Lo prevenimos cuando el value es ''. Backspace en input
+            // no vacío sigue funcionando normal.
+            if (e.key === 'Backspace' && (e.currentTarget.value ?? '') === '') {
+              e.preventDefault();
+            }
+          }}
           disabled={disabled}
           placeholder={placeholder}
           maxLength={maxLength}
@@ -463,12 +543,30 @@ export function DireccionAutocomplete({
                 selectSuggestion(suggestion);
               }}
               className="w-full text-left px-4 py-3 flex items-start gap-3 transition-colors touch-manipulation"
-              style={{ color: theme.text }}
+              style={{
+                color: theme.text,
+                backgroundColor: suggestion._esEsquina ? `${theme.primary}10` : 'transparent',
+              }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = theme.backgroundSecondary)}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = suggestion._esEsquina ? `${theme.primary}10` : 'transparent')
+              }
             >
-              <MapPin className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: theme.primary }} />
-              <span className="text-sm line-clamp-2">{suggestion.display_name}</span>
+              <MapPin
+                className="h-5 w-5 flex-shrink-0 mt-0.5"
+                style={{ color: suggestion._esEsquina ? '#10b981' : theme.primary }}
+              />
+              <div className="flex-1 min-w-0">
+                {suggestion._esEsquina && (
+                  <span
+                    className="inline-block text-[10px] font-semibold px-1.5 py-0.5 rounded mr-1.5 mb-0.5"
+                    style={{ backgroundColor: '#10b98125', color: '#059669' }}
+                  >
+                    ESQUINA
+                  </span>
+                )}
+                <span className="text-sm line-clamp-2">{suggestion.display_name}</span>
+              </div>
             </button>
           ))}
         </div>
