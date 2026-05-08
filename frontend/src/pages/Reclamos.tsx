@@ -507,6 +507,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         // Pedir los mismos reclamos que tenemos en pantalla para comparar
         const params: Record<string, string | number> = { skip: 0, limit: reclamos.length };
         if (filtroEstado) params.estado = filtroEstado;
+        else params.excluir_finalizados = 'true';
         if (filtroCategoria) params.categoria_id = filtroCategoria;
         if (soloMiArea && user?.dependencia?.id) params.municipio_dependencia_id = user.dependencia.id;
         if (filtroDependencia) params.municipio_dependencia_id = filtroDependencia;
@@ -553,6 +554,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           // Hacer fetch completo silencioso (sin loading spinner)
           const fullParams: Record<string, string | number> = { skip: 0, limit: ITEMS_PER_PAGE };
           if (filtroEstado) fullParams.estado = filtroEstado;
+          else fullParams.excluir_finalizados = 'true';
           if (filtroCategoria) fullParams.categoria_id = filtroCategoria;
           if (debouncedSearch?.trim()) fullParams.search = debouncedSearch.trim();
           if (soloMiArea && user?.dependencia?.id) fullParams.municipio_dependencia_id = user.dependencia.id;
@@ -1016,6 +1018,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       };
       if (filtroEstado) {
         params.estado = filtroEstado;
+      } else {
+        // Default "Todos": ocultar finalizados/rechazados/resueltos.
+        // Excepción: los finalizados con feedback negativo del vecino
+        // (confirmado_vecino=false) siguen visibles porque requieren
+        // que la dependencia los retome. Si el supervisor quiere ver
+        // los cerrados, usa el chip de "Final." o "Rech." explicito.
+        params.excluir_finalizados = 'true';
       }
       if (filtroCategoria) {
         params.categoria_id = filtroCategoria;
@@ -4578,7 +4587,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   Todos
                 </span>
                 <span className={`text-[9px] font-bold ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
-                  {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
+                  {/* "Todos" suma solo los activos (recibido / en_curso /
+                      pospuesto + legacy). Finalizados y rechazados quedan
+                      fuera para que el contador refleje lo que realmente
+                      se ve en la lista. */}
+                  {(() => {
+                    const activos = ['recibido', 'en_curso', 'pospuesto', 'nuevo', 'asignado', 'en_proceso', 'pendiente_confirmacion'];
+                    return activos.reduce((acc, k) => acc + (conteosEstados[k] || 0), 0);
+                  })()}
                 </span>
               </button>
 

@@ -381,6 +381,14 @@ async def get_reclamos(
     zona_id: Optional[int] = None,
     municipio_dependencia_id: Optional[int] = None,
     search: Optional[str] = Query(None, description="Búsqueda en todos los campos"),
+    excluir_finalizados: bool = Query(
+        False,
+        description=(
+            "Si es true, oculta reclamos finalizados / resueltos / rechazados. "
+            "Excepción: los finalizados con feedback negativo del vecino "
+            "(confirmado_vecino=false) siguen visibles porque requieren atención."
+        ),
+    ),
     skip: int = Query(0, ge=0, description="Número de registros a saltar"),
     limit: int = Query(20, ge=1, le=100, description="Número de registros a retornar"),
     db: AsyncSession = Depends(get_db),
@@ -420,6 +428,19 @@ async def get_reclamos(
     # Filtros opcionales
     if estado:
         query = query.where(Reclamo.estado == estado)
+    elif excluir_finalizados:
+        # Por default ocultar todo lo cerrado, excepto los finalizados con
+        # feedback negativo (confirmado_vecino=false): esos requieren que la
+        # dependencia los atienda de nuevo.
+        cerrados = [
+            EstadoReclamo.FINALIZADO,
+            EstadoReclamo.RESUELTO,
+            EstadoReclamo.RECHAZADO,
+        ]
+        query = query.where(
+            (Reclamo.estado.notin_(cerrados))
+            | (Reclamo.confirmado_vecino == False)  # noqa: E712
+        )
     if categoria_id:
         query = query.where(Reclamo.categoria_id == categoria_id)
     if zona_id:

@@ -179,6 +179,14 @@ export default function MisReclamos() {
         : 'Lamentamos que el problema persista. Tu feedback fue registrado.'
       );
       setComentarioConfirmacion('');
+
+      // Si el vecino dijo que sigue el problema, no tiene sentido pedirle
+      // que califique — el reclamo va a volver a la dependencia. Cerramos
+      // el modal directo. Si dijo solucionado, lo dejamos abierto para que
+      // pueda calificar si quiere.
+      if (!solucionado) {
+        setTimeout(() => closeSheet(), 800);
+      }
     } catch (error: unknown) {
       console.error('Error enviando confirmación:', error);
       if (error && typeof error === 'object' && 'response' in error) {
@@ -461,8 +469,12 @@ export default function MisReclamos() {
           </div>
         )}
 
-        {/* Calificación (solo para reclamos resueltos) */}
-        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'finalizado') && (
+        {/* Calificación — solo si el vecino YA confirmó que se solucionó.
+            Si no confirmó, no tiene sentido pedirle que califique algo que
+            todavia no validó. Si dijo que sigue el problema, tampoco
+            corresponde calificar — el reclamo se reabre. */}
+        {(selectedReclamo.estado === 'resuelto' || selectedReclamo.estado === 'finalizado') &&
+         selectedReclamo.confirmado_vecino === true && (
           <div className="pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <h4 className="font-medium flex items-center mb-3">
               <Star className="h-4 w-4 mr-2" />
