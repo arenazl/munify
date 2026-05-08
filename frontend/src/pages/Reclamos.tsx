@@ -4453,7 +4453,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               </div>
             )}
 
-            {/* Categorías - botón Todas fijo + scroll horizontal (fila 2) */}
+            {/* Categorías - botón Todas fijo + scroll horizontal (fila 2).
+                Solo se renderiza si hay al menos una categoría con conteo
+                (o una seleccionada). Si todas estan vacias, escondemos la
+                fila entera para no dejar un "Todas" suelto sin contexto. */}
+            {(categorias.some(c => (conteosCategorias[c.id] || 0) > 0) || filtroCategoria !== null) && (
             <div className="flex gap-1">
               {/* Botón Todas fijo - outlined */}
               <button
@@ -4592,6 +4596,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 </button>
               )}
             </div>
+            )}
 
             {/* Estados - botón Todos fijo + scroll horizontal */}
             <div className="flex gap-1">
