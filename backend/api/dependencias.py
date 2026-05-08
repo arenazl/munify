@@ -23,11 +23,13 @@ from models import (
     MunicipioDependencia,
     MunicipioDependenciaCategoria,
     MunicipioDependenciaTramite,
+    Reclamo,
     Tramite,
 )
 from models.categoria_reclamo import CategoriaReclamo as Categoria
 from models.categoria_tramite import CategoriaTramite
 from models.dependencia import TipoGestionDependencia
+from models.enums import EstadoReclamo
 from schemas.dependencia import (
     DependenciaCreate,
     DependenciaUpdate,
@@ -488,7 +490,17 @@ async def asignar_categorias(
 ):
     """
     Asigna categorías de reclamos a una dependencia.
-    Reemplaza las asignaciones existentes.
+
+    Reglas:
+    - 1 categoría = 1 dependencia por municipio. Si la categoría estaba
+      asignada a otra dependencia del mismo municipio, se le quita de allá
+      antes de re-asignarla acá. (Sin esto quedaban filas duplicadas y el
+      auto-asignador en creación de reclamo fallaba con MultipleResultsFound,
+      dejando los reclamos sin dependencia o en la vieja.)
+    - Reclamos en estado inicial (recibido / nuevo) que tenían la
+      categoría afectada se migran a la nueva dependencia. Reclamos en
+      curso, finalizados o rechazados no se tocan — el cambio de mapeo
+      no debería pisar trabajo en marcha.
     """
     if current_user.rol not in ["admin", "supervisor"]:
         raise HTTPException(status_code=403, detail="No tiene permisos")
@@ -510,14 +522,26 @@ async def asignar_categorias(
     municipio_id = md.municipio_id
     dependencia_id = md.dependencia_id
 
-    # Eliminar asignaciones existentes
+    # 1) Eliminar TODAS las asignaciones existentes de esas categorías en
+    #    el municipio — sin importar a qué dependencia apuntaban antes.
+    #    Esto garantiza la regla "1 categoría = 1 dependencia por municipio".
+    if data.categoria_ids:
+        await db.execute(
+            delete(MunicipioDependenciaCategoria).where(
+                MunicipioDependenciaCategoria.municipio_id == municipio_id,
+                MunicipioDependenciaCategoria.categoria_id.in_(data.categoria_ids),
+            )
+        )
+
+    # 2) Limpiar también las asignaciones viejas de ESTA dependencia que
+    #    ya no estén en data.categoria_ids (categorías que se "destildaron").
     await db.execute(
         delete(MunicipioDependenciaCategoria).where(
             MunicipioDependenciaCategoria.municipio_dependencia_id == municipio_dependencia_id
         )
     )
 
-    # Crear nuevas asignaciones
+    # 3) Crear las asignaciones nuevas
     for cat_id in data.categoria_ids:
         asignacion = MunicipioDependenciaCategoria(
             municipio_id=municipio_id,
@@ -528,11 +552,39 @@ async def asignar_categorias(
         )
         db.add(asignacion)
 
+    # 4) Migrar reclamos existentes con esas categorías que sigan en
+    #    estado inicial (recibido/nuevo) a la nueva dependencia. Solo
+    #    actualizamos los que NO están siendo trabajados.
+    estados_iniciales = [EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO]
+    reclamos_migrados = 0
+    if data.categoria_ids:
+        reclamos_query = await db.execute(
+            select(Reclamo).where(
+                Reclamo.municipio_id == municipio_id,
+                Reclamo.categoria_id.in_(data.categoria_ids),
+                Reclamo.estado.in_(estados_iniciales),
+                # Migramos tanto los que no tenían dependencia como los
+                # que estaban en otra dependencia del mismo municipio
+                # (porque el mapeo cambió).
+                (Reclamo.municipio_dependencia_id != municipio_dependencia_id)
+                | (Reclamo.municipio_dependencia_id.is_(None)),
+            )
+        )
+        for reclamo in reclamos_query.scalars().all():
+            reclamo.municipio_dependencia_id = municipio_dependencia_id
+            reclamos_migrados += 1
+
     await db.commit()
 
-    logger.info(f"[Dependencias] Asignadas {len(data.categoria_ids)} categorías a dependencia {municipio_dependencia_id}")
+    logger.info(
+        f"[Dependencias] Asignadas {len(data.categoria_ids)} categorías a "
+        f"dependencia {municipio_dependencia_id}. Reclamos migrados: {reclamos_migrados}"
+    )
 
-    return {"message": f"Asignadas {len(data.categoria_ids)} categorías"}
+    return {
+        "message": f"Asignadas {len(data.categoria_ids)} categorías",
+        "reclamos_migrados": reclamos_migrados,
+    }
 
 
 @router.get("/municipio/{municipio_dependencia_id}/categorias")

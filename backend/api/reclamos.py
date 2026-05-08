@@ -1087,17 +1087,23 @@ async def create_reclamo(
     except Exception as e:
         print(f"[BARRIO] Error detectando barrio: {e}", flush=True)
 
-    # Auto-asignar a dependencia basándose en la categoría
+    # Auto-asignar a dependencia basándose en la categoría.
+    # Usamos .first() (no scalar_one_or_none) porque si por algún motivo
+    # quedó duplicidad de filas activas para la misma (municipio, categoria)
+    # — bug histórico que ya arreglamos en el endpoint de asignación, pero
+    # puede haber data sucia preexistente — preferimos tomar la más reciente
+    # antes que tirar excepción y dejar el reclamo sin dependencia.
     try:
         asignacion = await db.execute(
             select(MunicipioDependenciaCategoria)
             .where(
                 MunicipioDependenciaCategoria.municipio_id == current_user.municipio_id,
                 MunicipioDependenciaCategoria.categoria_id == data.categoria_id,
-                MunicipioDependenciaCategoria.activo == True
+                MunicipioDependenciaCategoria.activo == True,
             )
+            .order_by(MunicipioDependenciaCategoria.created_at.desc())
         )
-        mdc = asignacion.scalar_one_or_none()
+        mdc = asignacion.scalars().first()
         if mdc:
             reclamo.municipio_dependencia_id = mdc.municipio_dependencia_id
             print(f"[DEPENDENCIA] Auto-asignado a dependencia_id={mdc.municipio_dependencia_id} por categoría", flush=True)
