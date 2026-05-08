@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MapPin, Loader2, Crosshair } from 'lucide-react';
+import { MapPin, Loader2, Crosshair, CheckCircle2, X as XIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -120,6 +120,12 @@ export function DireccionAutocomplete({
   const [searching, setSearching] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
   const [userInputNumber, setUserInputNumber] = useState<string>('');
+  // Estado interno: true cuando el value actual está respaldado por
+  // coords reales (suggestion clickeada o "usar mi ubicación"). Se resetea
+  // en cuanto el usuario tipea, porque al editar el texto los coords ya
+  // no corresponden a lo que escribió.
+  const [isGeolocated, setIsGeolocated] = useState(false);
+  const [geoCoords, setGeoCoords] = useState<{ lat: number; lon: number } | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Abort controller para cancelar requests en vuelo cuando el usuario escribe
@@ -358,6 +364,8 @@ export function DireccionAutocomplete({
 
     // Al tipear, el usuario está editando la dirección → resetear las coords
     onChange(newValue, null, null);
+    setIsGeolocated(false);
+    setGeoCoords(null);
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -395,7 +403,17 @@ export function DireccionAutocomplete({
       }
     }
 
-    onChange(direccion, parseFloat(suggestion.lat), parseFloat(suggestion.lon));
+    const lat = parseFloat(suggestion.lat);
+    const lon = parseFloat(suggestion.lon);
+    onChange(direccion, lat, lon);
+    setIsGeolocated(true);
+    setGeoCoords({ lat, lon });
+    console.log('[DireccionAutocomplete] Ubicado:', {
+      direccion,
+      lat,
+      lon,
+      tipo: suggestion._esEsquina ? 'esquina (overpass)' : 'direccion (nominatim)',
+    });
     setShowSuggestions(false);
     setSuggestions([]);
   };
@@ -443,6 +461,9 @@ export function DireccionAutocomplete({
       }
 
       onChange(direccion, lat, lon);
+      setIsGeolocated(true);
+      setGeoCoords({ lat, lon });
+      console.log('[DireccionAutocomplete] Ubicado (GPS):', { direccion, lat, lon });
       toast.success('Ubicación detectada');
     } catch (err: any) {
       if (err?.code === 1) {
@@ -498,11 +519,39 @@ export function DireccionAutocomplete({
             border: `1px solid ${hasError ? '#ef4444' : theme.border}`,
           }}
         />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
           {(searching || gettingLocation) && (
             <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.textSecondary }} />
           )}
-          {showCurrentLocationButton && (
+          {/* Cuando ya hay geo: badge verde "Ubicado" + X para borrarla */}
+          {!searching && !gettingLocation && isGeolocated && (
+            <>
+              <div
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                style={{ backgroundColor: '#10b98120', color: '#059669' }}
+                title={geoCoords ? `Lat ${geoCoords.lat.toFixed(5)}, Lon ${geoCoords.lon.toFixed(5)}` : 'Geolocalizado'}
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                Ubicado
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(value, null, null);
+                  setIsGeolocated(false);
+                  setGeoCoords(null);
+                  console.log('[DireccionAutocomplete] Geolocalización borrada');
+                }}
+                className="p-1 rounded-lg transition-all hover:scale-110 active:scale-95"
+                style={{ backgroundColor: '#ef444415', color: '#ef4444' }}
+                title="Borrar geolocalización"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            </>
+          )}
+          {/* Cuando NO hay geo: botón de "usar mi ubicación actual" */}
+          {!searching && !gettingLocation && !isGeolocated && showCurrentLocationButton && (
             <button
               type="button"
               onClick={getCurrentLocation}
