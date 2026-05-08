@@ -108,6 +108,27 @@ export function InboxLayout({
         .inbox-section {
           animation: inboxFadeIn 0.5s ease-out backwards;
         }
+        /* Divisor entre secciones — barra horizontal sutil con un acento
+           grueso del lado izquierdo del color de la seccion siguiente.
+           Sirve de "marcador" visual entre etapas. */
+        .inbox-divider {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin: 8px 0 4px 0;
+        }
+        .inbox-divider-accent {
+          height: 4px;
+          width: 36px;
+          border-radius: 2px;
+          flex-shrink: 0;
+        }
+        .inbox-divider-line {
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(to right, currentColor 0%, transparent 100%);
+          opacity: 0.25;
+        }
       `}</style>
 
       {/* === Hero compacto: saludo inline + chips en la misma fila === */}
@@ -187,7 +208,23 @@ export function InboxLayout({
           );
         }
         return conItems.map((sec, idxSec) => (
-          <Seccion key={sec.id} seccion={sec} indexBase={idxSec} />
+          <div key={sec.id}>
+            {/* Divisor visual entre etapas. La primera no lleva. */}
+            {idxSec > 0 && (
+              <div
+                className="inbox-divider"
+                style={{ color: sec.color, marginTop: 24, marginBottom: 16 }}
+                aria-hidden="true"
+              >
+                <div
+                  className="inbox-divider-accent"
+                  style={{ backgroundColor: sec.color }}
+                />
+                <div className="inbox-divider-line" />
+              </div>
+            )}
+            <Seccion seccion={sec} indexBase={idxSec} />
+          </div>
         ));
       })()}
     </div>
