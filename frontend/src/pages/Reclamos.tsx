@@ -3685,7 +3685,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   onClick={handleRechazar}
                   disabled={saving}
                   className="flex-1 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                  style={{ backgroundColor: '#dc2626', color: '#ffffff' }}
+                  style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
                 >
                   {saving ? 'Rechazando...' : 'Confirmar Rechazo'}
                 </button>
@@ -4006,7 +4006,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   </p>
                 )}
                 {selectedReclamo.fecha_confirmacion_vecino && (
-                  <p className="text-xs mt-1 opacity-80" style={{ color: '#dc2626' }}>
+                  <p className="text-xs mt-1 opacity-80" style={{ color: '#ef4444' }}>
                     {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleString('es-AR', {
                       day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
                     })}
@@ -4209,7 +4209,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       }
       metricasChips={[
         ...(inboxData.conFeedback.length > 0 ? [
-          { color: '#dc2626', icon: <ThumbsDown className="w-3.5 h-3.5" />, label: 'sigue el problema', value: inboxData.conFeedback.length },
+          { color: '#ef4444', icon: <ThumbsDown className="w-3.5 h-3.5" />, label: 'sigue el problema', value: inboxData.conFeedback.length },
         ] : []),
         { color: '#ef4444', icon: <AlertCircle className="w-3.5 h-3.5" />, label: 'urgentes', value: inboxData.urgentes.length },
         { color: '#3b82f6', icon: <Inbox className="w-3.5 h-3.5" />, label: 'nuevos', value: inboxData.nuevos.length },
@@ -4228,10 +4228,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           titulo: 'El vecino dice que sigue el problema',
           subtitulo: 'Reclamos cerrados con feedback negativo — revisar y reabrir',
           icono: <ThumbsDown className="w-5 h-5" />,
-          color: '#dc2626',
+          color: '#ef4444',
           emptyMessage: 'Sin disputas del vecino — buen trabajo.',
           count: inboxData.conFeedback.length,
-          items: (density) => inboxData.conFeedback.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#dc2626' })),
+          items: (density) => inboxData.conFeedback.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#ef4444' })),
         },
         {
           id: 'urgente',
