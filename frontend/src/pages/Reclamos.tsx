@@ -1496,8 +1496,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         try {
           await reclamosApi.descartarFeedbackVecino(reclamoId);
           toast.success('Feedback descartado. El reclamo queda finalizado.');
-          fetchReclamos();
+          // resetPage=true para que sea un fetch fresco desde la pagina 1.
+          // Sin esto, fetchReclamos() solo apendea y el reclamo recien
+          // descartado queda igual en el estado local, asi que la vista
+          // sigue mostrandolo hasta que el usuario hace F5 manual.
+          fetchReclamos(true);
           closeConfirmModal();
+          closeSheet();
         } catch (err) {
           const e = err as { response?: { data?: { detail?: string } } };
           toast.error(e.response?.data?.detail || 'No se pudo descartar');
