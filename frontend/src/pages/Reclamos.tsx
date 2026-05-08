@@ -4131,7 +4131,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
   const renderInboxCard = (
     r: Reclamo,
-    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row' },
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string },
   ) => {
     const cat = r.categoria;
     const color = cat?.color || DEFAULT_CATEGORY_COLOR;
@@ -4178,6 +4178,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         tiempoLabel={tiempoLabel}
         creadoLabel={creadoLabel}
         color={color}
+        sectionColor={opts?.sectionColor}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
@@ -4213,7 +4214,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
           count: inboxData.urgentes.length,
-          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density })),
+          items: (density) => inboxData.urgentes.map((r) => renderInboxCard(r, { urgente: true, density, sectionColor: '#ef4444' })),
         },
         {
           id: 'nuevos',
@@ -4223,7 +4224,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#3b82f6',
           emptyMessage: '🎉 No hay reclamos nuevos sin tomar.',
           count: inboxData.nuevos.length,
-          items: (density) => inboxData.nuevos.map((r) => renderInboxCard(r, { density })),
+          items: (density) => inboxData.nuevos.map((r) => renderInboxCard(r, { density, sectionColor: '#3b82f6' })),
         },
         {
           id: 'en-curso',
@@ -4233,7 +4234,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#f59e0b',
           emptyMessage: 'Nada en curso ahora mismo.',
           count: inboxData.enCurso.length,
-          items: (density) => inboxData.enCurso.map((r) => renderInboxCard(r, { density })),
+          items: (density) => inboxData.enCurso.map((r) => renderInboxCard(r, { density, sectionColor: '#f59e0b' })),
           colapsable: inboxData.enCurso.length > 6,
         },
         {
@@ -4244,7 +4245,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#8b5cf6',
           emptyMessage: 'Sin reclamos pospuestos.',
           count: inboxData.esperando.length,
-          items: (density) => inboxData.esperando.map((r) => renderInboxCard(r, { density })),
+          items: (density) => inboxData.esperando.map((r) => renderInboxCard(r, { density, sectionColor: '#8b5cf6' })),
           colapsable: true,
         },
         {
@@ -4255,7 +4256,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           color: '#71717a',
           emptyMessage: 'No hay reclamos viejos sin atender.',
           count: inboxData.fosiles.length,
-          items: (density) => inboxData.fosiles.map((r) => renderInboxCard(r, { density })),
+          items: (density) => inboxData.fosiles.map((r) => renderInboxCard(r, { density, sectionColor: '#71717a' })),
           colapsable: true,
         },
       ]}

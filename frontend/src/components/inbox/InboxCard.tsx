@@ -17,8 +17,16 @@ interface InboxCardProps {
   tiempoLabel?: string;
   /** Texto de antigüedad: "Creado hace 5d", solo se muestra en `large`. */
   creadoLabel?: string;
-  /** Color de acento (categoría, dependencia, estado). */
+  /** Color de acento de la categoría / tipo. Se usa SOLO para el icono. */
   color: string;
+  /**
+   * Color de la sección a la que pertenece la card en el inbox (urgente,
+   * nuevos, en curso, etc). Se usa para el borde, el CTA y los acentos
+   * principales — para que todas las cards de la misma etapa se vean
+   * coherentes entre si, sin importar la categoria. Si no se pasa,
+   * fallback al color de la categoria.
+   */
+  sectionColor?: string;
   /** Ícono representativo (de la categoría / tipo). */
   icono?: ReactNode;
   /** Badges adicionales arriba a la derecha (urgencia, pago, etc). */
@@ -47,6 +55,7 @@ export function InboxCard({
   tiempoLabel,
   creadoLabel,
   color,
+  sectionColor,
   icono,
   badges,
   ctaLabel = 'Abrir',
@@ -60,7 +69,12 @@ export function InboxCard({
     : undefined;
   const { theme } = useTheme();
 
-  const borderColor = urgente ? '#ef4444' : color + '40';
+  // Color principal de la card: el de la SECCION (etapa) — para que todas
+  // las cards de la misma etapa se vean iguales. Si no hay sectionColor,
+  // fallback al de la categoria.
+  const accentColor = sectionColor || color;
+
+  const borderColor = urgente ? '#ef4444' : accentColor + '40';
   const borderWidth = urgente ? '2px' : '1px';
   const shadow = urgente ? '0 6px 20px rgba(239, 68, 68, 0.15)' : 'none';
 
@@ -136,7 +150,7 @@ export function InboxCard({
         )}
         <div
           className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-white flex-shrink-0 transition-all group-hover:brightness-110"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: accentColor }}
         >
           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
         </div>
@@ -229,7 +243,7 @@ export function InboxCard({
 
         <div
           className="inline-flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-white transition-all group-hover:brightness-110 mt-auto"
-          style={{ backgroundColor: color }}
+          style={{ backgroundColor: accentColor }}
         >
           <span>{ctaLabel}</span>
           <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -333,10 +347,10 @@ export function InboxCard({
         ))}
       </div>
 
-      {/* CTA — más bajo, mismo color de acento */}
+      {/* CTA — color de la SECCION (etapa) para coherencia visual */}
       <div
         className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all group-hover:brightness-110 mt-1"
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: accentColor }}
       >
         <span>{ctaLabel}</span>
         <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />

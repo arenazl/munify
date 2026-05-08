@@ -1510,7 +1510,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   const renderInboxCard = (
     t: Solicitud,
-    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row' },
+    opts?: { urgente?: boolean; density?: 'large' | 'compact' | 'row'; sectionColor?: string },
   ) => {
     const cat = t.tramite?.categoria_tramite;
     const color = cat?.color || theme.primary;
@@ -1554,6 +1554,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         tiempoLabel={tiempoLabel}
         creadoLabel={creadoLabel}
         color={color}
+        sectionColor={opts?.sectionColor}
         icono={cat?.icono ? <DynamicIcon name={cat.icono} className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
         badges={badges.length > 0 ? badges : undefined}
         ctaLabel={opts?.urgente ? 'Resolver ya' : 'Abrir'}
@@ -1589,7 +1590,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#ef4444',
           emptyMessage: '✨ Sin urgentes. Bandeja al día.',
           count: inboxData.urgentes.length,
-          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density })),
+          items: (density) => inboxData.urgentes.map((t) => renderInboxCard(t, { urgente: true, density, sectionColor: '#ef4444' })),
         },
         {
           id: 'nuevos',
@@ -1599,7 +1600,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#3b82f6',
           emptyMessage: '🎉 No hay trámites nuevos sin tomar.',
           count: inboxData.nuevos.length,
-          items: (density) => inboxData.nuevos.map((t) => renderInboxCard(t, { density })),
+          items: (density) => inboxData.nuevos.map((t) => renderInboxCard(t, { density, sectionColor: '#3b82f6' })),
         },
         {
           id: 'en-curso',
@@ -1609,7 +1610,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#f59e0b',
           emptyMessage: 'Nada en curso ahora mismo.',
           count: inboxData.enCurso.length,
-          items: (density) => inboxData.enCurso.map((t) => renderInboxCard(t, { density })),
+          items: (density) => inboxData.enCurso.map((t) => renderInboxCard(t, { density, sectionColor: '#f59e0b' })),
           colapsable: inboxData.enCurso.length > 6,
         },
         {
@@ -1620,7 +1621,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#8b5cf6',
           emptyMessage: 'Sin trámites esperando.',
           count: inboxData.esperando.length,
-          items: (density) => inboxData.esperando.map((t) => renderInboxCard(t, { density })),
+          items: (density) => inboxData.esperando.map((t) => renderInboxCard(t, { density, sectionColor: '#8b5cf6' })),
           colapsable: true,
         },
         {
@@ -1631,7 +1632,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           color: '#71717a',
           emptyMessage: 'No hay trámites viejos sin atender.',
           count: inboxData.fosiles.length,
-          items: (density) => inboxData.fosiles.map((t) => renderInboxCard(t, { density })),
+          items: (density) => inboxData.fosiles.map((t) => renderInboxCard(t, { density, sectionColor: '#71717a' })),
           colapsable: true,
         },
       ]}
