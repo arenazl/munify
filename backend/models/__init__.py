@@ -177,3 +177,31 @@ __all__ += [
     "ExportacionImputacion",
     "MunicipioSidebarItem",
 ]
+
+# Modulos activables por municipio (feature flags)
+from .municipio_modulo import MunicipioModulo
+
+# Tesoreria (control de gastos del intendente)
+from .contacto import Contacto, TipoContacto
+from .gasto import (
+    Gasto,
+    GastoCuota,
+    DestinoGasto,
+    TipoFinanciacion,
+    FrecuenciaRecurrencia,
+    FormaPago,
+    EstadoGastoCuota,
+)
+
+__all__ += [
+    "MunicipioModulo",
+    "Contacto",
+    "TipoContacto",
+    "Gasto",
+    "GastoCuota",
+    "DestinoGasto",
+    "TipoFinanciacion",
+    "FrecuenciaRecurrencia",
+    "FormaPago",
+    "EstadoGastoCuota",
+]

@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "descripcion": "Catalogo de conceptos de gasto sugeridos para autocomplete en el wizard de Tesoreria. El usuario puede elegir uno o escribir libre. Basado en el Excel real del intendente de San Pedro.",
+  "grupos": [
+    {
+      "nombre": "Sueldos y haberes",
+      "conceptos": [
+        "Sueldo mensual",
+        "Sueldo basico",
+        "Horas extras",
+        "Aguinaldo",
+        "Medio aguinaldo",
+        "Bono",
+        "Adicional por antiguedad",
+        "Adicional por presentismo",
+        "Adicional por zona",
+        "Adicional jerarquico",
+        "Liquidacion final",
+        "Vacaciones",
+        "Indemnizacion"
+      ]
+    },
+    {
+      "nombre": "Concejales y politicos",
+      "conceptos": [
+        "Dieta concejal",
+        "Dieta concejal aguinaldo",
+        "Gastos de representacion",
+        "Movilidad",
+        "Viaticos"
+      ]
+    },
+    {
+      "nombre": "Honorarios profesionales",
+      "conceptos": [
+        "Honorarios abogado",
+        "Honorarios contador",
+        "Honorarios ingeniero",
+        "Honorarios arquitecto",
+        "Honorarios doctor",
+        "Honorarios sistemas",
+        "Honorarios consultor",
+        "Honorarios escribano",
+        "Honorarios prensa",
+        "Honorarios diseno grafico"
+      ]
+    },
+    {
+      "nombre": "Publicidad y prensa",
+      "conceptos": [
+        "Publicidad radial",
+        "Publicidad TV",
+        "Publicidad redes sociales",
+        "Publicidad grafica",
+        "Cartel publicitario",
+        "Patrocinio evento"
+      ]
+    },
+    {
+      "nombre": "Aportes y subsidios",
+      "conceptos": [
+        "Aporte vecinal",
+        "Aporte agrario",
+        "Aporte barrial",
+        "Aporte cultural",
+        "Aporte deportivo",
+        "Aporte religioso",
+        "Subsidio social",
+        "Subsidio por emergencia",
+        "Subsidio educativo",
+        "Subsidio sanitario",
+        "Subsidio funebre",
+        "Ayuda economica"
+      ]
+    },
+    {
+      "nombre": "Prestamos",
+      "conceptos": [
+        "Prestamo personal",
+        "Prestamo agrario",
+        "Prestamo barrial",
+        "Prestamo productivo",
+        "Prestamo para inversion",
+        "Prestamo para vivienda",
+        "Prestamo emergencia"
+      ]
+    },
+    {
+      "nombre": "Eventos y cultura",
+      "conceptos": [
+        "Festival",
+        "Festival folklorico",
+        "Festival deportivo",
+        "Festival de futbol",
+        "Carnaval",
+        "Aniversario del pueblo",
+        "Fiesta patronal",
+        "Acto institucional",
+        "Espectaculo musical",
+        "Capacitacion / taller",
+        "Premio cultural"
+      ]
+    },
+    {
+      "nombre": "Obras y servicios",
+      "conceptos": [
+        "Obra publica",
+        "Obra de bacheo",
+        "Obra de alumbrado",
+        "Obra de cloacas",
+        "Obra de agua potable",
+        "Obra de pavimentacion",
+        "Obra de vestuarios",
+        "Obra de canchas",
+        "Mantenimiento de edificios",
+        "Materiales de construccion",
+        "Cemento / arena / hierro",
+        "Maquinaria"
+      ]
+    },
+    {
+      "nombre": "Combustibles y movilidad",
+      "conceptos": [
+        "Combustible",
+        "Gasoil",
+        "Nafta",
+        "GNC",
+        "Lubricantes",
+        "Service de vehiculo",
+        "Repuestos vehiculo",
+        "Patentes",
+        "Seguro vehicular",
+        "Peajes"
+      ]
+    },
+    {
+      "nombre": "Salud",
+      "conceptos": [
+        "Medicamentos",
+        "Insumos hospital",
+        "Traslado sanitario",
+        "Estudios medicos",
+        "Honorarios medicos"
+      ]
+    },
+    {
+      "nombre": "Educacion",
+      "conceptos": [
+        "Materiales escolares",
+        "Uniformes escolares",
+        "Comedor escolar",
+        "Beca de estudio",
+        "Pasajes escolares",
+        "Equipamiento educativo"
+      ]
+    },
+    {
+      "nombre": "Servicios e impuestos",
+      "conceptos": [
+        "Luz",
+        "Agua",
+        "Gas",
+        "Internet",
+        "Telefonia",
+        "Alquiler",
+        "Limpieza",
+        "Seguridad",
+        "Impuestos",
+        "Tasas provinciales",
+        "Cargas sociales",
+        "Aportes ANSES"
+      ]
+    },
+    {
+      "nombre": "Otros",
+      "conceptos": [
+        "Visa",
+        "Caja chica",
+        "Insumos de oficina",
+        "Capacitacion del personal",
+        "Regalo institucional",
+        "Donacion",
+        "Otros"
+      ]
+    }
+  ]
+}
