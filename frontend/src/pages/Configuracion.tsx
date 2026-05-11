@@ -5,6 +5,7 @@ import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
+import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
 
 // Claves que se muestran en la sección especial del Municipio
 const MUNICIPIO_KEYS = ['nombre_municipio', 'direccion_municipio', 'latitud_municipio', 'longitud_municipio', 'telefono_contacto'];
@@ -570,6 +571,9 @@ export default function Configuracion() {
         subtitle="Parámetros del sistema y branding"
         icon={Settings}
       />
+
+      {/* Módulos activables del municipio (feature flags). Solo admin. */}
+      <ModulosToggle />
 
       {/* Sección Datos del Municipio */}
       <div

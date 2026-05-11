@@ -1914,3 +1914,72 @@ export const planificacionApi = {
       },
     }),
 };
+
+// =====================================================================
+// TESORERIA (control de gastos del intendente)
+// =====================================================================
+
+export const modulosApi = {
+  list: () => api.get('/modulos/'),
+  get: (nombre: string) => api.get(`/modulos/${nombre}`),
+  upsert: (nombre: string, activo: boolean) =>
+    api.put(`/modulos/${nombre}`, { modulo: nombre, activo }),
+};
+
+export const contactosApi = {
+  list: (params?: { tipo?: string; search?: string; activo?: boolean; skip?: number; limit?: number }) =>
+    api.get('/tesoreria/contactos', { params }),
+  get: (id: number) => api.get(`/tesoreria/contactos/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/contactos', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tesoreria/contactos/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/contactos/${id}`),
+};
+
+export const gastosApi = {
+  list: (params?: {
+    destino_tipo?: string;
+    contacto_id?: number;
+    dependencia_id?: number;
+    concepto?: string;
+    desde?: string;
+    hasta?: string;
+    skip?: number;
+    limit?: number;
+  }) => api.get('/tesoreria/gastos', { params }),
+  get: (id: number) => api.get(`/tesoreria/gastos/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/gastos', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tesoreria/gastos/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/gastos/${id}`),
+  pagarCuota: (cuotaId: number, data: Record<string, unknown>) =>
+    api.post(`/tesoreria/gastos/cuotas/${cuotaId}/pagar`, data),
+  proyecciones: (params?: { desde?: string; hasta?: string }) =>
+    api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
+};
+
+export const cotizacionApi = {
+  usd: () => api.get('/cotizacion/usd'),
+};
+
+export const tesoreriaCatalogoApi = {
+  conceptos: () => api.get('/tesoreria/conceptos'),
+};
+
+export const tesoreriaImportApi = {
+  excelMatriz: (archivo: File, anio?: number) => {
+    const fd = new FormData();
+    fd.append('archivo', archivo);
+    return api.post('/tesoreria/import/excel-matriz', fd, {
+      params: anio ? { anio } : undefined,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  kmz: (archivo: File) => {
+    const fd = new FormData();
+    fd.append('archivo', archivo);
+    return api.post('/tesoreria/import/kmz', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};

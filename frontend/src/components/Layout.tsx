@@ -81,6 +81,8 @@ export default function Layout() {
   const [emailValidationCode, setEmailValidationCode] = useState('');
   // Items del sidebar ocultos por el superadmin para el muni actual
   const [hrefsOcultos, setHrefsOcultos] = useState<string[]>([]);
+  // Modulos activos del municipio (feature flags)
+  const [modulosActivos, setModulosActivos] = useState<string[]>([]);
   const [pendingEmail, setPendingEmail] = useState('');
   const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
@@ -165,6 +167,19 @@ export default function Layout() {
     navegacionApi.misHrefsOcultos()
       .then((r) => setHrefsOcultos(r.data || []))
       .catch(() => setHrefsOcultos([]));
+  }, [user?.id, user?.municipio_id]);
+
+  // Cargar modulos activos del municipio (feature flags)
+  useEffect(() => {
+    if (!user) {
+      setModulosActivos([]);
+      return;
+    }
+    import('../lib/api').then(({ modulosApi }) => {
+      modulosApi.list()
+        .then((r) => setModulosActivos((r.data || []).filter((m: any) => m.activo).map((m: any) => m.modulo)))
+        .catch(() => setModulosActivos([]));
+    });
   }, [user?.id, user?.municipio_id]);
 
   // Cargar datos del usuario cuando se abre el sheet de perfil
@@ -317,6 +332,7 @@ export default function Layout() {
     // del sidebar. Quedan accesibles sólo desde /gestion/ajustes.
     abmEnSidebar: municipioActual?.abm_en_sidebar ?? true,
     hrefsOcultos,
+    modulosActivos,
   });
   const mobileTabs = getMobileTabs(user.rol);
 

@@ -62,6 +62,12 @@ import AsignacionDependencias from './pages/AsignacionDependencias';
 import Municipios from './pages/Municipios';
 import MiArea from './pages/MiArea';
 
+// Tesoreria
+import Tesoreria from './pages/Tesoreria';
+import TesoreriaContactos from './pages/TesoreriaContactos';
+import TesoreriaMapa from './pages/TesoreriaMapa';
+import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
+
 // Demos de diseño
 import DemosIndex from './pages/demos';
 import DemoGlassmorphism from './pages/demos/DemoGlassmorphism';
@@ -180,6 +186,12 @@ export const router = createBrowserRouter([
 
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },
+
+      // Tesorería (solo admin del municipio)
+      { path: 'tesoreria', element: <ProtectedRoute roles={['admin']}><Tesoreria /></ProtectedRoute> },
+      { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin']}><TesoreriaContactos /></ProtectedRoute> },
+      { path: 'tesoreria/mapa', element: <ProtectedRoute roles={['admin']}><TesoreriaMapa /></ProtectedRoute> },
+      { path: 'tesoreria/proyecciones', element: <ProtectedRoute roles={['admin']}><TesoreriaProyecciones /></ProtectedRoute> },
 
       // Logros/Gamificación (para todos los usuarios autenticados)
       { path: 'logros', element: <Gamificacion /> },

@@ -22,6 +22,12 @@ interface NavigationOptions {
    * Viene de GET /api/navigation/hrefs-ocultos al loguearse.
    */
   hrefsOcultos?: string[];
+  /**
+   * Modulos activos del municipio (feature flags). Items que dependen
+   * de un modulo (ej: 'tesoreria') solo se muestran si su clave esta
+   * aca. Default: set vacio → todos los items "modulares" se ocultan.
+   */
+  modulosActivos?: string[];
 }
 
 export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => {
@@ -37,6 +43,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     const raw = userRoleOrOptions.hrefsOcultos;
     if (!Array.isArray(raw)) return new Set<string>();
     return new Set<string>(raw.filter((h): h is string => typeof h === 'string'));
+  })();
+  const modulosActivos = (() => {
+    if (typeof userRoleOrOptions !== 'object') return new Set<string>();
+    const raw = userRoleOrOptions.modulosActivos;
+    if (!Array.isArray(raw)) return new Set<string>();
+    return new Set<string>(raw);
   })();
 
   const isAdmin = userRole === 'admin';
@@ -134,6 +146,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       icon: ScanLine,
       show: esFuncionarioMuni,
       description: 'Ventanilla asistida — biometría + trámite presencial'
+    },
+    {
+      // Modulo activable desde Configuración. Solo aparece si el municipio
+      // tiene activo el flag `tesoreria` Y el usuario es admin.
+      name: 'Tesorería',
+      href: '/gestion/tesoreria',
+      icon: Receipt,
+      show: isAdmin && modulosActivos.has('tesoreria'),
+      description: 'Control de gastos del intendente'
     },
     {
       name: 'Mapa',

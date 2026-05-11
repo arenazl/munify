@@ -464,3 +464,122 @@ export type TramiteCatalogo = Tramite;
 // Alias para tipos legacy que NO se usan más pero quedan en imports sueltos
 export type EstadoTramite = EstadoSolicitud;
 export type HistorialTramite = HistorialSolicitud;
+
+// =====================================================================
+// TESORERIA (control de gastos del intendente)
+// =====================================================================
+
+export type TipoContacto =
+  | 'concejal' | 'empleado' | 'profesional'
+  | 'proveedor' | 'contratista' | 'beneficiario' | 'otro';
+
+export type DestinoGasto = 'dependencia' | 'contacto';
+export type TipoFinanciacion = 'contado' | 'cuotas' | 'prestamo' | 'recurrente';
+export type FrecuenciaRecurrencia =
+  | 'semanal' | 'quincenal' | 'mensual'
+  | 'bimestral' | 'trimestral' | 'anual';
+export type FormaPago =
+  | 'efectivo' | 'transferencia' | 'cheque'
+  | 'tarjeta' | 'mercadopago' | 'otro';
+export type EstadoGastoCuota = 'pendiente' | 'pagada' | 'vencida' | 'cancelada';
+
+export interface Contacto {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  apellido?: string | null;
+  dni?: string | null;
+  telefono?: string | null;
+  email?: string | null;
+  direccion?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  alias_pago?: string | null;
+  tipo: TipoContacto;
+  subtipo?: string | null;
+  notas?: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GastoCuota {
+  id: number;
+  gasto_id: number;
+  numero: number;
+  monto: string;  // Decimal serializado como string
+  fecha_vencimiento: string;
+  fecha_pago?: string | null;
+  estado: EstadoGastoCuota;
+  forma_pago?: FormaPago | null;
+  comprobante?: string | null;
+  notas?: string | null;
+}
+
+export interface Gasto {
+  id: number;
+  municipio_id: number;
+  creador_id: number;
+  destino_tipo: DestinoGasto;
+  destino_dependencia_id?: number | null;
+  destino_contacto_id?: number | null;
+  concepto: string;
+  descripcion?: string | null;
+  monto_pesos: string;
+  cotizacion_usd?: string | null;
+  monto_usd?: string | null;
+  fecha: string;
+  tipo_financiacion: TipoFinanciacion;
+  forma_pago: FormaPago;
+  cuotas_total?: number | null;
+  frecuencia?: FrecuenciaRecurrencia | null;
+  fecha_fin_recurrencia?: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  cuotas?: GastoCuota[];
+}
+
+export interface CotizacionUSD {
+  fecha: string;
+  fuente: string;
+  blue_compra?: string | null;
+  blue_venta?: string | null;
+  oficial_compra?: string | null;
+  oficial_venta?: string | null;
+  valor_sugerido?: string | null;
+}
+
+export interface ProyeccionMes {
+  anio: number;
+  mes: number;
+  total_pesos: string;
+  total_usd?: string | null;
+  cantidad_cuotas: number;
+}
+
+export interface ProyeccionResponse {
+  desde: string;
+  hasta: string;
+  total_pesos: string;
+  cantidad_cuotas: number;
+  por_mes: ProyeccionMes[];
+}
+
+export interface ConceptoGastoGrupo {
+  nombre: string;
+  conceptos: string[];
+}
+
+export interface ConceptosCatalogo {
+  version: number;
+  descripcion?: string;
+  grupos: ConceptoGastoGrupo[];
+}
+
+export interface MunicipioModulo {
+  id: number;
+  municipio_id: number;
+  modulo: string;
+  activo: boolean;
+}
