@@ -4,12 +4,27 @@ import { useTheme } from '../../contexts/ThemeContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// URLs de tiles para tema claro y oscuro.
-// Voyager: tiles claros con detalle (calles, nombres, color). Más legible
-// que "light_all" — el user ve mejor dónde pincha el marker.
-const TILE_URLS = {
-  light: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  dark: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+// Proveedores de tiles disponibles. Toggle visible en la UI para probar
+// y comparar cuál se ve mejor en esta app. Los dos son gratis y sin API key.
+// - osm: maximo detalle (calles, comercios, POIs), colores fuertes.
+// - stadia: equilibrio detalle + estetica limpia (tier free con rate limit).
+type TileProviderId = 'osm' | 'stadia';
+
+const TILE_PROVIDERS: Record<TileProviderId, {
+  label: string;
+  url: string;
+  attribution: string;
+}> = {
+  osm: {
+    label: 'OSM',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
+  stadia: {
+    label: 'Stadia',
+    url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; Stadia Maps &copy; OpenStreetMap',
+  },
 };
 
 // Fix para el icono de Leaflet en Vite
@@ -68,6 +83,43 @@ function MapCenterUpdater({ coords }: { coords: { lat: number; lng: number } | n
   return null;
 }
 
+// Toggle visual entre OSM y Stadia. Renderizado absolute top-left dentro del
+// contenedor del mapa, encima de los tiles (z-index alto).
+function TileProviderToggle({
+  active,
+  onChange,
+}: {
+  active: TileProviderId;
+  onChange: (id: TileProviderId) => void;
+}) {
+  const { theme } = useTheme();
+  return (
+    <div
+      className="absolute top-3 left-3 z-[1000] flex rounded-lg overflow-hidden shadow-lg"
+      style={{ border: `1px solid ${theme.border}` }}
+    >
+      {(Object.keys(TILE_PROVIDERS) as TileProviderId[]).map((id) => {
+        const isActive = id === active;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            className="px-3 py-1 text-xs font-medium transition-colors"
+            style={{
+              backgroundColor: isActive ? theme.primary : theme.card,
+              color: isActive ? theme.card : theme.text,
+            }}
+            title={`Cambiar a ${TILE_PROVIDERS[id].label}`}
+          >
+            {TILE_PROVIDERS[id].label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Componente para forzar resize cuando el mapa se hace visible
 function MapResizeHandler() {
   const map = useMap();
@@ -99,10 +151,9 @@ export function MapPicker({
   zoom = 13,
   center = { lat: -34.6037, lng: -58.3816 }, // Buenos Aires por defecto
 }: MapPickerProps) {
-  const { theme, currentPresetId } = useTheme();
-  // Detectar si el tema es claro (solo sand y arctic son claros)
-  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
-  const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
+  const { theme } = useTheme();
+  const [tileProvider, setTileProvider] = useState<TileProviderId>('osm');
+  const provider = TILE_PROVIDERS[tileProvider];
 
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(value || null);
   const mapRef = useRef<L.Map | null>(null);
@@ -147,14 +198,18 @@ export function MapPicker({
         ref={mapRef}
       >
         <TileLayer
-          attribution='&copy; OSM &copy; CARTO'
-          url={tileUrl}
+          key={tileProvider}
+          attribution={provider.attribution}
+          url={provider.url}
         />
         <MapResizeHandler />
         <MapCenterUpdater coords={value || null} />
         {!readOnly && <MapClickHandler onLocationSelect={handleLocationSelect} />}
         {position && <Marker position={[position.lat, position.lng]} />}
       </MapContainer>
+
+      {/* Toggle de proveedor de tiles (experimento: OSM vs Stadia) */}
+      <TileProviderToggle active={tileProvider} onChange={setTileProvider} />
 
       {/* Botón de ubicación actual */}
       {!readOnly && (
@@ -207,10 +262,9 @@ export function MapView({
   center = { lat: -34.6037, lng: -58.3816 },
   onMarkerClick,
 }: MapViewProps) {
-  const { theme, currentPresetId } = useTheme();
-  // Detectar si el tema es claro (solo sand y arctic son claros)
-  const isDarkTheme = currentPresetId !== 'sand' && currentPresetId !== 'arctic';
-  const tileUrl = isDarkTheme ? TILE_URLS.dark : TILE_URLS.light;
+  const { theme } = useTheme();
+  const [tileProvider, setTileProvider] = useState<TileProviderId>('osm');
+  const provider = TILE_PROVIDERS[tileProvider];
 
   // Calcular centro basado en marcadores si existen
   const mapCenter = markers.length > 0
@@ -221,15 +275,16 @@ export function MapView({
     : center;
 
   return (
-    <div className="rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
+    <div className="relative rounded-lg overflow-hidden" style={{ height, border: `1px solid ${theme.border}` }}>
       <MapContainer
         center={[mapCenter.lat, mapCenter.lng]}
         zoom={zoom}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          attribution='&copy; OSM &copy; CARTO'
-          url={tileUrl}
+          key={tileProvider}
+          attribution={provider.attribution}
+          url={provider.url}
         />
         <MapResizeHandler />
         {markers.map((marker) => (
@@ -242,6 +297,9 @@ export function MapView({
           />
         ))}
       </MapContainer>
+
+      {/* Toggle de proveedor de tiles (experimento: OSM vs Stadia) */}
+      <TileProviderToggle active={tileProvider} onChange={setTileProvider} />
     </div>
   );
 }
