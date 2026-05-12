@@ -90,17 +90,8 @@ export default function TesoreriaResumen() {
   // Mes expandido (solo aplica a modo 'anio')
   const [mesExpandido, setMesExpandido] = useState<string | null>(null);
 
-  // Calcular rango fechas según modo + período seleccionado
-  const { desde, hasta } = useMemo(() => {
-    if (modo === 'mes') {
-      const d = new Date(anioActual, mesActual, 1);
-      const h = new Date(anioActual, mesActual + 1, 0);
-      return { desde: d.toISOString().slice(0, 10), hasta: h.toISOString().slice(0, 10) };
-    }
-    return { desde: `${anioActual}-01-01`, hasta: `${anioActual}-12-31` };
-  }, [modo, mesActual, anioActual]);
-
-  // Cargar catalogos
+  // Cargar TODO una sola vez (mismo patron que Tesoreria home).
+  // El filtrado por periodo (mes/año) es 100% client-side -> sin flicker.
   useEffect(() => {
     if (sinPermisos) return;
     contactosApi.list({ activo: true, limit: 1000 }).then(r => setContactos(r.data || [])).catch(() => {});
@@ -109,19 +100,11 @@ export default function TesoreriaResumen() {
     conceptosAbmApi.list({ activo: true }).then(r => setConceptos(r.data || [])).catch(() => {});
     tiposEmpleadoApi.list({ activo: true }).then(r => setTiposEmpleado(r.data || [])).catch(() => {});
     cajasApi.list({ activo: true, include_saldos: false }).then(r => setCajas(r.data || [])).catch(() => {});
+    gastosApi.list({ limit: 1000 })
+      .then(r => setGastos(r.data || []))
+      .catch(() => setGastos([]))
+      .finally(() => setLoading(false));
   }, [sinPermisos]);
-
-  // Cargar gastos del periodo
-  useEffect(() => {
-    if (sinPermisos) return;
-    let cancelled = false;
-    setLoading(true);
-    gastosApi.list({ desde, hasta, limit: 1000 })
-      .then(r => { if (!cancelled) setGastos(r.data || []); })
-      .catch(() => { if (!cancelled) setGastos([]); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [desde, hasta, sinPermisos]);
 
   const contactosMap = useMemo(() => {
     const m = new Map<number, Contacto>();
@@ -150,11 +133,18 @@ export default function TesoreriaResumen() {
     return m;
   }, [conceptos]);
 
-  // Aplicar filtros sobre los gastos del periodo
+  // Aplicar filtros (incluyendo el período mes/año, client-side, sin refetch)
   const filtered = useMemo(() => {
     const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
     const cajaId = cajaFiltro ? parseInt(cajaFiltro, 10) : null;
     return gastos.filter(g => {
+      // Período: en modo mes, solo este mes+año. En modo año, solo este año.
+      const d = new Date(g.fecha);
+      if (modo === 'mes') {
+        if (d.getMonth() !== mesActual || d.getFullYear() !== anioActual) return false;
+      } else {
+        if (d.getFullYear() !== anioActual) return false;
+      }
       if (formaPagoFiltro && g.forma_pago !== formaPagoFiltro) return false;
       if (depId != null) {
         if (g.destino_tipo !== 'dependencia' || g.destino_dependencia_id !== depId) return false;
@@ -170,8 +160,9 @@ export default function TesoreriaResumen() {
       if (cajaId != null && (g as Gasto & { caja_id?: number | null }).caja_id !== cajaId) return false;
       return true;
     });
-  }, [gastos, formaPagoFiltro, dependenciaFiltro, tipoContactoFiltro, subtipoEmpleadoFiltro,
-      tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, cajaFiltro, contactosMap]);
+  }, [gastos, modo, mesActual, anioActual, formaPagoFiltro, dependenciaFiltro, tipoContactoFiltro,
+      subtipoEmpleadoFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres,
+      cajaFiltro, contactosMap]);
 
   const totalGeneral = useMemo(() => filtered.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0), [filtered]);
 
