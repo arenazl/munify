@@ -54,7 +54,7 @@ const ESTADO_ICON: Record<EstadoContactoAgregado, typeof CheckCircle2> = {
 // Proveedores de tiles disponibles para el mapa. Toggle visible arriba a la
 // izquierda. Si esto funciona bien, despues lo extraemos a lib/mapTiles.tsx
 // para que el resto de los mapas tambien lo use.
-type TileProviderId = 'osm' | 'stadia';
+type TileProviderId = 'osm' | 'stadia' | 'voyager';
 
 const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attribution: string }> = {
   osm: {
@@ -66,6 +66,11 @@ const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attri
     label: 'Stadia',
     url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
     attribution: '&copy; Stadia Maps &copy; OpenStreetMap',
+  },
+  voyager: {
+    label: 'Voyager',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; OSM &copy; CARTO',
   },
 };
 
@@ -96,58 +101,27 @@ if (typeof document !== 'undefined' && !document.getElementById('tesoreria-pin-s
   document.head.appendChild(style);
 }
 
-/** Pin con SVG de casita: gradient + sombra + borde + badge contador + pulse opcional. */
+/** Pin clasico drop-pin renderizado como IMG con data-URL SVG. Es un L.icon
+ *  (no L.divIcon) a proposito: asi el browser lo trata como imagen pura,
+ *  sin wrapper div con CSS de Leaflet que pueda meter cuadraditos blancos
+ *  o bordes. Robusto en cualquier theme/CSS global. */
 function casitaDivIcon(opts: {
   color: string;
   size?: number;
+  // Estos params se mantienen por compat con el call site pero no se
+  // usan visualmente en esta version. Si los necesitamos de nuevo
+  // (badge de count, pulse de mora), reagregar arriba del SVG.
   count?: number;
   pulse?: boolean;
   highlight?: boolean;
 }) {
-  const { color, size = 38, count = 0, pulse = false, highlight = false } = opts;
-  const dark = darken(color, 25);
-  const showBadge = count > 0;
-  const html = `
-    <div class="tesoreria-pin${highlight ? ' highlight' : ''}" style="
-      position: relative; width: ${size}px; height: ${size}px;
-      transform: translate(-50%, -100%);
-    ">
-      <div class="tesoreria-pin-bg" style="
-        position: absolute; inset: 0;
-        background: linear-gradient(160deg, ${color} 0%, ${dark} 100%);
-        border: 2.5px solid #fff;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.1);
-        ${pulse ? 'animation: pulse-mora 1.4s ease-in-out infinite;' : ''}
-      "></div>
-      <svg viewBox="0 0 24 24" width="${size * 0.5}" height="${size * 0.5}"
-        fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
-        style="position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);">
-        <path d="M3 10.182V22a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6h6v6a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V10.182a2 2 0 0 0-.659-1.484l-7.999-7.273a2 2 0 0 0-2.683 0L3.66 8.698A2 2 0 0 0 3 10.182z"/>
-      </svg>
-      ${showBadge ? `
-        <div style="
-          position: absolute; top: -4px; right: -4px;
-          min-width: 18px; height: 18px; padding: 0 4px;
-          border-radius: 9px;
-          background: #fff;
-          color: ${dark};
-          font-size: 10px;
-          font-weight: 800;
-          line-height: 18px;
-          text-align: center;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-          border: 1.5px solid ${color};
-        ">${count}</div>
-      ` : ''}
-    </div>
-  `;
-  return L.divIcon({
-    html,
-    className: 'tesoreria-divicon',
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size],
+  const { color, size = 16 } = opts;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size * 1.4}" viewBox="0 0 24 34"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 22 12 22s12-13 12-22C24 5.4 18.6 0 12 0z" fill="${color}" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="4.5" fill="#fff"/></svg>`;
+  const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return L.icon({
+    iconUrl: dataUrl,
+    iconSize: [size, size * 1.4],
+    iconAnchor: [size / 2, size * 1.4],
   });
 }
 
@@ -182,7 +156,7 @@ function MapController({
       return;
     }
     const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+    map.fitBounds(bounds, { padding: [30, 30], maxZoom: 18 });
   }, [points, map, triggerFit]);
   return null;
 }
@@ -652,7 +626,7 @@ export default function TesoreriaMapa() {
               {visibles.map(c => {
                 const total = totalesPorContacto[c.id] || 0;
                 const cantidad = gastosPorContacto[c.id]?.length || 0;
-                const baseSize = total > 0 ? Math.min(54, 36 + Math.log10(total + 1) * 3.5) : 36;
+                const baseSize = total > 0 ? Math.min(24, 14 + Math.log10(total + 1) * 2) : 14;
                 const enMora = estadosPorContacto[c.id] === 'en_mora';
                 const pinColor = enMora ? ESTADO_CONTACTO_COLOR.en_mora : TIPO_COLORS[c.tipo];
                 const isHovered = hoveredContacto === c.id;
