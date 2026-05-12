@@ -3,6 +3,7 @@ import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
+import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
   contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi,
@@ -293,34 +294,50 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                     📍 {c.direccion}
                   </p>
                 ) : (
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      placeholder="Ej: Av. San Martín 123"
+                  <div className="space-y-2">
+                    <DireccionAutocomplete
                       value={direccionEditable}
-                      onChange={(e) => setDireccionEditable(e.target.value)}
-                      className="flex-1 px-3 py-1.5 rounded-lg text-sm"
-                      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+                      onChange={(dir, lat, lon) => {
+                        setDireccionEditable(dir);
+                        if (lat != null && lon != null) {
+                          // Si autocompletaron, guardamos coords pendientes
+                          (window as any).__tesoreriaPendingLatLon = { lat, lon, contactoId: c.id };
+                        }
+                      }}
+                      placeholder="Ej: Av. San Martín 123 o Mitre y Belgrano"
+                      showCurrentLocationButton={false}
+                      inputClassName="py-1.5"
                     />
                     <button
                       type="button"
                       onClick={async () => {
                         if (!direccionEditable.trim()) return;
+                        const pending = (window as any).__tesoreriaPendingLatLon;
+                        const hasCoords = pending && pending.contactoId === c.id;
                         try {
-                          await contactosApi.update(c.id, { direccion: direccionEditable.trim() });
-                          // Refrescar el contacto en el state local
-                          setContactos(prev => prev.map(x => x.id === c.id ? { ...x, direccion: direccionEditable.trim() } : x));
+                          const update: Record<string, unknown> = { direccion: direccionEditable.trim() };
+                          if (hasCoords) {
+                            update.latitud = pending.lat;
+                            update.longitud = pending.lon;
+                          }
+                          await contactosApi.update(c.id, update);
+                          setContactos(prev => prev.map(x => x.id === c.id ? {
+                            ...x,
+                            direccion: direccionEditable.trim(),
+                            ...(hasCoords ? { latitud: pending.lat, longitud: pending.lon } : {}),
+                          } : x));
                           setDireccionEditable('');
-                          toast.success('Dirección agregada al contacto');
+                          (window as any).__tesoreriaPendingLatLon = null;
+                          toast.success(hasCoords ? 'Dirección + ubicación guardadas' : 'Dirección agregada');
                         } catch {
                           toast.error('Error guardando dirección');
                         }
                       }}
                       disabled={!direccionEditable.trim()}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50"
+                      className="w-full px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50"
                       style={{ backgroundColor: theme.primary, color: '#fff' }}
                     >
-                      Guardar
+                      Guardar en el contacto
                     </button>
                   </div>
                 )}

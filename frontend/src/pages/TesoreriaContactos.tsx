@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Upload, MapPin, Phone, Mail, Users, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
-import { Edit2, Trash2 } from 'lucide-react';
-import { contactosApi, tesoreriaImportApi, api } from '../lib/api';
+import { contactosApi, tesoreriaImportApi } from '../lib/api';
 import type { Contacto, TipoContacto } from '../types';
 
 const TIPO_LABELS: Record<TipoContacto, string> = {
@@ -46,42 +46,10 @@ export default function TesoreriaContactos() {
   const [saving, setSaving] = useState(false);
 
   const [importing, setImporting] = useState<'excel' | 'kmz' | null>(null);
-  const [reverseLoading, setReverseLoading] = useState(false);
-  const reverseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return <p className="p-6 text-sm">Sin permisos.</p>;
   }
-
-  const reverseGeocode = (lat: number, lon: number) => {
-    if (reverseTimeoutRef.current) clearTimeout(reverseTimeoutRef.current);
-    reverseTimeoutRef.current = setTimeout(async () => {
-      setReverseLoading(true);
-      try {
-        const res = await api.get('/geocoding/reverse', { params: { lat, lon } });
-        const addr = res.data.address;
-        let direccion = '';
-        if (addr) {
-          const parts: string[] = [];
-          if (addr.road) {
-            parts.push(addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road);
-          }
-          const loc = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
-          if (loc) parts.push(loc);
-          direccion = parts.join(', ');
-        }
-        if (!direccion && res.data.display_name) {
-          direccion = res.data.display_name.split(', ').slice(0, 3).join(', ');
-        }
-        if (direccion) {
-          setForm(prev => ({ ...prev, direccion }));
-          toast.success('Dirección detectada');
-        }
-      } catch { /* silent */ } finally {
-        setReverseLoading(false);
-      }
-    }, 600);
-  };
 
   const fetch = async () => {
     setLoading(true);
@@ -268,43 +236,25 @@ export default function TesoreriaContactos() {
           color: TIPO_COLORS[t],
         }))}
       />
-      <div className="relative">
-        <ABMInput
-          label="Dirección"
-          value={form.direccion || ''}
-          onChange={(e) => setForm({ ...form, direccion: e.target.value })}
-        />
-        {reverseLoading && (
-          <Loader2 className="absolute right-3 top-9 h-4 w-4 animate-spin" style={{ color: theme.textSecondary }} />
-        )}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <ABMInput
-          label="Latitud"
-          type="number"
-          step="0.000001"
-          value={form.latitud ?? ''}
-          onChange={(e) => {
-            const v = e.target.value === '' ? null : parseFloat(e.target.value);
-            setForm(prev => ({ ...prev, latitud: v }));
-            if (v != null && form.longitud != null) reverseGeocode(v, form.longitud);
-          }}
-        />
-        <ABMInput
-          label="Longitud"
-          type="number"
-          step="0.000001"
-          value={form.longitud ?? ''}
-          onChange={(e) => {
-            const v = e.target.value === '' ? null : parseFloat(e.target.value);
-            setForm(prev => ({ ...prev, longitud: v }));
-            if (v != null && form.latitud != null) reverseGeocode(form.latitud, v);
-          }}
-        />
-      </div>
-      <p className="text-[10px]" style={{ color: theme.textSecondary }}>
-        Si cargás lat/lon, completamos la dirección automáticamente.
-      </p>
+      <DireccionAutocomplete
+        label="Dirección"
+        value={form.direccion || ''}
+        onChange={(dir, lat, lon) =>
+          setForm(prev => ({
+            ...prev,
+            direccion: dir,
+            latitud: lat ?? prev.latitud,
+            longitud: lon ?? prev.longitud,
+          }))
+        }
+        placeholder="Ej: Av. San Martín 123 o Mitre y Belgrano"
+        inputClassName="py-2"
+      />
+      {form.latitud && form.longitud && (
+        <p className="text-[10px]" style={{ color: '#10b981' }}>
+          📍 Geolocalizado: {form.latitud.toFixed(5)}, {form.longitud.toFixed(5)}
+        </p>
+      )}
     </div>
   );
 
