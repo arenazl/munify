@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
-  Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight,
+  Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight, CalendarClock,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -521,6 +521,13 @@ export default function Tesoreria() {
         style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
       >
         <Briefcase className="h-3.5 w-3.5" /> Proyectos
+      </Link>
+      <Link
+        to="/gestion/tesoreria/agenda"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+      >
+        <CalendarClock className="h-3.5 w-3.5" /> Agenda
       </Link>
       <Link
         to="/gestion/tesoreria/mapa"

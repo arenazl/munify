@@ -68,6 +68,7 @@ import TesoreriaContactos from './pages/TesoreriaContactos';
 import TesoreriaMapa from './pages/TesoreriaMapa';
 import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
 import TesoreriaProyectos from './pages/TesoreriaProyectos';
+import TesoreriaAgenda from './pages/TesoreriaAgenda';
 import ConfiguracionTesoreria from './pages/ConfiguracionTesoreria';
 
 // Demos de diseño
@@ -193,6 +194,7 @@ export const router = createBrowserRouter([
       { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
       { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
       { path: 'tesoreria/proyectos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyectos /></ProtectedRoute> },
+      { path: 'tesoreria/agenda', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaAgenda /></ProtectedRoute> },
       { path: 'configuracion/tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><ConfiguracionTesoreria /></ProtectedRoute> },
       { path: 'tesoreria/mapa', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaMapa /></ProtectedRoute> },
       { path: 'tesoreria/proyecciones', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyecciones /></ProtectedRoute> },

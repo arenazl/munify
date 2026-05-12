@@ -4,7 +4,7 @@ import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
   CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet, FileDown,
-  Tag, Briefcase,
+  Tag, Briefcase, PiggyBank, CalendarClock,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -343,12 +343,39 @@ export default function Ajustes() {
           show: isAdminOrSupervisor && !isSuperAdmin,
         },
         {
+          id: 'tesoreria-tipos-empleado',
+          label: 'Tipos de empleado',
+          description: 'Sub-clasificación de empleados: albañil, MMO, arquitecto, jornalizado, etc',
+          icon: UsersRound,
+          color: '#06b6d4',
+          link: '/gestion/configuracion/tesoreria?tab=tipos-empleado',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
+          id: 'tesoreria-cajas',
+          label: 'Cajas / Fondos',
+          description: 'FOFINDE, FODEMEP, FOMEP, Coparticipación. Saldo, ingresos y egresos',
+          icon: PiggyBank,
+          color: '#f59e0b',
+          link: '/gestion/configuracion/tesoreria?tab=cajas',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
           id: 'tesoreria-proyectos',
           label: 'Proyectos',
           description: 'Obras e iniciativas que agrupan gastos (con presupuesto y % imputado)',
           icon: Briefcase,
           color: '#10b981',
           link: '/gestion/configuracion/tesoreria?tab=proyectos',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
+          id: 'tesoreria-agenda',
+          label: 'Agenda de pagos',
+          description: 'Programá pagos recurrentes (sueldos, honorarios) con ejecución 1-click',
+          icon: CalendarClock,
+          color: '#ec4899',
+          link: '/gestion/tesoreria/agenda',
           show: isAdminOrSupervisor && !isSuperAdmin,
         },
       ],

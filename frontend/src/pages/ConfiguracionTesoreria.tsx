@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Tag, FileText, Briefcase, Plus, Edit2, Trash2, Loader2, ArrowLeft,
+  Users, PiggyBank, TrendingUp, TrendingDown,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -9,11 +10,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { Sheet } from '../components/ui/Sheet';
-import { tiposConceptoApi, conceptosAbmApi } from '../lib/api';
-import type { TipoConcepto, Concepto } from '../types';
+import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
+import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja } from '../types';
 import TesoreriaProyectos from './TesoreriaProyectos';
 
-type Tab = 'tipos' | 'conceptos' | 'proyectos';
+type Tab = 'tipos' | 'conceptos' | 'tipos-empleado' | 'cajas' | 'proyectos';
 
 export default function ConfiguracionTesoreria() {
   const { theme } = useTheme();
@@ -21,7 +22,7 @@ export default function ConfiguracionTesoreria() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as Tab) || 'tipos';
   const [tab, setTabState] = useState<Tab>(
-    ['tipos','conceptos','proyectos'].includes(initialTab) ? initialTab : 'tipos'
+    ['tipos','conceptos','tipos-empleado','cajas','proyectos'].includes(initialTab) ? initialTab : 'tipos'
   );
   const setTab = (t: Tab) => {
     setTabState(t);
@@ -69,6 +70,8 @@ export default function ConfiguracionTesoreria() {
         {([
           { id: 'tipos', label: 'Tipos de concepto', icon: <Tag className="h-4 w-4" /> },
           { id: 'conceptos', label: 'Conceptos', icon: <FileText className="h-4 w-4" /> },
+          { id: 'tipos-empleado', label: 'Tipos de empleado', icon: <Users className="h-4 w-4" /> },
+          { id: 'cajas', label: 'Cajas / Fondos', icon: <PiggyBank className="h-4 w-4" /> },
           { id: 'proyectos', label: 'Proyectos', icon: <Briefcase className="h-4 w-4" /> },
         ] as const).map(t => {
           const active = tab === t.id;
@@ -94,6 +97,8 @@ export default function ConfiguracionTesoreria() {
       <div className="pt-2">
         {tab === 'tipos' && <TiposConceptoTab />}
         {tab === 'conceptos' && <ConceptosTab />}
+        {tab === 'tipos-empleado' && <TiposEmpleadoTab />}
+        {tab === 'cajas' && <CajasTab />}
         {tab === 'proyectos' && (
           // Embeber la pagina existente. Tiene su propio header y ABMPage.
           <div className="-mt-3 -mx-4">
@@ -506,6 +511,299 @@ function ConceptosTab() {
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
             <textarea value={form.descripcion} onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+// ============================================================
+// Tab: Tipos de empleado (sub-clasificacion de contactos tipo=empleado)
+// ============================================================
+function TiposEmpleadoTab() {
+  const { theme } = useTheme();
+  const [tipos, setTipos] = useState<TipoEmpleadoCatalogo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<TipoEmpleadoCatalogo | null>(null);
+  const [form, setForm] = useState({ nombre: '', descripcion: '', color: '#3b82f6', icono: 'Briefcase', orden: 0 });
+  const [saving, setSaving] = useState(false);
+
+  const fetch = async () => {
+    setLoading(true);
+    try {
+      const res = await tiposEmpleadoApi.list({ activo: true });
+      setTipos(res.data || []);
+    } catch { toast.error('Error cargando tipos'); } finally { setLoading(false); }
+  };
+  useEffect(() => { fetch(); }, []);
+
+  const openSheet = (t: TipoEmpleadoCatalogo | null = null) => {
+    if (t) {
+      setEditing(t);
+      setForm({ nombre: t.nombre, descripcion: t.descripcion || '', color: t.color || '#3b82f6', icono: t.icono || 'Briefcase', orden: t.orden });
+    } else {
+      setEditing(null);
+      setForm({ nombre: '', descripcion: '', color: '#3b82f6', icono: 'Briefcase', orden: tipos.length });
+    }
+    setSheetOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.nombre.trim()) return toast.error('Nombre requerido');
+    setSaving(true);
+    try {
+      const payload = { ...form, nombre: form.nombre.trim(), descripcion: form.descripcion.trim() || null };
+      if (editing) await tiposEmpleadoApi.update(editing.id, payload);
+      else await tiposEmpleadoApi.create(payload);
+      toast.success(editing ? 'Actualizado' : 'Creado');
+      setSheetOpen(false); fetch();
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error'); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (t: TipoEmpleadoCatalogo) => {
+    if (!confirm(`¿Eliminar "${t.nombre}"?`)) return;
+    try { await tiposEmpleadoApi.delete(t.id); toast.success('Eliminado'); fetch(); }
+    catch { toast.error('Error'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>;
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs" style={{ color: theme.textSecondary }}>
+          {tipos.length} tipos. Sub-clasificación de los contactos tipo "empleado" (albañil, MMO, arquitecto, etc).
+        </p>
+        <button onClick={() => openSheet()} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: theme.primary }}>
+          <Plus className="h-4 w-4" /> Nuevo tipo
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {tipos.map(t => (
+          <div key={t.id} onClick={() => openSheet(t)} className="rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+            <div className="flex items-start gap-2.5">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${t.color || theme.primary}20` }}>
+                <DynamicIcon name={t.icono || 'Briefcase'} size={20} color={t.color || theme.primary} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate" style={{ color: theme.text }}>{t.nombre}</p>
+                {t.descripcion && <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>{t.descripcion}</p>}
+                <p className="text-[10px] mt-0.5" style={{ color: t.color || theme.primary }}>{t.cantidad_empleados ?? 0} empleados</p>
+              </div>
+              <div className="flex flex-col gap-1">
+                <button onClick={(e) => { e.stopPropagation(); openSheet(t); }} className="p-1 rounded hover:scale-110" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(t); }} className="p-1 rounded hover:scale-110" style={{ color: '#ef4444' }}><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Sheet
+        open={sheetOpen} onClose={() => setSheetOpen(false)}
+        title={editing ? `Editar · ${editing.nombre}` : 'Nuevo tipo de empleado'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
+            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Guardando...' : (editing ? 'Guardar' : 'Crear')}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Nombre *</label>
+            <input value={form.nombre} onChange={(e) => setForm(f => ({ ...f, nombre: e.target.value }))} autoFocus className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
+            <textarea value={form.descripcion} onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.color} onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded cursor-pointer" style={{ border: `1px solid ${theme.border}` }} />
+                <input type="text" value={form.color} onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Icono (Lucide)</label>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${form.color}20`, border: `1px solid ${theme.border}` }}>
+                  <DynamicIcon name={form.icono} size={20} color={form.color} />
+                </div>
+                <input type="text" value={form.icono} onChange={(e) => setForm(f => ({ ...f, icono: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+// ============================================================
+// Tab: Cajas / Fondos
+// ============================================================
+function CajasTab() {
+  const { theme } = useTheme();
+  const [cajas, setCajas] = useState<Caja[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<Caja | null>(null);
+  const [form, setForm] = useState({ nombre: '', codigo: '', descripcion: '', color: '#3b82f6', icono: 'PiggyBank', saldo_inicial: '0', orden: 0 });
+  const [saving, setSaving] = useState(false);
+
+  const fetch = async () => {
+    setLoading(true);
+    try {
+      const res = await cajasApi.list({ activo: true, include_saldos: true });
+      setCajas(res.data || []);
+    } catch { toast.error('Error cargando cajas'); } finally { setLoading(false); }
+  };
+  useEffect(() => { fetch(); }, []);
+
+  const openSheet = (c: Caja | null = null) => {
+    if (c) {
+      setEditing(c);
+      setForm({
+        nombre: c.nombre, codigo: c.codigo || '', descripcion: c.descripcion || '',
+        color: c.color || '#3b82f6', icono: c.icono || 'PiggyBank',
+        saldo_inicial: String(c.saldo_inicial), orden: c.orden,
+      });
+    } else {
+      setEditing(null);
+      setForm({ nombre: '', codigo: '', descripcion: '', color: '#3b82f6', icono: 'PiggyBank', saldo_inicial: '0', orden: cajas.length });
+    }
+    setSheetOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.nombre.trim()) return toast.error('Nombre requerido');
+    setSaving(true);
+    try {
+      const payload = {
+        nombre: form.nombre.trim(),
+        codigo: form.codigo.trim() || null,
+        descripcion: form.descripcion.trim() || null,
+        color: form.color, icono: form.icono,
+        saldo_inicial: parseFloat(form.saldo_inicial) || 0,
+        orden: form.orden,
+      };
+      if (editing) await cajasApi.update(editing.id, payload);
+      else await cajasApi.create(payload);
+      toast.success(editing ? 'Actualizada' : 'Creada');
+      setSheetOpen(false); fetch();
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error'); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (c: Caja) => {
+    if (!confirm(`¿Eliminar "${c.nombre}"?`)) return;
+    try { await cajasApi.delete(c.id); toast.success('Eliminada'); fetch(); }
+    catch { toast.error('Error'); }
+  };
+
+  const fmt = (v?: string | null) => v ? `$${parseFloat(v).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` : '$0';
+
+  if (loading) return <div className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>;
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs" style={{ color: theme.textSecondary }}>
+          {cajas.length} cajas. De acá se descuentan los gastos. Los ingresos suman saldo.
+        </p>
+        <button onClick={() => openSheet()} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: theme.primary }}>
+          <Plus className="h-4 w-4" /> Nueva caja
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {cajas.map(c => {
+          const color = c.color || theme.primary;
+          return (
+            <div key={c.id} onClick={() => openSheet(c)} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
+                  <DynamicIcon name={c.icono || 'PiggyBank'} size={22} color={color} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm truncate" style={{ color: theme.text }}>{c.nombre}</p>
+                  {c.codigo && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}15`, color }}>{c.codigo}</span>}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); openSheet(c); }} className="p-1 rounded hover:scale-110" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(c); }} className="p-1 rounded hover:scale-110" style={{ color: '#ef4444' }}><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+              {c.descripcion && <p className="text-[11px] mb-2 line-clamp-2" style={{ color: theme.textSecondary }}>{c.descripcion}</p>}
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase font-semibold" style={{ color: theme.textSecondary }}>Saldo actual</div>
+                <div className="text-xl font-bold tabular-nums" style={{ color }}>{fmt(c.saldo_actual)}</div>
+                <div className="flex items-center gap-3 text-[10px] mt-1.5" style={{ color: theme.textSecondary }}>
+                  <span className="inline-flex items-center gap-1"><TrendingUp className="h-2.5 w-2.5" style={{ color: '#10b981' }} /> {fmt(c.total_ingresos)}</span>
+                  <span className="inline-flex items-center gap-1"><TrendingDown className="h-2.5 w-2.5" style={{ color: '#ef4444' }} /> {fmt(c.total_egresos)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Sheet
+        open={sheetOpen} onClose={() => setSheetOpen(false)}
+        title={editing ? `Editar · ${editing.nombre}` : 'Nueva caja / fondo'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
+            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Guardando...' : (editing ? 'Guardar' : 'Crear')}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Nombre *</label>
+              <input value={form.nombre} onChange={(e) => setForm(f => ({ ...f, nombre: e.target.value }))} autoFocus className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder="Ej: Tesoro propio" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Código</label>
+              <input value={form.codigo} onChange={(e) => setForm(f => ({ ...f, codigo: e.target.value.toUpperCase() }))} className="w-full px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder="FOFINDE" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
+            <textarea value={form.descripcion} onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Saldo inicial</label>
+            <input type="number" value={form.saldo_inicial} onChange={(e) => setForm(f => ({ ...f, saldo_inicial: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-sm tabular-nums" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+            <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>Saldo de apertura. Después se ajusta con ingresos y egresos.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.color} onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded cursor-pointer" style={{ border: `1px solid ${theme.border}` }} />
+                <input type="text" value={form.color} onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Icono</label>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${form.color}20`, border: `1px solid ${theme.border}` }}>
+                  <DynamicIcon name={form.icono} size={20} color={form.color} />
+                </div>
+                <input type="text" value={form.icono} onChange={(e) => setForm(f => ({ ...f, icono: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
           </div>
         </div>
       </Sheet>

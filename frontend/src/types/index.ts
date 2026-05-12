@@ -604,6 +604,79 @@ export interface Concepto {
   updated_at: string;
 }
 
+export interface TipoEmpleadoCatalogo {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string | null;
+  color?: string | null;
+  icono?: string | null;
+  orden: number;
+  activo: boolean;
+  cantidad_empleados?: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Caja {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  codigo?: string | null;
+  descripcion?: string | null;
+  color?: string | null;
+  icono?: string | null;
+  saldo_inicial: string;
+  fecha_apertura?: string | null;
+  orden: number;
+  activo: boolean;
+  total_ingresos?: string | null;
+  total_egresos?: string | null;
+  saldo_actual?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type TipoMovimientoCaja = 'ingreso' | 'egreso';
+export type FrecuenciaPago = 'semanal' | 'quincenal' | 'mensual' | 'bimestral' | 'trimestral' | 'anual';
+
+export interface MovimientoCaja {
+  id: number;
+  municipio_id: number;
+  caja_id: number;
+  caja_nombre?: string | null;
+  gasto_id?: number | null;
+  tipo: TipoMovimientoCaja;
+  monto: string;
+  fecha: string;
+  concepto: string;
+  descripcion?: string | null;
+  created_at: string;
+}
+
+export interface PagoProgramado {
+  id: number;
+  municipio_id: number;
+  contacto_id: number;
+  contacto_nombre?: string | null;
+  caja_id?: number | null;
+  caja_nombre?: string | null;
+  concepto: string;
+  descripcion?: string | null;
+  monto_pesos: string;
+  forma_pago: string;
+  frecuencia: FrecuenciaPago;
+  dia_del_mes: number;
+  fecha_inicio: string;
+  fecha_fin?: string | null;
+  proximo_pago: string;
+  ultimo_pago?: string | null;
+  notas?: string | null;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CotizacionUSD {
   fecha: string;
   fuente: string;

@@ -1996,6 +1996,34 @@ export const conceptosAbmApi = {
   delete: (id: number) => api.delete(`/tesoreria/conceptos-abm/${id}`),
 };
 
+export const tiposEmpleadoApi = {
+  list: (params?: { activo?: boolean }) => api.get('/tesoreria/tipos-empleado', { params }),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/tipos-empleado', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tesoreria/tipos-empleado/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/tipos-empleado/${id}`),
+};
+
+export const cajasApi = {
+  list: (params?: { activo?: boolean; include_saldos?: boolean }) => api.get('/tesoreria/cajas', { params }),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/cajas', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tesoreria/cajas/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/cajas/${id}`),
+  listMovimientos: (cajaId: number, params?: { tipo?: string; limit?: number }) =>
+    api.get(`/tesoreria/cajas/${cajaId}/movimientos`, { params }),
+  createMovimiento: (data: Record<string, unknown>) => api.post('/tesoreria/cajas/movimientos', data),
+  deleteMovimiento: (id: number) => api.delete(`/tesoreria/cajas/movimientos/${id}`),
+};
+
+export const agendaPagosApi = {
+  list: (params?: { activo?: boolean; proximos_dias?: number; contacto_id?: number }) =>
+    api.get('/tesoreria/agenda', { params }),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/agenda', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tesoreria/agenda/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/agenda/${id}`),
+  ejecutar: (id: number, fechaPago?: string) =>
+    api.post(`/tesoreria/agenda/${id}/ejecutar`, null, { params: fechaPago ? { fecha_pago: fechaPago } : undefined }),
+};
+
 export const proyectosApi = {
   list: (params?: { estado?: string; activo?: boolean; search?: string; include_resumen?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/proyectos', { params }),

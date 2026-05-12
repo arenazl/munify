@@ -194,6 +194,10 @@ from .gasto import (
 )
 from .proyecto import Proyecto, GastoProyecto, EstadoProyecto
 from .tesoreria_concepto import TesoreriaTipoConcepto, TesoreriaConcepto
+from .tesoreria_extra import (
+    TesoreriaTipoEmpleado, TesoreriaCaja, TesoreriaMovimientoCaja,
+    TesoreriaPagoProgramado, TipoMovimientoCaja, FrecuenciaPago,
+)
 
 __all__ += [
     "MunicipioModulo",
@@ -211,4 +215,10 @@ __all__ += [
     "EstadoProyecto",
     "TesoreriaTipoConcepto",
     "TesoreriaConcepto",
+    "TesoreriaTipoEmpleado",
+    "TesoreriaCaja",
+    "TesoreriaMovimientoCaja",
+    "TesoreriaPagoProgramado",
+    "TipoMovimientoCaja",
+    "FrecuenciaPago",
 ]
