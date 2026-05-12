@@ -10,6 +10,7 @@ import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
+import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 import { Sheet } from '../components/ui/Sheet';
 import { ABMPage } from '../components/ui/ABMPage';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
@@ -185,6 +186,9 @@ export default function TesoreriaMapa() {
   // Provider de tiles activo (toggle visible arriba del mapa)
   const [tileProvider, setTileProvider] = useState<TileProviderId>('osm');
   const tile = TILE_PROVIDERS[tileProvider];
+
+  // Wizard de "Nuevo gasto" (boton fijo al final del header)
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Navegabilidad: hover state compartido entre sidebar y pines + ref al mapa
   const [hoveredContacto, setHoveredContacto] = useState<number | null>(null);
@@ -513,6 +517,8 @@ export default function TesoreriaMapa() {
         extraFilters={extraFilters}
         secondaryFilters={secondaryFilters}
         headerActions={headerActions}
+        buttonLabel="Nuevo Gasto"
+        onAdd={() => setWizardOpen(true)}
         loading={loading}
         isEmpty={!loading && visibles.length === 0}
         emptyMessage="No hay contactos visibles. Ajustá los filtros o agregá ubicaciones a los contactos."
@@ -929,6 +935,18 @@ export default function TesoreriaMapa() {
           </div>
         )}
       </Sheet>
+
+      <CrearGastoWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onSuccess={() => {
+          setWizardOpen(false);
+          // Refresh gastos sin recargar la página
+          gastosApi.list({ destino_tipo: 'contacto', limit: 1000 })
+            .then(r => setGastos(r.data))
+            .catch(() => {});
+        }}
+      />
     </>
   );
 }
