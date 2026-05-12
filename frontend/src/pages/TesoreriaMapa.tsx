@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapPin, Home, ChevronDown, ChevronRight, Loader2, Phone, Mail,
@@ -51,28 +51,72 @@ const ESTADO_ICON: Record<EstadoContactoAgregado, typeof CheckCircle2> = {
   sin_gastos: MinusCircle,
 };
 
-/** SVG inline de casita (Lucide Home) con color custom. Se usa como DivIcon. */
-function casitaDivIcon(color: string, size = 36) {
-  const html = `
-    <div style="
-      position: relative;
-      width: ${size}px;
-      height: ${size}px;
-      transform: translate(-50%, -100%);
+/** CSS global para los pines (inyectado una sola vez al cargar el modulo). */
+if (typeof document !== 'undefined' && !document.getElementById('tesoreria-pin-styles')) {
+  const style = document.createElement('style');
+  style.id = 'tesoreria-pin-styles';
+  style.textContent = `
+    @keyframes pulse-mora {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6), 0 4px 12px rgba(0,0,0,0.35); }
+      50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0), 0 4px 12px rgba(0,0,0,0.35); }
+    }
+    .tesoreria-pin {
       cursor: pointer;
+      transition: transform 0.15s ease-out;
+    }
+    .tesoreria-pin:hover { transform: translate(-50%, -100%) scale(1.18); z-index: 1000 !important; }
+    .tesoreria-pin.highlight .tesoreria-pin-bg {
+      animation: pulse-mora 1.4s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/** Pin con SVG de casita: gradient + sombra + borde + badge contador + pulse opcional. */
+function casitaDivIcon(opts: {
+  color: string;
+  size?: number;
+  count?: number;
+  pulse?: boolean;
+  highlight?: boolean;
+}) {
+  const { color, size = 38, count = 0, pulse = false, highlight = false } = opts;
+  const dark = darken(color, 25);
+  const showBadge = count > 0;
+  const html = `
+    <div class="tesoreria-pin${highlight ? ' highlight' : ''}" style="
+      position: relative; width: ${size}px; height: ${size}px;
+      transform: translate(-50%, -100%);
     ">
-      <svg viewBox="0 0 24 24" width="${size}" height="${size}"
-        fill="${color}" stroke="#fff" stroke-width="1.5"
-        style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));">
+      <div class="tesoreria-pin-bg" style="
+        position: absolute; inset: 0;
+        background: linear-gradient(160deg, ${color} 0%, ${dark} 100%);
+        border: 2.5px solid #fff;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.1);
+        ${pulse ? 'animation: pulse-mora 1.4s ease-in-out infinite;' : ''}
+      "></div>
+      <svg viewBox="0 0 24 24" width="${size * 0.5}" height="${size * 0.5}"
+        fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+        style="position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);">
         <path d="M3 10.182V22a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6h6v6a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V10.182a2 2 0 0 0-.659-1.484l-7.999-7.273a2 2 0 0 0-2.683 0L3.66 8.698A2 2 0 0 0 3 10.182z"/>
       </svg>
-      <div style="
-        position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%);
-        width: 0; height: 0;
-        border-left: 4px solid transparent;
-        border-right: 4px solid transparent;
-        border-top: 6px solid ${color};
-      "></div>
+      ${showBadge ? `
+        <div style="
+          position: absolute; top: -4px; right: -4px;
+          min-width: 18px; height: 18px; padding: 0 4px;
+          border-radius: 9px;
+          background: #fff;
+          color: ${dark};
+          font-size: 10px;
+          font-weight: 800;
+          line-height: 18px;
+          text-align: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          border: 1.5px solid ${color};
+        ">${count}</div>
+      ` : ''}
     </div>
   `;
   return L.divIcon({
@@ -83,18 +127,39 @@ function casitaDivIcon(color: string, size = 36) {
   });
 }
 
-/** Componente interno: auto-ajusta el zoom para que se vean todos los pines. */
-function FitBounds({ points }: { points: [number, number][] }) {
+/** Oscurece un color hex un X% (0-100). Helper para el gradient del pin. */
+function darken(hex: string, percent: number): string {
+  const h = hex.replace('#', '');
+  const num = parseInt(h, 16);
+  const r = Math.max(0, ((num >> 16) & 0xff) - Math.round(255 * percent / 100));
+  const g = Math.max(0, ((num >> 8) & 0xff) - Math.round(255 * percent / 100));
+  const b = Math.max(0, (num & 0xff) - Math.round(255 * percent / 100));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
+/** Auto-ajusta el zoom inicial + expone el map al padre via callback. */
+function MapController({
+  points,
+  triggerFit,
+  onReady,
+}: {
+  points: [number, number][];
+  triggerFit: number;
+  onReady?: (map: L.Map) => void;
+}) {
   const map = useMap();
+  useEffect(() => {
+    if (onReady) onReady(map);
+  }, [map, onReady]);
   useEffect(() => {
     if (!points.length) return;
     if (points.length === 1) {
-      map.setView(points[0], 14);
+      map.setView(points[0], 16);
       return;
     }
     const bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
-  }, [points, map]);
+    map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+  }, [points, map, triggerFit]);
   return null;
 }
 
@@ -118,6 +183,19 @@ export default function TesoreriaMapa() {
   const [gastosDetalle, setGastosDetalle] = useState<Gasto[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [expandedGasto, setExpandedGasto] = useState<number | null>(null);
+
+  // Navegabilidad: hover state compartido entre sidebar y pines + ref al mapa
+  const [hoveredContacto, setHoveredContacto] = useState<number | null>(null);
+  const [fitTrigger, setFitTrigger] = useState(0); // incrementar -> re-ajusta el fit
+  const mapRef = useRef<L.Map | null>(null);
+
+  // Click en el item del sidebar: vuela al pin con zoom alto y abre el detalle
+  const handleItemClick = (c: Contacto) => {
+    if (mapRef.current && c.latitud && c.longitud) {
+      mapRef.current.flyTo([c.latitud, c.longitud], 17, { duration: 0.9 });
+    }
+    handlePinClick(c);
+  };
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return <p className="p-6 text-sm">Sin permisos.</p>;
@@ -403,32 +481,135 @@ export default function TesoreriaMapa() {
         isEmpty={!loading && visibles.length === 0}
         emptyMessage="No hay contactos visibles. Ajustá los filtros o agregá ubicaciones a los contactos."
       >
-        <div className="rounded-xl overflow-hidden col-span-full" style={{ border: `1px solid ${theme.border}`, height: 600 }}>
-          <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maxZoom={19}
-            />
-            <FitBounds points={points} />
-            {visibles.map(c => {
-              const total = totalesPorContacto[c.id] || 0;
-              const baseSize = total > 0 ? Math.min(56, 32 + Math.log10(total + 1) * 4) : 32;
-              // Si está en mora, el pin se pinta rojo para destacarse — lectura
-              // visual instantánea del estado del contacto en el mapa.
-              const pinColor = estadosPorContacto[c.id] === 'en_mora'
-                ? ESTADO_CONTACTO_COLOR.en_mora
-                : TIPO_COLORS[c.tipo];
-              return (
-                <Marker
-                  key={c.id}
-                  position={[c.latitud!, c.longitud!]}
-                  icon={casitaDivIcon(pinColor, baseSize)}
-                  eventHandlers={{ click: () => handlePinClick(c) }}
-                />
-              );
-            })}
-          </MapContainer>
+        <div className="col-span-full grid grid-cols-1 lg:grid-cols-4 gap-3" style={{ height: 680 }}>
+          {/* Sidebar 25% — lista de contactos visibles con click para volar al pin */}
+          <div
+            className="lg:col-span-1 rounded-xl overflow-hidden flex flex-col"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div
+              className="px-3 py-2 flex items-center justify-between flex-shrink-0"
+              style={{ borderBottom: `1px solid ${theme.border}`, backgroundColor: theme.backgroundSecondary }}
+            >
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                Contactos · {visibles.length}
+              </p>
+              <button
+                type="button"
+                onClick={() => setFitTrigger(v => v + 1)}
+                className="text-[10px] font-semibold px-2 py-1 rounded-md transition-all hover:scale-105"
+                style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+                title="Ajustar zoom para ver todos los pines"
+              >
+                Ver todos
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
+              {visibles.length === 0 ? (
+                <p className="text-xs text-center p-4 opacity-60" style={{ color: theme.textSecondary }}>
+                  Sin resultados con los filtros actuales.
+                </p>
+              ) : (
+                visibles.map(c => {
+                  const total = totalesPorContacto[c.id] || 0;
+                  const estado = estadosPorContacto[c.id];
+                  const tipoColor = TIPO_COLORS[c.tipo];
+                  const isHovered = hoveredContacto === c.id;
+                  const isSelected = selected?.id === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => handleItemClick(c)}
+                      onMouseEnter={() => setHoveredContacto(c.id)}
+                      onMouseLeave={() => setHoveredContacto(null)}
+                      className="w-full text-left px-3 py-2 transition-all"
+                      style={{
+                        borderBottom: `1px solid ${theme.border}`,
+                        backgroundColor: isSelected
+                          ? `${theme.primary}15`
+                          : isHovered ? theme.backgroundSecondary : 'transparent',
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: `${tipoColor}25`, color: tipoColor }}
+                        >
+                          <Home className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: theme.text }}>
+                            {c.nombre} {c.apellido || ''}
+                          </p>
+                          <p className="text-[10px] truncate opacity-70" style={{ color: theme.textSecondary }}>
+                            {TIPO_LABELS[c.tipo]}
+                          </p>
+                          {total > 0 && (
+                            <p className="text-[11px] font-bold tabular-nums mt-0.5" style={{ color: theme.primary }}>
+                              ${total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                            </p>
+                          )}
+                        </div>
+                        {estado && estado !== 'sin_gastos' && (
+                          <span
+                            className="text-[8px] uppercase font-bold px-1 py-0.5 rounded flex-shrink-0"
+                            style={{
+                              backgroundColor: `${ESTADO_CONTACTO_COLOR[estado]}25`,
+                              color: ESTADO_CONTACTO_COLOR[estado],
+                            }}
+                          >
+                            {estado === 'en_mora' ? 'Mora' : 'OK'}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Mapa 75% */}
+          <div
+            className="lg:col-span-3 rounded-xl overflow-hidden relative"
+            style={{ border: `1px solid ${theme.border}` }}
+          >
+            <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maxZoom={19}
+              />
+              <MapController points={points} triggerFit={fitTrigger} onReady={(m) => { mapRef.current = m; }} />
+              {visibles.map(c => {
+                const total = totalesPorContacto[c.id] || 0;
+                const cantidad = gastosPorContacto[c.id]?.length || 0;
+                const baseSize = total > 0 ? Math.min(54, 36 + Math.log10(total + 1) * 3.5) : 36;
+                const enMora = estadosPorContacto[c.id] === 'en_mora';
+                const pinColor = enMora ? ESTADO_CONTACTO_COLOR.en_mora : TIPO_COLORS[c.tipo];
+                const isHovered = hoveredContacto === c.id;
+                return (
+                  <Marker
+                    key={c.id}
+                    position={[c.latitud!, c.longitud!]}
+                    icon={casitaDivIcon({
+                      color: pinColor,
+                      size: isHovered ? baseSize * 1.18 : baseSize,
+                      count: cantidad,
+                      pulse: enMora,
+                      highlight: isHovered,
+                    })}
+                    eventHandlers={{
+                      click: () => handlePinClick(c),
+                      mouseover: () => setHoveredContacto(c.id),
+                      mouseout: () => setHoveredContacto(null),
+                    }}
+                  />
+                );
+              })}
+            </MapContainer>
+          </div>
         </div>
       </ABMPage>
 
