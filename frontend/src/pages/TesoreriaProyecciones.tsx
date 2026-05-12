@@ -1,252 +1,261 @@
+/**
+ * Resumen de gastos. Muestra UN período a la vez (mes o año) con flechas
+ * para navegar atrás/adelante. Filtros arriba (mismos que Tesorería home).
+ *
+ * Modo "mes": tabla de gastos del mes elegido + total.
+ * Modo "año": 12 meses del año elegido, cada uno expandible con sus gastos.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import {
-  TrendingUp, Download, ChevronDown, ChevronRight, AlertTriangle,
-  Loader2, Calendar,
+  BarChart3, ChevronDown, ChevronRight, ChevronLeft, Calendar,
+  Home, Building2,
 } from 'lucide-react';
-import {
-  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
-} from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage } from '../components/ui/ABMPage';
-import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
-import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
-import { gastosApi, dependenciasApi, contactosApi, conceptosAbmApi } from '../lib/api';
-import { exportProyeccionExcel } from '../lib/exportProyeccionExcel';
+import {
+  gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposConceptoApi,
+  tiposEmpleadoApi, cajasApi,
+} from '../lib/api';
 import type {
-  ProyeccionResponse, ProyeccionMes, CuotaProyeccion,
-  Contacto, Gasto, Concepto,
+  Gasto, Contacto, Concepto, TipoConcepto, TipoContacto, TipoEmpleadoCatalogo,
+  Caja, FormaPago,
 } from '../types';
 
-const MESES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-                     'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-function rangoDefault12m(): DateRange {
-  const hoy = new Date();
-  const en1y = new Date(hoy.getFullYear(), hoy.getMonth() + 12, hoy.getDate());
-  return {
-    desde: hoy.toISOString().slice(0, 10),
-    hasta: en1y.toISOString().slice(0, 10),
-  };
-}
-
-function fmtMoney(value: string | number): string {
-  const n = typeof value === 'string' ? parseFloat(value) : value;
-  return n.toLocaleString('es-AR', { maximumFractionDigits: 0 });
-}
-
-function mesKey(m: ProyeccionMes): string {
-  return `${m.anio}-${String(m.mes).padStart(2, '0')}`;
-}
-
-const TIPO_FIN_OPTIONS = [
-  { value: '', label: 'Todos los tipos' },
-  { value: 'cuotas', label: 'Cuotas' },
-  { value: 'prestamo', label: 'Préstamos' },
-  { value: 'recurrente', label: 'Recurrentes' },
-];
-
-const ESTADO_COLORS: Record<string, string> = {
-  pendiente: '#3b82f6',
-  vencida: '#ef4444',
-  pagada: '#22c55e',
-  cancelada: '#71717a',
+const TIPO_CONTACTO_LABELS: Record<TipoContacto, string> = {
+  concejal: 'Concejales', empleado: 'Empleados', profesional: 'Profesionales',
+  proveedor: 'Proveedores', contratista: 'Contratistas', beneficiario: 'Beneficiarios', otro: 'Otros',
+};
+const TIPO_CONTACTO_COLORS: Record<TipoContacto, string> = {
+  concejal: '#8b5cf6', empleado: '#3b82f6', profesional: '#f59e0b',
+  proveedor: '#10b981', contratista: '#06b6d4', beneficiario: '#ec4899', otro: '#71717a',
+};
+const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
+  efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque',
+  tarjeta: 'Tarjeta', mercadopago: 'MercadoPago', otro: 'Otro',
 };
 
-export default function TesoreriaProyecciones() {
+type Modo = 'mes' | 'anio';
+
+function fmtMoney(v: number | string): string {
+  const n = typeof v === 'string' ? parseFloat(v) : v;
+  return `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+}
+
+interface GrupoMes {
+  anio: number;
+  mes: number;
+  key: string;
+  label: string;
+  total: number;
+  count: number;
+  gastos: Gasto[];
+}
+
+export default function TesoreriaResumen() {
   const { theme } = useTheme();
   const { user } = useAuth();
-
-  // Permisos: solo admin/supervisor del municipio.
-  // El return se evalua despues de declarar hooks abajo si no tiene permisos.
   const sinPermisos = user && user.rol !== 'admin' && user.rol !== 'supervisor';
 
-  const [data, setData] = useState<ProyeccionResponse | null>(null);
+  const today = new Date();
+  const [modo, setModo] = useState<Modo>('mes');
+  const [mesActual, setMesActual] = useState<number>(today.getMonth());
+  const [anioActual, setAnioActual] = useState<number>(today.getFullYear());
+
+  const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  // Filtros
-  const [rango, setRango] = useState<DateRange>(rangoDefault12m);
-  const [tipoFin, setTipoFin] = useState<string>('');
-  const [dependenciaId, setDependenciaId] = useState<string>('');
-  const [contactoId, setContactoId] = useState<number | null>(null);
-  const [contactoSelected, setContactoSelected] = useState<Contacto | null>(null);
-  const [conceptoSearch, setConceptoSearch] = useState('');
-
-  // Dependencias del municipio para el select
-  const [dependenciaOptions, setDependenciaOptions] = useState<{ value: string; label: string }[]>([]);
-  // Contactos para el combo
+  // Catalogos
   const [contactos, setContactos] = useState<Contacto[]>([]);
-  // Conceptos para el combo
-  const [conceptosLista, setConceptosLista] = useState<Concepto[]>([]);
-  // Cambiamos conceptoSearch a string EXACTO (valor del combo)
+  const [dependencias, setDependencias] = useState<Array<{ id: number; nombre: string; color?: string | null }>>([]);
+  const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
+  const [conceptos, setConceptos] = useState<Concepto[]>([]);
+  const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
+  const [cajas, setCajas] = useState<Caja[]>([]);
 
-  // Drill-down: mes expandido y sus cuotas
+  // Filtros (mismos que Tesoreria home)
+  const [tipoContactoFiltro, setTipoContactoFiltro] = useState<TipoContacto | ''>('');
+  const [subtipoEmpleadoFiltro, setSubtipoEmpleadoFiltro] = useState<string>('');
+  const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
+  const [tipoConceptoFiltro, setTipoConceptoFiltro] = useState<string>('');
+  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
+  const [formaPagoFiltro, setFormaPagoFiltro] = useState<FormaPago | ''>('');
+  const [cajaFiltro, setCajaFiltro] = useState<string>('');
+
+  // Mes expandido (solo aplica a modo 'anio')
   const [mesExpandido, setMesExpandido] = useState<string | null>(null);
-  const [cuotasDelMes, setCuotasDelMes] = useState<Record<string, CuotaProyeccion[]>>({});
-  const [loadingCuotas, setLoadingCuotas] = useState<string | null>(null);
 
-  // Sheet con detalle del gasto madre
-  const [gastoSelected, setGastoSelected] = useState<Gasto | null>(null);
-  const [loadingGasto, setLoadingGasto] = useState(false);
+  // Calcular rango fechas según modo + período seleccionado
+  const { desde, hasta } = useMemo(() => {
+    if (modo === 'mes') {
+      const d = new Date(anioActual, mesActual, 1);
+      const h = new Date(anioActual, mesActual + 1, 0);
+      return { desde: d.toISOString().slice(0, 10), hasta: h.toISOString().slice(0, 10) };
+    }
+    return { desde: `${anioActual}-01-01`, hasta: `${anioActual}-12-31` };
+  }, [modo, mesActual, anioActual]);
 
-  // Cargar dependencias del municipio una vez
+  // Cargar catalogos
   useEffect(() => {
     if (sinPermisos) return;
-    dependenciasApi.getMunicipio({ activo: true })
-      .then(res => {
-        const items = (res.data as Array<{ id: number; dependencia?: { nombre?: string }; nombre?: string }>);
-        const opts = items.map(d => ({
-          value: String(d.id),
-          label: d.dependencia?.nombre || d.nombre || `Dependencia #${d.id}`,
-        }));
-        setDependenciaOptions([{ value: '', label: 'Todas las dependencias' }, ...opts]);
-      })
-      .catch(() => setDependenciaOptions([{ value: '', label: 'Todas las dependencias' }]));
-
-    // Cargar contactos y conceptos para los combos
-    contactosApi.list({ activo: true, limit: 500 }).then(r => setContactos(r.data || [])).catch(() => setContactos([]));
-    conceptosAbmApi.list({ activo: true }).then(r => setConceptosLista(r.data || [])).catch(() => setConceptosLista([]));
+    contactosApi.list({ activo: true, limit: 1000 }).then(r => setContactos(r.data || [])).catch(() => {});
+    dependenciasApi.getMunicipio({ activo: true }).then(r => setDependencias(r.data || [])).catch(() => {});
+    tiposConceptoApi.list({ activo: true }).then(r => setTiposConcepto(r.data || [])).catch(() => {});
+    conceptosAbmApi.list({ activo: true }).then(r => setConceptos(r.data || [])).catch(() => {});
+    tiposEmpleadoApi.list({ activo: true }).then(r => setTiposEmpleado(r.data || [])).catch(() => {});
+    cajasApi.list({ activo: true, include_saldos: false }).then(r => setCajas(r.data || [])).catch(() => {});
   }, [sinPermisos]);
 
-  // Cargar proyeccion cuando cambian los filtros
+  // Cargar gastos del periodo
   useEffect(() => {
     if (sinPermisos) return;
     let cancelled = false;
     setLoading(true);
-    setError(null);
-    gastosApi.proyecciones({
-      desde: rango.desde || undefined,
-      hasta: rango.hasta || undefined,
-      destino_dependencia_id: dependenciaId ? Number(dependenciaId) : undefined,
-      destino_contacto_id: contactoId ?? undefined,
-      tipo_financiacion: tipoFin || undefined,
-      concepto: conceptoSearch || undefined,
-    })
-      .then(res => {
-        if (cancelled) return;
-        setData(res.data);
-        setMesExpandido(null);
-        setCuotasDelMes({});
-      })
-      .catch(e => {
-        if (cancelled) return;
-        console.error(e);
-        setError('No pudimos cargar la proyeccion.');
-      })
+    gastosApi.list({ desde, hasta, limit: 1000 })
+      .then(r => { if (!cancelled) setGastos(r.data || []); })
+      .catch(() => { if (!cancelled) setGastos([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [rango.desde, rango.hasta, tipoFin, dependenciaId, contactoId, conceptoSearch, sinPermisos]);
+  }, [desde, hasta, sinPermisos]);
 
-  // Promedio mensual derivado
-  const promedioMensual = useMemo(() => {
-    if (!data || data.por_mes.length === 0) return 0;
-    return parseFloat(data.total_pesos) / data.por_mes.length;
-  }, [data]);
+  const contactosMap = useMemo(() => {
+    const m = new Map<number, Contacto>();
+    contactos.forEach(c => m.set(c.id, c));
+    return m;
+  }, [contactos]);
 
-  // Datos para el grafico de area
-  const chartData = useMemo(() => {
-    if (!data) return [];
-    return data.por_mes.map(m => ({
-      mes: `${MESES_CORTO[m.mes - 1]} ${String(m.anio).slice(2)}`,
-      total: parseFloat(m.total_pesos),
-      cuotas: m.cantidad_cuotas,
-      vencidas: m.cuotas_vencidas ?? 0,
+  const dependenciasMap = useMemo(() => {
+    const m = new Map<number, { nombre: string; color?: string | null }>();
+    dependencias.forEach(d => m.set(d.id, { nombre: d.nombre, color: d.color }));
+    return m;
+  }, [dependencias]);
+
+  const conceptosDelTipoNombres = useMemo(() => {
+    if (!tipoConceptoFiltro) return null;
+    const tipoId = parseInt(tipoConceptoFiltro, 10);
+    return new Set(conceptos.filter(c => c.tipo_concepto_id === tipoId).map(c => c.nombre.toLowerCase()));
+  }, [conceptos, tipoConceptoFiltro]);
+
+  const conceptoToTipoMap = useMemo(() => {
+    const m = new Map<string, { nombre: string; color?: string | null }>();
+    conceptos.forEach(c => m.set(c.nombre.toLowerCase(), {
+      nombre: c.tipo_concepto_nombre || '',
+      color: c.tipo_concepto_color,
     }));
-  }, [data]);
+    return m;
+  }, [conceptos]);
 
-  // Handler: click en un mes para expandir/colapsar y cargar cuotas
-  const toggleMes = async (m: ProyeccionMes) => {
-    const key = mesKey(m);
-    if (mesExpandido === key) {
-      setMesExpandido(null);
-      return;
+  // Aplicar filtros sobre los gastos del periodo
+  const filtered = useMemo(() => {
+    const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
+    const cajaId = cajaFiltro ? parseInt(cajaFiltro, 10) : null;
+    return gastos.filter(g => {
+      if (formaPagoFiltro && g.forma_pago !== formaPagoFiltro) return false;
+      if (depId != null) {
+        if (g.destino_tipo !== 'dependencia' || g.destino_dependencia_id !== depId) return false;
+      }
+      if (tipoContactoFiltro) {
+        if (g.destino_tipo !== 'contacto') return false;
+        const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+        if (!c || c.tipo !== tipoContactoFiltro) return false;
+        if (tipoContactoFiltro === 'empleado' && subtipoEmpleadoFiltro && (c.subtipo || '') !== subtipoEmpleadoFiltro) return false;
+      }
+      if (tipoConceptoFiltro && conceptosDelTipoNombres && !conceptosDelTipoNombres.has(g.concepto.toLowerCase())) return false;
+      if (conceptoFiltro && g.concepto.toLowerCase() !== conceptoFiltro.toLowerCase()) return false;
+      if (cajaId != null && (g as Gasto & { caja_id?: number | null }).caja_id !== cajaId) return false;
+      return true;
+    });
+  }, [gastos, formaPagoFiltro, dependenciaFiltro, tipoContactoFiltro, subtipoEmpleadoFiltro,
+      tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, cajaFiltro, contactosMap]);
+
+  const totalGeneral = useMemo(() => filtered.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0), [filtered]);
+
+  // Para modo "año": agrupar por mes (siempre 12 buckets)
+  const gruposAnio = useMemo<GrupoMes[]>(() => {
+    if (modo !== 'anio') return [];
+    const buckets: GrupoMes[] = Array.from({ length: 12 }, (_, mes) => ({
+      anio: anioActual, mes, key: `${anioActual}-${String(mes).padStart(2, '0')}`,
+      label: `${MESES_LARGO[mes]} ${anioActual}`, total: 0, count: 0, gastos: [],
+    }));
+    for (const g of filtered) {
+      const d = new Date(g.fecha);
+      const m = d.getMonth();
+      buckets[m].total += parseFloat(g.monto_pesos || '0');
+      buckets[m].count += 1;
+      buckets[m].gastos.push(g);
     }
-    setMesExpandido(key);
-    if (cuotasDelMes[key]) return; // Ya cargado
-    setLoadingCuotas(key);
-    try {
-      const res = await gastosApi.proyeccionesCuotasDelMes({
-        anio: m.anio,
-        mes: m.mes,
-        destino_dependencia_id: dependenciaId ? Number(dependenciaId) : undefined,
-        destino_contacto_id: contactoId ?? undefined,
-        tipo_financiacion: tipoFin || undefined,
-        concepto: conceptoSearch || undefined,
-      });
-      setCuotasDelMes(prev => ({ ...prev, [key]: res.data }));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingCuotas(null);
+    return buckets;
+  }, [filtered, modo, anioActual]);
+
+  // ========================== Navegación ==========================
+  const irAtras = () => {
+    if (modo === 'mes') {
+      if (mesActual === 0) { setMesActual(11); setAnioActual(a => a - 1); }
+      else setMesActual(m => m - 1);
+    } else {
+      setAnioActual(a => a - 1);
     }
   };
-
-  // Handler: click en una cuota para abrir Sheet con el gasto madre
-  const verGastoMadre = async (gastoId: number) => {
-    setLoadingGasto(true);
-    try {
-      const res = await gastosApi.get(gastoId);
-      setGastoSelected(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingGasto(false);
+  const irAdelante = () => {
+    if (modo === 'mes') {
+      if (mesActual === 11) { setMesActual(0); setAnioActual(a => a + 1); }
+      else setMesActual(m => m + 1);
+    } else {
+      setAnioActual(a => a + 1);
     }
   };
+  const labelPeriodo = modo === 'mes' ? `${MESES_LARGO[mesActual]} ${anioActual}` : `Año ${anioActual}`;
 
-  // Handler: exportar Excel
-  const handleExport = async () => {
-    if (!data) return;
-    // Si el user expandio meses, ya tenemos sus cuotas; sumarlas para el detalle.
-    const cuotasDetalle = Object.values(cuotasDelMes).flat();
-    const depLabel = dependenciaOptions.find(o => o.value === dependenciaId)?.label;
-    exportProyeccionExcel(
-      data,
-      {
-        desde: data.desde,
-        hasta: data.hasta,
-        dependencia_nombre: dependenciaId ? depLabel : null,
-        contacto_nombre: contactoSelected ? `${contactoSelected.nombre} ${contactoSelected.apellido || ''}`.trim() : null,
-        tipo_financiacion: tipoFin || null,
-        concepto: conceptoSearch || null,
-      },
-      cuotasDetalle.length > 0 ? cuotasDetalle : undefined,
-    );
-  };
+  // ========================== Opciones combos ==========================
+  const tipoContactoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los contactos' },
+    ...(Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(t => ({
+      value: t, label: TIPO_CONTACTO_LABELS[t], color: TIPO_CONTACTO_COLORS[t],
+    })),
+  ]), []);
+  const subtipoEmpleadoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los empleados' },
+    ...tiposEmpleado.map(t => ({ value: t.nombre, label: t.nombre, color: t.color || undefined })),
+  ]), [tiposEmpleado]);
+  const dependenciaOptions = useMemo(() => ([
+    { value: '', label: 'Todas las dependencias' },
+    ...dependencias.map(d => ({ value: String(d.id), label: d.nombre, color: d.color || undefined })),
+  ]), [dependencias]);
+  const tipoConceptoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los tipos' },
+    ...tiposConcepto.map(t => ({ value: String(t.id), label: t.nombre, color: t.color || undefined })),
+  ]), [tiposConcepto]);
+  const conceptosFiltradosPorTipo = useMemo(() => {
+    if (!tipoConceptoFiltro) return conceptos;
+    const tid = parseInt(tipoConceptoFiltro, 10);
+    return conceptos.filter(c => c.tipo_concepto_id === tid);
+  }, [conceptos, tipoConceptoFiltro]);
+  const conceptoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los conceptos' },
+    ...conceptosFiltradosPorTipo.map(c => ({ value: c.nombre, label: c.nombre })),
+  ]), [conceptosFiltradosPorTipo]);
+  const formaPagoOptions = useMemo(() => ([
+    { value: '', label: 'Todas las formas' },
+    ...(Object.keys(FORMA_PAGO_LABELS) as FormaPago[]).map(fp => ({ value: fp, label: FORMA_PAGO_LABELS[fp] })),
+  ]), []);
+  const cajaOptions = useMemo(() => ([
+    { value: '', label: 'Todas las cajas' },
+    ...cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
+  ]), [cajas]);
 
   if (sinPermisos) return <p className="p-6 text-sm">Sin permisos.</p>;
 
-  // ---------- JSX helpers ----------
-
-  const contactoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los contactos' },
-    ...contactos.map(c => ({
-      value: String(c.id),
-      label: `${c.nombre} ${c.apellido || ''}`.trim(),
-    })),
-  ]), [contactos]);
-
-  const conceptoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los conceptos' },
-    ...conceptosLista.map(c => ({
-      value: c.nombre,
-      label: c.nombre,
-      color: c.tipo_concepto_color || undefined,
-    })),
-  ]), [conceptosLista]);
-
-  // Filtros unificados: TODOS son ModernSelect searchable con misma altura.
-  // El DateRangePicker comparte la clase .ts-fitem que fuerza h-40 + rounded.
+  // ========================== Filtros header ==========================
   const extraFilters = (
-    <div className="flex flex-wrap items-center gap-2 w-full proyecciones-filters-row">
+    <div className="flex flex-wrap items-center gap-2 w-full resumen-filters-row">
       <style>{`
-        .proyecciones-filters-row .ts-fitem button,
-        .proyecciones-filters-row .ts-fitem > div > button {
+        .resumen-filters-row .ts-fitem button,
+        .resumen-filters-row .ts-fitem > div > button {
           height: 40px !important;
           padding-top: 0 !important;
           padding-bottom: 0 !important;
@@ -255,374 +264,258 @@ export default function TesoreriaProyecciones() {
         }
       `}</style>
 
-      <div className="min-w-[260px] flex-shrink-0 ts-fitem">
-        <DateRangePicker
-          value={rango}
-          onChange={setRango}
-          allowClear={false}
-        />
+      {/* Toggle Mes / Año */}
+      <div
+        className="inline-flex items-center flex-shrink-0 rounded-xl overflow-hidden"
+        style={{ height: 40, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+      >
+        {(['mes', 'anio'] as Modo[]).map(m => (
+          <button
+            key={m}
+            onClick={() => setModo(m)}
+            className="h-full px-3 text-sm font-semibold transition-colors"
+            style={{
+              backgroundColor: modo === m ? theme.primary : 'transparent',
+              color: modo === m ? '#fff' : theme.textSecondary,
+            }}
+          >
+            {m === 'mes' ? 'Mes' : 'Año'}
+          </button>
+        ))}
       </div>
 
-      <div className="min-w-[160px] flex-shrink-0 ts-fitem">
+      {/* Navegador período */}
+      <div
+        className="inline-flex items-center flex-shrink-0 rounded-xl overflow-hidden"
+        style={{ height: 40, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+      >
+        <button onClick={irAtras} className="h-full px-2.5" style={{ color: theme.textSecondary }} title={modo === 'mes' ? 'Mes anterior' : 'Año anterior'}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="h-full px-3 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: theme.text }}>
+          <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
+          <span>{labelPeriodo}</span>
+        </div>
+        <button onClick={irAdelante} className="h-full px-2.5" style={{ color: theme.textSecondary }} title={modo === 'mes' ? 'Mes siguiente' : 'Año siguiente'}>
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
         <ModernSelect
-          value={tipoFin}
-          onChange={setTipoFin}
-          options={TIPO_FIN_OPTIONS}
-          placeholder="Todos los tipos"
-          searchable
+          value={tipoContactoFiltro}
+          onChange={(v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); }}
+          options={tipoContactoOptions} placeholder="Todos los contactos" searchable
         />
       </div>
-
-      {dependenciaOptions.length > 0 && (
-        <div className="min-w-[200px] flex-shrink-0 ts-fitem">
-          <ModernSelect
-            value={dependenciaId}
-            onChange={setDependenciaId}
-            options={dependenciaOptions}
-            placeholder="Todas las dependencias"
-            searchable
-          />
+      {tipoContactoFiltro === 'empleado' && tiposEmpleado.length > 0 && (
+        <div className="min-w-[180px] flex-shrink-0 ts-fitem">
+          <ModernSelect value={subtipoEmpleadoFiltro} onChange={setSubtipoEmpleadoFiltro}
+            options={subtipoEmpleadoOptions} placeholder="Todos los empleados" searchable />
         </div>
       )}
-
-      <div className="min-w-[200px] flex-shrink-0 ts-fitem">
-        <ModernSelect
-          value={contactoId ? String(contactoId) : ''}
-          onChange={(v) => {
-            const id = v ? parseInt(v, 10) : null;
-            setContactoId(id);
-            setContactoSelected(id ? contactos.find(c => c.id === id) || null : null);
-          }}
-          options={contactoOptions}
-          placeholder="Todos los contactos"
-          searchable
-        />
+      <div className="min-w-[190px] flex-shrink-0 ts-fitem">
+        <ModernSelect value={dependenciaFiltro} onChange={setDependenciaFiltro}
+          options={dependenciaOptions} placeholder="Todas las dependencias" searchable />
       </div>
-
-      <div className="min-w-[200px] flex-shrink-0 ts-fitem">
-        <ModernSelect
-          value={conceptoSearch}
-          onChange={setConceptoSearch}
-          options={conceptoOptions}
-          placeholder="Todos los conceptos"
-          searchable
-        />
+      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
+        <ModernSelect value={tipoConceptoFiltro}
+          onChange={(v) => { setTipoConceptoFiltro(v); setConceptoFiltro(''); }}
+          options={tipoConceptoOptions} placeholder="Todos los tipos" searchable />
       </div>
+      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
+        <ModernSelect value={conceptoFiltro} onChange={setConceptoFiltro}
+          options={conceptoOptions} placeholder="Todos los conceptos" searchable />
+      </div>
+      <div className="min-w-[160px] flex-shrink-0 ts-fitem">
+        <ModernSelect value={formaPagoFiltro} onChange={(v) => setFormaPagoFiltro(v as FormaPago | '')}
+          options={formaPagoOptions} placeholder="Todas las formas" searchable />
+      </div>
+      {cajas.length > 0 && (
+        <div className="min-w-[170px] flex-shrink-0 ts-fitem">
+          <ModernSelect value={cajaFiltro} onChange={setCajaFiltro}
+            options={cajaOptions} placeholder="Todas las cajas" searchable />
+        </div>
+      )}
     </div>
-  );
-
-  const headerActions = (
-    <button
-      type="button"
-      onClick={handleExport}
-      disabled={!data || loading}
-      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-40"
-      style={{ backgroundColor: theme.primary, color: theme.card }}
-      title="Exportar a Excel"
-    >
-      <Download className="h-3.5 w-3.5" /> Exportar
-    </button>
   );
 
   return (
     <>
       <div className="px-4 pt-3">
-        <TesoreriaHint titulo="Proyección de Pagos" storageKey="proyecciones">
-          Te mostramos cuánto vas a tener que pagar mes a mes según las
-          cuotas pendientes que cargaste (sueldos recurrentes, préstamos,
-          etc). Filtrá por período, dependencia o contacto, expandí cada
-          mes para ver el detalle, y exportá a Excel para presupuesto.
+        <TesoreriaHint titulo="Resumen" storageKey="resumen">
+          Mirá gasto por <b>mes</b> o <b>año</b> con las flechas ← →. Aplicá los filtros de arriba
+          para ver cuánto se gastó en cada rubro/contacto/dependencia. En modo "Año" cada mes se expande.
         </TesoreriaHint>
       </div>
 
       <ABMPage
-        title="Proyección de Pagos"
-        icon={<TrendingUp className="h-5 w-5" />}
+        title="Resumen"
+        icon={<BarChart3 className="h-5 w-5" />}
         backLink="/gestion/tesoreria"
+        searchPlaceholder="Buscar..."
         searchValue=""
         onSearchChange={() => {}}
         extraFilters={extraFilters}
-        headerActions={headerActions}
         loading={loading}
-        isEmpty={!loading && !error && (!data || data.por_mes.length === 0)}
-        emptyMessage="No hay cuotas futuras con esos filtros. Cargá gastos con tipo 'cuotas' o 'recurrente' o relajá los filtros."
+        isEmpty={!loading && filtered.length === 0}
+        emptyMessage={`No hay gastos en ${labelPeriodo} con esos filtros.`}
+        defaultViewMode="cards"
       >
-        {error && (
-          <div className="col-span-full p-3 rounded-lg text-sm" style={{ backgroundColor: '#ef444415', color: '#ef4444', border: '1px solid #ef444440' }}>
-            {error}
-          </div>
-        )}
-
-        {data && data.por_mes.length > 0 && (
-          <div className="col-span-full space-y-4">
-            {/* KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <KpiCard
-                label="Total proyectado"
-                value={`$${fmtMoney(data.total_pesos)}`}
-                accent={theme.primary}
-              />
-              <KpiCard
-                label="Cuotas pendientes"
-                value={String(data.cantidad_cuotas)}
-              />
-              <KpiCard
-                label="Promedio mensual"
-                value={`$${fmtMoney(promedioMensual)}`}
-              />
-              <KpiCard
-                label="Mes pico"
-                value={data.mes_pico
-                  ? `${MESES_CORTO[data.mes_pico.mes - 1]} ${String(data.mes_pico.anio).slice(2)}`
-                  : '—'}
-                sub={data.mes_pico ? `$${fmtMoney(data.mes_pico.total_pesos)}` : undefined}
-              />
-              <KpiCard
-                label="Cuotas vencidas"
-                value={String(data.cuotas_vencidas ?? 0)}
-                accent={(data.cuotas_vencidas ?? 0) > 0 ? '#ef4444' : undefined}
-                icon={(data.cuotas_vencidas ?? 0) > 0 ? <AlertTriangle className="h-4 w-4" /> : null}
-              />
+        <div className="col-span-full space-y-3">
+          {/* Total prominente */}
+          <div
+            className="rounded-xl p-4 flex items-center gap-4"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
+              <BarChart3 className="h-6 w-6" style={{ color: theme.primary }} />
             </div>
-
-            {/* Grafico de area */}
-            <div
-              className="rounded-xl p-4"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <h3 className="font-semibold mb-3 text-sm" style={{ color: theme.text }}>Tendencia mensual</h3>
-              <div style={{ width: '100%', height: 240 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="proyArea" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={theme.primary} stopOpacity={0.4} />
-                        <stop offset="100%" stopColor={theme.primary} stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
-                    <XAxis dataKey="mes" tick={{ fontSize: 11, fill: theme.textSecondary }} />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: theme.textSecondary }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 8,
-                        color: theme.text,
-                      }}
-                      formatter={(value: number) => `$${fmtMoney(value)}`}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="total"
-                      stroke={theme.primary}
-                      strokeWidth={2}
-                      fill="url(#proyArea)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Tabla expandible por mes */}
-            <div
-              className="rounded-xl"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="px-4 py-3 border-b" style={{ borderColor: theme.border }}>
-                <h3 className="font-semibold text-sm" style={{ color: theme.text }}>Detalle por mes</h3>
-                <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
-                  Tocá un mes para ver las cuotas individuales.
-                </p>
-              </div>
-              <div className="divide-y" style={{ borderColor: theme.border }}>
-                {data.por_mes.map((m) => {
-                  const key = mesKey(m);
-                  const expandido = mesExpandido === key;
-                  const cuotas = cuotasDelMes[key];
-                  const cargando = loadingCuotas === key;
-                  return (
-                    <div key={key}>
-                      <button
-                        type="button"
-                        onClick={() => toggleMes(m)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:opacity-80 transition-opacity"
-                        style={{ borderColor: theme.border }}
-                      >
-                        {expandido
-                          ? <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-                          : <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />}
-                        <div className="w-36 text-sm font-medium" style={{ color: theme.text }}>
-                          {MESES_LARGO[m.mes - 1]} {m.anio}
-                        </div>
-                        <div className="flex-1 text-sm font-bold" style={{ color: theme.primary }}>
-                          ${fmtMoney(m.total_pesos)}
-                        </div>
-                        <div className="text-xs" style={{ color: theme.textSecondary }}>
-                          {m.cantidad_cuotas} cuotas
-                        </div>
-                        {(m.cuotas_vencidas ?? 0) > 0 && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold"
-                            style={{ backgroundColor: '#ef444422', color: '#ef4444' }}
-                          >
-                            <AlertTriangle className="h-3 w-3" /> {m.cuotas_vencidas} vencidas
-                          </span>
-                        )}
-                      </button>
-                      {expandido && (
-                        <div className="px-4 pb-3" style={{ backgroundColor: theme.backgroundSecondary || theme.card }}>
-                          {cargando && (
-                            <div className="flex items-center gap-2 py-3 text-sm" style={{ color: theme.textSecondary }}>
-                              <Loader2 className="h-4 w-4 animate-spin" /> Cargando cuotas...
-                            </div>
-                          )}
-                          {!cargando && cuotas && cuotas.length === 0 && (
-                            <div className="py-3 text-sm" style={{ color: theme.textSecondary }}>Sin cuotas en este mes.</div>
-                          )}
-                          {!cargando && cuotas && cuotas.length > 0 && (
-                            <div className="space-y-1 pt-2">
-                              {cuotas.map(c => (
-                                <button
-                                  key={c.cuota_id}
-                                  type="button"
-                                  onClick={() => verGastoMadre(c.gasto_id)}
-                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs hover:opacity-80 transition-opacity"
-                                  style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-                                >
-                                  <Calendar className="h-3.5 w-3.5 flex-shrink-0" style={{ color: theme.textSecondary }} />
-                                  <span className="font-mono" style={{ color: theme.textSecondary }}>
-                                    {c.fecha_vencimiento}
-                                  </span>
-                                  <span
-                                    className="px-1.5 py-0.5 rounded-full text-[9px] uppercase font-semibold"
-                                    style={{
-                                      backgroundColor: `${ESTADO_COLORS[c.estado] || theme.textSecondary}22`,
-                                      color: ESTADO_COLORS[c.estado] || theme.textSecondary,
-                                    }}
-                                  >
-                                    {c.estado}
-                                  </span>
-                                  <span className="flex-1 truncate" style={{ color: theme.text }}>
-                                    {c.concepto}
-                                    {c.contacto_nombre && <span style={{ color: theme.textSecondary }}> — {c.contacto_nombre}</span>}
-                                    {c.dependencia_nombre && <span style={{ color: theme.textSecondary }}> — {c.dependencia_nombre}</span>}
-                                  </span>
-                                  {c.total_cuotas && (
-                                    <span style={{ color: theme.textSecondary }}>
-                                      {c.numero_cuota}/{c.total_cuotas}
-                                    </span>
-                                  )}
-                                  <span className="font-bold" style={{ color: theme.text }}>
-                                    ${fmtMoney(c.monto)}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="flex-1">
+              <p className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
+                {labelPeriodo} · {filtered.length} {filtered.length === 1 ? 'gasto' : 'gastos'}
+              </p>
+              <p className="text-2xl font-bold tabular-nums" style={{ color: theme.primary }}>{fmtMoney(totalGeneral)}</p>
             </div>
           </div>
-        )}
+
+          {/* Modo MES: lista lineal con detalle */}
+          {modo === 'mes' && filtered.length > 0 && (
+            <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+              <TablaGastos
+                gastos={filtered}
+                dependenciasMap={dependenciasMap}
+                contactosMap={contactosMap}
+                conceptoToTipoMap={conceptoToTipoMap}
+                theme={theme}
+              />
+            </div>
+          )}
+
+          {/* Modo AÑO: 12 meses, cada uno colapsable */}
+          {modo === 'anio' && gruposAnio.map(g => (
+            <MesRow
+              key={g.key}
+              grupo={g}
+              expandido={mesExpandido === g.key}
+              onToggle={() => setMesExpandido(prev => prev === g.key ? null : g.key)}
+              dependenciasMap={dependenciasMap}
+              contactosMap={contactosMap}
+              conceptoToTipoMap={conceptoToTipoMap}
+            />
+          ))}
+        </div>
       </ABMPage>
-
-      {/* Sheet con detalle del gasto madre */}
-      <Sheet
-        open={!!gastoSelected || loadingGasto}
-        onClose={() => setGastoSelected(null)}
-        title={gastoSelected ? gastoSelected.concepto : 'Cargando...'}
-        description={gastoSelected ? `Gasto #${gastoSelected.id}` : ''}
-      >
-        {loadingGasto && (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.textSecondary }} />
-          </div>
-        )}
-        {gastoSelected && !loadingGasto && (
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <KpiCard label="Monto" value={`$${fmtMoney(gastoSelected.monto_pesos)}`} accent={theme.primary} />
-              <KpiCard label="Tipo" value={gastoSelected.tipo_financiacion} />
-            </div>
-            <div className="space-y-1">
-              <p><span style={{ color: theme.textSecondary }}>Fecha:</span> {gastoSelected.fecha}</p>
-              {gastoSelected.cuotas_total && (
-                <p><span style={{ color: theme.textSecondary }}>Cuotas totales:</span> {gastoSelected.cuotas_total}</p>
-              )}
-            </div>
-            {gastoSelected.cuotas && gastoSelected.cuotas.length > 0 && (
-              <div>
-                <h4 className="font-semibold mb-2" style={{ color: theme.text }}>
-                  Cuotas del gasto ({gastoSelected.cuotas.length})
-                </h4>
-                <div className="space-y-1 max-h-72 overflow-y-auto">
-                  {gastoSelected.cuotas.map(c => (
-                    <div
-                      key={c.id}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md text-xs"
-                      style={{ backgroundColor: theme.backgroundSecondary || theme.card, border: `1px solid ${theme.border}` }}
-                    >
-                      <span style={{ color: theme.textSecondary }}>#{c.numero}</span>
-                      <span className="font-mono flex-1" style={{ color: theme.text }}>{c.fecha_vencimiento}</span>
-                      <span
-                        className="px-1.5 py-0.5 rounded-full text-[9px] uppercase font-semibold"
-                        style={{
-                          backgroundColor: `${ESTADO_COLORS[c.estado] || theme.textSecondary}22`,
-                          color: ESTADO_COLORS[c.estado] || theme.textSecondary,
-                        }}
-                      >
-                        {c.estado}
-                      </span>
-                      <span className="font-bold" style={{ color: theme.text }}>${fmtMoney(c.monto)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </Sheet>
     </>
   );
 }
 
-// ---------- Subcomponentes ----------
+function TablaGastos({
+  gastos, dependenciasMap, contactosMap, conceptoToTipoMap, theme,
+}: {
+  gastos: Gasto[];
+  dependenciasMap: Map<number, { nombre: string; color?: string | null }>;
+  contactosMap: Map<number, Contacto>;
+  conceptoToTipoMap: Map<string, { nombre: string; color?: string | null }>;
+  theme: ReturnType<typeof useTheme>['theme'];
+}) {
+  const total = gastos.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr style={{ backgroundColor: theme.backgroundSecondary }}>
+          <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase" style={{ color: theme.textSecondary }}>Fecha</th>
+          <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase" style={{ color: theme.textSecondary }}>Concepto</th>
+          <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase" style={{ color: theme.textSecondary }}>Tipo</th>
+          <th className="text-left px-3 py-2 text-[10px] font-semibold uppercase" style={{ color: theme.textSecondary }}>Destino</th>
+          <th className="text-right px-3 py-2 text-[10px] font-semibold uppercase" style={{ color: theme.textSecondary }}>Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {gastos.sort((a, b) => a.fecha.localeCompare(b.fecha)).map(g => {
+          const tipo = conceptoToTipoMap.get(g.concepto.toLowerCase());
+          const dep = g.destino_tipo === 'dependencia' && g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+          const c = g.destino_tipo === 'contacto' && g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+          return (
+            <tr key={g.id} className="border-t" style={{ borderColor: theme.border }}>
+              <td className="px-3 py-2 text-xs" style={{ color: theme.textSecondary }}>{new Date(g.fecha).toLocaleDateString('es-AR')}</td>
+              <td className="px-3 py-2 font-medium" style={{ color: theme.text }}>{g.concepto}</td>
+              <td className="px-3 py-2">
+                {tipo?.nombre ? (
+                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: `${tipo.color || theme.primary}20`, color: tipo.color || theme.primary }}>
+                    {tipo.nombre}
+                  </span>
+                ) : <span className="text-xs opacity-50">—</span>}
+              </td>
+              <td className="px-3 py-2 text-xs" style={{ color: theme.textSecondary }}>
+                {c ? (
+                  <span className="inline-flex items-center gap-1"><Home className="h-3 w-3" />{c.nombre} {c.apellido || ''}</span>
+                ) : dep ? (
+                  <span className="inline-flex items-center gap-1" style={{ color: dep.color || undefined }}><Building2 className="h-3 w-3" />{dep.nombre}</span>
+                ) : '—'}
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: theme.text }}>
+                ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+              </td>
+            </tr>
+          );
+        })}
+        <tr style={{ backgroundColor: theme.backgroundSecondary, borderTop: `2px solid ${theme.border}` }}>
+          <td colSpan={4} className="px-3 py-2 text-xs font-bold uppercase" style={{ color: theme.text }}>Total</td>
+          <td className="px-3 py-2 text-right text-base font-bold tabular-nums" style={{ color: theme.primary }}>
+            ${total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
 
-function KpiCard({ label, value, sub, accent, icon }: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: string;
-  icon?: React.ReactNode;
+function MesRow({
+  grupo, expandido, onToggle, dependenciasMap, contactosMap, conceptoToTipoMap,
+}: {
+  grupo: GrupoMes;
+  expandido: boolean;
+  onToggle: () => void;
+  dependenciasMap: Map<number, { nombre: string; color?: string | null }>;
+  contactosMap: Map<number, Contacto>;
+  conceptoToTipoMap: Map<string, { nombre: string; color?: string | null }>;
 }) {
   const { theme } = useTheme();
+  const vacio = grupo.count === 0;
+
   return (
-    <div
-      className="p-3 rounded-xl"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <p className="text-[10px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>
-        {label}
-      </p>
-      <p
-        className="text-xl font-bold mt-1 inline-flex items-center gap-1.5"
-        style={{ color: accent || theme.text }}
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, opacity: vacio ? 0.6 : 1 }}>
+      <button
+        onClick={vacio ? undefined : onToggle}
+        disabled={vacio}
+        className="w-full px-4 py-3 flex items-center gap-3 transition-colors hover:bg-opacity-50"
+        style={{ cursor: vacio ? 'default' : 'pointer' }}
       >
-        {icon}
-        {value}
-      </p>
-      {sub && (
-        <p className="text-[11px] mt-0.5" style={{ color: theme.textSecondary }}>
-          {sub}
-        </p>
+        {!vacio && (expandido
+          ? <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+          : <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+        )}
+        {vacio && <div className="w-4 flex-shrink-0" />}
+        <Calendar className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
+        <span className="font-bold text-sm flex-shrink-0" style={{ color: theme.text }}>{grupo.label}</span>
+        <span className="text-[11px] flex-shrink-0" style={{ color: theme.textSecondary }}>{grupo.count} gastos</span>
+        <div className="flex-1" />
+        <span className="text-base font-bold tabular-nums flex-shrink-0" style={{ color: vacio ? theme.textSecondary : theme.primary }}>
+          ${grupo.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+        </span>
+      </button>
+
+      {expandido && !vacio && (
+        <div className="border-t" style={{ borderColor: theme.border }}>
+          <TablaGastos
+            gastos={grupo.gastos}
+            dependenciasMap={dependenciasMap}
+            contactosMap={contactosMap}
+            conceptoToTipoMap={conceptoToTipoMap}
+            theme={theme}
+          />
+        </div>
       )}
     </div>
   );
