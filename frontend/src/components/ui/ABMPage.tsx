@@ -51,6 +51,8 @@ interface ABMPageProps {
   searchPlaceholder?: string;
   searchValue: string;
   onSearchChange: (value: string) => void;
+  /** Ancho maximo del input de busqueda (px). Si no se setea ocupa flex-1. */
+  searchMaxWidth?: number;
 
   // Extra filters (opcional)
   extraFilters?: ReactNode;
@@ -99,6 +101,7 @@ export function ABMPage({
   buttonIcon,
   onAdd,
   searchPlaceholder = 'Buscar...',
+  searchMaxWidth,
   searchValue,
   onSearchChange,
   extraFilters,
@@ -202,7 +205,10 @@ export function ABMPage({
           <div className={`h-8 w-px hidden sm:block ${searchFocused ? 'sm:hidden md:block' : ''}`} style={{ backgroundColor: theme.border }} />
 
           {/* Buscador que se expande en mobile al focus */}
-          <div className={`relative group transition-all duration-300 ${searchFocused ? 'flex-1' : 'flex-1 sm:flex-1'}`}>
+          <div
+            className={`relative group transition-all duration-300 ${searchFocused ? 'flex-1' : 'flex-1 sm:flex-1'}`}
+            style={searchMaxWidth ? { maxWidth: searchMaxWidth, flex: '0 1 auto', width: '100%' } : undefined}
+          >
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-all duration-300 group-focus-within:scale-110"
               style={{ color: theme.textSecondary }}

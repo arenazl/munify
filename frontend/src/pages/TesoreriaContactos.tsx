@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,8 +7,8 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
-import { contactosApi, tesoreriaImportApi } from '../lib/api';
-import type { Contacto, TipoContacto } from '../types';
+import { contactosApi, tesoreriaImportApi, tiposEmpleadoApi } from '../lib/api';
+import type { Contacto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
 
 const TIPO_LABELS: Record<TipoContacto, string> = {
   concejal: 'Concejal',
@@ -38,6 +38,8 @@ export default function TesoreriaContactos() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<TipoContacto | ''>('');
+  const [tipoEmpleadoFiltro, setTipoEmpleadoFiltro] = useState<string>('');
+  const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
 
   // Sheet (form)
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -73,7 +75,25 @@ export default function TesoreriaContactos() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const filtered = useMemo(() => contactos, [contactos]);
+  // Cargar catalogo de tipos de empleado (per-muni)
+  useEffect(() => {
+    tiposEmpleadoApi.list({ activo: true })
+      .then(r => setTiposEmpleado(r.data || []))
+      .catch(() => setTiposEmpleado([]));
+  }, []);
+
+  // Reset filtro de subtipo cuando cambia el tipo principal
+  useEffect(() => {
+    if (tipoFiltro !== 'empleado') setTipoEmpleadoFiltro('');
+  }, [tipoFiltro]);
+
+  // Filtrado client-side por subtipo cuando tipo=empleado.
+  // Matchea contra el nombre del tipo del catalogo en c.subtipo (string libre).
+  const filtered = useMemo(() => {
+    if (tipoFiltro !== 'empleado' || !tipoEmpleadoFiltro) return contactos;
+    const target = tipoEmpleadoFiltro.toLowerCase();
+    return contactos.filter(c => (c.subtipo || '').toLowerCase() === target);
+  }, [contactos, tipoFiltro, tipoEmpleadoFiltro]);
 
   const openSheet = (c?: Contacto) => {
     if (c) {
@@ -148,9 +168,28 @@ export default function TesoreriaContactos() {
     }
   };
 
-  // Filtros: chips por tipo
+  const tipoEmpleadoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los empleados' },
+    ...tiposEmpleado.map(t => ({
+      value: t.nombre, label: t.nombre, color: t.color || undefined,
+    })),
+  ]), [tiposEmpleado]);
+
+  // Filtros: chips por tipo. Si tipo=empleado, aparece combo de subtipo
+  // de empleado (del catalogo per-muni) al lado de la pill Empleado.
+  // Mismo .ts-fitem CSS que otras pantallas para mantener look uniforme.
+  const TIPOS_KEYS = Object.keys(TIPO_LABELS) as TipoContacto[];
   const extraFilters = (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5 contactos-filters-row">
+      <style>{`
+        .contactos-filters-row .ts-fitem button {
+          height: 32px !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          font-size: 0.75rem !important;
+          border-radius: 0.375rem !important;
+        }
+      `}</style>
       <button
         onClick={() => setTipoFiltro('')}
         className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
@@ -158,24 +197,41 @@ export default function TesoreriaContactos() {
           backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
           color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
           border: `1px solid ${tipoFiltro === '' ? theme.primary : theme.border}`,
+          height: 32,
         }}
       >
         Todos {contactos.length > 0 && `(${contactos.length})`}
       </button>
-      {(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => (
-        <button
-          key={t}
-          onClick={() => setTipoFiltro(t)}
-          className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-          style={{
-            backgroundColor: tipoFiltro === t ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
-            color: tipoFiltro === t ? '#fff' : TIPO_COLORS[t],
-            border: `1px solid ${TIPO_COLORS[t]}40`,
-          }}
-        >
-          {TIPO_LABELS[t]}
-        </button>
-      ))}
+      {TIPOS_KEYS.map(t => {
+        const active = tipoFiltro === t;
+        return (
+          <Fragment key={t}>
+            <button
+              onClick={() => setTipoFiltro(t)}
+              className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              style={{
+                backgroundColor: active ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
+                color: active ? '#fff' : TIPO_COLORS[t],
+                border: `1px solid ${TIPO_COLORS[t]}40`,
+                height: 32,
+              }}
+            >
+              {TIPO_LABELS[t]}
+            </button>
+            {t === 'empleado' && active && tiposEmpleado.length > 0 && (
+              <div className="min-w-[180px] ts-fitem">
+                <ModernSelect
+                  value={tipoEmpleadoFiltro}
+                  onChange={setTipoEmpleadoFiltro}
+                  options={tipoEmpleadoOptions}
+                  placeholder="Todos los empleados"
+                  searchable
+                />
+              </div>
+            )}
+          </Fragment>
+        );
+      })}
     </div>
   );
 
@@ -274,7 +330,8 @@ export default function TesoreriaContactos() {
         backLink="/gestion/tesoreria"
         buttonLabel="Nuevo"
         onAdd={() => openSheet()}
-        searchPlaceholder="Buscar por nombre, DNI, alias…"
+        searchPlaceholder="Buscar por nombre, DNI…"
+        searchMaxWidth={320}
         searchValue={search}
         onSearchChange={setSearch}
         extraFilters={extraFilters}

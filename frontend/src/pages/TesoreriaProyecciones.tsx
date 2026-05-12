@@ -13,12 +13,11 @@ import { ABMPage } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
-import { ContactoAutocomplete } from '../components/ui/ContactoAutocomplete';
-import { gastosApi, dependenciasApi } from '../lib/api';
+import { gastosApi, dependenciasApi, contactosApi, conceptosAbmApi } from '../lib/api';
 import { exportProyeccionExcel } from '../lib/exportProyeccionExcel';
 import type {
   ProyeccionResponse, ProyeccionMes, CuotaProyeccion,
-  Contacto, Gasto,
+  Contacto, Gasto, Concepto,
 } from '../types';
 
 const MESES_CORTO = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
@@ -80,6 +79,11 @@ export default function TesoreriaProyecciones() {
 
   // Dependencias del municipio para el select
   const [dependenciaOptions, setDependenciaOptions] = useState<{ value: string; label: string }[]>([]);
+  // Contactos para el combo
+  const [contactos, setContactos] = useState<Contacto[]>([]);
+  // Conceptos para el combo
+  const [conceptosLista, setConceptosLista] = useState<Concepto[]>([]);
+  // Cambiamos conceptoSearch a string EXACTO (valor del combo)
 
   // Drill-down: mes expandido y sus cuotas
   const [mesExpandido, setMesExpandido] = useState<string | null>(null);
@@ -103,6 +107,10 @@ export default function TesoreriaProyecciones() {
         setDependenciaOptions([{ value: '', label: 'Todas las dependencias' }, ...opts]);
       })
       .catch(() => setDependenciaOptions([{ value: '', label: 'Todas las dependencias' }]));
+
+    // Cargar contactos y conceptos para los combos
+    contactosApi.list({ activo: true, limit: 500 }).then(r => setContactos(r.data || [])).catch(() => setContactos([]));
+    conceptosAbmApi.list({ activo: true }).then(r => setConceptosLista(r.data || [])).catch(() => setConceptosLista([]));
   }, [sinPermisos]);
 
   // Cargar proyeccion cuando cambian los filtros
@@ -215,43 +223,91 @@ export default function TesoreriaProyecciones() {
 
   // ---------- JSX helpers ----------
 
+  const contactoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los contactos' },
+    ...contactos.map(c => ({
+      value: String(c.id),
+      label: `${c.nombre} ${c.apellido || ''}`.trim(),
+    })),
+  ]), [contactos]);
+
+  const conceptoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los conceptos' },
+    ...conceptosLista.map(c => ({
+      value: c.nombre,
+      label: c.nombre,
+      color: c.tipo_concepto_color || undefined,
+    })),
+  ]), [conceptosLista]);
+
+  // Filtros unificados: TODOS son ModernSelect searchable con misma altura.
+  // El DateRangePicker comparte la clase .ts-fitem que fuerza h-40 + rounded.
   const extraFilters = (
-    <div className="flex flex-wrap items-center gap-2 w-full">
-      <DateRangePicker
-        value={rango}
-        onChange={setRango}
-        allowClear={false}
-        className="min-w-[260px]"
-      />
-      <ModernSelect
-        value={tipoFin}
-        onChange={setTipoFin}
-        options={TIPO_FIN_OPTIONS}
-        className="min-w-[160px]"
-      />
-      {dependenciaOptions.length > 0 && (
-        <ModernSelect
-          value={dependenciaId}
-          onChange={setDependenciaId}
-          options={dependenciaOptions}
-          searchable
-          className="min-w-[200px]"
+    <div className="flex flex-wrap items-center gap-2 w-full proyecciones-filters-row">
+      <style>{`
+        .proyecciones-filters-row .ts-fitem button,
+        .proyecciones-filters-row .ts-fitem > div > button {
+          height: 40px !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          font-size: 0.875rem !important;
+          border-radius: 0.75rem !important;
+        }
+      `}</style>
+
+      <div className="min-w-[260px] flex-shrink-0 ts-fitem">
+        <DateRangePicker
+          value={rango}
+          onChange={setRango}
+          allowClear={false}
         />
+      </div>
+
+      <div className="min-w-[160px] flex-shrink-0 ts-fitem">
+        <ModernSelect
+          value={tipoFin}
+          onChange={setTipoFin}
+          options={TIPO_FIN_OPTIONS}
+          placeholder="Todos los tipos"
+          searchable
+        />
+      </div>
+
+      {dependenciaOptions.length > 0 && (
+        <div className="min-w-[200px] flex-shrink-0 ts-fitem">
+          <ModernSelect
+            value={dependenciaId}
+            onChange={setDependenciaId}
+            options={dependenciaOptions}
+            placeholder="Todas las dependencias"
+            searchable
+          />
+        </div>
       )}
-      <ContactoAutocomplete
-        value={contactoId}
-        onChange={(id, c) => { setContactoId(id); setContactoSelected(c); }}
-        placeholder="Filtrar por contacto"
-        className="min-w-[220px]"
-      />
-      <input
-        type="text"
-        value={conceptoSearch}
-        onChange={e => setConceptoSearch(e.target.value)}
-        placeholder="Buscar concepto..."
-        className="px-3 py-2 rounded-lg text-sm outline-none min-w-[180px]"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
-      />
+
+      <div className="min-w-[200px] flex-shrink-0 ts-fitem">
+        <ModernSelect
+          value={contactoId ? String(contactoId) : ''}
+          onChange={(v) => {
+            const id = v ? parseInt(v, 10) : null;
+            setContactoId(id);
+            setContactoSelected(id ? contactos.find(c => c.id === id) || null : null);
+          }}
+          options={contactoOptions}
+          placeholder="Todos los contactos"
+          searchable
+        />
+      </div>
+
+      <div className="min-w-[200px] flex-shrink-0 ts-fitem">
+        <ModernSelect
+          value={conceptoSearch}
+          onChange={setConceptoSearch}
+          options={conceptoOptions}
+          placeholder="Todos los conceptos"
+          searchable
+        />
+      </div>
     </div>
   );
 
