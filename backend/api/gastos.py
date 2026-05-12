@@ -147,7 +147,7 @@ async def list_gastos(
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

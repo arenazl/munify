@@ -75,6 +75,9 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [conceptoSearch, setConceptoSearch] = useState('');
   const conceptoInputRef = useRef<HTMLInputElement>(null);
 
+  // Edicion inline de la direccion del contacto seleccionado (paso 2)
+  const [direccionEditable, setDireccionEditable] = useState('');
+
   // Reset al cerrar
   useEffect(() => {
     if (!open) {
@@ -247,7 +250,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
             className="w-full px-3 py-2 rounded-xl text-sm mb-2"
             style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
           />
-          <div className="rounded-xl max-h-72 overflow-y-auto space-y-1" style={{ border: `1px solid ${theme.border}` }}>
+          <div className="rounded-xl max-h-60 overflow-y-auto space-y-1" style={{ border: `1px solid ${theme.border}` }}>
             {contactos.map(c => (
               <button
                 key={c.id}
@@ -272,6 +275,63 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
               </p>
             )}
           </div>
+
+          {/* Info / edicion de direccion del contacto seleccionado */}
+          {contactoId && (() => {
+            const c = contactos.find(x => x.id === contactoId);
+            if (!c) return null;
+            return (
+              <div
+                className="mt-3 p-3 rounded-xl"
+                style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+              >
+                <p className="text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                  Dirección del contacto
+                </p>
+                {c.direccion ? (
+                  <p className="text-sm" style={{ color: theme.text }}>
+                    📍 {c.direccion}
+                  </p>
+                ) : (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Ej: Av. San Martín 123"
+                      value={direccionEditable}
+                      onChange={(e) => setDireccionEditable(e.target.value)}
+                      className="flex-1 px-3 py-1.5 rounded-lg text-sm"
+                      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!direccionEditable.trim()) return;
+                        try {
+                          await contactosApi.update(c.id, { direccion: direccionEditable.trim() });
+                          // Refrescar el contacto en el state local
+                          setContactos(prev => prev.map(x => x.id === c.id ? { ...x, direccion: direccionEditable.trim() } : x));
+                          setDireccionEditable('');
+                          toast.success('Dirección agregada al contacto');
+                        } catch {
+                          toast.error('Error guardando dirección');
+                        }
+                      }}
+                      disabled={!direccionEditable.trim()}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50"
+                      style={{ backgroundColor: theme.primary, color: '#fff' }}
+                    >
+                      Guardar
+                    </button>
+                  </div>
+                )}
+                {c.latitud && c.longitud && (
+                  <p className="text-[10px] mt-1" style={{ color: '#10b981' }}>
+                    Geolocalizado: {c.latitud.toFixed(4)}, {c.longitud.toFixed(4)}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
