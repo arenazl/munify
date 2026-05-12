@@ -7,9 +7,15 @@ Cubre:
 """
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, List, Literal
+from typing import Optional, List
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+
+from models.contacto import TipoContacto
+from models.gasto import (
+    DestinoGasto, TipoFinanciacion, FrecuenciaRecurrencia,
+    FormaPago, EstadoGastoCuota,
+)
 
 
 # ============================================================
@@ -32,10 +38,8 @@ class ModuloResponse(ModuloBase):
 # Contacto
 # ============================================================
 
-TipoContactoStr = Literal[
-    "concejal", "empleado", "profesional",
-    "proveedor", "contratista", "beneficiario", "otro",
-]
+# Alias para retrocompatibilidad — usar los Enum directamente.
+TipoContactoStr = TipoContacto
 
 
 class ContactoBase(BaseModel):
@@ -74,7 +78,7 @@ class ContactoUpdate(BaseModel):
 
 
 class ContactoResponse(ContactoBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: int
     municipio_id: int
@@ -87,15 +91,15 @@ class ContactoResponse(ContactoBase):
 # Gasto + Cuota
 # ============================================================
 
-DestinoGastoStr = Literal["dependencia", "contacto"]
-TipoFinanciacionStr = Literal["contado", "cuotas", "prestamo", "recurrente"]
-FrecuenciaStr = Literal["semanal", "quincenal", "mensual", "bimestral", "trimestral", "anual"]
-FormaPagoStr = Literal["efectivo", "transferencia", "cheque", "tarjeta", "mercadopago", "otro"]
-EstadoCuotaStr = Literal["pendiente", "pagada", "vencida", "cancelada"]
+DestinoGastoStr = DestinoGasto
+TipoFinanciacionStr = TipoFinanciacion
+FrecuenciaStr = FrecuenciaRecurrencia
+FormaPagoStr = FormaPago
+EstadoCuotaStr = EstadoGastoCuota
 
 
 class GastoCuotaResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: int
     gasto_id: int
@@ -148,7 +152,7 @@ class GastoUpdate(BaseModel):
 
 
 class GastoResponse(GastoBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: int
     municipio_id: int
