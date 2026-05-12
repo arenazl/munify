@@ -771,6 +771,31 @@ export default function TesoreriaMapa() {
               </div>
             </div>
 
+            {/* Mini preview del mapa centrado en el contacto */}
+            {selected.latitud != null && selected.longitud != null && (
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{ height: 140, border: `1px solid ${theme.border}` }}
+              >
+                <MapContainer
+                  center={[selected.latitud, selected.longitud]}
+                  zoom={16}
+                  style={{ width: '100%', height: '100%' }}
+                  zoomControl={false}
+                  attributionControl={false}
+                  dragging={false}
+                  doubleClickZoom={false}
+                  scrollWheelZoom={false}
+                >
+                  <TileLayer key={tileProvider} url={tile.url} attribution={tile.attribution} />
+                  <Marker
+                    position={[selected.latitud, selected.longitud]}
+                    icon={casitaDivIcon({ color: TIPO_COLORS[selected.tipo], size: 18 })}
+                  />
+                </MapContainer>
+              </div>
+            )}
+
             {/* Datos de contacto */}
             <div className="grid grid-cols-1 gap-1.5 text-sm">
               {selected.direccion && (
