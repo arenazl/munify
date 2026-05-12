@@ -94,6 +94,10 @@ class Gasto(Base):
 
     descripcion = Column(Text, nullable=True)
 
+    # Notas internas del intendente / supervisor sobre el gasto.
+    # Se edita desde el side modal de Tesoreria. No se muestra al beneficiario.
+    observaciones = Column(Text, nullable=True)
+
     # ============ MONTO + COTIZACION ============
     # Monto en pesos al momento del gasto (siempre).
     monto_pesos = Column(Numeric(15, 2), nullable=False)

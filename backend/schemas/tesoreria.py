@@ -127,6 +127,7 @@ class GastoBase(BaseModel):
 
     concepto: str = Field(..., min_length=1, max_length=150)
     descripcion: Optional[str] = None
+    observaciones: Optional[str] = None
 
     monto_pesos: Decimal = Field(..., gt=0)
     cotizacion_usd: Optional[Decimal] = Field(None, gt=0)
@@ -148,6 +149,7 @@ class GastoCreate(GastoBase):
 class GastoUpdate(BaseModel):
     concepto: Optional[str] = Field(None, min_length=1, max_length=150)
     descripcion: Optional[str] = None
+    observaciones: Optional[str] = None
     activo: Optional[bool] = None
 
 

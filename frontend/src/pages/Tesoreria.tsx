@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Wallet, Users, Map as MapIcon, TrendingUp, Trash2 } from 'lucide-react';
+import {
+  Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
+  Building2, Home, Calendar,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
+import {
+  GastoDetalleSheet, calcEstadoAgregado, ESTADO_AGREGADO_META,
+  type EstadoAgregado,
+} from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
-import { gastosApi } from '../lib/api';
+import { ModernSelect } from '../components/ui/ModernSelect';
+import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
+import { gastosApi, dependenciasApi } from '../lib/api';
 import type { Gasto, TipoFinanciacion } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
@@ -17,6 +26,21 @@ const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   recurrente: '#f59e0b',
 };
 
+interface DependenciaOption {
+  id: number;
+  nombre: string;
+  color?: string | null;
+  icono?: string | null;
+}
+
+const ESTADO_FILTROS: { value: EstadoAgregado | ''; label: string }[] = [
+  { value: '', label: 'Todos' },
+  { value: 'al_dia', label: 'Al día' },
+  { value: 'en_mora', label: 'En mora' },
+  { value: 'pendiente', label: 'Pendiente' },
+  { value: 'completado', label: 'Completado' },
+];
+
 export default function Tesoreria() {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -25,7 +49,16 @@ export default function Tesoreria() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<TipoFinanciacion | ''>('');
+  const [dependenciaFiltro, setDependenciaFiltro] = useState<string>(''); // string para ModernSelect
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
+  const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
+
+  const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Side modal de detalle
+  const [gastoSeleccionado, setGastoSeleccionado] = useState<Gasto | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (
@@ -49,12 +82,46 @@ export default function Tesoreria() {
     }
   };
 
-  useEffect(() => { fetchGastos(); }, []);
+  const fetchDependencias = async () => {
+    try {
+      const res = await dependenciasApi.getMunicipio({ activo: true });
+      setDependencias(res.data || []);
+    } catch {
+      setDependencias([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchGastos();
+    fetchDependencias();
+  }, []);
+
+  // Refrescar el gasto seleccionado cuando se actualiza la lista
+  useEffect(() => {
+    if (!gastoSeleccionado) return;
+    const actualizado = gastos.find(g => g.id === gastoSeleccionado.id);
+    if (actualizado) setGastoSeleccionado(actualizado);
+  }, [gastos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
+    const desde = rangoFechas.desde ? new Date(rangoFechas.desde) : null;
+    const hasta = rangoFechas.hasta ? new Date(rangoFechas.hasta) : null;
+    if (desde) desde.setHours(0, 0, 0, 0);
+    if (hasta) hasta.setHours(23, 59, 59, 999);
+    const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
+
     return gastos.filter(g => {
       if (tipoFiltro && g.tipo_financiacion !== tipoFiltro) return false;
+      if (depId != null) {
+        if (g.destino_tipo !== 'dependencia' || g.destino_dependencia_id !== depId) return false;
+      }
+      if (estadoFiltro && calcEstadoAgregado(g) !== estadoFiltro) return false;
+      if (desde || hasta) {
+        const fechaGasto = new Date(g.fecha);
+        if (desde && fechaGasto < desde) return false;
+        if (hasta && fechaGasto > hasta) return false;
+      }
       if (s) {
         const hay = g.concepto.toLowerCase().includes(s)
           || (g.descripcion?.toLowerCase().includes(s) ?? false);
@@ -62,7 +129,7 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, tipoFiltro]);
+  }, [gastos, search, tipoFiltro, dependenciaFiltro, estadoFiltro, rangoFechas]);
 
   const totalMes = useMemo(() => {
     const ahora = new Date();
@@ -74,6 +141,12 @@ export default function Tesoreria() {
       .reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0);
   }, [gastos]);
 
+  const dependenciasMap = useMemo(() => {
+    const m = new Map<number, DependenciaOption>();
+    dependencias.forEach(d => m.set(d.id, d));
+    return m;
+  }, [dependencias]);
+
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar este gasto?')) return;
     try {
@@ -83,6 +156,17 @@ export default function Tesoreria() {
     } catch {
       toast.error('Error eliminando');
     }
+  };
+
+  const openDetalle = (g: Gasto) => {
+    setGastoSeleccionado(g);
+    setSheetOpen(true);
+  };
+
+  const closeDetalle = () => {
+    setSheetOpen(false);
+    // pequeño delay para no flashear sin contenido durante la animación de cierre
+    setTimeout(() => setGastoSeleccionado(null), 400);
   };
 
   // Chips filtros por tipo de financiación
@@ -117,6 +201,67 @@ export default function Tesoreria() {
     </div>
   );
 
+  // Chips de estado agregado
+  const estadoChips = (
+    <div className="flex flex-wrap gap-1.5">
+      {ESTADO_FILTROS.map(e => {
+        const isActive = estadoFiltro === e.value;
+        const meta = e.value ? ESTADO_AGREGADO_META[e.value] : null;
+        const color = meta?.color || theme.primary;
+        return (
+          <button
+            key={e.value || 'all'}
+            onClick={() => setEstadoFiltro(e.value as EstadoAgregado | '')}
+            className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+            style={{
+              backgroundColor: isActive ? color : `${color}15`,
+              color: isActive ? '#fff' : color,
+              border: `1px solid ${color}40`,
+            }}
+          >
+            {e.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // Opciones de dependencia
+  const dependenciaOptions = useMemo(() => ([
+    { value: '', label: 'Todas las dependencias' },
+    ...dependencias.map(d => ({
+      value: String(d.id),
+      label: d.nombre,
+      color: d.color || undefined,
+    })),
+  ]), [dependencias]);
+
+  // Barra de filtros secundarios (dependencia + fechas + estado)
+  const secondaryFilters = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="min-w-[200px] flex-shrink-0">
+        <ModernSelect
+          value={dependenciaFiltro}
+          onChange={setDependenciaFiltro}
+          options={dependenciaOptions}
+          placeholder="Todas las dependencias"
+          searchable
+        />
+      </div>
+      <div className="flex-shrink-0">
+        <DateRangePicker
+          value={rangoFechas}
+          onChange={setRangoFechas}
+          placeholder="Rango de fechas"
+          allowClear
+        />
+      </div>
+      <div className="flex-1 min-w-0 flex justify-end">
+        {estadoChips}
+      </div>
+    </div>
+  );
+
   // Accesos rápidos como headerActions
   const headerActions = (
     <>
@@ -144,14 +289,66 @@ export default function Tesoreria() {
     </>
   );
 
+  // Renderer del destino para la celda de la tabla
+  const renderDestino = (g: Gasto) => {
+    if (g.destino_tipo === 'contacto') {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
+          <Home className="h-3 w-3" /> Contacto
+        </span>
+      );
+    }
+    const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+    const color = dep?.color || theme.primary;
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+        style={{ backgroundColor: `${color}15`, color }}
+        title={dep?.nombre}
+      >
+        <Building2 className="h-3 w-3" />
+        <span className="truncate max-w-[140px]">{dep?.nombre || 'Secretaría'}</span>
+      </span>
+    );
+  };
+
+  const renderEstadoBadge = (g: Gasto) => {
+    const est = calcEstadoAgregado(g);
+    const meta = ESTADO_AGREGADO_META[est];
+    return (
+      <span
+        className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{ backgroundColor: meta.bg, color: meta.color, border: `1px solid ${meta.color}30` }}
+      >
+        {meta.label}
+      </span>
+    );
+  };
+
   const tableView = (
     <ABMTable<Gasto>
       data={filtered}
       keyExtractor={(g) => g.id}
+      onRowClick={openDetalle}
       columns={[
-        { key: 'fecha', header: 'Fecha', render: (g) => new Date(g.fecha).toLocaleDateString('es-AR') },
-        { key: 'concepto', header: 'Concepto', render: (g) => <span className="font-medium">{g.concepto}</span> },
-        { key: 'destino_tipo', header: 'Destino', render: (g) => g.destino_tipo === 'contacto' ? 'Contacto' : 'Secretaría' },
+        {
+          key: 'fecha',
+          header: 'Fecha',
+          render: (g) => new Date(g.fecha).toLocaleDateString('es-AR'),
+          sortValue: (g) => g.fecha,
+        },
+        {
+          key: 'concepto',
+          header: 'Concepto',
+          render: (g) => <span className="font-medium">{g.concepto}</span>,
+          sortValue: (g) => g.concepto,
+        },
+        {
+          key: 'destino',
+          header: 'Destino',
+          render: renderDestino,
+          sortable: false,
+        },
         {
           key: 'monto_pesos',
           header: 'Monto',
@@ -160,6 +357,7 @@ export default function Tesoreria() {
               ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
             </span>
           ),
+          sortValue: (g) => parseFloat(g.monto_pesos),
         },
         {
           key: 'tipo_financiacion',
@@ -172,10 +370,30 @@ export default function Tesoreria() {
               {g.tipo_financiacion}
             </span>
           ),
+          sortValue: (g) => g.tipo_financiacion,
+        },
+        {
+          key: 'estado_agregado',
+          header: 'Estado',
+          render: renderEstadoBadge,
+          sortValue: (g) => calcEstadoAgregado(g),
         },
       ]}
       actions={(g) => (
-        <ABMTableAction title="Eliminar" onClick={() => handleDelete(g.id)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
+        <>
+          <ABMTableAction
+            title="Ver detalle"
+            onClick={() => openDetalle(g)}
+            variant="primary"
+            icon={<Eye className="h-4 w-4" />}
+          />
+          <ABMTableAction
+            title="Eliminar"
+            onClick={() => handleDelete(g.id)}
+            variant="danger"
+            icon={<Trash2 className="h-4 w-4" />}
+          />
+        </>
       )}
     />
   );
@@ -202,45 +420,86 @@ export default function Tesoreria() {
         searchValue={search}
         onSearchChange={setSearch}
         extraFilters={extraFilters}
+        secondaryFilters={secondaryFilters}
         headerActions={headerActions}
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
-        emptyMessage="Todavía no hay gastos. Tocá 'Nuevo Gasto' para cargar uno."
+        emptyMessage="No hay gastos que coincidan con los filtros."
         tableView={tableView}
         defaultViewMode="table"
       >
-        {/* Card view (mismo data en cards si el user cambia el toggle) */}
-        {filtered.map(g => (
-          <div
-            key={g.id}
-            className="rounded-xl p-4"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
-                <p className="text-[10px]" style={{ color: theme.textSecondary }}>
-                  {new Date(g.fecha).toLocaleDateString('es-AR')} · {g.destino_tipo === 'contacto' ? 'Contacto' : 'Secretaría'}
-                </p>
+        {/* Card view */}
+        {filtered.map(g => {
+          const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+          const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
+          return (
+            <div
+              key={g.id}
+              onClick={() => openDetalle(g)}
+              className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
+                      <Calendar className="h-2.5 w-2.5" />
+                      {new Date(g.fecha).toLocaleDateString('es-AR')}
+                    </span>
+                    {g.destino_tipo === 'contacto' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
+                        <Home className="h-2.5 w-2.5" /> Contacto
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
+                        style={{
+                          backgroundColor: `${dep?.color || theme.primary}15`,
+                          color: dep?.color || theme.primary,
+                        }}
+                      >
+                        <Building2 className="h-2.5 w-2.5" />
+                        <span className="truncate max-w-[100px]">{dep?.nombre || 'Secretaría'}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span
+                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
+                >
+                  {g.tipo_financiacion}
+                </span>
               </div>
-              <span
-                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
-              >
-                {g.tipo_financiacion}
-              </span>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>
+                  ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </p>
+                <span
+                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: estMeta.bg, color: estMeta.color, border: `1px solid ${estMeta.color}30` }}
+                >
+                  {estMeta.label}
+                </span>
+              </div>
             </div>
-            <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>
-              ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </ABMPage>
 
       <CrearGastoWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         onSuccess={() => { setWizardOpen(false); fetchGastos(); }}
+      />
+
+      <GastoDetalleSheet
+        open={sheetOpen}
+        onClose={closeDetalle}
+        gasto={gastoSeleccionado}
+        onUpdated={fetchGastos}
+        onDeleted={fetchGastos}
       />
     </>
   );

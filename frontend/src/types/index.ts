@@ -525,6 +525,7 @@ export interface Gasto {
   destino_contacto_id?: number | null;
   concepto: string;
   descripcion?: string | null;
+  observaciones?: string | null;
   monto_pesos: string;
   cotizacion_usd?: string | null;
   monto_usd?: string | null;
