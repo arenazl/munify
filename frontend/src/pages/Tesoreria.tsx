@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
-  Building2, Home, Calendar, Briefcase,
+  Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -15,9 +15,8 @@ import {
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
-import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi } from '../lib/api';
-import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto } from '../types';
+import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   contado: '#10b981',
@@ -34,6 +33,25 @@ const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   mercadopago: 'MercadoPago',
   otro: 'Otro',
 };
+
+const TIPO_CONTACTO_LABELS: Record<TipoContacto, string> = {
+  concejal: 'Concejales',
+  empleado: 'Empleados',
+  profesional: 'Profesionales',
+  proveedor: 'Proveedores',
+  contratista: 'Contratistas',
+  beneficiario: 'Beneficiarios',
+  otro: 'Otros',
+};
+const TIPO_CONTACTO_COLORS: Record<TipoContacto, string> = {
+  concejal: '#8b5cf6', empleado: '#3b82f6', profesional: '#f59e0b',
+  proveedor: '#10b981', contratista: '#06b6d4', beneficiario: '#ec4899', otro: '#71717a',
+};
+
+const MESES_LARGO = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 
 interface DependenciaOption {
   id: number;
@@ -57,15 +75,21 @@ export default function Tesoreria() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [formaPagoFiltro, setFormaPagoFiltro] = useState<FormaPago | ''>('');
+  const [tipoContactoFiltro, setTipoContactoFiltro] = useState<TipoContacto | ''>('');
+  const [subtipoEmpleadoFiltro, setSubtipoEmpleadoFiltro] = useState<string>('');
   const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
   const [tipoConceptoFiltro, setTipoConceptoFiltro] = useState<string>('');
   const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
-  const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
+
+  // Navegador de meses. mes/anio = filtro activo. todosLosMeses = sin filtro temporal.
+  const today = new Date();
+  const [mesActual, setMesActual] = useState<number>(today.getMonth());  // 0-11
+  const [anioActual, setAnioActual] = useState<number>(today.getFullYear());
+  const [todosLosMeses, setTodosLosMeses] = useState<boolean>(false);
 
   const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
-  const [, setContactos] = useState<Contacto[]>([]);
+  const [contactos, setContactos] = useState<Contacto[]>([]);
   const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -149,35 +173,67 @@ export default function Tesoreria() {
     return conceptos.filter(c => c.tipo_concepto_id === tipoId);
   }, [conceptos, tipoConceptoFiltro]);
 
-  // Nombres de conceptos del tipo seleccionado, para matchear con g.concepto (string)
   const conceptosDelTipoNombres = useMemo(
     () => new Set(conceptosDelTipo.map(c => c.nombre.toLowerCase())),
     [conceptosDelTipo]
   );
 
+  // Map contactos por id (para filtrar por tipo y mostrar nombre en la grilla)
+  const contactosMap = useMemo(() => {
+    const m = new Map<number, Contacto>();
+    contactos.forEach(c => m.set(c.id, c));
+    return m;
+  }, [contactos]);
+
+  // Map concepto (string) -> tipo (con color), para badge en la grilla
+  const conceptoToTipoMap = useMemo(() => {
+    const m = new Map<string, { nombre: string; color: string | null | undefined }>();
+    conceptos.forEach(c => {
+      m.set(c.nombre.toLowerCase(), {
+        nombre: c.tipo_concepto_nombre || '',
+        color: c.tipo_concepto_color,
+      });
+    });
+    return m;
+  }, [conceptos]);
+
+  // Subtipos disponibles entre empleados (para el combo dinamico)
+  const subtiposEmpleado = useMemo(() => {
+    const set = new Set<string>();
+    contactos.forEach(c => {
+      if (c.tipo === 'empleado' && c.subtipo && c.subtipo.trim()) {
+        set.add(c.subtipo.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [contactos]);
+
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
-    const desde = rangoFechas.desde ? new Date(rangoFechas.desde) : null;
-    const hasta = rangoFechas.hasta ? new Date(rangoFechas.hasta) : null;
-    if (desde) desde.setHours(0, 0, 0, 0);
-    if (hasta) hasta.setHours(23, 59, 59, 999);
     const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
 
     return gastos.filter(g => {
-      if (formaPagoFiltro && g.forma_pago !== formaPagoFiltro) return false;
+      // Mes
+      if (!todosLosMeses) {
+        const d = new Date(g.fecha);
+        if (d.getMonth() !== mesActual || d.getFullYear() !== anioActual) return false;
+      }
+      // Dependencia
       if (depId != null) {
         if (g.destino_tipo !== 'dependencia' || g.destino_dependencia_id !== depId) return false;
+      }
+      // Tipo de contacto (y subtipo si empleado)
+      if (tipoContactoFiltro) {
+        if (g.destino_tipo !== 'contacto') return false;
+        const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+        if (!c || c.tipo !== tipoContactoFiltro) return false;
+        if (tipoContactoFiltro === 'empleado' && subtipoEmpleadoFiltro && (c.subtipo || '') !== subtipoEmpleadoFiltro) return false;
       }
       // Tipo de concepto: matchea por NOMBRE de concepto contra los del tipo
       if (tipoConceptoFiltro && !conceptosDelTipoNombres.has(g.concepto.toLowerCase())) return false;
       // Concepto exacto
       if (conceptoFiltro && g.concepto.toLowerCase() !== conceptoFiltro.toLowerCase()) return false;
       if (estadoFiltro && calcEstadoAgregado(g) !== estadoFiltro) return false;
-      if (desde || hasta) {
-        const fechaGasto = new Date(g.fecha);
-        if (desde && fechaGasto < desde) return false;
-        if (hasta && fechaGasto > hasta) return false;
-      }
       if (s) {
         const hay = g.concepto.toLowerCase().includes(s)
           || (g.descripcion?.toLowerCase().includes(s) ?? false);
@@ -185,7 +241,26 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, formaPagoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, rangoFechas]);
+  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, todosLosMeses, contactosMap]);
+
+  // Totalizador (refleja todos los filtros activos)
+  const totales = useMemo(() => {
+    let totalPesos = 0;
+    let totalImputado = 0;
+    let totalUsd = 0;
+    let conUsd = 0;
+    for (const g of filtered) {
+      totalPesos += parseFloat(g.monto_pesos || '0');
+      for (const p of (g.proyectos || [])) {
+        totalImputado += parseFloat(String(p.monto_asignado || '0'));
+      }
+      if (g.monto_usd) {
+        totalUsd += parseFloat(g.monto_usd);
+        conUsd += 1;
+      }
+    }
+    return { totalPesos, totalImputado, totalUsd, conUsd, cantidad: filtered.length };
+  }, [filtered]);
 
   const totalMes = useMemo(() => {
     const ahora = new Date();
@@ -225,14 +300,21 @@ export default function Tesoreria() {
     setTimeout(() => setGastoSeleccionado(null), 400);
   };
 
-  // Opciones de forma de pago
-  const formaPagoOptions = useMemo(() => ([
-    { value: '', label: 'Todas las formas' },
-    ...(Object.keys(FORMA_PAGO_LABELS) as FormaPago[]).map(fp => ({
-      value: fp,
-      label: FORMA_PAGO_LABELS[fp],
+  // Opciones de tipo de contacto
+  const tipoContactoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los contactos' },
+    ...(Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(tc => ({
+      value: tc,
+      label: TIPO_CONTACTO_LABELS[tc],
+      color: TIPO_CONTACTO_COLORS[tc],
     })),
   ]), []);
+
+  // Opciones de subtipo de empleado (dinamico)
+  const subtipoEmpleadoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los empleados' },
+    ...subtiposEmpleado.map(s => ({ value: s, label: s })),
+  ]), [subtiposEmpleado]);
 
   // Opciones de tipo de concepto (desde el catalogo per-muni)
   const tipoConceptoOptions = useMemo(() => ([
@@ -253,6 +335,29 @@ export default function Tesoreria() {
       color: c.tipo_concepto_color || undefined,
     })),
   ]), [conceptosDelTipo]);
+
+  // Navegacion de meses
+  const irMesAnterior = () => {
+    setTodosLosMeses(false);
+    if (mesActual === 0) {
+      setMesActual(11);
+      setAnioActual(a => a - 1);
+    } else {
+      setMesActual(m => m - 1);
+    }
+  };
+  const irMesSiguiente = () => {
+    setTodosLosMeses(false);
+    if (mesActual === 11) {
+      setMesActual(0);
+      setAnioActual(a => a + 1);
+    } else {
+      setMesActual(m => m + 1);
+    }
+  };
+  const labelMes = todosLosMeses
+    ? 'Todos los meses'
+    : `${MESES_LARGO[mesActual]} ${anioActual}`;
 
   // Chips de estado agregado
   const estadoChips = (
@@ -289,9 +394,9 @@ export default function Tesoreria() {
     })),
   ]), [dependencias]);
 
-  // Iguala altura de TODOS los triggers (ModernSelect y DateRangePicker)
-  // forzando height/padding via clase wrapper. Sin tocar los componentes
-  // compartidos para no romper otras pantallas.
+  // Iguala altura/padding/radius de TODOS los triggers (ModernSelect)
+  // y del navegador de meses (que usa <button> directo). Una sola CSS,
+  // un solo wrapper class. Esto da look orgnico.
   const secondaryFilters = (
     <div className="flex flex-wrap items-center gap-2 tesoreria-filters-row">
       <style>{`
@@ -300,18 +405,34 @@ export default function Tesoreria() {
           padding-top: 0 !important;
           padding-bottom: 0 !important;
           font-size: 0.875rem !important;
+          border-radius: 0.75rem !important;
         }
       `}</style>
-      <div className="min-w-[150px] flex-shrink-0 ts-fitem">
+
+      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
         <ModernSelect
-          value={formaPagoFiltro}
-          onChange={(v) => setFormaPagoFiltro(v as FormaPago | '')}
-          options={formaPagoOptions}
-          placeholder="Todas las formas"
+          value={tipoContactoFiltro}
+          onChange={(v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); }}
+          options={tipoContactoOptions}
+          placeholder="Todos los contactos"
           searchable
         />
       </div>
-      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
+
+      {/* Combo dinamico: solo si elegiste "empleado" */}
+      {tipoContactoFiltro === 'empleado' && subtiposEmpleado.length > 0 && (
+        <div className="min-w-[180px] flex-shrink-0 ts-fitem">
+          <ModernSelect
+            value={subtipoEmpleadoFiltro}
+            onChange={setSubtipoEmpleadoFiltro}
+            options={subtipoEmpleadoOptions}
+            placeholder="Todos los empleados"
+            searchable
+          />
+        </div>
+      )}
+
+      <div className="min-w-[190px] flex-shrink-0 ts-fitem">
         <ModernSelect
           value={dependenciaFiltro}
           onChange={setDependenciaFiltro}
@@ -320,7 +441,8 @@ export default function Tesoreria() {
           searchable
         />
       </div>
-      <div className="min-w-[160px] flex-shrink-0 ts-fitem">
+
+      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
         <ModernSelect
           value={tipoConceptoFiltro}
           onChange={(v) => { setTipoConceptoFiltro(v); setConceptoFiltro(''); }}
@@ -329,7 +451,8 @@ export default function Tesoreria() {
           searchable
         />
       </div>
-      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
+
+      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
         <ModernSelect
           value={conceptoFiltro}
           onChange={setConceptoFiltro}
@@ -338,14 +461,44 @@ export default function Tesoreria() {
           searchable
         />
       </div>
-      <div className="flex-shrink-0 ts-fitem">
-        <DateRangePicker
-          value={rangoFechas}
-          onChange={setRangoFechas}
-          placeholder="Rango de fechas"
-          allowClear
-        />
+
+      {/* Navegador de meses con misma altura/estilo que los selects */}
+      <div
+        className="inline-flex items-center flex-shrink-0 overflow-hidden"
+        style={{
+          height: 40,
+          borderRadius: '0.75rem',
+          backgroundColor: theme.backgroundSecondary,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        <button
+          onClick={irMesAnterior}
+          className="h-full px-2 transition-colors hover:bg-opacity-50"
+          style={{ color: theme.textSecondary }}
+          title="Mes anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setTodosLosMeses(v => !v)}
+          className="h-full px-3 inline-flex items-center gap-1.5 text-sm font-medium"
+          style={{ color: theme.text }}
+          title={todosLosMeses ? 'Filtrar al mes actual' : 'Ver todos los meses'}
+        >
+          <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
+          <span>{labelMes}</span>
+        </button>
+        <button
+          onClick={irMesSiguiente}
+          className="h-full px-2 transition-colors hover:bg-opacity-50"
+          style={{ color: theme.textSecondary }}
+          title="Mes siguiente"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
+
       <div className="flex-1 min-w-0 flex justify-end">
         {estadoChips}
       </div>
@@ -386,9 +539,19 @@ export default function Tesoreria() {
     </>
   );
 
-  // Renderer del destino para la celda de la tabla
+  // Renderer del destino para la celda de la tabla. Ahora muestra el NOMBRE.
   const renderDestino = (g: Gasto) => {
     if (g.destino_tipo === 'contacto') {
+      const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+      if (c) {
+        const color = TIPO_CONTACTO_COLORS[c.tipo] || theme.primary;
+        return (
+          <span className="inline-flex items-center gap-1 text-xs" title={`${TIPO_CONTACTO_LABELS[c.tipo]} · ${c.subtipo || ''}`}>
+            <Home className="h-3 w-3" style={{ color }} />
+            <span className="font-medium truncate max-w-[150px]" style={{ color: theme.text }}>{c.nombre} {c.apellido || ''}</span>
+          </span>
+        );
+      }
       return (
         <span className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
           <Home className="h-3 w-3" /> Contacto
@@ -447,6 +610,24 @@ export default function Tesoreria() {
           sortable: false,
         },
         {
+          key: 'tipo_concepto',
+          header: 'Tipo',
+          render: (g) => {
+            const t = conceptoToTipoMap.get(g.concepto.toLowerCase());
+            if (!t || !t.nombre) return <span className="text-xs opacity-50">—</span>;
+            const c = t.color || theme.primary;
+            return (
+              <span
+                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ backgroundColor: `${c}20`, color: c }}
+              >
+                {t.nombre}
+              </span>
+            );
+          },
+          sortValue: (g) => conceptoToTipoMap.get(g.concepto.toLowerCase())?.nombre || '',
+        },
+        {
           key: 'monto_pesos',
           header: 'Monto',
           render: (g) => (
@@ -457,8 +638,18 @@ export default function Tesoreria() {
           sortValue: (g) => parseFloat(g.monto_pesos),
         },
         {
+          key: 'forma_pago',
+          header: 'Forma pago',
+          render: (g) => (
+            <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+              {FORMA_PAGO_LABELS[g.forma_pago] || g.forma_pago}
+            </span>
+          ),
+          sortValue: (g) => g.forma_pago,
+        },
+        {
           key: 'tipo_financiacion',
-          header: 'Tipo',
+          header: 'Financ.',
           render: (g) => (
             <span
               className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
@@ -583,6 +774,52 @@ export default function Tesoreria() {
           );
         })}
       </ABMPage>
+
+      {/* Totalizador. Refleja todos los filtros activos. */}
+      {!loading && (
+        <div className="px-4 mt-3">
+          <div
+            className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
+                Filtrado
+              </span>
+              <span className="text-lg font-bold tabular-nums" style={{ color: theme.primary }}>
+                ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-xs" style={{ color: theme.textSecondary }}>
+                ({totales.cantidad} {totales.cantidad === 1 ? 'gasto' : 'gastos'})
+              </span>
+            </div>
+            {totales.totalImputado > 0 && (
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
+                <span className="text-xs" style={{ color: theme.textSecondary }}>Imputado a proyectos:</span>
+                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
+                  ${totales.totalImputado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            )}
+            {totales.totalUsd > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: theme.textSecondary }}>USD equiv.:</span>
+                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
+                  US$ {totales.totalUsd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                  ({totales.conUsd} con cotización)
+                </span>
+              </div>
+            )}
+            <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
+              <Calendar className="h-3 w-3" />
+              {labelMes}
+            </div>
+          </div>
+        </div>
+      )}
 
       <CrearGastoWizard
         open={wizardOpen}
