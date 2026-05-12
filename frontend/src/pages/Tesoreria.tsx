@@ -16,8 +16,8 @@ import {
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
-import { gastosApi, dependenciasApi } from '../lib/api';
-import type { Gasto, TipoFinanciacion } from '../types';
+import { gastosApi, dependenciasApi, contactosApi } from '../lib/api';
+import type { Gasto, TipoFinanciacion, Contacto } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   contado: '#10b981',
@@ -50,10 +50,12 @@ export default function Tesoreria() {
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<TipoFinanciacion | ''>('');
   const [dependenciaFiltro, setDependenciaFiltro] = useState<string>(''); // string para ModernSelect
+  const [contactoFiltro, setContactoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
   const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
 
   const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
+  const [contactos, setContactos] = useState<Contacto[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Side modal de detalle
@@ -91,9 +93,19 @@ export default function Tesoreria() {
     }
   };
 
+  const fetchContactos = async () => {
+    try {
+      const res = await contactosApi.list({ activo: true, limit: 500 });
+      setContactos(res.data || []);
+    } catch {
+      setContactos([]);
+    }
+  };
+
   useEffect(() => {
     fetchGastos();
     fetchDependencias();
+    fetchContactos();
   }, []);
 
   // Refrescar el gasto seleccionado cuando se actualiza la lista
@@ -169,37 +181,14 @@ export default function Tesoreria() {
     setTimeout(() => setGastoSeleccionado(null), 400);
   };
 
-  // Chips filtros por tipo de financiación
-  const TIPOS: { value: TipoFinanciacion | ''; label: string }[] = [
-    { value: '', label: 'Todos' },
-    { value: 'contado', label: 'Contado' },
-    { value: 'cuotas', label: 'Cuotas' },
-    { value: 'prestamo', label: 'Préstamos' },
-    { value: 'recurrente', label: 'Recurrente' },
-  ];
-
-  const extraFilters = (
-    <div className="flex flex-wrap gap-1.5">
-      {TIPOS.map(t => {
-        const isActive = tipoFiltro === t.value;
-        const color = t.value ? TIPO_FIN_COLORS[t.value] : theme.primary;
-        return (
-          <button
-            key={t.value || 'all'}
-            onClick={() => setTipoFiltro(t.value as TipoFinanciacion | '')}
-            className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-            style={{
-              backgroundColor: isActive ? color : `${color}15`,
-              color: isActive ? '#fff' : color,
-              border: `1px solid ${color}40`,
-            }}
-          >
-            {t.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  // Opciones de tipo de financiación (combo searchable, no chips)
+  const tipoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los tipos' },
+    { value: 'contado', label: 'Contado', color: TIPO_FIN_COLORS.contado },
+    { value: 'cuotas', label: 'Cuotas', color: TIPO_FIN_COLORS.cuotas },
+    { value: 'prestamo', label: 'Préstamos', color: TIPO_FIN_COLORS.prestamo },
+    { value: 'recurrente', label: 'Recurrente', color: TIPO_FIN_COLORS.recurrente },
+  ]), []);
 
   // Chips de estado agregado
   const estadoChips = (
@@ -236,9 +225,18 @@ export default function Tesoreria() {
     })),
   ]), [dependencias]);
 
-  // Barra de filtros secundarios (dependencia + fechas + estado)
+  // Barra de filtros secundarios (tipo + dependencia + fechas + estado)
   const secondaryFilters = (
     <div className="flex flex-wrap items-center gap-2">
+      <div className="min-w-[180px] flex-shrink-0">
+        <ModernSelect
+          value={tipoFiltro}
+          onChange={(v) => setTipoFiltro(v as TipoFinanciacion | '')}
+          options={tipoOptions}
+          placeholder="Todos los tipos"
+          searchable
+        />
+      </div>
       <div className="min-w-[200px] flex-shrink-0">
         <ModernSelect
           value={dependenciaFiltro}
@@ -419,7 +417,6 @@ export default function Tesoreria() {
         searchPlaceholder="Buscar por concepto o descripción..."
         searchValue={search}
         onSearchChange={setSearch}
-        extraFilters={extraFilters}
         secondaryFilters={secondaryFilters}
         headerActions={headerActions}
         loading={loading}

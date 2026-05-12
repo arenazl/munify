@@ -126,6 +126,7 @@ sugerenciasMun/
 | Input de **fecha única** | `<DatePicker value onChange label minDate maxDate />` | `<input type="date">` |
 | Input de **rango de fechas** | `<DateRangePicker value onChange allowClear />` con presets | dos `<input type="date">` |
 | **Select / dropdown** | `<ModernSelect value onChange options placeholder searchable />` | `<select>` |
+| **Combo con autocomplete** (filtrado por texto) | `<ModernSelect ... searchable />` — mismo componente con la prop `searchable`. Las opciones se filtran por `label`/`description` con un input "Buscar..." que aparece al abrir el dropdown | `<datalist>`, librerías externas, combo + input separado |
 | **Autocomplete genérico** (no dirección) | `<AutocompleteInput options value onChange />` | `<datalist>` o input + dropdown a mano |
 | Input **con validación inline** | `<ValidatedInput value onChange validate error />` | `<input>` + manejar error suelto |
 | Layout de **ABM listado** | `<ABMPage title items columns onNew ... />` | divs sueltos con tabla a mano |

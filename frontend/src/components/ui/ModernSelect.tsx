@@ -2,6 +2,40 @@ import { useState, useRef, useEffect, ReactNode } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
+/**
+ * ModernSelect — Combo dropdown canónico de la app. REEMPLAZA `<select>` nativo.
+ *
+ * Soporta:
+ *   - `searchable`: convierte el combo en autocomplete con input "Buscar..."
+ *      al abrirlo. Las opciones se filtran por `label` y `description`.
+ *   - `color` por opción: tinta el label y el icono con un color custom (útil
+ *      para estados, tipos, dependencias).
+ *   - `icon` y `description` por opción para listas ricas.
+ *
+ * GOTCHA z-index / overflow: el dropdown usa `z-50` y se renderiza con
+ * `position: absolute`. Si su contenedor ancestro tiene `overflow-hidden`,
+ * el dropdown se CLIPEA. Patrón canónico: meter el ModernSelect en
+ * `secondaryFilters` de ABMPage (sin overflow-hidden), NUNCA en `extraFilters`
+ * (que vive dentro de un container con overflow-hidden).
+ *
+ * Patrón canónico (autocomplete combo de filtrado):
+ * ```tsx
+ * const options = useMemo(() => ([
+ *   { value: '', label: 'Todas las opciones' },
+ *   { value: 'a', label: 'Opción A', color: theme.success },
+ * ]), []);
+ *
+ * <div className="min-w-[200px] flex-shrink-0">
+ *   <ModernSelect
+ *     value={filtro}
+ *     onChange={setFiltro}
+ *     options={options}
+ *     placeholder="Todas las opciones"
+ *     searchable
+ *   />
+ * </div>
+ * ```
+ */
 export interface SelectOption {
   value: string;
   label: string;
