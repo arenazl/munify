@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
-  Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight, CalendarClock,
+  Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight, CalendarClock, Settings,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -15,8 +15,8 @@ import {
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
-import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi } from '../lib/api';
-import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto } from '../types';
+import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi } from '../lib/api';
+import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   contado: '#10b981',
@@ -92,6 +92,7 @@ export default function Tesoreria() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
+  const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Side modal de detalle
@@ -152,11 +153,21 @@ export default function Tesoreria() {
     }
   };
 
+  const fetchTiposEmpleado = async () => {
+    try {
+      const res = await tiposEmpleadoApi.list({ activo: true });
+      setTiposEmpleado(res.data || []);
+    } catch {
+      setTiposEmpleado([]);
+    }
+  };
+
   useEffect(() => {
     fetchGastos();
     fetchDependencias();
     fetchContactos();
     fetchCatalogoConceptos();
+    fetchTiposEmpleado();
   }, []);
 
   // Refrescar el gasto seleccionado cuando se actualiza la lista
@@ -197,8 +208,12 @@ export default function Tesoreria() {
     return m;
   }, [conceptos]);
 
-  // Subtipos disponibles entre empleados (para el combo dinamico)
+  // Tipos de empleado: tomamos del catálogo (tesoreria_tipos_empleado),
+  // no de los subtipos legacy. Si el catálogo está vacío, fallback al subtipo.
   const subtiposEmpleado = useMemo(() => {
+    if (tiposEmpleado.length > 0) {
+      return tiposEmpleado.map(t => t.nombre);
+    }
     const set = new Set<string>();
     contactos.forEach(c => {
       if (c.tipo === 'empleado' && c.subtipo && c.subtipo.trim()) {
@@ -206,7 +221,7 @@ export default function Tesoreria() {
       }
     });
     return Array.from(set).sort();
-  }, [contactos]);
+  }, [tiposEmpleado, contactos]);
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -310,11 +325,13 @@ export default function Tesoreria() {
     })),
   ]), []);
 
-  // Opciones de subtipo de empleado (dinamico)
-  const subtipoEmpleadoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los empleados' },
-    ...subtiposEmpleado.map(s => ({ value: s, label: s })),
-  ]), [subtiposEmpleado]);
+  // Opciones de subtipo de empleado (usa el catalogo si existe)
+  const subtipoEmpleadoOptions = useMemo(() => {
+    const items = tiposEmpleado.length > 0
+      ? tiposEmpleado.map(t => ({ value: t.nombre, label: t.nombre, color: t.color || undefined }))
+      : subtiposEmpleado.map(s => ({ value: s, label: s, color: undefined as string | undefined }));
+    return [{ value: '', label: 'Todos los empleados' }, ...items];
+  }, [tiposEmpleado, subtiposEmpleado]);
 
   // Opciones de tipo de concepto (desde el catalogo per-muni)
   const tipoConceptoOptions = useMemo(() => ([
@@ -542,6 +559,14 @@ export default function Tesoreria() {
         style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
       >
         <TrendingUp className="h-3.5 w-3.5" /> Proyecciones
+      </Link>
+      <Link
+        to="/gestion/configuracion/tesoreria"
+        className="inline-flex items-center justify-center w-9 h-9 rounded-xl transition-all hover:scale-105 hover:rotate-45"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
+        title="Configuración de Tesorería"
+      >
+        <Settings className="h-4 w-4" />
       </Link>
     </>
   );
