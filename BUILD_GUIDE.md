@@ -174,7 +174,7 @@ Total: **25 componentes** en `frontend/src/components/ui/`.
 | `DireccionAutocomplete` | Componente de input con autocomplete de direcciones usando OpenStreetMap (Nominatim). Reutilizable por NuevoReclamo, Cre | `DireccionAutocomplete.tsx` |
 | `DynamicIcon` | Componente que renderiza iconos de Lucide dinámicamente basado en el nombre. El nombre debe ser en formato kebab-case (e | `DynamicIcon.tsx` |
 | `HeatmapWidget` | Callback cuando se hace click en una categoría - si está definido, redirige en lugar de filtrar | `HeatmapWidget.tsx` |
-| `MapPicker` | _(sin doc)_ | `MapPicker.tsx` |
+| `MapPicker` | Mapa interactivo (Leaflet + tiles Voyager de CartoCDN) para que el user elija una ubicacion clickeando, o para mostrar u | `MapPicker.tsx` |
 | `MobilePageHeader` | Sub-header estandar para pantallas mobile con contexto. Se usa DEBAJO de la topbar principal del Layout (nunca la reempl | `MobilePageHeader.tsx` |
 | `Modal` | Modal component - Renders a centered modal dialog fixed to viewport Uses createPortal to render outside DOM hierarchy, a | `Modal.tsx` |
 | `ModernSelect` | _(sin doc)_ | `ModernSelect.tsx` |
@@ -292,6 +292,7 @@ Total: **25 componentes** en `frontend/src/components/ui/`.
 
 #### `MapPicker`
 - **Archivo:** `frontend/src/components/ui/MapPicker.tsx`
+- **Descripción:** Mapa interactivo (Leaflet + tiles Voyager de CartoCDN) para que el user elija una ubicacion clickeando, o para mostrar una coordenada de solo lectura. Click en el mapa dispara `onChange({lat, lng})`; el marker se centra automaticamente cuando cambia `value` desde afuera (util...
 - **Props (`MapPickerProps`):**
   - `value?: { lat: number; lng: number`
 

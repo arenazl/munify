@@ -24,6 +24,18 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+/**
+ * Mapa interactivo (Leaflet + tiles Voyager de CartoCDN) para que el user
+ * elija una ubicacion clickeando, o para mostrar una coordenada de solo
+ * lectura. Click en el mapa dispara `onChange({lat, lng})`; el marker
+ * se centra automaticamente cuando cambia `value` desde afuera (util
+ * cuando el usuario eligio una direccion en `DireccionAutocomplete` y
+ * queremos sincronizar el mapa).
+ *
+ * Para inputs de direccion donde el primer paso es texto y el segundo
+ * es ajustar en el mapa, combinar con `DireccionAutocomplete`: ese
+ * resuelve el geocoding y este permite el fine-tuning visual.
+ */
 interface MapPickerProps {
   value?: { lat: number; lng: number } | null;
   onChange?: (coords: { lat: number; lng: number }) => void;
