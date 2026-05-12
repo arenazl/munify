@@ -331,33 +331,7 @@ export default function TesoreriaMapa() {
     ? estadoDeContacto(gastosDetalleFiltrados)
     : null;
 
-  const extraFilters = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <button
-        onClick={() => setTipoFiltro('')}
-        className="px-2 py-1 rounded-md text-xs font-medium"
-        style={{
-          backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
-          color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
-          border: `1px solid ${theme.border}`,
-        }}
-      >Todos</button>
-      {(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => (
-        <button
-          key={t}
-          onClick={() => setTipoFiltro(tipoFiltro === t ? '' : t)}
-          className="px-2 py-1 rounded-md text-xs font-medium"
-          style={{
-            backgroundColor: tipoFiltro === t ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
-            color: tipoFiltro === t ? '#fff' : TIPO_COLORS[t],
-            border: `1px solid ${TIPO_COLORS[t]}40`,
-          }}
-        >{TIPO_LABELS[t]}</button>
-      ))}
-    </div>
-  );
-
-  // Segunda fila de filtros: rango de fechas + estado agregado
+  // Estado agregado: opciones para los chips
   const ESTADOS: { value: EstadoContactoAgregado | ''; label: string; color: string }[] = [
     { value: '', label: 'Cualquier estado', color: theme.primary },
     { value: 'al_dia', label: ESTADO_CONTACTO_LABEL.al_dia, color: ESTADO_CONTACTO_COLOR.al_dia },
@@ -365,12 +339,33 @@ export default function TesoreriaMapa() {
     { value: 'sin_gastos', label: ESTADO_CONTACTO_LABEL.sin_gastos, color: ESTADO_CONTACTO_COLOR.sin_gastos },
   ];
 
+  // Header limpio: NO chips ni métricas. Solo el search global del ABMPage.
+  const extraFilters = null;
+  const headerActions = null;
+
+  // Una sola fila secundaria con secciones bien separadas por etiquetas:
+  // PERÍODO  |  ESTADO  |  TIPO  |  MÍN $
+  // Las métricas viven en una banda aparte (afuera del ABMPage, en children).
+  const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+    <span
+      className="text-[9px] uppercase font-bold tracking-wider whitespace-nowrap"
+      style={{ color: theme.textSecondary }}
+    >
+      {children}
+    </span>
+  );
+  const VerticalDivider = () => (
+    <div className="h-8 w-px self-center" style={{ backgroundColor: theme.border }} />
+  );
+
   const secondaryFilters = (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="inline-flex items-center gap-1.5">
-        <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>
-          Período
-        </span>
+    <div
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 rounded-xl"
+      style={{ backgroundColor: `${theme.backgroundSecondary}90`, border: `1px solid ${theme.border}` }}
+    >
+      {/* Período */}
+      <div className="flex items-center gap-2">
+        <FieldLabel>Período</FieldLabel>
         <DateRangePicker
           value={rango}
           onChange={setRango}
@@ -379,38 +374,71 @@ export default function TesoreriaMapa() {
         />
       </div>
 
-      <div className="h-6 w-px" style={{ backgroundColor: theme.border }} />
+      <VerticalDivider />
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>
-          Estado
-        </span>
-        {ESTADOS.map(s => {
-          const active = estadoFiltro === s.value;
-          return (
+      {/* Estado */}
+      <div className="flex items-center gap-2">
+        <FieldLabel>Estado</FieldLabel>
+        <div className="flex flex-wrap gap-1">
+          {ESTADOS.map(s => {
+            const active = estadoFiltro === s.value;
+            return (
+              <button
+                key={s.value || 'all'}
+                onClick={() => setEstadoFiltro(s.value as EstadoContactoAgregado | '')}
+                className="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: active ? s.color : `${s.color}15`,
+                  color: active ? '#fff' : s.color,
+                  border: `1px solid ${s.color}40`,
+                }}
+              >
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <VerticalDivider />
+
+      {/* Tipo de contacto */}
+      <div className="flex items-center gap-2">
+        <FieldLabel>Tipo</FieldLabel>
+        <div className="flex flex-wrap gap-1">
+          <button
+            onClick={() => setTipoFiltro('')}
+            className="px-2.5 py-1 rounded-md text-xs font-medium"
+            style={{
+              backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
+              color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
+              border: `1px solid ${theme.border}`,
+            }}
+          >
+            Todos
+          </button>
+          {(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => (
             <button
-              key={s.value || 'all'}
-              onClick={() => setEstadoFiltro(s.value as EstadoContactoAgregado | '')}
-              className="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+              key={t}
+              onClick={() => setTipoFiltro(tipoFiltro === t ? '' : t)}
+              className="px-2.5 py-1 rounded-md text-xs font-medium"
               style={{
-                backgroundColor: active ? s.color : `${s.color}15`,
-                color: active ? '#fff' : s.color,
-                border: `1px solid ${s.color}40`,
+                backgroundColor: tipoFiltro === t ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
+                color: tipoFiltro === t ? '#fff' : TIPO_COLORS[t],
+                border: `1px solid ${TIPO_COLORS[t]}40`,
               }}
             >
-              {s.label}
+              {TIPO_LABELS[t]}
             </button>
-          );
-        })}
+          ))}
+        </div>
       </div>
-    </div>
-  );
 
-  const headerActions = (
-    <>
-      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-        <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>Mín $</span>
+      <VerticalDivider />
+
+      {/* Monto mínimo */}
+      <div className="flex items-center gap-2">
+        <FieldLabel>Mín $</FieldLabel>
         <input
           type="number"
           value={montoMin || ''}
@@ -418,43 +446,49 @@ export default function TesoreriaMapa() {
           placeholder="0"
           min={0}
           step={10000}
-          className="w-20 px-1 py-0 rounded text-xs bg-transparent outline-none"
-          style={{ color: theme.text }}
+          className="w-24 px-2 py-1 rounded-md text-xs"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
         />
       </div>
-      <div className="inline-flex items-center gap-3 px-3 py-2 rounded-xl"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-        <div className="text-center">
-          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Visibles</p>
-          <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>{visibles.length}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Gastos</p>
-          <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>{cantidadGastosVisibles}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Total</p>
-          <p className="text-sm font-bold leading-none" style={{ color: theme.primary }}>
-            ${totalVisible.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Prom.</p>
-          <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>
-            ${promedioPorContacto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </p>
-        </div>
-        <div className="text-center">
-          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>En mora</p>
-          <p
-            className="text-sm font-bold leading-none"
-            style={{ color: cantidadEnMora > 0 ? ESTADO_CONTACTO_COLOR.en_mora : theme.text }}
-          >
-            {cantidadEnMora}
-          </p>
-        </div>
+    </div>
+  );
+
+  // Banda de métricas (KPIs) — aparece entre la fila de filtros y el mapa.
+  const metricsBar = (
+    <div
+      className="grid grid-cols-2 sm:grid-cols-5 gap-2 rounded-xl p-2"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <div className="text-center py-1">
+        <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Visibles</p>
+        <p className="text-lg font-bold leading-tight" style={{ color: theme.text }}>{visibles.length}</p>
       </div>
-    </>
+      <div className="text-center py-1" style={{ borderLeft: `1px solid ${theme.border}` }}>
+        <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Gastos</p>
+        <p className="text-lg font-bold leading-tight" style={{ color: theme.text }}>{cantidadGastosVisibles}</p>
+      </div>
+      <div className="text-center py-1" style={{ borderLeft: `1px solid ${theme.border}` }}>
+        <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Total</p>
+        <p className="text-lg font-bold leading-tight" style={{ color: theme.primary }}>
+          ${totalVisible.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+        </p>
+      </div>
+      <div className="text-center py-1" style={{ borderLeft: `1px solid ${theme.border}` }}>
+        <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Promedio</p>
+        <p className="text-lg font-bold leading-tight" style={{ color: theme.text }}>
+          ${promedioPorContacto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+        </p>
+      </div>
+      <div className="text-center py-1" style={{ borderLeft: `1px solid ${theme.border}` }}>
+        <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>En mora</p>
+        <p
+          className="text-lg font-bold leading-tight"
+          style={{ color: cantidadEnMora > 0 ? ESTADO_CONTACTO_COLOR.en_mora : theme.text }}
+        >
+          {cantidadEnMora}
+        </p>
+      </div>
+    </div>
   );
 
   return (
@@ -481,6 +515,10 @@ export default function TesoreriaMapa() {
         isEmpty={!loading && visibles.length === 0}
         emptyMessage="No hay contactos visibles. Ajustá los filtros o agregá ubicaciones a los contactos."
       >
+        <div className="col-span-full mb-3">
+          {metricsBar}
+        </div>
+
         <div className="col-span-full grid grid-cols-1 lg:grid-cols-4 gap-3" style={{ height: 680 }}>
           {/* Sidebar 25% — lista de contactos visibles con click para volar al pin */}
           <div
