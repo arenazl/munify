@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
+import { ModernSelect } from '../ui/ModernSelect';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
   contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi,
@@ -375,17 +376,12 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         ))}
       </div>
 
-      <div>
-        <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>Forma de pago</label>
-        <select
-          value={formaPago}
-          onChange={(e) => setFormaPago(e.target.value as FormaPago)}
-          className="w-full px-3 py-2 rounded-xl text-sm"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-        >
-          {FORMAS_PAGO.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-        </select>
-      </div>
+      <ModernSelect
+        label="Forma de pago"
+        value={formaPago}
+        onChange={(v) => setFormaPago(v as FormaPago)}
+        options={FORMAS_PAGO.map(f => ({ value: f.value, label: f.label }))}
+      />
 
       {(tipoFinanciacion === 'cuotas' || tipoFinanciacion === 'prestamo') && (
         <div>
@@ -404,17 +400,12 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
 
       {tipoFinanciacion === 'recurrente' && (
         <>
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>Frecuencia</label>
-            <select
-              value={frecuencia}
-              onChange={(e) => setFrecuencia(e.target.value as FrecuenciaRecurrencia)}
-              className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-            >
-              {FRECUENCIAS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-            </select>
-          </div>
+          <ModernSelect
+            label="Frecuencia"
+            value={frecuencia}
+            onChange={(v) => setFrecuencia(v as FrecuenciaRecurrencia)}
+            options={FRECUENCIAS.map(f => ({ value: f.value, label: f.label }))}
+          />
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>Hasta fecha (opcional, default 12 ocurrencias)</label>
             <input

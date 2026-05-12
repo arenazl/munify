@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Upload, MapPin, Phone, Mail, Search, Users, Trash2, Edit2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Plus, Upload, MapPin, Phone, Mail, Search, Users, Trash2, Edit2, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
-import { contactosApi, tesoreriaImportApi } from '../lib/api';
+import { ModernSelect } from '../components/ui/ModernSelect';
+import { contactosApi, tesoreriaImportApi, api } from '../lib/api';
 import type { Contacto, TipoContacto } from '../types';
 
 const TIPO_LABELS: Record<TipoContacto, string> = {
@@ -45,6 +46,42 @@ export default function TesoreriaContactos() {
 
   // Import modals
   const [importing, setImporting] = useState<'excel' | 'kmz' | null>(null);
+
+  // Reverse geocoding state (al ingresar lat/lon manual, autocompleta direccion)
+  const [reverseLoading, setReverseLoading] = useState(false);
+  const reverseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reverseGeocode = (lat: number, lon: number) => {
+    if (reverseTimeoutRef.current) clearTimeout(reverseTimeoutRef.current);
+    reverseTimeoutRef.current = setTimeout(async () => {
+      setReverseLoading(true);
+      try {
+        const res = await api.get('/geocoding/reverse', { params: { lat, lon } });
+        const addr = res.data.address;
+        let direccion = '';
+        if (addr) {
+          const parts: string[] = [];
+          if (addr.road) {
+            parts.push(addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road);
+          }
+          const loc = addr.neighbourhood || addr.suburb || addr.village || addr.town || addr.city;
+          if (loc) parts.push(loc);
+          direccion = parts.join(', ');
+        }
+        if (!direccion && res.data.display_name) {
+          direccion = res.data.display_name.split(', ').slice(0, 3).join(', ');
+        }
+        if (direccion) {
+          setForm(prev => ({ ...prev, direccion }));
+          toast.success('Dirección detectada');
+        }
+      } catch {
+        // silencioso — el campo de dirección queda como lo dejó el usuario
+      } finally {
+        setReverseLoading(false);
+      }
+    }, 600);
+  };
 
   if (user && user.rol !== 'admin') {
     return <p className="p-6 text-sm">Solo Admin.</p>;
@@ -243,10 +280,62 @@ export default function TesoreriaContactos() {
               <input placeholder="Alias MP / CVU" value={form.alias_pago || ''} onChange={e => setForm({ ...form, alias_pago: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }} />
               <input placeholder="Teléfono" value={form.telefono || ''} onChange={e => setForm({ ...form, telefono: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }} />
               <input placeholder="Email" value={form.email || ''} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }} />
-              <input placeholder="Dirección" value={form.direccion || ''} onChange={e => setForm({ ...form, direccion: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }} />
-              <select value={form.tipo || 'beneficiario'} onChange={e => setForm({ ...form, tipo: e.target.value as TipoContacto })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}>
-                {(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => <option key={t} value={t}>{TIPO_LABELS[t]}</option>)}
-              </select>
+              <div className="relative">
+                <input
+                  placeholder="Dirección"
+                  value={form.direccion || ''}
+                  onChange={e => setForm({ ...form, direccion: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+                />
+                {reverseLoading && (
+                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{ color: theme.textSecondary }} />
+                )}
+              </div>
+              {/* Lat / Lon: al editarlos hace reverse geocoding para autocompletar la direccion */}
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="number"
+                  step="0.000001"
+                  placeholder="Latitud (-30.26...)"
+                  value={form.latitud ?? ''}
+                  onChange={e => {
+                    const v = e.target.value === '' ? null : parseFloat(e.target.value);
+                    setForm(prev => ({ ...prev, latitud: v }));
+                    const lon = form.longitud;
+                    if (v != null && lon != null) reverseGeocode(v, lon);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+                />
+                <input
+                  type="number"
+                  step="0.000001"
+                  placeholder="Longitud (-64.12...)"
+                  value={form.longitud ?? ''}
+                  onChange={e => {
+                    const v = e.target.value === '' ? null : parseFloat(e.target.value);
+                    setForm(prev => ({ ...prev, longitud: v }));
+                    const lat = form.latitud;
+                    if (v != null && lat != null) reverseGeocode(lat, v);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+                />
+              </div>
+              <p className="text-[10px]" style={{ color: theme.textSecondary }}>
+                Si cargás lat/lon, completamos la dirección automáticamente.
+              </p>
+              <ModernSelect
+                label="Tipo"
+                value={form.tipo || 'beneficiario'}
+                onChange={(v) => setForm({ ...form, tipo: v as TipoContacto })}
+                options={(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => ({
+                  value: t,
+                  label: TIPO_LABELS[t],
+                  color: TIPO_COLORS[t],
+                }))}
+              />
             </div>
             <div className="flex gap-2 mt-4 justify-end">
               <button onClick={() => setFormOpen(false)} className="px-4 py-2 rounded-lg text-sm" style={{ border: `1px solid ${theme.border}`, color: theme.text }}>Cancelar</button>
