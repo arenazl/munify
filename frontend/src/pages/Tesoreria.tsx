@@ -1,30 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Wallet, Users, Map as MapIcon, TrendingUp, Search, Trash2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Wallet, Users, Map as MapIcon, TrendingUp, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
+import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { gastosApi } from '../lib/api';
-import type { Gasto } from '../types';
+import type { Gasto, TipoFinanciacion } from '../types';
 
-/**
- * Landing del modulo Tesoreria. Tabla simple de gastos del municipio,
- * con CTA grande para cargar uno nuevo. Pensado para que el intendente
- * lo use sin trabarse: pocos filtros visibles, lo avanzado abajo.
- */
+const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
+  contado: '#10b981',
+  cuotas: '#3b82f6',
+  prestamo: '#8b5cf6',
+  recurrente: '#f59e0b',
+};
+
 export default function Tesoreria() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const navigate = useNavigate();
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [tipoFiltro, setTipoFiltro] = useState<TipoFinanciacion | ''>('');
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  // Admin o Supervisor del muni
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (
       <div className="p-6">
@@ -38,10 +40,9 @@ export default function Tesoreria() {
   const fetchGastos = async () => {
     setLoading(true);
     try {
-      const res = await gastosApi.list({ limit: 100 });
+      const res = await gastosApi.list({ limit: 200 });
       setGastos(res.data);
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error('Error cargando gastos');
     } finally {
       setLoading(false);
@@ -52,22 +53,26 @@ export default function Tesoreria() {
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
-    if (!s) return gastos;
-    return gastos.filter(g =>
-      g.concepto.toLowerCase().includes(s) ||
-      (g.descripcion?.toLowerCase().includes(s) ?? false)
-    );
-  }, [gastos, search]);
+    return gastos.filter(g => {
+      if (tipoFiltro && g.tipo_financiacion !== tipoFiltro) return false;
+      if (s) {
+        const hay = g.concepto.toLowerCase().includes(s)
+          || (g.descripcion?.toLowerCase().includes(s) ?? false);
+        if (!hay) return false;
+      }
+      return true;
+    });
+  }, [gastos, search, tipoFiltro]);
 
   const totalMes = useMemo(() => {
     const ahora = new Date();
-    return filtered
+    return gastos
       .filter(g => {
         const d = new Date(g.fecha);
         return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
       })
       .reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0);
-  }, [filtered]);
+  }, [gastos]);
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Eliminar este gasto?')) return;
@@ -80,152 +85,163 @@ export default function Tesoreria() {
     }
   };
 
-  return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      {/* Banner-guía */}
-      <TesoreriaHint titulo="Bienvenido a Tesorería" storageKey="home">
-        Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
-        préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o
-        a un <b>Contacto</b> (persona). Tocá el botón verde grande para
-        cargar uno nuevo.
-      </TesoreriaHint>
+  // Chips filtros por tipo de financiación
+  const TIPOS: { value: TipoFinanciacion | ''; label: string }[] = [
+    { value: '', label: 'Todos' },
+    { value: 'contado', label: 'Contado' },
+    { value: 'cuotas', label: 'Cuotas' },
+    { value: 'prestamo', label: 'Préstamos' },
+    { value: 'recurrente', label: 'Recurrente' },
+  ];
 
-      {/* Header con CTA grande + accesos rápidos */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: theme.text }}>
-            <Wallet className="h-7 w-7 inline mr-2" />
-            Tesorería
-          </h1>
-          <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-            Total gastos este mes:{' '}
-            <span className="font-bold" style={{ color: theme.primary }}>
-              ${totalMes.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+  const extraFilters = (
+    <div className="flex flex-wrap gap-1.5">
+      {TIPOS.map(t => {
+        const isActive = tipoFiltro === t.value;
+        const color = t.value ? TIPO_FIN_COLORS[t.value] : theme.primary;
+        return (
+          <button
+            key={t.value || 'all'}
+            onClick={() => setTipoFiltro(t.value as TipoFinanciacion | '')}
+            className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+            style={{
+              backgroundColor: isActive ? color : `${color}15`,
+              color: isActive ? '#fff' : color,
+              border: `1px solid ${color}40`,
+            }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  // Accesos rápidos como headerActions
+  const headerActions = (
+    <>
+      <Link
+        to="/gestion/tesoreria/contactos"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+      >
+        <Users className="h-3.5 w-3.5" /> Contactos
+      </Link>
+      <Link
+        to="/gestion/tesoreria/mapa"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+      >
+        <MapIcon className="h-3.5 w-3.5" /> Mapa
+      </Link>
+      <Link
+        to="/gestion/tesoreria/proyecciones"
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+      >
+        <TrendingUp className="h-3.5 w-3.5" /> Proyecciones
+      </Link>
+    </>
+  );
+
+  const tableView = (
+    <ABMTable<Gasto>
+      data={filtered}
+      keyExtractor={(g) => g.id}
+      columns={[
+        { key: 'fecha', header: 'Fecha', render: (g) => new Date(g.fecha).toLocaleDateString('es-AR') },
+        { key: 'concepto', header: 'Concepto', render: (g) => <span className="font-medium">{g.concepto}</span> },
+        { key: 'destino_tipo', header: 'Destino', render: (g) => g.destino_tipo === 'contacto' ? 'Contacto' : 'Secretaría' },
+        {
+          key: 'monto_pesos',
+          header: 'Monto',
+          render: (g) => (
+            <span className="font-bold tabular-nums">
+              ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
             </span>
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setWizardOpen(true)}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl text-base font-bold transition-all hover:scale-[1.02] active:scale-95 shadow-lg"
-          style={{
-            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-            color: '#fff',
-            boxShadow: '0 6px 20px rgba(34, 197, 94, 0.35)',
-          }}
-        >
-          <Plus className="h-5 w-5" /> Cargar nuevo gasto
-        </button>
-      </div>
-
-      {/* Accesos rápidos */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-        <Link to="/gestion/tesoreria/contactos" className="p-4 rounded-xl flex items-center gap-3 transition-all hover:scale-[1.02]"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
-            <Users className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm" style={{ color: theme.text }}>Contactos</p>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>Agenda de personas</p>
-          </div>
-        </Link>
-        <Link to="/gestion/tesoreria/mapa" className="p-4 rounded-xl flex items-center gap-3 transition-all hover:scale-[1.02]"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#8b5cf620', color: '#8b5cf6' }}>
-            <MapIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm" style={{ color: theme.text }}>Mapa</p>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>Contactos geolocalizados</p>
-          </div>
-        </Link>
-        <Link to="/gestion/tesoreria/proyecciones" className="p-4 rounded-xl flex items-center gap-3 transition-all hover:scale-[1.02]"
-          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
-            <TrendingUp className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm" style={{ color: theme.text }}>Proyecciones</p>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>Cuánto vas a pagar/cobrar</p>
-          </div>
-        </Link>
-      </div>
-
-      {/* Buscador */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: theme.textSecondary }} />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar por concepto o descripción..."
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-        />
-      </div>
-
-      {/* Tabla */}
-      {loading ? (
-        <p className="text-center py-12" style={{ color: theme.textSecondary }}>Cargando...</p>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 rounded-xl" style={{ backgroundColor: theme.card, border: `1px dashed ${theme.border}` }}>
-          <Wallet className="h-12 w-12 mx-auto mb-3" style={{ color: theme.textSecondary }} />
-          <p className="font-semibold" style={{ color: theme.text }}>Todavía no hay gastos cargados</p>
-          <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>Tocá "Cargar nuevo gasto" arriba para empezar.</p>
-        </div>
-      ) : (
-        <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-          <table className="w-full text-sm">
-            <thead style={{ backgroundColor: theme.backgroundSecondary }}>
-              <tr>
-                <th className="text-left p-3" style={{ color: theme.textSecondary }}>Fecha</th>
-                <th className="text-left p-3" style={{ color: theme.textSecondary }}>Concepto</th>
-                <th className="text-left p-3" style={{ color: theme.textSecondary }}>Destino</th>
-                <th className="text-right p-3" style={{ color: theme.textSecondary }}>Monto</th>
-                <th className="text-center p-3" style={{ color: theme.textSecondary }}>Tipo</th>
-                <th className="text-center p-3" style={{ color: theme.textSecondary }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(g => (
-                <tr key={g.id} className="border-t" style={{ borderColor: theme.border }}>
-                  <td className="p-3" style={{ color: theme.text }}>{new Date(g.fecha).toLocaleDateString('es-AR')}</td>
-                  <td className="p-3 font-medium" style={{ color: theme.text }}>{g.concepto}</td>
-                  <td className="p-3" style={{ color: theme.textSecondary }}>
-                    {g.destino_tipo === 'contacto' ? 'Contacto' : 'Secretaría'}
-                  </td>
-                  <td className="p-3 text-right font-bold" style={{ color: theme.text }}>
-                    ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                  </td>
-                  <td className="p-3 text-center">
-                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
-                      style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
-                      {g.tipo_financiacion}
-                    </span>
-                  </td>
-                  <td className="p-3 text-center">
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(g.id)}
-                      className="p-1.5 rounded-lg transition-all hover:scale-110"
-                      style={{ color: '#ef4444' }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          ),
+        },
+        {
+          key: 'tipo_financiacion',
+          header: 'Tipo',
+          render: (g) => (
+            <span
+              className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
+            >
+              {g.tipo_financiacion}
+            </span>
+          ),
+        },
+      ]}
+      actions={(g) => (
+        <ABMTableAction title="Eliminar" onClick={() => handleDelete(g.id)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
       )}
+    />
+  );
+
+  return (
+    <>
+      <div className="px-4 pt-3">
+        <TesoreriaHint titulo="Bienvenido a Tesorería" storageKey="home">
+          Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
+          préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o
+          a un <b>Contacto</b>. Total este mes:{' '}
+          <span className="font-bold" style={{ color: theme.primary }}>
+            ${totalMes.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </span>
+        </TesoreriaHint>
+      </div>
+
+      <ABMPage
+        title="Tesorería"
+        icon={<Wallet className="h-5 w-5" />}
+        buttonLabel="Nuevo Gasto"
+        onAdd={() => setWizardOpen(true)}
+        searchPlaceholder="Buscar por concepto o descripción..."
+        searchValue={search}
+        onSearchChange={setSearch}
+        extraFilters={extraFilters}
+        headerActions={headerActions}
+        loading={loading}
+        isEmpty={!loading && filtered.length === 0}
+        emptyMessage="Todavía no hay gastos. Tocá 'Nuevo Gasto' para cargar uno."
+        tableView={tableView}
+        defaultViewMode="table"
+      >
+        {/* Card view (mismo data en cards si el user cambia el toggle) */}
+        {filtered.map(g => (
+          <div
+            key={g.id}
+            className="rounded-xl p-4"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
+                <p className="text-[10px]" style={{ color: theme.textSecondary }}>
+                  {new Date(g.fecha).toLocaleDateString('es-AR')} · {g.destino_tipo === 'contacto' ? 'Contacto' : 'Secretaría'}
+                </p>
+              </div>
+              <span
+                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
+              >
+                {g.tipo_financiacion}
+              </span>
+            </div>
+            <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>
+              ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+            </p>
+          </div>
+        ))}
+      </ABMPage>
 
       <CrearGastoWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
         onSuccess={() => { setWizardOpen(false); fetchGastos(); }}
       />
-    </div>
+    </>
   );
 }
