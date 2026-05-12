@@ -166,7 +166,7 @@ Total: **25 componentes** en `frontend/src/components/ui/`.
 
 | Componente | Para qué sirve | Archivo |
 |---|---|---|
-| `ABMPage` | _(sin doc)_ | `ABMPage.tsx` |
+| `ABMPage` | Layout canonico para paginas tipo ABM (listado + crear/editar/ver en Sheet). Es el componente de referencia para cualqui | `ABMPage.tsx` |
 | `AutocompleteInput` | Callback cuando cambian las palabras seleccionadas del autocomplete | `AutocompleteInput.tsx` |
 | `ConfirmModal` | Si se pasa, muestra un textarea obligatorio y devuelve el valor al confirmar | `ConfirmModal.tsx` |
 | `DatePicker` | _(sin doc)_ | `DatePicker.tsx` |
@@ -196,6 +196,7 @@ Total: **25 componentes** en `frontend/src/components/ui/`.
 
 #### `ABMPage`
 - **Archivo:** `frontend/src/components/ui/ABMPage.tsx`
+- **Descripción:** Layout canonico para paginas tipo ABM (listado + crear/editar/ver en Sheet). Es el componente de referencia para cualquier pagina de "tabla + botones". Maneja: titulo + boton "Nuevo", buscador, filtros extra (chips, selects), toggle entre vista cards y tabla, Sheet lateral...
 - **Props (`ABMPageProps`):**
   - `title: string`
   - `icon?: ReactNode;`

@@ -21,6 +21,23 @@ function useIsMobile() {
   return isMobile;
 }
 
+/**
+ * Layout canonico para paginas tipo ABM (listado + crear/editar/ver en Sheet).
+ * Es el componente de referencia para cualquier pagina de "tabla + botones".
+ * Maneja: titulo + boton "Nuevo", buscador, filtros extra (chips, selects),
+ * toggle entre vista cards y tabla, Sheet lateral opcional para
+ * crear/editar/ver, empty state, loading, sticky header opcional y
+ * back link opcional.
+ *
+ * Usar SIEMPRE para pantallas de ABM en lugar de armar la estructura a mano.
+ * Las acciones de fila se manejan adentro de cada card/row; las acciones
+ * globales (filtros, ordenamiento) van como `extraFilters` o `headerActions`.
+ *
+ * Patron canonico (ver BUILD_GUIDE.md §7.1):
+ *   <ABMPage title="Cosas" searchValue={s} onSearchChange={setS} onAdd={...}>
+ *     {items.map(item => <Card onClick={() => openSheet(item)} />)}
+ *   </ABMPage>
+ */
 interface ABMPageProps {
   // Header
   title: string;
