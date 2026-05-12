@@ -32,7 +32,7 @@ export default function TesoreriaMapa() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
 
-  if (user && user.rol !== 'admin') return <p className="p-6 text-sm">Solo Admin.</p>;
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') return <p className="p-6 text-sm">Sin permisos.</p>;
 
   useEffect(() => {
     (async () => {

@@ -29,8 +29,10 @@ router = APIRouter()
 
 
 def _require_admin(user: User):
-    if user.rol != RolUsuario.ADMIN:
-        raise HTTPException(status_code=403, detail="Solo admin puede gestionar contactos")
+    # Admin del muni o supervisor del muni (no dependencia) pueden gestionar
+    # contactos. Los supervisores de dependencia y vecinos no.
+    if user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Sin permisos para gestionar contactos")
 
 
 @router.get("", response_model=List[ContactoResponse])

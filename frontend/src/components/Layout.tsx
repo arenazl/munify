@@ -10,7 +10,7 @@ import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { Sheet } from './ui/Sheet';
-import { usersApi, municipiosApi, navegacionApi, API_URL as apiUrl_ } from '../lib/api';
+import { usersApi, municipiosApi, navegacionApi, modulosApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
 import NotificationSettings from './NotificationSettings';
 import { NotificationActivationSheet } from './NotificationActivationSheet';
@@ -175,11 +175,12 @@ export default function Layout() {
       setModulosActivos([]);
       return;
     }
-    import('../lib/api').then(({ modulosApi }) => {
-      modulosApi.list()
-        .then((r) => setModulosActivos((r.data || []).filter((m: any) => m.activo).map((m: any) => m.modulo)))
-        .catch(() => setModulosActivos([]));
-    });
+    modulosApi.list()
+      .then((r) => {
+        const activos = (r.data || []).filter((m: any) => m.activo).map((m: any) => m.modulo);
+        setModulosActivos(activos);
+      })
+      .catch(() => setModulosActivos([]));
   }, [user?.id, user?.municipio_id]);
 
   // Cargar datos del usuario cuando se abre el sheet de perfil

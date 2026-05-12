@@ -24,12 +24,12 @@ export default function Tesoreria() {
   const [search, setSearch] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  // Solo admin
-  if (user && user.rol !== 'admin') {
+  // Admin o Supervisor del muni
+  if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (
       <div className="p-6">
         <p className="text-sm" style={{ color: theme.textSecondary }}>
-          El módulo Tesorería es exclusivo del Administrador del municipio.
+          El módulo Tesorería es exclusivo de los gestores del municipio.
         </p>
       </div>
     );

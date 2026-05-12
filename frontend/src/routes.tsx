@@ -188,10 +188,10 @@ export const router = createBrowserRouter([
       { path: 'mapa', element: <Mapa /> },
 
       // Tesorería (solo admin del municipio)
-      { path: 'tesoreria', element: <ProtectedRoute roles={['admin']}><Tesoreria /></ProtectedRoute> },
-      { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin']}><TesoreriaContactos /></ProtectedRoute> },
-      { path: 'tesoreria/mapa', element: <ProtectedRoute roles={['admin']}><TesoreriaMapa /></ProtectedRoute> },
-      { path: 'tesoreria/proyecciones', element: <ProtectedRoute roles={['admin']}><TesoreriaProyecciones /></ProtectedRoute> },
+      { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
+      { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
+      { path: 'tesoreria/mapa', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaMapa /></ProtectedRoute> },
+      { path: 'tesoreria/proyecciones', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyecciones /></ProtectedRoute> },
 
       // Logros/Gamificación (para todos los usuarios autenticados)
       { path: 'logros', element: <Gamificacion /> },

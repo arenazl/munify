@@ -149,12 +149,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     },
     {
       // Modulo activable desde Configuración. Solo aparece si el municipio
-      // tiene activo el flag `tesoreria` Y el usuario es admin.
+      // tiene activo el flag `tesoreria` Y el usuario es admin o supervisor
+      // del muni (sin dependencia asignada — los supervisores de dependencia
+      // tienen su propia seccion).
       name: 'Tesorería',
       href: '/gestion/tesoreria',
       icon: Receipt,
-      show: isAdmin && modulosActivos.has('tesoreria'),
-      description: 'Control de gastos del intendente'
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      description: 'Control de gastos del municipio'
     },
     {
       name: 'Mapa',

@@ -47,7 +47,7 @@ export function ModulosToggle() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (user?.rol !== 'admin') return null;
+  if (user?.rol !== 'admin' && user?.rol !== 'supervisor') return null;
 
   const toggle = async (key: string) => {
     const next = !estados[key];
