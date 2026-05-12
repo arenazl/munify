@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MapPin, Home, ChevronDown, ChevronRight, Loader2, Phone, Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import {
+  MapPin, Home, ChevronDown, ChevronRight, Loader2, Phone, Mail,
+  Users, Plus, AlertTriangle, CheckCircle2, MinusCircle,
+} from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -8,8 +12,16 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { Sheet } from '../components/ui/Sheet';
 import { ABMPage } from '../components/ui/ABMPage';
+import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import { contactosApi, gastosApi } from '../lib/api';
 import type { Contacto, Gasto, GastoCuota, TipoContacto } from '../types';
+import {
+  estadoDeContacto, estadoDeGasto, gastoEnRango, recortarGastoARango,
+  ESTADO_CONTACTO_LABEL, ESTADO_CONTACTO_COLOR,
+  ESTADO_GASTO_LABEL, ESTADO_GASTO_COLOR,
+  ESTADO_CUOTA_COLOR,
+  type EstadoContactoAgregado,
+} from '../lib/tesoreria-helpers';
 
 const TIPO_COLORS: Record<TipoContacto, string> = {
   concejal: '#8b5cf6',
@@ -32,6 +44,12 @@ const TIPO_LABELS: Record<TipoContacto, string> = {
 };
 
 const ARG_DEFAULT_CENTER: [number, number] = [-30.266, -64.125];
+
+const ESTADO_ICON: Record<EstadoContactoAgregado, typeof CheckCircle2> = {
+  al_dia: CheckCircle2,
+  en_mora: AlertTriangle,
+  sin_gastos: MinusCircle,
+};
 
 /** SVG inline de casita (Lucide Home) con color custom. Se usa como DivIcon. */
 function casitaDivIcon(color: string, size = 36) {
@@ -92,6 +110,8 @@ export default function TesoreriaMapa() {
   const [tipoFiltro, setTipoFiltro] = useState<TipoContacto | ''>('');
   const [search, setSearch] = useState('');
   const [montoMin, setMontoMin] = useState<number>(0);
+  const [rango, setRango] = useState<DateRange>({ desde: '', hasta: '' });
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoContactoAgregado | ''>('');
 
   // Side modal
   const [selected, setSelected] = useState<Contacto | null>(null);
@@ -120,16 +140,35 @@ export default function TesoreriaMapa() {
     })();
   }, []);
 
-  // Total gastado por contacto
-  const totalesPorContacto = useMemo(() => {
-    const map: Record<number, number> = {};
+  // Gastos agrupados por contacto (ya recortados al rango si hay rango).
+  const gastosPorContacto = useMemo(() => {
+    const map: Record<number, Gasto[]> = {};
     for (const g of gastos) {
-      if (g.destino_contacto_id) {
-        map[g.destino_contacto_id] = (map[g.destino_contacto_id] || 0) + parseFloat(g.monto_pesos);
-      }
+      if (!g.destino_contacto_id) continue;
+      if (!gastoEnRango(g, rango.desde, rango.hasta)) continue;
+      const recortado = recortarGastoARango(g, rango.desde, rango.hasta);
+      (map[g.destino_contacto_id] = map[g.destino_contacto_id] || []).push(recortado);
     }
     return map;
-  }, [gastos]);
+  }, [gastos, rango]);
+
+  // Total gastado por contacto (en el rango filtrado, si aplica)
+  const totalesPorContacto = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const [cid, lista] of Object.entries(gastosPorContacto)) {
+      map[Number(cid)] = lista.reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0);
+    }
+    return map;
+  }, [gastosPorContacto]);
+
+  // Estado agregado por contacto
+  const estadosPorContacto = useMemo(() => {
+    const map: Record<number, EstadoContactoAgregado> = {};
+    for (const c of contactos) {
+      map[c.id] = estadoDeContacto(gastosPorContacto[c.id] || []);
+    }
+    return map;
+  }, [contactos, gastosPorContacto]);
 
   // Contactos con geo + filtros aplicados
   const visibles = useMemo(() => {
@@ -139,6 +178,7 @@ export default function TesoreriaMapa() {
       if (tipoFiltro && c.tipo !== tipoFiltro) return false;
       const total = totalesPorContacto[c.id] || 0;
       if (montoMin && total < montoMin) return false;
+      if (estadoFiltro && estadosPorContacto[c.id] !== estadoFiltro) return false;
       if (s) {
         const nombreCompleto = `${c.nombre} ${c.apellido || ''}`.toLowerCase();
         if (!nombreCompleto.includes(s) && !(c.alias_pago?.toLowerCase().includes(s))) {
@@ -147,7 +187,7 @@ export default function TesoreriaMapa() {
       }
       return true;
     });
-  }, [contactos, tipoFiltro, search, montoMin, totalesPorContacto]);
+  }, [contactos, tipoFiltro, search, montoMin, estadoFiltro, totalesPorContacto, estadosPorContacto]);
 
   // Puntos para FitBounds
   const points = useMemo<[number, number][]>(
@@ -155,10 +195,24 @@ export default function TesoreriaMapa() {
     [visibles],
   );
 
-  // Métricas
+  // Métricas del header
   const totalVisible = useMemo(
     () => visibles.reduce((acc, c) => acc + (totalesPorContacto[c.id] || 0), 0),
     [visibles, totalesPorContacto],
+  );
+
+  const cantidadGastosVisibles = useMemo(
+    () => visibles.reduce((acc, c) => acc + (gastosPorContacto[c.id]?.length || 0), 0),
+    [visibles, gastosPorContacto],
+  );
+
+  const promedioPorContacto = visibles.length > 0
+    ? Math.round(totalVisible / visibles.length)
+    : 0;
+
+  const cantidadEnMora = useMemo(
+    () => visibles.filter(c => estadosPorContacto[c.id] === 'en_mora').length,
+    [visibles, estadosPorContacto],
   );
 
   // Al elegir un contacto: fetch gastos del contacto con cuotas
@@ -181,6 +235,23 @@ export default function TesoreriaMapa() {
     setGastosDetalle([]);
     setExpandedGasto(null);
   };
+
+  // Gastos del detalle ya recortados al rango (consistente con el mapa)
+  const gastosDetalleFiltrados = useMemo(() => {
+    if (!rango.desde && !rango.hasta) return gastosDetalle;
+    return gastosDetalle
+      .filter(g => gastoEnRango(g, rango.desde, rango.hasta))
+      .map(g => recortarGastoARango(g, rango.desde, rango.hasta));
+  }, [gastosDetalle, rango]);
+
+  const totalDetalle = useMemo(
+    () => gastosDetalleFiltrados.reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0),
+    [gastosDetalleFiltrados],
+  );
+
+  const estadoSeleccionado: EstadoContactoAgregado | null = selected
+    ? estadoDeContacto(gastosDetalleFiltrados)
+    : null;
 
   const extraFilters = (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -208,6 +279,55 @@ export default function TesoreriaMapa() {
     </div>
   );
 
+  // Segunda fila de filtros: rango de fechas + estado agregado
+  const ESTADOS: { value: EstadoContactoAgregado | ''; label: string; color: string }[] = [
+    { value: '', label: 'Cualquier estado', color: theme.primary },
+    { value: 'al_dia', label: ESTADO_CONTACTO_LABEL.al_dia, color: ESTADO_CONTACTO_COLOR.al_dia },
+    { value: 'en_mora', label: ESTADO_CONTACTO_LABEL.en_mora, color: ESTADO_CONTACTO_COLOR.en_mora },
+    { value: 'sin_gastos', label: ESTADO_CONTACTO_LABEL.sin_gastos, color: ESTADO_CONTACTO_COLOR.sin_gastos },
+  ];
+
+  const secondaryFilters = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="inline-flex items-center gap-1.5">
+        <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>
+          Período
+        </span>
+        <DateRangePicker
+          value={rango}
+          onChange={setRango}
+          allowClear
+          placeholder="Todo el histórico"
+        />
+      </div>
+
+      <div className="h-6 w-px" style={{ backgroundColor: theme.border }} />
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>
+          Estado
+        </span>
+        {ESTADOS.map(s => {
+          const active = estadoFiltro === s.value;
+          return (
+            <button
+              key={s.value || 'all'}
+              onClick={() => setEstadoFiltro(s.value as EstadoContactoAgregado | '')}
+              className="px-2.5 py-1 rounded-md text-xs font-medium transition-all"
+              style={{
+                backgroundColor: active ? s.color : `${s.color}15`,
+                color: active ? '#fff' : s.color,
+                border: `1px solid ${s.color}40`,
+              }}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   const headerActions = (
     <>
       <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl"
@@ -231,9 +351,28 @@ export default function TesoreriaMapa() {
           <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>{visibles.length}</p>
         </div>
         <div className="text-center">
+          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Gastos</p>
+          <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>{cantidadGastosVisibles}</p>
+        </div>
+        <div className="text-center">
           <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Total</p>
           <p className="text-sm font-bold leading-none" style={{ color: theme.primary }}>
             ${totalVisible.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Prom.</p>
+          <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>
+            ${promedioPorContacto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>En mora</p>
+          <p
+            className="text-sm font-bold leading-none"
+            style={{ color: cantidadEnMora > 0 ? ESTADO_CONTACTO_COLOR.en_mora : theme.text }}
+          >
+            {cantidadEnMora}
           </p>
         </div>
       </div>
@@ -246,7 +385,7 @@ export default function TesoreriaMapa() {
         <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
           Cada casita es un contacto con ubicación cargada. Tocá un pin para
           ver el detalle de los gastos. El tamaño del pin indica cuánto le
-          pagaste en total. Usá los filtros para acotar.
+          pagaste en total. Usá los filtros para acotar período y estado.
         </TesoreriaHint>
       </div>
 
@@ -258,6 +397,7 @@ export default function TesoreriaMapa() {
         searchValue={search}
         onSearchChange={setSearch}
         extraFilters={extraFilters}
+        secondaryFilters={secondaryFilters}
         headerActions={headerActions}
         loading={loading}
         isEmpty={!loading && visibles.length === 0}
@@ -274,11 +414,16 @@ export default function TesoreriaMapa() {
             {visibles.map(c => {
               const total = totalesPorContacto[c.id] || 0;
               const baseSize = total > 0 ? Math.min(56, 32 + Math.log10(total + 1) * 4) : 32;
+              // Si está en mora, el pin se pinta rojo para destacarse — lectura
+              // visual instantánea del estado del contacto en el mapa.
+              const pinColor = estadosPorContacto[c.id] === 'en_mora'
+                ? ESTADO_CONTACTO_COLOR.en_mora
+                : TIPO_COLORS[c.tipo];
               return (
                 <Marker
                   key={c.id}
                   position={[c.latitud!, c.longitud!]}
-                  icon={casitaDivIcon(TIPO_COLORS[c.tipo], baseSize)}
+                  icon={casitaDivIcon(pinColor, baseSize)}
                   eventHandlers={{ click: () => handlePinClick(c) }}
                 />
               );
@@ -293,10 +438,68 @@ export default function TesoreriaMapa() {
         onClose={closeDetalle}
         title={selected ? `${selected.nombre} ${selected.apellido || ''}`.trim() : ''}
         description={selected ? TIPO_LABELS[selected.tipo] : ''}
+        stickyFooter={
+          selected ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to="/gestion/tesoreria/contactos"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95"
+                style={{
+                  backgroundColor: theme.backgroundSecondary,
+                  border: `1px solid ${theme.border}`,
+                  color: theme.text,
+                }}
+              >
+                <Users className="h-3.5 w-3.5" /> Ver en agenda
+              </Link>
+              <Link
+                to="/gestion/tesoreria"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-95"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                  color: '#fff',
+                  boxShadow: `0 4px 14px ${theme.primary}40`,
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" /> Cargar gasto
+              </Link>
+            </div>
+          ) : undefined
+        }
       >
         {selected && (
           <div className="space-y-4">
-            {/* Header info */}
+            {/* Estado agregado del contacto - prominente arriba */}
+            {estadoSeleccionado && (() => {
+              const Icon = ESTADO_ICON[estadoSeleccionado];
+              const color = ESTADO_CONTACTO_COLOR[estadoSeleccionado];
+              return (
+                <div
+                  className="p-3 rounded-xl flex items-center gap-3"
+                  style={{
+                    backgroundColor: `${color}15`,
+                    border: `1px solid ${color}40`,
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                  >
+                    <Icon className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] uppercase font-bold" style={{ color }}>
+                      Estado del contacto
+                    </p>
+                    <p className="text-base font-bold" style={{ color: theme.text }}>
+                      {ESTADO_CONTACTO_LABEL[estadoSeleccionado]}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Header info (tipo + alias) */}
             <div
               className="p-3 rounded-xl flex items-center gap-3"
               style={{
@@ -352,17 +555,17 @@ export default function TesoreriaMapa() {
               )}
             </div>
 
-            {/* Total gastado */}
+            {/* Total + cantidad - respeta rango si está seteado */}
             <div
               className="p-3 rounded-xl flex items-center justify-between"
               style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
             >
               <div>
                 <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
-                  Total pagado
+                  {rango.desde || rango.hasta ? 'Pagado en período' : 'Total pagado'}
                 </p>
                 <p className="text-2xl font-bold" style={{ color: theme.primary }}>
-                  ${(totalesPorContacto[selected.id] || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  ${totalDetalle.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                 </p>
               </div>
               <div className="text-right">
@@ -370,7 +573,7 @@ export default function TesoreriaMapa() {
                   Gastos
                 </p>
                 <p className="text-lg font-semibold" style={{ color: theme.text }}>
-                  {gastosDetalle.length}
+                  {gastosDetalleFiltrados.length}
                 </p>
               </div>
             </div>
@@ -384,15 +587,19 @@ export default function TesoreriaMapa() {
                 <div className="text-center py-6">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto" style={{ color: theme.primary }} />
                 </div>
-              ) : gastosDetalle.length === 0 ? (
+              ) : gastosDetalleFiltrados.length === 0 ? (
                 <p className="text-sm text-center py-4 opacity-60" style={{ color: theme.textSecondary }}>
-                  Sin gastos cargados.
+                  {rango.desde || rango.hasta
+                    ? 'Sin gastos en el período seleccionado.'
+                    : 'Sin gastos cargados.'}
                 </p>
               ) : (
                 <div className="space-y-1.5">
-                  {gastosDetalle.map(g => {
+                  {gastosDetalleFiltrados.map(g => {
                     const isExpanded = expandedGasto === g.id;
                     const cuotas = g.cuotas || [];
+                    const estadoG = estadoDeGasto(g);
+                    const estadoColor = ESTADO_GASTO_COLOR[estadoG];
                     return (
                       <div
                         key={g.id}
@@ -409,7 +616,19 @@ export default function TesoreriaMapa() {
                             ? <ChevronDown className="h-4 w-4 flex-shrink-0" />
                             : <ChevronRight className="h-4 w-4 flex-shrink-0" />}
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="font-medium text-sm truncate">{g.concepto}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium text-sm truncate">{g.concepto}</p>
+                              <span
+                                className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                                style={{
+                                  backgroundColor: `${estadoColor}20`,
+                                  color: estadoColor,
+                                  border: `1px solid ${estadoColor}40`,
+                                }}
+                              >
+                                {ESTADO_GASTO_LABEL[estadoG]}
+                              </span>
+                            </div>
                             <p className="text-[10px] opacity-60">
                               {new Date(g.fecha).toLocaleDateString('es-AR')} · {g.tipo_financiacion}
                             </p>
@@ -448,13 +667,7 @@ export default function TesoreriaMapa() {
 
 function CuotaRow({ cuota }: { cuota: GastoCuota }) {
   const { theme } = useTheme();
-  const colors: Record<string, string> = {
-    pagada: '#10b981',
-    pendiente: '#f59e0b',
-    vencida: '#ef4444',
-    cancelada: '#71717a',
-  };
-  const c = colors[cuota.estado] || theme.textSecondary;
+  const c = ESTADO_CUOTA_COLOR[cuota.estado] || theme.textSecondary;
   return (
     <div className="flex items-center gap-2 py-1 text-xs">
       <span
