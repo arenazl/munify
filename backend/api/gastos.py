@@ -26,12 +26,13 @@ from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import (
     Gasto, GastoCuota, Contacto, MunicipioDependencia, User, RolUsuario,
-    EstadoGastoCuota,
+    EstadoGastoCuota, Proyecto, GastoProyecto,
 )
 from models.gasto import TipoFinanciacion
 from models.dependencia import Dependencia
 from schemas.tesoreria import (
-    GastoCreate, GastoUpdate, GastoResponse,
+    GastoCreate, GastoUpdate, GastoResponse, GastoProyectoResponse,
+    GastoProyectoAssignment,
     GastoCuotaPagarPayload,
     ProyeccionResponse, ProyeccionMes, DesgloseTipoFinanciacion,
     CuotaProyeccionResponse,
@@ -45,6 +46,97 @@ def _require_admin(user: User):
     # gastos. Los supervisores de dependencia y vecinos no.
     if user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
         raise HTTPException(status_code=403, detail="Sin permisos para gestionar gastos")
+
+
+def _gasto_to_response(gasto: Gasto) -> GastoResponse:
+    """Serializa un gasto a su response (con cuotas y proyectos imputados).
+
+    Requiere que el gasto se haya cargado con selectinload de cuotas,
+    proyectos_asignados y GastoProyecto.proyecto. Caso contrario lanza
+    MissingGreenlet al acceder a las relaciones.
+    """
+    resp = GastoResponse.model_validate(gasto)
+    resp.proyectos = [
+        GastoProyectoResponse(
+            proyecto_id=gp.proyecto_id,
+            proyecto_nombre=gp.proyecto.nombre if gp.proyecto else "",
+            monto_asignado=gp.monto_asignado,
+        )
+        for gp in (gasto.proyectos_asignados or [])
+    ]
+    return resp
+
+
+async def _validar_imputaciones(
+    db: AsyncSession,
+    gasto: Gasto,
+    asignaciones: List[GastoProyectoAssignment],
+    municipio_id: int,
+):
+    """Valida la lista de imputaciones sin tocar la DB.
+
+    - SUM(monto_asignado) <= gasto.monto_pesos
+    - No se repite el mismo proyecto_id
+    - Cada proyecto_id existe y es del muni correcto
+    """
+    if not asignaciones:
+        return
+    proyecto_ids = [a.proyecto_id for a in asignaciones]
+    if len(set(proyecto_ids)) != len(proyecto_ids):
+        raise HTTPException(status_code=422, detail="No se puede imputar el mismo proyecto dos veces")
+
+    total_asignado = sum((Decimal(a.monto_asignado) for a in asignaciones), Decimal(0))
+    if total_asignado > Decimal(gasto.monto_pesos):
+        raise HTTPException(
+            status_code=422,
+            detail=f"La suma imputada (${total_asignado}) supera el monto del gasto (${gasto.monto_pesos})",
+        )
+
+    found = (await db.execute(
+        select(Proyecto.id).where(
+            Proyecto.id.in_(proyecto_ids),
+            Proyecto.municipio_id == municipio_id,
+        )
+    )).scalars().all()
+    faltantes = set(proyecto_ids) - set(found)
+    if faltantes:
+        raise HTTPException(status_code=422, detail=f"Proyectos no encontrados: {sorted(faltantes)}")
+
+
+async def _crear_imputaciones(
+    db: AsyncSession,
+    gasto: Gasto,
+    asignaciones: List[GastoProyectoAssignment],
+    municipio_id: int,
+):
+    """Crea las imputaciones de un gasto nuevo (asume gasto.id ya seteado)."""
+    await _validar_imputaciones(db, gasto, asignaciones, municipio_id)
+    for a in asignaciones:
+        db.add(GastoProyecto(
+            gasto_id=gasto.id,
+            proyecto_id=a.proyecto_id,
+            monto_asignado=a.monto_asignado,
+        ))
+
+
+async def _reemplazar_imputaciones(
+    db: AsyncSession,
+    gasto: Gasto,
+    asignaciones: List[GastoProyectoAssignment],
+    municipio_id: int,
+):
+    """Reemplaza las imputaciones existentes (asume relacion ya cargada con selectinload)."""
+    await _validar_imputaciones(db, gasto, asignaciones, municipio_id)
+    # Borrar las viejas (ya cargadas eagerly)
+    for old in list(gasto.proyectos_asignados or []):
+        await db.delete(old)
+    # Insertar las nuevas
+    for a in asignaciones:
+        db.add(GastoProyecto(
+            gasto_id=gasto.id,
+            proyecto_id=a.proyecto_id,
+            monto_asignado=a.monto_asignado,
+        ))
 
 
 def _add_months(d: date, months: int) -> date:
@@ -159,7 +251,11 @@ async def list_gastos(
 
     query = (
         select(Gasto)
-        .options(selectinload(Gasto.cuotas), selectinload(Gasto.contacto))
+        .options(
+            selectinload(Gasto.cuotas),
+            selectinload(Gasto.contacto),
+            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
+        )
         .where(Gasto.municipio_id == municipio_id, Gasto.activo == True)  # noqa: E712
     )
     if destino_tipo:
@@ -177,7 +273,8 @@ async def list_gastos(
 
     query = query.order_by(Gasto.fecha.desc(), Gasto.id.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().unique().all()
+    gastos = result.scalars().unique().all()
+    return [_gasto_to_response(g) for g in gastos]
 
 
 @router.post("", response_model=GastoResponse, status_code=201)
@@ -194,12 +291,12 @@ async def create_gasto(
     if payload.destino_tipo == "dependencia":
         if not payload.destino_dependencia_id:
             raise HTTPException(status_code=422, detail="destino_dependencia_id requerido")
-        payload_dict = payload.model_dump()
+        payload_dict = payload.model_dump(exclude={"proyectos"})
         payload_dict["destino_contacto_id"] = None
     elif payload.destino_tipo == "contacto":
         if not payload.destino_contacto_id:
             raise HTTPException(status_code=422, detail="destino_contacto_id requerido")
-        payload_dict = payload.model_dump()
+        payload_dict = payload.model_dump(exclude={"proyectos"})
         payload_dict["destino_dependencia_id"] = None
     else:
         raise HTTPException(status_code=422, detail="destino_tipo invalido")
@@ -221,17 +318,25 @@ async def create_gasto(
     # Generar cuotas
     cuotas = _generar_cuotas(gasto)
     db.add_all(cuotas)
+
+    # Imputaciones a proyectos (opcional)
+    if payload.proyectos:
+        await _crear_imputaciones(db, gasto, payload.proyectos, municipio_id)
+
     await db.commit()
 
-    # Re-cargar el gasto con la relación de cuotas eagerly, para evitar
-    # MissingGreenlet al serializar la respuesta (Pydantic intenta acceder
-    # a created_at/updated_at y otros atributos que pueden estar expired).
+    # Re-cargar el gasto con todas las relaciones eagerly, para evitar
+    # MissingGreenlet al serializar la respuesta.
     result = await db.execute(
         select(Gasto)
-        .options(selectinload(Gasto.cuotas), selectinload(Gasto.contacto))
+        .options(
+            selectinload(Gasto.cuotas),
+            selectinload(Gasto.contacto),
+            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
+        )
         .where(Gasto.id == gasto.id)
     )
-    return result.scalar_one()
+    return _gasto_to_response(result.scalar_one())
 
 
 @router.get("/{gasto_id}", response_model=GastoResponse)
@@ -246,13 +351,17 @@ async def get_gasto(
 
     result = await db.execute(
         select(Gasto)
-        .options(selectinload(Gasto.cuotas), selectinload(Gasto.contacto))
+        .options(
+            selectinload(Gasto.cuotas),
+            selectinload(Gasto.contacto),
+            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
+        )
         .where(Gasto.id == gasto_id, Gasto.municipio_id == municipio_id)
     )
     gasto = result.scalar_one_or_none()
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
-    return gasto
+    return _gasto_to_response(gasto)
 
 
 @router.put("/{gasto_id}", response_model=GastoResponse)
@@ -268,18 +377,38 @@ async def update_gasto(
 
     result = await db.execute(
         select(Gasto)
-        .options(selectinload(Gasto.cuotas))
+        .options(
+            selectinload(Gasto.cuotas),
+            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
+        )
         .where(Gasto.id == gasto_id, Gasto.municipio_id == municipio_id)
     )
     gasto = result.scalar_one_or_none()
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
 
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    payload_data = payload.model_dump(exclude_unset=True)
+    payload_data.pop("proyectos", None)  # se procesa aparte
+    for k, v in payload_data.items():
         setattr(gasto, k, v)
+
+    # Si vinieron proyectos en el payload (incluso lista vacia), reasignar.
+    if payload.proyectos is not None:
+        await _reemplazar_imputaciones(db, gasto, payload.proyectos, municipio_id)
+
     await db.commit()
-    await db.refresh(gasto)
-    return gasto
+
+    # Re-cargar para devolver con relaciones frescas
+    result = await db.execute(
+        select(Gasto)
+        .options(
+            selectinload(Gasto.cuotas),
+            selectinload(Gasto.contacto),
+            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
+        )
+        .where(Gasto.id == gasto_id)
+    )
+    return _gasto_to_response(result.scalar_one())
 
 
 @router.delete("/{gasto_id}")

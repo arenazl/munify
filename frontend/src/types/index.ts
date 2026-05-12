@@ -539,6 +539,41 @@ export interface Gasto {
   created_at: string;
   updated_at: string;
   cuotas?: GastoCuota[];
+  proyectos?: GastoProyectoLink[];
+}
+
+export type EstadoProyecto = 'activo' | 'pausado' | 'finalizado';
+
+export interface GastoProyectoLink {
+  proyecto_id: number;
+  proyecto_nombre: string;
+  monto_asignado: string;
+}
+
+export interface GastoProyectoAssignment {
+  proyecto_id: number;
+  monto_asignado: number;
+}
+
+export interface ProyectoResumen {
+  total_imputado: string;
+  cantidad_gastos: number;
+  porcentaje_presupuesto?: number | null;
+}
+
+export interface Proyecto {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string | null;
+  presupuesto?: string | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+  estado: EstadoProyecto;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  resumen?: ProyectoResumen | null;
 }
 
 export interface CotizacionUSD {

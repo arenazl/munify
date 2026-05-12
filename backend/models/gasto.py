@@ -149,6 +149,14 @@ class Gasto(Base):
         order_by="GastoCuota.numero",
     )
 
+    # Proyectos a los que se imputa este gasto (N:M con monto_asignado).
+    # Un gasto puede imputarse a 0+, y la suma de monto_asignado <= monto_pesos.
+    proyectos_asignados = relationship(
+        "GastoProyecto",
+        back_populates="gasto",
+        cascade="all, delete-orphan",
+    )
+
     def __repr__(self):
         return f"<Gasto {self.id} ${self.monto_pesos} {self.concepto}>"
 

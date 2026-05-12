@@ -16,6 +16,7 @@ from models.gasto import (
     DestinoGasto, TipoFinanciacion, FrecuenciaRecurrencia,
     FormaPago, EstadoGastoCuota,
 )
+from models.proyecto import EstadoProyecto
 
 
 # ============================================================
@@ -120,6 +121,19 @@ class GastoCuotaPagarPayload(BaseModel):
     notas: Optional[str] = None
 
 
+class GastoProyectoAssignment(BaseModel):
+    """Imputacion del gasto a un proyecto (parcial o total)."""
+    proyecto_id: int
+    monto_asignado: Decimal = Field(..., gt=0)
+
+
+class GastoProyectoResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    proyecto_id: int
+    proyecto_nombre: str
+    monto_asignado: Decimal
+
+
 class GastoBase(BaseModel):
     destino_tipo: DestinoGastoStr
     destino_dependencia_id: Optional[int] = None
@@ -143,7 +157,9 @@ class GastoBase(BaseModel):
 
 
 class GastoCreate(GastoBase):
-    pass
+    # Imputaciones opcionales a proyectos. La suma de monto_asignado
+    # debe ser <= monto_pesos (validado en el endpoint).
+    proyectos: List[GastoProyectoAssignment] = []
 
 
 class GastoUpdate(BaseModel):
@@ -151,6 +167,9 @@ class GastoUpdate(BaseModel):
     descripcion: Optional[str] = None
     observaciones: Optional[str] = None
     activo: Optional[bool] = None
+    # Si se manda, reemplaza las imputaciones existentes. Si se omite,
+    # quedan como estaban.
+    proyectos: Optional[List[GastoProyectoAssignment]] = None
 
 
 class GastoResponse(GastoBase):
@@ -164,6 +183,7 @@ class GastoResponse(GastoBase):
     created_at: datetime
     updated_at: datetime
     cuotas: List[GastoCuotaResponse] = []
+    proyectos: List[GastoProyectoResponse] = []
 
 
 # ============================================================
@@ -228,3 +248,51 @@ class CuotaProyeccionResponse(BaseModel):
     numero_cuota: int
     total_cuotas: Optional[int] = None
     tipo_financiacion: str
+
+
+# ============================================================
+# Proyecto (control de obras / iniciativas con varios gastos)
+# ============================================================
+
+EstadoProyectoStr = EstadoProyecto
+
+
+class ProyectoBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=150)
+    descripcion: Optional[str] = None
+    presupuesto: Optional[Decimal] = Field(None, gt=0)
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+    estado: EstadoProyectoStr = "activo"
+
+
+class ProyectoCreate(ProyectoBase):
+    pass
+
+
+class ProyectoUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=1, max_length=150)
+    descripcion: Optional[str] = None
+    presupuesto: Optional[Decimal] = Field(None, gt=0)
+    fecha_inicio: Optional[date] = None
+    fecha_fin: Optional[date] = None
+    estado: Optional[EstadoProyectoStr] = None
+    activo: Optional[bool] = None
+
+
+class ProyectoResumen(BaseModel):
+    """Suma de imputaciones del proyecto y cantidad de gastos vinculados."""
+    total_imputado: Decimal
+    cantidad_gastos: int
+    porcentaje_presupuesto: Optional[float] = None  # null si no hay presupuesto
+
+
+class ProyectoResponse(ProyectoBase):
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+
+    id: int
+    municipio_id: int
+    activo: bool
+    created_at: datetime
+    updated_at: datetime
+    resumen: Optional[ProyectoResumen] = None

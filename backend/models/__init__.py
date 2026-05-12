@@ -192,6 +192,7 @@ from .gasto import (
     FormaPago,
     EstadoGastoCuota,
 )
+from .proyecto import Proyecto, GastoProyecto, EstadoProyecto
 
 __all__ += [
     "MunicipioModulo",
@@ -204,4 +205,7 @@ __all__ += [
     "FrecuenciaRecurrencia",
     "FormaPago",
     "EstadoGastoCuota",
+    "Proyecto",
+    "GastoProyecto",
+    "EstadoProyecto",
 ]

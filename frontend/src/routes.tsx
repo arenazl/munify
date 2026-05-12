@@ -67,6 +67,7 @@ import Tesoreria from './pages/Tesoreria';
 import TesoreriaContactos from './pages/TesoreriaContactos';
 import TesoreriaMapa from './pages/TesoreriaMapa';
 import TesoreriaProyecciones from './pages/TesoreriaProyecciones';
+import TesoreriaProyectos from './pages/TesoreriaProyectos';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -190,6 +191,7 @@ export const router = createBrowserRouter([
       // Tesorería (solo admin del municipio)
       { path: 'tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><Tesoreria /></ProtectedRoute> },
       { path: 'tesoreria/contactos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaContactos /></ProtectedRoute> },
+      { path: 'tesoreria/proyectos', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyectos /></ProtectedRoute> },
       { path: 'tesoreria/mapa', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaMapa /></ProtectedRoute> },
       { path: 'tesoreria/proyecciones', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaProyecciones /></ProtectedRoute> },
 

@@ -1976,6 +1976,16 @@ export const cotizacionApi = {
   usd: () => api.get('/cotizacion/usd'),
 };
 
+export const proyectosApi = {
+  list: (params?: { estado?: string; activo?: boolean; search?: string; include_resumen?: boolean; skip?: number; limit?: number }) =>
+    api.get('/tesoreria/proyectos', { params }),
+  get: (id: number) => api.get(`/tesoreria/proyectos/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/proyectos', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tesoreria/proyectos/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/proyectos/${id}`),
+};
+
 export const tesoreriaCatalogoApi = {
   conceptos: () => api.get('/tesoreria/conceptos'),
 };

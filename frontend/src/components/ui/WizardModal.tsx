@@ -28,6 +28,10 @@ interface WizardModalProps {
   onComplete: () => void;
   loading?: boolean;
   completeLabel?: string;
+  /** Accion secundaria en el ultimo step (ej: "Guardar y agregar otro").
+   * Si se define se renderiza un boton extra al lado del primario. */
+  onCompleteSecondary?: () => void;
+  completeSecondaryLabel?: string;
   aiPanel?: ReactNode;
   headerBadge?: HeaderBadge;
   /** Si es true, se renderiza como página embebida sin modal overlay */
@@ -46,6 +50,8 @@ export function WizardModal({
   onComplete,
   loading = false,
   completeLabel = 'Finalizar',
+  onCompleteSecondary,
+  completeSecondaryLabel,
   aiPanel,
   headerBadge,
   embedded = false,
@@ -582,6 +588,32 @@ export function WizardModal({
             />
           ))}
         </div>
+
+        {isLastStep && onCompleteSecondary && (
+          <button
+            onClick={onCompleteSecondary}
+            disabled={loading || !canProceed}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '10px',
+              border: `1px solid ${theme.border}`,
+              backgroundColor: 'transparent',
+              color: theme.text,
+              fontWeight: 600,
+              cursor: loading || !canProceed ? 'not-allowed' : 'pointer',
+              opacity: loading || !canProceed ? 0.5 : 1,
+              transition: 'all 0.3s ease',
+              marginRight: '8px',
+            }}
+            title="Guarda este gasto y abre el wizard para cargar otro con el mismo proyecto/fecha"
+          >
+            <Check style={{ width: '16px', height: '16px' }} />
+            {completeSecondaryLabel || 'Guardar y agregar otro'}
+          </button>
+        )}
 
         <button
           className="wizard-primary-btn"

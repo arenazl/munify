@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar } from 'lucide-react';
+import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
-  contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi,
+  contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi, proyectosApi,
 } from '../../lib/api';
 import type {
   Contacto, ConceptosCatalogo, CotizacionUSD, TipoFinanciacion,
-  FrecuenciaRecurrencia, FormaPago, DestinoGasto,
+  FrecuenciaRecurrencia, FormaPago, DestinoGasto, Proyecto, GastoProyectoAssignment,
 } from '../../types';
 
 interface Props {
@@ -56,6 +56,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [conceptos, setConceptos] = useState<ConceptosCatalogo | null>(null);
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [dependencias, setDependencias] = useState<DepOption[]>([]);
+  const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [cotizacion, setCotizacion] = useState<CotizacionUSD | null>(null);
 
   // Form state
@@ -72,6 +73,10 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrencia>('mensual');
   const [fechaFinRec, setFechaFinRec] = useState<string>('');
   const [descripcion, setDescripcion] = useState('');
+
+  // Imputaciones a proyectos (opcional). Persisten cuando se usa
+  // "Guardar y agregar otro" para no recargar el mismo proyecto.
+  const [proyectoAsignaciones, setProyectoAsignaciones] = useState<GastoProyectoAssignment[]>([]);
 
   const [conceptoSearch, setConceptoSearch] = useState('');
   const conceptoInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +98,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       setTipoFinanciacion('contado');
       setFormaPago('transferencia');
       setDescripcion('');
+      setProyectoAsignaciones([]);
     }
   }, [open]);
 
@@ -101,15 +107,17 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     if (!open) return;
     (async () => {
       try {
-        const [cRes, ctRes, depRes, usdRes] = await Promise.all([
+        const [cRes, ctRes, depRes, projRes, usdRes] = await Promise.all([
           tesoreriaCatalogoApi.conceptos(),
           contactosApi.list({ activo: true, limit: 500 }),
           dependenciasApi.getMunicipio({ activo: true }),
+          proyectosApi.list({ activo: true, include_resumen: false, limit: 500 }).catch(() => ({ data: [] as Proyecto[] })),
           cotizacionApi.usd().catch(() => null),
         ]);
         setConceptos(cRes.data);
         setContactos(ctRes.data);
         setDependencias(depRes.data || []);
+        setProyectos(projRes.data || []);
         if (usdRes?.data?.valor_sugerido) {
           setCotizacion(usdRes.data);
           setCotizacionUsd(String(usdRes.data.valor_sugerido));
@@ -140,11 +148,21 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     return (m / c).toFixed(2);
   }, [montoPesos, cotizacionUsd]);
 
-  const guardar = async () => {
+  const totalImputado = useMemo(
+    () => proyectoAsignaciones.reduce((acc, a) => acc + (Number(a.monto_asignado) || 0), 0),
+    [proyectoAsignaciones]
+  );
+
+  const guardar = async (continueAdding = false) => {
     if (!concepto.trim()) return toast.error('Falta el concepto');
     if (destinoTipo === 'contacto' && !contactoId) return toast.error('Elegí un contacto');
     if (destinoTipo === 'dependencia' && !dependenciaId) return toast.error('Elegí una secretaría');
     if (!montoPesos || parseFloat(montoPesos) <= 0) return toast.error('Ingresá el monto');
+
+    const monto = parseFloat(montoPesos);
+    if (totalImputado > monto + 0.001) {
+      return toast.error(`La imputación a proyectos ($${totalImputado.toLocaleString('es-AR')}) supera el monto del gasto ($${monto.toLocaleString('es-AR')})`);
+    }
 
     setSaving(true);
     try {
@@ -162,9 +180,25 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         cuotas_total: tipoFinanciacion === 'cuotas' || tipoFinanciacion === 'prestamo' ? cuotasTotal : null,
         frecuencia: tipoFinanciacion === 'recurrente' ? frecuencia : null,
         fecha_fin_recurrencia: tipoFinanciacion === 'recurrente' && fechaFinRec ? fechaFinRec : null,
+        proyectos: proyectoAsignaciones.length > 0 ? proyectoAsignaciones : [],
       });
-      toast.success('Gasto cargado correctamente');
+      toast.success(continueAdding ? 'Gasto cargado · cargá el siguiente' : 'Gasto cargado correctamente');
       onSuccess?.();
+
+      if (continueAdding) {
+        // Reset todo MENOS proyectos imputados y fecha. Vuelve al step 0.
+        setStep(0);
+        setConcepto('');
+        setConceptoSearch('');
+        setDestinoTipo('contacto');
+        setContactoId(null);
+        setDependenciaId(null);
+        setMontoPesos('');
+        setTipoFinanciacion('contado');
+        setFormaPago('transferencia');
+        setDescripcion('');
+        // proyectoAsignaciones y fecha se preservan
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Error guardando gasto');
     } finally {
@@ -513,6 +547,128 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const contactoSel = contactos.find(c => c.id === contactoId);
   const depSel = dependencias.find(d => d.id === dependenciaId);
 
+  // ============ Step 5: Proyectos (opcional) ============
+  const monto = parseFloat(montoPesos || '0');
+  const remanente = Math.max(0, monto - totalImputado);
+  const proyectoOptions = useMemo(
+    () => proyectos
+      .filter(p => p.estado === 'activo')
+      .filter(p => !proyectoAsignaciones.some(a => a.proyecto_id === p.id))
+      .map(p => ({ value: String(p.id), label: p.nombre })),
+    [proyectos, proyectoAsignaciones]
+  );
+
+  const agregarImputacion = (proyectoId: string) => {
+    const id = parseInt(proyectoId, 10);
+    if (!id) return;
+    // Si solo queda un proyecto en la lista y no hay imputaciones, autocompletar
+    // con el monto total. Si ya hay imputaciones, usar el remanente.
+    const sugerencia = proyectoAsignaciones.length === 0 ? monto : remanente;
+    setProyectoAsignaciones(prev => [...prev, { proyecto_id: id, monto_asignado: sugerencia }]);
+  };
+
+  const updateImputacion = (proyectoId: number, monto_asignado: number) => {
+    setProyectoAsignaciones(prev =>
+      prev.map(a => a.proyecto_id === proyectoId ? { ...a, monto_asignado } : a)
+    );
+  };
+
+  const removeImputacion = (proyectoId: number) => {
+    setProyectoAsignaciones(prev => prev.filter(a => a.proyecto_id !== proyectoId));
+  };
+
+  const stepProyectos = (
+    <div className="space-y-3">
+      <p className="text-sm" style={{ color: theme.textSecondary }}>
+        Opcional: imputá una parte (o todo) del gasto a uno o varios proyectos.
+        Sirve para llevar el control de cuánto se llevó cada obra.
+      </p>
+
+      {proyectos.length === 0 ? (
+        <div className="p-3 rounded-xl text-sm" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}>
+          No hay proyectos creados. Creá uno desde "Tesorería → Proyectos" para imputar este gasto.
+        </div>
+      ) : (
+        <>
+          {proyectoAsignaciones.length > 0 && (
+            <div className="space-y-2">
+              {proyectoAsignaciones.map(a => {
+                const p = proyectos.find(pr => pr.id === a.proyecto_id);
+                return (
+                  <div key={a.proyecto_id} className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+                    <Briefcase className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
+                    <span className="flex-1 text-sm font-medium truncate" style={{ color: theme.text }}>
+                      {p?.nombre || `Proyecto #${a.proyecto_id}`}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs" style={{ color: theme.textSecondary }}>$</span>
+                      <input
+                        type="number"
+                        value={a.monto_asignado || ''}
+                        onChange={(e) => updateImputacion(a.proyecto_id, parseFloat(e.target.value) || 0)}
+                        className="w-28 px-2 py-1 rounded text-sm tabular-nums text-right"
+                        style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => removeImputacion(a.proyecto_id)}
+                      className="p-1 rounded hover:opacity-70"
+                      title="Quitar imputación"
+                      style={{ color: '#ef4444' }}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {proyectoOptions.length > 0 && (
+            <ModernSelect
+              value=""
+              onChange={agregarImputacion}
+              options={proyectoOptions}
+              placeholder="+ Agregar proyecto"
+              searchable
+            />
+          )}
+
+          {/* Barra de progreso de la imputación */}
+          {monto > 0 && (
+            <div className="p-3 rounded-lg space-y-2" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+              <div className="flex items-center justify-between text-xs">
+                <span style={{ color: theme.textSecondary }}>Asignado a proyectos</span>
+                <span className="tabular-nums font-semibold" style={{ color: theme.text }}>
+                  ${totalImputado.toLocaleString('es-AR', { maximumFractionDigits: 0 })} / ${monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.min(100, (totalImputado / monto) * 100)}%`,
+                    backgroundColor: totalImputado > monto ? '#ef4444' : totalImputado === monto ? '#10b981' : theme.primary,
+                  }}
+                />
+              </div>
+              {remanente > 0 && totalImputado > 0 && (
+                <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                  Quedan ${remanente.toLocaleString('es-AR', { maximumFractionDigits: 0 })} sin imputar (se cargan como gasto sin proyecto).
+                </p>
+              )}
+              {totalImputado > monto && (
+                <p className="text-[11px] font-semibold" style={{ color: '#ef4444' }}>
+                  La imputación supera el monto del gasto.
+                </p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+
   const step5 = (
     <div className="space-y-3">
       <div className="p-4 rounded-xl" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
@@ -569,6 +725,11 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       icon: <Calendar className="h-4 w-4" />, content: step4, isValid: true,
     },
     {
+      id: 'proyectos', title: 'Proyectos', description: 'Imputar a obras (opcional)',
+      icon: <Briefcase className="h-4 w-4" />, content: stepProyectos,
+      isValid: totalImputado <= (parseFloat(montoPesos || '0') || 0) + 0.001,
+    },
+    {
       id: 'confirmar', title: 'Confirmar', description: 'Revisar y guardar',
       icon: <CheckCircle2 className="h-4 w-4" />, content: step5, isValid: true,
     },
@@ -582,7 +743,9 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       steps={steps}
       currentStep={step}
       onStepChange={setStep}
-      onComplete={guardar}
+      onComplete={() => guardar(false)}
+      onCompleteSecondary={proyectoAsignaciones.length > 0 ? () => guardar(true) : undefined}
+      completeSecondaryLabel="Guardar y agregar otro"
       loading={saving}
       completeLabel="Cargar gasto"
     />
