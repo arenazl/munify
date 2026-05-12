@@ -292,7 +292,7 @@ export default function TesoreriaProyecciones() {
         emptyMessage="No hay cuotas futuras con esos filtros. Cargá gastos con tipo 'cuotas' o 'recurrente' o relajá los filtros."
       >
         {error && (
-          <div className="col-span-full p-3 rounded-lg text-sm" style={{ backgroundColor: `${theme.danger}15`, color: theme.danger, border: `1px solid ${theme.danger}40` }}>
+          <div className="col-span-full p-3 rounded-lg text-sm" style={{ backgroundColor: '#ef444415', color: '#ef4444', border: '1px solid #ef444440' }}>
             {error}
           </div>
         )}
