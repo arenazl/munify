@@ -401,6 +401,11 @@ async def update_gasto(
 
     await db.commit()
 
+    # Expirar la cache de la session para que el re-query no devuelva
+    # collections viejas (las imputaciones se reemplazaron pero el objeto
+    # cacheado en memoria todavia tiene las anteriores).
+    db.expire_all()
+
     # Re-cargar para devolver con relaciones frescas
     result = await db.execute(
         select(Gasto)
