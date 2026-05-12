@@ -129,9 +129,29 @@ El user tiene `gh`, `heroku`, `netlify`, `git`, `npm`, `node`, `python`, `docker
 autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI.
 
 ### 13. Deploy
-- El user no testea local — cada cambio significativo va a prod.
-- Pipeline: `git push origin master` + `git push heroku master:main` (Heroku necesita rama `main`).
-- Netlify production branch: `master`. Pushear a otra rama es preview.
+
+**Pipeline canónico — usar SIEMPRE este, no inventar atajos:**
+
+1. **Antes de pushear front**, correr `cd frontend && npm run build` **localmente**. Si falla
+   `tsc -b`, Netlify también va a fallar y la versión vieja va a quedar en prod
+   silenciosamente. **Sin excepciones.**
+2. `git push origin master` → Netlify reconstruye automáticamente vía su
+   integración nativa de GitHub (NO via GitHub Actions). El workflow `.github/workflows/cd.yml`
+   está roto/legacy — ignorarlo.
+3. `git push heroku master:main` → solo si cambió backend (Heroku necesita rama `main`).
+4. Verificar: comparar el hash del bundle en prod (`curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'`) contra el `dist/index.html` local.
+
+**Lo que NO hacer:**
+- `netlify deploy --prod --dir dist` directo desde CLI — rompe la trazabilidad
+  (deploy sin commit asociado). El pipeline es `git push` → Netlify auto-build, punto.
+- Pushear sin haber corrido `npm run build` local.
+- Asumir que el push deployó: si el build falla en Netlify, prod queda con el bundle viejo
+  y no hay error visible salvo que mires el dashboard de Netlify.
+
+**Notas:**
+- El user no testea local — cada cambio significativo va directo a prod.
+- Netlify production branch: `master`. Pushear a otra rama solo genera preview.
+- Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
 
 ### 14. Cuando el user hace varias preguntas
 NO contestar todo de una. Responder de a una y esperar antes de seguir.
