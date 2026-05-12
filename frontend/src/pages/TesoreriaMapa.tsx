@@ -51,6 +51,24 @@ const ESTADO_ICON: Record<EstadoContactoAgregado, typeof CheckCircle2> = {
   sin_gastos: MinusCircle,
 };
 
+// Proveedores de tiles disponibles para el mapa. Toggle visible arriba a la
+// izquierda. Si esto funciona bien, despues lo extraemos a lib/mapTiles.tsx
+// para que el resto de los mapas tambien lo use.
+type TileProviderId = 'osm' | 'stadia';
+
+const TILE_PROVIDERS: Record<TileProviderId, { label: string; url: string; attribution: string }> = {
+  osm: {
+    label: 'OSM',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
+  stadia: {
+    label: 'Stadia',
+    url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png',
+    attribution: '&copy; Stadia Maps &copy; OpenStreetMap',
+  },
+};
+
 /** CSS global para los pines (inyectado una sola vez al cargar el modulo). */
 if (typeof document !== 'undefined' && !document.getElementById('tesoreria-pin-styles')) {
   const style = document.createElement('style');
@@ -183,6 +201,10 @@ export default function TesoreriaMapa() {
   const [gastosDetalle, setGastosDetalle] = useState<Gasto[]>([]);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [expandedGasto, setExpandedGasto] = useState<number | null>(null);
+
+  // Provider de tiles activo (toggle visible arriba del mapa)
+  const [tileProvider, setTileProvider] = useState<TileProviderId>('osm');
+  const tile = TILE_PROVIDERS[tileProvider];
 
   // Navegabilidad: hover state compartido entre sidebar y pines + ref al mapa
   const [hoveredContacto, setHoveredContacto] = useState<number | null>(null);
@@ -615,8 +637,9 @@ export default function TesoreriaMapa() {
           >
             <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
               <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                key={tileProvider}
+                attribution={tile.attribution}
+                url={tile.url}
                 maxZoom={19}
               />
               <MapController points={points} triggerFit={fitTrigger} onReady={(m) => { mapRef.current = m; }} />
@@ -647,6 +670,31 @@ export default function TesoreriaMapa() {
                 );
               })}
             </MapContainer>
+
+            {/* Toggle de proveedor de tiles (experimento: OSM vs Stadia) */}
+            <div
+              className="absolute top-3 left-3 z-[1000] flex rounded-lg overflow-hidden shadow-lg"
+              style={{ border: `1px solid ${theme.border}` }}
+            >
+              {(Object.keys(TILE_PROVIDERS) as TileProviderId[]).map((id) => {
+                const isActive = id === tileProvider;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTileProvider(id)}
+                    className="px-3 py-1 text-xs font-medium transition-colors"
+                    style={{
+                      backgroundColor: isActive ? theme.primary : theme.card,
+                      color: isActive ? theme.card : theme.text,
+                    }}
+                    title={`Cambiar a ${TILE_PROVIDERS[id].label}`}
+                  >
+                    {TILE_PROVIDERS[id].label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </ABMPage>
