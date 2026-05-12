@@ -517,11 +517,7 @@ export default function TesoreriaMapa() {
         isEmpty={!loading && visibles.length === 0}
         emptyMessage="No hay contactos visibles. Ajustá los filtros o agregá ubicaciones a los contactos."
       >
-        <div className="col-span-full mb-3">
-          {metricsBar}
-        </div>
-
-        <div className="col-span-full grid grid-cols-1 lg:grid-cols-4 gap-3" style={{ height: 680 }}>
+        <div className="col-span-full grid grid-cols-1 lg:grid-cols-4 gap-3" style={{ height: 'calc(100vh - 200px)' }}>
           {/* Sidebar 25% — lista de contactos visibles con click para volar al pin */}
           <div
             className="lg:col-span-1 rounded-xl overflow-hidden flex flex-col"
