@@ -127,9 +127,12 @@ async def _reemplazar_imputaciones(
 ):
     """Reemplaza las imputaciones existentes (asume relacion ya cargada con selectinload)."""
     await _validar_imputaciones(db, gasto, asignaciones, municipio_id)
-    # Borrar las viejas (ya cargadas eagerly)
+    # Borrar las viejas (ya cargadas eagerly) y FLUSHEAR antes de insertar
+    # las nuevas, sino SQLAlchemy puede reordenar el INSERT antes del DELETE
+    # y caemos en UNIQUE (gasto_id, proyecto_id) si la imputacion era la misma.
     for old in list(gasto.proyectos_asignados or []):
         await db.delete(old)
+    await db.flush()
     # Insertar las nuevas
     for a in asignaciones:
         db.add(GastoProyecto(
