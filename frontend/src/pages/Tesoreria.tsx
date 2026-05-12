@@ -16,14 +16,23 @@ import {
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
-import { gastosApi, dependenciasApi, contactosApi } from '../lib/api';
-import type { Gasto, TipoFinanciacion, Contacto } from '../types';
+import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi } from '../lib/api';
+import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   contado: '#10b981',
   cuotas: '#3b82f6',
   prestamo: '#8b5cf6',
   recurrente: '#f59e0b',
+};
+
+const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  cheque: 'Cheque',
+  tarjeta: 'Tarjeta',
+  mercadopago: 'MercadoPago',
+  otro: 'Otro',
 };
 
 interface DependenciaOption {
@@ -48,14 +57,17 @@ export default function Tesoreria() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [tipoFiltro, setTipoFiltro] = useState<TipoFinanciacion | ''>('');
-  const [dependenciaFiltro, setDependenciaFiltro] = useState<string>(''); // string para ModernSelect
-  const [contactoFiltro, setContactoFiltro] = useState<string>('');
+  const [formaPagoFiltro, setFormaPagoFiltro] = useState<FormaPago | ''>('');
+  const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
+  const [tipoConceptoFiltro, setTipoConceptoFiltro] = useState<string>('');
+  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
   const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
 
   const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
-  const [contactos, setContactos] = useState<Contacto[]>([]);
+  const [, setContactos] = useState<Contacto[]>([]);
+  const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
+  const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Side modal de detalle
@@ -102,10 +114,25 @@ export default function Tesoreria() {
     }
   };
 
+  const fetchCatalogoConceptos = async () => {
+    try {
+      const [tiposRes, conceptosRes] = await Promise.all([
+        tiposConceptoApi.list({ activo: true }),
+        conceptosAbmApi.list({ activo: true }),
+      ]);
+      setTiposConcepto(tiposRes.data || []);
+      setConceptos(conceptosRes.data || []);
+    } catch {
+      setTiposConcepto([]);
+      setConceptos([]);
+    }
+  };
+
   useEffect(() => {
     fetchGastos();
     fetchDependencias();
     fetchContactos();
+    fetchCatalogoConceptos();
   }, []);
 
   // Refrescar el gasto seleccionado cuando se actualiza la lista
@@ -114,6 +141,19 @@ export default function Tesoreria() {
     const actualizado = gastos.find(g => g.id === gastoSeleccionado.id);
     if (actualizado) setGastoSeleccionado(actualizado);
   }, [gastos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Conceptos del tipo seleccionado (para el dropdown de concepto)
+  const conceptosDelTipo = useMemo(() => {
+    if (!tipoConceptoFiltro) return conceptos;
+    const tipoId = parseInt(tipoConceptoFiltro, 10);
+    return conceptos.filter(c => c.tipo_concepto_id === tipoId);
+  }, [conceptos, tipoConceptoFiltro]);
+
+  // Nombres de conceptos del tipo seleccionado, para matchear con g.concepto (string)
+  const conceptosDelTipoNombres = useMemo(
+    () => new Set(conceptosDelTipo.map(c => c.nombre.toLowerCase())),
+    [conceptosDelTipo]
+  );
 
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -124,10 +164,14 @@ export default function Tesoreria() {
     const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
 
     return gastos.filter(g => {
-      if (tipoFiltro && g.tipo_financiacion !== tipoFiltro) return false;
+      if (formaPagoFiltro && g.forma_pago !== formaPagoFiltro) return false;
       if (depId != null) {
         if (g.destino_tipo !== 'dependencia' || g.destino_dependencia_id !== depId) return false;
       }
+      // Tipo de concepto: matchea por NOMBRE de concepto contra los del tipo
+      if (tipoConceptoFiltro && !conceptosDelTipoNombres.has(g.concepto.toLowerCase())) return false;
+      // Concepto exacto
+      if (conceptoFiltro && g.concepto.toLowerCase() !== conceptoFiltro.toLowerCase()) return false;
       if (estadoFiltro && calcEstadoAgregado(g) !== estadoFiltro) return false;
       if (desde || hasta) {
         const fechaGasto = new Date(g.fecha);
@@ -141,7 +185,7 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, tipoFiltro, dependenciaFiltro, estadoFiltro, rangoFechas]);
+  }, [gastos, search, formaPagoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, rangoFechas]);
 
   const totalMes = useMemo(() => {
     const ahora = new Date();
@@ -181,14 +225,34 @@ export default function Tesoreria() {
     setTimeout(() => setGastoSeleccionado(null), 400);
   };
 
-  // Opciones de tipo de financiación (combo searchable, no chips)
-  const tipoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los tipos' },
-    { value: 'contado', label: 'Contado', color: TIPO_FIN_COLORS.contado },
-    { value: 'cuotas', label: 'Cuotas', color: TIPO_FIN_COLORS.cuotas },
-    { value: 'prestamo', label: 'Préstamos', color: TIPO_FIN_COLORS.prestamo },
-    { value: 'recurrente', label: 'Recurrente', color: TIPO_FIN_COLORS.recurrente },
+  // Opciones de forma de pago
+  const formaPagoOptions = useMemo(() => ([
+    { value: '', label: 'Todas las formas' },
+    ...(Object.keys(FORMA_PAGO_LABELS) as FormaPago[]).map(fp => ({
+      value: fp,
+      label: FORMA_PAGO_LABELS[fp],
+    })),
   ]), []);
+
+  // Opciones de tipo de concepto (desde el catalogo per-muni)
+  const tipoConceptoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los tipos' },
+    ...tiposConcepto.map(t => ({
+      value: String(t.id),
+      label: t.nombre,
+      color: t.color || undefined,
+    })),
+  ]), [tiposConcepto]);
+
+  // Opciones de concepto (filtradas por tipo si hay seleccionado)
+  const conceptoOptions = useMemo(() => ([
+    { value: '', label: 'Todos los conceptos' },
+    ...conceptosDelTipo.map(c => ({
+      value: c.nombre,
+      label: c.nombre,
+      color: c.tipo_concepto_color || undefined,
+    })),
+  ]), [conceptosDelTipo]);
 
   // Chips de estado agregado
   const estadoChips = (
@@ -225,19 +289,29 @@ export default function Tesoreria() {
     })),
   ]), [dependencias]);
 
-  // Barra de filtros secundarios (tipo + dependencia + fechas + estado)
+  // Iguala altura de TODOS los triggers (ModernSelect y DateRangePicker)
+  // forzando height/padding via clase wrapper. Sin tocar los componentes
+  // compartidos para no romper otras pantallas.
   const secondaryFilters = (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="min-w-[180px] flex-shrink-0">
+    <div className="flex flex-wrap items-center gap-2 tesoreria-filters-row">
+      <style>{`
+        .tesoreria-filters-row .ts-fitem button {
+          height: 40px !important;
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          font-size: 0.875rem !important;
+        }
+      `}</style>
+      <div className="min-w-[150px] flex-shrink-0 ts-fitem">
         <ModernSelect
-          value={tipoFiltro}
-          onChange={(v) => setTipoFiltro(v as TipoFinanciacion | '')}
-          options={tipoOptions}
-          placeholder="Todos los tipos"
+          value={formaPagoFiltro}
+          onChange={(v) => setFormaPagoFiltro(v as FormaPago | '')}
+          options={formaPagoOptions}
+          placeholder="Todas las formas"
           searchable
         />
       </div>
-      <div className="min-w-[200px] flex-shrink-0">
+      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
         <ModernSelect
           value={dependenciaFiltro}
           onChange={setDependenciaFiltro}
@@ -246,7 +320,25 @@ export default function Tesoreria() {
           searchable
         />
       </div>
-      <div className="flex-shrink-0">
+      <div className="min-w-[160px] flex-shrink-0 ts-fitem">
+        <ModernSelect
+          value={tipoConceptoFiltro}
+          onChange={(v) => { setTipoConceptoFiltro(v); setConceptoFiltro(''); }}
+          options={tipoConceptoOptions}
+          placeholder="Todos los tipos"
+          searchable
+        />
+      </div>
+      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
+        <ModernSelect
+          value={conceptoFiltro}
+          onChange={setConceptoFiltro}
+          options={conceptoOptions}
+          placeholder="Todos los conceptos"
+          searchable
+        />
+      </div>
+      <div className="flex-shrink-0 ts-fitem">
         <DateRangePicker
           value={rangoFechas}
           onChange={setRangoFechas}
