@@ -5,7 +5,8 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
-import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter } from '../components/ui/ABMPage';
+import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import { Edit2, Trash2 } from 'lucide-react';
 import { contactosApi, tesoreriaImportApi, api } from '../lib/api';
 import type { Contacto, TipoContacto } from '../types';
 
@@ -331,6 +332,65 @@ export default function TesoreriaContactos() {
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay contactos. Importá el Excel o agregalos con 'Nuevo'."
+        defaultViewMode="table"
+        tableView={
+          <ABMTable<Contacto>
+            data={filtered}
+            keyExtractor={(c) => c.id}
+            columns={[
+              {
+                key: 'nombre',
+                header: 'Nombre',
+                render: (c) => (
+                  <span className="font-medium">{c.nombre} {c.apellido || ''}</span>
+                ),
+              },
+              {
+                key: 'tipo',
+                header: 'Tipo',
+                render: (c) => (
+                  <span
+                    className="inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: `${TIPO_COLORS[c.tipo]}20`, color: TIPO_COLORS[c.tipo] }}
+                  >
+                    {TIPO_LABELS[c.tipo]}
+                  </span>
+                ),
+              },
+              {
+                key: 'alias_pago',
+                header: 'Alias',
+                render: (c) => c.alias_pago
+                  ? <span className="text-xs font-mono">{c.alias_pago}</span>
+                  : <span className="text-xs opacity-50">—</span>,
+              },
+              {
+                key: 'telefono',
+                header: 'Teléfono',
+                render: (c) => c.telefono || <span className="text-xs opacity-50">—</span>,
+              },
+              {
+                key: 'email',
+                header: 'Email',
+                render: (c) => c.email || <span className="text-xs opacity-50">—</span>,
+              },
+              {
+                key: 'ubicacion',
+                header: 'Ubicación',
+                sortable: false,
+                render: (c) => (c.latitud && c.longitud)
+                  ? <span className="inline-flex items-center gap-1 text-xs" style={{ color: '#10b981' }}><MapPin className="h-3 w-3" />ubicado</span>
+                  : <span className="text-xs opacity-50">—</span>,
+              },
+            ]}
+            actions={(c) => (
+              <>
+                <ABMTableAction title="Editar" onClick={() => openSheet(c)} variant="primary" icon={<Edit2 className="h-4 w-4" />} />
+                <ABMTableAction title="Eliminar" onClick={() => handleDelete(c.id)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
+              </>
+            )}
+          />
+        }
         sheetOpen={sheetOpen}
         sheetTitle={editing ? `Editar contacto · ${editing.nombre} ${editing.apellido || ''}` : 'Nuevo contacto'}
         sheetContent={sheetContent}
