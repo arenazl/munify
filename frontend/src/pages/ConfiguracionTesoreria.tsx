@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Tag, FileText, Briefcase, Plus, Edit2, Trash2, Loader2, ArrowLeft,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +18,15 @@ type Tab = 'tipos' | 'conceptos' | 'proyectos';
 export default function ConfiguracionTesoreria() {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('tipos');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as Tab) || 'tipos';
+  const [tab, setTabState] = useState<Tab>(
+    ['tipos','conceptos','proyectos'].includes(initialTab) ? initialTab : 'tipos'
+  );
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    setSearchParams({ tab: t }, { replace: true });
+  };
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (

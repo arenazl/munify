@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
-  CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet, FileDown
+  CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet, FileDown,
+  Tag, Briefcase,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -79,6 +80,10 @@ export default function Ajustes() {
       {
         id: 'cobranzas',
         title: 'Cobranzas',
+      },
+      {
+        id: 'tesoreria',
+        title: 'Tesorería',
       },
     ] : []),
     ...(isSuperAdmin ? [
@@ -311,6 +316,39 @@ export default function Ajustes() {
           icon: Landmark,
           color: '#0ea5e9',
           link: '/gestion/ajustes/importar-padron',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+      ],
+    },
+    {
+      id: 'tesoreria',
+      title: 'Tesorería',
+      items: [
+        {
+          id: 'tesoreria-tipos-concepto',
+          label: 'Tipos de concepto',
+          description: 'Categorías de los conceptos de gasto (Sueldos, Materiales, Honorarios, etc)',
+          icon: Tag,
+          color: '#8b5cf6',
+          link: '/gestion/configuracion/tesoreria?tab=tipos',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
+          id: 'tesoreria-conceptos',
+          label: 'Conceptos de gasto',
+          description: 'Lista de conceptos disponibles al cargar un gasto. Editables y asignables a un tipo',
+          icon: FileText,
+          color: '#3b82f6',
+          link: '/gestion/configuracion/tesoreria?tab=conceptos',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
+          id: 'tesoreria-proyectos',
+          label: 'Proyectos',
+          description: 'Obras e iniciativas que agrupan gastos (con presupuesto y % imputado)',
+          icon: Briefcase,
+          color: '#10b981',
+          link: '/gestion/configuracion/tesoreria?tab=proyectos',
           show: isAdminOrSupervisor && !isSuperAdmin,
         },
       ],
