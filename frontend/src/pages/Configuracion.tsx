@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, ImageIcon, Trash2, SlidersHorizontal } from 'lucide-react';
+import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -574,6 +575,29 @@ export default function Configuracion() {
 
       {/* Módulos activables del municipio (feature flags). Solo admin. */}
       <ModulosToggle />
+
+      {/* Tarjeta: Configuración de Tesorería (catalogo de conceptos, tipos, proyectos) */}
+      <Link
+        to="/gestion/configuracion/tesoreria"
+        className="block rounded-xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${theme.primary}20` }}
+          >
+            <Wallet className="h-5 w-5" style={{ color: theme.primary }} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-bold" style={{ color: theme.text }}>Tesorería</h2>
+            <p className="text-xs" style={{ color: theme.textSecondary }}>
+              Tipos de concepto, conceptos de gasto y proyectos del municipio
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 flex-shrink-0" style={{ color: theme.textSecondary }} />
+        </div>
+      </Link>
 
       {/* Sección Datos del Municipio */}
       <div

@@ -576,6 +576,34 @@ export interface Proyecto {
   resumen?: ProyectoResumen | null;
 }
 
+export interface TipoConcepto {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string | null;
+  color?: string | null;
+  icono?: string | null;
+  orden: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+  cantidad_conceptos?: number | null;
+}
+
+export interface Concepto {
+  id: number;
+  municipio_id: number;
+  tipo_concepto_id: number;
+  tipo_concepto_nombre?: string | null;
+  tipo_concepto_color?: string | null;
+  nombre: string;
+  descripcion?: string | null;
+  orden: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CotizacionUSD {
   fecha: string;
   fuente: string;

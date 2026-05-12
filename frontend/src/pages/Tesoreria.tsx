@@ -271,7 +271,7 @@ export default function Tesoreria() {
         <Users className="h-3.5 w-3.5" /> Contactos
       </Link>
       <Link
-        to="/gestion/tesoreria/proyectos"
+        to="/gestion/configuracion/tesoreria"
         className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
         style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
       >

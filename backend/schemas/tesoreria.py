@@ -296,3 +296,68 @@ class ProyectoResponse(ProyectoBase):
     created_at: datetime
     updated_at: datetime
     resumen: Optional[ProyectoResumen] = None
+
+
+# ============================================================
+# Tipos de concepto + conceptos (catalogo per-muni)
+# ============================================================
+
+class TipoConceptoBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=100)
+    descripcion: Optional[str] = None
+    color: Optional[str] = Field(None, max_length=20)
+    icono: Optional[str] = Field(None, max_length=60)
+    orden: int = 0
+
+
+class TipoConceptoCreate(TipoConceptoBase):
+    pass
+
+
+class TipoConceptoUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=1, max_length=100)
+    descripcion: Optional[str] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    orden: Optional[int] = None
+    activo: Optional[bool] = None
+
+
+class TipoConceptoResponse(TipoConceptoBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    municipio_id: int
+    activo: bool
+    created_at: datetime
+    updated_at: datetime
+    cantidad_conceptos: Optional[int] = None
+
+
+class ConceptoBase(BaseModel):
+    tipo_concepto_id: int
+    nombre: str = Field(..., min_length=1, max_length=150)
+    descripcion: Optional[str] = None
+    orden: int = 0
+
+
+class ConceptoCreate(ConceptoBase):
+    pass
+
+
+class ConceptoUpdate(BaseModel):
+    tipo_concepto_id: Optional[int] = None
+    nombre: Optional[str] = Field(None, min_length=1, max_length=150)
+    descripcion: Optional[str] = None
+    orden: Optional[int] = None
+    activo: Optional[bool] = None
+
+
+class ConceptoResponse(ConceptoBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    municipio_id: int
+    activo: bool
+    tipo_concepto_nombre: Optional[str] = None
+    tipo_concepto_color: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime

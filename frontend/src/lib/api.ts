@@ -1976,6 +1976,26 @@ export const cotizacionApi = {
   usd: () => api.get('/cotizacion/usd'),
 };
 
+export const tiposConceptoApi = {
+  list: (params?: { activo?: boolean }) =>
+    api.get('/tesoreria/tipos-concepto', { params }),
+  create: (data: Record<string, unknown>) =>
+    api.post('/tesoreria/tipos-concepto', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tesoreria/tipos-concepto/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/tipos-concepto/${id}`),
+};
+
+export const conceptosAbmApi = {
+  list: (params?: { tipo_concepto_id?: number; activo?: boolean; search?: string }) =>
+    api.get('/tesoreria/conceptos-abm', { params }),
+  create: (data: Record<string, unknown>) =>
+    api.post('/tesoreria/conceptos-abm', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tesoreria/conceptos-abm/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/conceptos-abm/${id}`),
+};
+
 export const proyectosApi = {
   list: (params?: { estado?: string; activo?: boolean; search?: string; include_resumen?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/proyectos', { params }),

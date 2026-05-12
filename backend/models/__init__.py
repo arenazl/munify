@@ -193,6 +193,7 @@ from .gasto import (
     EstadoGastoCuota,
 )
 from .proyecto import Proyecto, GastoProyecto, EstadoProyecto
+from .tesoreria_concepto import TesoreriaTipoConcepto, TesoreriaConcepto
 
 __all__ += [
     "MunicipioModulo",
@@ -208,4 +209,6 @@ __all__ += [
     "Proyecto",
     "GastoProyecto",
     "EstadoProyecto",
+    "TesoreriaTipoConcepto",
+    "TesoreriaConcepto",
 ]
