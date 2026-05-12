@@ -1,22 +1,50 @@
-# Instrucciones para Claude
+# Instrucciones para Claude — reglas duras
 
 ## REGLA PRINCIPAL
-ANTES de realizar cualquier tarea, SIEMPRE leer la carpeta `APP_GUIDE/` para obtener contexto.
 
-La guía `00_COMO_USAR.md` tiene el índice de todas las guías disponibles.
+**ANTES de tocar UNA SOLA línea de código en este repo, leer `BUILD_GUIDE.md`** (en
+la raíz). Ese archivo es la fuente de verdad de **cómo se construyen las cosas en
+esta app**: qué componentes ya existen, qué patrones usamos para ABMs, dónde está
+cada cosa.
 
-## Comportamiento esperado
-1. Leer la guía relevante ANTES de actuar
-2. NO preguntar información que ya está en las guías
-3. Ser proactivo
-4. Mantener las guías actualizadas cuando haya cambios
+> **NO usar `APP_GUIDE/`** como referencia — es una plantilla agnóstica para
+> arrancar apps desde cero, está siendo rehecha, y la mayor parte de su contenido
+> está desactualizado respecto a esta app.
+
+---
+
+## PRE-FLIGHT CHECKLIST (obligatorio antes de codear UI o backend)
+
+Antes de escribir código nuevo, responder estas preguntas. Si la respuesta es
+**"no sé"** a cualquiera, **parar, leer la sección referenciada en
+`BUILD_GUIDE.md`**, o preguntar al user. No codear a ciegas.
+
+### Para UI nueva
+1. ¿Qué pantalla estás creando? → §7 de BUILD_GUIDE (patrones canónicos).
+2. **Para cada input del form, ¿qué componente vas a usar?** → §5 de BUILD_GUIDE (tabla "Para esto → usá esto"). Si no sabés si existe el control que necesitás, leé §6 (inventario completo de `components/ui/`).
+3. ¿Qué página existente es tu referencia? → §7.
+4. ¿Cómo abrís modales/side panels? → `Sheet` (edición) o `WizardModal` (crear multi-paso). NUNCA modal a mano.
+5. ¿Cómo manejás colores? → `useTheme()`. CERO hex inline.
+6. ¿Cómo manejás estados/enums? → Single Source of Truth en `lib/enums/`. NO redefinir colores localmente.
+
+### Para backend nuevo
+1. ¿Cómo se llama el router y dónde se registra? → `backend/api/<entidad>.py` + `main.py`.
+2. **¿Filtrás SIEMPRE por `municipio_id == current_user.municipio_id`?** Esto NO es opcional — olvidarse es leak de tenants.
+3. ¿Validás el rol al inicio del handler?
+4. ¿Hay cambio de schema? Si sí → migración (Alembic o script ad-hoc) y ejecutarla **sin preguntar** (ver abajo).
+5. ¿Dispara notificación? Usar helpers en `backend/services/notificaciones.py`.
+
+---
 
 ## MIGRACIONES DE BASE DE DATOS
-**SIEMPRE ejecutar los cambios de schema de base de datos automáticamente.**
-- NO preguntar si ejecutar migraciones
-- Ejecutar directamente usando SQLAlchemy/Alembic con código Python
-- Usar `async with engine.begin()` para commits automáticos
-- Ejemplo:
+
+**SIEMPRE ejecutar los cambios de schema automáticamente. NO preguntar.**
+
+Dos formas válidas:
+
+**A) Alembic** (preferido para cambios formales): `backend/alembic/versions/NNN_xxx.py` con `def upgrade()` / `def downgrade()`.
+
+**B) Script ad-hoc** (cambios urgentes o seeds):
 ```python
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
@@ -31,351 +59,88 @@ async def migrate():
 
 ---
 
-## REGLAS BÁSICAS DE DESARROLLO (NO NEGOCIABLES)
+## REGLAS DURAS DE DESARROLLO (NO NEGOCIABLES)
 
-### 1. Componentes Compartidos - DRY (Don't Repeat Yourself)
-- **NUNCA** duplicar código de componentes visuales
-- Si un elemento visual (card, badge, lista) se usa en más de un lugar → crear componente compartido en `components/ui/`
-- Un `ReclamoCard` es un `ReclamoCard` → mismo componente, mismos colores, misma distribución
-- Las variaciones se manejan con props (ej: `showCreador`, `similaresCount`), NO duplicando código
+### 1. DRY — componentes compartidos
+- NUNCA duplicar componentes visuales. Si un patrón visual aparece 2+ veces, hay que extraerlo a `components/ui/`.
+- Variaciones se manejan con **props**, no duplicando componentes (ej. `<ReclamoCard showCreador />`, NO `<ReclamoCardVecino>` + `<ReclamoCardSupervisor>`).
+- **Antes de crear** un componente nuevo, buscar en `components/ui/` (correr `python scripts/generate_ui_inventory.py` si dudás del inventario actual).
 
-### 2. Colores y Estilos Consistentes
-- Los colores de estados (`estadoColors`) deben estar definidos en UN solo lugar
-- Si desktop y mobile muestran colores diferentes para lo mismo → está MAL
-- Exportar constantes de colores desde el componente compartido e importar donde se necesite
+### 2. Single Source of Truth para enums/estados
+- Estados (`estadoColors`, `estadoLabels`, `estadoIcons`) definidos en **un solo lugar** dentro de `frontend/src/lib/enums/`.
+- Resto de archivos importan de ahí, no duplican.
+- **Test mental:** "si agrego un estado mañana, ¿cuántos archivos toco?" Si son más de 2 → diseño mal.
 
-### 3. Estructura de Componentes Compartidos
-```
-components/ui/
-├── ReclamoCard.tsx      ← Card de reclamo (vecino + supervisor)
-├── TramiteCard.tsx      ← Card de trámite
-├── EstadoBadge.tsx      ← Badge de estado con colores
-└── ...
-```
-
-### 4. Props para Variaciones, NO Duplicación
+### 3. Código resiliente — patrón con fallback
 ```tsx
-// ✅ CORRECTO - Un componente con props
-<ReclamoCard
-  reclamo={r}
-  showCreador={true}        // Solo supervisor ve el creador
-  similaresCount={5}        // Solo supervisor ve similares
-/>
-
-// ❌ INCORRECTO - Duplicar componentes
-<ReclamoCardVecino ... />
-<ReclamoCardSupervisor ... />
-```
-
-### 5. Revisar antes de crear
-Antes de escribir un componente visual, BUSCAR si ya existe algo similar que pueda reutilizarse o extenderse.
-
-### 6. Código Resiliente a Cambios (Open/Closed Principle)
-- Agregar un estado nuevo NO debería romper funcionalidades existentes
-- Usar **patrones con fallback** en lugar de switch/if exhaustivos:
-```tsx
-// ✅ CORRECTO - Con fallback, no se rompe con estados nuevos
-const color = estadoColors[estado] || estadoColors.default || '#6366f1';
+// ✅
+const color = estadoColors[estado] || estadoColors.default || theme.muted;
 const label = estadoLabels[estado] || estado;
 
-// ❌ INCORRECTO - Se rompe si falta un case
-switch(estado) {
-  case 'recibido': return 'blue';
-  case 'en_curso': return 'yellow';
-  // Falta 'pospuesto' → rompe
-}
+// ❌ switch exhaustivo (rompe al agregar un estado)
+switch(estado) { case 'recibido': ...; case 'en_curso': ...; }
 ```
+Notificaciones, subscripciones y eventos deben manejar estados desconocidos gracefully.
 
-- Las notificaciones, subscripciones y eventos deben manejar estados desconocidos gracefully
-- Si un mapa/diccionario no tiene la clave, usar valor por defecto, NO fallar
-- **Test mental**: "Si agrego un estado mañana, ¿cuántos archivos tengo que tocar?" → Si son más de 2-3, el diseño está mal
+### 4. Controles nativos VETADOS
+Rompen el theme/dark mode. **Prohibidos en toda la app.**
 
-### 7. Single Source of Truth para Enums/Estados
-- Los estados y sus propiedades (colores, labels, iconos) se definen en UN solo lugar
-- Ese lugar exporta todo lo necesario: `estadoColors`, `estadoLabels`, `estadoIcons`
-- Todos los demás archivos importan de ahí, NO duplican definiciones
+| Nativo ❌ | Usá ✅ |
+|---|---|
+| `<select>` | `ModernSelect` |
+| `<input type="date">` (fecha) | `DatePicker` |
+| `<input type="date">` x2 (rango) | `DateRangePicker` |
+| `<input type="text">` para dirección | `DireccionAutocomplete` |
+| `window.confirm()` / `window.alert()` | `ConfirmModal` / `toast` (sonner) |
 
-### 8. Controles nativos vetados - SIEMPRE el componente custom
-Los controles nativos de HTML (`<select>`, `<input type="date">`, `<input type="time">`,
-`<input type="color">`) dibujan su popup con el navegador, **rompen el dark mode**
-y no respetan el theme. Están **PROHIBIDOS** en toda la app.
+Inventario completo y demás reemplazos: **BUILD_GUIDE.md §5 y §6**.
 
-**Reemplazos obligatorios:**
+### 5. Colores: cero hex inline
+- `useTheme()` y `theme.primary`, `theme.success`, `theme.danger`, etc.
+- **PROHIBIDO** `'#22c55e'`, `bg-[#3b82f6]`, `bg-[var(--xxx)]` ad-hoc inventado.
 
-| Nativo ❌ | Usar ✅ | Archivo |
-|-----------|---------|---------|
-| `<select>` | `ModernSelect` | `components/ui/ModernSelect.tsx` |
-| `<input type="date">` (fecha única) | `DatePicker` | `components/ui/DatePicker.tsx` |
-| `<input type="date">` x2 (rango) | `DateRangePicker` | `components/ui/DateRangePicker.tsx` |
+### 6. ABMs con Sheet, no con rutas separadas
+- Lista + Sheet en la misma ruta. Click en card abre Sheet en modo edición.
+- **NUNCA** rutas `/<entidad>/nuevo`, `/<entidad>/:id`, `/<entidad>/:id/edit`.
 
-Ambos `DatePicker` y `DateRangePicker` están construidos con `react-day-picker`
-+ `date-fns` y se estilan con el theme vía CSS variables. El `DateRangePicker`
-además trae presets (Hoy / Semana / Mes / Mes anterior / Trimestre / Año).
+### 7. Multi-tenant (backend)
+- TODA query con `municipio_id` filtra por `current_user.municipio_id`. Sin excepciones.
 
-```tsx
-// ✅ CORRECTO
-<ModernSelect value={origen} onChange={setOrigen} options={[...]} placeholder="Origen" />
-<DatePicker value={fecha} onChange={setFecha} minDate={hoy} label="Fecha programada" />
-<DateRangePicker value={{desde, hasta}} onChange={r => { setDesde(r.desde); setHasta(r.hasta); }} allowClear />
-
-// ❌ INCORRECTO — todos estos rompen el theme en dark mode
-<select value={x} onChange={e => setX(e.target.value)}>...</select>
-<input type="date" value={fecha} onChange={e => setFecha(e.target.value)} />
-```
-
-Si necesitás multi-select con chips, extender `ModernSelect` — NO volver al nativo.
+### 8. Emojis Unicode prohibidos
+- Cero emojis en UI, código, commits, labels. Sólo iconos `lucide-react` vía `<DynamicIcon name="Building2" />` o import directo.
 
 ---
 
-## ESTADO ACTUAL DE DESARROLLO (2025-02-04)
+## REGLAS DE TRABAJO CON EL USER
 
-### NUEVA FUNCIONALIDAD: Sistema de "Sumarse" a Reclamos Duplicados
+### 9. Jamás modificar módulos centrales sin consentimiento explícito
+Proponer en texto primero (qué archivo, qué cambio, por qué). Esperar "dale" /
+"hacelo" / "aplicalo". "Aplicá los cambios que consideres" NO es carta blanca.
 
-Se implementó un sistema que permite que múltiples vecinos se unan a un mismo reclamo existente en lugar de crear duplicados. Esto incluye:
+### 10. Respuestas en UNA línea por defecto
+Excepción: cuando el user pide explícitamente listas, detalle, o roadmap.
 
-#### Backend Cambios:
-- **Nuevo Modelo:** `ReclamoPersona` - Tabla intermedia que vincula múltiples usuarios con un reclamo
-  - Archivo: `backend/models/reclamo_persona.py`
-  - Tabla: `reclamo_personas` (FK: reclamo_id, usuario_id, es_creador_original)
+### 11. No adivinar — verificar con datos reales
+Si el user duda de un resultado o pregunta "¿esto es real?", ejecutar query/script
+contra la fuente real (DB, API, código), no responder con hipótesis.
 
-- **Nuevo Endpoint:** `POST /reclamos/{id}/sumarse`
-  - Valida que el usuario no sea creador original
-  - Evita duplicados con UniqueConstraint
-  - Crea entrada en historial con acción "persona_sumada"
+### 12. CLIs primero, dashboard después
+El user tiene `gh`, `heroku`, `netlify`, `git`, `npm`, `node`, `python`, `docker`
+autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI.
 
-- **Funciones de Notificación:**
-  - `notificar_persona_sumada()` - Notifica cuando alguien se suma
-  - `notificar_comentario_a_personas_sumadas()` - Notifica a TODOS los sumados cuando hay comentario
+### 13. Deploy
+- El user no testea local — cada cambio significativo va a prod.
+- Pipeline: `git push origin master` + `git push heroku master:main` (Heroku necesita rama `main`).
+- Netlify production branch: `master`. Pushear a otra rama es preview.
 
-- **Actualizaciones a Modelos:**
-  - `Reclamo.personas` - relación a ReclamoPersona
-  - `User.reclamos_unidos` - relación a ReclamoPersona
-
-- **Actualización de Endpoint:** `POST /reclamos/{id}/comentario`
-  - Retorna datos del usuario que comenta (nombre, apellido, id)
-  - Notifica a todos los sumados + supervisores
-
-#### Frontend Cambios:
-- **Componente `ReclamosSimilares.tsx`:**
-  - Nuevo prop: `onSumarse?: (id: number) => Promise<void>`
-  - Botón "Sumarme" junto a "Ver detalles" en cada similar
-  - Estados de loading mientras se suma
-
-- **Página `NuevoReclamo.tsx`:**
-  - Handler para `onSumarse` que llamaa la API
-  - Navega a detalle del reclamo después de sumarse
-
-- **API `frontend/src/lib/api.ts`:**
-  - Nuevo método: `reclamosApi.sumarse(id)`
-
-- **Tipos TypeScript:**
-  - Nueva interfaz: `ReclamoPersona` con campos id, nombre, apellido, email, created_at, es_creador_original
-  - Campo opcional en `Reclamo.personas: ReclamoPersona[]`
-
-- **Visualización de Historial:**
-  - Comentarios mostrados con badge azul "💬 Comentario"
-  - Acciones de sumarse mostradas con badge verde "✓ Persona sumada"
-  - Comentarios tienen estilo diferenciado con borde azul
-
-#### Migraciones de Datos:
-- Script `backend/scripts/migrate_creadores_to_reclamo_personas.py`
-  - Inserta todos los creadores existentes como `es_creador_original=true`
-  - Ejecutado automáticamente
-
-#### Flujo de Usuario:
-1. Usuario intenta crear reclamo similar → Se muestran similares
-2. Usuario hace click en "Sumarme" → POST /reclamos/{id}/sumarse
-3. Se crea ReclamoPersona + entrada en historial
-4. Se notifica a otros sumados
-5. Usuario es redirigido al detalle del reclamo
+### 14. Cuando el user hace varias preguntas
+NO contestar todo de una. Responder de a una y esperar antes de seguir.
 
 ---
 
-## ESTADO ANTERIOR (2025-02-01)
+## CÓMO MANTENER ESTE REPO ORDENADO
 
-### Cambios Completados: Eliminación rol "empleado" y nuevo flujo de estados
-
-#### 1. Eliminación del rol "empleado"
-
-El rol `empleado` fue eliminado del sistema. Los roles válidos ahora son:
-- `vecino` - Ciudadanos que crean reclamos
-- `supervisor` - Usuarios de dependencias que procesan reclamos
-- `admin` - Administradores del municipio
-
-**Usuarios de dependencia:** Tienen `municipio_dependencia_id` asignado y rol `supervisor`.
-
-**Archivos modificados:**
-- `backend/models/enums.py` - Rol EMPLEADO marcado como legacy
-- `backend/scripts/crear_usuarios_dependencias.py` - Crea usuarios con rol supervisor
-- `frontend/src/types/index.ts` - RolUsuario sin empleado
-- `frontend/src/routes.tsx` - Rutas actualizadas
-- `frontend/src/config/navigation.ts` - Navegación sin sección empleados
-- `frontend/src/pages/Demo.tsx` - Removido perfil "Empleado Demo"
-- Múltiples componentes actualizados para remover referencias a empleado
-
-#### 2. Nuevo flujo de estados de reclamos
-
-Estados activos (en orden):
-1. **recibido** - Dependencia recibió el reclamo
-2. **en_curso** - Trabajo en progreso (antes era "en_proceso")
-3. **finalizado** - Trabajo completado
-4. **pospuesto** - Trabajo diferido
-5. **rechazado** - Disponible desde cualquier estado
-
-**Estados legacy** (compatibilidad con datos existentes):
-- nuevo, asignado, en_proceso, pendiente_confirmacion, resuelto
-
-**Transiciones válidas:**
-```
-recibido → en_curso, rechazado
-en_curso → finalizado, pospuesto, rechazado
-pospuesto → en_curso, finalizado, rechazado
-finalizado → (estado final)
-rechazado → (estado final)
-```
-
-**Cambios en base de datos:**
-- MySQL ENUM actualizado para incluir `en_curso`
-- Datos migrados de `en_proceso` a `en_curso`
-- Datos migrados de `nuevo` a `recibido`
-- `historial_reclamos` actualizado con nuevos valores de enum
-
-**Descripción obligatoria:** Todos los cambios de estado requieren una descripción/comentario.
-
-#### 3. UI de estados actualizada
-
-- Botón "Iniciar" renombrado a **"En Curso"**
-- Panel muestra **"Poner En Proceso"**
-- Toast: **"Reclamo en proceso"**
-- Colores y labels actualizados en todos los componentes
-
----
-
-## ESTADO ANTERIOR (2025-01-25)
-
-### Tarea Completada: Asignación de Trámites Específicos a Dependencias
-
-Se rediseñó la pantalla AsignacionDependencias para permitir asignar trámites específicos (no solo tipos) a cada dependencia.
-
-**Nueva estructura:**
-- Cada dependencia se muestra como un acordeón expandible
-- Para RECLAMOS: se seleccionan categorías directamente (toggle on/off)
-- Para TRÁMITES: se muestran los tipos de trámite, y al expandir un tipo se ven los trámites específicos
-- Botón "Todos" para seleccionar/quitar todos los trámites de un tipo
-
-**Backend:**
-- Nuevo modelo: `MunicipioDependenciaTramite` (asigna trámites específicos a dependencias)
-- Nuevos endpoints: `GET/POST /dependencias/municipio/{id}/tramites`
-- Migración SQL: `migrations/create_municipio_dependencia_tramites.sql`
-
-**Frontend:**
-- Rediseño completo de `AsignacionDependencias.tsx`
-- Nuevas funciones en `api.ts`: `getTramites()` y `asignarTramites()`
-
----
-
-### Tarea Completada: Wizards de Nuevo Reclamo y Nuevo Trámite
-
-Se mejoraron los wizards con:
-- Panel lateral derecho con asistente IA (aiPanel) - solo desktop
-- Secciones con colores distintivos (Recomendación: amber, Asistente: blue)
-- Autocomplete de dirección mejorado con fallbacks para Nominatim
-- Muestra la dependencia encargada antes de enviar
-
-#### Cambios realizados:
-
-**Frontend - NuevoReclamo.tsx:**
-- Autocomplete de direcciones con 3 fallbacks (viewbox → sin viewbox → query simple)
-- Fetch de dependencia encargada basado en categoría seleccionada
-- Banner de dependencia en paso de confirmación
-- Panel IA con colores por sección
-
-**Frontend - WizardModal.tsx:**
-- Prop `primaryButtonColor` para personalizar botón según categoría
-- Removido `bottomRecommendation` (duplicaba el panel lateral)
-
-**Frontend - api.ts:**
-- `getServicios()` usa `/tramites/municipio/${municipioId}/tramites`
-
-### Tablas Intermedias (sistema de habilitación por municipio):
-
-| Tabla | Catálogo Global | Por Municipio |
-|-------|-----------------|---------------|
-| Categorías | `categorias` | `municipio_categorias` |
-| Tipos Trámite | `tipos_tramite` | `municipio_tipos_tramite` |
-| Trámites | `tramites` | `municipio_tramites` |
-| Dependencias | `dependencias` | `municipio_dependencias` |
-| Asignación Dep-Tramite | - | `municipio_dependencia_tramites` |
-
-**Nota:** `municipio_dependencia_tramites` permite asignar trámites específicos a cada dependencia (nivel más granular que tipos).
-
-### Endpoints relevantes:
-
-- `GET /categorias` - Categorías habilitadas del municipio (usa MunicipioCategoria)
-- `GET /categorias/catalogo` - Todas las categorías del catálogo
-- `GET /tramites/tipos` - Tipos de trámite habilitados (usa MunicipioTipoTramite)
-- `GET /tramites/municipio/{id}/tramites` - Trámites habilitados del municipio
-- `GET /tramites/catalogo` - Todos los trámites del catálogo
-
----
-
-### Tarea Anterior: Migración empleado_id → dependencia_id
-
-Se eliminaron todas las referencias a `Reclamo.empleado_id` del backend porque esa columna no existe en la tabla `reclamos`. Los reclamos ahora se asignarán a **dependencias** (MunicipioDependencia) en lugar de empleados individuales.
-
-#### Archivos Backend modificados:
-- `api/dashboard.py` - conteo-categorias, conteo-estados, metricas-accion
-- `api/reclamos.py` - filtros, mis-estadisticas, mi-historial, disponibilidad, sugerencia-asignacion
-- `api/analytics.py` - rendimiento-empleados
-- `api/calificaciones.py` - estadísticas y ranking
-- `api/exportar.py` - filtros y stats por empleado
-- `api/planificacion.py` - reclamos asignados y sin asignar
-- `api/reportes.py` - top empleados
-- `api/turnos.py` - calendario y disponibilidad
-- `api/chat.py` - queries de IA
-- `api/empleados.py` - cálculo de carga de trabajo
-- `api/tramites.py` - filtros de Solicitud.empleado_id
-- `models/municipio_dependencia.py` - relaciones comentadas
-- `models/tramite.py` - agregado municipio_dependencia_id a Solicitud
-
-#### Frontend modificado:
-- `pages/DependenciasConfig.tsx` - diferencia superadmin vs supervisor
-  - Superadmin (sin municipio_id): ve catálogo global de dependencias
-  - Supervisor (con municipio_id): ve dependencias habilitadas para su municipio
-
-### Migraciones Completadas (2025-01-25):
-
-1. ✅ **Columna municipio_dependencia_id en reclamos** - Agregada con FK e índice
-2. ✅ **Relaciones ORM habilitadas** en `models/reclamo.py` y `models/municipio_dependencia.py`
-3. ✅ **Seed completo para Chacabuco (municipio_id=7)**:
-   - Script: `backend/scripts/seed_chacabuco_dependencias.py`
-   - 12 dependencias habilitadas
-   - 24 categorías asignadas a dependencias (mapeo manual consciente)
-   - 11 tipos de trámite asignados
-   - 38 trámites específicos asignados
-   - 5 reclamos existentes actualizados con su dependencia
-
-### Migraciones Pendientes:
-
-1. **Implementar auto-asignación** - Cuando se cree un reclamo, asignar automáticamente a la dependencia correcta basándose en la categoría (usar el mapeo de `municipio_dependencia_categorias`).
-
-2. **Agregar color e icono a dependencias** - La tabla `dependencias` necesita campos `color` e `icono` para mostrar visualmente cada dependencia en la UI.
-```sql
-ALTER TABLE dependencias ADD COLUMN color VARCHAR(20) DEFAULT '#6366f1';
-ALTER TABLE dependencias ADD COLUMN icono VARCHAR(50) DEFAULT 'Building2';
-```
-
-### Pantalla AsignacionDependencias (nueva):
-- **Layout**: 2 columnas con drag & drop
-- **Columna izquierda**: Items disponibles (categorías o tipos de trámite)
-- **Columna derecha**: Dependencias como destinos de drop
-- **Reclamos**: Arrastrás categorías a las dependencias
-- **Trámites**: Arrastrás tipos de trámite, luego expandís para ver/activar trámites específicos
-- Al asignar un tipo de trámite, todos sus trámites se activan por defecto
-- Botón "Ver trámites" expande la dependencia para mostrar tipos asignados
-- Chevron en cada tipo expande para ver/editar trámites individuales
-
-### Notas técnicas:
-- Todos los endpoints que usaban `Reclamo.empleado_id` ahora retornan 0 o listas vacías
-- Hay comentarios `# TODO:` en el código indicando dónde reactivar la lógica
-- El modelo `Solicitud` (trámites) ya tiene `municipio_dependencia_id` agregado
+- **`BUILD_GUIDE.md`** se actualiza cuando aparece un patrón canónico nuevo o un componente reutilizable nuevo. El §6 (inventario UI) se regenera con `python scripts/generate_ui_inventory.py`.
+- **Este archivo (`CLAUDE.md`)** se actualiza cuando aparece una regla dura nueva o el user da feedback que se vuelve regla.
+- **NO** ensuciar `CLAUDE.md` ni `BUILD_GUIDE.md` con "estado actual del desarrollo", "fixes recientes" o decisiones de producto. Eso vive en commits, PRs e issues.
+- Docs viejos (planes terminados, specs ya implementadas) → `docs/archive/`.
