@@ -557,6 +557,13 @@ export interface ProyeccionMes {
   total_pesos: string;
   total_usd?: string | null;
   cantidad_cuotas: number;
+  cuotas_vencidas?: number;
+}
+
+export interface DesgloseTipoFinanciacion {
+  tipo: string;
+  total_pesos: string;
+  cantidad_cuotas: number;
 }
 
 export interface ProyeccionResponse {
@@ -564,7 +571,24 @@ export interface ProyeccionResponse {
   hasta: string;
   total_pesos: string;
   cantidad_cuotas: number;
+  cuotas_vencidas?: number;
+  mes_pico?: ProyeccionMes | null;
   por_mes: ProyeccionMes[];
+  desglose_por_tipo?: DesgloseTipoFinanciacion[];
+}
+
+export interface CuotaProyeccion {
+  cuota_id: number;
+  gasto_id: number;
+  concepto: string;
+  contacto_nombre: string | null;
+  dependencia_nombre: string | null;
+  monto: string;
+  fecha_vencimiento: string;
+  estado: string;
+  numero_cuota: number;
+  total_cuotas: number | null;
+  tipo_financiacion: string;
 }
 
 export interface ConceptoGastoGrupo {

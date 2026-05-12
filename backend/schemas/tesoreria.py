@@ -191,6 +191,16 @@ class ProyeccionMes(BaseModel):
     total_pesos: Decimal
     total_usd: Optional[Decimal] = None
     cantidad_cuotas: int
+    # NUEVO: cuotas con estado VENCIDA (fecha_vencimiento ya paso). Default 0
+    # asi callers viejos que construyen ProyeccionMes a mano no se rompen.
+    cuotas_vencidas: int = 0
+
+
+class DesgloseTipoFinanciacion(BaseModel):
+    """Desglose de la proyeccion por tipo de financiacion (cuotas/prestamo/recurrente)."""
+    tipo: str  # valor del enum TipoFinanciacion en string
+    total_pesos: Decimal
+    cantidad_cuotas: int
 
 
 class ProyeccionResponse(BaseModel):
@@ -198,4 +208,23 @@ class ProyeccionResponse(BaseModel):
     hasta: date
     total_pesos: Decimal
     cantidad_cuotas: int
+    cuotas_vencidas: int = 0
+    # Mes con mayor total_pesos dentro del rango (None si por_mes esta vacio).
+    mes_pico: Optional[ProyeccionMes] = None
     por_mes: List[ProyeccionMes]
+    desglose_por_tipo: List[DesgloseTipoFinanciacion] = []
+
+
+class CuotaProyeccionResponse(BaseModel):
+    """Detalle de una cuota individual en el drill-down de proyecciones."""
+    cuota_id: int
+    gasto_id: int
+    concepto: str
+    contacto_nombre: Optional[str] = None
+    dependencia_nombre: Optional[str] = None
+    monto: Decimal
+    fecha_vencimiento: date
+    estado: str
+    numero_cuota: int
+    total_cuotas: Optional[int] = None
+    tipo_financiacion: str

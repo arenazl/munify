@@ -1954,8 +1954,22 @@ export const gastosApi = {
   delete: (id: number) => api.delete(`/tesoreria/gastos/${id}`),
   pagarCuota: (cuotaId: number, data: Record<string, unknown>) =>
     api.post(`/tesoreria/gastos/cuotas/${cuotaId}/pagar`, data),
-  proyecciones: (params?: { desde?: string; hasta?: string }) =>
-    api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
+  proyecciones: (params?: {
+    desde?: string;
+    hasta?: string;
+    destino_dependencia_id?: number;
+    destino_contacto_id?: number;
+    tipo_financiacion?: string;
+    concepto?: string;
+  }) => api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
+  proyeccionesCuotasDelMes: (params: {
+    anio: number;
+    mes: number;
+    destino_dependencia_id?: number;
+    destino_contacto_id?: number;
+    tipo_financiacion?: string;
+    concepto?: string;
+  }) => api.get('/tesoreria/gastos/proyecciones/cobros/cuotas', { params }),
 };
 
 export const cotizacionApi = {

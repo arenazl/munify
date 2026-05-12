@@ -17,7 +17,7 @@ from typing import List, Optional
 from calendar import monthrange
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy import select, and_, func, extract
+from sqlalchemy import select, and_, func, extract, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,10 +28,13 @@ from models import (
     Gasto, GastoCuota, Contacto, MunicipioDependencia, User, RolUsuario,
     EstadoGastoCuota,
 )
+from models.gasto import TipoFinanciacion
+from models.dependencia import Dependencia
 from schemas.tesoreria import (
     GastoCreate, GastoUpdate, GastoResponse,
     GastoCuotaPagarPayload,
-    ProyeccionResponse, ProyeccionMes,
+    ProyeccionResponse, ProyeccionMes, DesgloseTipoFinanciacion,
+    CuotaProyeccionResponse,
 )
 
 router = APIRouter()
@@ -340,15 +343,60 @@ async def pagar_cuota(
 # Proyecciones
 # ============================================================
 
+def _filtros_proyeccion(
+    municipio_id: int,
+    desde: date,
+    hasta: date,
+    destino_dependencia_id: Optional[int],
+    destino_contacto_id: Optional[int],
+    tipo_financiacion: Optional[str],
+    concepto: Optional[str],
+) -> list:
+    """Construye la lista de WHEREs comunes para queries de proyeccion.
+
+    Centralizada asi el endpoint padre y el de drill-down filtran identico.
+    """
+    wheres: list = [
+        Gasto.municipio_id == municipio_id,
+        Gasto.activo == True,  # noqa: E712
+        GastoCuota.estado.in_([EstadoGastoCuota.PENDIENTE, EstadoGastoCuota.VENCIDA]),
+        GastoCuota.fecha_vencimiento >= desde,
+        GastoCuota.fecha_vencimiento <= hasta,
+    ]
+    if destino_dependencia_id is not None:
+        wheres.append(Gasto.destino_dependencia_id == destino_dependencia_id)
+    if destino_contacto_id is not None:
+        wheres.append(Gasto.destino_contacto_id == destino_contacto_id)
+    if tipo_financiacion:
+        try:
+            tf_enum = TipoFinanciacion(tipo_financiacion)
+            wheres.append(Gasto.tipo_financiacion == tf_enum)
+        except ValueError:
+            raise HTTPException(400, f"tipo_financiacion invalido: {tipo_financiacion}")
+    if concepto:
+        wheres.append(Gasto.concepto.ilike(f"%{concepto}%"))
+    return wheres
+
+
 @router.get("/proyecciones/cobros", response_model=ProyeccionResponse)
 async def proyecciones_cobros(
     request: Request,
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
+    destino_dependencia_id: Optional[int] = None,
+    destino_contacto_id: Optional[int] = None,
+    tipo_financiacion: Optional[str] = None,
+    concepto: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Suma cuotas pendientes agrupadas por mes en un rango.
+
+    Filtros opcionales:
+      - destino_dependencia_id: solo cuotas de gastos a esa dependencia
+      - destino_contacto_id: solo cuotas de gastos a ese contacto
+      - tipo_financiacion: cuotas | prestamo | recurrente (contado no aplica)
+      - concepto: ILIKE substring search en el concepto del gasto
 
     Default: desde hoy hasta dentro de 12 meses.
     """
@@ -361,26 +409,32 @@ async def proyecciones_cobros(
     if not hasta:
         hasta = _add_months(desde, 12)
 
-    query = (
+    wheres = _filtros_proyeccion(
+        municipio_id, desde, hasta,
+        destino_dependencia_id, destino_contacto_id, tipo_financiacion, concepto,
+    )
+
+    # CASE para contar cuotas vencidas por mes en una sola pasada
+    vencida_case = case(
+        (GastoCuota.estado == EstadoGastoCuota.VENCIDA, 1),
+        else_=0,
+    )
+
+    # Query 1: agregado por mes
+    query_mes = (
         select(
             extract("year", GastoCuota.fecha_vencimiento).label("anio"),
             extract("month", GastoCuota.fecha_vencimiento).label("mes"),
             func.sum(GastoCuota.monto).label("total_pesos"),
             func.count(GastoCuota.id).label("cantidad"),
+            func.sum(vencida_case).label("vencidas"),
         )
         .join(Gasto, GastoCuota.gasto_id == Gasto.id)
-        .where(
-            Gasto.municipio_id == municipio_id,
-            Gasto.activo == True,  # noqa: E712
-            GastoCuota.estado.in_([EstadoGastoCuota.PENDIENTE, EstadoGastoCuota.VENCIDA]),
-            GastoCuota.fecha_vencimiento >= desde,
-            GastoCuota.fecha_vencimiento <= hasta,
-        )
+        .where(*wheres)
         .group_by("anio", "mes")
         .order_by("anio", "mes")
     )
-    result = await db.execute(query)
-    rows = result.all()
+    rows = (await db.execute(query_mes)).all()
 
     por_mes = [
         ProyeccionMes(
@@ -388,16 +442,123 @@ async def proyecciones_cobros(
             mes=int(r.mes),
             total_pesos=Decimal(r.total_pesos or 0),
             cantidad_cuotas=int(r.cantidad),
+            cuotas_vencidas=int(r.vencidas or 0),
         )
         for r in rows
     ]
+
+    # Query 2: desglose por tipo_financiacion del gasto madre
+    query_tipo = (
+        select(
+            Gasto.tipo_financiacion.label("tipo"),
+            func.sum(GastoCuota.monto).label("total_pesos"),
+            func.count(GastoCuota.id).label("cantidad"),
+        )
+        .join(Gasto, GastoCuota.gasto_id == Gasto.id)
+        .where(*wheres)
+        .group_by(Gasto.tipo_financiacion)
+    )
+    tipo_rows = (await db.execute(query_tipo)).all()
+    desglose_por_tipo = [
+        DesgloseTipoFinanciacion(
+            tipo=(r.tipo.value if hasattr(r.tipo, "value") else str(r.tipo)),
+            total_pesos=Decimal(r.total_pesos or 0),
+            cantidad_cuotas=int(r.cantidad),
+        )
+        for r in tipo_rows
+    ]
+
     total_pesos = sum((p.total_pesos for p in por_mes), Decimal(0))
     cantidad = sum((p.cantidad_cuotas for p in por_mes), 0)
+    cuotas_vencidas = sum((p.cuotas_vencidas for p in por_mes), 0)
+
+    # mes_pico: el mes con mayor total_pesos (None si por_mes esta vacio)
+    mes_pico = max(por_mes, key=lambda p: p.total_pesos) if por_mes else None
 
     return ProyeccionResponse(
         desde=desde,
         hasta=hasta,
         total_pesos=total_pesos,
         cantidad_cuotas=cantidad,
+        cuotas_vencidas=cuotas_vencidas,
+        mes_pico=mes_pico,
         por_mes=por_mes,
+        desglose_por_tipo=desglose_por_tipo,
     )
+
+
+@router.get("/proyecciones/cobros/cuotas", response_model=List[CuotaProyeccionResponse])
+async def proyecciones_cuotas_del_mes(
+    request: Request,
+    anio: int,
+    mes: int,
+    destino_dependencia_id: Optional[int] = None,
+    destino_contacto_id: Optional[int] = None,
+    tipo_financiacion: Optional[str] = None,
+    concepto: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Drill-down: lista las cuotas individuales de un mes especifico.
+
+    Usa los mismos filtros que el endpoint padre para que el detalle sea
+    consistente con la suma agregada.
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    # Rango = mes completo
+    desde_mes = date(anio, mes, 1)
+    last_day = monthrange(anio, mes)[1]
+    hasta_mes = date(anio, mes, last_day)
+
+    wheres = _filtros_proyeccion(
+        municipio_id, desde_mes, hasta_mes,
+        destino_dependencia_id, destino_contacto_id, tipo_financiacion, concepto,
+    )
+
+    query = (
+        select(
+            GastoCuota.id.label("cuota_id"),
+            GastoCuota.gasto_id,
+            GastoCuota.numero,
+            GastoCuota.monto,
+            GastoCuota.fecha_vencimiento,
+            GastoCuota.estado,
+            Gasto.concepto,
+            Gasto.cuotas_total,
+            Gasto.tipo_financiacion,
+            Contacto.nombre.label("contacto_nombre"),
+            Contacto.apellido.label("contacto_apellido"),
+            Dependencia.nombre.label("dependencia_nombre"),
+        )
+        .join(Gasto, GastoCuota.gasto_id == Gasto.id)
+        .outerjoin(Contacto, Gasto.destino_contacto_id == Contacto.id)
+        .outerjoin(MunicipioDependencia, Gasto.destino_dependencia_id == MunicipioDependencia.id)
+        .outerjoin(Dependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
+        .where(*wheres)
+        .order_by(GastoCuota.fecha_vencimiento, GastoCuota.id)
+    )
+    rows = (await db.execute(query)).all()
+
+    return [
+        CuotaProyeccionResponse(
+            cuota_id=int(r.cuota_id),
+            gasto_id=int(r.gasto_id),
+            concepto=r.concepto or "",
+            contacto_nombre=(
+                f"{r.contacto_nombre or ''} {r.contacto_apellido or ''}".strip() or None
+            ),
+            dependencia_nombre=r.dependencia_nombre,
+            monto=Decimal(r.monto or 0),
+            fecha_vencimiento=r.fecha_vencimiento,
+            estado=(r.estado.value if hasattr(r.estado, "value") else str(r.estado)),
+            numero_cuota=int(r.numero),
+            total_cuotas=(int(r.cuotas_total) if r.cuotas_total is not None else None),
+            tipo_financiacion=(
+                r.tipo_financiacion.value if hasattr(r.tipo_financiacion, "value")
+                else str(r.tipo_financiacion)
+            ),
+        )
+        for r in rows
+    ]
