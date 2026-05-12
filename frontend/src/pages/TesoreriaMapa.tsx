@@ -78,6 +78,12 @@ if (typeof document !== 'undefined' && !document.getElementById('tesoreria-pin-s
       0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6), 0 4px 12px rgba(0,0,0,0.35); }
       50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0), 0 4px 12px rgba(0,0,0,0.35); }
     }
+    /* Reset del background/border que Leaflet aplica por default a .leaflet-div-icon.
+       Sin esto se ve un cuadradito blanco con sombra alrededor del pin real. */
+    .tesoreria-divicon {
+      background: transparent !important;
+      border: none !important;
+    }
     .tesoreria-pin {
       cursor: pointer;
       transition: transform 0.15s ease-out;
@@ -139,7 +145,7 @@ function casitaDivIcon(opts: {
   `;
   return L.divIcon({
     html,
-    className: '',
+    className: 'tesoreria-divicon',
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
   });
