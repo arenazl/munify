@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, MapPin, Home, Search, X, ChevronDown, ChevronRight, Loader2, Phone, Mail } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { MapPin, Home, ChevronDown, ChevronRight, Loader2, Phone, Mail } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
-import L, { LatLngBoundsExpression } from 'leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { Sheet } from '../components/ui/Sheet';
+import { ABMPage } from '../components/ui/ABMPage';
 import { contactosApi, gastosApi } from '../lib/api';
 import type { Contacto, Gasto, GastoCuota, TipoContacto } from '../types';
 
@@ -182,101 +182,88 @@ export default function TesoreriaMapa() {
     setExpandedGasto(null);
   };
 
-  return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <Link to="/gestion/tesoreria" className="text-sm inline-flex items-center gap-1 mb-3" style={{ color: theme.primary }}>
-        <ArrowLeft className="h-4 w-4" /> Volver a Tesorería
-      </Link>
+  const extraFilters = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        onClick={() => setTipoFiltro('')}
+        className="px-2 py-1 rounded-md text-xs font-medium"
+        style={{
+          backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
+          color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
+          border: `1px solid ${theme.border}`,
+        }}
+      >Todos</button>
+      {(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => (
+        <button
+          key={t}
+          onClick={() => setTipoFiltro(tipoFiltro === t ? '' : t)}
+          className="px-2 py-1 rounded-md text-xs font-medium"
+          style={{
+            backgroundColor: tipoFiltro === t ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
+            color: tipoFiltro === t ? '#fff' : TIPO_COLORS[t],
+            border: `1px solid ${TIPO_COLORS[t]}40`,
+          }}
+        >{TIPO_LABELS[t]}</button>
+      ))}
+    </div>
+  );
 
-      <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
-        Cada casita es un contacto con ubicación cargada. Tocá un pin para ver
-        el detalle de los gastos que tuvo. Usá los filtros para ver solo
-        cierto tipo o un rango de monto.
-      </TesoreriaHint>
-
-      {/* Header con métricas en vivo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <h1 className="text-2xl font-bold flex items-center gap-2" style={{ color: theme.text }}>
-          <MapPin className="h-6 w-6" /> Mapa
-        </h1>
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="text-right">
-            <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Visibles</p>
-            <p className="text-lg font-bold" style={{ color: theme.text }}>{visibles.length}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Total $</p>
-            <p className="text-lg font-bold" style={{ color: theme.primary }}>
-              ${totalVisible.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </p>
-          </div>
-        </div>
+  const headerActions = (
+    <>
+      <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+        <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>Mín $</span>
+        <input
+          type="number"
+          value={montoMin || ''}
+          onChange={(e) => setMontoMin(parseFloat(e.target.value) || 0)}
+          placeholder="0"
+          min={0}
+          step={10000}
+          className="w-20 px-1 py-0 rounded text-xs bg-transparent outline-none"
+          style={{ color: theme.text }}
+        />
       </div>
-
-      {/* Filtros */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: theme.textSecondary }} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar contacto..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl text-sm"
-            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-          />
+      <div className="inline-flex items-center gap-3 px-3 py-2 rounded-xl"
+        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+        <div className="text-center">
+          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Visibles</p>
+          <p className="text-sm font-bold leading-none" style={{ color: theme.text }}>{visibles.length}</p>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>Tipo:</span>
-          <button
-            onClick={() => setTipoFiltro('')}
-            className="px-2 py-1 rounded-md text-xs font-medium"
-            style={{
-              backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
-              color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
-              border: `1px solid ${theme.border}`,
-            }}
-          >Todos</button>
-          {(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => (
-            <button
-              key={t}
-              onClick={() => setTipoFiltro(tipoFiltro === t ? '' : t)}
-              className="px-2 py-1 rounded-md text-xs font-medium"
-              style={{
-                backgroundColor: tipoFiltro === t ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
-                color: tipoFiltro === t ? '#fff' : TIPO_COLORS[t],
-                border: `1px solid ${TIPO_COLORS[t]}40`,
-              }}
-            >{TIPO_LABELS[t]}</button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] uppercase font-bold opacity-70" style={{ color: theme.textSecondary }}>Mín $:</span>
-          <input
-            type="number"
-            value={montoMin || ''}
-            onChange={(e) => setMontoMin(parseFloat(e.target.value) || 0)}
-            placeholder="0"
-            min={0}
-            step={10000}
-            className="w-28 px-2 py-1 rounded-md text-xs"
-            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-          />
-        </div>
-      </div>
-
-      {loading ? (
-        <p className="text-center py-12" style={{ color: theme.textSecondary }}>Cargando...</p>
-      ) : visibles.length === 0 ? (
-        <div className="text-center py-16 rounded-xl" style={{ backgroundColor: theme.card, border: `1px dashed ${theme.border}` }}>
-          <MapPin className="h-12 w-12 mx-auto mb-3" style={{ color: theme.textSecondary }} />
-          <p className="font-semibold" style={{ color: theme.text }}>No hay contactos visibles</p>
-          <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
-            Ajustá los filtros o agregá ubicaciones a los contactos.
+        <div className="text-center">
+          <p className="text-[9px] uppercase font-bold opacity-60" style={{ color: theme.textSecondary }}>Total</p>
+          <p className="text-sm font-bold leading-none" style={{ color: theme.primary }}>
+            ${totalVisible.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
           </p>
         </div>
-      ) : (
-        <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${theme.border}`, height: 600 }}>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      <div className="px-4 pt-3">
+        <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
+          Cada casita es un contacto con ubicación cargada. Tocá un pin para
+          ver el detalle de los gastos. El tamaño del pin indica cuánto le
+          pagaste en total. Usá los filtros para acotar.
+        </TesoreriaHint>
+      </div>
+
+      <ABMPage
+        title="Mapa"
+        icon={<MapPin className="h-5 w-5" />}
+        backLink="/gestion/tesoreria"
+        searchPlaceholder="Buscar por nombre o alias…"
+        searchValue={search}
+        onSearchChange={setSearch}
+        extraFilters={extraFilters}
+        headerActions={headerActions}
+        loading={loading}
+        isEmpty={!loading && visibles.length === 0}
+        emptyMessage="No hay contactos visibles. Ajustá los filtros o agregá ubicaciones a los contactos."
+      >
+        <div className="rounded-xl overflow-hidden col-span-full" style={{ border: `1px solid ${theme.border}`, height: 600 }}>
           <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -286,22 +273,19 @@ export default function TesoreriaMapa() {
             <FitBounds points={points} />
             {visibles.map(c => {
               const total = totalesPorContacto[c.id] || 0;
-              // Tamaño del pin proporcional al monto total (32-56 px)
               const baseSize = total > 0 ? Math.min(56, 32 + Math.log10(total + 1) * 4) : 32;
               return (
                 <Marker
                   key={c.id}
                   position={[c.latitud!, c.longitud!]}
                   icon={casitaDivIcon(TIPO_COLORS[c.tipo], baseSize)}
-                  eventHandlers={{
-                    click: () => handlePinClick(c),
-                  }}
+                  eventHandlers={{ click: () => handlePinClick(c) }}
                 />
               );
             })}
           </MapContainer>
         </div>
-      )}
+      </ABMPage>
 
       {/* Side modal con detalle del contacto + gastos expandibles */}
       <Sheet
@@ -458,7 +442,7 @@ export default function TesoreriaMapa() {
           </div>
         )}
       </Sheet>
-    </div>
+    </>
   );
 }
 
