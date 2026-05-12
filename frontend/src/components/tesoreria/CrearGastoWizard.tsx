@@ -11,7 +11,29 @@ import {
 import type {
   Contacto, ConceptosCatalogo, CotizacionUSD, TipoFinanciacion,
   FrecuenciaRecurrencia, FormaPago, DestinoGasto, Proyecto, GastoProyectoAssignment,
+  TipoContacto,
 } from '../../types';
+
+// Mismas labels/colores que TesoreriaContactos.tsx (DRY: si crece, extraer
+// a lib/enums/tipo-contacto.ts).
+const TIPO_CONTACTO_LABELS: Record<TipoContacto, string> = {
+  concejal: 'Concejales',
+  empleado: 'Empleados',
+  profesional: 'Profesionales',
+  proveedor: 'Proveedores',
+  contratista: 'Contratistas',
+  beneficiario: 'Beneficiarios',
+  otro: 'Otros',
+};
+const TIPO_CONTACTO_COLORS: Record<TipoContacto, string> = {
+  concejal: '#8b5cf6',
+  empleado: '#3b82f6',
+  profesional: '#f59e0b',
+  proveedor: '#10b981',
+  contratista: '#06b6d4',
+  beneficiario: '#ec4899',
+  otro: '#71717a',
+};
 
 interface Props {
   open: boolean;
@@ -78,6 +100,10 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   // "Guardar y agregar otro" para no recargar el mismo proyecto.
   const [proyectoAsignaciones, setProyectoAsignaciones] = useState<GastoProyectoAssignment[]>([]);
 
+  // Filtros del step "destino: contacto"
+  const [contactoSearch, setContactoSearch] = useState('');
+  const [contactoTipoFiltro, setContactoTipoFiltro] = useState<TipoContacto | ''>('');
+
   const [conceptoSearch, setConceptoSearch] = useState('');
   const conceptoInputRef = useRef<HTMLInputElement>(null);
 
@@ -99,6 +125,8 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       setFormaPago('transferencia');
       setDescripcion('');
       setProyectoAsignaciones([]);
+      setContactoSearch('');
+      setContactoTipoFiltro('');
     }
   }, [open]);
 
@@ -274,41 +302,103 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
 
       {destinoTipo === 'contacto' ? (
         <div>
+          {/* Pills de tipo de contacto: una fila, scroll horizontal si se desbordan */}
+          <div
+            className="flex gap-1.5 overflow-x-auto pb-2 mb-2"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            <button
+              type="button"
+              onClick={() => setContactoTipoFiltro('')}
+              className="flex-shrink-0 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
+              style={{
+                backgroundColor: contactoTipoFiltro === '' ? theme.primary : 'transparent',
+                color: contactoTipoFiltro === '' ? '#fff' : theme.textSecondary,
+                border: `1px solid ${contactoTipoFiltro === '' ? theme.primary : theme.border}`,
+              }}
+            >
+              Todos
+            </button>
+            {(Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(t => {
+              const active = contactoTipoFiltro === t;
+              const color = TIPO_CONTACTO_COLORS[t];
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setContactoTipoFiltro(t)}
+                  className="flex-shrink-0 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap"
+                  style={{
+                    backgroundColor: active ? color : `${color}15`,
+                    color: active ? '#fff' : color,
+                    border: `1px solid ${color}40`,
+                  }}
+                >
+                  {TIPO_CONTACTO_LABELS[t]}
+                </button>
+              );
+            })}
+          </div>
+
           <input
             type="text"
-            placeholder="Buscar por nombre..."
-            onChange={(e) => {
-              const q = e.target.value.toLowerCase();
-              setContactos(prev => prev);  // no filter on backend, just visual
-              // Filter via state — simple
-            }}
+            placeholder="Buscar por nombre, DNI, alias..."
+            value={contactoSearch}
+            onChange={(e) => setContactoSearch(e.target.value)}
             className="w-full px-3 py-2 rounded-xl text-sm mb-2"
             style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
           />
           <div className="rounded-xl max-h-60 overflow-y-auto space-y-1" style={{ border: `1px solid ${theme.border}` }}>
-            {contactos.map(c => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setContactoId(c.id)}
-                className="w-full text-left px-3 py-2 transition-all flex items-center justify-between"
-                style={{
-                  backgroundColor: contactoId === c.id ? `${theme.primary}20` : 'transparent',
-                  color: theme.text,
-                }}
-              >
-                <span>
-                  <span className="font-medium">{c.nombre} {c.apellido || ''}</span>
-                  {c.alias_pago && <span className="text-[10px] ml-2 opacity-60">{c.alias_pago}</span>}
-                </span>
-                <span className="text-[10px] uppercase opacity-60">{c.tipo}</span>
-              </button>
-            ))}
-            {contactos.length === 0 && (
-              <p className="text-sm text-center p-4" style={{ color: theme.textSecondary }}>
-                No hay contactos cargados. <a href="/gestion/tesoreria/contactos" className="underline" style={{ color: theme.primary }}>Agregar uno</a>
-              </p>
-            )}
+            {(() => {
+              const q = contactoSearch.trim().toLowerCase();
+              const filtrados = contactos.filter(c => {
+                if (contactoTipoFiltro && c.tipo !== contactoTipoFiltro) return false;
+                if (!q) return true;
+                return (
+                  c.nombre.toLowerCase().includes(q) ||
+                  (c.apellido?.toLowerCase().includes(q) ?? false) ||
+                  (c.dni?.toLowerCase().includes(q) ?? false) ||
+                  (c.alias_pago?.toLowerCase().includes(q) ?? false)
+                );
+              });
+              if (filtrados.length === 0) {
+                if (contactos.length === 0) {
+                  return (
+                    <p className="text-sm text-center p-4" style={{ color: theme.textSecondary }}>
+                      No hay contactos cargados. <a href="/gestion/tesoreria/contactos" className="underline" style={{ color: theme.primary }}>Agregar uno</a>
+                    </p>
+                  );
+                }
+                return (
+                  <p className="text-sm text-center p-4" style={{ color: theme.textSecondary }}>
+                    Ningún contacto coincide con el filtro.
+                  </p>
+                );
+              }
+              return filtrados.map(c => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setContactoId(c.id)}
+                  className="w-full text-left px-3 py-2 transition-all flex items-center justify-between"
+                  style={{
+                    backgroundColor: contactoId === c.id ? `${theme.primary}20` : 'transparent',
+                    color: theme.text,
+                  }}
+                >
+                  <span>
+                    <span className="font-medium">{c.nombre} {c.apellido || ''}</span>
+                    {c.alias_pago && <span className="text-[10px] ml-2 opacity-60">{c.alias_pago}</span>}
+                  </span>
+                  <span
+                    className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: `${TIPO_CONTACTO_COLORS[c.tipo]}20`, color: TIPO_CONTACTO_COLORS[c.tipo] }}
+                  >
+                    {c.tipo}
+                  </span>
+                </button>
+              ));
+            })()}
           </div>
 
           {/* Info / edicion de direccion del contacto seleccionado */}
