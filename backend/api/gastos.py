@@ -219,8 +219,16 @@ async def create_gasto(
     cuotas = _generar_cuotas(gasto)
     db.add_all(cuotas)
     await db.commit()
-    await db.refresh(gasto, attribute_names=["cuotas"])
-    return gasto
+
+    # Re-cargar el gasto con la relación de cuotas eagerly, para evitar
+    # MissingGreenlet al serializar la respuesta (Pydantic intenta acceder
+    # a created_at/updated_at y otros atributos que pueden estar expired).
+    result = await db.execute(
+        select(Gasto)
+        .options(selectinload(Gasto.cuotas), selectinload(Gasto.contacto))
+        .where(Gasto.id == gasto.id)
+    )
+    return result.scalar_one()
 
 
 @router.get("/{gasto_id}", response_model=GastoResponse)
