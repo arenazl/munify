@@ -163,6 +163,21 @@ export default function DependenciasConfig() {
   const [selectedToAdd, setSelectedToAdd] = useState<number[]>([]);
   const [editingDep, setEditingDep] = useState<MunicipioDependenciaDetail | null>(null);
 
+  // CRUD del catalogo global (solo superadmin). `editingCatalogo` = null cuando
+  // se crea nuevo, o el objeto Dependencia cuando se edita.
+  const [showCatalogoModal, setShowCatalogoModal] = useState(false);
+  const [editingCatalogo, setEditingCatalogo] = useState<Dependencia | null>(null);
+  const [catalogoForm, setCatalogoForm] = useState({
+    nombre: '',
+    descripcion: '',
+    tipo_gestion: 'AMBOS' as 'RECLAMO' | 'TRAMITE' | 'AMBOS',
+    tipo_jerarquico: 'SECRETARIA' as TipoJerarquico,
+    dependencia_padre_id: null as number | null,
+    color: '#6366f1',
+    icono: 'Landmark',
+  });
+  const [savingCatalogo, setSavingCatalogo] = useState(false);
+
   // Vista jerarquica: que Secretarias tienen sus Direcciones desplegadas.
   const [direccionesAbiertas, setDireccionesAbiertas] = useState<Set<number>>(new Set());
 
@@ -448,6 +463,69 @@ export default function DependenciasConfig() {
       latitud_local: coords.lat,
       longitud_local: coords.lng,
     }));
+  };
+
+  // ============================================================
+  // CRUD del catalogo global (solo superadmin)
+  // ============================================================
+  const openCatalogoModal = (dep: Dependencia | null = null) => {
+    if (dep) {
+      setEditingCatalogo(dep);
+      setCatalogoForm({
+        nombre: dep.nombre || '',
+        descripcion: dep.descripcion || '',
+        tipo_gestion: dep.tipo_gestion || 'AMBOS',
+        tipo_jerarquico: dep.tipo_jerarquico || 'SECRETARIA',
+        dependencia_padre_id: dep.dependencia_padre_id ?? null,
+        color: dep.color || '#6366f1',
+        icono: dep.icono || (dep.tipo_jerarquico === 'DIRECCION' ? 'Building2' : 'Landmark'),
+      });
+    } else {
+      setEditingCatalogo(null);
+      setCatalogoForm({
+        nombre: '',
+        descripcion: '',
+        tipo_gestion: 'AMBOS',
+        tipo_jerarquico: 'SECRETARIA',
+        dependencia_padre_id: null,
+        color: '#6366f1',
+        icono: 'Landmark',
+      });
+    }
+    setShowCatalogoModal(true);
+  };
+
+  const saveCatalogo = async () => {
+    if (!catalogoForm.nombre.trim()) return toast.error('Nombre requerido');
+    if (catalogoForm.tipo_jerarquico === 'DIRECCION' && !catalogoForm.dependencia_padre_id) {
+      return toast.error('Una Dirección requiere indicar la Secretaría padre');
+    }
+    setSavingCatalogo(true);
+    try {
+      const payload: Record<string, unknown> = {
+        nombre: catalogoForm.nombre.trim(),
+        descripcion: catalogoForm.descripcion.trim() || null,
+        tipo_gestion: catalogoForm.tipo_gestion,
+        tipo_jerarquico: catalogoForm.tipo_jerarquico,
+        dependencia_padre_id: catalogoForm.tipo_jerarquico === 'DIRECCION' ? catalogoForm.dependencia_padre_id : null,
+        color: catalogoForm.color,
+        icono: catalogoForm.icono,
+      };
+      if (editingCatalogo) {
+        await dependenciasApi.updateCatalogo(editingCatalogo.id, payload);
+        toast.success('Dependencia actualizada');
+      } else {
+        await dependenciasApi.createCatalogo(payload);
+        toast.success('Dependencia creada en el catálogo');
+      }
+      setShowCatalogoModal(false);
+      setEditingCatalogo(null);
+      await fetchData();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Error guardando dependencia');
+    } finally {
+      setSavingCatalogo(false);
+    }
   };
 
   // Toggle categoría habilitada/deshabilitada — NO-OP en el modelo nuevo.
@@ -934,7 +1012,7 @@ export default function DependenciasConfig() {
                   {/* Botón editar catálogo (superadmin) */}
                   {isCatalogoItem && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); /* TODO: openEditCatalogoModal(catDep); */ toast.info('Edición de catálogo próximamente'); }}
+                      onClick={(e) => { e.stopPropagation(); openCatalogoModal(dep as Dependencia); }}
                       className="p-2 rounded-lg transition-colors hover:scale-105"
                       style={{ backgroundColor: theme.primary + '15' }}
                       title="Editar dependencia"
@@ -1602,29 +1680,26 @@ export default function DependenciasConfig() {
             </div>
 
             {isSuperAdmin ? (
-              /* Formulario para crear nueva dependencia en el catálogo */
+              /* Trigger del modal de creacion: lo hago en otro modal aparte
+                 para reusar el mismo componente CRUD (crear / editar). */
               <div className="space-y-4">
                 <p className="text-sm" style={{ color: theme.textSecondary }}>
-                  Crear una nueva dependencia en el catálogo maestro. Esta dependencia estará disponible para que todos los municipios la habiliten.
+                  Crear una nueva dependencia en el catálogo maestro. Va a estar disponible para que cualquier municipio la habilite.
                 </p>
-
-                <div
-                  className="flex items-center gap-2 p-3 rounded-lg text-sm"
-                  style={{ backgroundColor: theme.primary + '10', border: `1px solid ${theme.primary}30` }}
-                >
-                  <AlertCircle className="h-4 w-4" style={{ color: theme.primary }} />
-                  <span style={{ color: theme.text }}>
-                    Funcionalidad de creación próximamente disponible.
-                  </span>
-                </div>
-
                 <div className="flex justify-end gap-3 pt-4">
                   <button
                     onClick={() => setShowAddModal(false)}
                     className="px-4 py-2 rounded-lg font-medium"
                     style={{ backgroundColor: theme.background, color: theme.text }}
                   >
-                    Cerrar
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => { setShowAddModal(false); openCatalogoModal(null); }}
+                    className="px-4 py-2 rounded-lg font-semibold text-white"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    Crear nueva
                   </button>
                 </div>
               </div>
@@ -2060,6 +2135,173 @@ export default function DependenciasConfig() {
                 style={{ backgroundColor: theme.background, color: theme.text }}
               >
                 Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal CRUD del catalogo global (crear / editar dependencia) */}
+      {showCatalogoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div
+            className="w-full max-w-xl rounded-2xl p-6 max-h-[85vh] overflow-y-auto"
+            style={{ backgroundColor: theme.backgroundSecondary }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: theme.text }}>
+                <DynamicIcon name={catalogoForm.icono} size={22} color={catalogoForm.color} />
+                {editingCatalogo ? 'Editar dependencia (catálogo)' : 'Nueva dependencia (catálogo)'}
+              </h2>
+              <button
+                onClick={() => { setShowCatalogoModal(false); setEditingCatalogo(null); }}
+                className="p-2 rounded-lg hover:bg-opacity-80"
+                style={{ backgroundColor: theme.background }}
+              >
+                <X className="h-5 w-5" style={{ color: theme.textSecondary }} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Nombre *</label>
+                <input
+                  type="text"
+                  value={catalogoForm.nombre}
+                  onChange={(e) => setCatalogoForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Ej: Secretaría de Obras Públicas"
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
+                <textarea
+                  value={catalogoForm.descripcion}
+                  onChange={(e) => setCatalogoForm(f => ({ ...f, descripcion: e.target.value }))}
+                  rows={2}
+                  placeholder="Descripción breve"
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Tipo jerárquico</label>
+                  <select
+                    value={catalogoForm.tipo_jerarquico}
+                    onChange={(e) => setCatalogoForm(f => ({
+                      ...f,
+                      tipo_jerarquico: e.target.value as TipoJerarquico,
+                      icono: e.target.value === 'DIRECCION' ? 'Building2' : 'Landmark',
+                      dependencia_padre_id: e.target.value === 'SECRETARIA' ? null : f.dependencia_padre_id,
+                    }))}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                    disabled={!!editingCatalogo}
+                  >
+                    <option value="SECRETARIA">Secretaría</option>
+                    <option value="DIRECCION">Dirección</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Tipo de gestión</label>
+                  <select
+                    value={catalogoForm.tipo_gestion}
+                    onChange={(e) => setCatalogoForm(f => ({ ...f, tipo_gestion: e.target.value as 'RECLAMO' | 'TRAMITE' | 'AMBOS' }))}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                  >
+                    <option value="AMBOS">Reclamos + Trámites</option>
+                    <option value="RECLAMO">Solo Reclamos</option>
+                    <option value="TRAMITE">Solo Trámites</option>
+                  </select>
+                </div>
+              </div>
+
+              {catalogoForm.tipo_jerarquico === 'DIRECCION' && (
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Secretaría padre *</label>
+                  <select
+                    value={catalogoForm.dependencia_padre_id ?? ''}
+                    onChange={(e) => setCatalogoForm(f => ({ ...f, dependencia_padre_id: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                  >
+                    <option value="">Elegir secretaría...</option>
+                    {catalogoGlobal
+                      .filter(d => d.tipo_jerarquico === 'SECRETARIA' && d.id !== editingCatalogo?.id)
+                      .map(s => (
+                        <option key={s.id} value={s.id}>{s.nombre}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={catalogoForm.color}
+                      onChange={(e) => setCatalogoForm(f => ({ ...f, color: e.target.value }))}
+                      className="w-10 h-10 rounded cursor-pointer"
+                      style={{ border: `1px solid ${theme.border}` }}
+                    />
+                    <input
+                      type="text"
+                      value={catalogoForm.color}
+                      onChange={(e) => setCatalogoForm(f => ({ ...f, color: e.target.value }))}
+                      className="flex-1 px-3 py-2 rounded-lg text-sm font-mono"
+                      style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Icono (Lucide)</label>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: `${catalogoForm.color}20`, border: `1px solid ${theme.border}` }}
+                    >
+                      <DynamicIcon name={catalogoForm.icono} size={20} color={catalogoForm.color} />
+                    </div>
+                    <input
+                      type="text"
+                      value={catalogoForm.icono}
+                      onChange={(e) => setCatalogoForm(f => ({ ...f, icono: e.target.value }))}
+                      placeholder="Landmark"
+                      className="flex-1 px-3 py-2 rounded-lg text-sm font-mono"
+                      style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t" style={{ borderColor: theme.border }}>
+              <button
+                onClick={() => { setShowCatalogoModal(false); setEditingCatalogo(null); }}
+                className="px-4 py-2 rounded-lg font-medium"
+                style={{ backgroundColor: theme.background, color: theme.text }}
+                disabled={savingCatalogo}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveCatalogo}
+                disabled={savingCatalogo}
+                className="px-4 py-2 rounded-lg font-semibold text-white inline-flex items-center gap-2"
+                style={{ backgroundColor: theme.primary, opacity: savingCatalogo ? 0.7 : 1 }}
+              >
+                {savingCatalogo && <RefreshCw className="h-4 w-4 animate-spin" />}
+                {editingCatalogo ? 'Guardar cambios' : 'Crear'}
               </button>
             </div>
           </div>
