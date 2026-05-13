@@ -4,7 +4,7 @@ import {
   Settings, Bell, MessageCircle, Users, Wrench, ChevronRight,
   FolderTree, MapPin, FileText, LayoutDashboard, UsersRound,
   CalendarOff, Building2, Check, Landmark, Link2, Activity, Wallet, FileDown,
-  Tag, Briefcase, PiggyBank, CalendarClock,
+  Tag, Briefcase, PiggyBank, CalendarClock, Trees,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -358,6 +358,15 @@ export default function Ajustes() {
           icon: PiggyBank,
           color: '#f59e0b',
           link: '/gestion/configuracion/tesoreria?tab=cajas',
+          show: isAdminOrSupervisor && !isSuperAdmin,
+        },
+        {
+          id: 'tesoreria-parajes',
+          label: 'Parajes',
+          description: 'Regiones del muni (Santa Rita, Los Álamos, etc) con polígono en el mapa',
+          icon: Trees,
+          color: '#10b981',
+          link: '/gestion/configuracion/tesoreria?tab=parajes',
           show: isAdminOrSupervisor && !isSuperAdmin,
         },
         {

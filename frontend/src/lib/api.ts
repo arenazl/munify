@@ -2024,6 +2024,14 @@ export const agendaPagosApi = {
     api.post(`/tesoreria/agenda/${id}/ejecutar`, null, { params: fechaPago ? { fecha_pago: fechaPago } : undefined }),
 };
 
+export const parajesApi = {
+  list: (params?: { activo?: boolean; include_count?: boolean }) =>
+    api.get('/tesoreria/parajes', { params }),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/parajes', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tesoreria/parajes/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/parajes/${id}`),
+};
+
 export const proyectosApi = {
   list: (params?: { estado?: string; activo?: boolean; search?: string; include_resumen?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/proyectos', { params }),

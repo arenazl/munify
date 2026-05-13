@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Tag, FileText, Briefcase, Plus, Edit2, Trash2, Loader2, ArrowLeft,
-  Users, PiggyBank, TrendingUp, TrendingDown,
+  Users, PiggyBank, TrendingUp, TrendingDown, MapPin,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -10,11 +10,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { Sheet } from '../components/ui/Sheet';
-import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
-import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja } from '../types';
+import { PolygonDrawer } from '../components/tesoreria/PolygonDrawer';
+import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesApi } from '../lib/api';
+import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje } from '../types';
 import TesoreriaProyectos from './TesoreriaProyectos';
 
-type Tab = 'tipos' | 'conceptos' | 'tipos-empleado' | 'cajas' | 'proyectos';
+type Tab = 'tipos' | 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos';
 
 export default function ConfiguracionTesoreria() {
   const { theme } = useTheme();
@@ -22,7 +23,7 @@ export default function ConfiguracionTesoreria() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as Tab) || 'tipos';
   const [tab, setTabState] = useState<Tab>(
-    ['tipos','conceptos','tipos-empleado','cajas','proyectos'].includes(initialTab) ? initialTab : 'tipos'
+    ['tipos','conceptos','tipos-empleado','cajas','parajes','proyectos'].includes(initialTab) ? initialTab : 'tipos'
   );
   const setTab = (t: Tab) => {
     setTabState(t);
@@ -72,6 +73,7 @@ export default function ConfiguracionTesoreria() {
           { id: 'conceptos', label: 'Conceptos', icon: <FileText className="h-4 w-4" /> },
           { id: 'tipos-empleado', label: 'Tipos de empleado', icon: <Users className="h-4 w-4" /> },
           { id: 'cajas', label: 'Cajas / Fondos', icon: <PiggyBank className="h-4 w-4" /> },
+          { id: 'parajes', label: 'Parajes', icon: <MapPin className="h-4 w-4" /> },
           { id: 'proyectos', label: 'Proyectos', icon: <Briefcase className="h-4 w-4" /> },
         ] as const).map(t => {
           const active = tab === t.id;
@@ -99,6 +101,7 @@ export default function ConfiguracionTesoreria() {
         {tab === 'conceptos' && <ConceptosTab />}
         {tab === 'tipos-empleado' && <TiposEmpleadoTab />}
         {tab === 'cajas' && <CajasTab />}
+        {tab === 'parajes' && <ParajesTab />}
         {tab === 'proyectos' && (
           // Embeber la pagina existente. Tiene su propio header y ABMPage.
           <div className="-mt-3 -mx-4">
@@ -810,3 +813,170 @@ function CajasTab() {
     </>
   );
 }
+
+// ============================================================
+// Tab: Parajes (regiones del muni con poligono en el mapa)
+// ============================================================
+function ParajesTab() {
+  const { theme } = useTheme();
+  const [parajes, setParajes] = useState<Paraje[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<Paraje | null>(null);
+  const [form, setForm] = useState({
+    nombre: '', descripcion: '', color: '#10b981', icono: 'MapPin',
+    poligono: [] as number[][], orden: 0,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const fetchParajes = async () => {
+    setLoading(true);
+    try {
+      const res = await parajesApi.list({ activo: true, include_count: true });
+      setParajes(res.data || []);
+    } catch { toast.error('Error cargando parajes'); } finally { setLoading(false); }
+  };
+  useEffect(() => { fetchParajes(); }, []);
+
+  const openSheet = (p: Paraje | null = null) => {
+    if (p) {
+      setEditing(p);
+      setForm({
+        nombre: p.nombre, descripcion: p.descripcion || '',
+        color: p.color || '#10b981', icono: p.icono || 'MapPin',
+        poligono: p.poligono || [], orden: p.orden,
+      });
+    } else {
+      setEditing(null);
+      setForm({ nombre: '', descripcion: '', color: '#10b981', icono: 'MapPin', poligono: [], orden: parajes.length });
+    }
+    setSheetOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.nombre.trim()) return toast.error('Nombre requerido');
+    if (form.poligono.length > 0 && form.poligono.length < 3) {
+      return toast.error('El polígono necesita al menos 3 vértices (o ninguno)');
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion.trim() || null,
+        color: form.color, icono: form.icono,
+        poligono: form.poligono.length >= 3 ? form.poligono : null,
+        orden: form.orden,
+      };
+      if (editing) await parajesApi.update(editing.id, payload);
+      else await parajesApi.create(payload);
+      toast.success(editing ? 'Paraje actualizado' : 'Paraje creado');
+      setSheetOpen(false); fetchParajes();
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error'); } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (p: Paraje) => {
+    if (!confirm(`¿Eliminar "${p.nombre}"? Los contactos asignados pasan a "Sin paraje".`)) return;
+    try { await parajesApi.delete(p.id); toast.success('Eliminado'); fetchParajes(); }
+    catch { toast.error('Error'); }
+  };
+
+  if (loading) return <div className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>;
+
+  return (
+    <>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs" style={{ color: theme.textSecondary }}>
+          {parajes.length} parajes. Regiones del muni (Santa Rita, Los Álamos, etc). Al crear un contacto podés elegir un paraje en lugar de cargar la dirección exacta.
+        </p>
+        <button onClick={() => openSheet()} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: theme.primary }}>
+          <Plus className="h-4 w-4" /> Nuevo paraje
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {parajes.map(p => {
+          const c = p.color || theme.primary;
+          return (
+            <div key={p.id} onClick={() => openSheet(p)} className="rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+              <div className="flex items-start gap-2.5">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${c}20` }}>
+                  <DynamicIcon name={p.icono || 'MapPin'} size={20} color={c} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: theme.text }}>{p.nombre}</p>
+                  {p.descripcion && <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>{p.descripcion}</p>}
+                  <div className="flex items-center gap-2 text-[10px] mt-0.5">
+                    <span style={{ color: c }}>{p.cantidad_contactos ?? 0} contactos</span>
+                    {p.poligono && p.poligono.length >= 3 ? (
+                      <span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: `${c}15`, color: c }}>{p.poligono.length} vértices</span>
+                    ) : (
+                      <span className="opacity-60" style={{ color: theme.textSecondary }}>sin polígono</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); openSheet(p); }} className="p-1 rounded hover:scale-110" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p); }} className="p-1 rounded hover:scale-110" style={{ color: '#ef4444' }}><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Sheet
+        open={sheetOpen} onClose={() => setSheetOpen(false)}
+        title={editing ? `Editar · ${editing.nombre}` : 'Nuevo paraje'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
+            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+              {saving ? 'Guardando...' : (editing ? 'Guardar' : 'Crear')}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Nombre *</label>
+            <input value={form.nombre} onChange={(e) => setForm(f => ({ ...f, nombre: e.target.value }))} autoFocus className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder='Ej: "Paraje Santa Rita"' />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
+            <textarea value={form.descripcion} onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Color</label>
+              <div className="flex items-center gap-2">
+                <input type="color" value={form.color} onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} className="w-10 h-10 rounded cursor-pointer" style={{ border: `1px solid ${theme.border}` }} />
+                <input type="text" value={form.color} onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Icono</label>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${form.color}20`, border: `1px solid ${theme.border}` }}>
+                  <DynamicIcon name={form.icono} size={20} color={form.color} />
+                </div>
+                <input type="text" value={form.icono} onChange={(e) => setForm(f => ({ ...f, icono: e.target.value }))} className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>
+              Polígono en el mapa <span className="opacity-60">(opcional, mínimo 3 vértices)</span>
+            </label>
+            <PolygonDrawer
+              value={form.poligono}
+              onChange={(coords) => setForm(f => ({ ...f, poligono: coords }))}
+              color={form.color}
+              centro={form.poligono.length > 0 ? [form.poligono[0][0], form.poligono[0][1]] : undefined}
+            />
+          </div>
+        </div>
+      </Sheet>
+    </>
+  );
+}
+

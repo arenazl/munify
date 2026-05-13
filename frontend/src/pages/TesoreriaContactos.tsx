@@ -7,8 +7,8 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
-import { contactosApi, tesoreriaImportApi, tiposEmpleadoApi } from '../lib/api';
-import type { Contacto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
+import { contactosApi, tesoreriaImportApi, tiposEmpleadoApi, parajesApi } from '../lib/api';
+import type { Contacto, TipoContacto, TipoEmpleadoCatalogo, Paraje } from '../types';
 
 const TIPO_LABELS: Record<TipoContacto, string> = {
   concejal: 'Concejal',
@@ -40,6 +40,8 @@ export default function TesoreriaContactos() {
   const [tipoFiltro, setTipoFiltro] = useState<TipoContacto | ''>('');
   const [tipoEmpleadoFiltro, setTipoEmpleadoFiltro] = useState<string>('');
   const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
+  const [parajes, setParajes] = useState<Paraje[]>([]);
+  const [ubicacionModo, setUbicacionModo] = useState<'direccion' | 'paraje'>('direccion');
 
   // Sheet (form)
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -75,11 +77,14 @@ export default function TesoreriaContactos() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Cargar catalogo de tipos de empleado (per-muni)
+  // Cargar catalogos (tipos de empleado + parajes)
   useEffect(() => {
     tiposEmpleadoApi.list({ activo: true })
       .then(r => setTiposEmpleado(r.data || []))
       .catch(() => setTiposEmpleado([]));
+    parajesApi.list({ activo: true, include_count: false })
+      .then(r => setParajes(r.data || []))
+      .catch(() => setParajes([]));
   }, []);
 
   // Reset filtro de subtipo cuando cambia el tipo principal
@@ -99,9 +104,12 @@ export default function TesoreriaContactos() {
     if (c) {
       setEditing(c);
       setForm(c);
+      // Si el contacto tiene paraje_id, modo "paraje"; sino "direccion".
+      setUbicacionModo(c.paraje_id ? 'paraje' : 'direccion');
     } else {
       setEditing(null);
       setForm({ nombre: '', apellido: '', tipo: 'beneficiario' });
+      setUbicacionModo('direccion');
     }
     setSheetOpen(true);
   };
@@ -292,20 +300,60 @@ export default function TesoreriaContactos() {
           color: TIPO_COLORS[t],
         }))}
       />
-      <DireccionAutocomplete
-        label="Dirección"
-        value={form.direccion || ''}
-        onChange={(dir, lat, lon) =>
-          setForm(prev => ({
-            ...prev,
-            direccion: dir,
-            latitud: lat ?? prev.latitud,
-            longitud: lon ?? prev.longitud,
-          }))
-        }
-        placeholder="Ej: Av. San Martín 123 o Mitre y Belgrano"
-        inputClassName="py-2"
-      />
+      {/* Toggle: ubicación por dirección exacta O por paraje */}
+      <div>
+        <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Ubicación</label>
+        <div className="inline-flex items-center gap-1 mb-2 rounded-lg p-0.5" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+          <button
+            type="button"
+            onClick={() => { setUbicacionModo('direccion'); setForm(prev => ({ ...prev, paraje_id: null })); }}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+            style={{
+              backgroundColor: ubicacionModo === 'direccion' ? theme.primary : 'transparent',
+              color: ubicacionModo === 'direccion' ? '#fff' : theme.textSecondary,
+            }}
+          >
+            Dirección exacta
+          </button>
+          <button
+            type="button"
+            onClick={() => { setUbicacionModo('paraje'); setForm(prev => ({ ...prev, direccion: null, latitud: null, longitud: null })); }}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+            style={{
+              backgroundColor: ubicacionModo === 'paraje' ? theme.primary : 'transparent',
+              color: ubicacionModo === 'paraje' ? '#fff' : theme.textSecondary,
+            }}
+          >
+            Paraje
+          </button>
+        </div>
+        {ubicacionModo === 'direccion' ? (
+          <DireccionAutocomplete
+            value={form.direccion || ''}
+            onChange={(dir, lat, lon) =>
+              setForm(prev => ({
+                ...prev,
+                direccion: dir,
+                latitud: lat ?? prev.latitud,
+                longitud: lon ?? prev.longitud,
+              }))
+            }
+            placeholder="Ej: Av. San Martín 123 o Mitre y Belgrano"
+            inputClassName="py-2"
+          />
+        ) : (
+          <ModernSelect
+            value={form.paraje_id ? String(form.paraje_id) : ''}
+            onChange={(v) => setForm(prev => ({ ...prev, paraje_id: v ? parseInt(v, 10) : null }))}
+            options={[
+              { value: '', label: 'Sin paraje' },
+              ...parajes.map(p => ({ value: String(p.id), label: p.nombre, color: p.color || undefined })),
+            ]}
+            placeholder="Elegir paraje..."
+            searchable
+          />
+        )}
+      </div>
       {form.latitud && form.longitud && (
         <p className="text-[10px]" style={{ color: '#10b981' }}>
           📍 Geolocalizado: {form.latitud.toFixed(5)}, {form.longitud.toFixed(5)}

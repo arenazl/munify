@@ -50,6 +50,7 @@ class ContactoBase(BaseModel):
     telefono: Optional[str] = Field(None, max_length=30)
     email: Optional[str] = Field(None, max_length=150)
     direccion: Optional[str] = Field(None, max_length=255)
+    paraje_id: Optional[int] = None  # alternativa a direccion exacta
     latitud: Optional[float] = None
     longitud: Optional[float] = None
     alias_pago: Optional[str] = Field(None, max_length=60)
@@ -69,6 +70,7 @@ class ContactoUpdate(BaseModel):
     telefono: Optional[str] = Field(None, max_length=30)
     email: Optional[str] = Field(None, max_length=150)
     direccion: Optional[str] = Field(None, max_length=255)
+    paraje_id: Optional[int] = None
     latitud: Optional[float] = None
     longitud: Optional[float] = None
     alias_pago: Optional[str] = Field(None, max_length=60)

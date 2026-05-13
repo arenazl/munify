@@ -492,11 +492,13 @@ export interface Contacto {
   telefono?: string | null;
   email?: string | null;
   direccion?: string | null;
+  paraje_id?: number | null;
   latitud?: number | null;
   longitud?: number | null;
   alias_pago?: string | null;
   tipo: TipoContacto;
   subtipo?: string | null;
+  tipo_empleado_id?: number | null;
   notas?: string | null;
   activo: boolean;
   created_at: string;
@@ -652,6 +654,23 @@ export interface MovimientoCaja {
   concepto: string;
   descripcion?: string | null;
   created_at: string;
+}
+
+export interface Paraje {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string | null;
+  color?: string | null;
+  icono?: string | null;
+  poligono?: number[][] | null;  // [[lat, lon], ...]
+  centro_lat?: number | null;
+  centro_lon?: number | null;
+  orden: number;
+  activo: boolean;
+  cantidad_contactos?: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PagoProgramado {

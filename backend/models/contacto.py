@@ -72,6 +72,11 @@ class Contacto(Base):
     # Subtipo / especialidad (para profesionales: "abogado", "contador", etc.)
     subtipo = Column(String(50), nullable=True)
 
+    # Para empleados: FK al catalogo de tipos de empleado (opcional)
+    tipo_empleado_id = Column(Integer, ForeignKey("tesoreria_tipos_empleado.id", ondelete="SET NULL"), nullable=True)
+    # Paraje opcional: alternativa a direccion exacta
+    paraje_id = Column(Integer, ForeignKey("tesoreria_parajes.id", ondelete="SET NULL"), nullable=True)
+
     notas = Column(Text, nullable=True)
 
     activo = Column(Boolean, default=True, nullable=False)

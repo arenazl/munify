@@ -57,6 +57,7 @@ from .tesoreria_conceptos import router as tesoreria_conceptos_router
 from .tesoreria_tipos_empleado import router as tesoreria_tipos_empleado_router
 from .tesoreria_cajas import router as tesoreria_cajas_router
 from .tesoreria_agenda import router as tesoreria_agenda_router
+from .tesoreria_parajes import router as tesoreria_parajes_router
 from .tesoreria_import import router as tesoreria_import_router
 
 api_router = APIRouter()
@@ -119,6 +120,7 @@ api_router.include_router(tesoreria_conceptos_router, prefix="/tesoreria", tags=
 api_router.include_router(tesoreria_tipos_empleado_router, prefix="/tesoreria/tipos-empleado", tags=["Tesoreria - Tipos Empleado"])
 api_router.include_router(tesoreria_cajas_router, prefix="/tesoreria/cajas", tags=["Tesoreria - Cajas"])
 api_router.include_router(tesoreria_agenda_router, prefix="/tesoreria/agenda", tags=["Tesoreria - Agenda Pagos"])
+api_router.include_router(tesoreria_parajes_router, prefix="/tesoreria/parajes", tags=["Tesoreria - Parajes"])
 api_router.include_router(tesoreria_import_router, prefix="/tesoreria/import", tags=["Tesoreria - Importadores"])
 
 # WebSockets
