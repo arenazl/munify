@@ -403,8 +403,7 @@ export default function TesoreriaContactos() {
         searchMaxWidth={320}
         searchValue={search}
         onSearchChange={setSearch}
-        extraFilters={extraFilters}
-        headerActions={headerActions}
+        headerActions={<>{headerActions}{extraFilters}</>}
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay contactos. Importá el Excel o agregalos con 'Nuevo'."
