@@ -449,6 +449,12 @@ export function ABMPage({
         )}
       </div>
 
+      {/* Mini hint sobre el toggle de vistas (cards/table/guided).
+          Se muestra una sola vez por usuario, dismissable, y solo si hay
+          al menos 2 vistas disponibles. Aplica a TODAS las pantallas
+          que usan ABMPage. */}
+      {(tableView || guidedView) && <ViewToggleHint hasGuided={!!guidedView} hasTable={!!tableView} />}
+
       {/* Grid de contenido con animación de transición */}
       {!isEmpty ? (
         <div className="relative mt-4">
@@ -1706,4 +1712,53 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
     }
   `;
   document.head.appendChild(style);
+}
+
+// ============================================================
+// Mini hint dismissable que explica el toggle cards/table/guided
+// ============================================================
+const VIEW_HINT_KEY = 'abm_view_toggle_hint_seen';
+
+function ViewToggleHint({ hasGuided, hasTable }: { hasGuided: boolean; hasTable: boolean }) {
+  const { theme } = useTheme();
+  const [visible, setVisible] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(VIEW_HINT_KEY) !== '1';
+  });
+
+  if (!visible) return null;
+
+  const dismiss = () => {
+    localStorage.setItem(VIEW_HINT_KEY, '1');
+    setVisible(false);
+  };
+
+  const modos: string[] = [];
+  modos.push('Tarjetas');
+  if (hasTable) modos.push('Tabla');
+  if (hasGuided) modos.push('Guiada');
+
+  return (
+    <div
+      className="mt-3 mb-1 rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm"
+      style={{
+        backgroundColor: `${theme.primary}10`,
+        border: `1px solid ${theme.primary}30`,
+        color: theme.text,
+      }}
+    >
+      <Sparkles className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
+      <span className="flex-1">
+        <b>Tip:</b> probá los <b>{modos.length} modos de vista</b> ({modos.join(' · ')}) con los iconos de la derecha arriba.
+        {hasGuided && ' La vista guiada agrupa los items por urgencia y prioridad.'}
+      </span>
+      <button
+        onClick={dismiss}
+        className="text-xs px-2 py-1 rounded font-semibold hover:bg-opacity-80 transition-colors flex-shrink-0"
+        style={{ backgroundColor: theme.primary, color: '#fff' }}
+      >
+        Entendido
+      </button>
+    </div>
+  );
 }

@@ -1565,7 +1565,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     );
   };
 
-  const inboxView = vistaInbox ? (
+  // Siempre devolver el InboxLayout (no depender de vistaInbox). ABMPage
+  // controla cuando mostrarlo via su viewMode. Si lo condicionamos aca,
+  // al togglear el boton guiado desaparece del toggle de ABMPage.
+  const inboxView = (
     <InboxLayout
       saludoNombre={user?.nombre || ''}
       contextoLabel={user?.dependencia?.nombre || municipioActual?.nombre || 'tu municipio'}
@@ -1637,7 +1640,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         },
       ]}
     />
-  ) : null;
+  );
 
   // Toggle de vista (botón en headerActions)
   const toggleVista = () => {
@@ -1661,7 +1664,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         loading={false}
         isEmpty={!loading && filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
-        defaultViewMode="guided"
+        defaultViewMode="table"
         viewStorageKey="tramites_view"
         guidedView={inboxView}
         onViewModeChange={(m) => setVistaInbox(m === 'guided')}
