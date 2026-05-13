@@ -92,11 +92,16 @@ function generateColors(
   sidebarIndex: number,
   primaryIndex: number
 ): ThemeColors {
-  const bg = palette[bgIndex];
+  const rawBg = palette[bgIndex];
   const sidebar = palette[sidebarIndex];
   const primary = palette[primaryIndex];
 
-  // Determinar si el fondo es claro u oscuro
+  // Si el preset elige blanco puro, reemplazamos por gris muy claro
+  // (slate-100) para que las cards blancas resalten del fondo. Cards
+  // siempre quedan en blanco para los temas light.
+  const isPureWhite = rawBg.toLowerCase() === '#ffffff' || rawBg.toLowerCase() === '#fff';
+  const bg = isPureWhite ? '#f1f5f9' : rawBg;
+
   const bgIsLight = isLightColor(bg);
   const sidebarIsLight = isLightColor(sidebar);
 
@@ -104,7 +109,9 @@ function generateColors(
     background: bg,
     backgroundSecondary: bgIsLight ? darken(bg, 3) : lighten(bg, 3),
     contentBackground: bg,
-    card: bgIsLight ? lighten(bg, 5) : lighten(bg, 5),
+    // Cards: si era blanco puro, las mantenemos blancas para que
+    // resalten contra el background gris. Sino, lighten normal.
+    card: isPureWhite ? '#ffffff' : lighten(bg, 5),
     sidebar: sidebar,
     sidebarText: sidebarIsLight ? '#1e293b' : '#ffffff',
     sidebarTextSecondary: sidebarIsLight ? '#475569' : '#94a3b8',
