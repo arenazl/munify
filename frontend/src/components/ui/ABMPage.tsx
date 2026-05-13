@@ -1,11 +1,11 @@
 import { ReactNode, useState, useEffect } from 'react';
-import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
 
-type ViewMode = 'cards' | 'table';
+type ViewMode = 'cards' | 'table' | 'guided';
 
 // Hook simple para detectar mobile (< 640px)
 function useIsMobile() {
@@ -83,6 +83,20 @@ interface ABMPageProps {
   // Vista tabla (opcional)
   tableView?: ReactNode;
 
+  // Vista guiada (opcional). Cuando se pasa, aparece un 3er boton en el
+  // toggle de vista (icono varita magica) y al seleccionarlo se renderiza
+  // este contenido en lugar de cards/table. Sirve para layouts Inbox/Wizard
+  // que muestran la misma data con otro enfoque.
+  guidedView?: ReactNode;
+
+  /** Clave de localStorage para persistir la vista elegida. Si se pasa,
+   * la eleccion sobrevive recargas (ej: "tramites_view"). */
+  viewStorageKey?: string;
+
+  /** Callback cuando el usuario cambia la vista. Util para que el parent
+   * re-fetche con limits diferentes (ej: inbox carga 500, grilla 50). */
+  onViewModeChange?: (mode: ViewMode) => void;
+
   // Sección de deshabilitados (se muestra en ambas vistas)
   disabledSection?: ReactNode;
 
@@ -119,6 +133,9 @@ export function ABMPage({
   sheetFooter,
   onSheetClose,
   tableView,
+  guidedView,
+  viewStorageKey,
+  onViewModeChange,
   disabledSection,
   defaultViewMode,
   stickyHeader = true,
@@ -128,13 +145,39 @@ export function ABMPage({
   const { theme } = useTheme();
   const isMobile = useIsMobile();
 
-  // Si no hay tableView, defaultear a 'cards' para evitar pantalla vacía
-  const resolvedDefaultViewMode = defaultViewMode || (tableView ? 'table' : 'cards');
-  const [viewMode, setViewMode] = useState<ViewMode>(resolvedDefaultViewMode);
+  // Si no hay tableView, defaultear a 'cards' para evitar pantalla vacía.
+  // Si se paso viewStorageKey, restaurar la vista guardada.
+  const resolvedDefaultViewMode: ViewMode = (() => {
+    if (typeof window !== 'undefined' && viewStorageKey) {
+      const saved = localStorage.getItem(viewStorageKey) as ViewMode | null;
+      if (saved && ['cards', 'table', 'guided'].includes(saved)) {
+        // Validar que la vista guardada sea posible (sino fallback)
+        if (saved === 'guided' && !guidedView) return 'cards';
+        if (saved === 'table' && !tableView) return 'cards';
+        return saved;
+      }
+    }
+    return defaultViewMode || (guidedView ? 'guided' : (tableView ? 'table' : 'cards'));
+  })();
+  const [viewMode, setViewModeState] = useState<ViewMode>(resolvedDefaultViewMode);
+  const setViewMode = (m: ViewMode) => {
+    setViewModeState(m);
+    if (typeof window !== 'undefined' && viewStorageKey) {
+      localStorage.setItem(viewStorageKey, m);
+    }
+    onViewModeChange?.(m);
+  };
+
+  // Notificar al parent del modo inicial (para que sincronice fetch limits, etc)
+  useEffect(() => {
+    onViewModeChange?.(viewMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // En mobile, siempre usar cards (mejor UX que tabla)
-  const effectiveViewMode = isMobile ? 'cards' : viewMode;
+  // En mobile, siempre usar cards (mejor UX que tabla). La vista guiada
+  // se respeta porque tipicamente esta diseñada para todos los anchos.
+  const effectiveViewMode: ViewMode = isMobile && viewMode === 'table' ? 'cards' : viewMode;
 
   if (loading) {
     return (
@@ -243,26 +286,20 @@ export function ABMPage({
             </button>
           )}
 
-          {/* Toggle Vista - solo desktop */}
-          {tableView && (
+          {/* Toggle Vista (cards / table / guided) - solo desktop */}
+          {(tableView || guidedView) && (
             <div
               className="hidden sm:flex items-center rounded-lg p-1 flex-shrink-0"
               style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
             >
               <button
                 onClick={() => setViewMode('cards')}
-                className={`
-                  relative p-2 rounded-md transition-all duration-300 ease-out
-                  ${viewMode === 'cards' ? 'text-white' : ''}
-                `}
-                style={{
-                  color: viewMode === 'cards' ? '#ffffff' : theme.textSecondary,
-                }}
+                className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'cards' ? 'text-white' : ''}`}
+                style={{ color: viewMode === 'cards' ? '#ffffff' : theme.textSecondary }}
                 title="Vista tarjetas"
               >
                 {viewMode === 'cards' && (
-                  <div
-                    className="absolute inset-0 rounded-md transition-all duration-300 ease-out"
+                  <div className="absolute inset-0 rounded-md transition-all duration-300 ease-out"
                     style={{
                       background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
                       boxShadow: `0 2px 8px ${theme.primary}40`,
@@ -271,28 +308,42 @@ export function ABMPage({
                 )}
                 <LayoutGrid className="h-4 w-4 relative z-10" />
               </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`
-                  relative p-2 rounded-md transition-all duration-300 ease-out
-                  ${viewMode === 'table' ? 'text-white' : ''}
-                `}
-                style={{
-                  color: viewMode === 'table' ? '#ffffff' : theme.textSecondary,
-                }}
-                title="Vista tabla"
-              >
-                {viewMode === 'table' && (
-                  <div
-                    className="absolute inset-0 rounded-md transition-all duration-300 ease-out"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                      boxShadow: `0 2px 8px ${theme.primary}40`,
-                    }}
-                  />
-                )}
-                <List className="h-4 w-4 relative z-10" />
-              </button>
+              {tableView && (
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'table' ? 'text-white' : ''}`}
+                  style={{ color: viewMode === 'table' ? '#ffffff' : theme.textSecondary }}
+                  title="Vista tabla"
+                >
+                  {viewMode === 'table' && (
+                    <div className="absolute inset-0 rounded-md transition-all duration-300 ease-out"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                        boxShadow: `0 2px 8px ${theme.primary}40`,
+                      }}
+                    />
+                  )}
+                  <List className="h-4 w-4 relative z-10" />
+                </button>
+              )}
+              {guidedView && (
+                <button
+                  onClick={() => setViewMode('guided')}
+                  className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'guided' ? 'text-white' : ''}`}
+                  style={{ color: viewMode === 'guided' ? '#ffffff' : theme.textSecondary }}
+                  title="Vista guiada"
+                >
+                  {viewMode === 'guided' && (
+                    <div className="absolute inset-0 rounded-md transition-all duration-300 ease-out"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
+                        boxShadow: `0 2px 8px ${theme.primary}40`,
+                      }}
+                    />
+                  )}
+                  <Wand2 className="h-4 w-4 relative z-10" />
+                </button>
+              )}
             </div>
           )}
 
@@ -435,6 +486,21 @@ export function ABMPage({
               }}
             >
               {tableView}
+            </div>
+          )}
+
+          {/* Vista Guiada (Inbox, wizard, etc.) */}
+          {guidedView && (
+            <div
+              style={{
+                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                opacity: effectiveViewMode === 'guided' ? 1 : 0,
+                position: effectiveViewMode === 'guided' ? 'relative' : 'absolute',
+                inset: effectiveViewMode === 'guided' ? 'auto' : 0,
+                pointerEvents: effectiveViewMode === 'guided' ? 'auto' : 'none',
+              }}
+            >
+              {guidedView}
             </div>
           )}
 

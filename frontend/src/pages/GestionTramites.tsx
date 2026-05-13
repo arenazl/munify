@@ -1651,30 +1651,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   return (
     <PullToRefresh onRefresh={async () => { await loadData(); }}>
       <PageHint pageId="tramites-list" />
-      {/* Toggle vista guiada / clásica */}
-      <div className="flex justify-end mb-3">
-        <button
-          type="button"
-          onClick={toggleVista}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
-          style={{
-            backgroundColor: vistaInbox ? `${theme.primary}15` : theme.backgroundSecondary,
-            border: `1px solid ${vistaInbox ? theme.primary + '60' : theme.border}`,
-            color: vistaInbox ? theme.primary : theme.textSecondary,
-          }}
-          title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
-        >
-          {vistaInbox ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
-          {vistaInbox ? 'Vista guiada' : 'Vista clásica'}
-        </button>
-      </div>
-
-      {vistaInbox ? (
-        <>
-          {inboxView}
-          {/* Sheet del trámite sigue funcionando con selectedTramite */}
-        </>
-      ) : (
       <ABMPage
         title="Trámites"
         buttonLabel="Nuevo Trámite"
@@ -1683,9 +1659,12 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
         loading={false}
-        isEmpty={!loading && filteredTramites.length === 0}
+        isEmpty={!loading && filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
-        defaultViewMode="table"
+        defaultViewMode="guided"
+        viewStorageKey="tramites_view"
+        guidedView={inboxView}
+        onViewModeChange={(m) => setVistaInbox(m === 'guided')}
         stickyHeader={true}
         headerActions={
           <div className="flex items-center gap-1.5">
@@ -1723,7 +1702,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       >
         {renderCards()}
       </ABMPage>
-      )}
 
       {/* Sentinel para infinite scroll + spinner de carga.
           Solo en vista clásica — en vista Inbox la lista no se pagina. */}
