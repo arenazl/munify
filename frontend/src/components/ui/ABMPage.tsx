@@ -366,16 +366,33 @@ export function ABMPage({
           )}
         </div>
 
-        {/* Secondary Filters Bar (full width) - dentro del sticky container */}
+        {/* Secondary Filters Bar (full width) - dentro del sticky container.
+            Wrapper responsive: horizontal-scroll si no entra, scrollbar oculto.
+            Esto previene el bug de chips/combos apilados verticalmente en tablet/mobile
+            cuando una pagina pone `flex-wrap` adentro. */}
         {secondaryFilters && (
           <div
-            className="rounded-b-xl p-3"
+            className="rounded-b-xl p-3 abm-secondary-filters-wrap"
             style={{
               backgroundColor: theme.card,
               border: `1px solid ${theme.border}`,
               borderTop: 'none',
             }}
           >
+            <style>{`
+              .abm-secondary-filters-wrap > div {
+                overflow-x: auto;
+                scrollbar-width: none;
+              }
+              .abm-secondary-filters-wrap > div::-webkit-scrollbar {
+                display: none;
+              }
+              /* Si la pagina puso flex-wrap directamente, lo neutralizamos
+                 — el ROW se mantiene horizontal con scroll. */
+              .abm-secondary-filters-wrap > div.flex-wrap {
+                flex-wrap: nowrap !important;
+              }
+            `}</style>
             {secondaryFilters}
           </div>
         )}

@@ -378,7 +378,7 @@ export default function Tesoreria() {
 
   // Chips de estado agregado
   const estadoChips = (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="inline-flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
       {ESTADO_FILTROS.map(e => {
         const isActive = estadoFiltro === e.value;
         const meta = e.value ? ESTADO_AGREGADO_META[e.value] : null;
@@ -516,7 +516,9 @@ export default function Tesoreria() {
         </button>
       </div>
 
-      <div className="flex-1 min-w-0 flex justify-end">
+      {/* Pills de estado: inline al final, sin push agresivo a la derecha
+          (en tablet/mobile evita que se apilen verticalmente). */}
+      <div className="flex-shrink-0 ml-auto max-w-full overflow-hidden">
         {estadoChips}
       </div>
     </div>
