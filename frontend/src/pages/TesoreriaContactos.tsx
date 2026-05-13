@@ -290,16 +290,37 @@ export default function TesoreriaContactos() {
         <ABMInput label="Teléfono" value={form.telefono || ''} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
         <ABMInput label="Email" type="email" value={form.email || ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />
       </div>
-      <ModernSelect
-        label="Tipo"
-        value={form.tipo || 'beneficiario'}
-        onChange={(v) => setForm({ ...form, tipo: v as TipoContacto })}
-        options={(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => ({
-          value: t,
-          label: TIPO_LABELS[t],
-          color: TIPO_COLORS[t],
-        }))}
-      />
+      <div className={form.tipo === 'empleado' && tiposEmpleado.length > 0 ? 'grid grid-cols-2 gap-3' : ''}>
+        <ModernSelect
+          label="Tipo"
+          value={form.tipo || 'beneficiario'}
+          onChange={(v) => setForm({ ...form, tipo: v as TipoContacto, tipo_empleado_id: v === 'empleado' ? form.tipo_empleado_id : null })}
+          options={(Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => ({
+            value: t, label: TIPO_LABELS[t], color: TIPO_COLORS[t],
+          }))}
+        />
+        {/* Combo dinamico: tipo de empleado (catalogo per-muni) */}
+        {form.tipo === 'empleado' && tiposEmpleado.length > 0 && (
+          <ModernSelect
+            label="Tipo de empleado"
+            value={form.tipo_empleado_id ? String(form.tipo_empleado_id) : ''}
+            onChange={(v) => {
+              const id = v ? parseInt(v, 10) : null;
+              const tipo = id ? tiposEmpleado.find(t => t.id === id) : null;
+              // Mantengo `subtipo` (string) sincronizado para backward-compat
+              setForm({ ...form, tipo_empleado_id: id, subtipo: tipo?.nombre || null });
+            }}
+            options={[
+              { value: '', label: 'Sin clasificar' },
+              ...tiposEmpleado.map(t => ({
+                value: String(t.id), label: t.nombre, color: t.color || undefined,
+              })),
+            ]}
+            placeholder="Elegir tipo..."
+            searchable
+          />
+        )}
+      </div>
       {/* Toggle: ubicación por dirección exacta O por paraje */}
       <div>
         <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Ubicación</label>
