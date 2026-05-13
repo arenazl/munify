@@ -598,6 +598,25 @@ async def crear_municipio_demo(
     except Exception as e:
         print(f"[CREAR DEMO] Seed de tasas fallo (best-effort): {e}")
 
+    # 6. Seed Tesoreria (best-effort): activa el modulo + carga catalogos
+    # (15 tipos concepto, 300 conceptos, 10 tipos empleado), 5 cajas/fondos
+    # (Tesoro+Copa+FOFINDE+FODEMEP+FOMEP), 5 parajes con poligonos demo,
+    # ~20 contactos, ~50 gastos historicos, 3 proyectos, 2 pagos programados.
+    try:
+        from services.seed_demo_tesoreria import seed_tesoreria_demo
+        # Buscar el admin del muni recien creado
+        from sqlalchemy import select as _sel
+        admin_user = (await db.execute(
+            _sel(User).where(User.municipio_id == municipio.id, User.rol == RolUsuario.ADMIN).limit(1)
+        )).scalar_one_or_none()
+        if admin_user:
+            t_counts = await seed_tesoreria_demo(db, municipio.id, admin_user.id)
+            print(f"[CREAR DEMO] Tesoreria seed: {t_counts}")
+            await db.commit()
+    except Exception as e:
+        print(f"[CREAR DEMO] Seed de Tesoreria fallo (best-effort): {e}")
+        await db.rollback()
+
     await db.refresh(municipio)
 
     return MunicipioDemoResponse(
