@@ -96,11 +96,13 @@ function generateColors(
   const sidebar = palette[sidebarIndex];
   const primary = palette[primaryIndex];
 
-  // Si el preset elige blanco puro, reemplazamos por gris muy claro
-  // (slate-100) para que las cards blancas resalten del fondo. Cards
-  // siempre quedan en blanco para los temas light.
-  const isPureWhite = rawBg.toLowerCase() === '#ffffff' || rawBg.toLowerCase() === '#fff';
-  const bg = isPureWhite ? '#f1f5f9' : rawBg;
+  // Si el preset elige un fondo MUY claro (blanco puro, casi-blanco,
+  // crema, etc.), lo reemplazamos por un gris suave (#e8eef5) para que
+  // las cards resalten. Cards quedan en blanco/cremita para los light.
+  const rawNum = parseInt(rawBg.replace('#', ''), 16);
+  const lum = ((rawNum >> 16) * 0.299 + ((rawNum >> 8) & 0xff) * 0.587 + (rawNum & 0xff) * 0.114) / 255;
+  const isCasiBlanco = lum > 0.92;
+  const bg = isCasiBlanco ? '#e8eef5' : rawBg;
 
   const bgIsLight = isLightColor(bg);
   const sidebarIsLight = isLightColor(sidebar);
@@ -109,9 +111,9 @@ function generateColors(
     background: bg,
     backgroundSecondary: bgIsLight ? darken(bg, 3) : lighten(bg, 3),
     contentBackground: bg,
-    // Cards: si era blanco puro, las mantenemos blancas para que
-    // resalten contra el background gris. Sino, lighten normal.
-    card: isPureWhite ? '#ffffff' : lighten(bg, 5),
+    // Cards: si el bg original era casi-blanco, las dejamos en el
+    // color original (blanco o crema) para que resalten contra el gris.
+    card: isCasiBlanco ? rawBg : lighten(bg, 5),
     sidebar: sidebar,
     sidebarText: sidebarIsLight ? '#1e293b' : '#ffffff',
     sidebarTextSecondary: sidebarIsLight ? '#475569' : '#94a3b8',
