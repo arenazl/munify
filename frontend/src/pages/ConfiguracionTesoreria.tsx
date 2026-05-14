@@ -15,16 +15,19 @@ import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesA
 import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje } from '../types';
 import TesoreriaProyectos from './TesoreriaProyectos';
 
-type Tab = 'tipos' | 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos';
+type Tab = 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos';
 
 export default function ConfiguracionTesoreria() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = (searchParams.get('tab') as Tab) || 'tipos';
-  const [tab, setTabState] = useState<Tab>(
-    ['tipos','conceptos','tipos-empleado','cajas','parajes','proyectos'].includes(initialTab) ? initialTab : 'tipos'
-  );
+  // 'tipos' eliminado del selector (los tipos siguen existiendo en DB
+  // pero ya no se gestionan desde acá — el ABM es solo de conceptos planos).
+  const requested = searchParams.get('tab') as string | null;
+  const initialTab: Tab = (requested && ['conceptos','tipos-empleado','cajas','parajes','proyectos'].includes(requested))
+    ? (requested as Tab)
+    : 'conceptos';
+  const [tab, setTabState] = useState<Tab>(initialTab);
   const setTab = (t: Tab) => {
     setTabState(t);
     setSearchParams({ tab: t }, { replace: true });
@@ -66,10 +69,9 @@ export default function ConfiguracionTesoreria() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — tipos eliminado, conceptos quedan planos */}
       <div className="flex gap-1 border-b" style={{ borderColor: theme.border }}>
         {([
-          { id: 'tipos', label: 'Tipos de concepto', icon: <Tag className="h-4 w-4" /> },
           { id: 'conceptos', label: 'Conceptos', icon: <FileText className="h-4 w-4" /> },
           { id: 'tipos-empleado', label: 'Tipos de empleado', icon: <Users className="h-4 w-4" /> },
           { id: 'cajas', label: 'Cajas / Fondos', icon: <PiggyBank className="h-4 w-4" /> },
@@ -97,7 +99,6 @@ export default function ConfiguracionTesoreria() {
 
       {/* Tab contents */}
       <div className="pt-2">
-        {tab === 'tipos' && <TiposConceptoTab />}
         {tab === 'conceptos' && <ConceptosTab />}
         {tab === 'tipos-empleado' && <TiposEmpleadoTab />}
         {tab === 'cajas' && <CajasTab />}
@@ -315,15 +316,16 @@ function TiposConceptoTab() {
 // ============================================================
 function ConceptosTab() {
   const { theme } = useTheme();
-  const [tipos, setTipos] = useState<TipoConcepto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtroTipo, setFiltroTipo] = useState<string>('');
   const [search, setSearch] = useState('');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Concepto | null>(null);
-  const [form, setForm] = useState({ nombre: '', descripcion: '', tipo_concepto_id: 0, orden: 0 });
+  const [form, setForm] = useState({ nombre: '', descripcion: '', orden: 0 });
   const [saving, setSaving] = useState(false);
+  // El backend exige tipo_concepto_id no-null (todavia). Resolvemos el tipo
+  // "General" del muni y se lo enviamos automaticamente en cada create.
+  const [generalTipoId, setGeneralTipoId] = useState<number | null>(null);
 
   const fetch = async () => {
     setLoading(true);
@@ -332,7 +334,9 @@ function ConceptosTab() {
         tiposConceptoApi.list({ activo: true }),
         conceptosAbmApi.list({ activo: true }),
       ]);
-      setTipos(tiposRes.data || []);
+      const tipos = (tiposRes.data || []) as TipoConcepto[];
+      const general = tipos.find(t => t.nombre.toLowerCase() === 'general');
+      setGeneralTipoId(general ? general.id : (tipos[0]?.id ?? null));
       setConceptos(conceptosRes.data || []);
     } catch {
       toast.error('Error cargando conceptos');
@@ -346,30 +350,33 @@ function ConceptosTab() {
   const filtered = useMemo(() => {
     const s = search.trim().toLowerCase();
     return conceptos.filter(c => {
-      if (filtroTipo && c.tipo_concepto_id !== parseInt(filtroTipo, 10)) return false;
       if (s && !c.nombre.toLowerCase().includes(s) && !(c.descripcion || '').toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [conceptos, filtroTipo, search]);
+  }, [conceptos, search]);
 
   const openSheet = (c: Concepto | null = null) => {
     if (c) {
       setEditing(c);
-      setForm({ nombre: c.nombre, descripcion: c.descripcion || '', tipo_concepto_id: c.tipo_concepto_id, orden: c.orden });
+      setForm({ nombre: c.nombre, descripcion: c.descripcion || '', orden: c.orden });
     } else {
       setEditing(null);
-      const defaultTipo = filtroTipo ? parseInt(filtroTipo, 10) : (tipos[0]?.id ?? 0);
-      setForm({ nombre: '', descripcion: '', tipo_concepto_id: defaultTipo, orden: 0 });
+      setForm({ nombre: '', descripcion: '', orden: 0 });
     }
     setSheetOpen(true);
   };
 
   const save = async () => {
     if (!form.nombre.trim()) return toast.error('Nombre requerido');
-    if (!form.tipo_concepto_id) return toast.error('Tipo requerido');
+    if (!generalTipoId) return toast.error('Configuracion: falta tipo General. Recargá la página.');
     setSaving(true);
     try {
-      const payload = { ...form, nombre: form.nombre.trim(), descripcion: form.descripcion.trim() || null };
+      const payload = {
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion.trim() || null,
+        orden: form.orden,
+        tipo_concepto_id: generalTipoId,
+      };
       if (editing) {
         await conceptosAbmApi.update(editing.id, payload);
         toast.success('Concepto actualizado');
@@ -397,19 +404,11 @@ function ConceptosTab() {
     }
   };
 
-  const tipoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los tipos' },
-    ...tipos.map(t => ({ value: String(t.id), label: t.nombre, color: t.color || undefined })),
-  ]), [tipos]);
-
   if (loading) return <div className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>;
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 mb-3">
-        <div className="min-w-[220px] flex-shrink-0">
-          <ModernSelect value={filtroTipo} onChange={setFiltroTipo} options={tipoOptions} placeholder="Todos los tipos" searchable />
-        </div>
         <input
           type="text"
           value={search}
@@ -425,8 +424,6 @@ function ConceptosTab() {
           onClick={() => openSheet()}
           className="ml-auto px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2"
           style={{ backgroundColor: theme.primary }}
-          disabled={tipos.length === 0}
-          title={tipos.length === 0 ? 'Primero creá al menos un tipo' : ''}
         >
           <Plus className="h-4 w-4" /> Nuevo concepto
         </button>
@@ -437,14 +434,13 @@ function ConceptosTab() {
           <thead>
             <tr style={{ backgroundColor: theme.backgroundSecondary }}>
               <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.textSecondary }}>Concepto</th>
-              <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ color: theme.textSecondary }}>Tipo</th>
               <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase tracking-wide w-24" style={{ color: theme.textSecondary }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={3} className="text-center p-6" style={{ color: theme.textSecondary }}>
+                <td colSpan={2} className="text-center p-6" style={{ color: theme.textSecondary }}>
                   No hay conceptos con los filtros actuales.
                 </td>
               </tr>
@@ -462,14 +458,6 @@ function ConceptosTab() {
                 <td className="px-3 py-2" style={{ color: theme.text }}>
                   <span className="font-medium">{c.nombre}</span>
                   {c.descripcion && <span className="block text-[11px]" style={{ color: theme.textSecondary }}>{c.descripcion}</span>}
-                </td>
-                <td className="px-3 py-2">
-                  <span
-                    className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                    style={{ backgroundColor: `${c.tipo_concepto_color || theme.primary}20`, color: c.tipo_concepto_color || theme.primary }}
-                  >
-                    {c.tipo_concepto_nombre}
-                  </span>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1">
@@ -500,16 +488,6 @@ function ConceptosTab() {
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Nombre *</label>
             <input value={form.nombre} onChange={(e) => setForm(f => ({ ...f, nombre: e.target.value }))} autoFocus className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Tipo *</label>
-            <ModernSelect
-              value={form.tipo_concepto_id ? String(form.tipo_concepto_id) : ''}
-              onChange={(v) => setForm(f => ({ ...f, tipo_concepto_id: parseInt(v, 10) }))}
-              options={tipos.map(t => ({ value: String(t.id), label: t.nombre, color: t.color || undefined }))}
-              placeholder="Elegir tipo..."
-              searchable
-            />
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>

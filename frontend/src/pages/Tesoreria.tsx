@@ -79,7 +79,8 @@ export default function Tesoreria() {
   const [tipoContactoFiltro, setTipoContactoFiltro] = useState<TipoContacto | ''>('');
   const [subtipoEmpleadoFiltro, setSubtipoEmpleadoFiltro] = useState<string>('');
   const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
-  const [tipoConceptoFiltro, setTipoConceptoFiltro] = useState<string>('');
+  // Filtro de tipo de concepto eliminado — listado plano de conceptos.
+  const tipoConceptoFiltro = '';
   const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
 
@@ -460,15 +461,7 @@ export default function Tesoreria() {
         />
       </div>
 
-      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
-        <ModernSelect
-          value={tipoConceptoFiltro}
-          onChange={(v) => { setTipoConceptoFiltro(v); setConceptoFiltro(''); }}
-          options={tipoConceptoOptions}
-          placeholder="Todos los tipos"
-          searchable
-        />
-      </div>
+      {/* Filtro 'Tipo de concepto' eliminado — listado plano (1 nivel). */}
 
       <div className="min-w-[180px] flex-shrink-0 ts-fitem">
         <ModernSelect
