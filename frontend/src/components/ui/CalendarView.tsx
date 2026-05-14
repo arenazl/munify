@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { MonthRangeNavigator } from './MonthRangeNavigator';
 
 /**
  * CalendarView — vista de calendario multi-mes, agnostica, generica.
@@ -82,6 +82,9 @@ export function CalendarView<T>(props: CalendarViewProps<T>) {
 
   const [dragItemId, setDragItemId] = useState<string | number | null>(null);
   const dragEnabled = !!onItemDrop;
+  // Modo "todos los meses": deshabilita la grilla mensual y muestra solo
+  // la lista detalle con todos los items (sin filtro de mes).
+  const [modoTodos, setModoTodos] = useState(false);
 
   const irMesAnterior = () => {
     if (calMes === 0) { setCalMes(11); setCalAnio(a => a - 1); }
@@ -113,11 +116,12 @@ export function CalendarView<T>(props: CalendarViewProps<T>) {
   }, [calMes, calAnio, mesesVisibles]);
 
   const itemsEnRango = useMemo(() => {
+    if (modoTodos) return items;
     return items.filter(it => {
       const d = new Date(getDate(it));
       return mesesAMostrar.some(m => m.anio === d.getFullYear() && m.mes === d.getMonth());
     });
-  }, [items, mesesAMostrar, getDate]);
+  }, [items, mesesAMostrar, getDate, modoTodos]);
 
   const handleDrop = (anio: number, mes: number, dia: number) => {
     if (!onItemDrop || dragItemId == null) return;
@@ -231,35 +235,30 @@ export function CalendarView<T>(props: CalendarViewProps<T>) {
 
   return (
     <div className="space-y-3">
-      {/* Header: nav + toggle 1/2/3/4 meses */}
-      <div className="flex items-center gap-2 rounded-xl p-3 flex-wrap" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        <button onClick={irMesAnterior} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <h3 className="text-base font-bold inline-flex items-center gap-2 flex-1 justify-center" style={{ color: theme.text }}>
-          <Calendar className="h-5 w-5" style={{ color: theme.primary }} />
-          {mesesAMostrar[0] && (
-            <>
-              {MESES_LARGO[mesesAMostrar[0].mes]} {mesesAMostrar[0].anio}
-              {mesesVisibles > 1 && mesesAMostrar[mesesVisibles - 1] && (
-                <> – {MESES_LARGO[mesesAMostrar[mesesVisibles - 1].mes]} {mesesAMostrar[mesesVisibles - 1].anio}</>
-              )}
-            </>
-          )}
-        </h3>
-        <button onClick={irMesSiguiente} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>
-          <ChevronRight className="h-4 w-4" />
-        </button>
-        <div className="inline-flex items-center rounded-lg p-0.5" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+      {/* Header: navegador de meses (control compacto con flechas pegadas
+          al label + boton "Todos") y toggle 1/2/3/4 meses a la derecha. */}
+      <div className="flex items-center gap-2 rounded-xl p-2.5 flex-wrap justify-between" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+        <MonthRangeNavigator
+          mes={calMes}
+          anio={calAnio}
+          cantidadMeses={mesesVisibles}
+          modoTodos={modoTodos}
+          onPrev={irMesAnterior}
+          onNext={irMesSiguiente}
+          onToggleTodos={() => setModoTodos(v => !v)}
+        />
+        {/* Toggle cantidad de meses (1/2/3/4) — control separado a la derecha */}
+        <div className="inline-flex items-center rounded-lg p-0.5" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, opacity: modoTodos ? 0.4 : 1, pointerEvents: modoTodos ? 'none' : 'auto' }}>
           {([1, 2, 3, 4] as const).map(n => (
             <button key={n}
               onClick={() => setMesesVisiblesPersist(n)}
-              className="px-2.5 py-1 rounded text-xs font-bold transition-all"
+              className="px-2 py-1 rounded text-[11px] font-bold transition-all"
               style={{
                 backgroundColor: mesesVisibles === n ? theme.primary : 'transparent',
                 color: mesesVisibles === n ? '#fff' : theme.textSecondary,
               }}
               title={`Ver ${n} mes${n > 1 ? 'es' : ''}`}
+              type="button"
             >
               {n}M
             </button>
@@ -271,14 +270,16 @@ export function CalendarView<T>(props: CalendarViewProps<T>) {
         <p className="text-[11px] text-center" style={{ color: theme.textSecondary }}>{helperText}</p>
       )}
 
-      <div className={`grid gap-3 ${
-        mesesVisibles === 1 ? 'grid-cols-1' :
-        mesesVisibles === 2 ? 'grid-cols-1 md:grid-cols-2' :
-        mesesVisibles === 3 ? 'grid-cols-1 md:grid-cols-3' :
-        'grid-cols-1 md:grid-cols-2'
-      }`}>
-        {mesesAMostrar.map(m => renderMes(m.anio, m.mes))}
-      </div>
+      {!modoTodos && (
+        <div className={`grid gap-3 ${
+          mesesVisibles === 1 ? 'grid-cols-1' :
+          mesesVisibles === 2 ? 'grid-cols-1 md:grid-cols-2' :
+          mesesVisibles === 3 ? 'grid-cols-1 md:grid-cols-3' :
+          'grid-cols-1 md:grid-cols-2'
+        }`}>
+          {mesesAMostrar.map(m => renderMes(m.anio, m.mes))}
+        </div>
+      )}
 
       {/* Lista detallada del rango */}
       {renderDetailRow && itemsEnRango.length > 0 && (
