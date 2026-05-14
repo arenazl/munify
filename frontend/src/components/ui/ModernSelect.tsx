@@ -189,15 +189,15 @@ export function ModernSelect({
         </label>
       )}
 
-      {/* Trigger Button */}
+      {/* Trigger Button — alto canonico 40px, tipografia 13px */}
       <button
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
         disabled={disabled}
         className={`
-          w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl
-          transition-all duration-200 text-left
+          w-full h-10 flex items-center justify-between gap-2 px-3 rounded-xl
+          transition-all duration-200 text-left text-[13px]
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-opacity-60'}
           ${isOpen ? 'ring-2' : ''}
         `}
@@ -208,10 +208,10 @@ export function ModernSelect({
           ['--tw-ring-color' as string]: `${theme.primary}40`,
         }}
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {selectedOption?.icon && (
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
               style={{
                 backgroundColor: selectedOption.color ? `${selectedOption.color}20` : `${theme.primary}20`,
                 color: selectedOption.color || theme.primary
@@ -222,29 +222,19 @@ export function ModernSelect({
           )}
           <div className="min-w-0 flex-1">
             {selectedOption ? (
-              <>
-                <span
-                  className="block truncate font-medium"
-                  style={{ color: selectedOption.color || theme.text }}
-                >
-                  {selectedOption.label}
-                </span>
-                {selectedOption.description && (
-                  <span
-                    className="block text-xs truncate"
-                    style={{ color: theme.textSecondary }}
-                  >
-                    {selectedOption.description}
-                  </span>
-                )}
-              </>
+              <span
+                className="block truncate font-medium leading-tight"
+                style={{ color: selectedOption.color || theme.text }}
+              >
+                {selectedOption.label}
+              </span>
             ) : (
-              <span style={{ color: theme.textSecondary }}>{placeholder}</span>
+              <span className="truncate block" style={{ color: theme.textSecondary }}>{placeholder}</span>
             )}
           </div>
         </div>
         <ChevronDown
-          className={`h-5 w-5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           style={{ color: theme.textSecondary }}
         />
       </button>
@@ -309,7 +299,7 @@ export function ModernSelect({
                     type="button"
                     onClick={() => handleSelect(option.value)}
                     className={`
-                      w-full flex items-center gap-3 px-4 py-3 text-left
+                      w-full flex items-center gap-2 px-3 py-2 text-left text-[13px]
                       transition-all duration-150
                     `}
                     style={{
@@ -326,7 +316,7 @@ export function ModernSelect({
                   >
                     {option.icon && (
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
                         style={{
                           backgroundColor: option.color ? `${option.color}20` : `${theme.primary}20`,
                           color: option.color || theme.primary
@@ -337,14 +327,14 @@ export function ModernSelect({
                     )}
                     <div className="min-w-0 flex-1">
                       <span
-                        className={`block truncate ${isSelected ? 'font-semibold' : 'font-medium'}`}
+                        className={`block truncate leading-tight ${isSelected ? 'font-semibold' : 'font-medium'}`}
                         style={{ color: option.color || theme.text }}
                       >
                         {option.label}
                       </span>
                       {option.description && (
                         <span
-                          className="block text-xs truncate"
+                          className="block text-[11px] truncate leading-tight"
                           style={{ color: theme.textSecondary }}
                         >
                           {option.description}
@@ -353,7 +343,7 @@ export function ModernSelect({
                     </div>
                     {isSelected && (
                       <Check
-                        className="h-5 w-5 flex-shrink-0"
+                        className="h-4 w-4 flex-shrink-0"
                         style={{ color: theme.primary }}
                       />
                     )}

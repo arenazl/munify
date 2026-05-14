@@ -156,6 +156,44 @@ sugerenciasMun/
 `<input type="email">`, `<input type="password">`, `<textarea>` cuando NO existe un
 componente custom equivalente. Y aún así envueltos con el theme (`useTheme()`).
 
+### Regla de UX: cuándo usar píldoras vs combo
+
+Filtros tipo **píldora / chip horizontal** funcionan bien con pocas opciones.
+Si la lista crece, conviene migrar a `ModernSelect`:
+
+- **≤ 5 opciones** → píldoras (visibles de un vistazo, click rápido).
+- **6+ opciones** → **sugerir** convertir a `ModernSelect`. Una fila de
+  6+ chips genera scroll horizontal molesto, ruido visual y se rompe en
+  mobile.
+
+Excepciones (mantener píldoras aun con muchas opciones):
+- Son estados primarios muy usados que el usuario quiere ver de un
+  vistazo (ej. Todos / Pendientes / En curso / Resueltos).
+- El usuario lo pide explícitamente.
+
+Cuando detectes 6+ filtros tipo píldora en una pantalla, plantealo al
+user antes de implementar — la decisión final es de él, pero la
+recomendación por defecto es migrar a combo.
+
+### Header de ABMPage: tamaños canónicos
+
+Todos los controles del header de un `ABMPage` (search input,
+`ModernSelect`, `DatePicker`, `DateRangePicker`, botón "Nuevo",
+píldoras) deben verse **orgánicos entre sí**:
+
+- **Alto**: `40px` (`h-10`) para todos los controles principales.
+- **Tipografía**: `13px` (`text-[13px]` o `text-sm`) para texto de
+  valor seleccionado / placeholder / botones.
+- **Píldoras**: pueden usar `12px` (`text-xs`) porque son chips más
+  compactos, pero **mismo alto** (40px) para que la línea no se
+  rompa.
+- **Mobile**: si los controles no entran, el wrapper hace
+  **scroll horizontal** (`overflow-x: auto`, scrollbar oculto). Cada
+  control mantiene su alto y se ve completo — nada se aplasta ni se
+  corta. Esto lo provee el wrapper `abm-secondary-filters-wrap` del
+  ABMPage automáticamente; las páginas solo tienen que poner los
+  controles dentro de `secondaryFilters`.
+
 **¿Necesitás un control que no está en la tabla?** Antes de crear uno nuevo:
 1. Buscar en `frontend/src/components/ui/` (puede tener otro nombre).
 2. Buscar en `frontend/src/components/` por dominio.

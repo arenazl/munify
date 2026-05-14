@@ -263,7 +263,7 @@ export function ABMPage({
               onChange={(e) => onSearchChange(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="w-full pl-9 pr-4 py-2 rounded-lg text-sm focus:ring-2 focus:outline-none transition-all duration-300"
+              className="w-full h-10 pl-9 pr-4 rounded-lg text-[13px] focus:ring-2 focus:outline-none transition-all duration-300"
               style={{
                 backgroundColor: theme.background,
                 color: theme.text,
@@ -357,7 +357,7 @@ export function ABMPage({
               <button
                 onClick={onAdd}
                 className={`
-                  inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm
+                  inline-flex items-center h-10 px-4 rounded-lg font-semibold text-[13px]
                   transition-all duration-300 ease-out
                   hover:scale-105 hover:-translate-y-0.5
                   active:scale-95
@@ -423,7 +423,7 @@ export function ABMPage({
             cuando una pagina pone `flex-wrap` adentro. */}
         {secondaryFilters && (
           <div
-            className="rounded-b-xl p-3 abm-secondary-filters-wrap"
+            className="rounded-b-xl p-2.5 abm-secondary-filters-wrap"
             style={{
               backgroundColor: theme.card,
               border: `1px solid ${theme.border}`,
@@ -431,9 +431,13 @@ export function ABMPage({
             }}
           >
             <style>{`
+              /* Wrapper interno: row horizontal con scroll-x cuando no entra */
               .abm-secondary-filters-wrap > div {
                 overflow-x: auto;
+                overflow-y: visible;
                 scrollbar-width: none;
+                gap: 8px;
+                align-items: center;
               }
               .abm-secondary-filters-wrap > div::-webkit-scrollbar {
                 display: none;
@@ -442,6 +446,35 @@ export function ABMPage({
                  — el ROW se mantiene horizontal con scroll. */
               .abm-secondary-filters-wrap > div.flex-wrap {
                 flex-wrap: nowrap !important;
+              }
+              /* TODOS los controles del header tienen alto canonico 40px
+                 y tipografia 13px para que se vean homogeneos.
+                 Esto aplica a botones, ModernSelect triggers, DatePickers,
+                 chips/pildoras, etc. */
+              .abm-secondary-filters-wrap button,
+              .abm-secondary-filters-wrap input:not([type="checkbox"]):not([type="radio"]) {
+                min-height: 40px;
+                font-size: 13px;
+              }
+              /* Las pildoras-chip que ya tienen text-xs (estados con badge)
+                 quedan organicas: matchean alto pero conservan su tipografia */
+              .abm-secondary-filters-wrap .text-xs,
+              .abm-secondary-filters-wrap [data-pill="true"] {
+                font-size: 12px;
+              }
+              /* Cada hijo directo no se aplasta */
+              .abm-secondary-filters-wrap > div > * {
+                flex-shrink: 0;
+              }
+              /* Mobile: padding lateral interno para que el primer/ultimo
+                 elemento no quede pegado al borde durante el scroll */
+              @media (max-width: 640px) {
+                .abm-secondary-filters-wrap > div {
+                  padding-left: 2px;
+                  padding-right: 2px;
+                  scroll-padding-left: 8px;
+                  scroll-padding-right: 8px;
+                }
               }
             `}</style>
             {secondaryFilters}
