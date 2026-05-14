@@ -19,6 +19,12 @@ export interface ThemePreset {
     vintage: ThemeColors;
     vibrante: ThemeColors;
   };
+  /** Familia del tema: 'light' (suaves), 'azul' (SaaS modernos), 'dark' (carbón VS Code) */
+  family?: 'light' | 'azul' | 'dark';
+  /** Si true, el tema NO aparece en el selector pero sigue funcionando
+   * si algun usuario lo tiene guardado en localStorage. Se usa para
+   * desactivar gradualmente la coleccion vieja sin romper sesiones. */
+  archived?: boolean;
 }
 
 export interface ThemeColors {
@@ -148,12 +154,147 @@ function generateVariants(
   };
 }
 
-// 12 Temas predefinidos - TODOS usando generateVariants()
+// ============================================================
+// COLECCION CURADA — 9 temas oficiales (3 light suaves + 3 azul SaaS + 3 dark VS Code)
+// El resto de los temas (Midnight, Forest, Sunset, etc.) estan `archived: true`:
+// siguen funcionando si alguien los tiene seleccionados pero no aparecen en el
+// selector. Para reactivar uno viejo, sacarle el flag `archived`.
+// ============================================================
 export const themePresets: ThemePreset[] = [
+
+  // ---- LIGHT (blancos suaves, NUNCA blanco puro) ----
+
+  // 1. Niebla — blanco grisaceo suave, acento indigo. Linear-style.
+  {
+    id: 'niebla',
+    name: 'Niebla',
+    family: 'light',
+    palette: ['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'],
+    variants: generateVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'], {
+      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+      vintage: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
+
+  // 2. Marfil — beige calido, acento verde olivo. Editorial/civic.
+  {
+    id: 'marfil',
+    name: 'Marfil',
+    family: 'light',
+    palette: ['#faf8f3', '#efece4', '#1f2937', '#65a30d'],
+    variants: generateVariants(['#faf8f3', '#efece4', '#1f2937', '#65a30d'], {
+      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+      vintage: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
+
+  // 3. Perla — gris perlado limpio, acento azul acero. Escandinavo.
+  {
+    id: 'perla',
+    name: 'Perla',
+    family: 'light',
+    palette: ['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'],
+    variants: generateVariants(['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'], {
+      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+      vintage: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
+    }),
+  },
+
+  // ---- AZUL (SaaS modernos, fondo azul-grisaceo) ----
+
+  // 4. Indigo — fondo slate-900 oscuro, acento indigo brillante. Premium SaaS.
+  {
+    id: 'indigo',
+    name: 'Indigo',
+    family: 'azul',
+    palette: ['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'],
+    variants: generateVariants(['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+    }),
+  },
+
+  // 5. Cobalto — fondo navy, sidebar azul-grisaceo, acento celeste. Tipo Notion/Linear.
+  {
+    id: 'cobalto',
+    name: 'Cobalto',
+    family: 'azul',
+    palette: ['#0b1426', '#172033', '#3b82f6', '#93c5fd'],
+    variants: generateVariants(['#0b1426', '#172033', '#3b82f6', '#93c5fd'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+    }),
+  },
+
+  // 6. Acero — fondo gris-azulado, acento azul electrico. Profesional/dashboards.
+  {
+    id: 'acero',
+    name: 'Acero',
+    family: 'azul',
+    palette: ['#111827', '#1f2937', '#2563eb', '#60a5fa'],
+    variants: generateVariants(['#111827', '#1f2937', '#2563eb', '#60a5fa'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+    }),
+  },
+
+  // ---- DARK (gris carbon VS Code, NUNCA negro puro) ----
+
+  // 7. Carbon VSC — replica el dark de VS Code (#1e1e1e + #252526). Acento azul VSC.
+  {
+    id: 'carbon-vsc',
+    name: 'Carbon',
+    family: 'dark',
+    palette: ['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'],
+    variants: generateVariants(['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
+    }),
+  },
+
+  // 8. Grafito — gris carbon mas neutro, acento ambar (calido pero serio).
+  {
+    id: 'grafito',
+    name: 'Grafito',
+    family: 'dark',
+    palette: ['#1f2024', '#2a2c31', '#404249', '#f59e0b'],
+    variants: generateVariants(['#1f2024', '#2a2c31', '#404249', '#f59e0b'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+    }),
+  },
+
+  // 9. Onix — el mas oscuro del set, casi negro pero NO negro puro. Acento teal.
+  {
+    id: 'onix',
+    name: 'Onix',
+    family: 'dark',
+    palette: ['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'],
+    variants: generateVariants(['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'], {
+      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
+    }),
+  },
+
+  // ============================================================
+  // TEMAS LEGACY — desactivados (archived: true). Quedan por compatibilidad
+  // con usuarios que los tengan en localStorage. NO aparecen en el selector.
+  // ============================================================
+
   // 1. Midnight Blue - Elegante y profesional
   {
     id: 'midnight',
     name: 'Midnight',
+    archived: true,
     palette: ['#0a0f1a', '#1a2744', '#3b82f6', '#60a5fa'],
     variants: generateVariants(['#0a0f1a', '#1a2744', '#3b82f6', '#60a5fa'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -166,6 +307,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'forest',
     name: 'Forest',
+    archived: true,
     palette: ['#0d1f12', '#1a3d22', '#22c55e', '#86efac'],
     variants: generateVariants(['#0d1f12', '#1a3d22', '#22c55e', '#86efac'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -178,6 +320,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'sunset',
     name: 'Sunset',
+    archived: true,
     palette: ['#1a0f0a', '#3d1f12', '#f97316', '#fdba74'],
     variants: generateVariants(['#1a0f0a', '#3d1f12', '#f97316', '#fdba74'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -190,6 +333,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'ocean',
     name: 'Ocean',
+    archived: true,
     palette: ['#0c1929', '#132f4c', '#0ea5e9', '#7dd3fc'],
     variants: generateVariants(['#0c1929', '#132f4c', '#0ea5e9', '#7dd3fc'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -202,6 +346,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'lavender',
     name: 'Lavender',
+    archived: true,
     palette: ['#1a0f2e', '#2d1b4e', '#a855f7', '#d8b4fe'],
     variants: generateVariants(['#1a0f2e', '#2d1b4e', '#a855f7', '#d8b4fe'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -214,6 +359,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'rose',
     name: 'Rose',
+    archived: true,
     palette: ['#1f0a14', '#3d1428', '#ec4899', '#f9a8d4'],
     variants: generateVariants(['#1f0a14', '#3d1428', '#ec4899', '#f9a8d4'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -226,6 +372,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'sand',
     name: 'Sand',
+    archived: true,
     palette: ['#f5f0e8', '#e8e0d5', '#a67c52', '#8b6642'],
     variants: generateVariants(['#f5f0e8', '#e8e0d5', '#a67c52', '#8b6642'], {
       clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar oscuro para contraste
@@ -238,6 +385,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'arctic',
     name: 'Arctic',
+    archived: true,
     palette: ['#f8fafc', '#e2e8f0', '#3b82f6', '#1e40af'],
     variants: generateVariants(['#f8fafc', '#e2e8f0', '#3b82f6', '#1e40af'], {
       clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar azul oscuro
@@ -250,6 +398,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'slate',
     name: 'Slate',
+    archived: true,
     palette: ['#0f172a', '#1e293b', '#64748b', '#94a3b8'],
     variants: generateVariants(['#0f172a', '#1e293b', '#64748b', '#94a3b8'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -262,6 +411,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'monochrome',
     name: 'Monochrome',
+    archived: true,
     palette: ['#0a0a0a', '#1a1a1a', '#666666', '#e0e0e0'],
     variants: generateVariants(['#0a0a0a', '#1a1a1a', '#666666', '#e0e0e0'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -274,6 +424,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'ember',
     name: 'Ember',
+    archived: true,
     palette: ['#1c1917', '#292524', '#dc2626', '#fca5a5'],
     variants: generateVariants(['#1c1917', '#292524', '#dc2626', '#fca5a5'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -286,6 +437,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'graphite',
     name: 'Graphite',
+    archived: true,
     palette: ['#18181b', '#27272a', '#52525b', '#a1a1aa'],
     variants: generateVariants(['#18181b', '#27272a', '#52525b', '#a1a1aa'], {
       clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
@@ -298,6 +450,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'mindful',
     name: 'MindfulSpace',
+    archived: true,
     palette: ['#E8EEF5', '#c5ccd6', '#34d399', '#22d3ee'],
     variants: generateVariants(['#E8EEF5', '#c5ccd6', '#34d399', '#22d3ee'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -310,6 +463,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'salescrm',
     name: 'Sales CRM',
+    archived: true,
     palette: ['#f1f5f9', '#1e3a5f', '#2563eb', '#16a34a'],
     variants: generateVariants(['#f1f5f9', '#1e3a5f', '#2563eb', '#16a34a'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -322,6 +476,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'aiwriter',
     name: 'AI Writer',
+    archived: true,
     palette: ['#F5F5F5', '#E5E5E5', '#18181B', '#3B82F6'],
     variants: generateVariants(['#F5F5F5', '#E5E5E5', '#18181B', '#3B82F6'], {
       clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },  // Fondo neutral, sidebar AI black, acento blue
@@ -334,6 +489,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'generative',
     name: 'Generative Art',
+    archived: true,
     palette: ['#121212', '#1A1A1A', '#8B5CF6', '#EC4899'],
     variants: generateVariants(['#121212', '#1A1A1A', '#8B5CF6', '#EC4899'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Fondo canvas, sidebar charcoal, acento purple
@@ -346,6 +502,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'aimagegen',
     name: 'AI Image Gen',
+    archived: true,
     palette: ['#0F0F0F', '#1C1C1E', '#06B6D4', '#F59E0B'],
     variants: generateVariants(['#0F0F0F', '#1C1C1E', '#06B6D4', '#F59E0B'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },  // Fondo deep black, sidebar dark, acento cyan
@@ -362,6 +519,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'onyx',
     name: 'Onyx',
+    archived: true,
     palette: ['#0a0a0a', '#1a1a1a', '#9b8755', '#d4b986'],
     variants: generateVariants(['#0a0a0a', '#1a1a1a', '#9b8755', '#d4b986'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -374,6 +532,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'pearl',
     name: 'Pearl',
+    archived: true,
     palette: ['#fafaf9', '#f0eee8', '#1e3a5f', '#475569'],
     variants: generateVariants(['#fafaf9', '#f0eee8', '#1e3a5f', '#475569'], {
       clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 2 },  // Sidebar navy oscuro
@@ -386,6 +545,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'espresso',
     name: 'Espresso',
+    archived: true,
     palette: ['#1c1410', '#2e211a', '#8b5a3c', '#c9a878'],
     variants: generateVariants(['#1c1410', '#2e211a', '#8b5a3c', '#c9a878'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -398,6 +558,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'steel',
     name: 'Steel',
+    archived: true,
     palette: ['#111418', '#1f2937', '#334155', '#0891b2'],
     variants: generateVariants(['#111418', '#1f2937', '#334155', '#0891b2'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
@@ -410,6 +571,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'sage',
     name: 'Sage',
+    archived: true,
     palette: ['#f5f5f0', '#e7e5dc', '#5a6e58', '#3d5a4f'],
     variants: generateVariants(['#f5f5f0', '#e7e5dc', '#5a6e58', '#3d5a4f'], {
       clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 2 },  // Sidebar verde oscuro
@@ -422,6 +584,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'bordeaux',
     name: 'Bordeaux',
+    archived: true,
     palette: ['#1a0d0f', '#2e1418', '#8b1e3f', '#c9a097'],
     variants: generateVariants(['#1a0d0f', '#2e1418', '#8b1e3f', '#c9a097'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
@@ -438,6 +601,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'paper',
     name: 'Paper',
+    archived: true,
     palette: ['#ffffff', '#f4f4f4', '#8a8a8a', '#1a1a1a'],
     variants: generateVariants(['#ffffff', '#f4f4f4', '#8a8a8a', '#1a1a1a'], {
       clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 3 },  // Fondo puro, sidebar negro
@@ -450,6 +614,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'ink',
     name: 'Ink',
+    archived: true,
     palette: ['#000000', '#121212', '#a3a3a3', '#ffffff'],
     variants: generateVariants(['#000000', '#121212', '#a3a3a3', '#ffffff'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },  // Negro puro + acento blanco
@@ -462,6 +627,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'concrete',
     name: 'Concrete',
+    archived: true,
     palette: ['#2a2a2a', '#3d3d3d', '#6b6b6b', '#cfcfcf'],
     variants: generateVariants(['#2a2a2a', '#3d3d3d', '#6b6b6b', '#cfcfcf'], {
       clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
@@ -474,6 +640,7 @@ export const themePresets: ThemePreset[] = [
   {
     id: 'platinum',
     name: 'Platinum',
+    archived: true,
     palette: ['#f5f5f7', '#e5e5ea', '#86868b', '#1d1d1f'],
     variants: generateVariants(['#f5f5f7', '#e5e5ea', '#86868b', '#1d1d1f'], {
       clasico: { bgIndex: 0, sidebarIndex: 3, primaryIndex: 3 },  // Fondo platino, sidebar carbón
@@ -490,17 +657,26 @@ export function getThemeColors(presetId: string, variant: ThemeVariant): ThemeCo
   return preset.variants[variant];
 }
 
-// Helper para obtener todos los presets como opciones
+// Helper para obtener los presets activos (no archivados) — los unicos
+// que aparecen en el selector. Los archivados siguen disponibles via
+// getThemeColors() para no romper sesiones con tema viejo seleccionado.
+export function getActivePresets(): ThemePreset[] {
+  return themePresets.filter(p => !p.archived);
+}
+
+// Helper para obtener todos los presets como opciones (solo activos).
 export function getPresetOptions() {
-  return themePresets.map(preset => ({
+  return getActivePresets().map(preset => ({
     id: preset.id,
     name: preset.name,
+    family: preset.family,
     palette: preset.palette,
   }));
 }
 
-// Configuración por defecto
+// Configuracion por defecto — tema dark estilo VS Code
 export const defaultThemeConfig = {
-  presetId: 'graphite',
+  presetId: 'carbon-vsc',
   variant: 'clasico' as ThemeVariant,
 };
+

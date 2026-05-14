@@ -7,7 +7,10 @@ import {
   ThemeVariant,
   defaultThemeConfig,
   getThemeColors,
+  getActivePresets,
 } from '../config/themePresets';
+import { DEFAULT_FONT_ID } from '../config/fontPresets';
+import { applyFontFamily } from '../lib/fontLoader';
 
 // Exportar tipos necesarios
 export type { ThemePreset, ThemeColors, ThemeVariant };
@@ -38,7 +41,11 @@ interface ThemeContextType {
   contentBgOpacity: number;
   setContentBgOpacity: (opacity: number) => void;
 
-  // Lista de presets disponibles
+  // Tipografia (solo persiste si user es superadmin/admin)
+  currentFontId: string;
+  setFont: (fontId: string) => void;
+
+  // Lista de presets disponibles (solo activos, sin archivados)
   presets: ThemePreset[];
 }
 
@@ -57,7 +64,8 @@ const readTheme = (userId: number | undefined) => {
   const sidebarOp = localStorage.getItem(userScopedKey(userId, 'sidebarBgOpacity'));
   const contentBg = localStorage.getItem(userScopedKey(userId, 'contentBgImage'));
   const contentOp = localStorage.getItem(userScopedKey(userId, 'contentBgOpacity'));
-  return { preset, variant, sidebarBg, sidebarOp, contentBg, contentOp };
+  const fontId = localStorage.getItem(userScopedKey(userId, 'fontId'));
+  return { preset, variant, sidebarBg, sidebarOp, contentBg, contentOp, fontId };
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -85,6 +93,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
   const [contentBgOpacity, setContentBgOpacityState] = useState<number>(
     initial.contentOp ? parseFloat(initial.contentOp) : 0.1
+  );
+  const [currentFontId, setCurrentFontId] = useState<string>(
+    initial.fontId || DEFAULT_FONT_ID
   );
 
   // Flag para evitar guardar en localStorage durante la hidratación inicial
@@ -121,6 +132,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setSidebarBgOpacityState(sidebarOp);
     setContentBgImageState(contentBg);
     setContentBgOpacityState(contentOp);
+
+    // Fuente: prioridad localStorage del usuario > tema_config del muni > default
+    const fontId = saved.fontId || (muniConfig as any)?.fontId || DEFAULT_FONT_ID;
+    setCurrentFontId(fontId);
 
     // Dejamos de hidratar en el próximo microtask, después de que los setState
     // hagan flush — así los effects que persisten en localStorage ignoran este
@@ -205,6 +220,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(userScopedKey(user?.id, 'contentBgOpacity'), String(contentBgOpacity));
   }, [contentBgOpacity, user?.id]);
 
+  // Aplicar la fuente cuando cambia (carga Google Fonts + setea CSS var
+  // + setea body.style.fontFamily). Persiste en localStorage del usuario.
+  useEffect(() => {
+    applyFontFamily(currentFontId);
+    if (hydratingRef.current) return;
+    localStorage.setItem(userScopedKey(user?.id, 'fontId'), currentFontId);
+  }, [currentFontId, user?.id]);
+
   // Función para cambiar preset y variante
   const setPreset = (presetId: string, variant: ThemeVariant) => {
     setCurrentPresetId(presetId);
@@ -227,6 +250,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setContentBgOpacityState(opacity);
   };
 
+  const setFont = (fontId: string) => {
+    setCurrentFontId(fontId);
+  };
+
   return (
     <ThemeContext.Provider
       value={{
@@ -242,7 +269,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setContentBgImage,
         contentBgOpacity,
         setContentBgOpacity,
-        presets: themePresets,
+        currentFontId,
+        setFont,
+        presets: getActivePresets(),
       }}
     >
       {children}

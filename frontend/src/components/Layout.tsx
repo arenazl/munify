@@ -5,6 +5,7 @@ import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, Ch
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
+import { fontPresets } from '../config/fontPresets';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
@@ -104,6 +105,8 @@ export default function Layout() {
     setContentBgImage,
     contentBgOpacity,
     setContentBgOpacity,
+    currentFontId,
+    setFont,
   } = useTheme();
   const location = useLocation();
 
@@ -911,6 +914,42 @@ export default function Layout() {
                           })}
                         </div>
                       </div>
+
+                      {/* Tipografia — solo visible para superadmin */}
+                      {user?.rol === 'admin' && !user?.municipio_id && (
+                        <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
+                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                            Tipografia (superadmin)
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5 mt-2">
+                            {fontPresets.map((f) => {
+                              const isSelected = currentFontId === f.id;
+                              return (
+                                <button
+                                  key={f.id}
+                                  onClick={() => setFont(f.id)}
+                                  className="text-left px-2 py-1.5 rounded-md transition-all"
+                                  style={{
+                                    backgroundColor: isSelected ? `${theme.primary}15` : theme.backgroundSecondary,
+                                    border: `1.5px solid ${isSelected ? theme.primary : 'transparent'}`,
+                                    fontFamily: f.family,
+                                  }}
+                                  title={f.name}
+                                  type="button"
+                                >
+                                  <span className="block text-[11px] font-semibold leading-tight" style={{ color: isSelected ? theme.primary : theme.text }}>
+                                    {f.name}
+                                  </span>
+                                  <span className="block text-[10px] leading-tight" style={{ color: theme.textSecondary }}>
+                                    Aa Bb Cc 123
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       {/* Fondo del sidebar */}
                       <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
                         <div className="flex items-center justify-between mb-2">

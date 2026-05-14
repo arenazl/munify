@@ -198,6 +198,35 @@ píldoras) deben verse **orgánicos entre sí**:
   evita que el teclado virtual aparezca y tape las opciones. El user
   toca el input solo si necesita filtrar.
 
+### Sistema de temas y tipografías (`config/themePresets.ts` + `config/fontPresets.ts`)
+
+**Temas**: 9 temas curados oficiales, organizados en 3 familias:
+- **Light** (blancos suaves, no #fff puro): `niebla`, `marfil`, `perla`.
+- **Azul** (SaaS modernos, fondos azul-grisáceos): `indigo`, `cobalto`, `acero`.
+- **Dark** (gris carbón estilo VS Code, no negro puro): `carbon-vsc`, `grafito`, `onix`.
+
+Los temas legacy (Midnight, Forest, Sunset, etc.) están marcados con
+`archived: true` — no aparecen en el selector pero siguen funcionando si
+algún usuario los tiene seleccionados. Usar `getActivePresets()` en lugar
+de `themePresets` para listar solo los curados.
+
+**Permisos del selector de tema** (lo configura en el menú user del Layout):
+- Admin de muni: elige tema → persiste en `municipios.tema_config` (DB) +
+  localStorage. Todos los usuarios del muni heredan.
+- Superadmin (con switcher de municipio activo): puede **sobrescribir** el
+  tema del admin local.
+
+**Tipografías**: 9 fuentes Google Fonts curadas (`Inter`, `Geist Sans`,
+`Manrope`, `Plus Jakarta Sans`, `DM Sans`, `Space Grotesk`, `Sora`,
+`Outfit`, `IBM Plex Sans`). Carga lazy via `lib/fontLoader.ts` (inyecta
+`<link rel="stylesheet">` dinámicamente solo cuando el preset se activa).
+
+**Permisos del selector de fuente**: SOLO superadmin lo ve. Persiste en
+`tema_config.fontId` del municipio activo.
+
+Fuente canónica agnóstica: `d:\Code\APP_GUIDE\config\themePresets.ts`,
+`d:\Code\APP_GUIDE\config\fontPresets.ts`, `d:\Code\APP_GUIDE\lib\fontLoader.ts`.
+
 ### Abreviaturas automáticas (`lib/textAbbreviation.ts`)
 
 `ModernSelect` aplica **abreviaturas automáticas** al label del trigger
