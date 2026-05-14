@@ -93,11 +93,13 @@ export function ModernSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose]);
 
-  // Focus en el input de búsqueda cuando se abre
+  // Focus en el input de busqueda solo en desktop. En mobile el auto-focus
+  // hace aparecer el teclado y tapa las opciones — el user igual puede
+  // tocar el input si quiere filtrar.
   useEffect(() => {
-    if (isOpen && searchable && inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (!isOpen || !searchable || !inputRef.current) return;
+    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
+    if (!isMobile) inputRef.current.focus();
   }, [isOpen, searchable]);
 
   const filteredOptions = searchable && searchTerm
