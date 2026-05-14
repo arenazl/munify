@@ -62,34 +62,38 @@ export function MunifyLogo({
 }: MunifyLogoProps) {
   const { theme } = useTheme();
 
-  // Resolver colores segun variant
-  let c1 = BRAND_DARK;
-  let c2 = BRAND_LIGHT;
+  // Esquema de marca:
+  //  - body (M) cambia segun el fondo: azul oscuro sobre claro, celeste claro
+  //    sobre oscuro.
+  //  - check siempre VERDE.
+  const BODY_DARK = '#112a6c';   // azul brand oscuro, va sobre sidebar/bg claro
+  const BODY_LIGHT = '#aebee0';  // celeste claro, va sobre sidebar/bg oscuro
+  const CHECK_GREEN = '#18a24d'; // verde tilde, constante
+
+  let bodyColor = BODY_DARK;
+  let checkColor = CHECK_GREEN;
 
   if (colorPair) {
-    [c1, c2] = colorPair;
+    [bodyColor, checkColor] = colorPair;
   } else if (color) {
-    c1 = color;
-    c2 = color;
+    bodyColor = color;
+    checkColor = color;
   } else if (variant === 'brand') {
-    // ya esta
+    // Mantener azul + azul-claro original (sin verde)
+    bodyColor = BRAND_DARK;
+    checkColor = BRAND_LIGHT;
   } else if (variant === 'sidebar' || (variant === 'auto' && theme.sidebar)) {
-    // Sidebar oscuro -> logo claro; sidebar claro -> logo oscuro/primary
     const sidebarIsLight = isLightColor(theme.sidebar);
-    if (sidebarIsLight) {
-      // Fondo claro -> usar primary del tema (que ya contrasta) + variacion
-      c1 = theme.primary;
-      c2 = theme.primary;
-    } else {
-      // Fondo oscuro -> logo en claro
-      c1 = '#ffffff';
-      c2 = '#cbd5e1';
-    }
+    bodyColor = sidebarIsLight ? BODY_DARK : BODY_LIGHT;
+    checkColor = CHECK_GREEN;
   } else if (variant === 'content') {
     const bgIsLight = isLightColor(theme.background);
-    c1 = theme.primary;
-    c2 = bgIsLight ? theme.primary : '#cbd5e1';
+    bodyColor = bgIsLight ? BODY_DARK : BODY_LIGHT;
+    checkColor = CHECK_GREEN;
   }
+
+  const c1 = bodyColor;
+  const c2 = checkColor;
 
   return (
     <svg
