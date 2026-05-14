@@ -198,6 +198,40 @@ píldoras) deben verse **orgánicos entre sí**:
   evita que el teclado virtual aparezca y tape las opciones. El user
   toca el input solo si necesita filtrar.
 
+### Librería de componentes core agnósticos (`d:\Code\APP_GUIDE\components\ui\`)
+
+La fuente canónica de componentes reutilizables vive en `d:\Code\APP_GUIDE\`.
+Cualquier proyecto nuevo arranca copiando de ahí. **Cuando se mejora un
+componente estable en Munify, OBLIGACIÓN portar el cambio en versión
+agnóstica a `APP_GUIDE/components/ui/`** (regla CLAUDE.md).
+
+**Componentes core actuales** (27):
+
+Layout/contenedores: `ABMPage`, `Sheet`, `Modal`, `WizardModal`,
+`WizardForm`, `StickyPageHeader`, `SectionHeader`, `MobilePageHeader`,
+`SettingsHeader`, `PageTransition`.
+
+Controles: `ModernSelect`, `DatePicker`, `DateRangePicker`,
+`AutocompleteInput`, `ValidatedInput`, `VoiceInput`, `ConfirmModal`.
+
+Específicos: `CalendarView`, `MonthRangeNavigator`, `MapPicker`,
+`HeatmapMapWidget`, `Skeleton`, `DynamicIcon`.
+
+**Agnósticos por composición** (reemplazan ad-hoc por entidad):
+- `EntityAutocomplete<T>` — autocomplete async genérico con getters
+  (reemplaza `ContactoAutocomplete` específico).
+- `EntityCard` — card de listado con title/badges/deadline/status props
+  (reemplaza `ReclamoCard` específico).
+- `AddressAutocomplete` — autocomplete de dirección con `geocoder` y
+  `regionContext` inyectables (reemplaza `DireccionAutocomplete`).
+- `PageHint` — recibe `hint` como prop en vez de leer de config global.
+
+En Munify, los wrappers viejos (`ContactoAutocomplete.tsx`,
+`ReclamoCard.tsx`, `DireccionAutocomplete.tsx`, `HeatmapWidget.tsx`)
+quedan **como están** — funcionan, no rompen imports. Cuando se reescriba
+una pantalla, migrarla a los componentes core. Para proyectos nuevos,
+usar siempre los core de APP_GUIDE.
+
 ### Sistema de temas y tipografías (`config/themePresets.ts` + `config/fontPresets.ts`)
 
 **Temas**: 9 temas curados oficiales, organizados en 3 familias:
