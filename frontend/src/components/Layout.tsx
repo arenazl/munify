@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
 import { fontPresets } from '../config/fontPresets';
+import { MunifyLogo } from './ui/MunifyLogo';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
@@ -47,10 +48,13 @@ const getMobileTabs = (userRole: string) => {
 };
 
 // Nombres de variantes en español
+// Cada tema curado tiene 3 variantes que controlan la TONALIDAD del sidebar.
+// El id interno se mantiene (clasico/vintage/vibrante) por compatibilidad con
+// sesiones guardadas, pero el label visible es Clara/Media/Oscura.
 const variantLabels: Record<ThemeVariant, string> = {
-  clasico: 'Clásico',
-  vintage: 'Vintage',
-  vibrante: 'Vibrante',
+  clasico: 'Clara',
+  vintage: 'Media',
+  vibrante: 'Oscura',
 };
 
 export default function Layout() {
@@ -401,11 +405,7 @@ export default function Layout() {
               justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
-            <img
-              src={new URL('../assets/munify_logo.png', import.meta.url).href}
-              alt="Munify"
-              className="h-8 w-8 object-contain flex-shrink-0"
-            />
+            <MunifyLogo size={40} variant="sidebar" className="flex-shrink-0" />
             <div
               style={{
                 width: isCollapsed ? 0 : 'auto',
@@ -894,7 +894,7 @@ export default function Layout() {
                         </div>
                       </div>
                       <div className="px-3 py-2 border-t" style={{ borderColor: theme.border }}>
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Estilo</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>Tono sidebar</span>
                         <div className="flex gap-2 mt-2">
                           {(['clasico', 'vintage', 'vibrante'] as ThemeVariant[]).map((variant) => {
                             const isSelected = currentVariant === variant;

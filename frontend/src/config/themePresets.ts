@@ -154,6 +154,34 @@ function generateVariants(
   };
 }
 
+/**
+ * Para los 9 temas curados: las 3 variantes (clasico/vintage/vibrante)
+ * funcionan como "Clara / Media / Oscura" del SIDEBAR, manteniendo el
+ * mismo bg y primary que el tema. Asi el user puede elegir la tonalidad
+ * del sidebar que prefiera sin salirse del tema.
+ *
+ * sidebars: [clara, media, oscura] — todas en el mismo hue del tema,
+ * pero con distinta luma.
+ */
+function genCuratedVariants(
+  palette: [string, string, string, string],
+  bgIndex: number,
+  primaryIndex: number,
+  sidebars: [string, string, string],
+): ThemePreset['variants'] {
+  const bg = palette[bgIndex];
+  const primary = palette[primaryIndex];
+  const buildWith = (sidebar: string): ThemeColors => {
+    const fakePalette: [string, string, string, string] = [bg, sidebar, primary, primary];
+    return generateColors(fakePalette, 0, 1, 2);
+  };
+  return {
+    clasico: buildWith(sidebars[0]),   // Sidebar CLARA
+    vintage: buildWith(sidebars[1]),   // Sidebar MEDIA
+    vibrante: buildWith(sidebars[2]),  // Sidebar OSCURA
+  };
+}
+
 // ============================================================
 // COLECCION CURADA — 9 temas oficiales (3 light suaves + 3 azul SaaS + 3 dark VS Code)
 // El resto de los temas (Midnight, Forest, Sunset, etc.) estan `archived: true`:
@@ -163,6 +191,7 @@ function generateVariants(
 export const themePresets: ThemePreset[] = [
 
   // ---- LIGHT (blancos suaves, NUNCA blanco puro) ----
+  // Variantes = tonalidad del sidebar: Clara / Media / Oscura.
 
   // 1. Niebla — blanco grisaceo suave, acento indigo. Linear-style.
   {
@@ -170,11 +199,8 @@ export const themePresets: ThemePreset[] = [
     name: 'Niebla',
     family: 'light',
     palette: ['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'],
-    variants: generateVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'], {
-      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vintage: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
+    variants: genCuratedVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'], 0, 3,
+      ['#e7ebf3', '#475569', '#1e293b']),
   },
 
   // 2. Marfil — beige calido, acento verde olivo. Editorial/civic.
@@ -183,11 +209,8 @@ export const themePresets: ThemePreset[] = [
     name: 'Marfil',
     family: 'light',
     palette: ['#faf8f3', '#efece4', '#1f2937', '#65a30d'],
-    variants: generateVariants(['#faf8f3', '#efece4', '#1f2937', '#65a30d'], {
-      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vintage: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
+    variants: genCuratedVariants(['#faf8f3', '#efece4', '#1f2937', '#65a30d'], 0, 3,
+      ['#efece4', '#57534e', '#292524']),
   },
 
   // 3. Perla — gris perlado limpio, acento azul acero. Escandinavo.
@@ -196,11 +219,8 @@ export const themePresets: ThemePreset[] = [
     name: 'Perla',
     family: 'light',
     palette: ['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'],
-    variants: generateVariants(['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'], {
-      clasico: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vintage: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 2, primaryIndex: 3 },
-    }),
+    variants: genCuratedVariants(['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'], 0, 3,
+      ['#e2e8f0', '#475569', '#0f172a']),
   },
 
   // ---- AZUL (SaaS modernos, fondo azul-grisaceo) ----
@@ -211,78 +231,60 @@ export const themePresets: ThemePreset[] = [
     name: 'Indigo',
     family: 'azul',
     palette: ['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'],
-    variants: generateVariants(['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-    }),
+    variants: genCuratedVariants(['#0f172a', '#1e293b', '#6366f1', '#a5b4fc'], 0, 2,
+      ['#334155', '#1e293b', '#0b1426']),
   },
 
-  // 5. Cobalto — fondo navy, sidebar azul-grisaceo, acento celeste. Tipo Notion/Linear.
+  // 5. Cobalto — fondo navy, sidebar azul-grisaceo, acento celeste.
   {
     id: 'cobalto',
     name: 'Cobalto',
     family: 'azul',
     palette: ['#0b1426', '#172033', '#3b82f6', '#93c5fd'],
-    variants: generateVariants(['#0b1426', '#172033', '#3b82f6', '#93c5fd'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-    }),
+    variants: genCuratedVariants(['#0b1426', '#172033', '#3b82f6', '#93c5fd'], 0, 2,
+      ['#2a3b5a', '#172033', '#070d18']),
   },
 
-  // 6. Acero — fondo gris-azulado, acento azul electrico. Profesional/dashboards.
+  // 6. Acero — fondo gris-azulado, acento azul electrico.
   {
     id: 'acero',
     name: 'Acero',
     family: 'azul',
     palette: ['#111827', '#1f2937', '#2563eb', '#60a5fa'],
-    variants: generateVariants(['#111827', '#1f2937', '#2563eb', '#60a5fa'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-    }),
+    variants: genCuratedVariants(['#111827', '#1f2937', '#2563eb', '#60a5fa'], 0, 2,
+      ['#374151', '#1f2937', '#0c1220']),
   },
 
   // ---- DARK (gris carbon VS Code, NUNCA negro puro) ----
 
-  // 7. Carbon VSC — replica el dark de VS Code (#1e1e1e + #252526). Acento azul VSC.
+  // 7. Carbon VSC — replica el dark de VS Code (#1e1e1e + #252526).
   {
     id: 'carbon-vsc',
     name: 'Carbon',
     family: 'dark',
     palette: ['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'],
-    variants: generateVariants(['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 2 },
-    }),
+    variants: genCuratedVariants(['#1e1e1e', '#252526', '#0e639c', '#9cdcfe'], 0, 2,
+      ['#3a3a3a', '#252526', '#161616']),
   },
 
-  // 8. Grafito — gris carbon mas neutro, acento ambar (calido pero serio).
+  // 8. Grafito — gris carbon mas neutro, acento ambar.
   {
     id: 'grafito',
     name: 'Grafito',
     family: 'dark',
     palette: ['#1f2024', '#2a2c31', '#404249', '#f59e0b'],
-    variants: generateVariants(['#1f2024', '#2a2c31', '#404249', '#f59e0b'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
+    variants: genCuratedVariants(['#1f2024', '#2a2c31', '#404249', '#f59e0b'], 0, 3,
+      ['#3f4147', '#2a2c31', '#15161a']),
   },
 
-  // 9. Onix — el mas oscuro del set, casi negro pero NO negro puro. Acento teal.
+  // 9. Onix — el mas oscuro del set, casi negro pero NO negro puro.
   {
     id: 'onix',
     name: 'Onix',
     family: 'dark',
     palette: ['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'],
-    variants: generateVariants(['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'], {
-      clasico: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vintage: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-      vibrante: { bgIndex: 0, sidebarIndex: 1, primaryIndex: 3 },
-    }),
+    variants: genCuratedVariants(['#1a1a1d', '#222226', '#2d2d33', '#14b8a6'], 0, 3,
+      ['#3a3a40', '#222226', '#101012']),
   },
 
   // ============================================================

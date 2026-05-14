@@ -4,7 +4,7 @@ import { Loader2, Shield, User, Sparkles, ArrowLeft, Building2 } from 'lucide-re
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import api from '../lib/api';
-import munifyLogo from '../assets/munify_logo.png';
+import { MunifyLogo } from '../components/ui/MunifyLogo';
 
 /**
  * Pantalla "demo lista" — landing ultra-minimalista a la que redirige
@@ -102,7 +102,7 @@ export default function DemoReady() {
       <header className="relative z-10 flex-shrink-0 px-6 py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={munifyLogo} alt="Munify" className="h-9 w-auto" />
+            <MunifyLogo size={36} variant="content" />
             <span className="text-xl font-bold text-white">Munify</span>
           </div>
           <button

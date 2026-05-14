@@ -4,7 +4,7 @@ import { Loader2, LogIn, Check, Building2, Sparkles, ArrowRight, Trash2 } from '
 import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
 import DemoCreationProgress from '../components/DemoCreationProgress';
-import munifyLogo from '../assets/munify_logo.png';
+import { MunifyLogo } from '../components/ui/MunifyLogo';
 
 interface Municipio {
   id: number;
@@ -129,7 +129,7 @@ export default function Demo() {
       <header className="flex-shrink-0 px-4 sm:px-6 py-4 sm:py-5">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <img src={munifyLogo} alt="Munify" className="h-8 sm:h-9 w-auto flex-shrink-0" />
+            <MunifyLogo size={36} variant="content" className="flex-shrink-0" />
             <span className="text-lg sm:text-xl font-bold text-slate-800 truncate">Munify</span>
           </div>
           <button
