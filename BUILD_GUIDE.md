@@ -127,6 +127,13 @@ sugerenciasMun/
 | Input de **rango de fechas** | `<DateRangePicker value onChange allowClear />` con presets | dos `<input type="date">` |
 | **Select / dropdown** | `<ModernSelect value onChange options placeholder searchable />` | `<select>` |
 | **Combo con autocomplete** (filtrado por texto) | `<ModernSelect ... searchable />` — mismo componente con la prop `searchable`. Las opciones se filtran por `label`/`description` con un input "Buscar..." que aparece al abrir el dropdown | `<datalist>`, librerías externas, combo + input separado |
+
+> **ℹ️ ModernSelect — comportamientos importantes a saber** (commits `ec6fe29`, `41f8498`):
+>
+> - **Dropdown via Portal** (`document.body`, `position: fixed`, `z-index: 9999`). Esto significa que **NO se clipea** por ningún `overflow:hidden` ancestro (resolvió el bug viejo del slot `extraFilters` de ABMPage). Podés meter `<ModernSelect>` adentro de cualquier container sin preocuparte.
+> - **Smart flip**: si hay poco espacio abajo del trigger y más arriba, el dropdown abre hacia arriba automáticamente. No hay que setear nada.
+> - **Mobile-aware**: en `max-width: 768px` la altura máxima del listado es `60vh` (~480-560px en iPhones), no `max-h-64`. Además NO auto-focusea el input de búsqueda para evitar que el teclado tape las opciones — el user toca el input si quiere filtrar.
+> - **Cierre touch**: maneja `mousedown` Y `touchstart`, no solo mouse.
 | **Autocomplete genérico** (no dirección) | `<AutocompleteInput options value onChange />` | `<datalist>` o input + dropdown a mano |
 | Input **con validación inline** | `<ValidatedInput value onChange validate error />` | `<input>` + manejar error suelto |
 | Layout de **ABM listado** | `<ABMPage title items columns onNew ... />` | divs sueltos con tabla a mano |
