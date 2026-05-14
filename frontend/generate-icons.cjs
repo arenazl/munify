@@ -1,72 +1,34 @@
 /**
- * Genera iconos PWA, favicon y apple-touch desde el master.
+ * Genera iconos PWA, favicon y apple-touch desde el SVG master.
  *
- * Master: public/brand/Logo-unedited.png (RGBA).
+ * Master: public/brand/Munify.svg
+ *
+ * Ventajas del SVG: escala infinito, sin halo, sin pixelado. sharp lo
+ * rasteriza a la densidad que necesitemos para cada tamano.
  *
  * Pipeline:
- *  1) whiteToTransparent — convierte pixeles muy blancos a alpha=0
- *     (por si el png viene con fondo blanco "falso transparente").
- *  2) trim() — recorta borde transparente real.
- *  3) extend a cuadrado (padding transparente).
- *  4) resize a cada tamano (contain, fondo transparente).
- *  5) version maskable con contenido al 80% del canvas.
+ *  1) sharp(svg).resize(N, N, fit: 'contain', background: transparent).
+ *  2) version maskable con contenido al 80% del canvas (Android no recorta).
  */
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = __dirname;
-const MASTER = path.join(ROOT, 'public/brand/Logo-unedited.png');
+const MASTER = path.join(ROOT, 'public/brand/Munify.svg');
 const OUT_ICONS = path.join(ROOT, 'public/icons');
 const OUT_PUBLIC = path.join(ROOT, 'public');
-const OUT_TRIMMED = path.join(ROOT, 'public/brand/Logo-square.png');
-
-// Umbral: si R+G+B > 245*3 y alpha > 0 -> setear alpha=0
-const WHITE_THRESHOLD = 245;
 
 const sizes = [16, 32, 72, 96, 128, 144, 152, 192, 384, 512];
 
-async function whiteToTransparent(inputPath) {
-  const img = sharp(inputPath).ensureAlpha();
-  const { data, info } = await img.raw().toBuffer({ resolveWithObject: true });
-  const { width, height, channels } = info;
-  if (channels !== 4) throw new Error(`expected 4 channels, got ${channels}`);
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    if (r >= WHITE_THRESHOLD && g >= WHITE_THRESHOLD && b >= WHITE_THRESHOLD) {
-      data[i + 3] = 0;
-    }
-  }
-  return sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
-}
-
-async function makeSquareMaster() {
-  // 1) blanco -> alpha 0
-  const cleaned = await whiteToTransparent(MASTER);
-  // 2) trim
-  const trimmed = await sharp(cleaned).trim().png().toBuffer();
-  const meta = await sharp(trimmed).metadata();
-  const w = meta.width;
-  const h = meta.height;
-  const side = Math.max(w, h);
-  // 3) padding a cuadrado
-  const padX = Math.floor((side - w) / 2);
-  const padY = Math.floor((side - h) / 2);
-  const squareBuf = await sharp(trimmed)
-    .extend({
-      top: padY,
-      bottom: side - h - padY,
-      left: padX,
-      right: side - w - padX,
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
+async function renderAt(size) {
+  // Para SVGs, density mas baja es suficiente (el SVG ya es vectorial).
+  // Limitamos a 300 para no exceder pixel limit en tamanos grandes.
+  const density = Math.min(300, Math.max(96, size));
+  return sharp(MASTER, { density, limitInputPixels: false })
+    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
-  fs.writeFileSync(OUT_TRIMMED, squareBuf);
-  console.log(`Master: ${w}x${h} -> ${side}x${side}`);
-  return squareBuf;
 }
 
 async function generateIcons() {
@@ -76,31 +38,24 @@ async function generateIcons() {
   }
   if (!fs.existsSync(OUT_ICONS)) fs.mkdirSync(OUT_ICONS, { recursive: true });
 
-  const masterBuf = await makeSquareMaster();
-
   for (const size of sizes) {
     const out = path.join(OUT_ICONS, `icon-${size}x${size}.png`);
-    await sharp(masterBuf)
-      .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toFile(out);
+    fs.writeFileSync(out, await renderAt(size));
     console.log(`OK icon-${size}x${size}.png`);
   }
 
-  await sharp(masterBuf)
-    .resize(32, 32, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toFile(path.join(OUT_PUBLIC, 'favicon.png'));
+  // Favicon PNG (32x32) y favicon.svg copiado tal cual
+  fs.writeFileSync(path.join(OUT_PUBLIC, 'favicon.png'), await renderAt(32));
   console.log('OK favicon.png');
+  fs.copyFileSync(MASTER, path.join(OUT_PUBLIC, 'favicon.svg'));
+  console.log('OK favicon.svg');
 
-  await sharp(masterBuf)
-    .resize(180, 180, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toFile(path.join(OUT_PUBLIC, 'apple-touch-icon.png'));
+  // Apple touch 180
+  fs.writeFileSync(path.join(OUT_PUBLIC, 'apple-touch-icon.png'), await renderAt(180));
   console.log('OK apple-touch-icon.png');
 
-  // Maskable: contenido al 80% para Android
-  const inner = await sharp(masterBuf)
+  // Maskable 512: contenido al 80% (410px) + padding transparente 51px
+  const inner = await sharp(MASTER, { density: 300, limitInputPixels: false })
     .resize(410, 410, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .toBuffer();
   await sharp(inner)
@@ -108,6 +63,13 @@ async function generateIcons() {
     .png()
     .toFile(path.join(OUT_ICONS, 'icon-maskable-512x512.png'));
   console.log('OK icon-maskable-512x512.png');
+
+  // Tambien generamos un PNG grande "master" para los lugares que usan
+  // logo.png directamente (Layout, Demo, DemoReady, etc.)
+  fs.writeFileSync(path.join(OUT_PUBLIC, 'logo.png'), await renderAt(1024));
+  fs.writeFileSync(path.join(OUT_PUBLIC, 'logo-removebg-preview.png'), await renderAt(1024));
+  fs.writeFileSync(path.join(ROOT, 'src/assets/munify_logo.png'), await renderAt(1024));
+  console.log('OK logo.png + logo-removebg-preview.png + munify_logo.png (1024)');
 
   console.log('Done.');
 }
