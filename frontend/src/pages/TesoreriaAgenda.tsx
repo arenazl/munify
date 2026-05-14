@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CalendarClock, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Loader2, Calendar,
-  ChevronLeft, ChevronRight, Home, Briefcase,
+  Home, Briefcase,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,6 +10,7 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
+import { CalendarView } from '../components/ui/CalendarView';
 import { agendaPagosApi, contactosApi, cajasApi } from '../lib/api';
 import type { PagoProgramado, Contacto, Caja, FrecuenciaPago } from '../types';
 
@@ -52,19 +53,6 @@ export default function TesoreriaAgenda() {
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
   const [frecuenciaFiltro, setFrecuenciaFiltro] = useState<FrecuenciaPago | ''>('');
   const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos'>('todos');
-
-  // Mes para el calendario (vista guiada)
-  const today = new Date();
-  const [calMes, setCalMes] = useState<number>(today.getMonth());
-  const [calAnio, setCalAnio] = useState<number>(today.getFullYear());
-  // Cantidad de meses visibles simultaneamente (1/2/3/4)
-  const [mesesVisibles, setMesesVisibles] = useState<1 | 2 | 3 | 4>(() => {
-    if (typeof window === 'undefined') return 1;
-    const saved = parseInt(localStorage.getItem('agenda_meses_visibles') || '1', 10);
-    return ([1, 2, 3, 4].includes(saved) ? saved : 1) as 1 | 2 | 3 | 4;
-  });
-  // Drag & drop: pago siendo arrastrado
-  const [dragPagoId, setDragPagoId] = useState<number | null>(null);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PagoProgramado | null>(null);
@@ -125,37 +113,16 @@ export default function TesoreriaAgenda() {
     return { pendientes7, total7, total30, vencidos };
   }, [pagos]);
 
-  // Pagos agrupados por fecha completa (yyyy-mm-dd) para multi-mes
-  const pagosPorFecha = useMemo(() => {
-    const map = new Map<string, PagoProgramado[]>();
-    for (const p of filtered) {
-      const key = p.proximo_pago.slice(0, 10);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
-    }
-    return map;
-  }, [filtered]);
-
   // Mover un pago a otra fecha via drag&drop -> actualiza proximo_pago en el backend
-  const handleDropEnDia = async (anio: number, mes: number, dia: number) => {
-    if (dragPagoId == null) return;
-    const pago = pagos.find(p => p.id === dragPagoId);
-    setDragPagoId(null);
-    if (!pago) return;
-    const nueva = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-    if (nueva === pago.proximo_pago.slice(0, 10)) return;
+  const handleMoverPago = async (pago: PagoProgramado, nuevaFechaISO: string) => {
+    const dia = parseInt(nuevaFechaISO.slice(8, 10), 10);
     try {
-      await agendaPagosApi.update(pago.id, { proximo_pago: nueva, dia_del_mes: dia });
+      await agendaPagosApi.update(pago.id, { proximo_pago: nuevaFechaISO, dia_del_mes: dia });
       toast.success('Pago movido');
       fetchAll();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Error moviendo');
     }
-  };
-
-  const setMesesVisiblesPersist = (n: 1 | 2 | 3 | 4) => {
-    setMesesVisibles(n);
-    try { localStorage.setItem('agenda_meses_visibles', String(n)); } catch {}
   };
 
   const openSheet = (p: PagoProgramado | null = null) => {
@@ -362,215 +329,42 @@ export default function TesoreriaAgenda() {
     </div>
   );
 
-  // ==================== Vista CALENDARIO (guiada) ====================
-  const irMesAnterior = () => {
-    if (calMes === 0) { setCalMes(11); setCalAnio(a => a - 1); }
-    else setCalMes(m => m - 1);
-  };
-  const irMesSiguiente = () => {
-    if (calMes === 11) { setCalMes(0); setCalAnio(a => a + 1); }
-    else setCalMes(m => m + 1);
-  };
-  const primerDiaSemana = new Date(calAnio, calMes, 1).getDay();  // 0 = domingo
-  // Calcular los meses a renderizar (calMes/calAnio + mesesVisibles-1 siguientes)
-  const mesesAMostrar = useMemo(() => {
-    const out: { anio: number; mes: number }[] = [];
-    for (let i = 0; i < mesesVisibles; i++) {
-      const total = calMes + i;
-      out.push({ anio: calAnio + Math.floor(total / 12), mes: total % 12 });
-    }
-    return out;
-  }, [calMes, calAnio, mesesVisibles]);
-
-  // Componente que renderiza UN mes (reusable para multi-mes view)
-  const renderMes = (anio: number, mes: number) => {
-    const primer = new Date(anio, mes, 1).getDay();
-    const diasN = new Date(anio, mes + 1, 0).getDate();
-    const off = (primer + 6) % 7;
-    return (
-      <div key={`${anio}-${mes}`} className="rounded-xl p-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        <p className="text-sm font-bold mb-2 text-center" style={{ color: theme.text }}>
-          {MESES_LARGO[mes]} <span style={{ color: theme.textSecondary }}>{anio}</span>
-        </p>
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
-            <div key={i} className="text-center text-[10px] font-bold uppercase py-1" style={{ color: theme.textSecondary }}>{d}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: off }).map((_, i) => (
-            <div key={`empty-${i}`} className="rounded-lg" style={{ minHeight: 72 }} />
-          ))}
-          {Array.from({ length: diasN }).map((_, i) => {
-            const dia = i + 1;
-            const fechaKey = `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-            const pagosHoy = pagosPorFecha.get(fechaKey) || [];
-            const total = pagosHoy.reduce((s, p) => s + parseFloat(p.monto_pesos), 0);
-            const now = new Date();
-            const esHoy = (now.getDate() === dia && now.getMonth() === mes && now.getFullYear() === anio);
-            const maxLineas = mesesVisibles === 1 ? 3 : mesesVisibles === 2 ? 2 : 1;
-            return (
-              <div
-                key={dia}
-                onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.outline = `2px dashed ${theme.primary}`; }}
-                onDragLeave={(e) => { e.currentTarget.style.outline = 'none'; }}
-                onDrop={(e) => { e.currentTarget.style.outline = 'none'; handleDropEnDia(anio, mes, dia); }}
-                className="rounded-lg p-1.5 flex flex-col gap-0.5 transition-all hover:shadow-md"
-                style={{
-                  backgroundColor: pagosHoy.length > 0 ? `${theme.primary}08` : theme.backgroundSecondary,
-                  border: esHoy ? `2px solid ${theme.primary}` : `1px solid ${theme.border}`,
-                  minHeight: 72,
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold" style={{ color: esHoy ? theme.primary : theme.text }}>{dia}</span>
-                  {pagosHoy.length > 0 && (
-                    <span className="text-[8px] font-bold px-1 rounded" style={{ backgroundColor: theme.primary, color: '#fff' }}>
-                      {pagosHoy.length}
-                    </span>
-                  )}
-                </div>
-                {/* Mini items con info real (drag handle por item) */}
-                <div className="flex-1 flex flex-col gap-0.5 overflow-hidden">
-                  {pagosHoy.slice(0, maxLineas).map(p => {
-                    const nombre = (p.contacto_nombre || '').split(' ')[0];
-                    return (
-                      <div
-                        key={p.id}
-                        draggable
-                        onDragStart={(e) => { setDragPagoId(p.id); e.dataTransfer.effectAllowed = 'move'; }}
-                        onDragEnd={() => setDragPagoId(null)}
-                        onClick={(e) => { e.stopPropagation(); openSheet(p); }}
-                        className="rounded px-1 py-0.5 cursor-move truncate"
-                        style={{
-                          backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}25`,
-                          borderLeft: `3px solid ${FRECUENCIA_COLORS[p.frecuencia]}`,
-                          fontSize: 9,
-                          color: theme.text,
-                          opacity: dragPagoId === p.id ? 0.4 : 1,
-                        }}
-                        title={`${p.contacto_nombre} · ${p.concepto} · ${fmtMoney(p.monto_pesos)} · Arrastrá a otro día`}
-                      >
-                        <div className="font-semibold truncate">{nombre}</div>
-                        <div className="tabular-nums truncate" style={{ color: theme.textSecondary, fontSize: 8 }}>
-                          {fmtMoney(p.monto_pesos)}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {pagosHoy.length > maxLineas && (
-                    <div className="text-[8px] text-center font-semibold" style={{ color: theme.primary }}>
-                      +{pagosHoy.length - maxLineas} más
-                    </div>
-                  )}
-                </div>
-                {/* Total del dia, solo si hay y hay espacio */}
-                {pagosHoy.length > 0 && mesesVisibles <= 2 && (
-                  <div className="text-[9px] tabular-nums truncate font-semibold border-t pt-0.5" style={{ color: theme.primary, borderColor: theme.border }}>
-                    {fmtMoney(total)}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // Lista de pagos visibles en el rango de meses mostrados
-  const pagosEnRango = useMemo(() => {
-    return filtered.filter(p => {
-      const d = new Date(p.proximo_pago);
-      return mesesAMostrar.some(m => m.anio === d.getFullYear() && m.mes === d.getMonth());
-    });
-  }, [filtered, mesesAMostrar]);
-
+  // ==================== Vista CALENDARIO (guiada) — usa CalendarView reutilizable ====================
   const guidedView = (
-    <div className="space-y-3">
-      {/* Header calendario con nav + toggle de meses visibles */}
-      <div className="flex items-center gap-2 rounded-xl p-3 flex-wrap" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-        <button onClick={irMesAnterior} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <h3 className="text-base font-bold inline-flex items-center gap-2 flex-1 justify-center" style={{ color: theme.text }}>
-          <Calendar className="h-5 w-5" style={{ color: theme.primary }} />
-          {mesesAMostrar[0] && (
-            <>
-              {MESES_LARGO[mesesAMostrar[0].mes]} {mesesAMostrar[0].anio}
-              {mesesVisibles > 1 && mesesAMostrar[mesesVisibles - 1] && (
-                <> – {MESES_LARGO[mesesAMostrar[mesesVisibles - 1].mes]} {mesesAMostrar[mesesVisibles - 1].anio}</>
-              )}
-            </>
-          )}
-        </h3>
-        <button onClick={irMesSiguiente} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>
-          <ChevronRight className="h-4 w-4" />
-        </button>
-        {/* Toggle 1/2/3/4 meses */}
-        <div className="inline-flex items-center rounded-lg p-0.5" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
-          {([1, 2, 3, 4] as const).map(n => (
-            <button key={n}
-              onClick={() => setMesesVisiblesPersist(n)}
-              className="px-2.5 py-1 rounded text-xs font-bold transition-all"
-              style={{
-                backgroundColor: mesesVisibles === n ? theme.primary : 'transparent',
-                color: mesesVisibles === n ? '#fff' : theme.textSecondary,
-              }}
-              title={`Ver ${n} mes${n > 1 ? 'es' : ''}`}
-            >
-              {n}M
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-[11px] text-center" style={{ color: theme.textSecondary }}>
-        💡 Arrastrá un pago a otro día para cambiarle la fecha. Click sobre un pago para editar.
-      </p>
-
-      {/* Grid de meses (1 a 4 lado a lado, wrap en mobile) */}
-      <div
-        className={`grid gap-3 ${
-          mesesVisibles === 1 ? 'grid-cols-1' :
-          mesesVisibles === 2 ? 'grid-cols-1 md:grid-cols-2' :
-          mesesVisibles === 3 ? 'grid-cols-1 md:grid-cols-3' :
-          'grid-cols-1 md:grid-cols-2'
-        }`}
-      >
-        {mesesAMostrar.map(m => renderMes(m.anio, m.mes))}
-      </div>
-
-      {/* Lista detallada de pagos en el rango */}
-      {pagosEnRango.length > 0 && (
-        <div className="rounded-xl p-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-          <p className="text-xs font-semibold uppercase mb-2" style={{ color: theme.textSecondary }}>
-            Pagos del rango ({pagosEnRango.length})
-          </p>
-          <div className="space-y-1.5">
-            {pagosEnRango.map(p => (
-              <div key={p.id} className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}20` }}>
-                  <span className="text-xs font-bold" style={{ color: FRECUENCIA_COLORS[p.frecuencia] }}>{new Date(p.proximo_pago).getDate()}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{p.contacto_nombre}</p>
-                  <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                    {p.concepto} · {new Date(p.proximo_pago).toLocaleDateString('es-AR')}
-                  </p>
-                </div>
-                <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</span>
-                <button onClick={() => handleEjecutar(p)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-white" style={{ backgroundColor: '#10b981' }}>
-                  Pagar
-                </button>
-                <button onClick={() => openSheet(p)} className="p-1.5 rounded" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
-              </div>
-            ))}
+    <CalendarView<PagoProgramado>
+      items={filtered}
+      getId={(p) => p.id}
+      getDate={(p) => p.proximo_pago}
+      getLabel={(p) => (p.contacto_nombre || '').split(' ')[0]}
+      getAmount={(p) => parseFloat(p.monto_pesos)}
+      getColor={(p) => FRECUENCIA_COLORS[p.frecuencia]}
+      getTooltip={(p) => `${p.contacto_nombre} · ${p.concepto} · ${fmtMoney(p.monto_pesos)}`}
+      onItemClick={(p) => openSheet(p)}
+      onItemDrop={(p, newIso) => handleMoverPago(p, newIso)}
+      mesesStorageKey="agenda_meses_visibles"
+      helperText="💡 Arrastrá un pago a otro día para cambiarle la fecha. Click sobre un pago para editar."
+      formatMoney={(n) => fmtMoney(n)}
+      renderDetailRow={(p) => (
+        <div className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}20` }}>
+            <span className="text-xs font-bold" style={{ color: FRECUENCIA_COLORS[p.frecuencia] }}>{new Date(p.proximo_pago).getDate()}</span>
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{p.contacto_nombre}</p>
+            <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+              {p.concepto} · {new Date(p.proximo_pago).toLocaleDateString('es-AR')}
+            </p>
+          </div>
+          <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</span>
+          <button onClick={() => handleEjecutar(p)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-white" style={{ backgroundColor: '#10b981' }}>
+            Pagar
+          </button>
+          <button onClick={() => openSheet(p)} className="p-1.5 rounded" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
         </div>
       )}
-    </div>
+    />
   );
+
 
   // ==================== Vista CARDS (children) ====================
   const cardsView = filtered.map(p => {

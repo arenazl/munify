@@ -7,9 +7,12 @@ la raíz). Ese archivo es la fuente de verdad de **cómo se construyen las cosas
 esta app**: qué componentes ya existen, qué patrones usamos para ABMs, dónde está
 cada cosa.
 
-> **NO usar `APP_GUIDE/`** como referencia — es una plantilla agnóstica para
-> arrancar apps desde cero, está siendo rehecha, y la mayor parte de su contenido
-> está desactualizado respecto a esta app.
+> **`d:\Code\APP_GUIDE\components\`** es la fuente canónica de componentes core
+> reutilizables (versión **agnóstica**, sin lógica de Munify). Cuando mejoramos
+> un componente core en este repo Y el cambio es **estable** (no custom de
+> Munify), OBLIGACIÓN de portar el cambio en versión agnóstica a
+> `APP_GUIDE\components\`. Si el cambio es lógica/copy específicos de Munify,
+> queda solo acá.
 
 ---
 

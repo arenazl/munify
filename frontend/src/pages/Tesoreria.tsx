@@ -15,6 +15,7 @@ import {
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { CalendarView } from '../components/ui/CalendarView';
 import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi } from '../lib/api';
 import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
 
@@ -747,6 +748,48 @@ export default function Tesoreria() {
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay gastos que coincidan con los filtros."
         tableView={tableView}
+        guidedView={
+          <CalendarView<Gasto>
+            items={filtered}
+            getId={(g) => g.id}
+            getDate={(g) => g.fecha}
+            getLabel={(g) => g.concepto}
+            getAmount={(g) => parseFloat(g.monto_pesos)}
+            getColor={(g) => TIPO_FIN_COLORS[g.tipo_financiacion]}
+            getTooltip={(g) => {
+              const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+              return `${g.concepto} · ${dep?.nombre || 'Contacto'} · $${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+            }}
+            onItemClick={(g) => openDetalle(g)}
+            mesesStorageKey="tesoreria_meses_visibles"
+            helperText="💡 Click sobre un gasto para ver el detalle. El calendario refleja los filtros activos."
+            formatMoney={(n) => `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
+            renderDetailRow={(g) => {
+              const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+              const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
+              return (
+                <div onClick={() => openDetalle(g)} className="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:shadow-sm" style={{ backgroundColor: theme.backgroundSecondary }}>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20` }}>
+                    <span className="text-xs font-bold" style={{ color: TIPO_FIN_COLORS[g.tipo_financiacion] }}>{new Date(g.fecha).getDate()}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
+                    <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                      {dep?.nombre || 'Contacto'} · {new Date(g.fecha).toLocaleDateString('es-AR')}
+                    </p>
+                  </div>
+                  <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>
+                    ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: estMeta.bg, color: estMeta.color }}>
+                    {estMeta.label}
+                  </span>
+                </div>
+              );
+            }}
+          />
+        }
+        viewStorageKey="tesoreria_view"
         defaultViewMode="table"
       >
         {/* Card view */}

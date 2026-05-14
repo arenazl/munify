@@ -6,10 +6,14 @@
 > que ya existen, no vas a romper el theming, y vas a producir código que se siente
 > parte de la app.
 >
-> **NO confundir con `APP_GUIDE/`** — esa carpeta es una plantilla agnóstica de
-> negocio para arrancar apps desde cero. Este archivo es **específico de esta
-> app concreta**: qué componentes usamos, qué patrones tenemos, dónde está cada
-> cosa.
+> **Relación con `d:\Code\APP_GUIDE\`** — esa carpeta tiene la versión
+> **agnóstica** y canónica de los componentes core (ej. `ABMPage`,
+> `CalendarView`, `ModernSelect`, `Sheet`, `WizardModal`). Cuando mejoramos
+> uno de esos componentes **en esta app** y el cambio es **estable** (no
+> custom de Munify), es OBLIGATORIO portar el cambio a
+> `d:\Code\APP_GUIDE\components\` en versión agnóstica. Este archivo
+> (`BUILD_GUIDE.md`) es **específico de esta app**: qué patrones usamos
+> acá, dónde está cada cosa, qué decisiones tomamos en Munify.
 >
 > **Lectura obligatoria** antes de crear cualquier pantalla, formulario, ABM o
 > módulo nuevo. Ver el [Pre-Flight Checklist](#pre-flight-checklist) abajo.
@@ -137,6 +141,7 @@ sugerenciasMun/
 | **Autocomplete genérico** (no dirección) | `<AutocompleteInput options value onChange />` | `<datalist>` o input + dropdown a mano |
 | Input **con validación inline** | `<ValidatedInput value onChange validate error />` | `<input>` + manejar error suelto |
 | Layout de **ABM listado** | `<ABMPage title items columns onNew ... />` | divs sueltos con tabla a mano |
+| **Vista calendario** (3ra vista de un ABMPage, junto a cards/tabla) | `<CalendarView<T> items getId getDate getLabel ... />` pasado a `ABMPage` como `guidedView={...}` | calendario inline a mano por página |
 | **Modal lateral** (crear / editar / ver) | `<Sheet open onClose title>...</Sheet>` | `<Modal>` (deprecated) o modal centrado |
 | **Wizard de creación** (multi-paso) | `<WizardModal steps>...</WizardModal>` | wizard custom local |
 | **Confirmar acción destructiva** | `<ConfirmModal open onConfirm title message />` | `window.confirm()` |
@@ -205,6 +210,14 @@ Total: **25 componentes** en `frontend/src/components/ui/`.
 #### `ABMPage`
 - **Archivo:** `frontend/src/components/ui/ABMPage.tsx`
 - **Descripción:** Layout canonico para paginas tipo ABM (listado + crear/editar/ver en Sheet). Es el componente de referencia para cualquier pagina de "tabla + botones". Maneja: titulo + boton "Nuevo", buscador, filtros extra (chips, selects), toggle entre vista cards y tabla, Sheet lateral...
+- **Patrón "3 vistas" (cards / tabla / calendario)**: una página ABM puede ofrecer las 3 vistas pasando `tableView`, `guidedView` y `children` (cards). Para `guidedView`, usar **`CalendarView<T>`** (ver abajo). Las 3 vistas reciben el mismo set de datos (`filtered`) — los filtros del header siguen valiendo.
+
+#### `CalendarView<T>`
+- **Archivo:** `frontend/src/components/ui/CalendarView.tsx`
+- **Descripción:** Vista calendario multi-mes 100% agnostica. Toggle 1/2/3/4 meses simultaneos (persistido en localStorage opt-in via `mesesStorageKey`), nav prev/next, celdas con label + monto, click-to-edit, drag-and-drop opt-in (`onItemDrop`). Cero conocimiento de entidad: recibe getters (`getId`, `getDate`, `getLabel`, `getAmount`, `getColor`, `getTooltip`) y pinta.
+- **Cuándo usarlo:** como `guidedView={...}` de un `ABMPage` cuando los items tienen una fecha relevante (gastos, pagos, eventos, tareas).
+- **Props clave:** `items`, `getId`, `getDate`, `getLabel`, opcionales `getAmount`/`getColor`/`getTooltip`, `onItemClick`, `onItemDrop` (drag-drop opt-in), `mesesStorageKey`, `helperText`, `renderDetailRow`, `formatMoney`.
+- **Fuente canónica agnóstica:** `d:\Code\APP_GUIDE\components\ui\CalendarView.tsx` (sincronizar cuando mejore acá).
 - **Props (`ABMPageProps`):**
   - `title: string`
   - `icon?: ReactNode;`
