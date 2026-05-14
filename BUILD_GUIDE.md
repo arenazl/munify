@@ -181,18 +181,45 @@ Todos los controles del header de un `ABMPage` (search input,
 `ModernSelect`, `DatePicker`, `DateRangePicker`, botón "Nuevo",
 píldoras) deben verse **orgánicos entre sí**:
 
-- **Alto**: `40px` (`h-10`) para todos los controles principales.
-- **Tipografía**: `13px` (`text-[13px]` o `text-sm`) para texto de
-  valor seleccionado / placeholder / botones.
-- **Píldoras**: pueden usar `12px` (`text-xs`) porque son chips más
-  compactos, pero **mismo alto** (40px) para que la línea no se
-  rompa.
-- **Mobile**: si los controles no entran, el wrapper hace
+- **Alto**: `34px` (`h-[34px]`) para todos los controles principales.
+- **Tipografía**: `12px` (`text-[12px]`) para texto de valor seleccionado
+  / placeholder / botones.
+- **Píldoras**: usan `11px` (`text-[11px]`) porque son chips más
+  compactos, pero **mismo alto** (34px) para que la línea no se rompa.
+- **Mobile/tablet**: si los controles no entran, el wrapper hace
   **scroll horizontal** (`overflow-x: auto`, scrollbar oculto). Cada
   control mantiene su alto y se ve completo — nada se aplasta ni se
   corta. Esto lo provee el wrapper `abm-secondary-filters-wrap` del
   ABMPage automáticamente; las páginas solo tienen que poner los
   controles dentro de `secondaryFilters`.
+- **No auto-focus del search en touch devices**: `ModernSelect` con
+  `searchable=true` NO enfoca el input automáticamente en dispositivos
+  con touch (mobile + tablet + cualquier `maxTouchPoints > 0`). Esto
+  evita que el teclado virtual aparezca y tape las opciones. El user
+  toca el input solo si necesita filtrar.
+
+### Abreviaturas automáticas (`lib/textAbbreviation.ts`)
+
+`ModernSelect` aplica **abreviaturas automáticas** al label del trigger
+para que entren textos largos. Esto es el equivalente funcional a un
+pipe de Angular: una función pura llamada en el render.
+
+- Diccionario agnóstico de palabras frecuentes:
+  `Secretaría → Sec.`, `Dirección → Dir.`, `Departamento → Dpto.`,
+  `Coordinación → Coord.`, `Administración → Admin.`,
+  `Municipalidad → Muni.`, `Ministerio → Min.`, `Gerencia → Ger.`,
+  `Tesorería → Tes.`, `Contaduría → Cont.`, `Sociedad Anónima → S.A.`,
+  `Sociedad de Responsabilidad Limitada → SRL`, etc.
+- Las **opciones del dropdown** siempre se muestran completas — la
+  abreviatura es solo para el trigger compacto.
+- Opt-out: pasar `abbreviate={false}` al `ModernSelect` en el raro caso
+  de necesitar el texto exacto en el trigger.
+- Para extender el diccionario en un proyecto específico:
+  ```ts
+  import { abreviarPalabras } from '@/lib/textAbbreviation';
+  const corto = abreviarPalabras(texto, { 'mi_palabra_larga': 'M.P.L.' });
+  ```
+- Fuente canónica agnóstica: `d:\Code\APP_GUIDE\lib\textAbbreviation.ts`.
 
 **¿Necesitás un control que no está en la tabla?** Antes de crear uno nuevo:
 1. Buscar en `frontend/src/components/ui/` (puede tener otro nombre).

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, ReactNode, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { abreviarPalabras } from '../../lib/textAbbreviation';
 
 /**
  * ModernSelect — Combo dropdown canónico de la app. REEMPLAZA `<select>` nativo.
@@ -56,6 +57,11 @@ interface ModernSelectProps {
   className?: string;
   onOpen?: () => void;
   onClose?: (selectedValue: string | null) => void;
+  /** Si es true (default), aplica abreviaturas al label del trigger para
+   * que entren textos largos. Las opciones del dropdown siempre muestran
+   * texto completo. Pasar `abbreviate={false}` solo cuando se necesite
+   * texto exacto en el trigger (raro). */
+  abbreviate?: boolean;
 }
 
 export function ModernSelect({
@@ -69,6 +75,7 @@ export function ModernSelect({
   className = '',
   onOpen,
   onClose,
+  abbreviate = true,
 }: ModernSelectProps) {
   const { theme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
@@ -146,13 +153,18 @@ export function ModernSelect({
     };
   }, [isOpen, onClose]);
 
-  // Focus en el input de busqueda solo en desktop. En mobile el auto-focus
-  // hace aparecer el teclado y tapa las opciones — el user igual puede
-  // tocar el input si quiere filtrar.
+  // Focus en el input de busqueda SOLO en desktop con teclado fisico.
+  // En mobile y tablet el auto-focus hace aparecer el teclado virtual y
+  // tapa las opciones — el user igual puede tocar el input si quiere
+  // filtrar. Breakpoint a 1024px para incluir tablets verticales/iPads.
   useEffect(() => {
     if (!isOpen || !searchable || !inputRef.current) return;
-    const isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
-    if (!isMobile) inputRef.current.focus();
+    const isTouchDevice = typeof window !== 'undefined' && (
+      window.matchMedia('(max-width: 1024px)').matches ||
+      ('ontouchstart' in window) ||
+      navigator.maxTouchPoints > 0
+    );
+    if (!isTouchDevice) inputRef.current.focus();
   }, [isOpen, searchable]);
 
   const filteredOptions = searchable && searchTerm
@@ -189,15 +201,16 @@ export function ModernSelect({
         </label>
       )}
 
-      {/* Trigger Button — alto canonico 40px, tipografia 13px */}
+      {/* Trigger Button — alto canonico 34px, tipografia 12px.
+          Aplica abreviaturas al label si abbreviate=true (default). */}
       <button
         ref={triggerRef}
         type="button"
         onClick={handleOpen}
         disabled={disabled}
         className={`
-          w-full h-10 flex items-center justify-between gap-2 px-3 rounded-xl
-          transition-all duration-200 text-left text-[13px]
+          w-full h-[34px] flex items-center justify-between gap-1.5 px-2.5 rounded-lg
+          transition-all duration-200 text-left text-[12px]
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-opacity-60'}
           ${isOpen ? 'ring-2' : ''}
         `}
@@ -208,10 +221,10 @@ export function ModernSelect({
           ['--tw-ring-color' as string]: `${theme.primary}40`,
         }}
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
           {selectedOption?.icon && (
             <div
-              className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+              className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
               style={{
                 backgroundColor: selectedOption.color ? `${selectedOption.color}20` : `${theme.primary}20`,
                 color: selectedOption.color || theme.primary
@@ -226,7 +239,7 @@ export function ModernSelect({
                 className="block truncate font-medium leading-tight"
                 style={{ color: selectedOption.color || theme.text }}
               >
-                {selectedOption.label}
+                {abbreviate ? abreviarPalabras(selectedOption.label) : selectedOption.label}
               </span>
             ) : (
               <span className="truncate block" style={{ color: theme.textSecondary }}>{placeholder}</span>
@@ -234,7 +247,7 @@ export function ModernSelect({
           </div>
         </div>
         <ChevronDown
-          className={`h-4 w-4 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`h-3.5 w-3.5 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
           style={{ color: theme.textSecondary }}
         />
       </button>
@@ -299,7 +312,7 @@ export function ModernSelect({
                     type="button"
                     onClick={() => handleSelect(option.value)}
                     className={`
-                      w-full flex items-center gap-2 px-3 py-2 text-left text-[13px]
+                      w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[12px]
                       transition-all duration-150
                     `}
                     style={{

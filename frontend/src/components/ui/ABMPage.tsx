@@ -253,7 +253,7 @@ export function ABMPage({
             style={searchMaxWidth ? { maxWidth: searchMaxWidth, flex: '0 1 auto', width: '100%' } : undefined}
           >
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-all duration-300 group-focus-within:scale-110"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-all duration-300 group-focus-within:scale-110"
               style={{ color: theme.textSecondary }}
             />
             <input
@@ -263,7 +263,7 @@ export function ABMPage({
               onChange={(e) => onSearchChange(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="w-full h-10 pl-9 pr-4 rounded-lg text-[13px] focus:ring-2 focus:outline-none transition-all duration-300"
+              className="w-full h-[34px] pl-8 pr-3 rounded-lg text-[12px] focus:ring-2 focus:outline-none transition-all duration-300"
               style={{
                 backgroundColor: theme.background,
                 color: theme.text,
@@ -357,7 +357,7 @@ export function ABMPage({
               <button
                 onClick={onAdd}
                 className={`
-                  inline-flex items-center h-10 px-4 rounded-lg font-semibold text-[13px]
+                  inline-flex items-center h-[34px] px-3 rounded-lg font-semibold text-[12px]
                   transition-all duration-300 ease-out
                   hover:scale-105 hover:-translate-y-0.5
                   active:scale-95
@@ -447,20 +447,20 @@ export function ABMPage({
               .abm-secondary-filters-wrap > div.flex-wrap {
                 flex-wrap: nowrap !important;
               }
-              /* TODOS los controles del header tienen alto canonico 40px
-                 y tipografia 13px para que se vean homogeneos.
+              /* TODOS los controles del header tienen alto canonico 34px
+                 y tipografia 12px para que se vean homogeneos.
                  Esto aplica a botones, ModernSelect triggers, DatePickers,
                  chips/pildoras, etc. */
               .abm-secondary-filters-wrap button,
               .abm-secondary-filters-wrap input:not([type="checkbox"]):not([type="radio"]) {
-                min-height: 40px;
-                font-size: 13px;
+                min-height: 34px;
+                font-size: 12px;
               }
               /* Las pildoras-chip que ya tienen text-xs (estados con badge)
                  quedan organicas: matchean alto pero conservan su tipografia */
               .abm-secondary-filters-wrap .text-xs,
               .abm-secondary-filters-wrap [data-pill="true"] {
-                font-size: 12px;
+                font-size: 11px;
               }
               /* Cada hijo directo no se aplasta */
               .abm-secondary-filters-wrap > div > * {
