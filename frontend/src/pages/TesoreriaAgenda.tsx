@@ -533,9 +533,9 @@ export default function TesoreriaAgenda() {
       <div
         className={`grid gap-3 ${
           mesesVisibles === 1 ? 'grid-cols-1' :
-          mesesVisibles === 2 ? 'grid-cols-1 lg:grid-cols-2' :
-          mesesVisibles === 3 ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' :
-          'grid-cols-1 md:grid-cols-2 xl:grid-cols-4'
+          mesesVisibles === 2 ? 'grid-cols-1 md:grid-cols-2' :
+          mesesVisibles === 3 ? 'grid-cols-1 md:grid-cols-3' :
+          'grid-cols-1 md:grid-cols-2'
         }`}
       >
         {mesesAMostrar.map(m => renderMes(m.anio, m.mes))}
