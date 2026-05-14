@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -30,7 +30,7 @@ const getMobileTabs = (userRole: string) => {
       { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
       { path: '/gestion/reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
       { path: '/gestion/tramites', icon: FileCheck, label: 'Trámites', end: false },
-      { path: '/gestion/tablero', icon: Wrench, label: 'Tablero', end: false },
+      { path: '/gestion/tesoreria', icon: Wallet, label: 'Tesorería', end: false },
     ];
   }
 
