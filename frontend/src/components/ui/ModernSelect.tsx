@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, ReactNode } from 'react';
+import { useState, useRef, useEffect, ReactNode, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -73,24 +74,76 @@ export function ModernSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Posicion calculada del dropdown (fixed). Se recalcula en cada open
+  // + scroll/resize. Asi el dropdown ESCAPA de cualquier overflow:hidden
+  // ancestro (problema clasico) y nunca se clipea.
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number; left: number; width: number; maxHeight: number; openUp: boolean;
+  } | null>(null);
+
+  const recalcPos = () => {
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const espacioAbajo = vh - r.bottom - 12;
+    const espacioArriba = r.top - 12;
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    // En mobile usamos hasta 60vh, en desktop hasta 400px
+    const maxAlturaDeseada = isMobile ? Math.min(vh * 0.6, 480) : 400;
+    let openUp = false;
+    let maxHeight = Math.min(maxAlturaDeseada, espacioAbajo);
+    if (espacioAbajo < 220 && espacioArriba > espacioAbajo) {
+      openUp = true;
+      maxHeight = Math.min(maxAlturaDeseada, espacioArriba);
+    }
+    setDropdownPos({
+      top: openUp ? r.top - 8 : r.bottom + 8,
+      left: r.left,
+      width: r.width,
+      maxHeight: Math.max(200, maxHeight),
+      openUp,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (isOpen) recalcPos();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onScrollOrResize = () => recalcPos();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [isOpen]);
 
   const selectedOption = options.find(opt => opt.value === value);
 
-  // Cerrar al hacer clic fuera
+  // Cerrar al hacer clic fuera. Tiene en cuenta el dropdown portaleado.
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        if (isOpen) {
-          onClose?.(null); // Cerrado sin seleccionar
-        }
+    const handleClickOutside = (event: Event) => {
+      const t = event.target as Node;
+      const inContainer = containerRef.current?.contains(t);
+      const inDropdown = dropdownRef.current?.contains(t);
+      if (!inContainer && !inDropdown) {
+        if (isOpen) onClose?.(null);
         setIsOpen(false);
         setSearchTerm('');
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, [isOpen, onClose]);
 
   // Focus en el input de busqueda solo en desktop. En mobile el auto-focus
@@ -138,6 +191,7 @@ export function ModernSelect({
 
       {/* Trigger Button */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={handleOpen}
         disabled={disabled}
@@ -195,11 +249,20 @@ export function ModernSelect({
         />
       </button>
 
-      {/* Dropdown */}
-      {isOpen && (
+      {/* Dropdown via portal con position: fixed.
+          Escapa de cualquier overflow:hidden ancestro y se ubica
+          inteligentemente arriba/abajo segun el espacio disponible. */}
+      {isOpen && dropdownPos && typeof document !== 'undefined' && createPortal(
         <div
-          className="absolute z-50 w-full mt-2 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          ref={dropdownRef}
+          className="rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
           style={{
+            position: 'fixed',
+            top: dropdownPos.openUp ? undefined : dropdownPos.top,
+            bottom: dropdownPos.openUp ? (window.innerHeight - dropdownPos.top) : undefined,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            zIndex: 9999,
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
             boxShadow: `0 20px 40px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px ${theme.border}`,
@@ -229,7 +292,7 @@ export function ModernSelect({
           )}
 
           {/* Options List */}
-          <div className="max-h-64 overflow-y-auto py-1">
+          <div className="overflow-y-auto py-1" style={{ maxHeight: dropdownPos.maxHeight - (searchable ? 60 : 0) }}>
             {filteredOptions.length === 0 ? (
               <div
                 className="px-4 py-3 text-sm text-center"
@@ -299,7 +362,8 @@ export function ModernSelect({
               })
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
