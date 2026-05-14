@@ -199,7 +199,6 @@ export function ChatWidget() {
 
   const handleLinkClick = (url: string) => {
     setIsPinned(false);
-    setIsHovered(false);
     navigate(url);
   };
 
@@ -238,8 +237,10 @@ export function ChatWidget() {
   });
   // Hover: el panel se abre al pasar el mouse sobre la línea/panel y se
   // cierra al salir. El estado abierto efectivo = pinned OR hovered.
-  const [isHovered, setIsHovered] = useState(false);
-  const isOpen = isPinned || isHovered;
+  // Panel abre/cierra SOLO por click en la barra lateral (toggle isPinned).
+  // Antes tambien abria con hover -> molestaba al rozar el mouse. Lo
+  // sacamos a pedido del user.
+  const isOpen = isPinned;
   // Legacy setter para el evento global munify:toggle-chat (lo invierte el pin).
   const setIsOpen = (v: boolean | ((o: boolean) => boolean)) => {
     setIsPinned(prev => (typeof v === 'function' ? v(prev) : v));
@@ -405,7 +406,6 @@ export function ChatWidget() {
           Visible cuando el panel está cerrado, oculta cuando está abierto.
           Hover abre el panel; click ancla. */}
       <div
-        onMouseEnter={() => setIsHovered(true)}
         onClick={() => setIsPinned(true)}
         className="fixed right-0 top-0 bottom-0 transition-all flex flex-col items-center pt-4 group"
         style={{
@@ -419,7 +419,7 @@ export function ChatWidget() {
           cursor: 'pointer',
           boxShadow: isOpen ? 'none' : `-4px 0 14px ${theme.primary}55`,
         }}
-        title="Asistente IA — hover para abrir, click para anclar"
+        title="Asistente IA — click para abrir"
       >
         {!isOpen && (
           <Sparkles
@@ -464,8 +464,6 @@ export function ChatWidget() {
           pointerEvents: isOpen ? 'auto' : 'none',
           opacity: isOpen ? 1 : 0.98,
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Handle de resize — barra vertical en el borde izquierdo */}
         {isOpen && (
@@ -527,7 +525,7 @@ export function ChatWidget() {
 
               {/* Cerrar panel: desancla y oculta */}
               <button
-                onClick={() => { setIsPinned(false); setIsHovered(false); }}
+                onClick={() => setIsPinned(false)}
                 className="w-7 h-7 rounded-md transition-all hover:bg-black/10 flex items-center justify-center"
                 style={{ color: theme.textSecondary }}
                 title="Cerrar"
