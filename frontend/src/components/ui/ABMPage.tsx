@@ -1822,7 +1822,7 @@ function PaginationFooter({ pagination, loading }: PaginationFooterProps) {
 
   return (
     <div
-      className="flex items-center gap-3 flex-wrap rounded-xl p-2.5 mt-3"
+      className="flex items-center gap-3 flex-wrap rounded-xl px-5 py-3 mt-3"
       style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
       <span className="text-[12px] font-medium flex-1 min-w-[140px]" style={{ color: theme.textSecondary }}>
