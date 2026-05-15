@@ -18,6 +18,7 @@ import {
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { PillsOrSelect } from '../components/ui/PillsOrSelect';
 import { CalendarView } from '../components/ui/CalendarView';
 import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi } from '../lib/api';
 import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
@@ -435,29 +436,20 @@ export default function Tesoreria() {
     }
   };
 
-  // Chips de estado agregado
+  // Chips de estado agregado — colapsan a ModernSelect cuando no entran.
+  const estadoChipsOptions = ESTADO_FILTROS.map(e => ({
+    value: e.value,
+    label: e.label,
+    color: e.value ? ESTADO_AGREGADO_META[e.value]?.color : undefined,
+  }));
   const estadoChips = (
-    <div className="inline-flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-      {ESTADO_FILTROS.map(e => {
-        const isActive = estadoFiltro === e.value;
-        const meta = e.value ? ESTADO_AGREGADO_META[e.value] : null;
-        const color = meta?.color || theme.primary;
-        return (
-          <button
-            key={e.value || 'all'}
-            onClick={() => setEstadoFiltro(e.value as EstadoAgregado | '')}
-            className="px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all"
-            style={{
-              backgroundColor: isActive ? color : `${color}15`,
-              color: isActive ? '#fff' : color,
-              border: `1px solid ${color}40`,
-            }}
-          >
-            {e.label}
-          </button>
-        );
-      })}
-    </div>
+    <PillsOrSelect
+      value={estadoFiltro}
+      onChange={(v) => setEstadoFiltro(v as EstadoAgregado | '')}
+      options={estadoChipsOptions}
+      placeholder="Estado"
+      size="sm"
+    />
   );
 
   // Opciones de dependencia
