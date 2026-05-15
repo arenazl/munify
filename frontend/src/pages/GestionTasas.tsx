@@ -76,7 +76,7 @@ export default function GestionTasas() {
       <ABMPage
         title="Tasas"
         icon={<Wallet className="h-5 w-5" />}
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         searchPlaceholder="Buscar por identificador, DNI o titular..."
         searchValue={searchInput}
         onSearchChange={(v) => { setSearchInput(v); onSearchChange(v); }}

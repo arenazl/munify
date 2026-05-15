@@ -222,7 +222,7 @@ export default function SLA() {
       <StickyPageHeader
         icon={<Clock className="h-5 w-5" />}
         title="Gestión de SLA"
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         buttonLabel="Nueva Config"
         onButtonClick={() => setShowForm(true)}
       />

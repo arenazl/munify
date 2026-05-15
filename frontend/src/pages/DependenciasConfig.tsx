@@ -810,7 +810,7 @@ export default function DependenciasConfig() {
       <StickyPageHeader
         icon={isSuperAdmin ? <BookOpen className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
         title={getTabTitle()}
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         searchPlaceholder={mainTab === 'dependencias' ? "Buscar dependencia..." : mainTab === 'categorias' ? "Buscar categoría..." : "Buscar trámite..."}
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}

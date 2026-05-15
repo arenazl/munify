@@ -231,7 +231,7 @@ export default function Municipios() {
         title="Gestión de Municipios"
         subtitle="Administra los municipios del sistema"
         icon={Building2}
-        backTo="/gestion/ajustes"
+        backTo="/gestion/configuracion"
       />
 
       <div className="max-w-6xl mx-auto px-6 py-6">

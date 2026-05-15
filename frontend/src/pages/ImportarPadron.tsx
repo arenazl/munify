@@ -199,7 +199,7 @@ export default function ImportarPadron() {
       <StickyPageHeader
         icon={<Landmark className="h-5 w-5" />}
         title="Importar catálogo de tasas"
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
       />
 
       {/* Stepper */}
@@ -631,7 +631,7 @@ export default function ImportarPadron() {
                 <RefreshCcw className="w-4 h-4" /> Importar otro padrón
               </button>
               <button
-                onClick={() => navigate('/gestion/ajustes')}
+                onClick={() => navigate('/gestion/configuracion')}
                 className="px-5 py-2 bg-sky-600 text-white rounded-lg font-semibold
                            hover:bg-sky-700 active:scale-95 transition-all
                            flex items-center gap-2 shadow-sm text-sm"

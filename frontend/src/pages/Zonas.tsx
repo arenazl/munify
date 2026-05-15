@@ -290,7 +290,7 @@ export default function Zonas() {
       <ABMPage
       title="Zonas / Barrios"
       icon={<Map className="h-5 w-5" />}
-      backLink="/gestion/ajustes"
+      backLink="/gestion/configuracion"
       buttonLabel="Nueva Zona"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar zonas..."

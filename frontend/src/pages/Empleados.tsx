@@ -625,7 +625,7 @@ export default function Empleados() {
       <ABMPage
       title="Empleados"
       icon={<Users className="h-5 w-5" />}
-      backLink="/gestion/ajustes"
+      backLink="/gestion/configuracion"
       buttonLabel={isEmpleadoView ? 'Nuevo Empleado' : `Nuevo ${vistaActual.label}`}
       onAdd={() => (isEmpleadoView ? openSheet() : openUserSheet())}
       searchPlaceholder={isEmpleadoView ? 'Buscar empleados...' : `Buscar ${vistaActual.label.toLowerCase()}es...`}

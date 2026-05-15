@@ -666,7 +666,7 @@ export default function TramitesConfig() {
       </div>
 
       <StickyPageHeader
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         icon={<FileText className="h-5 w-5" />}
         title="Trámites"
         searchValue={search}

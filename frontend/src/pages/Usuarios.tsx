@@ -189,7 +189,7 @@ export default function Usuarios() {
     <ABMPage
       title="Vecinos"
       icon={<Users className="h-5 w-5" />}
-      backLink="/gestion/ajustes"
+      backLink="/gestion/configuracion"
       buttonLabel="Nuevo Vecino"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar vecinos..."

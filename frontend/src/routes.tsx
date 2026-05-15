@@ -40,7 +40,8 @@ import SidebarConfig from './pages/SidebarConfig';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
-import Ajustes from './pages/Ajustes';
+// Ajustes fue absorbido por Configuracion (unificacion 2026-05-14). Si alguien
+// llega via /gestion/ajustes lo redirigimos.
 import ImportarPadron from './pages/ImportarPadron';
 import MiRendimiento from './pages/MiRendimiento';
 import MiHistorial from './pages/MiHistorial';
@@ -313,13 +314,17 @@ export const router = createBrowserRouter([
         path: 'sidebar-config',
         element: <ProtectedRoute roles={['admin']}><SidebarConfig /></ProtectedRoute>
       },
-      // Ajustes (preferencias de notificaciones, accesos a usuarios/empleados/whatsapp)
+      // Ajustes -> Configuración (compat: ambas rutas viejas redirigen).
       {
         path: 'ajustes',
-        element: <Ajustes />
+        element: <Navigate to="/gestion/configuracion" replace />
       },
       {
         path: 'ajustes/importar-padron',
+        element: <Navigate to="/gestion/configuracion/importar-padron" replace />
+      },
+      {
+        path: 'configuracion/importar-padron',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><ImportarPadron /></ProtectedRoute>
       },
       // Configuración del Dashboard (qué ven vecinos y empleados)

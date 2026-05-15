@@ -339,7 +339,7 @@ export default function Layout() {
     isSuperAdmin: user.rol === 'admin' && !user.municipio_id,
     // Si el muni actual tiene `abm_en_sidebar=false`, los 3 items de ABMs
     // (Categorías Reclamo, Categorías Trámite, Tipos de Trámite) se ocultan
-    // del sidebar. Quedan accesibles sólo desde /gestion/ajustes.
+    // del sidebar. Quedan accesibles sólo desde /gestion/configuracion.
     abmEnSidebar: municipioActual?.abm_en_sidebar ?? true,
     hrefsOcultos,
     modulosActivos,

@@ -478,7 +478,7 @@ export default function AsignacionDependencias() {
       <StickyPageHeader
         icon={<BookOpen className="h-5 w-5" />}
         title="Asignación de Dependencias"
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         filterPanel={
           <FilterChipRow
             chips={filterChips}

@@ -132,7 +132,7 @@ export default function ProveedoresPago() {
   return (
     <div className="space-y-4">
       <StickyPageHeader
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         icon={<Wallet className="h-5 w-5" />}
         title="Proveedores de Pago"
       />

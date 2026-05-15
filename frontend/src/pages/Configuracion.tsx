@@ -1,5 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
-import { Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload, Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight } from 'lucide-react';
+import {
+  Save, Settings, Sparkles, Check, X, MapPin, Loader2, Building2, Upload,
+  Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
+  Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
+  UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
+  Briefcase, PiggyBank, CalendarClock, Trees,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { configuracionApi, municipiosApi } from '../lib/api';
@@ -7,6 +13,23 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
 import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
+import NotificationPreferences from '../components/NotificationPreferences';
+
+// Tipos del dashboard de tarjetas (fusion de Ajustes.tsx)
+interface SettingCard {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+  color: string;
+  link: string;
+  show: boolean;
+}
+interface SettingSection {
+  id: string;
+  title: string;
+  items: SettingCard[];
+}
 
 // Claves que se muestran en la sección especial del Municipio
 const MUNICIPIO_KEYS = ['nombre_municipio', 'direccion_municipio', 'latitud_municipio', 'longitud_municipio', 'telefono_contacto'];
@@ -52,7 +75,22 @@ const BRAND_COLORS = [
 
 export default function Configuracion() {
   const { theme } = useTheme();
-  const { municipioActual, loadMunicipios } = useAuth();
+  const { municipioActual, loadMunicipios, user } = useAuth();
+  // Tabs: General (datos muni + branding) / Usuarios / Catalogos / Cobranzas / Tesoreria / Super Admin
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('configuracion_active_tab') || 'general';
+    }
+    return 'general';
+  });
+  const setTab = (t: string) => {
+    setActiveTab(t);
+    try { localStorage.setItem('configuracion_active_tab', t); } catch {}
+  };
+  const isAdmin = user?.rol === 'admin';
+  const isSupervisor = user?.rol === 'supervisor';
+  const isAdminOrSupervisor = isAdmin || isSupervisor;
+  const isSuperAdmin = isAdmin && !user?.municipio_id;
   const [configs, setConfigs] = useState<Config[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -564,40 +602,123 @@ export default function Configuracion() {
     );
   }
 
+  // Tabs visibles segun rol — fusion de Ajustes.tsx + Configuracion.tsx
+  const mainTabs = [
+    { id: 'general', title: 'General' },
+    ...(isAdminOrSupervisor ? [
+      { id: 'usuarios', title: 'Usuarios' },
+      { id: 'catalogos', title: 'Catálogos' },
+      { id: 'cobranzas', title: 'Cobranzas' },
+      { id: 'tesoreria', title: 'Tesorería' },
+      { id: 'whatsapp', title: 'WhatsApp' },
+    ] : []),
+    ...(isSuperAdmin ? [{ id: 'super-admin', title: 'Super Admin' }] : []),
+  ];
+
+  // Tarjetas por tab (replica el patron del dashboard de Ajustes)
+  const cardSections: SettingSection[] = [
+    {
+      id: 'usuarios',
+      title: 'Usuarios y Empleados',
+      items: [
+        { id: 'vecinos', label: 'Vecinos', description: 'Padrón de vecinos del municipio', icon: Users, color: '#3b82f6', link: '/gestion/usuarios', show: isAdminOrSupervisor },
+        { id: 'empleados', label: 'Empleados', description: 'Administradores, supervisores y empleados', icon: Wrench, color: '#f59e0b', link: '/gestion/empleados', show: isAdminOrSupervisor },
+        { id: 'cuadrillas', label: 'Cuadrillas', description: 'Grupos de trabajo y asignaciones', icon: UsersRound, color: '#10b981', link: '/gestion/cuadrillas', show: isAdminOrSupervisor },
+        { id: 'ausencias', label: 'Ausencias', description: 'Vacaciones, licencias y permisos', icon: CalendarOff, color: '#ef4444', link: '/gestion/ausencias', show: isAdminOrSupervisor },
+      ],
+    },
+    {
+      id: 'catalogos',
+      title: 'Catálogos',
+      items: [
+        { id: 'municipios', label: 'Municipios', description: 'Alta, baja y modificación de municipios', icon: Landmark, color: '#ec4899', link: '/gestion/municipios', show: isSuperAdmin },
+        { id: 'dependencias', label: 'Dependencias', description: 'Secretarías y direcciones que gestionan reclamos y trámites', icon: Building2, color: '#3b82f6', link: '/gestion/dependencias', show: isAdminOrSupervisor },
+        { id: 'asignacion-dependencias', label: 'Asignación', description: 'Asignar categorías y tipos de trámite a dependencias', icon: Link2, color: '#f59e0b', link: '/gestion/asignacion-dependencias', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'categorias-reclamo', label: 'Categorías Reclamo', description: 'Tipos de reclamos del municipio: alumbrado, bacheo, etc', icon: FolderTree, color: '#8b5cf6', link: '/gestion/categorias-reclamo', show: isAdminOrSupervisor },
+        { id: 'categorias-tramite', label: 'Categorías Trámite', description: 'Categorías de trámites del municipio: Obras, Comercio, etc', icon: FolderTree, color: '#10b981', link: '/gestion/categorias-tramite', show: isAdminOrSupervisor },
+        { id: 'tramites-config', label: 'Tipos de Trámite', description: 'Trámites específicos del municipio (ej: Licencia de Conducir)', icon: FileText, color: '#6366f1', link: '/gestion/tramites-config', show: isAdminOrSupervisor },
+        { id: 'zonas', label: 'Zonas', description: 'Barrios y áreas del municipio', icon: MapPin, color: '#06b6d4', link: '/gestion/zonas', show: isAdminOrSupervisor },
+        { id: 'importar-padron', label: 'Catálogo de Tasas', description: 'Importá el padrón tributario y mapealo al catálogo Munify', icon: Landmark, color: '#0ea5e9', link: '/gestion/configuracion/importar-padron', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'dashboard-config', label: 'Dashboards', description: 'Personalizá los dashboards por rol', icon: LayoutDashboard, color: '#8b5cf6', link: '/gestion/config-dashboard', show: isAdminOrSupervisor },
+        { id: 'exportar', label: 'Exportar', description: 'Exportar informes CSV de reclamos, trámites y métricas', icon: FileDown, color: '#10b981', link: '/gestion/exportar', show: isAdminOrSupervisor },
+      ],
+    },
+    {
+      id: 'cobranzas',
+      title: 'Cobranzas',
+      items: [
+        { id: 'proveedores-pago', label: 'Proveedores de Pago', description: 'Activá GIRE, MercadoPago o MODO e importá el padrón de contribuyentes', icon: Wallet, color: '#0066cc', link: '/gestion/proveedores-pago', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tramites-pago', label: 'Método de cobro por trámite', description: 'Asigná Botón de Pago, Rapipago o Adhesión Débito a cada trámite con costo', icon: FileText, color: '#10b981', link: '/gestion/tramites-config', show: isAdminOrSupervisor && !isSuperAdmin },
+      ],
+    },
+    {
+      id: 'tesoreria',
+      title: 'Tesorería',
+      items: [
+        { id: 'tesoreria-conceptos', label: 'Conceptos de gasto', description: 'Lista plana de conceptos disponibles al cargar un gasto', icon: FileText, color: '#3b82f6', link: '/gestion/configuracion/tesoreria?tab=conceptos', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-tipos-empleado', label: 'Tipos de empleado', description: 'Sub-clasificación de empleados: albañil, MMO, arquitecto, jornalizado, etc', icon: UsersRound, color: '#06b6d4', link: '/gestion/configuracion/tesoreria?tab=tipos-empleado', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-cajas', label: 'Cajas / Fondos', description: 'FOFINDE, FODEMEP, FOMEP, Coparticipación. Saldo, ingresos y egresos', icon: PiggyBank, color: '#f59e0b', link: '/gestion/configuracion/tesoreria?tab=cajas', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-parajes', label: 'Parajes', description: 'Regiones del muni con polígono en el mapa', icon: Trees, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=parajes', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-proyectos', label: 'Proyectos', description: 'Obras e iniciativas que agrupan gastos (con presupuesto y % imputado)', icon: Briefcase, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=proyectos', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-agenda', label: 'Agenda de pagos', description: 'Programá pagos recurrentes con ejecución 1-click', icon: CalendarClock, color: '#ec4899', link: '/gestion/tesoreria/agenda', show: isAdminOrSupervisor && !isSuperAdmin },
+      ],
+    },
+    {
+      id: 'whatsapp',
+      title: 'WhatsApp',
+      items: [
+        { id: 'whatsapp-config', label: 'Configuración WhatsApp', description: 'Integración con WhatsApp Business', icon: MessageCircle, color: '#25D366', link: '/gestion/whatsapp', show: isAdminOrSupervisor },
+      ],
+    },
+    {
+      id: 'super-admin',
+      title: 'Super Admin',
+      items: [
+        { id: 'audit-logs', label: 'Consola de auditoría', description: 'Logs cross-municipio con filtros por endpoint, latencia y status', icon: Activity, color: '#8b5cf6', link: '/gestion/admin/audit-logs', show: isSuperAdmin },
+        { id: 'sidebar-config', label: 'Config sidebar', description: 'Configurar qué items del menú ve cada municipio', icon: SlidersHorizontal, color: '#06b6d4', link: '/gestion/sidebar-config', show: isSuperAdmin },
+      ],
+    },
+  ];
+
+  const currentSection = cardSections.find(s => s.id === activeTab);
+  const visibleItems = currentSection ? currentSection.items.filter(i => i.show) : [];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <SettingsHeader
         title="Configuración"
-        subtitle="Parámetros del sistema y branding"
+        subtitle="Parámetros del sistema, catálogos y branding"
         icon={Settings}
       />
 
-      {/* Módulos activables del municipio (feature flags). Solo admin. */}
-      <ModulosToggle />
-
-      {/* Tarjeta: Configuración de Tesorería (catalogo de conceptos, tipos, proyectos) */}
-      <Link
-        to="/gestion/configuracion/tesoreria"
-        className="block rounded-xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-md"
-        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      {/* Tabs */}
+      <div
+        className="flex gap-1 sm:gap-2 p-1 sm:p-1.5 rounded-xl overflow-x-auto scrollbar-hide"
+        style={{ backgroundColor: theme.backgroundSecondary }}
       >
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${theme.primary}20` }}
+        {mainTabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-all flex-shrink-0"
+            style={{
+              backgroundColor: activeTab === t.id ? theme.card : 'transparent',
+              color: activeTab === t.id ? theme.primary : theme.textSecondary,
+              boxShadow: activeTab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            }}
+            type="button"
           >
-            <Wallet className="h-5 w-5" style={{ color: theme.primary }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-base font-bold" style={{ color: theme.text }}>Tesorería</h2>
-            <p className="text-xs" style={{ color: theme.textSecondary }}>
-              Tipos de concepto, conceptos de gasto y proyectos del municipio
-            </p>
-          </div>
-          <ChevronRight className="h-5 w-5 flex-shrink-0" style={{ color: theme.textSecondary }} />
-        </div>
-      </Link>
+            {t.title}
+          </button>
+        ))}
+      </div>
+
+      {/* TAB: GENERAL — contiene Datos del Municipio + Filtros + Branding (contenido legacy) */}
+      {activeTab === 'general' && (
+        <div className="space-y-6">
+      {/* Modulos activables — solo super admin */}
+      {isSuperAdmin && <ModulosToggle />}
 
       {/* Sección Datos del Municipio */}
       <div
@@ -1310,6 +1431,44 @@ export default function Configuracion() {
           </tbody>
         </table>
       </div>
+      )}
+        </div>
+      )}
+
+      {/* OTROS TABS — grid de tarjetas */}
+      {activeTab !== 'general' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Tab notificaciones inline (no se ve normal, pero por si lo agregamos) */}
+          {visibleItems.length === 0 && (
+            <p className="text-sm col-span-full text-center py-8" style={{ color: theme.textSecondary }}>
+              No hay items disponibles en esta sección.
+            </p>
+          )}
+          {visibleItems.map(item => (
+            <Link
+              key={item.id}
+              to={item.link}
+              className="group rounded-xl p-5 transition-all hover:shadow-lg"
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+            >
+              <div className="flex items-start gap-4">
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110"
+                  style={{ backgroundColor: `${item.color}20` }}
+                >
+                  <item.icon className="h-6 w-6" style={{ color: item.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold" style={{ color: theme.text }}>{item.label}</h3>
+                    <ChevronRight className="h-5 w-5 transition-transform group-hover:translate-x-1" style={{ color: theme.textSecondary }} />
+                  </div>
+                  <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>{item.description}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
     </div>
   );

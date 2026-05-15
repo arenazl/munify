@@ -405,7 +405,7 @@ export default function Categorias() {
     <ABMPage
       title="Categorías"
       icon={<Tags className="h-5 w-5" />}
-      backLink="/gestion/ajustes"
+      backLink="/gestion/configuracion"
       buttonLabel="Nueva Categoría"
       onAdd={() => openSheet()}
       searchPlaceholder="Buscar categorías..."

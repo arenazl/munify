@@ -120,7 +120,7 @@ export default function ConfigDashboard() {
       <StickyPageHeader
         icon={<Settings className="h-5 w-5" />}
         title="Configuración del Dashboard"
-        backLink="/gestion/ajustes"
+        backLink="/gestion/configuracion"
         actions={
           <div className="flex items-center gap-2">
             <button

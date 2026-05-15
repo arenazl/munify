@@ -12,7 +12,7 @@ interface NavigationOptions {
   /**
    * Flag de UI del municipio actual. Si es false, los 3 ABMs de
    * "Categorías Reclamo", "Categorías Trámite" y "Tipos de Trámite" se
-   * ocultan del sidebar (quedan sólo accesibles desde /gestion/ajustes).
+   * ocultan del sidebar (quedan sólo accesibles desde /gestion/configuracion).
    * Default true para no romper munis existentes.
    */
   abmEnSidebar?: boolean;
@@ -212,7 +212,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     // === ABMs per-municipio (refactor trámites/categorías) ===
     // Se muestran sólo si el muni tiene `abm_en_sidebar=true`. Los munis
     // creados por el flow de demo arrancan en false → estos 3 quedan
-    // accesibles únicamente desde /gestion/ajustes.
+    // accesibles únicamente desde /gestion/configuracion.
     {
       name: 'Categorías Reclamo',
       href: '/gestion/categorias-reclamo',
@@ -257,8 +257,8 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Configurar qué items del menú ve cada municipio'
     },
     {
-      name: 'Ajustes',
-      href: '/gestion/ajustes',
+      name: 'Configuración',
+      href: '/gestion/configuracion',
       icon: Settings,
       show: isAdminOrSupervisor,
       description: 'Configuración del sistema'

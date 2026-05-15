@@ -36,7 +36,8 @@
       "WebFetch(domain:reclamos-mun-api-aedc8e147cbe.herokuapp.com)",
       "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
       "WebFetch(domain:app.munify.com.ar)",
-      "WebFetch(domain:munify.com.ar)"
+      "WebFetch(domain:munify.com.ar)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $procId = $_.OwningProcess; Write-Host \"Killing PID $procId\"; Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue }; Start-Sleep 3; $still = Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction SilentlyContinue; if \\($still\\) { Write-Host \"Still listening\"; $still | Select-Object OwningProcess } else { Write-Host \"Port 8002 FREE\" })"
     ],
     "deny": [],
     "ask": []

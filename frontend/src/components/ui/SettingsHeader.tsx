@@ -23,7 +23,7 @@ export default function SettingsHeader({
   subtitle,
   icon: Icon,
   iconColor,
-  backTo = '/gestion/ajustes',
+  backTo = '/gestion/configuracion',
   showSave = false,
   onSave,
   saving = false,
