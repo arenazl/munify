@@ -91,6 +91,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [tipoFinanciacion, setTipoFinanciacion] = useState<TipoFinanciacion>('contado');
   const [formaPago, setFormaPago] = useState<FormaPago>('transferencia');
+  const [estadoPago, setEstadoPago] = useState<'concretado' | 'pendiente'>('concretado');
   const [cuotasTotal, setCuotasTotal] = useState<number>(12);
   const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrencia>('mensual');
   const [fechaFinRec, setFechaFinRec] = useState<string>('');
@@ -205,6 +206,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         fecha,
         tipo_financiacion: tipoFinanciacion,
         forma_pago: formaPago,
+        estado_pago: estadoPago,
         cuotas_total: tipoFinanciacion === 'cuotas' || tipoFinanciacion === 'prestamo' ? cuotasTotal : null,
         frecuencia: tipoFinanciacion === 'recurrente' ? frecuencia : null,
         fecha_fin_recurrencia: tipoFinanciacion === 'recurrente' && fechaFinRec ? fechaFinRec : null,
@@ -224,6 +226,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         setMontoPesos('');
         setTipoFinanciacion('contado');
         setFormaPago('transferencia');
+        setEstadoPago('concretado');
         setDescripcion('');
         // proyectoAsignaciones y fecha se preservan
       }
@@ -583,6 +586,33 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         onChange={(v) => setFormaPago(v as FormaPago)}
         options={FORMAS_PAGO.map(f => ({ value: f.value, label: f.label }))}
       />
+
+      {/* Estado del pago: concretado (default) o pendiente */}
+      <div>
+        <label className="block text-xs font-semibold mb-1.5" style={{ color: theme.text }}>Estado</label>
+        <div className="grid grid-cols-2 gap-2">
+          {(['concretado', 'pendiente'] as const).map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setEstadoPago(s)}
+              className="px-3 py-2 rounded-xl text-xs font-bold capitalize transition-all"
+              style={{
+                backgroundColor: estadoPago === s ? (s === 'concretado' ? '#10b981' : '#f59e0b') : theme.backgroundSecondary,
+                color: estadoPago === s ? '#fff' : theme.text,
+                border: `2px solid ${estadoPago === s ? (s === 'concretado' ? '#10b981' : '#f59e0b') : 'transparent'}`,
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
+          {estadoPago === 'concretado'
+            ? 'El pago ya se hizo. Descuenta caja.'
+            : 'Pago futuro o por hacer. No descuenta caja todavía.'}
+        </p>
+      </div>
 
       {(tipoFinanciacion === 'cuotas' || tipoFinanciacion === 'prestamo') && (
         <div>

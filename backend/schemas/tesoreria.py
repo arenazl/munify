@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, ConfigDict, field_validator
 from models.contacto import TipoContacto
 from models.gasto import (
     DestinoGasto, TipoFinanciacion, FrecuenciaRecurrencia,
-    FormaPago, EstadoGastoCuota,
+    FormaPago, EstadoGastoCuota, EstadoPagoGasto,
 )
 from models.proyecto import EstadoProyecto
 
@@ -99,6 +99,7 @@ TipoFinanciacionStr = TipoFinanciacion
 FrecuenciaStr = FrecuenciaRecurrencia
 FormaPagoStr = FormaPago
 EstadoCuotaStr = EstadoGastoCuota
+EstadoPagoStr = EstadoPagoGasto
 
 
 class GastoCuotaResponse(BaseModel):
@@ -152,6 +153,7 @@ class GastoBase(BaseModel):
 
     tipo_financiacion: TipoFinanciacionStr = "contado"
     forma_pago: FormaPagoStr = "transferencia"
+    estado_pago: EstadoPagoStr = "concretado"
 
     cuotas_total: Optional[int] = Field(None, ge=1, le=120)
     frecuencia: Optional[FrecuenciaStr] = None
@@ -169,6 +171,8 @@ class GastoUpdate(BaseModel):
     descripcion: Optional[str] = None
     observaciones: Optional[str] = None
     activo: Optional[bool] = None
+    # Cambiar estado de pago: pendiente <-> concretado.
+    estado_pago: Optional[EstadoPagoStr] = None
     # Si se manda, reemplaza las imputaciones existentes. Si se omite,
     # quedan como estaban.
     proyectos: Optional[List[GastoProyectoAssignment]] = None

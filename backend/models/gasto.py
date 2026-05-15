@@ -42,6 +42,17 @@ class EstadoGastoCuota(str, enum.Enum):
     CANCELADA = "cancelada"
 
 
+class EstadoPagoGasto(str, enum.Enum):
+    """Tag manual del gasto: concretado (caja descontada) o pendiente (no).
+
+    Default 'concretado' (comportamiento historico: cargar un gasto era
+    siempre algo ya pagado). 'pendiente' permite cargar un gasto futuro
+    o pendiente de pago sin que descuente la caja todavia.
+    """
+    CONCRETADO = "concretado"
+    PENDIENTE = "pendiente"
+
+
 class Gasto(Base):
     """
     Registro de un gasto del municipio.
@@ -123,6 +134,16 @@ class Gasto(Base):
         Enum(FormaPago, values_callable=lambda x: [e.value for e in x]),
         default=FormaPago.TRANSFERENCIA,
         nullable=False,
+    )
+
+    # Estado de pago: concretado (caja ya descontada) o pendiente (futuro/por pagar).
+    # Default 'concretado' al crear (comportamiento historico). Cuando pasa de
+    # pendiente -> concretado, recien ahi se descuenta la caja (logica en API).
+    estado_pago = Column(
+        Enum(EstadoPagoGasto, values_callable=lambda x: [e.value for e in x]),
+        default=EstadoPagoGasto.CONCRETADO,
+        nullable=False,
+        server_default='concretado',
     )
 
     # Para CUOTAS / PRESTAMO: cantidad total de cuotas

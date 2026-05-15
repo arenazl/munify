@@ -639,6 +639,13 @@ function CajasTab() {
   const [editing, setEditing] = useState<Caja | null>(null);
   const [form, setForm] = useState({ nombre: '', codigo: '', descripcion: '', color: '#3b82f6', icono: 'PiggyBank', saldo_inicial: '0', orden: 0 });
   const [saving, setSaving] = useState(false);
+  // Agregar fondos (ingreso) + historial de movimientos
+  const [fondosSheetOpen, setFondosSheetOpen] = useState(false);
+  const [fondosCaja, setFondosCaja] = useState<Caja | null>(null);
+  const [fondosForm, setFondosForm] = useState({ tipo: 'ingreso' as 'ingreso' | 'egreso', monto: '', concepto: '', fecha: new Date().toISOString().slice(0, 10), descripcion: '' });
+  const [fondosMovimientos, setFondosMovimientos] = useState<any[]>([]);
+  const [fondosLoadingMov, setFondosLoadingMov] = useState(false);
+  const [fondosSaving, setFondosSaving] = useState(false);
 
   const fetch = async () => {
     setLoading(true);
@@ -691,6 +698,69 @@ function CajasTab() {
 
   const fmt = (v?: string | null) => v ? `$${parseFloat(v).toLocaleString('es-AR', { maximumFractionDigits: 0 })}` : '$0';
 
+  const openFondos = async (c: Caja) => {
+    setFondosCaja(c);
+    setFondosForm({ tipo: 'ingreso', monto: '', concepto: '', fecha: new Date().toISOString().slice(0, 10), descripcion: '' });
+    setFondosSheetOpen(true);
+    setFondosLoadingMov(true);
+    try {
+      const res = await cajasApi.listMovimientos(c.id, { limit: 50 });
+      setFondosMovimientos(res.data || []);
+    } catch {
+      setFondosMovimientos([]);
+    } finally {
+      setFondosLoadingMov(false);
+    }
+  };
+
+  const guardarFondos = async () => {
+    if (!fondosCaja) return;
+    const monto = parseFloat(fondosForm.monto);
+    if (!monto || monto <= 0) return toast.error('Monto invalido');
+    if (!fondosForm.concepto.trim()) return toast.error('Concepto requerido');
+    setFondosSaving(true);
+    try {
+      await cajasApi.createMovimiento({
+        caja_id: fondosCaja.id,
+        tipo: fondosForm.tipo,
+        monto,
+        concepto: fondosForm.concepto.trim(),
+        fecha: fondosForm.fecha,
+        descripcion: fondosForm.descripcion.trim() || null,
+      });
+      toast.success(fondosForm.tipo === 'ingreso' ? 'Fondos agregados' : 'Egreso registrado');
+      // Refresh historial + cajas (para que se actualice el saldo)
+      const [mov, c] = await Promise.all([
+        cajasApi.listMovimientos(fondosCaja.id, { limit: 50 }),
+        cajasApi.list({ activo: true, include_saldos: true }),
+      ]);
+      setFondosMovimientos(mov.data || []);
+      setCajas(c.data || []);
+      setFondosForm({ tipo: 'ingreso', monto: '', concepto: '', fecha: new Date().toISOString().slice(0, 10), descripcion: '' });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Error guardando');
+    } finally {
+      setFondosSaving(false);
+    }
+  };
+
+  const eliminarMovimiento = async (movId: number) => {
+    if (!fondosCaja) return;
+    if (!confirm('¿Eliminar este movimiento?')) return;
+    try {
+      await cajasApi.deleteMovimiento(movId);
+      toast.success('Movimiento eliminado');
+      const [mov, c] = await Promise.all([
+        cajasApi.listMovimientos(fondosCaja.id, { limit: 50 }),
+        cajasApi.list({ activo: true, include_saldos: true }),
+      ]);
+      setFondosMovimientos(mov.data || []);
+      setCajas(c.data || []);
+    } catch {
+      toast.error('Error eliminando');
+    }
+  };
+
   if (loading) return <div className="p-6 flex justify-center"><Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.primary }} /></div>;
 
   return (
@@ -718,6 +788,14 @@ function CajasTab() {
                   {c.codigo && <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}15`, color }}>{c.codigo}</span>}
                 </div>
                 <div className="flex flex-col gap-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openFondos(c); }}
+                    className="p-1 rounded hover:scale-110"
+                    style={{ color: '#10b981' }}
+                    title="Agregar fondos / ver historial"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
                   <button onClick={(e) => { e.stopPropagation(); openSheet(c); }} className="p-1 rounded hover:scale-110" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
                   <button onClick={(e) => { e.stopPropagation(); handleDelete(c); }} className="p-1 rounded hover:scale-110" style={{ color: '#ef4444' }}><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>
@@ -787,6 +865,112 @@ function CajasTab() {
             </div>
           </div>
         </div>
+      </Sheet>
+
+      {/* Sheet: agregar fondos + historial de movimientos */}
+      <Sheet
+        open={fondosSheetOpen}
+        onClose={() => setFondosSheetOpen(false)}
+        title={fondosCaja ? `Fondos · ${fondosCaja.nombre}` : 'Fondos'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setFondosSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>
+              Cerrar
+            </button>
+            <button onClick={guardarFondos} disabled={fondosSaving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: fondosForm.tipo === 'ingreso' ? '#10b981' : '#ef4444', opacity: fondosSaving ? 0.7 : 1 }}>
+              {fondosSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              {fondosForm.tipo === 'ingreso' ? 'Agregar fondos' : 'Registrar egreso'}
+            </button>
+          </div>
+        }
+      >
+        {fondosCaja && (
+          <div className="space-y-4">
+            {/* Saldo actual destacado */}
+            <div className="rounded-xl p-3 flex items-center justify-between" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}>
+              <div>
+                <div className="text-[10px] uppercase font-semibold" style={{ color: theme.textSecondary }}>Saldo actual</div>
+                <div className="text-2xl font-bold tabular-nums" style={{ color: fondosCaja.color || theme.primary }}>{fmt(fondosCaja.saldo_actual)}</div>
+              </div>
+              <div className="flex flex-col items-end text-[11px]" style={{ color: theme.textSecondary }}>
+                <span className="inline-flex items-center gap-1"><TrendingUp className="h-3 w-3" style={{ color: '#10b981' }} /> {fmt(fondosCaja.total_ingresos)}</span>
+                <span className="inline-flex items-center gap-1"><TrendingDown className="h-3 w-3" style={{ color: '#ef4444' }} /> {fmt(fondosCaja.total_egresos)}</span>
+              </div>
+            </div>
+
+            {/* Form alta de movimiento */}
+            <div className="rounded-xl p-3 space-y-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+              <div className="grid grid-cols-2 gap-2">
+                {(['ingreso', 'egreso'] as const).map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setFondosForm(f => ({ ...f, tipo: t }))}
+                    className="px-3 py-2 rounded-lg text-xs font-bold capitalize transition-all"
+                    style={{
+                      backgroundColor: fondosForm.tipo === t ? (t === 'ingreso' ? '#10b981' : '#ef4444') : theme.backgroundSecondary,
+                      color: fondosForm.tipo === t ? '#fff' : theme.text,
+                      border: `2px solid ${fondosForm.tipo === t ? (t === 'ingreso' ? '#10b981' : '#ef4444') : 'transparent'}`,
+                    }}
+                  >
+                    {t === 'ingreso' ? 'Ingreso (sumar)' : 'Egreso (restar)'}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Monto *</label>
+                  <input type="number" value={fondosForm.monto} onChange={(e) => setFondosForm(f => ({ ...f, monto: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-sm tabular-nums" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder="500000" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Fecha</label>
+                  <input type="date" value={fondosForm.fecha} onChange={(e) => setFondosForm(f => ({ ...f, fecha: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Concepto *</label>
+                <input value={fondosForm.concepto} onChange={(e) => setFondosForm(f => ({ ...f, concepto: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder="Ej: Aporte coparticipación abril" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
+                <textarea value={fondosForm.descripcion} onChange={(e) => setFondosForm(f => ({ ...f, descripcion: e.target.value }))} rows={2} className="w-full px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              </div>
+            </div>
+
+            {/* Historial */}
+            <div>
+              <p className="text-xs font-semibold uppercase mb-2" style={{ color: theme.textSecondary }}>
+                Historial ({fondosMovimientos.length})
+              </p>
+              {fondosLoadingMov ? (
+                <div className="p-4 flex justify-center"><Loader2 className="h-4 w-4 animate-spin" style={{ color: theme.primary }} /></div>
+              ) : fondosMovimientos.length === 0 ? (
+                <p className="text-xs text-center py-4" style={{ color: theme.textSecondary }}>Sin movimientos.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {fondosMovimientos.map(m => {
+                    const esIngreso = m.tipo === 'ingreso';
+                    return (
+                      <div key={m.id} className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
+                        <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: esIngreso ? '#10b98120' : '#ef444420' }}>
+                          {esIngreso ? <TrendingUp className="h-4 w-4" style={{ color: '#10b981' }} /> : <TrendingDown className="h-4 w-4" style={{ color: '#ef4444' }} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: theme.text }}>{m.concepto}</p>
+                          <p className="text-[10px]" style={{ color: theme.textSecondary }}>{new Date(m.fecha).toLocaleDateString('es-AR')}</p>
+                        </div>
+                        <span className="font-bold tabular-nums text-sm whitespace-nowrap" style={{ color: esIngreso ? '#10b981' : '#ef4444' }}>
+                          {esIngreso ? '+' : '−'} {fmt(m.monto)}
+                        </span>
+                        <button onClick={() => eliminarMovimiento(m.id)} className="p-1 rounded hover:scale-110" style={{ color: '#ef4444' }} title="Eliminar"><Trash2 className="h-3 w-3" /></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </Sheet>
     </>
   );

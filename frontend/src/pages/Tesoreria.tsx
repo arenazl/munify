@@ -63,10 +63,11 @@ interface DependenciaOption {
   icono?: string | null;
 }
 
+// 'en_mora' eliminado por pedido del user (ocultar por ahora). Si
+// algun dia se quiere volver, agregar de nuevo aca.
 const ESTADO_FILTROS: { value: EstadoAgregado | ''; label: string }[] = [
   { value: '', label: 'Todos' },
   { value: 'al_dia', label: 'Al día' },
-  { value: 'en_mora', label: 'En mora' },
   { value: 'pendiente', label: 'Pendiente' },
   { value: 'completado', label: 'Completado' },
 ];
