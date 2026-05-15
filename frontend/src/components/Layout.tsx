@@ -88,6 +88,7 @@ export default function Layout() {
   const [hrefsOcultos, setHrefsOcultos] = useState<string[]>([]);
   // Modulos activos del municipio (feature flags)
   const [modulosActivos, setModulosActivos] = useState<string[]>([]);
+  const [modulosDesactivados, setModulosDesactivados] = useState<string[]>([]);
   const [pendingEmail, setPendingEmail] = useState('');
   const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
@@ -184,10 +185,11 @@ export default function Layout() {
     }
     modulosApi.list()
       .then((r) => {
-        const activos = (r.data || []).filter((m: any) => m.activo).map((m: any) => m.modulo);
-        setModulosActivos(activos);
+        const rows = (r.data || []) as Array<{ modulo: string; activo: boolean }>;
+        setModulosActivos(rows.filter(m => m.activo).map(m => m.modulo));
+        setModulosDesactivados(rows.filter(m => !m.activo).map(m => m.modulo));
       })
-      .catch(() => setModulosActivos([]));
+      .catch(() => { setModulosActivos([]); setModulosDesactivados([]); });
   }, [user?.id, user?.municipio_id]);
 
   // Cargar datos del usuario cuando se abre el sheet de perfil
@@ -341,6 +343,7 @@ export default function Layout() {
     abmEnSidebar: municipioActual?.abm_en_sidebar ?? true,
     hrefsOcultos,
     modulosActivos,
+    modulosDesactivados,
   });
   const mobileTabs = getMobileTabs(user.rol);
 

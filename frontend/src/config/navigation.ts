@@ -28,6 +28,12 @@ interface NavigationOptions {
    * aca. Default: set vacio → todos los items "modulares" se ocultan.
    */
   modulosActivos?: string[];
+  /**
+   * Modulos explicitamente desactivados para este municipio. Items que
+   * referencian alguno de estos NO se muestran. Es OPT-OUT: si un modulo
+   * no esta en este set, se asume activo (no rompe sesiones viejas).
+   */
+  modulosDesactivados?: string[];
 }
 
 export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => {
@@ -50,6 +56,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     if (!Array.isArray(raw)) return new Set<string>();
     return new Set<string>(raw);
   })();
+  const modulosDesactivados = (() => {
+    if (typeof userRoleOrOptions !== 'object') return new Set<string>();
+    const raw = userRoleOrOptions.modulosDesactivados;
+    if (!Array.isArray(raw)) return new Set<string>();
+    return new Set<string>(raw);
+  })();
+  // Helper: un modulo esta habilitado si NO esta en la lista de
+  // desactivados. Opt-out, default activo (compat con munis viejos).
+  const moduloOn = (modulo: string) => !modulosDesactivados.has(modulo);
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
@@ -105,53 +120,54 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     },
 
     // === SECCIÓN GESTORES (Admin/Supervisor) ===
+    // Cada item declara su `modulo` y `show` chequea moduloOn() — si el
+    // municipio tiene una fila explicita activo=False en municipio_modulos
+    // para esa clave, el item desaparece. Si no hay fila, asume activo.
     {
       name: 'Dashboard',
       href: '/gestion',
       icon: Home,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('dashboard'),
       description: 'Resumen y métricas'
     },
     {
       name: 'Reclamos',
       href: '/gestion/reclamos',
       icon: ClipboardList,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('reclamos'),
       description: 'Gestionar todos los reclamos'
     },
     {
       name: 'Trámites',
       href: '/gestion/tramites',
       icon: FileCheck,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
       description: 'Gestionar trámites'
     },
     {
       name: 'Tasas',
       href: '/gestion/tasas',
       icon: Receipt,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('tasas'),
       description: 'Partidas del padrón y deudas'
     },
     {
       name: 'Pagos',
       href: '/gestion/pagos',
       icon: Wallet,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('pagos'),
       description: 'Histórico transaccional para contaduría'
     },
     {
       name: 'Mostrador',
       href: '/gestion/mostrador',
       icon: ScanLine,
-      show: esFuncionarioMuni,
+      show: esFuncionarioMuni && moduloOn('mostrador'),
       description: 'Ventanilla asistida — biometría + trámite presencial'
     },
     {
-      // Modulo activable desde Configuración. Solo aparece si el municipio
-      // tiene activo el flag `tesoreria` Y el usuario es admin o supervisor
-      // del muni (sin dependencia asignada — los supervisores de dependencia
-      // tienen su propia seccion).
+      // Tesoreria sigue siendo OPT-IN: solo aparece si esta en modulosActivos
+      // (no por moduloOn). Es legacy y queremos preservarlo asi por ahora.
       name: 'Tesorería',
       href: '/gestion/tesoreria',
       icon: Receipt,
@@ -162,35 +178,35 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Mapa',
       href: '/gestion/mapa',
       icon: Map,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('mapa'),
       description: 'Ver reclamos en el mapa'
     },
     {
       name: 'Tablero',
       href: '/gestion/tablero',
       icon: Wrench,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('tablero'),
       description: 'Tablero Kanban'
     },
     {
       name: 'Planificación',
       href: '/gestion/planificacion',
       icon: CalendarDays,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('planificacion'),
       description: 'Calendario semanal del personal'
     },
     {
       name: 'SLA',
       href: '/gestion/sla',
       icon: Clock,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('sla'),
       description: 'Gestión de SLA'
     },
     {
       name: 'Panel BI',
       href: '/gestion/panel-bi',
       icon: LayoutDashboard,
-      show: isAdminOrSupervisor,
+      show: isAdminOrSupervisor && moduloOn('panel-bi'),
       description: 'Consultas y análisis con IA'
     },
     // === ABMs per-municipio (refactor trámites/categorías) ===
