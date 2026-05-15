@@ -16,8 +16,8 @@ from decimal import Decimal
 from typing import List, Optional
 from calendar import monthrange
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy import select, and_, func, extract, case
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response
+from sqlalchemy import select, and_, or_, func, extract, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -235,31 +235,13 @@ def _generar_cuotas(gasto: Gasto) -> List[GastoCuota]:
 # CRUD
 # ============================================================
 
-@router.get("", response_model=List[GastoResponse])
-async def list_gastos(
-    request: Request,
-    destino_tipo: Optional[str] = None,
-    contacto_id: Optional[int] = None,
-    dependencia_id: Optional[int] = None,
-    concepto: Optional[str] = None,
-    desde: Optional[date] = None,
-    hasta: Optional[date] = None,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=5000),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _require_admin(current_user)
-    municipio_id = get_effective_municipio_id(request, current_user)
-
-    query = (
-        select(Gasto)
-        .options(
-            selectinload(Gasto.cuotas),
-            selectinload(Gasto.contacto),
-            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
-        )
-        .where(Gasto.municipio_id == municipio_id, Gasto.activo == True)  # noqa: E712
+def _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependencia_id,
+                                concepto, search, desde, hasta, estado_pago):
+    """Construye query con filtros (sin offset/limit/order_by/options).
+    Reutilizable para list paginado + count."""
+    query = select(Gasto).where(
+        Gasto.municipio_id == municipio_id,
+        Gasto.activo == True,  # noqa: E712
     )
     if destino_tipo:
         query = query.where(Gasto.destino_tipo == destino_tipo)
@@ -268,14 +250,63 @@ async def list_gastos(
     if dependencia_id:
         query = query.where(Gasto.destino_dependencia_id == dependencia_id)
     if concepto:
-        query = query.where(Gasto.concepto.ilike(f"%{concepto}%"))
+        query = query.where(Gasto.concepto == concepto)
+    if search and search.strip():
+        s = f"%{search.strip()}%"
+        query = query.where(or_(
+            Gasto.concepto.ilike(s),
+            Gasto.descripcion.ilike(s),
+            Gasto.observaciones.ilike(s),
+        ))
     if desde:
         query = query.where(Gasto.fecha >= desde)
     if hasta:
         query = query.where(Gasto.fecha <= hasta)
+    if estado_pago:
+        query = query.where(Gasto.estado_pago == estado_pago)
+    return query
 
-    query = query.order_by(Gasto.fecha.desc(), Gasto.id.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
+
+@router.get("", response_model=List[GastoResponse])
+async def list_gastos(
+    response: Response,
+    request: Request,
+    destino_tipo: Optional[str] = None,
+    contacto_id: Optional[int] = None,
+    dependencia_id: Optional[int] = None,
+    concepto: Optional[str] = None,
+    search: Optional[str] = Query(None, description="Busca en concepto/descripcion/observaciones"),
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    estado_pago: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    base = _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependencia_id,
+                                       concepto, search, desde, hasta, estado_pago)
+
+    # Total filtrado (sin paginar) para que el frontend calcule paginas
+    count_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_q)).scalar_one()
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
+
+    # Items paginados con relaciones cargadas
+    items_q = (
+        base.options(
+            selectinload(Gasto.cuotas),
+            selectinload(Gasto.contacto),
+            selectinload(Gasto.proyectos_asignados).selectinload(GastoProyecto.proyecto),
+        )
+        .order_by(Gasto.fecha.desc(), Gasto.id.desc())
+        .offset(skip).limit(limit)
+    )
+    result = await db.execute(items_q)
     gastos = result.scalars().unique().all()
     return [_gasto_to_response(g) for g in gastos]
 

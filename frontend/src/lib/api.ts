@@ -1944,6 +1944,8 @@ export const gastosApi = {
     contacto_id?: number;
     dependencia_id?: number;
     concepto?: string;
+    search?: string;
+    estado_pago?: string;
     desde?: string;
     hasta?: string;
     skip?: number;

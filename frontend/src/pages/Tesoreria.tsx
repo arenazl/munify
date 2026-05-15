@@ -79,6 +79,7 @@ export default function Tesoreria() {
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalServer, setTotalServer] = useState(0);
   const [search, setSearch] = useState('');
   const [tipoContactoFiltro, setTipoContactoFiltro] = useState<TipoContacto | ''>('');
   const [subtipoEmpleadoFiltro, setSubtipoEmpleadoFiltro] = useState<string>('');
@@ -127,8 +128,28 @@ export default function Tesoreria() {
   const fetchGastos = async () => {
     setLoading(true);
     try {
-      const res = await gastosApi.list({ limit: 5000 });
+      // Filtros server-side: search, dependencia, concepto, rango fechas.
+      // El resto (tipoContacto, subtipoEmpleado, tipoConcepto, estadoAgregado,
+      // periodo mes/anio) se aplican client-side sobre la pagina actual.
+      const params: any = { skip: (page - 1) * pageSize, limit: pageSize };
+      if (search.trim()) params.search = search.trim();
+      if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
+      if (conceptoFiltro) params.concepto = conceptoFiltro;
+      if (rangoActivo) { params.desde = rangoFechas.desde; params.hasta = rangoFechas.hasta; }
+      else if (!todosLosMeses && modoPeriodo === 'mes') {
+        // Filtro temporal por mes: primer dia y ultimo dia
+        const ini = new Date(anioActual, mesActual, 1);
+        const fin = new Date(anioActual, mesActual + 1, 0);
+        params.desde = ini.toISOString().slice(0, 10);
+        params.hasta = fin.toISOString().slice(0, 10);
+      } else if (!todosLosMeses && modoPeriodo === 'anio') {
+        params.desde = `${anioActual}-01-01`;
+        params.hasta = `${anioActual}-12-31`;
+      }
+      const res = await gastosApi.list(params);
       setGastos(res.data);
+      const total = res.headers?.['x-total-count'] || res.headers?.['X-Total-Count'];
+      if (total) setTotalServer(parseInt(total as string, 10));
     } catch {
       toast.error('Error cargando gastos');
     } finally {
@@ -178,12 +199,27 @@ export default function Tesoreria() {
   };
 
   useEffect(() => {
-    fetchGastos();
     fetchDependencias();
     fetchContactos();
     fetchCatalogoConceptos();
     fetchTiposEmpleado();
   }, []);
+
+  // Re-fetch gastos cada vez que cambia un filtro server-side o la paginacion.
+  // Filtros client-side (tipoContacto, subtipoEmpleado, estadoAgregado) NO
+  // disparan re-fetch — solo filtran lo que ya esta en memoria.
+  useEffect(() => {
+    fetchGastos();
+    /* eslint-disable-next-line */
+  }, [page, pageSize, dependenciaFiltro, conceptoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+
+  // Search con debounce
+  useEffect(() => {
+    setPage(1);
+    const t = setTimeout(() => fetchGastos(), 400);
+    return () => clearTimeout(t);
+    /* eslint-disable-next-line */
+  }, [search]);
 
   // Refrescar el gasto seleccionado cuando se actualiza la lista
   useEffect(() => {
@@ -280,15 +316,9 @@ export default function Tesoreria() {
     });
   }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
 
-  const paginatedFiltered = useMemo(() => {
-    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    if (page > totalPages) return filtered.slice(0, pageSize);
-    return filtered.slice((page - 1) * pageSize, page * pageSize);
-  }, [filtered, page, pageSize]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [filtered.length]);
+  // Server ya paginó: `filtered` ya tiene solo la página actual con filtros
+  // client-side extra aplicados encima.
+  const paginatedFiltered = filtered;
 
   // Totalizador (refleja todos los filtros activos)
   const totales = useMemo(() => {
@@ -798,7 +828,9 @@ export default function Tesoreria() {
         pagination={{
           page,
           pageSize,
-          totalItems: filtered.length,
+          // Total viene del header X-Total-Count (filtros server-side aplicados).
+          // El filtered.length es solo el subset cliente sobre los 50 actuales.
+          totalItems: totalServer,
           onPageChange: setPage,
           onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
         }}
