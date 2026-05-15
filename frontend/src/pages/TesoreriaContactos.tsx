@@ -266,37 +266,9 @@ export default function TesoreriaContactos() {
     </div>
   );
 
-  const headerActions = (
-    <>
-      <label
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
-        <Upload className="h-3.5 w-3.5" />
-        {importing === 'excel' ? 'Importando…' : 'Excel'}
-        <input
-          type="file"
-          accept=".xlsx"
-          className="hidden"
-          disabled={!!importing}
-          onChange={(e) => e.target.files?.[0] && handleImportExcel(e.target.files[0])}
-        />
-      </label>
-      <label
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
-        <MapPin className="h-3.5 w-3.5" />
-        {importing === 'kmz' ? 'Importando…' : 'KMZ'}
-        <input
-          type="file"
-          accept=".kmz,.kml"
-          className="hidden"
-          disabled={!!importing}
-          onChange={(e) => e.target.files?.[0] && handleImportKmz(e.target.files[0])}
-        />
-      </label>
-    </>
+  // Botones Excel/KMZ sacados del header a pedido del user — accesibles
+  // desde una pantalla aparte si hace falta importar.
+  const headerActions = null;
   );
 
   const sheetContent = (
@@ -423,7 +395,6 @@ export default function TesoreriaContactos() {
         buttonLabel="Nuevo"
         onAdd={() => openSheet()}
         searchPlaceholder="Buscar por nombre, DNI…"
-        searchMaxWidth={320}
         searchValue={search}
         onSearchChange={setSearch}
         headerActions={<>{headerActions}{extraFilters}</>}
