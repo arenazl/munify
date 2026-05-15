@@ -269,7 +269,6 @@ export default function TesoreriaContactos() {
   // Botones Excel/KMZ sacados del header a pedido del user — accesibles
   // desde una pantalla aparte si hace falta importar.
   const headerActions = null;
-  );
 
   const sheetContent = (
     <div className="space-y-3">
