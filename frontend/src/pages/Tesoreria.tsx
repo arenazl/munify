@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
   Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight, CalendarClock, Settings,
+  Sparkles,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -714,6 +715,15 @@ export default function Tesoreria() {
     />
   );
 
+  // Detectar gastos importados de Bartolo que cayeron en conceptos genericos
+  // y necesitan curacion manual. Solo aparece el banner si hay alguno.
+  const dudosos = useMemo(() => {
+    const TAG = '[BARTOLO-DUDOSO]';
+    const list = gastos.filter(g => g.observaciones && g.observaciones.includes(TAG));
+    const monto = list.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
+    return { count: list.length, monto };
+  }, [gastos]);
+
   return (
     <>
       <div className="px-4 pt-3">
@@ -726,6 +736,37 @@ export default function Tesoreria() {
           </span>
         </TesoreriaHint>
       </div>
+
+      {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes */}
+      {dudosos.count > 0 && (
+        <div className="px-4">
+          <Link
+            to="/gestion/tesoreria/curacion-bartolo"
+            className="block rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            style={{
+              backgroundColor: '#f59e0b15',
+              border: `1px solid #f59e0b40`,
+            }}
+          >
+            <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#f59e0b' }}>
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold" style={{ color: theme.text }}>
+                  {dudosos.count} gastos importados pendientes de revisar
+                </p>
+                <p className="text-xs" style={{ color: theme.textSecondary }}>
+                  La IA los clasificó como "Compras/Otros varios" · Total: ${dudosos.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white whitespace-nowrap" style={{ backgroundColor: '#f59e0b' }}>
+                Revisar →
+              </span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       <ABMPage
         title="Tesorería"

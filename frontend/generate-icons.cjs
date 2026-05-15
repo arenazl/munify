@@ -50,9 +50,20 @@ async function generateIcons() {
   fs.copyFileSync(MASTER, path.join(OUT_PUBLIC, 'favicon.svg'));
   console.log('OK favicon.svg');
 
-  // Apple touch 180
-  fs.writeFileSync(path.join(OUT_PUBLIC, 'apple-touch-icon.png'), await renderAt(180));
-  console.log('OK apple-touch-icon.png');
+  // Apple touch 180: usa variante iOS (azul brand + M blanca + check verde).
+  // iOS NO aplica transparencia ni masks sobre apple-touch-icon, asi que
+  // conviene un PNG con fondo solido y diseno completo.
+  const MASTER_IOS = path.join(ROOT, 'public/brand/Munify-ios.svg');
+  if (fs.existsSync(MASTER_IOS)) {
+    await sharp(MASTER_IOS, { density: 300, limitInputPixels: false })
+      .resize(180, 180, { fit: 'cover' })
+      .png()
+      .toFile(path.join(OUT_PUBLIC, 'apple-touch-icon.png'));
+    console.log('OK apple-touch-icon.png (variante iOS azul + blanco + verde)');
+  } else {
+    fs.writeFileSync(path.join(OUT_PUBLIC, 'apple-touch-icon.png'), await renderAt(180));
+    console.log('OK apple-touch-icon.png (fallback master comun)');
+  }
 
   // Maskable 512: contenido al 80% (410px) + padding transparente 51px
   const inner = await sharp(MASTER, { density: 300, limitInputPixels: false })
