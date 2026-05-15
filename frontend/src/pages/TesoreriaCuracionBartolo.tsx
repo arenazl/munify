@@ -12,8 +12,7 @@
  * y route).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -211,105 +210,124 @@ export default function TesoreriaCuracionBartolo() {
     </div>
   );
 
-  return (
-    <div className="px-4 py-3 space-y-3">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link
-          to="/gestion/tesoreria"
-          className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
-          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f59e0b15' }}>
-          <Sparkles className="h-5 w-5" style={{ color: '#f59e0b' }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold" style={{ color: theme.text }}>Curación de gastos (Bartolo)</h1>
-          <p className="text-xs" style={{ color: theme.textSecondary }}>
-            Cambiá el concepto sugerido por la IA cuando no haya quedado bien. Al confirmar se quita la marca dudoso.
-          </p>
-        </div>
-        <div className="text-right">
-          <span className="font-bold text-lg" style={{ color: '#f59e0b' }}>{gastos.length}</span>
-          <span className="text-xs ml-1" style={{ color: theme.textSecondary }}>pendientes</span>
-        </div>
-      </div>
+  // Chips de distribución como secondaryFilters (compactos, scrolleables)
+  const distribucionChips = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {Array.from(conceptosUsadosCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([nombre, count]) => (
+          <button
+            key={nombre}
+            onClick={() => setConceptoFiltro(conceptoFiltro === nombre ? '' : nombre)}
+            className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-all whitespace-nowrap"
+            style={{
+              backgroundColor: conceptoFiltro === nombre ? theme.primary : `${theme.primary}20`,
+              color: conceptoFiltro === nombre ? '#fff' : theme.primary,
+            }}
+          >
+            {nombre.replace('Pago de ', '').replace('Contratación de ', '').replace('Compra de ', '')} · {count}
+          </button>
+        ))}
+    </div>
+  );
 
-      {/* Stats por concepto sugerido */}
-      {gastos.length > 0 && (
-        <div className="rounded-xl p-3 flex flex-wrap gap-1.5" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-          <span className="text-[10px] uppercase font-semibold mr-1 self-center" style={{ color: theme.textSecondary }}>
-            Distribución:
-          </span>
-          {Array.from(conceptosUsadosCount.entries())
-            .sort((a, b) => b[1] - a[1])
-            .map(([nombre, count]) => (
-              <button
-                key={nombre}
-                onClick={() => setConceptoFiltro(conceptoFiltro === nombre ? '' : nombre)}
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-full transition-all"
-                style={{
-                  backgroundColor: conceptoFiltro === nombre ? theme.primary : `${theme.primary}20`,
-                  color: conceptoFiltro === nombre ? '#fff' : theme.primary,
-                }}
-              >
-                {nombre} ({count})
-              </button>
-            ))}
-          {conceptoFiltro && (
+  return (
+    <ABMPage
+      title="Curación de gastos (Bartolo)"
+      icon={<Sparkles className="h-5 w-5" />}
+      backLink="/gestion/tesoreria"
+      searchPlaceholder="Buscar por descripción / proveedor..."
+      searchValue={search}
+      onSearchChange={setSearch}
+      headerActions={
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap" style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
+          {gastos.length} pendientes
+        </span>
+      }
+      secondaryFilters={
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[220px]">
+            <ModernSelect
+              value={conceptoFiltro}
+              onChange={setConceptoFiltro}
+              options={conceptosFilter}
+              placeholder="Todos los conceptos"
+              searchable
+            />
+          </div>
+          {distribucionChips}
+          {filtered.length > 0 && filtered.length <= 200 && (
             <button
-              onClick={() => setConceptoFiltro('')}
-              className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+              onClick={() => {
+                const cand = prompt(`¿A qué concepto querés cambiar los ${filtered.length} gastos visibles? Escribí EXACTAMENTE el nombre del concepto`);
+                if (cand && conceptos.find(c => c.nombre === cand)) aplicarMasivo(cand);
+                else if (cand) toast.error('Concepto no existe');
+              }}
+              className="px-3 h-[34px] rounded-lg text-[12px] font-semibold text-white"
+              style={{ backgroundColor: '#8b5cf6' }}
+              disabled={savingId === -1}
             >
-              Quitar filtro
+              Aplicar a {filtered.length}
             </button>
           )}
         </div>
-      )}
-
-      <ABMPage
-        title=""
-        searchPlaceholder="Buscar por descripción / proveedor..."
-        searchValue={search}
-        onSearchChange={setSearch}
-        secondaryFilters={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-[260px]">
-              <ModernSelect
-                value={conceptoFiltro}
-                onChange={setConceptoFiltro}
-                options={conceptosFilter}
-                placeholder="Todos los conceptos"
-                searchable
-              />
+      }
+      loading={loading}
+      isEmpty={!loading && filtered.length === 0}
+      emptyMessage={gastos.length === 0 ? '🎉 No hay gastos dudosos.' : 'Sin resultados.'}
+      tableView={tableView}
+      defaultViewMode="table"
+    >
+        {/* Cards (mobile): mismo set de datos en formato vertical */}
+        {filtered.map((g) => {
+          const obsLimpio = (g.observaciones || '')
+            .split('|').map(s => s.trim())
+            .filter(s => !s.startsWith('[BARTOLO]') && !s.startsWith('[BARTOLO-DUDOSO]'))
+            .join(' · ');
+          const pending = pendingConcepto[g.id] || '';
+          return (
+            <div key={g.id} className="rounded-xl p-3 space-y-2" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: theme.text }}>{g.descripcion || '(sin descripción)'}</p>
+                  <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    {new Date(g.fecha).toLocaleDateString('es-AR')}
+                    {obsLimpio && ` · ${obsLimpio}`}
+                  </p>
+                </div>
+                <span className="font-bold tabular-nums text-sm whitespace-nowrap" style={{ color: theme.text }}>
+                  ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
+                  style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}>
+                  {g.concepto}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <ModernSelect
+                    value={pending || g.concepto}
+                    onChange={(v) => setPendingConcepto(p => ({ ...p, [g.id]: v }))}
+                    options={conceptosOpts}
+                    searchable
+                    placeholder="Cambiar a..."
+                  />
+                </div>
+                <button
+                  onClick={() => confirmar(g)}
+                  disabled={savingId === g.id}
+                  className="px-3 h-[34px] rounded-lg text-[12px] font-semibold text-white inline-flex items-center gap-1 disabled:opacity-50 flex-shrink-0"
+                  style={{ backgroundColor: '#10b981' }}
+                >
+                  {savingId === g.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                  OK
+                </button>
+              </div>
             </div>
-            {filtered.length > 0 && filtered.length <= 200 && (
-              <button
-                onClick={() => {
-                  const cand = prompt(`¿A qué concepto querés cambiar los ${filtered.length} gastos visibles? Escribí EXACTAMENTE el nombre del concepto`);
-                  if (cand && conceptos.find(c => c.nombre === cand)) aplicarMasivo(cand);
-                  else if (cand) toast.error('Concepto no existe');
-                }}
-                className="px-3 h-[34px] rounded-lg text-[12px] font-semibold text-white"
-                style={{ backgroundColor: '#8b5cf6' }}
-                disabled={savingId === -1}
-              >
-                Aplicar masivo a {filtered.length}
-              </button>
-            )}
-          </div>
-        }
-        loading={loading}
-        isEmpty={!loading && filtered.length === 0}
-        emptyMessage={gastos.length === 0 ? '🎉 No hay gastos dudosos.' : 'Sin resultados.'}
-        tableView={tableView}
-        defaultViewMode="table"
-      >
-        {null}
-      </ABMPage>
-    </div>
+          );
+        })}
+    </ABMPage>
   );
 }
