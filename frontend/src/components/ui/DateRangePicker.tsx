@@ -217,14 +217,14 @@ export function DateRangePicker({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-95"
+        className="inline-flex items-center gap-1.5 px-2.5 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:brightness-110"
         style={{
-          background: `linear-gradient(135deg, ${theme.backgroundSecondary} 0%, ${theme.card} 100%)`,
+          backgroundColor: theme.backgroundSecondary,
           border: `1px solid ${theme.border}`,
           color: theme.text,
         }}
       >
-        <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
+        <Calendar className="h-3.5 w-3.5" style={{ color: theme.primary }} />
         <span className="whitespace-nowrap">{display}</span>
         {allowClear && (value.desde || value.hasta) && (
           <span
@@ -239,7 +239,7 @@ export function DateRangePicker({
             <X className="h-3.5 w-3.5" />
           </span>
         )}
-        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: theme.textSecondary }} />
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: theme.textSecondary }} />
       </button>
 
       {open && (

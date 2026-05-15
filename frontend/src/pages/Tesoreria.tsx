@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 import { PeriodNavigator, type PeriodModo } from '../components/ui/PeriodNavigator';
+import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
 import {
   GastoDetalleSheet, calcEstadoAgregado, ESTADO_AGREGADO_META,
   type EstadoAgregado,
@@ -92,6 +93,9 @@ export default function Tesoreria() {
   const [mesActual, setMesActual] = useState<number>(today.getMonth());  // 0-11
   const [anioActual, setAnioActual] = useState<number>(today.getFullYear());
   const [todosLosMeses, setTodosLosMeses] = useState<boolean>(false);
+  // Rango de fechas (desde/hasta). Si esta seteado, PISA al PeriodNavigator.
+  const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
+  const rangoActivo = !!(rangoFechas.desde && rangoFechas.hasta);
 
   const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -233,8 +237,11 @@ export default function Tesoreria() {
     const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
 
     return gastos.filter(g => {
-      // Filtro temporal segun modoPeriodo
-      if (!todosLosMeses) {
+      // Filtro temporal: si hay rango activo, pisa al PeriodNavigator.
+      if (rangoActivo) {
+        const fechaISO = g.fecha.slice(0, 10);
+        if (fechaISO < rangoFechas.desde || fechaISO > rangoFechas.hasta) return false;
+      } else if (!todosLosMeses) {
         const d = new Date(g.fecha);
         if (modoPeriodo === 'anio') {
           if (d.getFullYear() !== anioActual) return false;
@@ -265,7 +272,7 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, contactosMap]);
+  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
 
   // Totalizador (refleja todos los filtros activos)
   const totales = useMemo(() => {
@@ -477,8 +484,9 @@ export default function Tesoreria() {
         />
       </div>
 
-      {/* Navegador de periodos: switch Mes/Año integrado + flechas + Todos */}
-      <div className="flex-shrink-0">
+      {/* Navegador de periodos: switch Mes/Año integrado + flechas + Todos.
+          Si hay rango de fechas activo, este nav queda atenuado y no filtra. */}
+      <div className="flex-shrink-0" style={{ opacity: rangoActivo ? 0.45 : 1, pointerEvents: rangoActivo ? 'none' : 'auto' }}>
         <PeriodNavigator
           modo={modoPeriodo}
           onModoChange={(m) => { setModoPeriodo(m); setTodosLosMeses(false); }}
@@ -488,6 +496,16 @@ export default function Tesoreria() {
           onPrev={irAtras}
           onNext={irAdelante}
           onToggleTodos={() => setTodosLosMeses(v => !v)}
+        />
+      </div>
+
+      {/* Rango de fechas puntual. Si esta seteado, pisa al PeriodNavigator. */}
+      <div className="flex-shrink-0">
+        <DateRangePicker
+          value={rangoFechas}
+          onChange={setRangoFechas}
+          placeholder="Rango de fechas"
+          allowClear
         />
       </div>
 
@@ -866,11 +884,13 @@ export default function Tesoreria() {
             )}
             <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
               <Calendar className="h-3 w-3" />
-              {todosLosMeses
-                ? 'Todos los períodos'
-                : modoPeriodo === 'anio'
-                  ? `Año ${anioActual}`
-                  : `${MESES_LARGO[mesActual]} ${anioActual}`}
+              {rangoActivo
+                ? `${rangoFechas.desde} → ${rangoFechas.hasta}`
+                : todosLosMeses
+                  ? 'Todos los períodos'
+                  : modoPeriodo === 'anio'
+                    ? `Año ${anioActual}`
+                    : `${MESES_LARGO[mesActual]} ${anioActual}`}
             </div>
           </div>
         </div>
