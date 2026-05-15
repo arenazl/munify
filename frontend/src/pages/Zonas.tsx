@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, MapPin, Navigation, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown, Map } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { zonasApi } from '../lib/api';
@@ -61,6 +61,9 @@ export default function Zonas() {
     latitud_centro: '',
     longitud_centro: ''
   });
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchZonas();
@@ -212,6 +215,16 @@ export default function Zonas() {
   const zonasActivas = filteredZonas.filter(z => z.activo);
   const zonasDeshabilitadas = filteredZonas.filter(z => !z.activo);
 
+  const paginatedActivas = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(zonasActivas.length / pageSize));
+    if (page > totalPages) return zonasActivas.slice(0, pageSize);
+    return zonasActivas.slice((page - 1) * pageSize, page * pageSize);
+  }, [zonasActivas, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredZonas.length]);
+
   // Efecto para animar cards de a una (staggered) - solo la primera vez
   useEffect(() => {
     if (loading || zonas.length === 0 || animationDone) return;
@@ -303,9 +316,16 @@ export default function Zonas() {
       sheetTitle={selectedZona ? 'Editar Zona' : 'Nueva Zona'}
       sheetDescription={selectedZona ? 'Modifica los datos de la zona' : 'Completa los datos para crear una nueva zona'}
       onSheetClose={closeSheet}
+      pagination={{
+        page,
+        pageSize,
+        totalItems: zonasActivas.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       tableView={
         <ABMTable
-          data={zonasActivas}
+          data={paginatedActivas}
           columns={tableColumns}
           keyExtractor={(z) => z.id}
           onRowClick={(z) => openSheet(z)}
@@ -546,7 +566,7 @@ export default function Zonas() {
         </form>
       }
     >
-      {zonasActivas.map((z, index) => {
+      {paginatedActivas.map((z, index) => {
         const zoneColor = ZONE_COLORS[index % ZONE_COLORS.length];
         const mapImage = getMapImageUrl(z.latitud_centro, z.longitud_centro);
         // Si la animación terminó, siempre visible

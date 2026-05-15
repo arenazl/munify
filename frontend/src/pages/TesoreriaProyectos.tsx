@@ -49,6 +49,9 @@ export default function TesoreriaProyectos() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Proyecto | null>(null);
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [form, setForm] = useState<Partial<Proyecto>>({ nombre: '', estado: 'activo' });
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +87,16 @@ export default function TesoreriaProyectos() {
       return true;
     });
   }, [proyectos, search, estadoFiltro]);
+
+  const paginatedFiltered = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (page > totalPages) return filtered.slice(0, pageSize);
+    return filtered.slice((page - 1) * pageSize, page * pageSize);
+  }, [filtered, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtered.length]);
 
   const openSheet = (p?: Proyecto) => {
     if (p) {
@@ -274,9 +287,16 @@ export default function TesoreriaProyectos() {
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay proyectos cargados. Creá uno con 'Nuevo Proyecto'."
         defaultViewMode="cards"
+        pagination={{
+          page,
+          pageSize,
+          totalItems: filtered.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         tableView={
           <ABMTable<Proyecto>
-            data={filtered}
+            data={paginatedFiltered}
             keyExtractor={(p) => p.id}
             columns={[
               { key: 'nombre', header: 'Nombre', render: (p) => <span className="font-medium">{p.nombre}</span> },
@@ -321,7 +341,7 @@ export default function TesoreriaProyectos() {
         sheetFooter={<ABMSheetFooter onCancel={closeSheet} onSave={handleSave} saving={saving} />}
         onSheetClose={closeSheet}
       >
-        {filtered.map((p, i) => (
+        {paginatedFiltered.map((p, i) => (
           <ABMCard key={p.id} onClick={() => openSheet(p)} index={i}>
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex-1 min-w-0">

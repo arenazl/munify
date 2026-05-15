@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Eye, Plus, ExternalLink, Star, MessageSquare, Send, Loader2, CheckCircle, ArrowUpDown, ThumbsUp, ThumbsDown, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,6 +61,10 @@ export default function MisReclamos() {
   // Confirmación del vecino states
   const [comentarioConfirmacion, setComentarioConfirmacion] = useState('');
   const [enviandoConfirmacion, setEnviandoConfirmacion] = useState(false);
+
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchData();
@@ -257,6 +261,16 @@ export default function MisReclamos() {
         return fechaA - fechaB;
       }
     });
+
+  const paginatedReclamos = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredReclamos.length / pageSize));
+    if (page > totalPages) return filteredReclamos.slice(0, pageSize);
+    return filteredReclamos.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredReclamos, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredReclamos.length]);
 
   // Estados únicos para el filtro
   const estadosUnicos = [...new Set(reclamos.map(r => r.estado))];
@@ -990,9 +1004,16 @@ export default function MisReclamos() {
         defaultViewMode="cards"
         stickyHeader={true}
         secondaryFilters={renderSecondaryFilters()}
+        pagination={{
+          page,
+          pageSize,
+          totalItems: filteredReclamos.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         tableView={
           <ABMTable
-            data={filteredReclamos}
+            data={paginatedReclamos}
             columns={tableColumns}
             keyExtractor={(r) => r.id}
             onRowClick={(r) => openViewSheet(r)}
@@ -1015,7 +1036,7 @@ export default function MisReclamos() {
             )}
           </div>
         ) : (
-          filteredReclamos.map((r) => (
+          paginatedReclamos.map((r) => (
             <ReclamoCard
               key={r.id}
               reclamo={r}

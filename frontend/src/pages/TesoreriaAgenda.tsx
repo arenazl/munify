@@ -56,6 +56,9 @@ export default function TesoreriaAgenda() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PagoProgramado | null>(null);
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [form, setForm] = useState({
     contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
     monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual' as FrecuenciaPago,
@@ -101,6 +104,16 @@ export default function TesoreriaAgenda() {
       return true;
     }).sort((a, b) => a.proximo_pago.localeCompare(b.proximo_pago));
   }, [pagos, search, contactoFiltro, cajaFiltro, frecuenciaFiltro, estadoFiltro]);
+
+  const paginatedFiltered = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (page > totalPages) return filtered.slice(0, pageSize);
+    return filtered.slice((page - 1) * pageSize, page * pageSize);
+  }, [filtered, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtered.length]);
 
   const stats = useMemo(() => {
     let pendientes7 = 0, total7 = 0, total30 = 0, vencidos = 0;
@@ -276,7 +289,7 @@ export default function TesoreriaAgenda() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((p, i) => {
+            {paginatedFiltered.map((p, i) => {
               const dias = diasDesdeHoy(p.proximo_pago);
               const urgente = dias <= 3;
               return (
@@ -367,7 +380,7 @@ export default function TesoreriaAgenda() {
 
 
   // ==================== Vista CARDS (children) ====================
-  const cardsView = filtered.map(p => {
+  const cardsView = paginatedFiltered.map(p => {
     const dias = diasDesdeHoy(p.proximo_pago);
     const urgente = dias <= 3;
     return (
@@ -433,6 +446,13 @@ export default function TesoreriaAgenda() {
         searchValue={search}
         onSearchChange={setSearch}
         secondaryFilters={secondaryFilters}
+        pagination={{
+          page,
+          pageSize,
+          totalItems: filtered.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay pagos con esos filtros."

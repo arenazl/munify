@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, Trash2, Clock, Calendar, Save, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
@@ -48,6 +48,9 @@ export default function GestionHorarios() {
   const [horariosSemana, setHorariosSemana] = useState<{
     [dia: number]: { activo: boolean; hora_entrada: string; hora_salida: string }
   }>({});
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchData();
@@ -136,6 +139,16 @@ export default function GestionHorarios() {
     getNombreCompleto(h.empleado).toLowerCase().includes(search.toLowerCase())
   );
 
+  const paginatedEmpleados = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredEmpleados.length / pageSize));
+    if (page > totalPages) return filteredEmpleados.slice(0, pageSize);
+    return filteredEmpleados.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredEmpleados, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredEmpleados.length]);
+
   const tableColumns = [
     {
       key: 'empleado',
@@ -178,6 +191,13 @@ export default function GestionHorarios() {
       isEmpty={filteredEmpleados.length === 0}
       emptyMessage="No hay empleados"
       sheetOpen={sheetOpen}
+      pagination={{
+        page,
+        pageSize,
+        totalItems: filteredEmpleados.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       sheetTitle={`Horarios de ${getNombreCompleto(selectedEmpleado || undefined)}`}
       sheetDescription="Configura el horario de trabajo para cada dia de la semana"
       onSheetClose={closeSheet}
@@ -270,7 +290,7 @@ export default function GestionHorarios() {
       }
     >
       {/* Vista Cards por empleado */}
-      {filteredEmpleados.map(({ empleado, horarios: horariosEmp }) => (
+      {paginatedEmpleados.map(({ empleado, horarios: horariosEmp }) => (
         <div
           key={empleado.id}
           onClick={() => openSheet(empleado)}

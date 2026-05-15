@@ -110,6 +110,10 @@ export default function Tesoreria() {
   const [gastoSeleccionado, setGastoSeleccionado] = useState<Gasto | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (
       <div className="p-6">
@@ -275,6 +279,16 @@ export default function Tesoreria() {
       return true;
     });
   }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
+
+  const paginatedFiltered = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    if (page > totalPages) return filtered.slice(0, pageSize);
+    return filtered.slice((page - 1) * pageSize, page * pageSize);
+  }, [filtered, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filtered.length]);
 
   // Totalizador (refleja todos los filtros activos)
   const totales = useMemo(() => {
@@ -616,7 +630,7 @@ export default function Tesoreria() {
 
   const tableView = (
     <ABMTable<Gasto>
-      data={filtered}
+      data={paginatedFiltered}
       keyExtractor={(g) => g.id}
       onRowClick={openDetalle}
       columns={[
@@ -781,6 +795,13 @@ export default function Tesoreria() {
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay gastos que coincidan con los filtros."
+        pagination={{
+          page,
+          pageSize,
+          totalItems: filtered.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         tableView={tableView}
         guidedView={
           <CalendarView<Gasto>
@@ -827,7 +848,7 @@ export default function Tesoreria() {
         defaultViewMode="table"
       >
         {/* Card view */}
-        {filtered.map(g => {
+        {paginatedFiltered.map(g => {
           const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
           const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
           return (

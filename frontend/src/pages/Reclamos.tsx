@@ -161,6 +161,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const ITEMS_PER_PAGE = 50;
+  // Paginación client-side adicional (50 items por página)
+  const [pageClient, setPageClient] = useState(1);
+  const [pageSizeClient, setPageSizeClient] = useState(50);
   const [conteosCategorias, setConteosCategorias] = useState<Record<number, number>>({});
 
   // Chips de categorías: limitadas a 2 renglones dinámicos.
@@ -1760,6 +1763,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       return fechaB - fechaA;
     }
   });
+
+  const paginatedReclamos = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredReclamos.length / pageSizeClient));
+    if (pageClient > totalPages) return filteredReclamos.slice(0, pageSizeClient);
+    return filteredReclamos.slice((pageClient - 1) * pageSizeClient, pageClient * pageSizeClient);
+  }, [filteredReclamos, pageClient, pageSizeClient]);
+
+  useEffect(() => {
+    setPageClient(1);
+  }, [filteredReclamos.length]);
 
   // Wizard Step 0: Describir problema
   const wizardStep0 = (
@@ -4679,10 +4692,17 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
 
           </div>
         }
+        pagination={{
+          page: pageClient,
+          pageSize: pageSizeClient,
+          totalItems: filteredReclamos.length,
+          onPageChange: setPageClient,
+          onPageSizeChange: (s) => { setPageSizeClient(s); setPageClient(1); },
+        }}
         tableView={
           <ABMTable
             key={`table-${ordenamiento}`}
-            data={filteredReclamos}
+            data={paginatedReclamos}
             columns={tableColumns}
             keyExtractor={(r) => r.id}
             onRowClick={(r) => openViewSheet(r)}
@@ -4698,7 +4718,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             <ABMCardSkeleton key={`skeleton-${i}`} index={i} />
           ))
         ) : (
-          filteredReclamos.map((r, index) => {
+          paginatedReclamos.map((r, index) => {
             const isVisible = animationDone || visibleCards.has(r.id);
             return (
               <ReclamoCard

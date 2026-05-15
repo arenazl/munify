@@ -22,6 +22,9 @@ export default function GestionTasas() {
   const [tipoFiltro, setTipoFiltro] = useState<number | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     tasasApi.getTipos().then(r => setTipos(r.data || [])).catch(() => {});
@@ -53,6 +56,16 @@ export default function GestionTasas() {
 
   const onSearchChange = useMemo(() => debounce((v: string) => setSearchQuery(v)), []);
 
+  const paginatedPartidas = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(partidas.length / pageSize));
+    if (page > totalPages) return partidas.slice(0, pageSize);
+    return partidas.slice((page - 1) * pageSize, page * pageSize);
+  }, [partidas, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [partidas.length]);
+
   const totales = useMemo(() => {
     const totalMonto = partidas.reduce((s, p) => s + Number(p.monto_pendiente || 0), 0);
     const conDeuda = partidas.filter(p => (p.deudas_pendientes || 0) > 0).length;
@@ -83,6 +96,13 @@ export default function GestionTasas() {
         loading={loading}
         isEmpty={partidas.length === 0}
         emptyMessage={emptyMsg}
+        pagination={{
+          page,
+          pageSize,
+          totalItems: partidas.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         secondaryFilters={
           <FilterChipRow
             chips={filterChips}
@@ -120,7 +140,7 @@ export default function GestionTasas() {
 
         {/* Lista — también col-span-full para ocupar todo el ancho */}
         <div className="col-span-full space-y-2">
-          {partidas.map(p => (
+          {paginatedPartidas.map(p => (
             <PartidaRow key={p.id} partida={p} theme={theme} />
           ))}
         </div>

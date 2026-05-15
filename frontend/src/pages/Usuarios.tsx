@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, Trash2, User as UserIcon, Mail, Phone, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { usersApi } from '../lib/api';
@@ -23,6 +23,9 @@ export default function Usuarios() {
     dni: '',
     direccion: '',
   });
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchData();
@@ -129,6 +132,16 @@ export default function Usuarios() {
     );
   });
 
+  const paginatedUsuarios = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredUsuarios.length / pageSize));
+    if (page > totalPages) return filteredUsuarios.slice(0, pageSize);
+    return filteredUsuarios.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredUsuarios, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredUsuarios.length]);
+
   const tableColumns = [
     {
       key: 'nombre',
@@ -202,9 +215,16 @@ export default function Usuarios() {
       sheetTitle={selectedUsuario ? 'Editar Vecino' : 'Nuevo Vecino'}
       sheetDescription={selectedUsuario ? 'Modifica los datos del vecino' : 'Completa los datos para registrar un nuevo vecino'}
       onSheetClose={closeSheet}
+      pagination={{
+        page,
+        pageSize,
+        totalItems: filteredUsuarios.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       tableView={
         <ABMTable
-          data={filteredUsuarios}
+          data={paginatedUsuarios}
           columns={tableColumns}
           keyExtractor={(u) => u.id}
           onRowClick={(u) => openSheet(u)}
@@ -296,7 +316,7 @@ export default function Usuarios() {
         </form>
       }
     >
-      {filteredUsuarios.map((u) => (
+      {paginatedUsuarios.map((u) => (
         <ABMCard key={u.id} onClick={() => openSheet(u)}>
           <div className="flex items-center justify-between">
             <div className="flex items-center">

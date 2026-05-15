@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, Trash2, CalendarOff, Check, X, Clock, CalendarX2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
@@ -54,6 +54,9 @@ export default function GestionAusencias() {
     fecha_fin: '',
     motivo: ''
   });
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchData();
@@ -183,6 +186,16 @@ export default function GestionAusencias() {
     a.tipo.toLowerCase().includes(search.toLowerCase())
   );
 
+  const paginatedAusencias = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredAusencias.length / pageSize));
+    if (page > totalPages) return filteredAusencias.slice(0, pageSize);
+    return filteredAusencias.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredAusencias, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredAusencias.length]);
+
   const tableColumns = [
     {
       key: 'empleado',
@@ -266,9 +279,16 @@ export default function GestionAusencias() {
           ]}
         />
       }
+      pagination={{
+        page,
+        pageSize,
+        totalItems: filteredAusencias.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       tableView={
         <ABMTable
-          data={filteredAusencias}
+          data={paginatedAusencias}
           columns={tableColumns}
           keyExtractor={(a) => a.id}
           onRowClick={(a) => openSheet(a)}
@@ -353,7 +373,7 @@ export default function GestionAusencias() {
       }
     >
       {/* Vista Cards */}
-      {filteredAusencias.map((a) => {
+      {paginatedAusencias.map((a) => {
         const config = getTipoConfig(a.tipo);
         return (
           <div

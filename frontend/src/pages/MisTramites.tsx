@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
@@ -60,6 +60,10 @@ export default function MisTramites() {
 
   // Wizard state
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   // Consulta por número de trámite (para usuarios no logueados)
   const [consultaNumero, setConsultaNumero] = useState('');
@@ -212,6 +216,16 @@ export default function MisTramites() {
         return (estadoOrden[a.estado] || 99) - (estadoOrden[b.estado] || 99);
       }
     });
+
+  const paginatedTramites = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredTramites.length / pageSize));
+    if (page > totalPages) return filteredTramites.slice(0, pageSize);
+    return filteredTramites.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredTramites, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredTramites.length]);
 
   // Estados únicos para el filtro (canónicos)
   const estadosUnicos = Array.from(new Set(tramites.map(t => t.estado)));
@@ -710,9 +724,16 @@ export default function MisTramites() {
         defaultViewMode="cards"
         stickyHeader={true}
         secondaryFilters={renderSecondaryFilters()}
+        pagination={{
+          page,
+          pageSize,
+          totalItems: filteredTramites.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         tableView={
           <ABMTable
-            data={filteredTramites}
+            data={paginatedTramites}
             columns={tableColumns}
             keyExtractor={(t) => t.id}
             onRowClick={(t) => openViewSheet(t)}
@@ -735,7 +756,7 @@ export default function MisTramites() {
             )}
           </div>
         ) : (
-          filteredTramites.map((t) => {
+          paginatedTramites.map((t) => {
             const estadoInfo = getEstadoInfo(t.estado);
             const IconEstado = estadoInfo.icon;
             const servicioColor = t.tramite?.categoria_tramite?.color || theme.primary;

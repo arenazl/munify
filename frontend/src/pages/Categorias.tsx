@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, ImageIcon, RefreshCw, X, Download, AlertTriangle, CheckCircle, Loader2, EyeOff, RotateCcw, ChevronDown, Tags } from 'lucide-react';
 import { toast } from 'sonner';
 import api, { categoriasApi, imagenesApi, API_BASE_URL } from '../lib/api';
@@ -66,6 +66,9 @@ export default function Categorias() {
   const [validacion, setValidacion] = useState<ValidacionDuplicado | null>(null);
   // Estado para sección de deshabilitados
   const [showDeshabilitados, setShowDeshabilitados] = useState(false);
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchCategorias();
@@ -326,6 +329,17 @@ export default function Categorias() {
   const categoriasActivas = filteredCategorias.filter(c => c.activo);
   const categoriasDeshabilitadas = filteredCategorias.filter(c => !c.activo);
 
+  // Slice paginado de las activas
+  const paginatedActivas = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(categoriasActivas.length / pageSize));
+    if (page > totalPages) return categoriasActivas.slice(0, pageSize);
+    return categoriasActivas.slice((page - 1) * pageSize, page * pageSize);
+  }, [categoriasActivas, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredCategorias.length]);
+
   // Efecto para animar cards de a una (staggered) - solo la primera vez que cargan
   useEffect(() => {
     if (loading || categorias.length === 0 || animationDone) return;
@@ -436,9 +450,16 @@ export default function Categorias() {
       sheetTitle={selectedCategoria ? 'Editar Categoría' : 'Nueva Categoría'}
       sheetDescription={selectedCategoria ? 'Modifica los datos de la categoría' : 'Completa los datos para crear una nueva categoría'}
       onSheetClose={closeSheet}
+      pagination={{
+        page,
+        pageSize,
+        totalItems: categoriasActivas.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       tableView={
         <ABMTable
-          data={categoriasActivas}
+          data={paginatedActivas}
           columns={tableColumns}
           keyExtractor={(c) => c.id}
           onRowClick={(c) => openSheet(c)}
@@ -812,7 +833,7 @@ export default function Categorias() {
         </form>
       }
     >
-      {categoriasActivas.map((c) => {
+      {paginatedActivas.map((c) => {
         const categoryColor = c.color || '#3B82F6';
         // Usar URL local directa (sin llamadas API) - la imagen ya está descargada
         const bgImage = getLocalImageUrl(c.nombre);

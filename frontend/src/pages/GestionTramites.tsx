@@ -130,6 +130,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [conteosTipos, setConteosTipos] = useState<Array<{ id: number; nombre: string; icono: string; color: string; cantidad: number }>>([]);
   const [conteosEstados, setConteosEstados] = useState<Record<string, number>>({});
   const [conteosLoaded, setConteosLoaded] = useState(false);
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   // Click dropdown para tramites (header)
   const [hoveredTramiteHeader, setHoveredTramiteHeader] = useState(false);
@@ -821,6 +824,16 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
+  const paginatedTramites = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredTramites.length / pageSize));
+    if (page > totalPages) return filteredTramites.slice(0, pageSize);
+    return filteredTramites.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredTramites, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredTramites.length]);
+
   // Render de cards (children de ABMPage)
   const renderCards = () => {
     if (loading) {
@@ -829,7 +842,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
       ));
     }
 
-    return filteredTramites.map((t) => {
+    return paginatedTramites.map((t) => {
       const config = getEstadoConfig(t.estado);
       const IconEstado = config.icon;
       const tipoTramite = t.tramite?.categoria_tramite;
@@ -1131,7 +1144,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const renderTableView = () => (
     <ABMTable
       key={`table-${ordenamiento}`}
-      data={filteredTramites}
+      data={paginatedTramites}
       columns={[
         {
           key: 'numero_tramite',
@@ -1664,6 +1677,13 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         loading={false}
         isEmpty={!loading && filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
+        pagination={{
+          page,
+          pageSize,
+          totalItems: filteredTramites.length,
+          onPageChange: setPage,
+          onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+        }}
         defaultViewMode="table"
         viewStorageKey="tramites_view"
         guidedView={inboxView}

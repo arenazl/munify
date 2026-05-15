@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, Trash2, User as UserIcon, Star, X, Check, Users, Clock, Shield, Mail, Phone, Wrench, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, zonasApi, categoriasApi, empleadosGestionApi, dependenciasApi, usersApi } from '../lib/api';
@@ -83,6 +83,9 @@ export default function Empleados() {
     direccion: '',
   });
   const [horariosSemana, setHorariosSemana] = useState<Record<number, HorarioDia>>(horariosDefault);
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const isEmpleadoView = vistaRol === 'empleado';
 
@@ -389,6 +392,21 @@ export default function Empleados() {
     );
   });
 
+  // Slice paginado de la lista activa según vista
+  const currentList = isEmpleadoView ? filteredEmpleados : filteredUsuarios;
+  const paginatedItems = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(currentList.length / pageSize));
+    if (page > totalPages) return currentList.slice(0, pageSize);
+    return currentList.slice((page - 1) * pageSize, page * pageSize);
+  }, [currentList, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [currentList.length, vistaRol]);
+
+  const paginatedEmpleados = isEmpleadoView ? (paginatedItems as Empleado[]) : [];
+  const paginatedUsuarios = !isEmpleadoView ? (paginatedItems as User[]) : [];
+
   const getNombreCompleto = (e: Empleado) => {
     if (e.apellido) {
       return `${e.nombre} ${e.apellido}`;
@@ -647,10 +665,17 @@ export default function Empleados() {
       }
       onSheetClose={closeSheet}
       extraFilters={pillsBar}
+      pagination={{
+        page,
+        pageSize,
+        totalItems: currentList.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       tableView={
         isEmpleadoView ? (
           <ABMTable
-            data={filteredEmpleados}
+            data={paginatedEmpleados}
             columns={tableColumns}
             keyExtractor={(c) => c.id}
             onRowClick={(c) => openSheet(c)}
@@ -672,7 +697,7 @@ export default function Empleados() {
           />
         ) : (
           <ABMTable
-            data={filteredUsuarios}
+            data={paginatedUsuarios}
             columns={userTableColumns}
             keyExtractor={(u) => u.id}
             onRowClick={(u) => openUserSheet(u)}
@@ -1039,7 +1064,7 @@ export default function Empleados() {
         </form>
       )}
     >
-      {isEmpleadoView ? filteredEmpleados.map((c) => {
+      {isEmpleadoView ? paginatedEmpleados.map((c) => {
         // Usar el color de la categoría principal, o un gradiente morado por defecto
         const mainColor = c.categoria_principal?.color || '#8B5CF6';
         const zona = zonas.find(z => z.id === c.zona_id);
@@ -1165,7 +1190,7 @@ export default function Empleados() {
             </div>
           </div>
         );
-      }) : filteredUsuarios.map((u) => {
+      }) : paginatedUsuarios.map((u) => {
         const Icon = vistaRol === 'admin' ? Shield : ShieldCheck;
         const bg = vistaRol === 'admin' ? 'bg-purple-500' : 'bg-yellow-500';
         return (

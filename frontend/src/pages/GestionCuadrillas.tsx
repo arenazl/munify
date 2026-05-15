@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Edit, Trash2, UsersRound, Star, Crown, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { empleadosApi, empleadosGestionApi } from '../lib/api';
@@ -48,6 +48,9 @@ export default function GestionCuadrillas() {
     cuadrilla_id: '',
     es_lider: false
   });
+  // Paginación client-side (50 items por página)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   useEffect(() => {
     fetchData();
@@ -148,6 +151,16 @@ export default function GestionCuadrillas() {
     a.cuadrilla?.nombre?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const paginatedAsignaciones = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredAsignaciones.length / pageSize));
+    if (page > totalPages) return filteredAsignaciones.slice(0, pageSize);
+    return filteredAsignaciones.slice((page - 1) * pageSize, page * pageSize);
+  }, [filteredAsignaciones, page, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filteredAsignaciones.length]);
+
   // Agrupar por cuadrilla para la vista cards
   const asignacionesPorCuadrilla = cuadrillas.map(c => ({
     cuadrilla: c,
@@ -216,9 +229,16 @@ export default function GestionCuadrillas() {
       sheetTitle={selectedAsignacion ? 'Editar Asignacion' : 'Asignar a Cuadrilla'}
       sheetDescription={selectedAsignacion ? 'Modifica el rol del empleado' : 'Selecciona empleado y cuadrilla'}
       onSheetClose={closeSheet}
+      pagination={{
+        page,
+        pageSize,
+        totalItems: filteredAsignaciones.length,
+        onPageChange: setPage,
+        onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
+      }}
       tableView={
         <ABMTable
-          data={filteredAsignaciones}
+          data={paginatedAsignaciones}
           columns={tableColumns}
           keyExtractor={(a) => a.id}
           onRowClick={(a) => openSheet(a)}
