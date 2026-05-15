@@ -122,7 +122,7 @@ export default function Tesoreria() {
   const fetchGastos = async () => {
     setLoading(true);
     try {
-      const res = await gastosApi.list({ limit: 200 });
+      const res = await gastosApi.list({ limit: 5000 });
       setGastos(res.data);
     } catch {
       toast.error('Error cargando gastos');
