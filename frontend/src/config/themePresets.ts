@@ -287,6 +287,29 @@ export const themePresets: ThemePreset[] = [
       ['#3a3a40', '#222226', '#101012']),
   },
 
+  // ---- SOBRIOS (escala de grises pura, sin color) ----
+
+  // 10. Papel — light sobrio. Blanco crudo + grises + acento negro.
+  // Para usuarios que prefieren neutralidad absoluta sin colores vibrantes.
+  {
+    id: 'papel',
+    name: 'Papel',
+    family: 'light',
+    palette: ['#f5f5f5', '#e5e5e5', '#404040', '#171717'],
+    variants: genCuratedVariants(['#f5f5f5', '#e5e5e5', '#404040', '#171717'], 0, 3,
+      ['#e5e5e5', '#525252', '#171717']),
+  },
+
+  // 11. Tinta — dark sobrio. Negros + grises carbon + acento blanco roto.
+  {
+    id: 'tinta',
+    name: 'Tinta',
+    family: 'dark',
+    palette: ['#0a0a0a', '#171717', '#262626', '#fafafa'],
+    variants: genCuratedVariants(['#0a0a0a', '#171717', '#262626', '#fafafa'], 0, 3,
+      ['#404040', '#171717', '#000000']),
+  },
+
   // ============================================================
   // TEMAS LEGACY — desactivados (archived: true). Quedan por compatibilidad
   // con usuarios que los tengan en localStorage. NO aparecen en el selector.
