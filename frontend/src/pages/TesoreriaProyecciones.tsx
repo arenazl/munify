@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { PeriodNavigator } from '../components/ui/PeriodNavigator';
 import {
   gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposConceptoApi,
   tiposEmpleadoApi, cajasApi,
@@ -255,41 +256,16 @@ export default function TesoreriaResumen() {
         }
       `}</style>
 
-      {/* Toggle Mes / Año */}
-      <div
-        className="inline-flex items-center flex-shrink-0 rounded-xl overflow-hidden"
-        style={{ height: 40, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-      >
-        {(['mes', 'anio'] as Modo[]).map(m => (
-          <button
-            key={m}
-            onClick={() => setModo(m)}
-            className="h-full px-3 text-sm font-semibold transition-colors"
-            style={{
-              backgroundColor: modo === m ? theme.primary : 'transparent',
-              color: modo === m ? '#fff' : theme.textSecondary,
-            }}
-          >
-            {m === 'mes' ? 'Mes' : 'Año'}
-          </button>
-        ))}
-      </div>
-
-      {/* Navegador período */}
-      <div
-        className="inline-flex items-center flex-shrink-0 rounded-xl overflow-hidden"
-        style={{ height: 40, backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-      >
-        <button onClick={irAtras} className="h-full px-2.5" style={{ color: theme.textSecondary }} title={modo === 'mes' ? 'Mes anterior' : 'Año anterior'}>
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <div className="h-full px-3 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: theme.text }}>
-          <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
-          <span>{labelPeriodo}</span>
-        </div>
-        <button onClick={irAdelante} className="h-full px-2.5" style={{ color: theme.textSecondary }} title={modo === 'mes' ? 'Mes siguiente' : 'Año siguiente'}>
-          <ChevronRight className="h-4 w-4" />
-        </button>
+      {/* Navegador de periodo unificado (switch Mes/Año integrado) */}
+      <div className="flex-shrink-0">
+        <PeriodNavigator
+          modo={modo as 'mes' | 'anio'}
+          onModoChange={(m) => setModo(m)}
+          mes={mesActual}
+          anio={anioActual}
+          onPrev={irAtras}
+          onNext={irAdelante}
+        />
       </div>
 
       <div className="min-w-[170px] flex-shrink-0 ts-fitem">

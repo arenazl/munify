@@ -9,6 +9,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
+import { PeriodNavigator, type PeriodModo } from '../components/ui/PeriodNavigator';
 import {
   GastoDetalleSheet, calcEstadoAgregado, ESTADO_AGREGADO_META,
   type EstadoAgregado,
@@ -84,8 +85,10 @@ export default function Tesoreria() {
   const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
 
-  // Navegador de meses. mes/anio = filtro activo. todosLosMeses = sin filtro temporal.
+  // Navegador de periodos. modo: 'mes' | 'anio'. mes/anio = filtro activo.
+  // todosLosMeses = sin filtro temporal.
   const today = new Date();
+  const [modoPeriodo, setModoPeriodo] = useState<PeriodModo>('mes');
   const [mesActual, setMesActual] = useState<number>(today.getMonth());  // 0-11
   const [anioActual, setAnioActual] = useState<number>(today.getFullYear());
   const [todosLosMeses, setTodosLosMeses] = useState<boolean>(false);
@@ -230,10 +233,14 @@ export default function Tesoreria() {
     const depId = dependenciaFiltro ? parseInt(dependenciaFiltro, 10) : null;
 
     return gastos.filter(g => {
-      // Mes
+      // Filtro temporal segun modoPeriodo
       if (!todosLosMeses) {
         const d = new Date(g.fecha);
-        if (d.getMonth() !== mesActual || d.getFullYear() !== anioActual) return false;
+        if (modoPeriodo === 'anio') {
+          if (d.getFullYear() !== anioActual) return false;
+        } else {
+          if (d.getMonth() !== mesActual || d.getFullYear() !== anioActual) return false;
+        }
       }
       // Dependencia
       if (depId != null) {
@@ -258,7 +265,7 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, todosLosMeses, contactosMap]);
+  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, contactosMap]);
 
   // Totalizador (refleja todos los filtros activos)
   const totales = useMemo(() => {
@@ -355,28 +362,25 @@ export default function Tesoreria() {
     })),
   ]), [conceptosDelTipo]);
 
-  // Navegacion de meses
-  const irMesAnterior = () => {
+  // Navegacion de periodos (respeta modo: salta de a mes o de a año entero)
+  const irAtras = () => {
     setTodosLosMeses(false);
-    if (mesActual === 0) {
-      setMesActual(11);
+    if (modoPeriodo === 'anio') {
       setAnioActual(a => a - 1);
     } else {
-      setMesActual(m => m - 1);
+      if (mesActual === 0) { setMesActual(11); setAnioActual(a => a - 1); }
+      else setMesActual(m => m - 1);
     }
   };
-  const irMesSiguiente = () => {
+  const irAdelante = () => {
     setTodosLosMeses(false);
-    if (mesActual === 11) {
-      setMesActual(0);
+    if (modoPeriodo === 'anio') {
       setAnioActual(a => a + 1);
     } else {
-      setMesActual(m => m + 1);
+      if (mesActual === 11) { setMesActual(0); setAnioActual(a => a + 1); }
+      else setMesActual(m => m + 1);
     }
   };
-  const labelMes = todosLosMeses
-    ? 'Todos los meses'
-    : `${MESES_LARGO[mesActual]} ${anioActual}`;
 
   // Chips de estado agregado
   const estadoChips = (
@@ -473,41 +477,18 @@ export default function Tesoreria() {
         />
       </div>
 
-      {/* Navegador de meses con misma altura/estilo que los selects */}
-      <div
-        className="inline-flex items-center flex-shrink-0 overflow-hidden"
-        style={{
-          height: 40,
-          borderRadius: '0.75rem',
-          backgroundColor: theme.backgroundSecondary,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <button
-          onClick={irMesAnterior}
-          className="h-full px-2 transition-colors hover:bg-opacity-50"
-          style={{ color: theme.textSecondary }}
-          title="Mes anterior"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          onClick={() => setTodosLosMeses(v => !v)}
-          className="h-full px-3 inline-flex items-center gap-1.5 text-sm font-medium"
-          style={{ color: theme.text }}
-          title={todosLosMeses ? 'Filtrar al mes actual' : 'Ver todos los meses'}
-        >
-          <Calendar className="h-4 w-4" style={{ color: theme.primary }} />
-          <span>{labelMes}</span>
-        </button>
-        <button
-          onClick={irMesSiguiente}
-          className="h-full px-2 transition-colors hover:bg-opacity-50"
-          style={{ color: theme.textSecondary }}
-          title="Mes siguiente"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+      {/* Navegador de periodos: switch Mes/Año integrado + flechas + Todos */}
+      <div className="flex-shrink-0">
+        <PeriodNavigator
+          modo={modoPeriodo}
+          onModoChange={(m) => { setModoPeriodo(m); setTodosLosMeses(false); }}
+          mes={mesActual}
+          anio={anioActual}
+          modoTodos={todosLosMeses}
+          onPrev={irAtras}
+          onNext={irAdelante}
+          onToggleTodos={() => setTodosLosMeses(v => !v)}
+        />
       </div>
 
       {/* Pills de estado: inline al final, sin push agresivo a la derecha
@@ -885,7 +866,11 @@ export default function Tesoreria() {
             )}
             <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
               <Calendar className="h-3 w-3" />
-              {labelMes}
+              {todosLosMeses
+                ? 'Todos los períodos'
+                : modoPeriodo === 'anio'
+                  ? `Año ${anioActual}`
+                  : `${MESES_LARGO[mesActual]} ${anioActual}`}
             </div>
           </div>
         </div>
