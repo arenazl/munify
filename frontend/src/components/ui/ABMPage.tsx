@@ -85,6 +85,11 @@ interface ABMPageProps {
     pageSizeOptions?: number[];
   };
 
+  // Slot opcional que se renderiza ARRIBA del paginator (totalizadores,
+  // resumenes del filtro activo, etc). Va dentro del mismo flujo del footer
+  // para mantener los margenes/centrado alineados con el resto del contenido.
+  paginationSummary?: ReactNode;
+
   // Sheet (opcional - para páginas que manejan su propio Sheet)
   sheetOpen?: boolean;
   sheetTitle?: string;
@@ -140,6 +145,7 @@ export function ABMPage({
   isEmpty = false,
   loading = false,
   pagination,
+  paginationSummary,
   sheetOpen,
   sheetTitle,
   sheetDescription,
@@ -545,7 +551,11 @@ export function ABMPage({
         </div>
       )}
 
-      {/* Footer de paginacion (opt-in). Se oculta si total <= pageSize. */}
+      {/* Footer area (opt-in). Orden: paginationSummary (totalizador) ARRIBA,
+          paginator ABAJO. Ambos comparten margenes para quedar alineados. */}
+      {paginationSummary && (
+        <div className="mt-3">{paginationSummary}</div>
+      )}
       {pagination && pagination.totalItems > pagination.pageSize && (
         <PaginationFooter pagination={pagination} loading={loading} />
       )}

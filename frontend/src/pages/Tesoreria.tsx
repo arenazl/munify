@@ -835,6 +835,54 @@ export default function Tesoreria() {
           onPageChange: setPage,
           onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
         }}
+        paginationSummary={!loading && (
+          <div
+            className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
+                Filtrado
+              </span>
+              <span className="text-lg font-bold tabular-nums" style={{ color: theme.primary }}>
+                ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+              </span>
+              <span className="text-xs" style={{ color: theme.textSecondary }}>
+                ({totales.cantidad} {totales.cantidad === 1 ? 'gasto' : 'gastos'})
+              </span>
+            </div>
+            {totales.totalImputado > 0 && (
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
+                <span className="text-xs" style={{ color: theme.textSecondary }}>Imputado a proyectos:</span>
+                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
+                  ${totales.totalImputado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            )}
+            {totales.totalUsd > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs" style={{ color: theme.textSecondary }}>USD equiv.:</span>
+                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
+                  US$ {totales.totalUsd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </span>
+                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                  ({totales.conUsd} con cotización)
+                </span>
+              </div>
+            )}
+            <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
+              <Calendar className="h-3 w-3" />
+              {rangoActivo
+                ? `${rangoFechas.desde} → ${rangoFechas.hasta}`
+                : todosLosMeses
+                  ? 'Todos los períodos'
+                  : modoPeriodo === 'anio'
+                    ? `Año ${anioActual}`
+                    : `${MESES_LARGO[mesActual]} ${anioActual}`}
+            </div>
+          </div>
+        )}
         tableView={tableView}
         guidedView={
           <CalendarView<Gasto>
@@ -939,58 +987,6 @@ export default function Tesoreria() {
           );
         })}
       </ABMPage>
-
-      {/* Totalizador. Refleja todos los filtros activos. */}
-      {!loading && (
-        <div className="px-4 mt-3">
-          <div
-            className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
-                Filtrado
-              </span>
-              <span className="text-lg font-bold tabular-nums" style={{ color: theme.primary }}>
-                ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-              <span className="text-xs" style={{ color: theme.textSecondary }}>
-                ({totales.cantidad} {totales.cantidad === 1 ? 'gasto' : 'gastos'})
-              </span>
-            </div>
-            {totales.totalImputado > 0 && (
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
-                <span className="text-xs" style={{ color: theme.textSecondary }}>Imputado a proyectos:</span>
-                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
-                  ${totales.totalImputado.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </span>
-              </div>
-            )}
-            {totales.totalUsd > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs" style={{ color: theme.textSecondary }}>USD equiv.:</span>
-                <span className="text-sm font-semibold tabular-nums" style={{ color: theme.text }}>
-                  US$ {totales.totalUsd.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </span>
-                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                  ({totales.conUsd} con cotización)
-                </span>
-              </div>
-            )}
-            <div className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: theme.textSecondary }}>
-              <Calendar className="h-3 w-3" />
-              {rangoActivo
-                ? `${rangoFechas.desde} → ${rangoFechas.hasta}`
-                : todosLosMeses
-                  ? 'Todos los períodos'
-                  : modoPeriodo === 'anio'
-                    ? `Año ${anioActual}`
-                    : `${MESES_LARGO[mesActual]} ${anioActual}`}
-            </div>
-          </div>
-        </div>
-      )}
 
       <CrearGastoWizard
         open={wizardOpen}
