@@ -55,14 +55,14 @@ export default function TesoreriaContactos() {
     return <p className="p-6 text-sm">Sin permisos.</p>;
   }
 
+  // Traemos TODOS los contactos UNA vez al montar. Los filtros por tipo y
+  // search son client-side (via `filtered` useMemo) para evitar flicker
+  // al tocar pildoras (antes cada cambio re-fetcheaba y ABMPage mostraba
+  // spinner durante 200-500ms desmontando todo el grid).
   const fetch = async () => {
     setLoading(true);
     try {
-      const res = await contactosApi.list({
-        limit: 500,
-        search: search || undefined,
-        tipo: tipoFiltro || undefined,
-      });
+      const res = await contactosApi.list({ limit: 5000 });
       setContactos(res.data);
     } catch {
       toast.error('Error cargando contactos');
@@ -71,11 +71,7 @@ export default function TesoreriaContactos() {
     }
   };
 
-  useEffect(() => { fetch(); }, [tipoFiltro]);
-  useEffect(() => {
-    const t = setTimeout(fetch, 400);
-    return () => clearTimeout(t);
-  }, [search]);
+  useEffect(() => { fetch(); }, []);
 
   // Cargar catalogos (tipos de empleado + parajes)
   useEffect(() => {
@@ -95,10 +91,19 @@ export default function TesoreriaContactos() {
   // Filtrado client-side por subtipo cuando tipo=empleado.
   // Matchea contra el nombre del tipo del catalogo en c.subtipo (string libre).
   const filtered = useMemo(() => {
-    if (tipoFiltro !== 'empleado' || !tipoEmpleadoFiltro) return contactos;
-    const target = tipoEmpleadoFiltro.toLowerCase();
-    return contactos.filter(c => (c.subtipo || '').toLowerCase() === target);
-  }, [contactos, tipoFiltro, tipoEmpleadoFiltro]);
+    const s = search.trim().toLowerCase();
+    const targetEmp = tipoEmpleadoFiltro ? tipoEmpleadoFiltro.toLowerCase() : '';
+    return contactos.filter(c => {
+      if (tipoFiltro && c.tipo !== tipoFiltro) return false;
+      if (tipoFiltro === 'empleado' && targetEmp && (c.subtipo || '').toLowerCase() !== targetEmp) return false;
+      if (s) {
+        const haystack = [c.nombre, c.apellido, c.dni, c.email, c.telefono, c.notas]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(s)) return false;
+      }
+      return true;
+    });
+  }, [contactos, tipoFiltro, tipoEmpleadoFiltro, search]);
 
   const openSheet = (c?: Contacto) => {
     if (c) {
