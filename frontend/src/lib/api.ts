@@ -1929,6 +1929,8 @@ export const modulosApi = {
 export const contactosApi = {
   list: (params?: { tipo?: string; search?: string; activo?: boolean; skip?: number; limit?: number }) =>
     api.get('/tesoreria/contactos', { params }),
+  count: (params?: { tipo?: string; search?: string; activo?: boolean }) =>
+    api.get<{ total: number }>('/tesoreria/contactos/count', { params }),
   get: (id: number) => api.get(`/tesoreria/contactos/${id}`),
   create: (data: Record<string, unknown>) => api.post('/tesoreria/contactos', data),
   update: (id: number, data: Record<string, unknown>) =>

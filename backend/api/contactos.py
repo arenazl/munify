@@ -15,8 +15,8 @@ Endpoints:
   POST   /tesoreria/contactos/importar-kmz    bulk update lat/lon desde KMZ
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, UploadFile, File
-from sqlalchemy import select, or_
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, UploadFile, File, Response
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -35,20 +35,9 @@ def _require_admin(user: User):
         raise HTTPException(status_code=403, detail="Sin permisos para gestionar contactos")
 
 
-@router.get("", response_model=List[ContactoResponse])
-async def list_contactos(
-    request: Request,
-    tipo: Optional[str] = None,
-    activo: Optional[bool] = True,
-    search: Optional[str] = Query(None, description="Busca en nombre/apellido/DNI/alias"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=5000),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _require_admin(current_user)
-    municipio_id = get_effective_municipio_id(request, current_user)
-
+def _build_filters_query(municipio_id, tipo, activo, search):
+    """Construye la query con filtros (sin offset/limit/order_by).
+    Reutilizable para list + count."""
     query = select(Contacto).where(Contacto.municipio_id == municipio_id)
     if tipo:
         query = query.where(Contacto.tipo == tipo)
@@ -64,10 +53,57 @@ async def list_contactos(
                 Contacto.alias_pago.ilike(s),
             )
         )
+    return query
 
-    query = query.order_by(Contacto.nombre.asc(), Contacto.apellido.asc()).offset(skip).limit(limit)
-    result = await db.execute(query)
+
+@router.get("", response_model=List[ContactoResponse])
+async def list_contactos(
+    response: Response,
+    request: Request,
+    tipo: Optional[str] = None,
+    activo: Optional[bool] = True,
+    search: Optional[str] = Query(None, description="Busca en nombre/apellido/DNI/alias"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve lista paginada + header X-Total-Count con total que matchea
+    los filtros (sin paginar). El frontend usa el header para calcular
+    cantidad de paginas en la UI."""
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    base = _build_filters_query(municipio_id, tipo, activo, search)
+    # Count: total que matchea sin paginar
+    count_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_q)).scalar_one()
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
+
+    # Items paginados
+    items_q = base.order_by(Contacto.nombre.asc(), Contacto.apellido.asc()).offset(skip).limit(limit)
+    result = await db.execute(items_q)
     return result.scalars().all()
+
+
+@router.get("/count")
+async def count_contactos(
+    request: Request,
+    tipo: Optional[str] = None,
+    activo: Optional[bool] = True,
+    search: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Endpoint dedicado de count (sin traer items). Usar cuando solo
+    se necesita el total para mostrar."""
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    base = _build_filters_query(municipio_id, tipo, activo, search)
+    count_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_q)).scalar_one()
+    return {"total": total}
 
 
 @router.post("", response_model=ContactoResponse, status_code=201)

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2 } from 'lucide-react';
+import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,9 +36,14 @@ export default function TesoreriaContactos() {
 
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState<string | null>(null); // pildora actualmente cargando
   const [search, setSearch] = useState('');
   const [tipoFiltro, setTipoFiltro] = useState<TipoContacto | ''>('');
   const [tipoEmpleadoFiltro, setTipoEmpleadoFiltro] = useState<string>('');
+  // Paginacion server-side
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [totalItems, setTotalItems] = useState(0);
   const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
   const [parajes, setParajes] = useState<Paraje[]>([]);
   const [ubicacionModo, setUbicacionModo] = useState<'direccion' | 'paraje'>('direccion');
@@ -55,23 +60,40 @@ export default function TesoreriaContactos() {
     return <p className="p-6 text-sm">Sin permisos.</p>;
   }
 
-  // Traemos TODOS los contactos UNA vez al montar. Los filtros por tipo y
-  // search son client-side (via `filtered` useMemo) para evitar flicker
-  // al tocar pildoras (antes cada cambio re-fetcheaba y ABMPage mostraba
-  // spinner durante 200-500ms desmontando todo el grid).
+  // Paginacion server-side: cada cambio de filtro/pagina dispara fetch.
+  // ABMPage NO se desmonta porque loading se mantiene true brevemente y
+  // los contactos viejos se mantienen visibles hasta que llegan los nuevos
+  // (no se borra el array al arrancar fetch — se reemplaza al terminar).
   const fetch = async () => {
-    setLoading(true);
     try {
-      const res = await contactosApi.list({ limit: 5000 });
+      const params: any = {
+        skip: (page - 1) * pageSize,
+        limit: pageSize,
+      };
+      if (tipoFiltro) params.tipo = tipoFiltro;
+      if (search.trim()) params.search = search.trim();
+      const res = await contactosApi.list(params);
       setContactos(res.data);
+      const totalHeader = (res.headers && (res.headers['x-total-count'] || res.headers['X-Total-Count']));
+      if (totalHeader) setTotalItems(parseInt(totalHeader as string, 10));
     } catch {
       toast.error('Error cargando contactos');
     } finally {
       setLoading(false);
+      setSearching(null);
     }
   };
 
-  useEffect(() => { fetch(); }, []);
+  // Initial fetch + cada vez que cambia algo de paginacion/filtro server-side
+  useEffect(() => { fetch(); /* eslint-disable-line */ }, [page, pageSize, tipoFiltro]);
+
+  // Search con debounce
+  useEffect(() => {
+    setPage(1);
+    const t = setTimeout(() => fetch(), 400);
+    return () => clearTimeout(t);
+    /* eslint-disable-next-line */
+  }, [search]);
 
   // Cargar catalogos (tipos de empleado + parajes)
   useEffect(() => {
@@ -88,22 +110,14 @@ export default function TesoreriaContactos() {
     if (tipoFiltro !== 'empleado') setTipoEmpleadoFiltro('');
   }, [tipoFiltro]);
 
-  // Filtrado client-side por subtipo cuando tipo=empleado.
-  // Matchea contra el nombre del tipo del catalogo en c.subtipo (string libre).
+  // El filtro server-side ya devuelve solo lo que corresponde. Solo queda
+  // el subtipo de empleado que se filtra client-side (es un metadata extra
+  // dentro del tipo 'empleado').
   const filtered = useMemo(() => {
-    const s = search.trim().toLowerCase();
-    const targetEmp = tipoEmpleadoFiltro ? tipoEmpleadoFiltro.toLowerCase() : '';
-    return contactos.filter(c => {
-      if (tipoFiltro && c.tipo !== tipoFiltro) return false;
-      if (tipoFiltro === 'empleado' && targetEmp && (c.subtipo || '').toLowerCase() !== targetEmp) return false;
-      if (s) {
-        const haystack = [c.nombre, c.apellido, c.dni, c.email, c.telefono, c.notas]
-          .filter(Boolean).join(' ').toLowerCase();
-        if (!haystack.includes(s)) return false;
-      }
-      return true;
-    });
-  }, [contactos, tipoFiltro, tipoEmpleadoFiltro, search]);
+    if (tipoFiltro !== 'empleado' || !tipoEmpleadoFiltro) return contactos;
+    const target = tipoEmpleadoFiltro.toLowerCase();
+    return contactos.filter(c => (c.subtipo || '').toLowerCase() === target);
+  }, [contactos, tipoFiltro, tipoEmpleadoFiltro]);
 
   const openSheet = (c?: Contacto) => {
     if (c) {
@@ -204,8 +218,8 @@ export default function TesoreriaContactos() {
         }
       `}</style>
       <button
-        onClick={() => setTipoFiltro('')}
-        className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+        onClick={() => { setSearching(''); setPage(1); setTipoFiltro(''); }}
+        className="px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5"
         style={{
           backgroundColor: tipoFiltro === '' ? theme.primary : 'transparent',
           color: tipoFiltro === '' ? '#fff' : theme.textSecondary,
@@ -213,15 +227,17 @@ export default function TesoreriaContactos() {
           height: 32,
         }}
       >
-        Todos {contactos.length > 0 && `(${contactos.length})`}
+        {searching === '' && <Loader2 className="h-3 w-3 animate-spin" />}
+        Todos {tipoFiltro === '' && totalItems > 0 && `(${totalItems.toLocaleString('es-AR')})`}
       </button>
       {TIPOS_KEYS.map(t => {
         const active = tipoFiltro === t;
+        const isLoadingThis = searching === t;
         return (
           <Fragment key={t}>
             <button
-              onClick={() => setTipoFiltro(t)}
-              className="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
+              onClick={() => { setSearching(t); setPage(1); setTipoFiltro(t); }}
+              className="px-3 py-1.5 rounded-md text-xs font-medium transition-all inline-flex items-center gap-1.5"
               style={{
                 backgroundColor: active ? TIPO_COLORS[t] : `${TIPO_COLORS[t]}15`,
                 color: active ? '#fff' : TIPO_COLORS[t],
@@ -229,7 +245,9 @@ export default function TesoreriaContactos() {
                 height: 32,
               }}
             >
+              {isLoadingThis && <Loader2 className="h-3 w-3 animate-spin" />}
               {TIPO_LABELS[t]}
+              {active && totalItems > 0 && ` (${totalItems.toLocaleString('es-AR')})`}
             </button>
             {t === 'empleado' && active && tiposEmpleado.length > 0 && (
               <div className="min-w-[180px] ts-fitem">
@@ -413,6 +431,13 @@ export default function TesoreriaContactos() {
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay contactos. Importá el Excel o agregalos con 'Nuevo'."
         defaultViewMode="table"
+        pagination={{
+          page,
+          pageSize,
+          totalItems,
+          onPageChange: (p) => { setSearching('*'); setPage(p); },
+          onPageSizeChange: (s) => { setSearching('*'); setPageSize(s); setPage(1); },
+        }}
         tableView={
           <ABMTable<Contacto>
             data={filtered}

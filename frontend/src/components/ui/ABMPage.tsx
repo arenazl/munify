@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
-import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2 } from 'lucide-react';
+import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sheet } from './Sheet';
@@ -72,6 +72,19 @@ interface ABMPageProps {
   // Loading
   loading?: boolean;
 
+  // Paginacion (opt-in). Si se pasa, renderiza un footer con
+  // navegacion de paginas + selector de page size. Si no, no se muestra
+  // nada (compat con paginas que cargan todo client-side).
+  pagination?: {
+    page: number;          // 1-based
+    pageSize: number;      // items por pagina
+    totalItems: number;    // total filtrado (despues de search/filters server-side)
+    onPageChange: (page: number) => void;
+    onPageSizeChange?: (size: number) => void;
+    /** Opciones de page size (default [25, 50, 100, 200]) */
+    pageSizeOptions?: number[];
+  };
+
   // Sheet (opcional - para páginas que manejan su propio Sheet)
   sheetOpen?: boolean;
   sheetTitle?: string;
@@ -126,6 +139,7 @@ export function ABMPage({
   emptyMessage = 'No se encontraron resultados',
   isEmpty = false,
   loading = false,
+  pagination,
   sheetOpen,
   sheetTitle,
   sheetDescription,
@@ -179,7 +193,11 @@ export function ABMPage({
   // se respeta porque tipicamente esta diseñada para todos los anchos.
   const effectiveViewMode: ViewMode = isMobile && viewMode === 'table' ? 'cards' : viewMode;
 
-  if (loading) {
+  // Spinner full-page SOLO en carga inicial (cuando no hay nada para mostrar
+  // todavía). Si hay paginacion, NO usamos este spinner — el footer ya tiene
+  // su propio indicador y los items previos se mantienen visibles mientras
+  // llegan los nuevos (sin flicker en blanco).
+  if (loading && !pagination && isEmpty) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="relative">
@@ -556,6 +574,11 @@ export function ABMPage({
           </div>
           <p className="text-lg">{emptyMessage}</p>
         </div>
+      )}
+
+      {/* Footer de paginacion (opt-in). Se oculta si total <= pageSize. */}
+      {pagination && pagination.totalItems > pagination.pageSize && (
+        <PaginationFooter pagination={pagination} loading={loading} />
       )}
 
       {/* Side Modal (solo si se proporcionan las props) */}
@@ -1792,6 +1815,108 @@ function ViewToggleHint({ hasGuided, hasTable }: { hasGuided: boolean; hasTable:
       >
         Entendido
       </button>
+    </div>
+  );
+}
+
+
+// ============================================================
+// PaginationFooter — footer interno de ABMPage cuando se pasa `pagination`.
+// Estilo coherente con el header (h-[34px], text-[12px]).
+// ============================================================
+interface PaginationFooterProps {
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    onPageChange: (page: number) => void;
+    onPageSizeChange?: (size: number) => void;
+    pageSizeOptions?: number[];
+  };
+  loading?: boolean;
+}
+
+function PaginationFooter({ pagination, loading }: PaginationFooterProps) {
+  const { theme } = useTheme();
+  const { page, pageSize, totalItems, onPageChange, onPageSizeChange, pageSizeOptions } = pagination;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+  const opts = pageSizeOptions || [25, 50, 100, 200];
+
+  const flechaStyle = (disabled: boolean) => ({
+    backgroundColor: theme.backgroundSecondary,
+    color: theme.text,
+    opacity: disabled ? 0.35 : 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  });
+
+  return (
+    <div
+      className="flex items-center gap-3 flex-wrap rounded-xl p-2.5 mt-3"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+    >
+      <span className="text-[12px] font-medium flex-1 min-w-[140px]" style={{ color: theme.textSecondary }}>
+        {loading ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${theme.primary}55`, borderTopColor: theme.primary }} />
+            Cargando…
+          </span>
+        ) : (
+          <>Mostrando <strong style={{ color: theme.text }}>{start}-{end}</strong> de <strong style={{ color: theme.text }}>{totalItems.toLocaleString('es-AR')}</strong></>
+        )}
+      </span>
+
+      {/* Navegacion (flechas pegadas al label como PeriodNavigator) */}
+      <div className="inline-flex items-stretch rounded-lg overflow-hidden" style={{ border: `1px solid ${theme.border}` }}>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="px-2 h-[34px] flex items-center justify-center transition-all hover:brightness-110"
+          style={flechaStyle(page <= 1)}
+          title="Anterior"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div
+          className="px-3 h-[34px] inline-flex items-center text-[12px] font-bold whitespace-nowrap"
+          style={{
+            backgroundColor: theme.card,
+            color: theme.text,
+            borderLeft: `1px solid ${theme.border}`,
+            borderRight: `1px solid ${theme.border}`,
+          }}
+        >
+          {page} de {totalPages}
+        </div>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          className="px-2 h-[34px] flex items-center justify-center transition-all hover:brightness-110"
+          style={flechaStyle(page >= totalPages)}
+          title="Siguiente"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Selector page size (estilo ModernSelect compacto) */}
+      {onPageSizeChange && (
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(parseInt(e.target.value, 10))}
+          className="h-[34px] px-2 rounded-lg text-[12px] font-semibold"
+          style={{
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.text,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          {opts.map(n => <option key={n} value={n}>{n} por página</option>)}
+        </select>
+      )}
     </div>
   );
 }
