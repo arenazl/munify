@@ -506,57 +506,26 @@ export function ABMPage({
           que usan ABMPage. */}
       {(tableView || guidedView) && <ViewToggleHint hasGuided={!!guidedView} hasTable={!!tableView} />}
 
-      {/* Grid de contenido con animación de transición */}
+      {/* Grid de contenido. Solo renderizamos la vista activa para que la
+          altura de la pagina sea exactamente la de su contenido (sin
+          espacio blanco al final por vistas inactivas con position:absolute
+          que igual contribuian a la altura virtual via children render). */}
       {!isEmpty ? (
-        <div className="relative mt-4">
-          {/* Vista Tarjetas - 1 columna en móvil, 2 en tablet, 3 en desktop */}
-          <div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5"
-            style={{
-              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              opacity: effectiveViewMode === 'cards' ? 1 : 0,
-              transform: effectiveViewMode === 'cards'
-                ? 'translateX(0) rotateY(0deg)'
-                : 'translateX(-100%) rotateY(-15deg)',
-              position: effectiveViewMode === 'cards' ? 'relative' : 'absolute',
-              inset: effectiveViewMode === 'cards' ? 'auto' : 0,
-              pointerEvents: effectiveViewMode === 'cards' ? 'auto' : 'none',
-              transformOrigin: 'center center',
-            }}
-          >
-            {children}
-          </div>
-
-          {/* Vista Tabla */}
-          {tableView && (
+        <div className="mt-4">
+          {effectiveViewMode === 'cards' && (
             <div
-              style={{
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                opacity: effectiveViewMode === 'table' ? 1 : 0,
-                transform: effectiveViewMode === 'table'
-                  ? 'translateX(0) rotateY(0deg)'
-                  : 'translateX(100%) rotateY(15deg)',
-                position: effectiveViewMode === 'table' ? 'relative' : 'absolute',
-                inset: effectiveViewMode === 'table' ? 'auto' : 0,
-                pointerEvents: effectiveViewMode === 'table' ? 'auto' : 'none',
-                transformOrigin: 'center center',
-              }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 animate-in fade-in duration-200"
             >
+              {children}
+            </div>
+          )}
+          {effectiveViewMode === 'table' && tableView && (
+            <div className="animate-in fade-in duration-200">
               {tableView}
             </div>
           )}
-
-          {/* Vista Guiada (Inbox, wizard, etc.) */}
-          {guidedView && (
-            <div
-              style={{
-                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                opacity: effectiveViewMode === 'guided' ? 1 : 0,
-                position: effectiveViewMode === 'guided' ? 'relative' : 'absolute',
-                inset: effectiveViewMode === 'guided' ? 'auto' : 0,
-                pointerEvents: effectiveViewMode === 'guided' ? 'auto' : 'none',
-              }}
-            >
+          {effectiveViewMode === 'guided' && guidedView && (
+            <div className="animate-in fade-in duration-200">
               {guidedView}
             </div>
           )}
