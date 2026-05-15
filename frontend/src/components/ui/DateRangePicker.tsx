@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronDown, X } from 'lucide-react';
 import { DayPicker, DateRange as RdpRange } from 'react-day-picker';
 import { es } from 'date-fns/locale';
@@ -110,13 +111,57 @@ export function DateRangePicker({
   const { theme } = useTheme();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Posicion del dropdown calculada via fixed (escapa de cualquier ancestro
+  // con overflow:hidden/auto que clipea el calendario).
+  const [dropdownPos, setDropdownPos] = useState<{
+    top: number; left: number; openUp: boolean;
+  } | null>(null);
+
+  const recalcPos = () => {
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const espacioAbajo = vh - r.bottom - 12;
+    const altoEstimado = 460; // calendar + presets aprox
+    const openUp = espacioAbajo < altoEstimado && r.top > altoEstimado;
+    setDropdownPos({
+      top: openUp ? r.top - 8 : r.bottom + 8,
+      left: r.left,
+      openUp,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (open) recalcPos();
+  }, [open]);
 
   useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    if (!open) return;
+    const onScrollOrResize = () => recalcPos();
+    window.addEventListener('scroll', onScrollOrResize, true);
+    window.addEventListener('resize', onScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize, true);
+      window.removeEventListener('resize', onScrollOrResize);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    const onDown = (e: Event) => {
+      const t = e.target as Node;
+      const inTrigger = ref.current?.contains(t);
+      const inDropdown = dropdownRef.current?.contains(t);
+      if (!inTrigger && !inDropdown) setOpen(false);
     };
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+    };
   }, []);
 
   const display = value.desde && value.hasta
@@ -215,6 +260,7 @@ export function DateRangePicker({
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="inline-flex items-center gap-1.5 px-2.5 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:brightness-110"
@@ -242,13 +288,20 @@ export function DateRangePicker({
         <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: theme.textSecondary }} />
       </button>
 
-      {open && (
+      {open && dropdownPos && typeof document !== 'undefined' && createPortal(
         <div
-          className="absolute top-full mt-2 left-0 z-40 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2"
+          ref={dropdownRef}
+          className="rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2"
           style={{
+            position: 'fixed',
+            top: dropdownPos.openUp ? undefined : dropdownPos.top,
+            bottom: dropdownPos.openUp ? (window.innerHeight - dropdownPos.top) : undefined,
+            left: dropdownPos.left,
+            zIndex: 9999,
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
             minWidth: '320px',
+            boxShadow: `0 20px 40px -12px rgba(0, 0, 0, 0.4), 0 0 0 1px ${theme.border}`,
           }}
         >
           {/* Presets */}
@@ -289,7 +342,8 @@ export function DateRangePicker({
               showOutsideDays
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
