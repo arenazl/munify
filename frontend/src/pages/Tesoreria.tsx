@@ -770,7 +770,7 @@ export default function Tesoreria() {
 
   return (
     <>
-      <div className="px-4 pt-3">
+      <div className="pt-3">
         <TesoreriaHint titulo="Bienvenido a Tesorería" storageKey="home">
           Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
           préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o
@@ -781,20 +781,21 @@ export default function Tesoreria() {
         </TesoreriaHint>
       </div>
 
-      {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes */}
+      {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes.
+          Alineado al mismo container que el ABMPage (no px-4 extra). */}
       {dudosos.count > 0 && (
-        <div className="px-4">
+        <div>
           <Link
             to="/gestion/tesoreria/curacion-bartolo"
             className="block rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:shadow-md"
             style={{
-              backgroundColor: '#f59e0b15',
-              border: `1px solid #f59e0b40`,
+              backgroundColor: `${theme.primary}10`,
+              border: `1px solid ${theme.primary}30`,
             }}
           >
             <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#f59e0b' }}>
-                <Sparkles className="h-5 w-5 text-white" />
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.primary }}>
+                <Sparkles className="h-5 w-5" style={{ color: theme.primaryText || '#ffffff' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold" style={{ color: theme.text }}>
@@ -804,7 +805,7 @@ export default function Tesoreria() {
                   La IA los clasificó como "Compras/Otros varios" · Total: ${dudosos.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                 </p>
               </div>
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white whitespace-nowrap" style={{ backgroundColor: '#f59e0b' }}>
+              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap" style={{ backgroundColor: theme.primary, color: theme.primaryText || '#ffffff' }}>
                 Revisar →
               </span>
             </div>
