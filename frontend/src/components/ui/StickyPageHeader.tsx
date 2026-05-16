@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Plus, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { PrimaryButton } from './PrimaryButton';
 
 interface StickyPageHeaderProps {
   /** Icono del título (ReactNode, ej: <FileText className="h-5 w-5" />) */
@@ -269,29 +270,15 @@ export function StickyPageHeader({
               {buttonLabel && onButtonClick && (
                 <>
                   {/* Mobile: solo icono */}
-                  <button
-                    onClick={onButtonClick}
-                    className="sm:hidden p-2 rounded-lg transition-all active:scale-95 flex-shrink-0"
-                    style={{
-                      backgroundColor: theme.primary,
-                      color: '#ffffff',
-                    }}
-                  >
-                    <Plus className="h-5 w-5" />
-                  </button>
+                  <div className="sm:hidden">
+                    <PrimaryButton onClick={onButtonClick} size="md" icon={<Plus className="h-5 w-5" />} />
+                  </div>
                   {/* Desktop: con texto */}
-                  <button
-                    onClick={onButtonClick}
-                    className="hidden sm:inline-flex items-center px-4 py-2 rounded-lg font-semibold text-sm transition-all hover:scale-105 active:scale-95 flex-shrink-0"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                      color: '#ffffff',
-                      boxShadow: `0 4px 14px ${theme.primary}40`,
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    {buttonLabel}
-                  </button>
+                  <div className="hidden sm:inline-flex">
+                    <PrimaryButton onClick={onButtonClick} size="md" icon={<Plus className="h-4 w-4 mr-1.5" />}>
+                      {buttonLabel}
+                    </PrimaryButton>
+                  </div>
                 </>
               )}
             </>

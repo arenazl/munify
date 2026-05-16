@@ -8,6 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import type { KpiSpec } from '../components/ui/KpiCard';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { conceptoIcon } from '../lib/conceptoIcons';
@@ -504,16 +505,6 @@ export default function TesoreriaAgenda() {
         </TesoreriaHint>
       </div>
 
-      <div className="px-4">
-        {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-3">
-          <Kpi label="Vencidos" value={`${stats.vencidos}`} sub="atrasados" color="#dc2626" icon={<AlertCircle className="h-4 w-4" />} />
-          <Kpi label="Próx. 7 días" value={`${stats.pendientes7}`} sub={fmtMoney(stats.total7)} color="#ef4444" icon={<AlertCircle className="h-4 w-4" />} />
-          <Kpi label="Próx. 30 días" value={fmtMoney(stats.total30)} sub={`${pagos.length} pagos activos`} color="#3b82f6" icon={<Calendar className="h-4 w-4" />} />
-          <Kpi label="Total activos" value={`${pagos.length}`} sub="programados" color="#10b981" icon={<CalendarClock className="h-4 w-4" />} />
-        </div>
-      </div>
-
       <ABMPage
         title="Agenda de Pagos"
         icon={<CalendarClock className="h-5 w-5" />}
@@ -523,6 +514,12 @@ export default function TesoreriaAgenda() {
         searchPlaceholder="Buscar por concepto o contacto..."
         searchValue={search}
         onSearchChange={setSearch}
+        kpis={[
+          { label: 'Vencidos', value: String(stats.vencidos), footnote: 'atrasados', color: '#dc2626', icon: AlertCircle },
+          { label: 'Próx. 7 días', value: String(stats.pendientes7), footnote: fmtMoney(stats.total7), color: '#ef4444', icon: AlertCircle },
+          { label: 'Próx. 30 días', value: fmtMoney(stats.total30), footnote: `${pagos.length} pagos activos`, color: '#3b82f6', icon: Calendar },
+          { label: 'Total activos', value: String(pagos.length), footnote: 'programados', color: '#10b981', icon: CalendarClock },
+        ] as KpiSpec[]}
         secondaryFilters={secondaryFilters}
         pagination={{
           page,
@@ -610,16 +607,3 @@ export default function TesoreriaAgenda() {
   );
 }
 
-function Kpi({ label, value, sub, color, icon }: { label: string; value: string; sub?: string; color: string; icon: React.ReactNode }) {
-  const { theme } = useTheme();
-  return (
-    <div className="rounded-xl p-3" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${color}20`, color }}>{icon}</div>
-        <span className="text-[11px] uppercase font-semibold" style={{ color: theme.textSecondary }}>{label}</span>
-      </div>
-      <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>{value}</p>
-      {sub && <p className="text-[11px]" style={{ color: theme.textSecondary }}>{sub}</p>}
-    </div>
-  );
-}

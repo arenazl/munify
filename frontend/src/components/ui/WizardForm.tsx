@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Check, Sparkles, Loader2, ArrowLeft, X, MessageCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { PrimaryButton } from './PrimaryButton';
 import { chatApi } from '../../lib/api';
 
 // Parser simple de markdown a HTML con emojis y límite de items
@@ -465,36 +466,18 @@ export function WizardForm({
         )}
 
         {/* Siguiente/Enviar */}
-        <button
+        <PrimaryButton
           onClick={handleNext}
           disabled={saving || !currentStepData || (currentStepData.isValid === false)}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 active:scale-[0.98] disabled:opacity-50 relative overflow-hidden group"
-          style={{
-            background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-            color: '#ffffff',
-            boxShadow: `0 4px 14px ${theme.primary}40`,
-          }}
+          fullWidth
+          size="md"
+          className="flex-1"
+          icon={saving ? <Loader2 className="h-4 w-4 animate-spin" /> : isLastStep ? <Check className="h-4 w-4" /> : undefined}
         >
-          {/* Shimmer effect */}
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Guardando...
-            </>
-          ) : isLastStep ? (
-            <>
-              <Check className="h-4 w-4" />
-              {completeLabel}
-            </>
-          ) : (
-            <>
-              Siguiente
-              <ChevronRight className="h-4 w-4" />
-            </>
+          {saving ? 'Guardando...' : isLastStep ? completeLabel : (
+            <span className="inline-flex items-center gap-2">Siguiente<ChevronRight className="h-4 w-4" /></span>
           )}
-        </button>
+        </PrimaryButton>
       </div>
 
       {/* Estilos de animación */}
