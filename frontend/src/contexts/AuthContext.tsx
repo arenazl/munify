@@ -91,6 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const munis = response.data;
       setMunicipios(munis);
 
+      // Si el user es superadmin (admin sin municipio_id) NO autoselecciona
+      // ningun muni: queda en modo Global hasta que elija desde el switcher.
+      const isSuperAdmin = user?.rol === 'admin' && !user?.municipio_id;
+      if (isSuperAdmin) {
+        return;
+      }
+
       // Determinar qué municipio seleccionar
       const storedMuniId = localStorage.getItem('municipio_actual_id');
       const userMuniId = user?.municipio_id;
@@ -168,6 +175,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isSuperAdmin = user.rol === 'admin' && !user.municipio_id;
 
     if (isSuperAdmin) {
+      // Al loguear como superadmin entramos SIEMPRE en modo Global
+      // (cross-tenant). Limpiamos cualquier muni persistido de una
+      // sesion anterior para que el topbar no muestre "Chacabuco" cuando
+      // en realidad el contexto es global.
+      await clearMunicipio();
+      setMunicipioActualState(null);
       try {
         const apiUrl = API_URL;
         const res = await fetch(`${apiUrl}/municipios`, {
@@ -176,13 +189,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (res.ok) {
           const munis = await res.json();
           setMunicipios(munis);
-          // Si había un muni persistido de una sesión anterior, lo mantenemos
-          // como contexto seleccionado — pero NO fuerza redirect al dashboard.
-          const storedMuniId = localStorage.getItem('municipio_actual_id');
-          if (storedMuniId) {
-            const found = munis.find((m: Municipio) => m.id === parseInt(storedMuniId));
-            if (found) setMunicipioActualState(found);
-          }
         }
       } catch (e) {
         console.error('Error cargando municipios para super admin:', e);
