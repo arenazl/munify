@@ -102,7 +102,7 @@ interface MetricasDetalle {
 
 export default function Dashboard() {
   console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
-  const { theme } = useTheme();
+  const { theme, currentVariant } = useTheme();
   const { municipioActual, user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -559,8 +559,12 @@ export default function Dashboard() {
         </defs>
       </svg>
 
-      {/* Hero Header - Estilo Wok Express */}
-      <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '200px' }}>
+      {/* Hero Header - Estilo Wok Express. Tema claro: opacity 0.3 para que no
+          compita visualmente con el contenido (el banner es decorativo). */}
+      <div
+        className="relative overflow-hidden rounded-2xl"
+        style={{ minHeight: '200px', opacity: currentVariant === 'light' ? 0.3 : 1 }}
+      >
         {/* Imagen de fondo - usa imagen_portada si existe, sino logo_url, sino placeholder */}
         <div className="absolute inset-0">
           <img

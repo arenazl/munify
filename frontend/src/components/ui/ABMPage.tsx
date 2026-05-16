@@ -1451,8 +1451,9 @@ interface ABMTableProps<T> {
   defaultSortDirection?: 'asc' | 'desc';
   // Render alternativo para mobile (cards)
   renderMobileCard?: (item: T, actions?: ReactNode) => ReactNode;
-  /** Si true, se omite el <thead> completo. Pensado para listas tipo "feed"
-   *  donde la tabla tiene un solo nivel visual (avatar + titulo + meta). */
+  /** Si true (default), se omite el <thead> completo — patron canonico del
+   *  sistema: tablas en estilo lista/feed (avatar + titulo + meta), sin
+   *  cabecera. Pasar `hideHeader={false}` para mostrar la cabecera. */
   hideHeader?: boolean;
   /** Agrupacion opcional. Inserta una fila-separador antes de cada grupo con
    *  label izq + subtotal der. Solo se aplica cuando el sort actual es por
@@ -1478,7 +1479,7 @@ export function ABMTable<T>({
   defaultSortKey,
   defaultSortDirection,
   renderMobileCard,
-  hideHeader,
+  hideHeader = true,
   groupBy,
 }: ABMTableProps<T>) {
   const { theme } = useTheme();

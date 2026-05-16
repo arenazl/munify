@@ -701,7 +701,6 @@ export default function Tesoreria() {
       data={paginatedFiltered}
       keyExtractor={(g) => g.id}
       onRowClick={openDetalle}
-      hideHeader
       groupBy={{
         sortKey: 'fecha',
         getKey: (g) => g.fecha,
