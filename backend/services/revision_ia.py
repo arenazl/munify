@@ -54,11 +54,8 @@ def cache_invalidate(municipio_id: int, kind: Optional[str] = None) -> None:
 
 
 async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
-    """Llama a Gemini REST y devuelve el texto plano de la respuesta.
-    Devuelve None si no hay key configurada o falla la llamada.
-    """
+    """Llama a Gemini REST. None si key no configurada o falla."""
     if not settings.GEMINI_API_KEY:
-        logger.warning("[RevisionIA] GEMINI_API_KEY no configurada")
         return None
     try:
         url = (
@@ -95,6 +92,59 @@ async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
     except Exception as e:
         logger.exception("[RevisionIA] Error llamando Gemini: %s", e)
         return None
+
+
+async def _call_groq(prompt: str, max_tokens: int = 8000) -> Optional[str]:
+    """Llama a Groq (OpenAI-compatible). Tier gratuito generoso con Llama 3.3.
+    None si key no configurada o falla."""
+    if not settings.GROQ_API_KEY:
+        return None
+    try:
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        async with httpx.AsyncClient(timeout=45.0) as client:
+            response = await client.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": settings.GROQ_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                    "max_tokens": max_tokens,
+                    "response_format": {"type": "json_object"},
+                },
+            )
+        if response.status_code != 200:
+            logger.error(
+                "[RevisionIA] Groq status=%s body=%s",
+                response.status_code,
+                response.text[:500],
+            )
+            return None
+        data = response.json()
+        return (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+        )
+    except Exception as e:
+        logger.exception("[RevisionIA] Error llamando Groq: %s", e)
+        return None
+
+
+async def _call_llm(prompt: str, max_tokens: int = 8000) -> Optional[str]:
+    """Intenta primero Gemini; si no responde, cae a Groq. Devuelve el texto
+    de la respuesta o None si ambos fallan / no estan configurados."""
+    text = await _call_gemini(prompt, max_tokens=max_tokens)
+    if text:
+        return text
+    logger.info("[RevisionIA] Gemini sin respuesta, intentando Groq...")
+    text = await _call_groq(prompt, max_tokens=max_tokens)
+    if text:
+        logger.info("[RevisionIA] Groq respondio OK")
+    return text
 
 
 def _parse_json_safely(text: str) -> Optional[Any]:
@@ -216,8 +266,8 @@ async def analizar_reclamos(
         if cached is not None:
             return cached
 
-    if not settings.GEMINI_API_KEY:
-        # Sin IA configurada: devolvemos demo claramente marcado.
+    if not settings.GEMINI_API_KEY and not settings.GROQ_API_KEY:
+        # Sin IA configurada (ningun proveedor): devolvemos demo.
         return _build_reclamos_demo("no_key")
 
     # Recortamos las descripciones a 200 chars para no explotar el prompt.
@@ -235,9 +285,9 @@ async def analizar_reclamos(
         })
 
     prompt = RECLAMOS_PROMPT_TEMPLATE.format(reclamos_json=json.dumps(compact, ensure_ascii=False))
-    text = await _call_gemini(prompt)
+    text = await _call_llm(prompt)
     if not text:
-        logger.warning("[RevisionIA] Gemini no respondio (vacio o error HTTP)")
+        logger.warning("[RevisionIA] Ningun LLM respondio (reclamos)")
         return _build_reclamos_demo("ia_fail")
 
     parsed = _parse_json_safely(text)
@@ -341,7 +391,7 @@ async def analizar_tramites(
         if cached is not None:
             return cached
 
-    if not settings.GEMINI_API_KEY:
+    if not settings.GEMINI_API_KEY and not settings.GROQ_API_KEY:
         return _build_tramites_demo("no_key")
 
     compact = []
@@ -359,9 +409,9 @@ async def analizar_tramites(
         })
 
     prompt = TRAMITES_PROMPT_TEMPLATE.format(solicitudes_json=json.dumps(compact, ensure_ascii=False))
-    text = await _call_gemini(prompt)
+    text = await _call_llm(prompt)
     if not text:
-        logger.warning("[RevisionIA] Gemini no respondio (tramites)")
+        logger.warning("[RevisionIA] Ningun LLM respondio (tramites)")
         return _build_tramites_demo("ia_fail")
 
     parsed = _parse_json_safely(text)

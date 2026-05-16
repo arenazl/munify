@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Gemini (Google - gratis con límites)
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-flash"
+    # Groq (fallback OpenAI-compatible, tier gratuito generoso con Llama 3.3 70B)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # Groq (API rápida)
     GROQ_API_KEY: str = ""
