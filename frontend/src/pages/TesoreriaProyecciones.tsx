@@ -16,6 +16,7 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PeriodNavigator } from '../components/ui/PeriodNavigator';
+import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import {
   gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposConceptoApi,
   tiposEmpleadoApi, cajasApi,
@@ -28,14 +29,7 @@ import type {
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-const TIPO_CONTACTO_LABELS: Record<TipoContacto, string> = {
-  concejal: 'Concejales', empleado: 'Empleados', profesional: 'Profesionales',
-  proveedor: 'Proveedores', contratista: 'Contratistas', beneficiario: 'Beneficiarios', otro: 'Otros',
-};
-const TIPO_CONTACTO_COLORS: Record<TipoContacto, string> = {
-  concejal: '#8b5cf6', empleado: '#3b82f6', profesional: '#f59e0b',
-  proveedor: '#10b981', contratista: '#06b6d4', beneficiario: '#ec4899', otro: '#71717a',
-};
+// TIPO_CONTACTO_LABELS/COLORS: fuente canonica unica en lib/contactoIcons.tsx
 const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque',
   tarjeta: 'Tarjeta', mercadopago: 'MercadoPago', otro: 'Otro',

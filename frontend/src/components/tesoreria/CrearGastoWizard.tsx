@@ -14,26 +14,7 @@ import type {
   TipoContacto,
 } from '../../types';
 
-// Mismas labels/colores que TesoreriaContactos.tsx (DRY: si crece, extraer
-// a lib/enums/tipo-contacto.ts).
-const TIPO_CONTACTO_LABELS: Record<TipoContacto, string> = {
-  concejal: 'Concejales',
-  empleado: 'Empleados',
-  profesional: 'Profesionales',
-  proveedor: 'Proveedores',
-  contratista: 'Contratistas',
-  beneficiario: 'Beneficiarios',
-  otro: 'Otros',
-};
-const TIPO_CONTACTO_COLORS: Record<TipoContacto, string> = {
-  concejal: '#8b5cf6',
-  empleado: '#3b82f6',
-  profesional: '#f59e0b',
-  proveedor: '#10b981',
-  contratista: '#06b6d4',
-  beneficiario: '#ec4899',
-  otro: '#71717a',
-};
+import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_COLORS } from '../../lib/contactoIcons';
 
 interface Props {
   open: boolean;

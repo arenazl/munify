@@ -24,7 +24,7 @@ import { PillsOrSelect } from '../components/ui/PillsOrSelect';
 import { CalendarView } from '../components/ui/CalendarView';
 import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi } from '../lib/api';
 import { conceptoIcon } from '../lib/conceptoIcons';
-import { contactoIconByTipo } from '../lib/contactoIcons';
+import { contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS } from '../lib/contactoIcons';
 import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
@@ -43,19 +43,7 @@ const FORMA_PAGO_LABELS: Record<FormaPago, string> = {
   otro: 'Otro',
 };
 
-const TIPO_CONTACTO_LABELS: Record<TipoContacto, string> = {
-  concejal: 'Concejales',
-  empleado: 'Empleados',
-  profesional: 'Profesionales',
-  proveedor: 'Proveedores',
-  contratista: 'Contratistas',
-  beneficiario: 'Beneficiarios',
-  otro: 'Otros',
-};
-const TIPO_CONTACTO_COLORS: Record<TipoContacto, string> = {
-  concejal: '#8b5cf6', empleado: '#3b82f6', profesional: '#f59e0b',
-  proveedor: '#10b981', contratista: '#06b6d4', beneficiario: '#ec4899', otro: '#71717a',
-};
+// TIPO_CONTACTO_LABELS y TIPO_CONTACTO_COLORS: fuente canonica en lib/contactoIcons.tsx
 
 const MESES_LARGO = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',

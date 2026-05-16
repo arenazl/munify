@@ -7,7 +7,10 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
-import { ABMPage, ABMSheetFooter } from '../components/ui/ABMPage';
+import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import { StatusPill } from '../components/ui/StatusPill';
+import { conceptoIcon } from '../lib/conceptoIcons';
+import { contactoIconByTipo, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { CalendarView } from '../components/ui/CalendarView';
@@ -272,74 +275,144 @@ export default function TesoreriaAgenda() {
     </div>
   );
 
-  // ==================== Vista TABLA ====================
+  // Map contacto_id -> tipo (para ícono uniforme por tipo de contacto)
+  const contactosMap = useMemo(() => {
+    const m = new Map<number, Contacto>();
+    contactos.forEach(c => m.set(c.id, c));
+    return m;
+  }, [contactos]);
+
+  // ==================== Vista TABLA (ABMTable canónica) ====================
   const tableView = (
-    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ backgroundColor: theme.backgroundSecondary }}>
-              <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: theme.textSecondary }}>Próximo pago</th>
-              <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: theme.textSecondary }}>Contacto</th>
-              <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: theme.textSecondary }}>Concepto</th>
-              <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: theme.textSecondary }}>Monto</th>
-              <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: theme.textSecondary }}>Frec.</th>
-              <th className="text-left px-3 py-2 text-[11px] font-semibold uppercase whitespace-nowrap" style={{ color: theme.textSecondary }}>Caja</th>
-              <th className="text-right px-3 py-2 text-[11px] font-semibold uppercase w-44 whitespace-nowrap" style={{ color: theme.textSecondary }}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedFiltered.map((p, i) => {
-              const dias = diasDesdeHoy(p.proximo_pago);
-              const urgente = dias <= 3;
-              return (
-                <tr key={p.id} style={{ borderTop: i > 0 ? `1px solid ${theme.border}` : undefined }}>
-                  <td className="px-3 py-2.5">
-                    <div className="flex flex-col">
-                      <span className="font-medium whitespace-nowrap" style={{ color: theme.text }}>
-                        {new Date(p.proximo_pago).toLocaleDateString('es-AR')}
-                      </span>
-                      <span className="text-[10px] font-semibold"
-                        style={{ color: urgente ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
-                        {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap" style={{ color: theme.text }}>{p.contacto_nombre}</td>
-                  <td className="px-3 py-2.5" style={{ color: theme.text }}>{p.concepto}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</td>
-                  <td className="px-3 py-2.5">
-                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                      style={{ backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}20`, color: FRECUENCIA_COLORS[p.frecuencia] }}>
-                      {FRECUENCIA_LABELS[p.frecuencia]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {p.caja_nombre ? (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
-                        {p.caja_nombre}
-                      </span>
-                    ) : <span className="opacity-50 text-xs">—</span>}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="inline-flex gap-1">
-                      <button onClick={() => handleEjecutar(p)} disabled={executingId === p.id}
-                        className="px-2 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 text-white"
-                        style={{ backgroundColor: '#10b981', opacity: executingId === p.id ? 0.5 : 1 }} title="Pagar ahora">
-                        {executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                        Pagar
-                      </button>
-                      <button onClick={() => openSheet(p)} className="p-1.5 rounded hover:scale-110" style={{ color: theme.primary }} title="Editar"><Edit2 className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => handleDelete(p)} className="p-1.5 rounded hover:scale-110" style={{ color: '#ef4444' }} title="Eliminar"><Trash2 className="h-3.5 w-3.5" /></button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <ABMTable<PagoProgramado>
+      data={paginatedFiltered}
+      keyExtractor={(p) => p.id}
+      onRowClick={(p) => openSheet(p)}
+      groupBy={{
+        sortKey: 'proximo_pago',
+        getKey: (p) => p.proximo_pago.slice(0, 10),
+        renderLabel: (key, items) => {
+          const d = new Date(key + 'T12:00:00');
+          const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+          const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
+          const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
+          const dStripped = new Date(d); dStripped.setHours(0, 0, 0, 0);
+          let label: string;
+          if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
+          else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
+          else if (dStripped.getTime() === manana.getTime()) label = 'Mañana';
+          else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+          return (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tabular-nums px-1.5 py-0.5 rounded" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.textSecondary }}>
+                {d.getDate().toString().padStart(2, '0')} {d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}
+              </span>
+              <span className="font-bold text-xs" style={{ color: theme.text }}>{label}</span>
+              <span className="text-[11px]" style={{ color: theme.textSecondary }}>· {items.length} {items.length === 1 ? 'pago' : 'pagos'}</span>
+            </div>
+          );
+        },
+        renderSubtotal: (_key, items) => {
+          const sum = items.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0);
+          return (
+            <div className="text-right">
+              <span className="text-[10px] uppercase font-bold mr-2" style={{ color: theme.textSecondary }}>Subtotal</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>{fmtMoney(sum)}</span>
+            </div>
+          );
+        },
+      }}
+      columns={[
+        {
+          key: 'proximo_pago',
+          header: 'Próximo pago',
+          sortValue: (p) => p.proximo_pago,
+          render: (p) => {
+            const dias = diasDesdeHoy(p.proximo_pago);
+            const urgente = dias <= 3;
+            return (
+              <div className="flex flex-col">
+                <span className="font-medium whitespace-nowrap" style={{ color: theme.text }}>
+                  {new Date(p.proximo_pago).toLocaleDateString('es-AR')}
+                </span>
+                <span className="text-[10px] font-semibold"
+                  style={{ color: urgente ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
+                  {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
+                </span>
+              </div>
+            );
+          },
+        },
+        {
+          key: 'contacto_nombre',
+          header: 'Contacto',
+          sortValue: (p) => p.contacto_nombre || '',
+          render: (p) => {
+            const c = contactosMap.get(p.contacto_id);
+            const tipo = c?.tipo || 'otro';
+            const Icon = contactoIconByTipo(tipo);
+            const color = TIPO_CONTACTO_COLORS[tipo] || theme.primary;
+            return (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
+                  <Icon className="h-3 w-3" style={{ color }} />
+                </span>
+                <span className="font-medium truncate max-w-[200px]" style={{ color: theme.text }}>{p.contacto_nombre || 'Contacto'}</span>
+              </span>
+            );
+          },
+        },
+        {
+          key: 'concepto',
+          header: 'Concepto',
+          sortValue: (p) => p.concepto,
+          render: (p) => {
+            const Icon = conceptoIcon(p.concepto);
+            const color = FRECUENCIA_COLORS[p.frecuencia];
+            return (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}20` }}>
+                  <Icon className="h-3 w-3" style={{ color }} />
+                </span>
+                <span className="font-medium" style={{ color: theme.text }}>{p.concepto}</span>
+              </span>
+            );
+          },
+        },
+        {
+          key: 'monto_pesos',
+          header: 'Monto',
+          sortValue: (p) => parseFloat(p.monto_pesos),
+          render: (p) => <span className="font-bold tabular-nums">{fmtMoney(p.monto_pesos)}</span>,
+        },
+        {
+          key: 'frecuencia',
+          header: 'Frec.',
+          sortValue: (p) => p.frecuencia,
+          render: (p) => <StatusPill label={FRECUENCIA_LABELS[p.frecuencia]} color={FRECUENCIA_COLORS[p.frecuencia]} size="xs" />,
+        },
+        {
+          key: 'caja_nombre',
+          header: 'Caja',
+          sortValue: (p) => p.caja_nombre || '',
+          render: (p) => p.caja_nombre
+            ? <StatusPill label={p.caja_nombre} color={theme.primary} size="xs" showDot={false} />
+            : <span className="opacity-50 text-xs">—</span>,
+        },
+      ]}
+      actions={(p) => (
+        <>
+          <button onClick={(e) => { e.stopPropagation(); handleEjecutar(p); }} disabled={executingId === p.id}
+            className="px-2 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 text-white"
+            style={{ backgroundColor: '#10b981', opacity: executingId === p.id ? 0.5 : 1 }} title="Pagar ahora">
+            {executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+            Pagar
+          </button>
+          <ABMTableAction title="Editar" onClick={() => openSheet(p)} variant="primary" icon={<Edit2 className="h-4 w-4" />} />
+          <ABMTableAction title="Eliminar" onClick={() => handleDelete(p)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
+        </>
+      )}
+    />
   );
 
   // ==================== Vista CALENDARIO (guiada) — usa CalendarView reutilizable ====================
