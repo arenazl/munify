@@ -22,6 +22,8 @@ import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
 import { CalendarView } from '../components/ui/CalendarView';
 import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi } from '../lib/api';
+import { conceptoIcon } from '../lib/conceptoIcons';
+import { contactoIconByTipo } from '../lib/contactoIcons';
 import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
@@ -467,11 +469,15 @@ export default function Tesoreria() {
 
   // Opciones de tipo de contacto
   const tipoContactoOptions = useMemo(() => {
-    const items = (Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(tc => ({
-      value: tc,
-      label: TIPO_CONTACTO_LABELS[tc],
-      color: TIPO_CONTACTO_COLORS[tc],
-    }));
+    const items = (Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(tc => {
+      const Icon = contactoIconByTipo(tc);
+      return {
+        value: tc,
+        label: TIPO_CONTACTO_LABELS[tc],
+        color: TIPO_CONTACTO_COLORS[tc],
+        icon: <Icon className="h-3 w-3" />,
+      };
+    });
     return [{ value: '', label: 'Contactos' }, ...sortByPresence(items, ordering.tipoContacto)];
   }, [ordering.tipoContacto]);
 
@@ -501,11 +507,15 @@ export default function Tesoreria() {
 
   // Opciones de concepto (filtradas por tipo si hay seleccionado)
   const conceptoOptions = useMemo(() => {
-    const items = conceptosDelTipo.map(c => ({
-      value: c.nombre,
-      label: c.nombre,
-      color: c.tipo_concepto_color || undefined,
-    }));
+    const items = conceptosDelTipo.map(c => {
+      const Icon = conceptoIcon(c.nombre);
+      return {
+        value: c.nombre,
+        label: c.nombre,
+        color: c.tipo_concepto_color || undefined,
+        icon: <Icon className="h-3 w-3" />,
+      };
+    });
     return [{ value: '', label: 'Conceptos' }, ...sortByPresence(items, ordering.concepto)];
   }, [conceptosDelTipo, ordering.concepto]);
 
@@ -697,35 +707,38 @@ export default function Tesoreria() {
     </>
   );
 
-  // Renderer del destino para la celda de la tabla. Ahora muestra el NOMBRE.
+  // Renderer del destino: icono por TIPO de contacto (uniforme en chip cuadrado del
+  // color del tipo) + nombre. Para destinos a dependencia, Building2.
   const renderDestino = (g: Gasto) => {
     if (g.destino_tipo === 'contacto') {
       const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
-      if (c) {
-        const color = TIPO_CONTACTO_COLORS[c.tipo] || theme.primary;
-        return (
-          <span className="inline-flex items-center gap-1 text-xs" title={`${TIPO_CONTACTO_LABELS[c.tipo]} · ${c.subtipo || ''}`}>
-            <Home className="h-3 w-3" style={{ color }} />
-            <span className="font-medium truncate max-w-[150px]" style={{ color: theme.text }}>{c.nombre} {c.apellido || ''}</span>
-          </span>
-        );
-      }
+      const tipo = c?.tipo || 'otro';
+      const Icon = contactoIconByTipo(tipo);
+      const color = TIPO_CONTACTO_COLORS[tipo as TipoContacto] || theme.primary;
+      const nombre = c ? `${c.nombre} ${c.apellido || ''}`.trim() : 'Contacto';
       return (
-        <span className="inline-flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
-          <Home className="h-3 w-3" /> Contacto
+        <span className="inline-flex items-center gap-1.5 text-xs" title={c ? `${TIPO_CONTACTO_LABELS[c.tipo]} · ${c.subtipo || ''}` : undefined}>
+          <span
+            className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${color}20` }}
+          >
+            <Icon className="h-3 w-3" style={{ color }} />
+          </span>
+          <span className="font-medium truncate max-w-[150px]" style={{ color: theme.text }}>{nombre}</span>
         </span>
       );
     }
     const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
     const color = dep?.color || theme.primary;
     return (
-      <span
-        className="inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
-        style={{ backgroundColor: `${color}15`, color }}
-        title={dep?.nombre}
-      >
-        <Building2 className="h-3 w-3" />
-        <span className="truncate max-w-[140px]">{dep?.nombre || 'Secretaría'}</span>
+      <span className="inline-flex items-center gap-1.5 text-xs" title={dep?.nombre}>
+        <span
+          className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${color}20` }}
+        >
+          <Building2 className="h-3 w-3" style={{ color }} />
+        </span>
+        <span className="font-medium truncate max-w-[140px]" style={{ color: theme.text }}>{dep?.nombre || 'Secretaría'}</span>
       </span>
     );
   };
@@ -758,7 +771,22 @@ export default function Tesoreria() {
         {
           key: 'concepto',
           header: 'Concepto',
-          render: (g) => <span className="font-medium">{g.concepto}</span>,
+          render: (g) => {
+            const Icon = conceptoIcon(g.concepto);
+            const tipo = conceptoToTipoMap.get(g.concepto.toLowerCase());
+            const color = tipo?.color || theme.primary;
+            return (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${color}20` }}
+                >
+                  <Icon className="h-3 w-3" style={{ color }} />
+                </span>
+                <span className="font-medium">{g.concepto}</span>
+              </span>
+            );
+          },
           sortValue: (g) => g.concepto,
         },
         {
