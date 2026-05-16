@@ -303,12 +303,10 @@ export default function TesoreriaResumen() {
 
   return (
     <>
-      <div className="px-4 pt-3">
-        <TesoreriaHint titulo="Resumen" storageKey="resumen">
-          Mirá gasto por <b>mes</b> o <b>año</b> con las flechas ← →. Aplicá los filtros de arriba
-          para ver cuánto se gastó en cada rubro/contacto/dependencia. En modo "Año" cada mes se expande.
-        </TesoreriaHint>
-      </div>
+      <TesoreriaHint titulo="Resumen" storageKey="resumen">
+        Mirá gasto por <b>mes</b> o <b>año</b> con las flechas ← →. Aplicá los filtros de arriba
+        para ver cuánto se gastó en cada rubro/contacto/dependencia. En modo "Año" cada mes se expande.
+      </TesoreriaHint>
 
       <ABMPage
         title="Resumen"

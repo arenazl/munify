@@ -564,13 +564,11 @@ export default function TesoreriaMapa() {
 
   return (
     <>
-      <div className="px-4 pt-3">
-        <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
-          Cada casita es un contacto con ubicación cargada. Tocá un pin para
-          ver el detalle de los gastos. El tamaño del pin indica cuánto le
-          pagaste en total. Usá los filtros para acotar período y estado.
-        </TesoreriaHint>
-      </div>
+      <TesoreriaHint titulo="Mapa de Contactos" storageKey="mapa">
+        Cada casita es un contacto con ubicación cargada. Tocá un pin para
+        ver el detalle de los gastos. El tamaño del pin indica cuánto le
+        pagaste en total. Usá los filtros para acotar período y estado.
+      </TesoreriaHint>
 
       <ABMPage
         title="Mapa"

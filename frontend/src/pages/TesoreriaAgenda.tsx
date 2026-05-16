@@ -482,12 +482,10 @@ export default function TesoreriaAgenda() {
 
   return (
     <>
-      <div className="px-4 pt-3">
-        <TesoreriaHint titulo="Agenda de pagos" storageKey="agenda">
-          Programá pagos <b>recurrentes</b> (sueldos, honorarios, alquileres). El sistema te
-          recuerda cuándo toca pagar y con un click crea el gasto + descuenta la caja correspondiente.
-        </TesoreriaHint>
-      </div>
+      <TesoreriaHint titulo="Agenda de pagos" storageKey="agenda">
+        Programá pagos <b>recurrentes</b> (sueldos, honorarios, alquileres). El sistema te
+        recuerda cuándo toca pagar y con un click crea el gasto + descuenta la caja correspondiente.
+      </TesoreriaHint>
 
       <ABMPage
         title="Agenda"
