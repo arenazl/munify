@@ -1,10 +1,67 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
 import { KpiRow, KpiSpec } from './KpiCard';
 import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
+import { ModernSelect, type SelectOption } from './ModernSelect';
+
+// =====================================================================
+// Toolbar declarativo (API nueva, ver REINGENIERIA_ABMPAGE_TOOLBAR.md)
+// =====================================================================
+
+export interface ToolbarComboSpec {
+  /** Key estable (ej: 'categoria'). */
+  key: string;
+  /** Placeholder + label del item ''. */
+  placeholder: string;
+  /** Valor seleccionado (controlled). */
+  value: string;
+  onChange: (v: string) => void;
+  /** Opciones de ModernSelect. ABMPage agrega el item vacio. */
+  options: SelectOption[];
+  searchable?: boolean;
+  /** Si false, no se renderiza. */
+  visible?: boolean;
+  /** Ancho minimo (px). Default 180. */
+  minWidth?: number;
+}
+
+export interface ToolbarStatusPillsSpec {
+  value: string;
+  onChange: (v: string) => void;
+  items: Array<{
+    key: string;
+    label: string;
+    icon?: LucideIcon;
+    color: string;
+    count?: number;
+  }>;
+  /** Mostrar pill "Todos" outlined. Default true. */
+  showTodos?: boolean;
+  /** Count del "Todos". */
+  todosCount?: number;
+}
+
+export interface ToolbarActionSpec {
+  key: string;
+  label: string;
+  icon?: LucideIcon;
+  active?: boolean;
+  onClick: () => void;
+  title?: string;
+  visible?: boolean;
+}
+
+export interface AbmToolbar {
+  combos?: ToolbarComboSpec[];
+  statusPills?: ToolbarStatusPillsSpec;
+  actions?: ToolbarActionSpec[];
+  /** 'left' = todo pegado a la izquierda. 'split' = combos izq, pills der. Default 'left'. */
+  layout?: 'left' | 'split';
+}
 
 type ViewMode = 'cards' | 'table' | 'guided';
 
@@ -62,8 +119,14 @@ interface ABMPageProps {
   // Header actions - botones extra junto al toggle de vista (ej: ordenamiento)
   headerActions?: ReactNode;
 
-  // Secondary filters bar (opcional - barra completa debajo del header)
+  // Secondary filters bar (opcional - barra completa debajo del header).
+  // LEGACY: preferir `toolbar` declarativo.
   secondaryFilters?: ReactNode;
+
+  /** Toolbar declarativo. Si se pasa, ABMPage renderiza combos+pills+actions
+   *  de forma estandar y NO se usan `secondaryFilters` ni `headerActions`.
+   *  Las paginas viejas siguen con la API legacy. */
+  toolbar?: AbmToolbar;
 
   // Grid
   children: ReactNode;
@@ -173,6 +236,7 @@ export function ABMPage({
   filters,
   headerActions,
   secondaryFilters,
+  toolbar,
   children,
   emptyMessage = 'No se encontraron resultados',
   isEmpty = false,
@@ -276,15 +340,131 @@ export function ABMPage({
     return groups;
   })();
 
+  // -------------------------------------------------------------------
+  // Render del toolbar declarativo (combos + status pills + actions).
+  // Layout 'left': todo pegado a la izquierda en una fila.
+  // Layout 'split': combos a la izquierda, pills a la derecha (justify-between).
+  // Si toolbar.actions tiene items, van junto al toggle de vista (no aca).
+  // -------------------------------------------------------------------
+  const renderToolbarFilters = (): ReactNode => {
+    if (!toolbar) return null;
+    const { combos = [], statusPills, layout = 'left' } = toolbar;
+    const visibleCombos = combos.filter(c => c.visible !== false);
+    const hasPills = !!statusPills;
+    if (visibleCombos.length === 0 && !hasPills) return null;
+
+    return (
+      <div className={`flex flex-wrap items-center gap-2 ${layout === 'split' ? 'justify-between' : 'justify-start'}`}>
+        {visibleCombos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {visibleCombos.map(c => (
+              <div key={c.key} style={{ minWidth: c.minWidth || 180 }} className="flex-shrink-0">
+                <ModernSelect
+                  value={c.value}
+                  onChange={c.onChange}
+                  options={[{ value: '', label: c.placeholder }, ...c.options]}
+                  placeholder={c.placeholder}
+                  searchable={c.searchable !== false}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {hasPills && renderStatusPills(statusPills!)}
+      </div>
+    );
+  };
+
+  const renderStatusPills = (spec: ToolbarStatusPillsSpec): ReactNode => {
+    const { value, onChange, items, showTodos = true, todosCount } = spec;
+    const totalCount = todosCount != null
+      ? todosCount
+      : items.reduce((acc, it) => acc + (it.count || 0), 0);
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {showTodos && (
+          <button
+            onClick={() => onChange('')}
+            className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
+            style={{
+              backgroundColor: value === '' ? `${theme.primary}15` : 'transparent',
+              border: `1px solid ${value === '' ? theme.primary : theme.border}`,
+              color: value === '' ? theme.primary : theme.textSecondary,
+            }}
+          >
+            Todos {totalCount > 0 && <span className="opacity-70">({totalCount})</span>}
+          </button>
+        )}
+        {items.map(it => {
+          const active = it.key === value;
+          const hasItems = (it.count || 0) > 0;
+          const Icon = it.icon;
+          return (
+            <button
+              key={it.key}
+              onClick={() => onChange(it.key)}
+              className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
+              style={{
+                backgroundColor: active ? `${it.color}20` : 'transparent',
+                border: `1px solid ${active ? it.color : theme.border}`,
+                color: active ? it.color : (hasItems ? theme.text : theme.textSecondary),
+                opacity: hasItems ? 1 : 0.45,
+              }}
+              title={it.label}
+            >
+              {Icon && <Icon className="h-3 w-3" />}
+              {it.label}
+              {hasItems && <span className="opacity-70">({it.count})</span>}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderToolbarActions = (): ReactNode => {
+    if (!toolbar?.actions || toolbar.actions.length === 0) return null;
+    return (
+      <div className="flex items-center gap-1.5">
+        {toolbar.actions.filter(a => a.visible !== false).map(a => {
+          const Icon = a.icon;
+          return (
+            <button
+              key={a.key}
+              onClick={a.onClick}
+              title={a.title || a.label}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: a.active ? `${theme.primary}15` : theme.backgroundSecondary,
+                border: `1px solid ${a.active ? theme.primary : theme.border}`,
+                color: a.active ? theme.primary : theme.textSecondary,
+              }}
+            >
+              {Icon && <Icon className="h-3 w-3" />}
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Si se pasa `toolbar`, sobreescribe a `headerActions` y `secondaryFilters`.
+  const effectiveHeaderActions = toolbar ? renderToolbarActions() : headerActions;
+  const effectiveSecondaryFilters = toolbar ? renderToolbarFilters() : secondaryFilters;
+
   return (
     <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y' }}>
       {/* KPIs (opt-in). Si es un array de KpiSpec, lo renderizamos con KpiRow
           (look outlined estandar, hard-limit 4). Si es un ReactNode arma JSX
-          libre. */}
+          libre. Se wrappea con el mismo padding-x que usa el sticky header,
+          asi quedan visualmente alineados al toolbar del ABM (no full-bleed). */}
       {kpis && (
-        Array.isArray(kpis)
-          ? <KpiRow kpis={kpis as KpiSpec[]} />
-          : <div>{kpis}</div>
+        <div className="px-3 sm:px-6 lg:px-8 -mx-3 sm:-mx-6 lg:-mx-8">
+          {Array.isArray(kpis)
+            ? <KpiRow kpis={kpis as KpiSpec[]} />
+            : <div>{kpis}</div>}
+        </div>
       )}
 
       {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
@@ -296,11 +476,11 @@ export function ABMPage({
       >
         {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
         <div
-          className={`px-5 py-3 relative overflow-hidden ${secondaryFilters ? 'rounded-t-xl' : 'rounded-xl'}`}
+          className={`px-5 py-3 relative overflow-hidden ${effectiveSecondaryFilters ? 'rounded-t-xl' : 'rounded-xl'}`}
           style={{
             backgroundColor: theme.card,
             border: `1px solid ${theme.border}`,
-            borderBottom: secondaryFilters ? 'none' : `1px solid ${theme.border}`,
+            borderBottom: effectiveSecondaryFilters ? 'none' : `1px solid ${theme.border}`,
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
@@ -437,8 +617,8 @@ export function ABMPage({
 
           {/* Contenedor para headerActions + Botón Nuevo - siempre juntos */}
           <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
-            {/* Header Actions (ordenamiento, etc) */}
-            {headerActions}
+            {/* Header Actions (ordenamiento, etc). Si hay toolbar, usa sus actions. */}
+            {effectiveHeaderActions}
 
             {/* Botón agregar */}
             {onAdd && buttonLabel && (
@@ -509,7 +689,7 @@ export function ABMPage({
             Wrapper responsive: horizontal-scroll si no entra, scrollbar oculto.
             Esto previene el bug de chips/combos apilados verticalmente en tablet/mobile
             cuando una pagina pone `flex-wrap` adentro. */}
-        {secondaryFilters && (
+        {effectiveSecondaryFilters && (
           <div
             className="rounded-b-xl p-2.5 abm-secondary-filters-wrap"
             style={{
@@ -565,7 +745,7 @@ export function ABMPage({
                 }
               }
             `}</style>
-            {secondaryFilters}
+            {effectiveSecondaryFilters}
           </div>
         )}
       </div>
