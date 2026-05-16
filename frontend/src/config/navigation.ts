@@ -186,7 +186,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/tesoreria',
       icon: Receipt,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Finanzas',
+      categoria: 'Tesorería',
       description: 'Control de gastos del municipio'
     },
     {

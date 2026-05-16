@@ -18,6 +18,7 @@ import {
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
 import { StatusPill } from '../components/ui/StatusPill';
+import { primaryButtonStyle } from '../components/ui/PrimaryButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
@@ -624,48 +625,28 @@ export default function Tesoreria() {
     customAtEnd: [estadoChips],
   };
 
-  // Accesos rápidos como headerActions
+  // Accesos rapidos como headerActions. Look canonico: gradient ghost del
+  // acento del tema (primaryButtonStyle 'ghost' = tinta sutil + border 30).
+  const ghostStyle = primaryButtonStyle('ghost', theme.primary, theme.primaryHover, theme.card, theme.text, theme.border);
+  const ghostClass = "inline-flex items-center gap-2 h-[34px] px-3 rounded-lg text-[12px] font-semibold transition-all hover:scale-105 hover:-translate-y-0.5 active:scale-95";
   const headerActions = (
     <>
-      <Link
-        to="/gestion/tesoreria/contactos"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
+      <Link to="/gestion/tesoreria/agenda" className={ghostClass} style={ghostStyle}>
+        <CalendarClock className="h-3.5 w-3.5" /> Pagos
+      </Link>
+      <Link to="/gestion/tesoreria/contactos" className={ghostClass} style={ghostStyle}>
         <Users className="h-3.5 w-3.5" /> Contactos
       </Link>
-      <Link
-        to="/gestion/configuracion/tesoreria"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
-        <Briefcase className="h-3.5 w-3.5" /> Proyectos
+      <Link to="/gestion/tesoreria/mapa" className={ghostClass} style={ghostStyle}>
+        <MapIcon className="h-3.5 w-3.5" /> Ubicación
       </Link>
-      <Link
-        to="/gestion/tesoreria/agenda"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
-        <CalendarClock className="h-3.5 w-3.5" /> Agenda
-      </Link>
-      <Link
-        to="/gestion/tesoreria/mapa"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
-        <MapIcon className="h-3.5 w-3.5" /> Mapa
-      </Link>
-      <Link
-        to="/gestion/tesoreria/proyecciones"
-        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02]"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-      >
-        <TrendingUp className="h-3.5 w-3.5" /> Resumen
+      <Link to="/gestion/tesoreria/proyecciones" className={ghostClass} style={ghostStyle}>
+        <TrendingUp className="h-3.5 w-3.5" /> Proyección
       </Link>
       <Link
         to="/gestion/configuracion/tesoreria"
-        className="inline-flex items-center justify-center w-9 h-9 rounded-xl transition-all hover:scale-105 hover:rotate-45"
-        style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
+        className="inline-flex items-center justify-center w-9 h-9 rounded-lg transition-all hover:scale-105 hover:rotate-45"
+        style={ghostStyle}
         title="Configuración de Tesorería"
       >
         <Settings className="h-4 w-4" />
@@ -1167,33 +1148,38 @@ export default function Tesoreria() {
       {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes.
           Margen vertical generoso para separarlo del hint y del header. */}
       {dudosos.count > 0 && (
-        <div className="my-4">
-          <Link
-            to="/gestion/tesoreria/curacion-bartolo"
-            className="block rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{
-              backgroundColor: `${theme.primary}10`,
-              border: `1px solid ${theme.primary}30`,
-            }}
-          >
-            <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: theme.primary }}>
-                <Sparkles className="h-5 w-5" style={{ color: theme.primaryText || '#ffffff' }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold" style={{ color: theme.text }}>
-                  {dudosos.count} gastos importados pendientes de revisar
-                </p>
-                <p className="text-xs" style={{ color: theme.textSecondary }}>
-                  La IA los clasificó como "Compras/Otros varios" · Total: ${dudosos.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </p>
-              </div>
-              <span className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap" style={{ backgroundColor: theme.primary, color: theme.primaryText || '#ffffff' }}>
-                Revisar →
-              </span>
+        <Link
+          to="/gestion/tesoreria/curacion-bartolo"
+          className="relative block mb-4 overflow-hidden rounded-xl shadow-sm transition-all hover:-translate-y-0.5"
+          style={{
+            background: `linear-gradient(135deg, ${theme.primary}12 0%, ${theme.primary}06 60%, ${theme.card} 100%)`,
+            border: `1px solid ${theme.primary}30`,
+          }}
+        >
+          <div className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: theme.primary }} />
+          <div className="p-4 flex items-start gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+              style={{ backgroundColor: `${theme.primary}25`, color: theme.primary }}
+            >
+              <Sparkles className="h-5 w-5" />
             </div>
-          </Link>
-        </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-base mb-1" style={{ color: theme.text }}>
+                {dudosos.count} gastos importados pendientes de revisar
+              </h3>
+              <div className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
+                La IA los clasificó como "Compras/Otros varios" · Total: ${dudosos.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <span
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap flex-shrink-0"
+              style={{ backgroundColor: `${theme.primary}20`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+            >
+              Revisar →
+            </span>
+          </div>
+        </Link>
       )}
 
       <ABMPage

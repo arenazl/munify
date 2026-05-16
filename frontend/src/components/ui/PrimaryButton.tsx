@@ -21,7 +21,7 @@ const GRADIENT_ANGLE = '135deg';
 const SHADOW_OPACITY = '40'; // hex ~25%
 const RIPPLE_OPACITY = '30';
 
-type Variant = 'primary' | 'success' | 'danger' | 'warning';
+type Variant = 'primary' | 'success' | 'danger' | 'warning' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface PrimaryButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style'> {
@@ -33,7 +33,7 @@ interface PrimaryButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   fullWidth?: boolean;
 }
 
-const VARIANT_COLORS: Record<Exclude<Variant, 'primary'>, { base: string; hover: string }> = {
+const VARIANT_COLORS: Record<Exclude<Variant, 'primary' | 'ghost'>, { base: string; hover: string }> = {
   success: { base: '#10b981', hover: '#059669' },
   danger:  { base: '#ef4444', hover: '#dc2626' },
   warning: { base: '#f59e0b', hover: '#d97706' },
@@ -51,19 +51,31 @@ export function resolvePrimaryColors(
   themePrimary: string,
   themePrimaryHover: string | undefined,
 ): { base: string; hover: string } {
-  if (variant === 'primary') {
+  if (variant === 'primary' || variant === 'ghost') {
     return { base: themePrimary, hover: themePrimaryHover || themePrimary };
   }
   return VARIANT_COLORS[variant];
 }
 
 /** Estilo canonico del boton de accion principal. Reutilizable si una pagina
- *  arma un boton custom y quiere el mismo look sin importar el componente. */
+ *  arma un boton custom y quiere el mismo look sin importar el componente.
+ *  Variant 'ghost' = look neutro con tinta sutil del acento (para navegacion
+ *  secundaria: tabs, links, accesos rapidos). */
 export function primaryButtonStyle(
   variant: Variant,
   themePrimary: string,
   themePrimaryHover: string | undefined,
+  themeCard?: string,
+  themeText?: string,
+  themeBorder?: string,
 ): CSSProperties {
+  if (variant === 'ghost') {
+    return {
+      background: `linear-gradient(${GRADIENT_ANGLE}, ${themePrimary}12 0%, ${themeCard || 'transparent'} 100%)`,
+      color: themeText || '#ffffff',
+      border: `1px solid ${themeBorder || themePrimary}30`,
+    };
+  }
   const { base, hover } = resolvePrimaryColors(variant, themePrimary, themePrimaryHover);
   return {
     background: `linear-gradient(${GRADIENT_ANGLE}, ${base} 0%, ${hover} 100%)`,
@@ -98,7 +110,7 @@ export function PrimaryButton({
         ${fullWidth ? 'w-full' : ''}
         ${className}
       `}
-      style={primaryButtonStyle(variant, theme.primary, theme.primaryHover)}
+      style={primaryButtonStyle(variant, theme.primary, theme.primaryHover, theme.card, theme.text, theme.border)}
     >
       {/* Ripple horizontal al hover (gloss) */}
       <span
