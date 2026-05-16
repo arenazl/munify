@@ -310,8 +310,11 @@ export default function Tesoreria() {
       if (conceptoFiltro && g.concepto.toLowerCase() !== conceptoFiltro.toLowerCase()) return false;
       if (estadoFiltro && calcEstadoAgregado(g) !== estadoFiltro) return false;
       if (s) {
+        const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+        const contactoStr = c ? `${c.nombre || ''} ${c.apellido || ''}`.trim().toLowerCase() : '';
         const hay = g.concepto.toLowerCase().includes(s)
-          || (g.descripcion?.toLowerCase().includes(s) ?? false);
+          || (g.descripcion?.toLowerCase().includes(s) ?? false)
+          || (contactoStr && contactoStr.includes(s));
         if (!hay) return false;
       }
       return true;
@@ -705,7 +708,7 @@ export default function Tesoreria() {
         },
         {
           key: 'destino',
-          header: 'Destino',
+          header: 'Contacto',
           render: renderDestino,
           sortable: false,
         },
@@ -1129,7 +1132,7 @@ export default function Tesoreria() {
         icon={<Wallet className="h-5 w-5" />}
         buttonLabel="Nuevo Gasto"
         onAdd={() => setWizardOpen(true)}
-        searchPlaceholder="Buscar por concepto o descripción..."
+        searchPlaceholder="Buscar por concepto, contacto o descripción..."
         searchValue={search}
         onSearchChange={setSearch}
         secondaryFilters={secondaryFilters}

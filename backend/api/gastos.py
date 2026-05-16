@@ -253,10 +253,13 @@ def _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependen
         query = query.where(Gasto.concepto == concepto)
     if search and search.strip():
         s = f"%{search.strip()}%"
-        query = query.where(or_(
+        # outerjoin a Contacto para poder matchear nombre/apellido del destinatario.
+        query = query.outerjoin(Contacto, Gasto.destino_contacto_id == Contacto.id).where(or_(
             Gasto.concepto.ilike(s),
             Gasto.descripcion.ilike(s),
             Gasto.observaciones.ilike(s),
+            Contacto.nombre.ilike(s),
+            Contacto.apellido.ilike(s),
         ))
     if desde:
         query = query.where(Gasto.fecha >= desde)
