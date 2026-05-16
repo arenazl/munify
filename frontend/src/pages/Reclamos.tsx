@@ -2929,32 +2929,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       sortValue: (r: Reclamo) => r.estado,
       render: (r: Reclamo) => {
         const color = estadoColors[r.estado]?.bg || '#6366f1';
-        // Detectar actividad reciente: updated_at > created_at por más de 1 minuto
-        const tieneActividadReciente = r.updated_at &&
-          new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000;
-        return (
-          <div className="flex items-center gap-2">
-            <StatusPill label={estadoLabels[r.estado]} color={color} />
-            {tieneActividadReciente && (() => {
-              const vecinoRechazo = r.confirmado_vecino === false;
-              const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
-              return (
-                <span
-                  className="w-5 h-5 rounded-md inline-flex items-center justify-center"
-                  style={{
-                    backgroundColor: `${bg}18`,
-                    border: `1px solid ${bg}40`,
-                  }}
-                  title={vecinoRechazo
-                    ? 'El vecino marcó que el problema NO se solucionó'
-                    : 'Actividad reciente'}
-                >
-                  <MessageCircle className="h-3 w-3" style={{ color: bg }} />
-                </span>
-              );
-            })()}
-          </div>
-        );
+        return <StatusPill label={estadoLabels[r.estado]} color={color} />;
       },
     },
     {
@@ -3057,6 +3032,33 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             style={{ color, backgroundColor: bg }}
           >
             {texto}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'actividad',
+      header: '',
+      sortable: false,
+      className: 'text-center',
+      render: (r: Reclamo) => {
+        const tieneActividadReciente = r.updated_at &&
+          new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000;
+        if (!tieneActividadReciente) return null;
+        const vecinoRechazo = r.confirmado_vecino === false;
+        const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
+        return (
+          <span
+            className="w-5 h-5 rounded-md inline-flex items-center justify-center mx-auto"
+            style={{
+              backgroundColor: `${bg}18`,
+              border: `1px solid ${bg}40`,
+            }}
+            title={vecinoRechazo
+              ? 'El vecino marcó que el problema NO se solucionó'
+              : 'Actividad reciente'}
+          >
+            <MessageCircle className="h-3 w-3" style={{ color: bg }} />
           </span>
         );
       },
