@@ -96,8 +96,10 @@ export function RevisionIAPanel({
   // Collapse persistido en localStorage. Default expandido.
   // Cuando esta colapsado, el panel se vuelve una barra vertical fina
   // pegada a la DERECHA (solo icono + count rotado).
+  // Default: arranca COLAPSADO. Solo se abre cuando el user clickea la barra.
+  // Si quiso abrirlo en sesion previa, restauramos.
   const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
+    try { return localStorage.getItem('revision_ia_collapsed') !== '0'; } catch { return true; }
   });
   useEffect(() => { onCollapsedChange?.(collapsed); }, [collapsed, onCollapsedChange]);
   const toggle = () => {

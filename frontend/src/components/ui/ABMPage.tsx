@@ -895,8 +895,8 @@ export function ABMPage({
           {/* Panel lateral derecho (solo desktop lg+). */}
           {sidePanel && (
             <aside
-              className="hidden lg:block flex-shrink-0"
-              style={{ width: sidePanelWidth }}
+              className="hidden lg:block flex-shrink-0 self-start"
+              style={{ width: sidePanelWidth, position: 'sticky', top: 0 }}
             >
               {sidePanel}
             </aside>
