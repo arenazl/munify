@@ -4376,183 +4376,63 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           />
         ) : undefined}
         sidePanelWidth={iaCollapsed ? 48 : 280}
-        headerActions={
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setOrdenamiento('reciente')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-              style={{
-                backgroundColor: ordenamiento === 'reciente' ? `${theme.primary}15` : theme.backgroundSecondary,
-                border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
-                color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
-              }}
-            >
-              <ArrowUpDown className="h-3 w-3" />
-              Más recientes
-            </button>
-            <button
-              onClick={() => setOrdenamiento('programado')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-              style={{
-                backgroundColor: ordenamiento === 'programado' ? `${theme.primary}15` : theme.backgroundSecondary,
-                border: `1px solid ${ordenamiento === 'programado' ? theme.primary : theme.border}`,
-                color: ordenamiento === 'programado' ? theme.primary : theme.textSecondary,
-              }}
-            >
-              <Calendar className="h-3 w-3" />
-              Por vencer
-            </button>
-            <button
-              type="button"
-              onClick={toggleVista}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-              style={{
-                backgroundColor: vistaInbox ? `${theme.primary}15` : theme.backgroundSecondary,
-                border: `1px solid ${vistaInbox ? theme.primary : theme.border}`,
-                color: vistaInbox ? theme.primary : theme.textSecondary,
-              }}
-              title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
-            >
-              {vistaInbox ? <LayoutList className="h-3 w-3" /> : <LayoutGrid className="h-3 w-3" />}
-              {vistaInbox ? 'Vista clásica' : 'Vista guiada'}
-            </button>
-          </div>
-        }
         stickyHeader={true}
-        secondaryFilters={
-          // Una sola fila: todo PEGADO a la izquierda (combos + pills).
-          // Patron canonico de la APP_GUIDE master.
-          <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-start">
-            {/* Combos: Categoria + Dependencia (si supervisor) */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="min-w-[180px]">
-                <ModernSelect
-                  value={filtroCategoria === null ? '' : String(filtroCategoria)}
-                  onChange={(v) => {
-                    setFilterLoading(v ? `cat-${v}` : 'cat-all');
-                    setFiltroCategoria(v ? parseInt(v, 10) : null);
-                  }}
-                  options={[
-                    { value: '', label: 'Categorías' },
-                    ...categorias
-                      .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
-                      .map(cat => ({
-                        value: String(cat.id),
-                        label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
-                        color: cat.color || DEFAULT_CATEGORY_COLOR,
-                      })),
-                  ]}
-                  placeholder="Categorías"
-                  searchable
-                />
-              </div>
-              {/* Dependencia — admin o supervisor, oculto si modo dependencia (soloMiArea) */}
-              {(user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea && (
-                <div className="min-w-[180px]">
-                  <ModernSelect
-                    value={filtroDependencia === null ? '' : String(filtroDependencia)}
-                    onChange={(v) => {
-                      setFilterLoading(v ? `dep-${v}` : 'dep-all');
-                      setFiltroDependencia(v ? parseInt(v, 10) : null);
-                    }}
-                    options={[
-                      { value: '', label: 'Dependencias' },
-                      ...dependenciasDisponibles
-                        .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
-                        .map(dep => ({
-                          value: String(dep.id),
-                          label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
-                          color: dep.color || '#6366f1',
-                        })),
-                    ]}
-                    placeholder="Dependencias"
-                    searchable
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Estados — status pills a la derecha */}
-            <div className="flex gap-1 items-center">
-              {/* Botón Todos fijo - outlined */}
-              <button
-                onClick={() => {
-                  setFilterLoading('estado-');
-                  setFiltroEstado('');
-                }}
-                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
-                style={{
-                  background: 'transparent',
-                  border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
-                }}
-              >
-                <Eye className={`h-3 w-3 ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }} />
-                <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
-                  Todos
-                </span>
-                <span className={`text-[9px] font-bold ${filterLoading === 'estado-' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroEstado === '' ? theme.primary : theme.textSecondary }}>
-                  {Object.values(conteosEstados).reduce((a, b) => a + b, 0)}
-                </span>
-              </button>
-
-              {/* Chips de estados — wrap si no entran en el ancho */}
-              <div className="flex flex-wrap gap-1 pb-1 flex-1 min-w-0">
-              {/* Lista fija de estados canónicos. Los counts vienen de
-                  `conteosEstados` y pueden ser 0 (sin skeleton falso). */}
-              {(
-                [
-                  // 1-a-1 con los 5 estados activos de EstadoReclamo (backend/models/enums.py).
-                  // Los counts de los legacy se mergean en su sucesor activo:
-                  //   nuevo + asignado -> recibido
-                  //   en_proceso + pendiente_confirmacion -> en_curso
-                  //   resuelto -> finalizado
-                  { key: 'recibido', label: 'Recib.', icon: Inbox, color: estadoColors.recibido.bg, count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
-                  { key: 'en_curso', label: 'Curso', icon: Play, color: estadoColors.en_curso.bg, count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
-                  { key: 'finalizado', label: 'Final.', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
-                  { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
-                  { key: 'rechazado', label: 'Rech.', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
-                ] as const
-              ).map((estado) => {
-                  const Icon = estado.icon;
-                  const isActive = filtroEstado === estado.key;
-                  const isLoadingThis = filterLoading === `estado-${estado.key}`;
-                  return (
-                    <button
-                      key={estado.key}
-                      onClick={() => {
-                        setFilterLoading(`estado-${estado.key}`);
-                        setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
-                      }}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
-                      style={{
-                        background: isActive ? estado.color : `${estado.color}15`,
-                        border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
-                      }}
-                    >
-                      <Icon
-                        className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                        style={{ color: isActive ? '#ffffff' : estado.color }}
-                      />
-                      <span
-                        className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                        style={{ color: isActive ? '#ffffff' : estado.color }}
-                      >
-                        {estado.label}
-                      </span>
-                      <span
-                        className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                        style={{ color: isActive ? '#ffffff' : estado.color }}
-                      >
-                        {estado.count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-          </div>
-        }
+        toolbar={{
+          combos: [
+            {
+              key: 'categoria',
+              placeholder: 'Categorías',
+              value: filtroCategoria === null ? '' : String(filtroCategoria),
+              onChange: (v) => {
+                setFilterLoading(v ? `cat-${v}` : 'cat-all');
+                setFiltroCategoria(v ? parseInt(v, 10) : null);
+              },
+              options: categorias
+                .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
+                .map(cat => ({
+                  value: String(cat.id),
+                  label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
+                  color: cat.color || DEFAULT_CATEGORY_COLOR,
+                })),
+              searchable: true,
+            },
+            {
+              key: 'dependencia',
+              placeholder: 'Dependencias',
+              value: filtroDependencia === null ? '' : String(filtroDependencia),
+              onChange: (v) => {
+                setFilterLoading(v ? `dep-${v}` : 'dep-all');
+                setFiltroDependencia(v ? parseInt(v, 10) : null);
+              },
+              options: dependenciasDisponibles
+                .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
+                .map(dep => ({
+                  value: String(dep.id),
+                  label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
+                  color: dep.color || '#6366f1',
+                })),
+              searchable: true,
+              visible: (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea,
+            },
+          ],
+          statusPills: {
+            value: filtroEstado,
+            onChange: (v) => { setFilterLoading(`estado-${v}`); setFiltroEstado(v); },
+            items: [
+              { key: 'recibido', label: 'Recibidos', icon: Inbox, color: estadoColors.recibido.bg, count: (conteosEstados['recibido'] || 0) + (conteosEstados['nuevo'] || 0) + (conteosEstados['asignado'] || 0) },
+              { key: 'en_curso', label: 'En curso', icon: Play, color: estadoColors.en_curso.bg, count: (conteosEstados['en_curso'] || 0) + (conteosEstados['en_proceso'] || 0) + (conteosEstados['pendiente_confirmacion'] || 0) },
+              { key: 'finalizado', label: 'Finalizados', icon: CheckCircle, color: estadoColors.finalizado.bg, count: (conteosEstados['finalizado'] || 0) + (conteosEstados['resuelto'] || 0) },
+              { key: 'pospuesto', label: 'Pospuestos', icon: PauseCircle, color: estadoColors.pospuesto.bg, count: conteosEstados['pospuesto'] || 0 },
+              { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: estadoColors.rechazado.bg, count: conteosEstados['rechazado'] || 0 },
+            ],
+          },
+          actions: [
+            { key: 'reciente', label: 'Más recientes', icon: ArrowUpDown, active: ordenamiento === 'reciente', onClick: () => setOrdenamiento('reciente') },
+            { key: 'programado', label: 'Por vencer', icon: Calendar, active: ordenamiento === 'programado', onClick: () => setOrdenamiento('programado') },
+            { key: 'vista', label: vistaInbox ? 'Vista clásica' : 'Vista guiada', icon: vistaInbox ? LayoutList : LayoutGrid, active: vistaInbox, onClick: toggleVista, title: vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada' },
+          ],
+          layout: 'left',
+        }}
         pagination={{
           page: pageClient,
           pageSize: pageSizeClient,

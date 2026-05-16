@@ -1688,35 +1688,58 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         guidedView={inboxView}
         onViewModeChange={(m) => setVistaInbox(m === 'guided')}
         stickyHeader={true}
-        headerActions={
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setOrdenamiento('reciente')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-              style={{
-                backgroundColor: ordenamiento === 'reciente' ? `${theme.primary}15` : theme.backgroundSecondary,
-                border: `1px solid ${ordenamiento === 'reciente' ? theme.primary : theme.border}`,
-                color: ordenamiento === 'reciente' ? theme.primary : theme.textSecondary,
-              }}
-            >
-              <ArrowUpDown className="h-3 w-3" />
-              Más recientes
-            </button>
-            <button
-              onClick={() => setOrdenamiento('por_vencer')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
-              style={{
-                backgroundColor: ordenamiento === 'por_vencer' ? `${theme.primary}15` : theme.backgroundSecondary,
-                border: `1px solid ${ordenamiento === 'por_vencer' ? theme.primary : theme.border}`,
-                color: ordenamiento === 'por_vencer' ? theme.primary : theme.textSecondary,
-              }}
-            >
-              <Calendar className="h-3 w-3" />
-              Por vencer
-            </button>
-          </div>
-        }
-        secondaryFilters={renderSecondaryFilters()}
+        toolbar={{
+          combos: [
+            {
+              key: 'tipo',
+              placeholder: 'Categorías',
+              value: filtroTipo === null ? '' : String(filtroTipo),
+              onChange: (v) => {
+                setFilterLoading(v ? `tipo-${v}` : 'tipo-all');
+                setFiltroTipo(v ? parseInt(v, 10) : null);
+              },
+              options: tipos.filter(t => t.activo).map(tipo => {
+                const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
+                return {
+                  value: String(tipo.id),
+                  label: `${tipo.nombre} (${conteo})`,
+                  color: tipo.color || theme.primary,
+                };
+              }),
+              searchable: true,
+            },
+            {
+              key: 'dependencia',
+              placeholder: 'Dependencias',
+              value: filtroDependencia === null ? '' : String(filtroDependencia),
+              onChange: (v) => setFiltroDependencia(v ? parseInt(v, 10) : null),
+              options: dependenciasOpts.map(d => ({
+                value: String(d.id),
+                label: d.nombre,
+                color: d.color || '#6366f1',
+              })),
+              searchable: true,
+              visible: (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea,
+            },
+          ],
+          statusPills: {
+            value: filtroEstado,
+            onChange: (v) => { setFilterLoading(`estado-${v}`); setFiltroEstado(v); },
+            items: [
+              { key: 'recibido', label: 'Recibidos', icon: Inbox, color: '#3b82f6', count: (conteosEstados['recibido'] || 0) + (conteosEstados['iniciado'] || 0) + (conteosEstados['INICIADO'] || 0) },
+              { key: 'pendiente_pago', label: 'Pago', icon: CreditCard, color: '#f59e0b', count: conteosEstados['pendiente_pago'] || 0 },
+              { key: 'en_curso', label: 'En curso', icon: Play, color: '#0ea5e9', count: conteosEstados['en_curso'] || 0 },
+              { key: 'finalizado', label: 'Finalizados', icon: CheckCircle2, color: '#10b981', count: conteosEstados['finalizado'] || 0 },
+              { key: 'pospuesto', label: 'Pospuestos', icon: PauseCircle, color: '#6b7280', count: conteosEstados['pospuesto'] || 0 },
+              { key: 'rechazado', label: 'Rechazados', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
+            ],
+          },
+          actions: [
+            { key: 'reciente', label: 'Más recientes', icon: ArrowUpDown, active: ordenamiento === 'reciente', onClick: () => setOrdenamiento('reciente') },
+            { key: 'por_vencer', label: 'Por vencer', icon: Calendar, active: ordenamiento === 'por_vencer', onClick: () => setOrdenamiento('por_vencer') },
+          ],
+          layout: 'left',
+        }}
         tableView={renderTableView()}
         sidePanel={!soloMiArea ? (
           <RevisionIAPanel
