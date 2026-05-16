@@ -50,6 +50,9 @@ export interface SelectOption {
   icon?: ReactNode;
   description?: string;
   color?: string;
+  /** Si true, la opcion se muestra en negrita y a opacidad full (tiene elementos
+   *  en el dataset actual). Las que no, quedan font-medium y atenuadas. */
+  emphasized?: boolean;
 }
 
 interface ModernSelectProps {
@@ -346,8 +349,13 @@ export function ModernSelect({
                     )}
                     <div className="min-w-0 flex-1">
                       <span
-                        className={`block truncate leading-tight ${isSelected ? 'font-semibold' : 'font-medium'}`}
-                        style={{ color: option.color || theme.text }}
+                        className={`block truncate leading-tight ${
+                          isSelected ? 'font-semibold' : option.emphasized ? 'font-bold' : 'font-medium'
+                        }`}
+                        style={{
+                          color: option.color || theme.text,
+                          opacity: option.emphasized === false ? 0.45 : 1,
+                        }}
                       >
                         {option.label}
                       </span>

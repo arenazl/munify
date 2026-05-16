@@ -416,43 +416,98 @@ export default function Tesoreria() {
     setTimeout(() => setGastoSeleccionado(null), 400);
   };
 
+  // Orden de aparicion en la grilla (gastos): para cada combo, mapeamos value -> primer
+  // indice donde aparece. Las opciones presentes se ordenan por ese indice (las que
+  // tienen elementos primero, en orden de la grilla); las que no aparecen, al final.
+  const ordering = useMemo(() => {
+    const tipoContacto = new Map<string, number>();
+    const subtipoEmpleado = new Map<string, number>();
+    const dependencia = new Map<string, number>();
+    // tipoConcepto: keyed por nombre (los TC options usan id como value, asi que
+    // construyo un set por id->nombre y mapeo por nombre cuando comparo).
+    const tipoConceptoByNombre = new Map<string, number>();
+    const concepto = new Map<string, number>();
+    gastos.forEach((g, idx) => {
+      // Concepto
+      const cKey = (g.concepto || '').toLowerCase();
+      if (cKey && !concepto.has(cKey)) concepto.set(cKey, idx);
+      // Tipo concepto (via map concepto->tipo)
+      const tc = conceptoToTipoMap.get(cKey);
+      if (tc && tc.nombre && !tipoConceptoByNombre.has(tc.nombre.toLowerCase())) {
+        tipoConceptoByNombre.set(tc.nombre.toLowerCase(), idx);
+      }
+      // Dependencia
+      if (g.destino_tipo === 'dependencia' && g.destino_dependencia_id) {
+        const k = String(g.destino_dependencia_id);
+        if (!dependencia.has(k)) dependencia.set(k, idx);
+      }
+      // Tipo de contacto + subtipo
+      if (g.destino_tipo === 'contacto' && g.destino_contacto_id) {
+        const c = contactosMap.get(g.destino_contacto_id);
+        if (c) {
+          if (!tipoContacto.has(c.tipo)) tipoContacto.set(c.tipo, idx);
+          if (c.subtipo && !subtipoEmpleado.has(c.subtipo)) subtipoEmpleado.set(c.subtipo, idx);
+        }
+      }
+    });
+    return { tipoContacto, subtipoEmpleado, dependencia, tipoConceptoByNombre, concepto };
+  }, [gastos, contactosMap, conceptoToTipoMap]);
+
+  // Helper: ordena options no-vacios por presencia en grilla, marca emphasized.
+  // value '' (placeholder) siempre va primero sin emphasis.
+  function sortByPresence<T extends { value: string; label: string; color?: string }>(
+    items: T[],
+    order: Map<string, number>,
+  ): Array<T & { emphasized?: boolean }> {
+    return items.map(it => {
+      const idx = order.get(it.value.toLowerCase()) ?? order.get(it.value);
+      return { ...it, emphasized: idx != null, _idx: idx ?? Number.POSITIVE_INFINITY };
+    }).sort((a, b) => a._idx - b._idx).map(({ _idx, ...rest }) => rest as T & { emphasized?: boolean });
+  }
+
   // Opciones de tipo de contacto
-  const tipoContactoOptions = useMemo(() => ([
-    { value: '', label: 'Contactos' },
-    ...(Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(tc => ({
+  const tipoContactoOptions = useMemo(() => {
+    const items = (Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(tc => ({
       value: tc,
       label: TIPO_CONTACTO_LABELS[tc],
       color: TIPO_CONTACTO_COLORS[tc],
-    })),
-  ]), []);
+    }));
+    return [{ value: '', label: 'Contactos' }, ...sortByPresence(items, ordering.tipoContacto)];
+  }, [ordering.tipoContacto]);
 
   // Opciones de subtipo de empleado (usa el catalogo si existe)
   const subtipoEmpleadoOptions = useMemo(() => {
     const items = tiposEmpleado.length > 0
       ? tiposEmpleado.map(t => ({ value: t.nombre, label: t.nombre, color: t.color || undefined }))
       : subtiposEmpleado.map(s => ({ value: s, label: s, color: undefined as string | undefined }));
-    return [{ value: '', label: 'Empleados' }, ...items];
-  }, [tiposEmpleado, subtiposEmpleado]);
+    return [{ value: '', label: 'Empleados' }, ...sortByPresence(items, ordering.subtipoEmpleado)];
+  }, [tiposEmpleado, subtiposEmpleado, ordering.subtipoEmpleado]);
 
-  // Opciones de tipo de concepto (desde el catalogo per-muni)
-  const tipoConceptoOptions = useMemo(() => ([
-    { value: '', label: 'Tipos' },
-    ...tiposConcepto.map(t => ({
-      value: String(t.id),
-      label: t.nombre,
-      color: t.color || undefined,
-    })),
-  ]), [tiposConcepto]);
+  // Opciones de tipo de concepto (desde el catalogo per-muni). Como aca el value
+  // es el id pero el ordering es por nombre, hacemos el match manual.
+  const tipoConceptoOptions = useMemo(() => {
+    const items = tiposConcepto.map(t => {
+      const idx = ordering.tipoConceptoByNombre.get((t.nombre || '').toLowerCase());
+      return {
+        value: String(t.id),
+        label: t.nombre,
+        color: t.color || undefined,
+        emphasized: idx != null,
+        _idx: idx ?? Number.POSITIVE_INFINITY,
+      };
+    }).sort((a, b) => a._idx - b._idx).map(({ _idx, ...rest }) => rest);
+    return [{ value: '', label: 'Tipos' }, ...items];
+  }, [tiposConcepto, ordering.tipoConceptoByNombre]);
 
   // Opciones de concepto (filtradas por tipo si hay seleccionado)
-  const conceptoOptions = useMemo(() => ([
-    { value: '', label: 'Conceptos' },
-    ...conceptosDelTipo.map(c => ({
+  const conceptoOptions = useMemo(() => {
+    const items = conceptosDelTipo.map(c => ({
       value: c.nombre,
       label: c.nombre,
       color: c.tipo_concepto_color || undefined,
-    })),
-  ]), [conceptosDelTipo]);
+    }));
+    return [{ value: '', label: 'Conceptos' }, ...sortByPresence(items, ordering.concepto)];
+  }, [conceptosDelTipo, ordering.concepto]);
 
   // Navegacion de periodos (respeta modo: salta de a mes o de a año entero)
   const irAtras = () => {
@@ -491,14 +546,14 @@ export default function Tesoreria() {
   );
 
   // Opciones de dependencia
-  const dependenciaOptions = useMemo(() => ([
-    { value: '', label: 'Dependencias' },
-    ...dependencias.map(d => ({
+  const dependenciaOptions = useMemo(() => {
+    const items = dependencias.map(d => ({
       value: String(d.id),
       label: d.nombre,
       color: d.color || undefined,
-    })),
-  ]), [dependencias]);
+    }));
+    return [{ value: '', label: 'Dependencias' }, ...sortByPresence(items, ordering.dependencia)];
+  }, [dependencias, ordering.dependencia]);
 
   // Iguala altura/padding/radius de TODOS los triggers (ModernSelect)
   // y del navegador de meses (que usa <button> directo). Una sola CSS,
