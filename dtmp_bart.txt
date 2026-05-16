@@ -1,0 +1,903 @@
+
+================================================================================
+FILE: Gastos 2024.xlsx
+================================================================================
+  Sheets: ['Aumeno', 'Empleados', 'Prof y pub', 'Gastos']
+
+  --- Sheet: 'Aumeno' rows=55 cols=10 ---
+    header_row=2 (non-empty=5)
+    headers: ['Auxiliares', 50000, None, '#REF!', 'Empleado', 'Trabajo', None, 0, 0, 'Sueldo']
+    sample rows:
+      r3: ['Farmacia', 90000, None, 90000, 'Baez Eduardo (galpón)', 'Galpón', 'en negro', 90000, 150000, 200000]
+      r4: ['Galpón vip', 200000, None, 120000, 'Barrios Mariela (enfermera)', 'Enfermera', 'En blanco y en negro', 133100, 150000, 200000]
+      r5: ['Chfer', 75000, None, 120000, 'Busto Sandra  (enfermera)', 'Enfermera', 'En blanco y en negro', 143130, 150000, 200000]
+    column stats (first 500 data rows):
+      col1 'Auxiliares': total=5 nums=0 name-like=0 unique_strs=5
+         sample_uniques: ['Chfer', 'Farmacia', 'Galpón', 'Galpón vip', 'limpieza']
+      col2 '50000': total=4 nums=4 name-like=0 unique_strs=0
+      col4 '#REF!': total=45 nums=45 name-like=0 unique_strs=0
+      col5 'Empleado': total=52 nums=0 name-like=14 unique_strs=52
+      col6 'Trabajo': total=52 nums=0 name-like=0 unique_strs=19
+         sample_uniques: ['Adrián', 'Agua', 'Alejandro', 'Auxiliar', 'Chofer', 'Enfermera', 'Farmacia', 'Galpón']
+      col7 'None': total=52 nums=0 name-like=0 unique_strs=2
+         sample_uniques: ['En blanco y en negro', 'en negro']
+      col8 '0': total=49 nums=49 name-like=0 unique_strs=0
+      col9 '0': total=47 nums=46 name-like=0 unique_strs=1
+         sample_uniques: ['Total:']
+      col10 'Sueldo': total=47 nums=47 name-like=0 unique_strs=0
+    names_inferred [14]: ['Carranza Jorge', 'Farías Oriana', 'Garay Adrián', 'Garay John', 'Gravino Juan José', 'Loza Alejandro', 'Mariño Laly', 'Miguel Carranza', 'Sosa Luciana', 'Sosa Macarena', 'Toledo Romina', 'Toledo Ruly', 'Toledo Valentina', 'Zapata José']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Empleados' rows=92 cols=45 ---
+    header_row=1 (non-empty=23)
+    headers: [None, None, None, 'Alias', None, 'Diciembre', 2024, 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Medio aguinaldo', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', 'Medio aguinaldo', 2025, 'Enero', 'Febrero', 'HE', 'Marzo', 'Horas extras', 'Abril', 'Horas extras', 'Mayo', 'Horas extras', 'Junio', 'Horas extras', 'Medio aguinaldo', 'Julio', 'Horas extras', 'Agosto', 'Horas extras', 'Septiembre', 'Horas extras', 'Octubre', None, 'Noviembre', 'Diciembre', 'Medio aguinaldo']
+    sample rows:
+      r2: [1, 85000, 'Árias Pilar', 'MARIAS6792.NX.ARS', None, None, None, None, None, None, None, None, None, 40000, 75000, 85000, 85000, 85000, 85000, 85000, 42500, None, None, 250000, None, 130000, None, 130000, None, 150000, None, 200000, None, 100000, 220000, None, 220000, None, 220000, None, 220000, None, None, None, None]
+      r3: [2, 160000, 'Ávila Adriana', None, 'en negro', None, None, None, None, None, None, None, None, None, None, 50000, 60000, 60000, 60000, 60000, 30000, None, 60000, 160000, None, 160000, 10000, 180000, None, 190000, 10000, 200000, None, 100000, 220000, None, 220000, None, 220000, None, 220000, 12250, None, None, None]
+      r4: [None, 55000, 'Ávila Cesar', 'cesaravila.mp', 'en negro', None, None, None, None, 45000, 55000, 45000, 45000, 30000, 80000, 55000, 55000, 55000, 55000, 55000, 27500, None, 55000, 55000, None, 55000, None, 75000, None, 'Cultura y turismo', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=65 nums=65 name-like=0 unique_strs=0
+      col2 'None': total=87 nums=81 name-like=0 unique_strs=6
+         sample_uniques: ['Efectivo', 'Jubilados (efectivo)', 'No trabaja más', 'Recibo de sueldo', 'Trafic', 'Transferencia']
+      col3 'None': total=83 nums=0 name-like=81 unique_strs=83
+      col4 'Alias': total=29 nums=0 name-like=0 unique_strs=29
+         sample_uniques: ['200318211000001000000*', '3840200500000017197720*', '7900273525780080*', 'AMOYA5745.NX.ARS', 'ARIETE.BORLAS.SALIDA', 'AlanBarrios.SPN', 'COSMOS.ABUELA.FIDEO', 'DITORIO.BALA.ABEJA']
+      col5 'None': total=66 nums=0 name-like=0 unique_strs=6
+         sample_uniques: ['Blanco', 'En blanco', 'En nero', 'Negro', 'en negro', 'negro']
+      col8 'Enero': total=48 nums=48 name-like=0 unique_strs=0
+      col9 'Febrero': total=49 nums=49 name-like=0 unique_strs=0
+      col10 'Marzo': total=55 nums=55 name-like=0 unique_strs=0
+      col11 'Abril': total=57 nums=57 name-like=0 unique_strs=0
+      col12 'Mayo': total=58 nums=58 name-like=0 unique_strs=0
+      col13 'Junio': total=57 nums=57 name-like=0 unique_strs=0
+      col14 'Medio aguinaldo': total=58 nums=58 name-like=0 unique_strs=0
+      col15 'Julio': total=61 nums=61 name-like=0 unique_strs=0
+      col16 'Agosto': total=64 nums=64 name-like=0 unique_strs=0
+      col17 'Septiembre': total=62 nums=62 name-like=0 unique_strs=0
+      col18 'Octubre': total=62 nums=62 name-like=0 unique_strs=0
+      col19 'Noviembre': total=61 nums=61 name-like=0 unique_strs=0
+      col20 'Diciembre': total=63 nums=63 name-like=0 unique_strs=0
+      col21 'Medio aguinaldo': total=64 nums=64 name-like=0 unique_strs=0
+      col23 'Enero': total=63 nums=63 name-like=0 unique_strs=0
+      col24 'Febrero': total=64 nums=64 name-like=0 unique_strs=0
+      col25 'HE': total=10 nums=10 name-like=0 unique_strs=0
+      col26 'Marzo': total=64 nums=64 name-like=0 unique_strs=0
+      col27 'Horas extras': total=11 nums=11 name-like=0 unique_strs=0
+      col28 'Abril': total=62 nums=62 name-like=0 unique_strs=0
+      col29 'Horas extras': total=1 nums=1 name-like=0 unique_strs=0
+      col30 'Mayo': total=61 nums=57 name-like=0 unique_strs=2
+         sample_uniques: ['Apoyo deportivo', 'Cultura y turismo']
+      col31 'Horas extras': total=11 nums=11 name-like=0 unique_strs=0
+      col32 'Junio': total=58 nums=58 name-like=0 unique_strs=0
+      col33 'Horas extras': total=19 nums=18 name-like=0 unique_strs=1
+         sample_uniques: ['$750.000 ch 1586']
+      col34 'Medio aguinaldo': total=58 nums=58 name-like=0 unique_strs=0
+      col35 'Julio': total=59 nums=59 name-like=0 unique_strs=0
+      col36 'Horas extras': total=9 nums=9 name-like=0 unique_strs=0
+      col37 'Agosto': total=62 nums=62 name-like=0 unique_strs=0
+      col38 'Horas extras': total=17 nums=17 name-like=0 unique_strs=0
+      col39 'Septiembre': total=59 nums=59 name-like=0 unique_strs=0
+      col40 'Horas extras': total=13 nums=12 name-like=0 unique_strs=1
+         sample_uniques: ['$1.000.000,00 Ch 1609']
+      col41 'Octubre': total=65 nums=65 name-like=0 unique_strs=0
+      col42 'None': total=15 nums=15 name-like=0 unique_strs=0
+      col43 'Noviembre': total=5 nums=5 name-like=0 unique_strs=0
+      col44 'Diciembre': total=5 nums=5 name-like=0 unique_strs=0
+      col45 'Medio aguinaldo': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [81]: ['Baez Santos Eduardo', 'Barrios Alan', 'Barrios Cristian', 'Barrios Cristina', 'Barrios Mariela', 'Barrios Martin', 'Barrios Sofía', 'Bravo Fernanda', 'Bustamante Karina', 'Busto Sandra', 'Bustos Elva', 'Bustos Ester', 'Báez Mariano', 'Cabrera Azucena', 'Cabrera Eugenia', 'Cande Ávila', 'Carlos Vera', 'Carnevale Oscar', 'Caro María Silvia', 'Carranza Cecilia']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Prof y pub' rows=144 cols=32 ---
+    header_row=1 (non-empty=24)
+    headers: [None, 'Enero ', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, 'Enero ', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', None, 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, None, None, None, None]
+    sample rows:
+      r2: ['Abogado', 169000, 169000, 400000, 475000, 400000, 245000, 400000, 400000, 400000, 400000, 485000, 450000, 'Abogado', 450000, 450000, 450000, 450000, 470000, 800000, 800000, 800000, None, 800000, 800000, None, None, None, None, None, None, None]
+      r3: ['Contador', 250000, 225000, 225000, 225000, 250000, None, 269999.99, 250000, 250000, 250000, 275000, 250000, 'Contador', 250000, 250000, 250000, 250000, 270000, 400000, 500000, 500000, None, 500000, 500000, None, None, None, None, None, None, None]
+      r4: ['Ingeniero', 553200, 482000, None, None, 486000, None, 545000, 506210, 381000, 576400, 576400, 449000, 'Ingeniero', 457000, 790000, 568400, None, 1331000, None, 1423000, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=64 nums=0 name-like=29 unique_strs=61
+      col2 'Enero ': total=19 nums=18 name-like=0 unique_strs=1
+         sample_uniques: ['Enero']
+      col3 'Febrero': total=18 nums=17 name-like=0 unique_strs=1
+         sample_uniques: ['Febrero']
+      col4 'Marzo': total=17 nums=16 name-like=0 unique_strs=1
+         sample_uniques: ['Marzo']
+      col5 'Abril': total=22 nums=21 name-like=0 unique_strs=1
+         sample_uniques: ['Abril']
+      col6 'Mayo': total=22 nums=21 name-like=0 unique_strs=1
+         sample_uniques: ['Mayo']
+      col7 'Junio': total=23 nums=22 name-like=0 unique_strs=1
+         sample_uniques: ['Junio']
+      col8 'Julio': total=26 nums=25 name-like=0 unique_strs=1
+         sample_uniques: ['Julio']
+      col9 'Agosto': total=35 nums=34 name-like=0 unique_strs=1
+         sample_uniques: ['Agosto']
+      col10 'Septiembre': total=38 nums=37 name-like=0 unique_strs=1
+         sample_uniques: ['Septiembre']
+      col11 'Octubre': total=39 nums=38 name-like=0 unique_strs=1
+         sample_uniques: ['Octubre']
+      col12 'Noviembre': total=39 nums=38 name-like=0 unique_strs=1
+         sample_uniques: ['Noviembre']
+      col13 'Diciembre': total=38 nums=37 name-like=0 unique_strs=1
+         sample_uniques: ['Diciembre']
+      col14 'None': total=47 nums=4 name-like=23 unique_strs=41
+      col15 'Enero ': total=42 nums=41 name-like=0 unique_strs=1
+         sample_uniques: ['Enero']
+      col16 'Febrero': total=44 nums=43 name-like=0 unique_strs=1
+         sample_uniques: ['Febrero']
+      col17 'Marzo': total=49 nums=48 name-like=0 unique_strs=1
+         sample_uniques: ['Marzo']
+      col18 'Abril': total=46 nums=45 name-like=0 unique_strs=1
+         sample_uniques: ['Abril']
+      col19 'Mayo': total=46 nums=45 name-like=0 unique_strs=1
+         sample_uniques: ['Mayo']
+      col20 'Junio': total=48 nums=45 name-like=0 unique_strs=2
+         sample_uniques: ['$277,600 (Visa)', 'Junio']
+      col21 'Julio': total=53 nums=51 name-like=0 unique_strs=1
+         sample_uniques: ['Julio']
+      col22 'Agosto': total=58 nums=56 name-like=0 unique_strs=1
+         sample_uniques: ['Agosto']
+      col23 'None': total=1 nums=1 name-like=0 unique_strs=0
+      col24 'Septiembre': total=52 nums=50 name-like=0 unique_strs=1
+         sample_uniques: ['Septiembre']
+      col25 'Octubre': total=26 nums=24 name-like=0 unique_strs=1
+         sample_uniques: ['Octubre']
+      col26 'Noviembre': total=6 nums=4 name-like=0 unique_strs=1
+         sample_uniques: ['Noviembre']
+      col27 'Diciembre': total=6 nums=4 name-like=0 unique_strs=1
+         sample_uniques: ['Diciembre']
+      col29 'None': total=1 nums=1 name-like=0 unique_strs=0
+      col30 'None': total=11 nums=11 name-like=0 unique_strs=0
+      col31 'None': total=11 nums=0 name-like=10 unique_strs=11
+         sample_uniques: ['Arena Fina', 'David Huenz', 'Despensa DyG', 'Diego Suárez', 'Elpidio Sosa', 'Lubricantes Jesús María', 'Mach Electrónica', 'Maria Risa Videro']
+      col32 'None': total=11 nums=0 name-like=0 unique_strs=2
+         sample_uniques: ['MP', 'Transf']
+    names_inferred [44]: ['Adri Margan', 'Arena Fina', 'Avila Antonella', 'Azucena Cabrera', 'Benjamín Reyna', 'Cabezón Varela', 'Camila Paredes', 'Catherine Farías', 'Club Patita', 'Consorcio Caminero', 'Cooperativa Mu Patronal', 'David Huenz', 'Despensa DyG', 'Deán Funes Actualidad', 'Diego Suárez', 'Dr Paredes', 'Eduardo Díaz', 'Elpidio Sosa', 'Estación FM', 'Franco Farías']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Gastos' rows=120 cols=45 ---
+    header_row=1 (non-empty=28)
+    headers: [None, 'Feb', 'Gastos', 'Empresa', 'Modo', 'Marzo', 'Gastos', 'Empresa', 'Modo', 'Abr', 'Gastos', 'Empresa', 'Modo', 'May', 'Gastos', 'Empresa', 'Modo', 'Jun', 'Gastos', 'Empresa', 'Modo', 'Jul', 'Gastos', 'Empresa', 'Modo', 'Ago', 'Gastos', 'Empresa', 'Modo', 'Sep', 'Gastos', 'Empresa', 'Modo', 'Oct', 'Gastos', 'Empresa', 'Modo', 'Nov', 'Gastos', 'Empresa', 'Modo', 'Dic', 'Gastos', 'Empresa', 'Modo']
+    sample rows:
+      r2: [None, 5000, None, 284250, 'Pc Solutions', 'Trans', None, 209403.81, 'Agroquímicos', 'Transf', None, 75000, 'Ramnón Quinteros', 'MP', None, 250000, 'Laura Bernabey', 'MP', None, 2000000, 'Puma', 'Transf', None, 117907, 'Centro Herramientas', 'MP', None, 375000, 'Coop', 'cheque', None, 375000, 'Coop', 'cheque', None, 375000, 'Coop', 'cheque', None, 480694, 'Acord', 'Cheq', None, 480694, 'Acord']
+      r3: [None, 2000, None, 400000, 'La Radio de Totoral ', 'Trans y eftv', None, 400000, 'Abogado', 'Transf', None, 30000, 'María del Pino', 'MP', None, 60900, 'Neneno', 'Ef', None, 1200000, 'Negro de Oro (Vivienda semilla)', 'Transf', None, 424005.81, 'Cooperativa Rosita', 'Transf', None, 480694, 'Acord', 'Cheq', None, 480694, 'Acord', 'Cheq', None, 480694, 'Acord', 'Cheq', None, 2800000, 'Fredy Mamoni', 'Ch 5296', None, 2191675, 'Ross Insumos SRL']
+      r4: [None, 16500, None, 45000, 'Cabezón Varela', ' Trans y eftv', None, 225000, 'Contador', 'Transf', None, 1365000, 'Vallas', 'Cheque 1853', None, 332000, 'Caro Ávila', 'Transf', None, 2900, 'Ohana', 'MP', None, 1978679, 'Mach Eletronic', 'Transf', None, 162500, 'Darío Alen', 'chque 1847', None, 162500, 'Darío Alen', 'chque 1848', None, 1343700.87, 'Gustavo Clara', 'Cheq', None, 2191675, 'Ross Insumos SRL', 'Echeq', None, 4890333.33, 'Negro de Oro (obra balneraio 3/3)']
+    column stats (first 500 data rows):
+      col2 'Feb': total=78 nums=78 name-like=0 unique_strs=0
+      col3 'Gastos': total=1 nums=0 name-like=0 unique_strs=1
+         sample_uniques: ['#REF!']
+      col4 'Empresa': total=65 nums=65 name-like=0 unique_strs=0
+      col5 'Modo': total=65 nums=0 name-like=32 unique_strs=54
+      col6 'Marzo': total=64 nums=0 name-like=0 unique_strs=7
+         sample_uniques: ['Cheque 1296', 'Eftv', 'MP', 'Trans', 'Trans y eftv', 'Transf', 'VEP']
+      col7 'Gastos': total=1 nums=0 name-like=0 unique_strs=1
+         sample_uniques: ['#REF!']
+      col8 'Empresa': total=77 nums=77 name-like=0 unique_strs=0
+      col9 'Modo': total=77 nums=0 name-like=51 unique_strs=66
+      col10 'Abr': total=77 nums=0 name-like=0 unique_strs=11
+         sample_uniques: ['Ch 1839', 'Ch 1840', 'Ch 1841', 'Ch 1842', 'Ch 1843', 'Ch1291', 'Ef', 'MP']
+      col11 'Gastos': total=1 nums=1 name-like=0 unique_strs=0
+      col12 'Empresa': total=85 nums=84 name-like=0 unique_strs=1
+         sample_uniques: ['#REF!']
+      col13 'Modo': total=85 nums=0 name-like=61 unique_strs=76
+      col14 'May': total=84 nums=0 name-like=0 unique_strs=9
+         sample_uniques: ['CH 1856', 'Ch 1855', 'Ch 1857', 'Ch 1858', 'Cheque 1853', 'Efectivo', 'MP', 'Transf']
+      col16 'Empresa': total=119 nums=119 name-like=0 unique_strs=0
+      col17 'Modo': total=119 nums=0 name-like=74 unique_strs=101
+      col18 'Jun': total=119 nums=0 name-like=0 unique_strs=6
+         sample_uniques: ['Bancón', 'Ef', 'Efectiv', 'MP', 'Transf', 'cheque']
+      col19 'Gastos': total=1 nums=1 name-like=0 unique_strs=0
+      col20 'Empresa': total=97 nums=97 name-like=0 unique_strs=0
+      col21 'Modo': total=97 nums=0 name-like=60 unique_strs=83
+      col22 'Jul': total=97 nums=0 name-like=0 unique_strs=5
+         sample_uniques: ['Efectivo', 'MP', 'Transf', 'cheque', 'chque 1845']
+      col24 'Empresa': total=117 nums=117 name-like=0 unique_strs=0
+      col25 'Modo': total=117 nums=0 name-like=86 unique_strs=100
+      col26 'Ago': total=117 nums=0 name-like=0 unique_strs=14
+         sample_uniques: ['Ch 1318', 'Ch 1865', 'Ch 1867', 'Ch 1871', 'Cheq', 'Ef', 'Ef - Ch 1830', 'Efect']
+      col28 'Empresa': total=119 nums=118 name-like=0 unique_strs=1
+         sample_uniques: ['z']
+      col29 'Modo': total=119 nums=0 name-like=62 unique_strs=104
+      col30 'Sep': total=119 nums=0 name-like=0 unique_strs=9
+         sample_uniques: ['Ch 2579', 'Ch 5287', 'Cheq', 'Efectivo', 'MP', 'Transf', 'Transf 764A0A', 'cheque']
+      col32 'Empresa': total=118 nums=118 name-like=0 unique_strs=0
+      col33 'Modo': total=119 nums=0 name-like=59 unique_strs=104
+      col34 'Oct': total=117 nums=0 name-like=1 unique_strs=12
+         sample_uniques: ['Ch 5288', 'Ch 5290', 'Cheq', 'Efectivo', 'MP', 'Mp', 'Tarjeta de crédito', 'Trans']
+      col36 'Empresa': total=119 nums=119 name-like=0 unique_strs=0
+      col37 'Modo': total=119 nums=0 name-like=59 unique_strs=112
+      col38 'Nov': total=119 nums=0 name-like=0 unique_strs=11
+         sample_uniques: ['Ch 5280', 'Cheq', 'Echeq', 'Efectivo', 'Efectvio', 'MP', 'Trans', 'Transf']
+      col40 'Empresa': total=119 nums=119 name-like=0 unique_strs=0
+      col41 'Modo': total=119 nums=0 name-like=63 unique_strs=108
+      col42 'Dic': total=119 nums=0 name-like=3 unique_strs=11
+         sample_uniques: ['Ch 5296', 'Cheq', 'Echeq', 'Efectivo', 'MP', 'Mercado Libre', 'Tarjeta', 'Trabsf']
+      col44 'Empresa': total=119 nums=119 name-like=0 unique_strs=0
+      col45 'Modo': total=119 nums=0 name-like=36 unique_strs=108
+    names_inferred [377]: ['ATAC Centro de Servicios', 'Adicionales FDF', 'Adicionales fundación de San Pedro Norte', 'Adrian Villarroel', 'Agrin Gomas', 'Agrocentro Funes', 'Agrofer Industrial', 'Aguinaldo Luciano Garay', 'Aguinaldo Oriana Farías', 'Alan Barrios', 'Alana Barrios', 'Alberto Zalabaza', 'Ale Britos', 'Ale Hnos autopartes', 'Alelí Ortiz', 'Amigo Mosquito', 'Ana Benítez', 'Ana del Pato', 'Anita Carranza', 'Arbitraje Liga Ischilín']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+================================================================================
+FILE: Gastos mensuales 2025 - 01-09.xlsx
+================================================================================
+  Sheets: ['Gastos', 'Octubre', 'Vestuarios', 'Prof y pub', 'Empleados', 'Concejales', 'Turismo y cultura', 'Apoyo gerontológico', 'Ayuda social', 'Aumento']
+
+  --- Sheet: 'Gastos' rows=120 cols=100 ---
+    header_row=1 (non-empty=0)
+    headers: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 'Enero', 'Gatos', 'Modo', 'Abril', 'Febrero', 'Gatos', 'Modo', 'Modo', 'Marcos', 'Gatos', 'Modo', 'Modo', 'Abril', 'Gatos', 'Modo', 'Modo', 'Mayo', 'Monto', 'Empresa', 'Modo', 'Junio', 'Monto', 'Empresa', 'Modo', 'Julio', 'Monto', 'Empresa', 'Modo', 'Agosto', 'Monto', 'Empresa', 'Modo', 'Sept', 'Monto', 'Empresa', 'Modo', 'Oct', 'Monto', 'Empresa', 'Modo', 'Nov', 'Monto', 'Empresa', 'Modo', 'Dici', 'Empresa', 'Modo', 2026, 'Ene', 'Gastos', 'Empresa', 'Modo', None]
+    sample rows:
+      r2: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 1000000, 'Ema de la Mata (semillas canchas)', 'Cheque', None, 2047231.65, 'Crucijuegos', 'Echeq', None, 1900000, 'Ema de la Mata (semillas canchas)', 'Cheque', None, 198989, 'Cooperacipon Seguros (Ford Transit) 21/04', None, None, 198989, 'Cooperacipon Seguros (Ford Transit) 21/05', None, None, 262720, 'Basterboom', 'Transf', None, 653922.5, 'Indumentaria Casilda (arenadora) Yafun', 'Echeq 09-07-25', None, 4134375, 'Emanuel de la Mata (3/4)', 'Echeq 09/08', None, 162666.66, 'Sima (arenadora) 3/3', 'Echeq 04/09', None, None, None, None, None, 1600000, 'IPC Picinas', 'Echeq 22/11', None, 1640000, 'IPC Picinas', 'Echeq 22/10', None, None, 1600000, 'IPC Picinas', 'Echeq 20//01']
+      r3: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 2191675, 'Ross Insumos SRL', 'Echeq', None, 907933.5, 'Hernán Cornejo', 'Echeq 09/02', None, 1250000, 'Pittau Gustavo (totem)', 'Echeq', None, 3396140.23, 'Electricidad Gauss', 'Echeq 20-04', None, 1617450, 'Taller Nadaya (Echeq)', None, None, 848500, 'Darío Alem', 'Transf', None, 2474333.33, 'Sofia Monje 3/3 (techos cancha 7)', 'Echeq 07/07-25', None, 1836625, 'Laurte S.A.', 'Echeq 08/08', None, 125000, 'Ismael Espinoza (lavado de vehículo)', 'Efectivo', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+      r4: [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, 2047231.65, 'Crucijuegos', 'Echeq', None, 743500, 'Sofía Monje (puertas y portones cancha 7)', 'Echeq 48', None, 3500000, 'Bocco (grupo electrógeno)', None, None, 1617450, 'Taller Nadaya (Echeq)', None, None, 2000000, 'Kutty Paredes (acuero jubilación)', None, None, 250000, 'Darío Alem (tranquera)', 'Transf', None, 4134375, 'Emanuel de la Mata (2/4)', 'Echeq 10-07-25', None, 162666.66, 'Sima (arenadora) 2/3', 'Echeq 05/08', None, 4134375, 'Emanuel de la Mata (3/4)', 'Echeq 08/09', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col48 'Enero': total=1 nums=1 name-like=0 unique_strs=0
+      col49 'Gatos': total=119 nums=119 name-like=0 unique_strs=0
+      col50 'Modo': total=119 nums=0 name-like=42 unique_strs=107
+      col51 'Abril': total=119 nums=0 name-like=0 unique_strs=11
+         sample_uniques: ['Cheque', 'Echeq', 'Echeq 07-01', 'Echeq 10-01', 'Echeq 10/01', 'Echeq 22-01', 'Echeq 47', 'Efectivo']
+      col52 'Febrero': total=1 nums=1 name-like=0 unique_strs=0
+      col53 'Gatos': total=119 nums=119 name-like=0 unique_strs=0
+      col54 'Modo': total=119 nums=0 name-like=45 unique_strs=107
+      col55 'Modo': total=117 nums=0 name-like=0 unique_strs=14
+         sample_uniques: ['Ch 5310', 'Ch 5311', 'Echeq', 'Echeq 05-02', 'Echeq 06-02', 'Echeq 09/02', 'Echeq 10-02', 'Echeq 13-02']
+      col57 'Gatos': total=119 nums=119 name-like=0 unique_strs=0
+      col58 'Modo': total=119 nums=0 name-like=36 unique_strs=115
+      col59 'Modo': total=118 nums=0 name-like=0 unique_strs=15
+         sample_uniques: ['Caja', 'Ch 5318', 'Ch 5319', 'Cheque', 'Echeq', 'Echeq 13/03', 'Echeq 14/03', 'Echeq 19-03']
+      col60 'Abril': total=1 nums=1 name-like=0 unique_strs=0
+      col61 'Gatos': total=98 nums=98 name-like=0 unique_strs=0
+      col62 'Modo': total=98 nums=0 name-like=31 unique_strs=92
+      col63 'Modo': total=96 nums=0 name-like=0 unique_strs=11
+         sample_uniques: ['Caja', 'Echeq 10-04-25', 'Echeq 10/05', 'Echeq 18-04', 'Echeq 20-04', 'Echeq 20/04', 'Efectivo', 'MP']
+      col65 'Monto': total=116 nums=114 name-like=0 unique_strs=1
+         sample_uniques: ['#REF!']
+      col66 'Empresa': total=116 nums=0 name-like=45 unique_strs=105
+      col67 'Modo': total=112 nums=0 name-like=1 unique_strs=22
+         sample_uniques: ['Ch 1325', 'Ch 1579', 'Ch 5277', 'Echeq 05/05/25', 'Echeq 10-05-25', 'Echeq 10/05', 'Echeq 11/05', 'Echeq 16/05']
+      col69 'Monto': total=119 nums=119 name-like=0 unique_strs=0
+      col70 'Empresa': total=119 nums=1 name-like=47 unique_strs=101
+      col71 'Modo': total=118 nums=0 name-like=0 unique_strs=17
+         sample_uniques: ['Ch 1585', 'Ch 1589', 'Ch 1590', 'Ch 1591', 'Echeq 06-06', 'Echeq 10/06', 'Echeq 11/06', 'Echeq 15/06']
+      col73 'Monto': total=119 nums=119 name-like=0 unique_strs=0
+      col74 'Empresa': total=119 nums=0 name-like=46 unique_strs=109
+      col75 'Modo': total=116 nums=0 name-like=0 unique_strs=22
+         sample_uniques: ['Ch 1596', 'Ch 1597 - 1323', 'Ch 1599', 'Echeq  11/07', 'Echeq 04/07', 'Echeq 06/07', 'Echeq 07/07', 'Echeq 07/07-25']
+      col76 'Agosto': total=1 nums=1 name-like=0 unique_strs=0
+      col77 'Monto': total=118 nums=117 name-like=0 unique_strs=1
+         sample_uniques: ['6CA2:CA11966667']
+      col78 'Empresa': total=118 nums=0 name-like=49 unique_strs=115
+      col79 'Modo': total=117 nums=0 name-like=0 unique_strs=18
+         sample_uniques: ['Ch 1601', 'Ch 1603', 'Ch 1604', 'Echeq 05/08', 'Echeq 07/08', 'Echeq 08/08', 'Echeq 09/08', 'Echeq 10/08']
+      col80 'Sept': total=1 nums=1 name-like=0 unique_strs=0
+      col81 'Monto': total=98 nums=98 name-like=0 unique_strs=0
+      col82 'Empresa': total=98 nums=1 name-like=44 unique_strs=89
+      col83 'Modo': total=95 nums=0 name-like=0 unique_strs=15
+         sample_uniques: ['Ch 1608', 'Ch 1609', 'Ch 1610', 'Echeq 04/09', 'Echeq 08/09', 'Echeq 10/09', 'Echeq 11/09', 'Echeq 12/09']
+      col88 'Nov': total=1 nums=1 name-like=0 unique_strs=0
+      col89 'Monto': total=4 nums=4 name-like=0 unique_strs=0
+      col90 'Empresa': total=4 nums=0 name-like=3 unique_strs=4
+         sample_uniques: ['IPC Picinas', 'Kako Martínez (vestuario predio)', 'Michelle Telledín', 'Papalera Farías']
+      col91 'Modo': total=1 nums=0 name-like=0 unique_strs=1
+         sample_uniques: ['Echeq 22/11']
+      col92 'Dici': total=1 nums=1 name-like=0 unique_strs=0
+      col93 'Empresa': total=2 nums=2 name-like=0 unique_strs=0
+      col94 'Modo': total=2 nums=0 name-like=1 unique_strs=2
+         sample_uniques: ['IPC Picinas', 'Kako Martínez (vestuario predio)']
+      col95 '2026': total=1 nums=0 name-like=0 unique_strs=1
+         sample_uniques: ['Echeq 22/10']
+      col97 'Gastos': total=1 nums=1 name-like=0 unique_strs=0
+      col98 'Empresa': total=2 nums=2 name-like=0 unique_strs=0
+      col99 'Modo': total=2 nums=0 name-like=1 unique_strs=2
+         sample_uniques: ['IPC Picinas', 'Kako Martínez (vestuario predio)']
+      col100 'None': total=1 nums=0 name-like=0 unique_strs=1
+         sample_uniques: ['Echeq 20//01']
+    names_inferred [226]: ['Abtex Argentina', 'Abtex Argentina - Change sports', 'Adicionales Copa Córdoba', 'Adicionales Festival de Fútbol', 'Adicionales Liga', 'Adrián Cucha Ávila', 'Adrián Jara', 'Alan Barrios', 'Aldrin Garay', 'Alfredo Mamondi', 'Ana María Nichelle', 'Ana Nichwlle', 'Andrés Marano Mueble', 'Antonela Avila', 'Ariel Arnaez', 'Asoc. Mutual Consorcio Caminero', 'Automatísmo Pauda Mercado Libre', 'Bazar Marita', 'Beltrán Hamburguesas', 'Boleto Educativo Gratiuto']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Octubre' rows=85 cols=4 ---
+    header_row=1 (non-empty=4)
+    headers: ['Oct', 'Monto', 'Empresa', 'Modo']
+    sample rows:
+      r2: [None, 60000, 'Noelia Farías', 'Transf']
+      r3: [None, 2663089.02, 'YPF Ruta', 'Efectivo']
+      r4: [None, 707850, 'Juan Capel (carpa) 1/2', 'Transf']
+    column stats (first 500 data rows):
+      col2 'Monto': total=70 nums=70 name-like=0 unique_strs=0
+      col3 'Empresa': total=70 nums=0 name-like=23 unique_strs=63
+      col4 'Modo': total=50 nums=0 name-like=0 unique_strs=8
+         sample_uniques: ['Echeq 11/10/25', 'Echeq 12/10', 'Echeq 19/10', 'Echeq 22/10', 'Echeq 26/10', 'Efectivo', 'Transf', 'Transf 25/10']
+    names_inferred [20]: ['Belen Papalera', 'Carolina Ávila', 'DF Farma', 'Darío Alem', 'Ferretería Tosini', 'IPC Picinas', 'Impacto Color', 'Jesús Ybanovich', 'Magui Suárez', 'Martín Orozco', 'Michelle Telledín', 'Murray - La Boutique del Pesado', 'Negro de Oro', 'Noelia Farías', 'PAA Protec S.A.S', 'Q Cobrai', 'Santa Rita', 'Tarde Farma', 'Tomy Hugues', 'YPF Ruta']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Vestuarios' rows=1 cols=2 ---
+    header_row=1 (non-empty=2)
+    headers: ['#REF!', 'Kako Martínez (vestuarios)']
+    sample rows:
+    column stats (first 500 data rows):
+    names_inferred [0]: []
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Prof y pub' rows=144 cols=32 ---
+    header_row=1 (non-empty=24)
+    headers: [None, 'Enero ', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, 'Enero ', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', None, 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, None, None, None, None]
+    sample rows:
+      r2: ['Abogado', 169000, 169000, 400000, 475000, 400000, 245000, 400000, 400000, 400000, 400000, 485000, 450000, 'Abogado', 450000, 450000, 450000, 450000, 470000, 800000, 800000, 800000, None, 800000, 800000, None, None, None, None, None, None, None]
+      r3: ['Contador', 250000, 225000, 225000, 225000, 250000, None, 269999.99, 250000, 250000, 250000, 275000, 250000, 'Contador', 250000, 250000, 250000, 250000, 270000, 400000, 500000, 500000, None, 500000, 500000, None, None, None, None, None, None, None]
+      r4: ['Ingeniero', 553200, 482000, None, None, 486000, None, 545000, 506210, 381000, 576400, 576400, 449000, 'Ingeniero', 457000, 790000, 568400, None, 1331000, None, 1423000, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=64 nums=0 name-like=29 unique_strs=61
+      col2 'Enero ': total=19 nums=18 name-like=0 unique_strs=1
+         sample_uniques: ['Enero']
+      col3 'Febrero': total=18 nums=17 name-like=0 unique_strs=1
+         sample_uniques: ['Febrero']
+      col4 'Marzo': total=17 nums=16 name-like=0 unique_strs=1
+         sample_uniques: ['Marzo']
+      col5 'Abril': total=22 nums=21 name-like=0 unique_strs=1
+         sample_uniques: ['Abril']
+      col6 'Mayo': total=22 nums=21 name-like=0 unique_strs=1
+         sample_uniques: ['Mayo']
+      col7 'Junio': total=23 nums=22 name-like=0 unique_strs=1
+         sample_uniques: ['Junio']
+      col8 'Julio': total=26 nums=25 name-like=0 unique_strs=1
+         sample_uniques: ['Julio']
+      col9 'Agosto': total=35 nums=34 name-like=0 unique_strs=1
+         sample_uniques: ['Agosto']
+      col10 'Septiembre': total=38 nums=37 name-like=0 unique_strs=1
+         sample_uniques: ['Septiembre']
+      col11 'Octubre': total=39 nums=38 name-like=0 unique_strs=1
+         sample_uniques: ['Octubre']
+      col12 'Noviembre': total=39 nums=38 name-like=0 unique_strs=1
+         sample_uniques: ['Noviembre']
+      col13 'Diciembre': total=38 nums=37 name-like=0 unique_strs=1
+         sample_uniques: ['Diciembre']
+      col14 'None': total=47 nums=4 name-like=23 unique_strs=41
+      col15 'Enero ': total=42 nums=41 name-like=0 unique_strs=1
+         sample_uniques: ['Enero']
+      col16 'Febrero': total=44 nums=43 name-like=0 unique_strs=1
+         sample_uniques: ['Febrero']
+      col17 'Marzo': total=49 nums=48 name-like=0 unique_strs=1
+         sample_uniques: ['Marzo']
+      col18 'Abril': total=46 nums=45 name-like=0 unique_strs=1
+         sample_uniques: ['Abril']
+      col19 'Mayo': total=46 nums=45 name-like=0 unique_strs=1
+         sample_uniques: ['Mayo']
+      col20 'Junio': total=48 nums=45 name-like=0 unique_strs=2
+         sample_uniques: ['$277,600 (Visa)', 'Junio']
+      col21 'Julio': total=53 nums=51 name-like=0 unique_strs=1
+         sample_uniques: ['Julio']
+      col22 'Agosto': total=58 nums=56 name-like=0 unique_strs=1
+         sample_uniques: ['Agosto']
+      col23 'None': total=1 nums=1 name-like=0 unique_strs=0
+      col24 'Septiembre': total=52 nums=50 name-like=0 unique_strs=1
+         sample_uniques: ['Septiembre']
+      col25 'Octubre': total=31 nums=29 name-like=0 unique_strs=1
+         sample_uniques: ['Octubre']
+      col26 'Noviembre': total=6 nums=4 name-like=0 unique_strs=1
+         sample_uniques: ['Noviembre']
+      col27 'Diciembre': total=6 nums=4 name-like=0 unique_strs=1
+         sample_uniques: ['Diciembre']
+      col29 'None': total=1 nums=1 name-like=0 unique_strs=0
+      col30 'None': total=11 nums=11 name-like=0 unique_strs=0
+      col31 'None': total=11 nums=0 name-like=10 unique_strs=11
+         sample_uniques: ['Arena Fina', 'David Huenz', 'Despensa DyG', 'Diego Suárez', 'Elpidio Sosa', 'Lubricantes Jesús María', 'Mach Electrónica', 'Maria Risa Videro']
+      col32 'None': total=11 nums=0 name-like=0 unique_strs=2
+         sample_uniques: ['MP', 'Transf']
+    names_inferred [44]: ['Adri Margan', 'Arena Fina', 'Avila Antonella', 'Azucena Cabrera', 'Benjamín Reyna', 'Cabezón Varela', 'Camila Paredes', 'Catherine Farías', 'Club Patita', 'Consorcio Caminero', 'Cooperativa Mu Patronal', 'David Huenz', 'Despensa DyG', 'Deán Funes Actualidad', 'Diego Suárez', 'Dr Paredes', 'Eduardo Díaz', 'Elpidio Sosa', 'Estación FM', 'Franco Farías']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Empleados' rows=92 cols=45 ---
+    header_row=1 (non-empty=23)
+    headers: [None, None, None, 'Alias', None, 'Diciembre', 2024, 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Medio aguinaldo', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', 'Medio aguinaldo', 2025, 'Enero', 'Febrero', 'HE', 'Marzo', 'Horas extras', 'Abril', 'Horas extras', 'Mayo', 'Horas extras', 'Junio', 'Horas extras', 'Medio aguinaldo', 'Julio', 'Horas extras', 'Agosto', 'Horas extras', 'Septiembre', 'Horas extras', 'Octubre', None, 'Noviembre', 'Diciembre', 'Medio aguinaldo']
+    sample rows:
+      r2: [1, 85000, 'Árias Pilar', 'MARIAS6792.NX.ARS', None, None, None, None, None, None, None, None, None, 40000, 75000, 85000, 85000, 85000, 85000, 85000, 42500, None, None, 250000, None, 130000, None, 130000, None, 150000, None, 200000, None, 100000, 220000, None, 220000, None, 220000, None, 220000, None, None, None, None]
+      r3: [2, 160000, 'Ávila Adriana', None, 'en negro', None, None, None, None, None, None, None, None, None, None, 50000, 60000, 60000, 60000, 60000, 30000, None, 60000, 160000, None, 160000, 10000, 180000, None, 190000, 10000, 200000, None, 100000, 220000, None, 220000, None, 220000, None, 220000, 12300, None, None, None]
+      r4: [None, 55000, 'Ávila Cesar', 'cesaravila.mp', 'en negro', None, None, None, None, 45000, 55000, 45000, 45000, 30000, 80000, 55000, 55000, 55000, 55000, 55000, 27500, None, 55000, 55000, None, 55000, None, 75000, None, 'Cultura y turismo', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=65 nums=65 name-like=0 unique_strs=0
+      col2 'None': total=87 nums=81 name-like=0 unique_strs=6
+         sample_uniques: ['Efectivo', 'Jubilados (efectivo)', 'No trabaja más', 'Recibo de sueldo', 'Trafic', 'Transferencia']
+      col3 'None': total=83 nums=0 name-like=81 unique_strs=83
+      col4 'Alias': total=29 nums=0 name-like=0 unique_strs=29
+         sample_uniques: ['200318211000001000000*', '3840200500000017197720*', '7900273525780080*', 'AMOYA5745.NX.ARS', 'ARIETE.BORLAS.SALIDA', 'AlanBarrios.SPN', 'COSMOS.ABUELA.FIDEO', 'DITORIO.BALA.ABEJA']
+      col5 'None': total=66 nums=0 name-like=0 unique_strs=6
+         sample_uniques: ['Blanco', 'En blanco', 'En nero', 'Negro', 'en negro', 'negro']
+      col8 'Enero': total=48 nums=48 name-like=0 unique_strs=0
+      col9 'Febrero': total=49 nums=49 name-like=0 unique_strs=0
+      col10 'Marzo': total=55 nums=55 name-like=0 unique_strs=0
+      col11 'Abril': total=57 nums=57 name-like=0 unique_strs=0
+      col12 'Mayo': total=58 nums=58 name-like=0 unique_strs=0
+      col13 'Junio': total=57 nums=57 name-like=0 unique_strs=0
+      col14 'Medio aguinaldo': total=58 nums=58 name-like=0 unique_strs=0
+      col15 'Julio': total=61 nums=61 name-like=0 unique_strs=0
+      col16 'Agosto': total=64 nums=64 name-like=0 unique_strs=0
+      col17 'Septiembre': total=62 nums=62 name-like=0 unique_strs=0
+      col18 'Octubre': total=62 nums=62 name-like=0 unique_strs=0
+      col19 'Noviembre': total=61 nums=61 name-like=0 unique_strs=0
+      col20 'Diciembre': total=63 nums=63 name-like=0 unique_strs=0
+      col21 'Medio aguinaldo': total=64 nums=64 name-like=0 unique_strs=0
+      col23 'Enero': total=63 nums=63 name-like=0 unique_strs=0
+      col24 'Febrero': total=64 nums=64 name-like=0 unique_strs=0
+      col25 'HE': total=10 nums=10 name-like=0 unique_strs=0
+      col26 'Marzo': total=64 nums=64 name-like=0 unique_strs=0
+      col27 'Horas extras': total=11 nums=11 name-like=0 unique_strs=0
+      col28 'Abril': total=62 nums=62 name-like=0 unique_strs=0
+      col29 'Horas extras': total=1 nums=1 name-like=0 unique_strs=0
+      col30 'Mayo': total=61 nums=57 name-like=0 unique_strs=2
+         sample_uniques: ['Apoyo deportivo', 'Cultura y turismo']
+      col31 'Horas extras': total=11 nums=11 name-like=0 unique_strs=0
+      col32 'Junio': total=58 nums=58 name-like=0 unique_strs=0
+      col33 'Horas extras': total=19 nums=18 name-like=0 unique_strs=1
+         sample_uniques: ['$750.000 ch 1586']
+      col34 'Medio aguinaldo': total=58 nums=58 name-like=0 unique_strs=0
+      col35 'Julio': total=59 nums=59 name-like=0 unique_strs=0
+      col36 'Horas extras': total=9 nums=9 name-like=0 unique_strs=0
+      col37 'Agosto': total=62 nums=62 name-like=0 unique_strs=0
+      col38 'Horas extras': total=17 nums=17 name-like=0 unique_strs=0
+      col39 'Septiembre': total=59 nums=59 name-like=0 unique_strs=0
+      col40 'Horas extras': total=13 nums=12 name-like=0 unique_strs=1
+         sample_uniques: ['$1.000.000,00 Ch 1609']
+      col41 'Octubre': total=65 nums=65 name-like=0 unique_strs=0
+      col42 'None': total=16 nums=16 name-like=0 unique_strs=0
+      col43 'Noviembre': total=5 nums=5 name-like=0 unique_strs=0
+      col44 'Diciembre': total=5 nums=5 name-like=0 unique_strs=0
+      col45 'Medio aguinaldo': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [81]: ['Baez Santos Eduardo', 'Barrios Alan', 'Barrios Cristian', 'Barrios Cristina', 'Barrios Mariela', 'Barrios Martin', 'Barrios Sofía', 'Bravo Fernanda', 'Bustamante Karina', 'Busto Sandra', 'Bustos Elva', 'Bustos Ester', 'Báez Mariano', 'Cabrera Azucena', 'Cabrera Eugenia', 'Cande Ávila', 'Carlos Vera', 'Carnevale Oscar', 'Caro María Silvia', 'Carranza Cecilia']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Concejales' rows=125 cols=35 ---
+    header_row=1 (non-empty=24)
+    headers: [None, 'Alias', None, 'Diciembre', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Aguinaldo', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, 'Enero', 'Febrero', 'Marzo', 'Abril', None, 'Mayo', 'Junio', 'Aguinaldo', 'Julio', None, 'Agosto', None, 'Septiembre', 'Octubre', None, 'Noviembre', 'Diciembre']
+    sample rows:
+      r2: ['Concejales', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+      r3: ['María del Pino', '720246188000036000000*', None, None, 30000, 30000, 30000, 30000, 30000, 30000, 15000, 30000, 40000, 40000, 40000, 40000, 40000, 20000, 40000, 40000, 140000, 160000, None, 170000, 180000, 40000, 88000, 100000, 88000, 100000, 88000, 88000, None, None, None]
+      r4: ['David Huenz', 'FUTBOL.SAN.PEDRO', None, None, 30000, 30000, 30000, 30000, 30000, 30000, 15000, 30000, 30000, 40000, 40000, 40000, 40000, None, 40000, 40000, 240000, 260000, None, 270000, 280000, 40000, 88000, 220000, 88000, 220000, 88000, 88000, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=14 nums=0 name-like=12 unique_strs=14
+         sample_uniques: ['Aldrin Garay', 'Alejandro Loza', 'Avila Antonella', 'Caro Ávila', 'Concejales', 'David Huenz', 'Elpidio Sosa', 'Gastos:']
+      col2 'Alias': total=8 nums=0 name-like=0 unique_strs=8
+         sample_uniques: ['720246188000036000000*', 'CARRANZAGUADI.mp', 'FACU.CARO.GABI', 'FUTBOL.SAN.PEDRO', 'MDIGAUDIOTOLE.NX.ARS', 'anto.avila99', 'cala.oro.zar', 'tomy.78']
+      col5 'Enero': total=12 nums=12 name-like=0 unique_strs=0
+      col6 'Febrero': total=12 nums=12 name-like=0 unique_strs=0
+      col7 'Marzo': total=12 nums=12 name-like=0 unique_strs=0
+      col8 'Abril': total=12 nums=12 name-like=0 unique_strs=0
+      col9 'Mayo': total=12 nums=12 name-like=0 unique_strs=0
+      col10 'Junio': total=12 nums=12 name-like=0 unique_strs=0
+      col11 'Aguinaldo': total=12 nums=12 name-like=0 unique_strs=0
+      col12 'Julio': total=12 nums=12 name-like=0 unique_strs=0
+      col13 'Agosto': total=12 nums=12 name-like=0 unique_strs=0
+      col14 'Septiembre': total=12 nums=12 name-like=0 unique_strs=0
+      col15 'Octubre': total=12 nums=12 name-like=0 unique_strs=0
+      col16 'Noviembre': total=12 nums=12 name-like=0 unique_strs=0
+      col17 'Diciembre': total=11 nums=11 name-like=0 unique_strs=0
+      col18 'None': total=7 nums=7 name-like=0 unique_strs=0
+      col19 'Enero': total=12 nums=12 name-like=0 unique_strs=0
+      col20 'Febrero': total=12 nums=12 name-like=0 unique_strs=0
+      col21 'Marzo': total=12 nums=12 name-like=0 unique_strs=0
+      col22 'Abril': total=12 nums=12 name-like=0 unique_strs=0
+      col23 'None': total=1 nums=0 name-like=1 unique_strs=1
+         sample_uniques: ['Laly Mariño']
+      col24 'Mayo': total=12 nums=12 name-like=0 unique_strs=0
+      col25 'Junio': total=13 nums=13 name-like=0 unique_strs=0
+      col26 'Aguinaldo': total=13 nums=13 name-like=0 unique_strs=0
+      col27 'Julio': total=12 nums=12 name-like=0 unique_strs=0
+      col28 'None': total=6 nums=6 name-like=0 unique_strs=0
+      col29 'Agosto': total=12 nums=12 name-like=0 unique_strs=0
+      col30 'None': total=5 nums=5 name-like=0 unique_strs=0
+      col31 'Septiembre': total=12 nums=12 name-like=0 unique_strs=0
+      col32 'Octubre': total=13 nums=13 name-like=0 unique_strs=0
+      col34 'Noviembre': total=1 nums=1 name-like=0 unique_strs=0
+      col35 'Diciembre': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [12]: ['Aldrin Garay', 'Alejandro Loza', 'Avila Antonella', 'Caro Ávila', 'David Huenz', 'Elpidio Sosa', 'Guada Carranza', 'Julio Ávila', 'Laly Mariño', 'María del Pino', 'Milagro Di Gaudio', 'Rosa Estanciero']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Turismo y cultura' rows=127 cols=33 ---
+    header_row=1 (non-empty=16)
+    headers: [None, None, None, None, None, None, None, None, None, None, None, None, 'Agosto', 'Septiemrbe', 'Octubre', 'Noviembre', 'Diciembre', 'Aguinaldo', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'Bono', 'junio', 'Aguinaldo', 'julio', None, 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    sample rows:
+      r2: ['Vero Gómez', None, None, None, None, None, None, None, None, None, None, None, 50000, 50000, 50000, 50000, 50000, None, None, None, None, 75000, 85000, 50000, 95000, 50000, 100000, 20000, 150000, 100000, None, None, None]
+      r3: ['Alelí Ortiz', None, None, None, None, None, None, None, None, None, None, None, 50000, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+      r4: ['Giyo Toledo', None, None, None, None, None, None, None, None, None, None, None, 50000, 50000, 50000, 50000, 50000, None, None, None, None, 75000, 85000, 50000, 95000, 50000, 100000, None, None, 100000, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=11 nums=0 name-like=10 unique_strs=11
+         sample_uniques: ['Alelí Ortiz', 'Camila Soria', 'Cesar Ávila', 'Giyo Toledo', 'Johana Lizardes', 'Lucrecia Pedernera', 'Sebastián Chánchez', 'Tatiana Barrios']
+      col13 'Agosto': total=5 nums=5 name-like=0 unique_strs=0
+      col14 'Septiemrbe': total=6 nums=6 name-like=0 unique_strs=0
+      col15 'Octubre': total=6 nums=6 name-like=0 unique_strs=0
+      col16 'Noviembre': total=6 nums=6 name-like=0 unique_strs=0
+      col17 'Diciembre': total=6 nums=6 name-like=0 unique_strs=0
+      col18 'Aguinaldo': total=2 nums=2 name-like=0 unique_strs=0
+      col19 'enero': total=3 nums=3 name-like=0 unique_strs=0
+      col20 'febrero': total=3 nums=3 name-like=0 unique_strs=0
+      col21 'marzo': total=3 nums=3 name-like=0 unique_strs=0
+      col22 'abril': total=8 nums=8 name-like=0 unique_strs=0
+      col23 'mayo': total=8 nums=8 name-like=0 unique_strs=0
+      col24 'Bono': total=8 nums=8 name-like=0 unique_strs=0
+      col25 'junio': total=9 nums=9 name-like=0 unique_strs=0
+      col26 'Aguinaldo': total=8 nums=8 name-like=0 unique_strs=0
+      col27 'julio': total=8 nums=8 name-like=0 unique_strs=0
+      col28 'None': total=4 nums=4 name-like=0 unique_strs=0
+      col29 'agosto': total=7 nums=7 name-like=0 unique_strs=0
+      col30 'septiembre': total=10 nums=10 name-like=0 unique_strs=0
+      col31 'octubre': total=2 nums=2 name-like=0 unique_strs=0
+      col32 'noviembre': total=1 nums=1 name-like=0 unique_strs=0
+      col33 'diciembre': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [10]: ['Alelí Ortiz', 'Camila Soria', 'Cesar Ávila', 'Giyo Toledo', 'Johana Lizardes', 'Lucrecia Pedernera', 'Sebastián Chánchez', 'Tatiana Barrios', 'Vero Gómez', 'Vivas Carranza Anita']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Apoyo gerontológico' rows=6 cols=8 ---
+    header_row=2 (non-empty=5)
+    headers: [None, None, None, 'Noviembre', 'diciembre', 'enero', 'febrero', 'Marzo']
+    sample rows:
+      r3: ['Verónica Gómez', 'vero.marcelagomez.23', 270554.31, 270554.31, 270554.31, 270554.31, 270554.31, 270554.31]
+      r4: ['Giyo Toledo', 'GISELAANAHI.88', 270554.31, 270554.31, 270554.31, 270554.31, 270554.31, 270554.31]
+      r5: ['Gabriela Ávila', 'aires.cinco.clima.mp', 270554.31, 270554.31, 270554.31, 270554.31, 270554.31, 270554.31]
+    column stats (first 500 data rows):
+      col1 'None': total=4 nums=0 name-like=4 unique_strs=4
+         sample_uniques: ['Gabriela Ávila', 'Giyo Toledo', 'Verónica Gómez', 'Yohana Lizardes']
+      col2 'None': total=4 nums=0 name-like=0 unique_strs=4
+         sample_uniques: ['GISELAANAHI.88', 'LIZARDESYOHANAV.UALA', 'aires.cinco.clima.mp', 'vero.marcelagomez.23']
+      col3 'None': total=3 nums=3 name-like=0 unique_strs=0
+      col4 'Noviembre': total=4 nums=4 name-like=0 unique_strs=0
+      col5 'diciembre': total=4 nums=4 name-like=0 unique_strs=0
+      col6 'enero': total=4 nums=4 name-like=0 unique_strs=0
+      col7 'febrero': total=4 nums=4 name-like=0 unique_strs=0
+      col8 'Marzo': total=4 nums=4 name-like=0 unique_strs=0
+    names_inferred [4]: ['Gabriela Ávila', 'Giyo Toledo', 'Verónica Gómez', 'Yohana Lizardes']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Ayuda social' rows=67 cols=13 ---
+    header_row=1 (non-empty=12)
+    headers: [None, 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    sample rows:
+      r2: ['Ávila Cesar', None, None, None, None, None, None, None, None, None, None, None, None]
+      r3: ['Ávila Fausto', None, None, None, None, None, None, None, None, None, None, None, None]
+      r4: ['Ávila Roque', None, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=66 nums=0 name-like=65 unique_strs=66
+      col2 'Enero': total=1 nums=1 name-like=0 unique_strs=0
+      col3 'Febrero': total=1 nums=1 name-like=0 unique_strs=0
+      col4 'Marzo': total=1 nums=1 name-like=0 unique_strs=0
+      col5 'Abril': total=1 nums=1 name-like=0 unique_strs=0
+      col6 'Mayo': total=1 nums=1 name-like=0 unique_strs=0
+      col7 'Junio': total=3 nums=3 name-like=0 unique_strs=0
+      col8 'Julio': total=5 nums=5 name-like=0 unique_strs=0
+      col9 'Agosto': total=1 nums=1 name-like=0 unique_strs=0
+      col10 'Septiembre': total=1 nums=1 name-like=0 unique_strs=0
+      col11 'Octubre': total=1 nums=1 name-like=0 unique_strs=0
+      col12 'Noviembre': total=1 nums=1 name-like=0 unique_strs=0
+      col13 'Diciembre': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [65]: ['Baez Eduardo', 'Barrios Alan', 'Barrios Cristina', 'Barrios Mariela', 'Barrios Martin', 'Bustamante Karina', 'Busto Sandra', 'Bustos Elva', 'Bustos Ester', 'Cabrera Azucena', 'Cabrera Eugenia', 'Cande Ávila', 'Carina López', 'Carnevale Oscar', 'Caro María Silvia', 'Carranza Anita', 'Carranza Cecilia', 'Carranza Jesus', 'Carranza Jorge', 'Carranza Miguel']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Aumento' rows=55 cols=10 ---
+    header_row=2 (non-empty=5)
+    headers: ['Auxiliares', 50000, None, '#REF!', 'Empleado', 'Trabajo', None, 0, 0, 'Sueldo']
+    sample rows:
+      r3: ['Farmacia', 90000, None, 90000, 'Baez Eduardo (galpón)', 'Galpón', 'en negro', 90000, 150000, 200000]
+      r4: ['Galpón vip', 200000, None, 120000, 'Barrios Mariela (enfermera)', 'Enfermera', 'En blanco y en negro', 133100, 150000, 200000]
+      r5: ['Chfer', 75000, None, 120000, 'Busto Sandra  (enfermera)', 'Enfermera', 'En blanco y en negro', 143130, 150000, 200000]
+    column stats (first 500 data rows):
+      col1 'Auxiliares': total=5 nums=0 name-like=0 unique_strs=5
+         sample_uniques: ['Chfer', 'Farmacia', 'Galpón', 'Galpón vip', 'limpieza']
+      col2 '50000': total=4 nums=4 name-like=0 unique_strs=0
+      col4 '#REF!': total=45 nums=45 name-like=0 unique_strs=0
+      col5 'Empleado': total=52 nums=0 name-like=14 unique_strs=52
+      col6 'Trabajo': total=52 nums=0 name-like=0 unique_strs=19
+         sample_uniques: ['Adrián', 'Agua', 'Alejandro', 'Auxiliar', 'Chofer', 'Enfermera', 'Farmacia', 'Galpón']
+      col7 'None': total=52 nums=0 name-like=0 unique_strs=2
+         sample_uniques: ['En blanco y en negro', 'en negro']
+      col8 '0': total=49 nums=49 name-like=0 unique_strs=0
+      col9 '0': total=47 nums=46 name-like=0 unique_strs=1
+         sample_uniques: ['Total:']
+      col10 'Sueldo': total=47 nums=47 name-like=0 unique_strs=0
+    names_inferred [14]: ['Carranza Jorge', 'Farías Oriana', 'Garay Adrián', 'Garay John', 'Gravino Juan José', 'Loza Alejandro', 'Mariño Laly', 'Miguel Carranza', 'Sosa Luciana', 'Sosa Macarena', 'Toledo Romina', 'Toledo Ruly', 'Toledo Valentina', 'Zapata José']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+================================================================================
+FILE: Gatos municipalidad oct-nov-dic.xlsx
+================================================================================
+  Sheets: ['Turismo y cultura', 'Concejales', 'Empleados', 'Vestuarios ', 'Profesionales y publicidad', 'Octubre', 'Noviembre', 'Diciembre']
+
+  --- Sheet: 'Turismo y cultura' rows=12 cols=22 ---
+    header_row=1 (non-empty=20)
+    headers: [None, 'Agosto', 'Septiemrbe', 'Octubre', 'Septiembre', 'Septiemrbe', 'Aguinaldo', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'Bono', 'junio', 'Aguinaldo', 'julio', None, 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    sample rows:
+      r2: ['Vero Gómez', 50000, 50000, 50000, 50000, 50000, None, None, None, None, 75000, 85000, 50000, 95000, 50000, 100000, 20000, 150000, 100000, 150000, 100000, None]
+      r3: ['Alelí Ortiz', 50000, None, None, 50001, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+      r4: ['Giyo Toledo', 50000, 50000, 50000, 50000, 50000, None, None, None, None, 75000, 85000, 50000, 95000, 50000, 100000, None, None, 100000, 150000, 100000, None]
+    column stats (first 500 data rows):
+      col1 'None': total=11 nums=0 name-like=10 unique_strs=11
+         sample_uniques: ['Alelí Ortiz', 'Camila Soria', 'Cesar Ávila', 'Giyo Toledo', 'Johana Lizardes', 'Lucrecia Pedernera', 'Sebastián Chánchez', 'Tatiana Barrios']
+      col2 'Agosto': total=5 nums=5 name-like=0 unique_strs=0
+      col3 'Septiemrbe': total=6 nums=6 name-like=0 unique_strs=0
+      col4 'Octubre': total=6 nums=6 name-like=0 unique_strs=0
+      col5 'Septiembre': total=5 nums=5 name-like=0 unique_strs=0
+      col6 'Septiemrbe': total=6 nums=6 name-like=0 unique_strs=0
+      col7 'Aguinaldo': total=2 nums=2 name-like=0 unique_strs=0
+      col8 'enero': total=3 nums=3 name-like=0 unique_strs=0
+      col9 'febrero': total=3 nums=3 name-like=0 unique_strs=0
+      col10 'marzo': total=3 nums=3 name-like=0 unique_strs=0
+      col11 'abril': total=8 nums=8 name-like=0 unique_strs=0
+      col12 'mayo': total=8 nums=8 name-like=0 unique_strs=0
+      col13 'Bono': total=8 nums=8 name-like=0 unique_strs=0
+      col14 'junio': total=8 nums=8 name-like=0 unique_strs=0
+      col15 'Aguinaldo': total=8 nums=8 name-like=0 unique_strs=0
+      col16 'julio': total=8 nums=8 name-like=0 unique_strs=0
+      col17 'None': total=4 nums=4 name-like=0 unique_strs=0
+      col18 'agosto': total=7 nums=7 name-like=0 unique_strs=0
+      col19 'septiembre': total=10 nums=10 name-like=0 unique_strs=0
+      col20 'octubre': total=10 nums=10 name-like=0 unique_strs=0
+      col21 'noviembre': total=9 nums=9 name-like=0 unique_strs=0
+      col22 'diciembre': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [10]: ['Alelí Ortiz', 'Camila Soria', 'Cesar Ávila', 'Giyo Toledo', 'Johana Lizardes', 'Lucrecia Pedernera', 'Sebastián Chánchez', 'Tatiana Barrios', 'Vero Gómez', 'Vivas Carranza Anita']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Concejales' rows=125 cols=38 ---
+    header_row=1 (non-empty=24)
+    headers: [None, 'Alias', None, 'Diciembre', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Aguinaldo', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, 'Enero', 'Febrero', 'Marzo', 'Abril', None, 'Mayo', 'Junio', 'Aguinaldo', 'Julio', None, 'Agosto', None, 'Septiembre', 'Octubre', None, 'Noviembre', None, 'Diciembre', 'Horas extras', 'Medio Aguinaldo']
+    sample rows:
+      r2: ['Concejales', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+      r3: ['María del Pino', '720246188000036000000*', None, None, 30000, 30000, 30000, 30000, 30000, 30000, 15000, 30000, 40000, 40000, 40000, 40000, 40000, 20000, 40000, 40000, 140000, 160000, None, 170000, 180000, 40000, 88000, 100000, 88000, 100000, 88000, 88000, 100000, 88000, 100000, 88000, None, 44000]
+      r4: ['David Huenz', 'FUTBOL.SAN.PEDRO', None, None, 30000, 30000, 30000, 30000, 30000, 30000, 15000, 30000, 30000, 40000, 40000, 40000, 40000, None, 40000, 40000, 240000, 260000, None, 270000, 280000, 40000, 88000, 220000, 88000, 220000, 88000, 88000, None, 88000, None, 88000, None, 44000]
+    column stats (first 500 data rows):
+      col1 'None': total=14 nums=0 name-like=12 unique_strs=14
+         sample_uniques: ['Aldrin Garay', 'Alejandro Loza', 'Avila Antonella', 'Caro Ávila', 'Concejales', 'David Huenz', 'Elpidio Sosa', 'Gastos:']
+      col2 'Alias': total=8 nums=0 name-like=0 unique_strs=8
+         sample_uniques: ['720246188000036000000*', 'CARRANZAGUADI.mp', 'FACU.CARO.GABI', 'FUTBOL.SAN.PEDRO', 'MDIGAUDIOTOLE.NX.ARS', 'anto.avila99', 'cala.oro.zar', 'tomy.78']
+      col5 'Enero': total=12 nums=12 name-like=0 unique_strs=0
+      col6 'Febrero': total=12 nums=12 name-like=0 unique_strs=0
+      col7 'Marzo': total=12 nums=12 name-like=0 unique_strs=0
+      col8 'Abril': total=12 nums=12 name-like=0 unique_strs=0
+      col9 'Mayo': total=12 nums=12 name-like=0 unique_strs=0
+      col10 'Junio': total=12 nums=12 name-like=0 unique_strs=0
+      col11 'Aguinaldo': total=12 nums=12 name-like=0 unique_strs=0
+      col12 'Julio': total=12 nums=12 name-like=0 unique_strs=0
+      col13 'Agosto': total=12 nums=12 name-like=0 unique_strs=0
+      col14 'Septiembre': total=12 nums=12 name-like=0 unique_strs=0
+      col15 'Octubre': total=12 nums=12 name-like=0 unique_strs=0
+      col16 'Noviembre': total=12 nums=12 name-like=0 unique_strs=0
+      col17 'Diciembre': total=11 nums=11 name-like=0 unique_strs=0
+      col18 'None': total=7 nums=7 name-like=0 unique_strs=0
+      col19 'Enero': total=12 nums=12 name-like=0 unique_strs=0
+      col20 'Febrero': total=12 nums=12 name-like=0 unique_strs=0
+      col21 'Marzo': total=12 nums=12 name-like=0 unique_strs=0
+      col22 'Abril': total=12 nums=12 name-like=0 unique_strs=0
+      col23 'None': total=1 nums=0 name-like=1 unique_strs=1
+         sample_uniques: ['Laly Mariño']
+      col24 'Mayo': total=12 nums=12 name-like=0 unique_strs=0
+      col25 'Junio': total=13 nums=13 name-like=0 unique_strs=0
+      col26 'Aguinaldo': total=13 nums=13 name-like=0 unique_strs=0
+      col27 'Julio': total=12 nums=12 name-like=0 unique_strs=0
+      col28 'None': total=6 nums=6 name-like=0 unique_strs=0
+      col29 'Agosto': total=12 nums=12 name-like=0 unique_strs=0
+      col30 'None': total=5 nums=5 name-like=0 unique_strs=0
+      col31 'Septiembre': total=12 nums=12 name-like=0 unique_strs=0
+      col32 'Octubre': total=13 nums=13 name-like=0 unique_strs=0
+      col33 'None': total=4 nums=4 name-like=0 unique_strs=0
+      col34 'Noviembre': total=10 nums=10 name-like=0 unique_strs=0
+      col35 'None': total=4 nums=4 name-like=0 unique_strs=0
+      col36 'Diciembre': total=12 nums=12 name-like=0 unique_strs=0
+      col38 'Medio Aguinaldo': total=11 nums=11 name-like=0 unique_strs=0
+    names_inferred [12]: ['Aldrin Garay', 'Alejandro Loza', 'Avila Antonella', 'Caro Ávila', 'David Huenz', 'Elpidio Sosa', 'Guada Carranza', 'Julio Ávila', 'Laly Mariño', 'María del Pino', 'Milagro Di Gaudio', 'Rosa Estanciero']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Empleados' rows=95 cols=33 ---
+    header_row=1 (non-empty=22)
+    headers: [None, None, None, 'Alias', None, 'Enero', 'Febrero', 'HE', 'Marzo', 'Horas extras', 'Abril', 'Horas extras', 'Mayo', 'Horas extras', 'Junio', 'Horas extras', 'Medio aguinaldo', 'Julio', 'Horas extras', 'Agosto', 'Horas extras', 'Septiembre', 'Horas extras', 'Octubre', None, None, 'Noviembre', None, 'Diciembre', 'Horas exteras', 'Medio aguinaldo', None, None]
+    sample rows:
+      r2: [1, 85000, 'Árias Pilar', 'MARIAS6792.NX.ARS', None, None, 250000, None, 130000, None, 130000, None, 150000, None, 200000, None, 100000, 220000, None, 220000, None, 220000, None, 220000, None, None, 220000, None, 220000, None, 110000, None, None]
+      r3: [2, 160000, 'Ávila Adriana', None, 'en negro', 60000, 160000, None, 160000, 10000, 180000, None, 190000, 10000, 200000, None, 100000, 220000, None, 220000, None, 220000, None, 220000, 12300, None, 220000, None, 220000, None, 110000, None, None]
+      r4: [None, 55000, 'Ávila Cesar', 'cesaravila.mp', 'en negro', 55000, 55000, None, 55000, None, 75000, None, 'Cultura y turismo', None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=66 nums=66 name-like=0 unique_strs=0
+      col2 'None': total=89 nums=83 name-like=0 unique_strs=6
+         sample_uniques: ['Efectivo', 'Jubilados (efectivo)', 'No trabaja más', 'Recibo de sueldo', 'Trafic', 'Transferencia']
+      col3 'None': total=86 nums=0 name-like=84 unique_strs=86
+      col4 'Alias': total=29 nums=0 name-like=0 unique_strs=29
+         sample_uniques: ['200318211000001000000*', '3840200500000017197720*', '7900273525780080*', 'AMOYA5745.NX.ARS', 'ARIETE.BORLAS.SALIDA', 'AlanBarrios.SPN', 'COSMOS.ABUELA.FIDEO', 'DITORIO.BALA.ABEJA']
+      col5 'None': total=66 nums=0 name-like=0 unique_strs=6
+         sample_uniques: ['Blanco', 'En blanco', 'En nero', 'Negro', 'en negro', 'negro']
+      col6 'Enero': total=63 nums=63 name-like=0 unique_strs=0
+      col7 'Febrero': total=64 nums=64 name-like=0 unique_strs=0
+      col8 'HE': total=10 nums=10 name-like=0 unique_strs=0
+      col9 'Marzo': total=64 nums=64 name-like=0 unique_strs=0
+      col10 'Horas extras': total=11 nums=11 name-like=0 unique_strs=0
+      col11 'Abril': total=62 nums=62 name-like=0 unique_strs=0
+      col12 'Horas extras': total=1 nums=1 name-like=0 unique_strs=0
+      col13 'Mayo': total=61 nums=57 name-like=0 unique_strs=2
+         sample_uniques: ['Apoyo deportivo', 'Cultura y turismo']
+      col14 'Horas extras': total=11 nums=11 name-like=0 unique_strs=0
+      col15 'Junio': total=58 nums=58 name-like=0 unique_strs=0
+      col16 'Horas extras': total=19 nums=18 name-like=0 unique_strs=1
+         sample_uniques: ['$750.000 ch 1586']
+      col17 'Medio aguinaldo': total=58 nums=58 name-like=0 unique_strs=0
+      col18 'Julio': total=59 nums=59 name-like=0 unique_strs=0
+      col19 'Horas extras': total=9 nums=9 name-like=0 unique_strs=0
+      col20 'Agosto': total=62 nums=62 name-like=0 unique_strs=0
+      col21 'Horas extras': total=17 nums=17 name-like=0 unique_strs=0
+      col22 'Septiembre': total=59 nums=59 name-like=0 unique_strs=0
+      col23 'Horas extras': total=13 nums=12 name-like=0 unique_strs=1
+         sample_uniques: ['$1.000.000,00 Ch 1609']
+      col24 'Octubre': total=65 nums=65 name-like=0 unique_strs=0
+      col25 'None': total=22 nums=22 name-like=0 unique_strs=0
+      col26 'None': total=1 nums=1 name-like=0 unique_strs=0
+      col27 'Noviembre': total=64 nums=64 name-like=0 unique_strs=0
+      col28 'None': total=18 nums=18 name-like=0 unique_strs=0
+      col29 'Diciembre': total=67 nums=67 name-like=0 unique_strs=0
+      col30 'Horas exteras': total=12 nums=12 name-like=0 unique_strs=0
+      col31 'Medio aguinaldo': total=61 nums=61 name-like=0 unique_strs=0
+    names_inferred [84]: ['Baez Santos Eduardo', 'Baez Veronica', 'Barrios Alan', 'Barrios Cristian', 'Barrios Cristina', 'Barrios Mariela', 'Barrios Martin', 'Barrios Sofía', 'Bravo Fernanda', 'Bustamante Karina', 'Busto Sandra', 'Bustos Elva', 'Bustos Ester', 'Báez Mariano', 'Cabrera Azucena', 'Cabrera Eugenia', 'Cande Ávila', 'Carlos Vera', 'Carnevale Oscar', 'Caro María Silvia']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Vestuarios ' rows=8 cols=8 ---
+    header_row=1 (non-empty=8)
+    headers: ['mayo ', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    sample rows:
+      r2: [1500000, 1500000, 1580000, 1580000, 1580000, 1500000, 800000, 1000000]
+      r3: [1500000, 1500000, 1580000, 1580000, 1580000, 800000, 1000000, 1000000]
+      r8: [None, None, None, 21580000, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'mayo ': total=2 nums=2 name-like=0 unique_strs=0
+      col2 'junio': total=2 nums=2 name-like=0 unique_strs=0
+      col3 'julio': total=2 nums=2 name-like=0 unique_strs=0
+      col4 'agosto': total=3 nums=3 name-like=0 unique_strs=0
+      col5 'septiembre': total=2 nums=2 name-like=0 unique_strs=0
+      col6 'octubre': total=2 nums=2 name-like=0 unique_strs=0
+      col7 'noviembre': total=2 nums=2 name-like=0 unique_strs=0
+      col8 'diciembre': total=2 nums=2 name-like=0 unique_strs=0
+    names_inferred [0]: []
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Profesionales y publicidad' rows=78 cols=28 ---
+    header_row=1 (non-empty=12)
+    headers: [None, None, None, 'Enero ', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', None, 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre', None, None, None, None, None, None, None, None, None, None, None, None]
+    sample rows:
+      r2: ['Abogado', 800000, 'Abogado', 450000, 450000, 450000, 450000, 470000, 800000, 800000, 800000, None, 800000, 800000, 800000, 1200000, None, None, None, None, None, None, None, None, None, None, None, None]
+      r3: ['Contador', 500000, 'Contador', 250000, 250000, 250000, 250000, 270000, 400000, 500000, 500000, None, 500000, 500000, 500000, 500000, None, None, None, None, None, None, None, None, None, None, None, None]
+      r4: ['Ingeniero', 385000, 'Ingeniero', 457000, 790000, 568400, None, 1331000, None, 1423000, 500000, None, None, None, 1020000, 1000000, None, None, None, None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'None': total=72 nums=0 name-like=32 unique_strs=69
+      col2 'None': total=5 nums=5 name-like=0 unique_strs=0
+      col3 'None': total=50 nums=7 name-like=22 unique_strs=41
+      col4 'Enero ': total=42 nums=41 name-like=0 unique_strs=1
+         sample_uniques: ['Enero']
+      col5 'Febrero': total=44 nums=43 name-like=0 unique_strs=1
+         sample_uniques: ['Febrero']
+      col6 'Marzo': total=49 nums=48 name-like=0 unique_strs=1
+         sample_uniques: ['Marzo']
+      col7 'Abril': total=46 nums=45 name-like=0 unique_strs=1
+         sample_uniques: ['Abril']
+      col8 'Mayo': total=46 nums=45 name-like=0 unique_strs=1
+         sample_uniques: ['Mayo']
+      col9 'Junio': total=48 nums=45 name-like=0 unique_strs=2
+         sample_uniques: ['$277,600 (Visa)', 'Junio']
+      col10 'Julio': total=53 nums=51 name-like=0 unique_strs=1
+         sample_uniques: ['Julio']
+      col11 'Agosto': total=58 nums=56 name-like=0 unique_strs=1
+         sample_uniques: ['Agosto']
+      col12 'None': total=1 nums=1 name-like=0 unique_strs=0
+      col13 'Septiembre': total=52 nums=50 name-like=0 unique_strs=1
+         sample_uniques: ['Septiembre']
+      col14 'Octubre': total=55 nums=53 name-like=0 unique_strs=1
+         sample_uniques: ['Octubre']
+      col15 'Noviembre': total=54 nums=52 name-like=0 unique_strs=1
+         sample_uniques: ['Noviembre']
+      col16 'Diciembre': total=53 nums=51 name-like=0 unique_strs=1
+         sample_uniques: ['Diciembre']
+      col17 'None': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [36]: ['Adri Margan', 'Azucena Cabrera', 'Azucena Magdalena Cabrera', 'Benjamín Reyna', 'Cabezón Varela', 'Camila Paredes', 'Canal C Argentina', 'Catherine Farías', 'Consorcio Caminero', 'Cooperativa Mu Patronal', 'Deán Funes Actualidad', 'Dr Paredes', 'Eduardo Díaz', 'Estación FM', 'Franco Farías', 'Guillermo Monjes', 'Juada Juárez', 'Lucero Pacheco', 'Luis Cativa', 'Mario Maidana']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Octubre' rows=146 cols=8 ---
+    header_row=1 (non-empty=3)
+    headers: ['Monto', 'Empresa', 'Modo', None, None, None, None, None]
+    sample rows:
+      r2: [60000, 'Noelia Farías', 'Transf', None, None, None, None, None]
+      r3: [2663089.02, 'YPF Ruta', 'Efectivo', None, None, None, None, None]
+      r4: [707850, 'Juan Capel (carpa) 1/2', 'Transf', None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'Monto': total=112 nums=112 name-like=0 unique_strs=0
+      col2 'Empresa': total=112 nums=0 name-like=34 unique_strs=102
+      col3 'Modo': total=106 nums=1 name-like=0 unique_strs=11
+         sample_uniques: ['Echeq', 'Echeq 11/10', 'Echeq 12/10', 'Echeq 19/10', 'Echeq 22/10', 'Echeq 26/10', 'Efectivo', 'Trans']
+    names_inferred [29]: ['Belen Papalera', 'Caballos y Placeres', 'Caminos del Interior', 'Carolina Ávila', 'Claudio Cuevas', 'DF Farma', 'Darío Alem', 'Dopazo Naveira', 'Dr Campos', 'Ferretería Tosini', 'Festival de Jineteada y Chamamé', 'Flaco Ruly', 'Florencia Requena', 'IPC Picinas', 'Impacto Color', 'Jesús Ybanovich', 'Magui Suárez', 'Martín Orozco', 'María Florencia Requena', 'Murray - La Boutique del Pesado']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Noviembre' rows=80 cols=5 ---
+    header_row=1 (non-empty=3)
+    headers: ['Monto', 'Empresa', 'Modo', None, None]
+    sample rows:
+      r2: [3360450.57, 'Santa Rita', 'Echeq 11/11/25', None, None]
+      r3: [765870, 'Diego Mamóndez (electricista', 'Transf', None, None]
+      r4: [1080000, 'Richi Constantini', 'Transf', None, None]
+    column stats (first 500 data rows):
+      col1 'Monto': total=72 nums=72 name-like=0 unique_strs=0
+      col2 'Empresa': total=71 nums=0 name-like=32 unique_strs=64
+      col3 'Modo': total=71 nums=0 name-like=0 unique_strs=10
+         sample_uniques: ['Ch 01779', 'Debin', 'Debito', 'Echeq 11/11', 'Echeq 11/11/25', 'Echeq 22/11/25', 'Echeq 25/11', 'Efectivo']
+      col4 'None': total=1 nums=0 name-like=0 unique_strs=1
+         sample_uniques: ['Ch 1613 14/12/25']
+      col5 'None': total=1 nums=1 name-like=0 unique_strs=0
+    names_inferred [26]: ['Ariel Arnaéz', 'Droguería Tarde Farma', 'Electricidad Gauss', 'Fernando Marcelo Luna', 'Horacio Adi', 'Javier Chávez', 'Julio Auad', 'Kako Martínez', 'Martín Orozco', 'Michelle Telledín', 'Murray - La Boutique del Automovil', 'Negro de Oro', 'Nicolás Papalera Farías', 'Panadería Mis Viejos', 'Raul Bustamante', 'Richi Constantini', 'Santa Rita', 'Sergio Soria', 'Sofía Monje', 'Sofía Ponce de León']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []
+
+  --- Sheet: 'Diciembre' rows=96 cols=12 ---
+    header_row=1 (non-empty=3)
+    headers: ['Monto', 'Empresa', 'Modo', None, None, None, None, None, None, None, None, None]
+    sample rows:
+      r2: [234170, 'Ricardo Palmeiro (mini pelotas festival) 2/2', 'Transf', None, None, None, None, None, None, None, None, None]
+      r3: [358997.4, 'Acerco', 'Transf', None, None, None, None, None, None, None, None, None]
+      r4: [585294, 'Xgov', 'Transf', None, None, None, None, None, None, None, None, None]
+    column stats (first 500 data rows):
+      col1 'Monto': total=95 nums=95 name-like=0 unique_strs=0
+      col2 'Empresa': total=94 nums=0 name-like=39 unique_strs=89
+      col3 'Modo': total=93 nums=0 name-like=0 unique_strs=8
+         sample_uniques: ['Debin', 'Echeq 1/4 - 13/12', 'Echeq 11/12/25', 'Echeq 22/12/2025', 'Efectivo', 'Transf', 'VEP', 'Visa']
+    names_inferred [38]: ['Adicionales Día de San Pedro Norte', 'Arbitro Liga Ischilín', 'Ariel Durán', 'Audifono Amalia', 'Carnicería Kike Rossi', 'Corazza Virginia', 'Dale Más', 'Daniel Lisowiec', 'Dra Nichelle', 'Emanuel Urquiza', 'Farmacia Mutual', 'Gingo Rizzi', 'Gomería Jesús María', 'Impacto Color', 'Independencia Piturería', 'La Casa de la Motoguadaña', 'Lubricantes Jesús María', 'Mabel Martínez', 'Magui Suárez', 'Marita Bravo']
+    secretarias_col [0]: []
+    proyectos_col [0]: []
+    cajas_col [0]: []
+    conceptos_col [0]: []

@@ -7,6 +7,7 @@ import { KpiRow, KpiSpec } from './KpiCard';
 import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
 import { ModernSelect, type SelectOption } from './ModernSelect';
+import { PrimaryButton } from './PrimaryButton';
 
 // =====================================================================
 // Toolbar declarativo (API nueva, ver REINGENIERIA_ABMPAGE_TOOLBAR.md)
@@ -487,8 +488,8 @@ export function ABMPage({
           className={`px-5 py-3 relative overflow-hidden ${effectiveSecondaryFilters ? 'rounded-t-xl' : 'rounded-xl'}`}
           style={{
             backgroundColor: theme.card,
-            border: `1px solid ${theme.border}`,
-            borderBottom: effectiveSecondaryFilters ? 'none' : `1px solid ${theme.border}`,
+            border: `1px solid ${theme.border}20`,
+            borderBottom: effectiveSecondaryFilters ? 'none' : `1px solid ${theme.border}20`,
           }}
         >
         <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap sm:flex-nowrap">
@@ -628,29 +629,14 @@ export function ABMPage({
             {/* Header Actions (ordenamiento, etc). Si hay toolbar, usa sus actions. */}
             {effectiveHeaderActions}
 
-            {/* Botón agregar */}
+            {/* Botón agregar: usa PrimaryButton canonico. */}
             {onAdd && buttonLabel && (
-              <button
+              <PrimaryButton
                 onClick={onAdd}
-                className={`
-                  inline-flex items-center h-[34px] px-3 rounded-lg font-semibold text-[12px]
-                  transition-all duration-300 ease-out
-                  hover:scale-105 hover:-translate-y-0.5
-                  active:scale-95
-                  group
-                  relative overflow-hidden
-                  flex-shrink-0
-                `}
-                style={{
-                  background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                  color: '#ffffff',
-                  boxShadow: `0 4px 14px ${theme.primary}40`,
-                }}
+                icon={buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
               >
-                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-                {buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
                 {buttonLabel}
-              </button>
+              </PrimaryButton>
             )}
           </div>
 
@@ -702,7 +688,7 @@ export function ABMPage({
             className="rounded-b-xl p-2.5 abm-secondary-filters-wrap"
             style={{
               backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
+              border: `1px solid ${theme.border}20`,
               borderTop: 'none',
             }}
           >
@@ -1674,7 +1660,7 @@ export function ABMTable<T>({
                   className={`transition-all duration-200 ${onRowClick ? 'cursor-pointer' : ''}`}
                   style={{
                     backgroundColor: index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`,
-                    borderBottom: `1px solid ${theme.border}40`,
+                    borderBottom: `1px solid ${theme.border}20`,
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${theme.primary}10`; }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`; }}

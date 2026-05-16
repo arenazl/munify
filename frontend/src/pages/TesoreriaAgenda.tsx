@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
 import { StatusPill } from '../components/ui/StatusPill';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { conceptoIcon } from '../lib/conceptoIcons';
 import { contactoIconByTipo, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import { ModernSelect } from '../components/ui/ModernSelect';
@@ -402,12 +403,16 @@ export default function TesoreriaAgenda() {
       ]}
       actions={(p) => (
         <>
-          <button onClick={(e) => { e.stopPropagation(); handleEjecutar(p); }} disabled={executingId === p.id}
-            className="px-2 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 text-white"
-            style={{ backgroundColor: '#10b981', opacity: executingId === p.id ? 0.5 : 1 }} title="Pagar ahora">
-            {executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+          <PrimaryButton
+            variant="success"
+            size="sm"
+            disabled={executingId === p.id}
+            onClick={(e) => { e.stopPropagation(); handleEjecutar(p); }}
+            title="Pagar ahora"
+            icon={executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+          >
             Pagar
-          </button>
+          </PrimaryButton>
           <ABMTableAction title="Editar" onClick={() => openSheet(p)} variant="primary" icon={<Edit2 className="h-4 w-4" />} />
           <ABMTableAction title="Eliminar" onClick={() => handleDelete(p)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
         </>

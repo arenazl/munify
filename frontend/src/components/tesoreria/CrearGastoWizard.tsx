@@ -3,6 +3,7 @@ import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
+import { PrimaryButton } from '../ui/PrimaryButton';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
@@ -416,8 +417,11 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                       showCurrentLocationButton={false}
                       inputClassName="py-1.5"
                     />
-                    <button
+                    <PrimaryButton
                       type="button"
+                      fullWidth
+                      size="sm"
+                      disabled={!direccionEditable.trim()}
                       onClick={async () => {
                         if (!direccionEditable.trim()) return;
                         const pending = (window as any).__tesoreriaPendingLatLon;
@@ -441,12 +445,9 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                           toast.error('Error guardando dirección');
                         }
                       }}
-                      disabled={!direccionEditable.trim()}
-                      className="w-full px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50"
-                      style={{ backgroundColor: theme.primary, color: '#fff' }}
                     >
                       Guardar en el contacto
-                    </button>
+                    </PrimaryButton>
                   </div>
                 )}
                 {c.latitud && c.longitud && (

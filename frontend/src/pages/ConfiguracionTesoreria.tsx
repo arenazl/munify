@@ -6,6 +6,7 @@ import {
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
+import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { useAuth } from '../contexts/AuthContext';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
@@ -260,9 +261,9 @@ function TiposConceptoTab() {
         footer={
           <div className="flex justify-end gap-2">
             <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
-            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+            <PrimaryButton onClick={save} disabled={saving} size="md">
               {saving ? 'Guardando...' : (editing ? 'Guardar cambios' : 'Crear')}
-            </button>
+            </PrimaryButton>
           </div>
         }
       >
@@ -478,9 +479,9 @@ function ConceptosTab() {
         footer={
           <div className="flex justify-end gap-2">
             <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
-            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+            <PrimaryButton onClick={save} disabled={saving} size="md">
               {saving ? 'Guardando...' : (editing ? 'Guardar cambios' : 'Crear')}
-            </button>
+            </PrimaryButton>
           </div>
         }
       >
@@ -557,9 +558,9 @@ function TiposEmpleadoTab() {
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {tipos.length} tipos. Sub-clasificación de los contactos tipo "empleado" (albañil, MMO, arquitecto, etc).
         </p>
-        <button onClick={() => openSheet()} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: theme.primary }}>
-          <Plus className="h-4 w-4" /> Nuevo tipo
-        </button>
+        <PrimaryButton onClick={() => openSheet()} icon={<Plus className="h-4 w-4" />}>
+          Nuevo tipo
+        </PrimaryButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -589,9 +590,9 @@ function TiposEmpleadoTab() {
         footer={
           <div className="flex justify-end gap-2">
             <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
-            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+            <PrimaryButton onClick={save} disabled={saving} size="md">
               {saving ? 'Guardando...' : (editing ? 'Guardar' : 'Crear')}
-            </button>
+            </PrimaryButton>
           </div>
         }
       >
@@ -769,9 +770,9 @@ function CajasTab() {
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {cajas.length} cajas. De acá se descuentan los gastos. Los ingresos suman saldo.
         </p>
-        <button onClick={() => openSheet()} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: theme.primary }}>
-          <Plus className="h-4 w-4" /> Nueva caja
-        </button>
+        <PrimaryButton onClick={() => openSheet()} icon={<Plus className="h-4 w-4" />}>
+          Nueva caja
+        </PrimaryButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -820,9 +821,9 @@ function CajasTab() {
         footer={
           <div className="flex justify-end gap-2">
             <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
-            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+            <PrimaryButton onClick={save} disabled={saving} size="md">
               {saving ? 'Guardando...' : (editing ? 'Guardar' : 'Crear')}
-            </button>
+            </PrimaryButton>
           </div>
         }
       >
@@ -1050,9 +1051,9 @@ function ParajesTab() {
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {parajes.length} parajes. Regiones del muni (Santa Rita, Los Álamos, etc). Al crear un contacto podés elegir un paraje en lugar de cargar la dirección exacta.
         </p>
-        <button onClick={() => openSheet()} className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2" style={{ backgroundColor: theme.primary }}>
-          <Plus className="h-4 w-4" /> Nuevo paraje
-        </button>
+        <PrimaryButton onClick={() => openSheet()} icon={<Plus className="h-4 w-4" />}>
+          Nuevo paraje
+        </PrimaryButton>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
@@ -1092,9 +1093,9 @@ function ParajesTab() {
         footer={
           <div className="flex justify-end gap-2">
             <button onClick={() => setSheetOpen(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: theme.backgroundSecondary, color: theme.text }}>Cancelar</button>
-            <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-sm font-semibold text-white" style={{ backgroundColor: theme.primary, opacity: saving ? 0.7 : 1 }}>
+            <PrimaryButton onClick={save} disabled={saving} size="md">
               {saving ? 'Guardando...' : (editing ? 'Guardar' : 'Crear')}
-            </button>
+            </PrimaryButton>
           </div>
         }
       >

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet } from '../ui/Sheet';
+import { PrimaryButton } from '../ui/PrimaryButton';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi } from '../../lib/api';
 import type {
@@ -208,13 +209,7 @@ export function GastoDetalleSheet({
             <Pencil className="h-3.5 w-3.5" /> Editar
           </button>
         )}
-        <button
-          onClick={onClose}
-          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
-          style={{ backgroundColor: theme.primary, color: '#ffffff' }}
-        >
-          Cerrar
-        </button>
+        <PrimaryButton onClick={onClose}>Cerrar</PrimaryButton>
       </div>
     </div>
   );
@@ -412,17 +407,14 @@ export function GastoDetalleSheet({
               >
                 <X className="h-3.5 w-3.5" /> Cancelar
               </button>
-              <button
+              <PrimaryButton
                 onClick={handleSaveObs}
                 disabled={savingObs}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                style={{ backgroundColor: theme.primary, color: '#ffffff' }}
+                size="sm"
+                icon={savingObs ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               >
-                {savingObs
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Save className="h-3.5 w-3.5" />}
                 Guardar
-              </button>
+              </PrimaryButton>
             </div>
           )}
         </div>

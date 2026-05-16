@@ -733,12 +733,20 @@ export default function Tesoreria() {
           else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
           else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
           return (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-bold tabular-nums px-1.5 py-0.5 rounded" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.textSecondary }}>
-                {d.getDate().toString().padStart(2, '0')} {d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}
-              </span>
-              <span className="font-bold text-xs" style={{ color: theme.text }}>{label}</span>
-              <span className="text-[11px]" style={{ color: theme.textSecondary }}>· {items.length} {items.length === 1 ? 'mov.' : 'mov.'}</span>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-12 text-center px-1 py-0.5 rounded-md text-[10px] uppercase font-bold leading-tight"
+                style={{ backgroundColor: theme.card, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <div className="text-base font-bold" style={{ color: theme.text }}>{d.getDate().toString().padStart(2, '0')}</div>
+                <div>{d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</div>
+              </div>
+              <div>
+                <div className="font-bold text-xs" style={{ color: theme.text }}>{label}</div>
+                <div className="text-[11px]" style={{ color: theme.textSecondary }}>
+                  {items.length} {items.length === 1 ? 'movimiento' : 'movimientos'}
+                </div>
+              </div>
             </div>
           );
         },
