@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet } from 'lucide-react';
@@ -625,16 +625,31 @@ export default function Layout() {
 
         {/* Navegación */}
         <nav className="relative z-10 flex-1 px-2 py-4 space-y-1 overflow-y-auto overflow-x-hidden">
-          {navigation.map((item) => {
+          {navigation.map((item, idx) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
+            // Header de categoría: se muestra cuando cambia respecto al anterior
+            // y el sidebar no está colapsado.
+            const itemCategoria = (item as { categoria?: string }).categoria;
+            const prevCategoria = idx > 0
+              ? (navigation[idx - 1] as { categoria?: string }).categoria
+              : undefined;
+            const showCategoryHeader = !isCollapsed && itemCategoria && itemCategoria !== prevCategoria;
             // Badge count si el item lo pide (ej: Mis Reclamos -> badges.reclamos)
             const badgeCount = (item as { badgeKey?: 'reclamos' | 'tramites' | 'tasas' }).badgeKey
               ? badges[(item as { badgeKey: 'reclamos' | 'tramites' | 'tasas' }).badgeKey]
               : 0;
             return (
+              <React.Fragment key={item.href}>
+                {showCategoryHeader && (
+                  <div
+                    className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider select-none"
+                    style={{ color: theme.sidebarTextSecondary, opacity: 0.55 }}
+                  >
+                    {itemCategoria}
+                  </div>
+                )}
               <Link
-                key={item.name}
                 to={item.href}
                 className="flex items-center py-2.5 rounded-lg text-sm font-medium active:scale-[0.98] group relative overflow-hidden"
                 style={{
@@ -700,6 +715,7 @@ export default function Layout() {
                   <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse flex-shrink-0" />
                 )}
               </Link>
+              </React.Fragment>
             );
           })}
         </nav>

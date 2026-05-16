@@ -155,9 +155,9 @@ export default function Dashboard() {
   }, []);
 
   // ====================================================================
-  // Filtro por dependencia — el dashboard NUNCA muestra todas las
-  // dependencias mezcladas: arranca pre-seleccionando la primera activa
-  // y la persiste en localStorage por municipio. El admin puede cambiarla.
+  // Filtro por dependencia — el dashboard arranca con vista consolidada
+  // ("Todas las dependencias"). El admin puede filtrar y la selección se
+  // persiste en localStorage por municipio.
   // ====================================================================
   type DependenciaItem = { id: number; nombre: string; color?: string; icono?: string };
   const [dependencias, setDependencias] = useState<DependenciaItem[]>([]);
@@ -184,7 +184,9 @@ export default function Dashboard() {
         }));
         setDependencias(items);
 
-        // Resolver selección: localStorage > primera activa > null
+        // Resolver selección: localStorage > Todas (null)
+        // Por defecto el dashboard arranca con vista consolidada de TODAS las
+        // dependencias. El admin puede filtrar y la selección se persiste.
         let nextId: number | null = null;
         if (lsKey) {
           const stored = localStorage.getItem(lsKey);
@@ -192,9 +194,6 @@ export default function Dashboard() {
             const parsed = parseInt(stored, 10);
             if (items.some(i => i.id === parsed)) nextId = parsed;
           }
-        }
-        if (nextId === null && items.length > 0) {
-          nextId = items[0].id;
         }
         setSelectedDependenciaId(nextId);
       } catch (err) {

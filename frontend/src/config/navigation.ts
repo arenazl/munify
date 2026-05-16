@@ -88,6 +88,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mi-area',
       icon: Building2,
       show: isDependencia,
+      categoria: 'Mi Área',
       description: 'Dashboard de mi dependencia'
     },
     {
@@ -95,6 +96,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/reclamos-area',
       icon: ClipboardList,
       show: isDependencia,
+      categoria: 'Mi Área',
       description: 'Reclamos de mi área'
     },
     {
@@ -102,6 +104,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/tramites-area',
       icon: FileCheck,
       show: isDependencia,
+      categoria: 'Mi Área',
       description: 'Trámites de mi área'
     },
     {
@@ -109,6 +112,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mapa',
       icon: Map,
       show: isDependencia,
+      categoria: 'Mi Área',
       description: 'Ver ubicaciones'
     },
     {
@@ -116,18 +120,17 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/estadisticas-area',
       icon: BarChart3,
       show: isDependencia,
+      categoria: 'Mi Área',
       description: 'Rendimiento del área'
     },
 
     // === SECCIÓN GESTORES (Admin/Supervisor) ===
-    // Cada item declara su `modulo` y `show` chequea moduloOn() — si el
-    // municipio tiene una fila explicita activo=False en municipio_modulos
-    // para esa clave, el item desaparece. Si no hay fila, asume activo.
     {
       name: 'Dashboard',
       href: '/gestion',
       icon: Home,
       show: isAdminOrSupervisor && moduloOn('dashboard'),
+      categoria: 'Principal',
       description: 'Resumen y métricas'
     },
     {
@@ -135,6 +138,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/reclamos',
       icon: ClipboardList,
       show: isAdminOrSupervisor && moduloOn('reclamos'),
+      categoria: 'Principal',
       description: 'Gestionar todos los reclamos'
     },
     {
@@ -142,13 +146,31 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/tramites',
       icon: FileCheck,
       show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Principal',
       description: 'Gestionar trámites'
+    },
+    {
+      name: 'Mapa',
+      href: '/gestion/mapa',
+      icon: Map,
+      show: isAdminOrSupervisor && moduloOn('mapa'),
+      categoria: 'Principal',
+      description: 'Ver reclamos en el mapa'
+    },
+    {
+      name: 'Mostrador',
+      href: '/gestion/mostrador',
+      icon: ScanLine,
+      show: esFuncionarioMuni && moduloOn('mostrador'),
+      categoria: 'Atención al vecino',
+      description: 'Ventanilla asistida — biometría + trámite presencial'
     },
     {
       name: 'Tasas',
       href: '/gestion/tasas',
       icon: Receipt,
       show: isAdminOrSupervisor && moduloOn('tasas'),
+      categoria: 'Atención al vecino',
       description: 'Partidas del padrón y deudas'
     },
     {
@@ -156,36 +178,23 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/pagos',
       icon: Wallet,
       show: isAdminOrSupervisor && moduloOn('pagos'),
+      categoria: 'Atención al vecino',
       description: 'Histórico transaccional para contaduría'
     },
     {
-      name: 'Mostrador',
-      href: '/gestion/mostrador',
-      icon: ScanLine,
-      show: esFuncionarioMuni && moduloOn('mostrador'),
-      description: 'Ventanilla asistida — biometría + trámite presencial'
-    },
-    {
-      // Tesoreria sigue siendo OPT-IN: solo aparece si esta en modulosActivos
-      // (no por moduloOn). Es legacy y queremos preservarlo asi por ahora.
       name: 'Tesorería',
       href: '/gestion/tesoreria',
       icon: Receipt,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Finanzas',
       description: 'Control de gastos del municipio'
-    },
-    {
-      name: 'Mapa',
-      href: '/gestion/mapa',
-      icon: Map,
-      show: isAdminOrSupervisor && moduloOn('mapa'),
-      description: 'Ver reclamos en el mapa'
     },
     {
       name: 'Tablero',
       href: '/gestion/tablero',
       icon: Wrench,
       show: isAdminOrSupervisor && moduloOn('tablero'),
+      categoria: 'Operación',
       description: 'Tablero Kanban'
     },
     {
@@ -193,6 +202,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/planificacion',
       icon: CalendarDays,
       show: isAdminOrSupervisor && moduloOn('planificacion'),
+      categoria: 'Operación',
       description: 'Calendario semanal del personal'
     },
     {
@@ -200,6 +210,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/sla',
       icon: Clock,
       show: isAdminOrSupervisor && moduloOn('sla'),
+      categoria: 'Operación',
       description: 'Gestión de SLA'
     },
     {
@@ -207,17 +218,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/panel-bi',
       icon: LayoutDashboard,
       show: isAdminOrSupervisor && moduloOn('panel-bi'),
+      categoria: 'Operación',
       description: 'Consultas y análisis con IA'
     },
-    // === ABMs per-municipio (refactor trámites/categorías) ===
-    // Se muestran sólo si el muni tiene `abm_en_sidebar=true`. Los munis
-    // creados por el flow de demo arrancan en false → estos 3 quedan
-    // accesibles únicamente desde /gestion/configuracion.
+    // === ABMs per-municipio ===
     {
       name: 'Categorías Reclamo',
       href: '/gestion/categorias-reclamo',
       icon: FolderTree,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
+      categoria: 'Configuración',
       description: 'Categorías de reclamos del municipio'
     },
     {
@@ -225,6 +235,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/categorias-tramite',
       icon: FolderTree,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
+      categoria: 'Configuración',
       description: 'Categorías de trámites del municipio'
     },
     {
@@ -232,14 +243,24 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/tramites-config',
       icon: FileText,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
-      description: 'Trámites específicos del municipio (ej: Licencia de Conducir)'
+      categoria: 'Configuración',
+      description: 'Trámites específicos del municipio'
     },
-    // === Solo SUPERADMIN (admin sin municipio asignado) ===
+    {
+      name: 'Configuración',
+      href: '/gestion/configuracion',
+      icon: Settings,
+      show: isAdminOrSupervisor,
+      categoria: 'Configuración',
+      description: 'Configuración del sistema'
+    },
+    // === Solo SUPERADMIN ===
     {
       name: 'Municipios',
       href: '/gestion/municipios',
       icon: Building2,
       show: isSuperAdmin,
+      categoria: 'Super Admin',
       description: 'Alta y gestión de municipios (cross-tenant)'
     },
     {
@@ -247,6 +268,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/admin/suscripciones',
       icon: Building2,
       show: isSuperAdmin,
+      categoria: 'Super Admin',
       description: 'Municipios suscriptos, plan, estado y próxima facturación'
     },
     {
@@ -254,21 +276,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/admin/audit-logs',
       icon: Activity,
       show: isSuperAdmin,
-      description: 'Consola de auditoría cross-municipio (resumen + logs)'
+      categoria: 'Super Admin',
+      description: 'Consola de auditoría cross-municipio'
     },
     {
       name: 'Config sidebar',
       href: '/gestion/sidebar-config',
       icon: Layers,
       show: isSuperAdmin,
+      categoria: 'Super Admin',
       description: 'Configurar qué items del menú ve cada municipio'
-    },
-    {
-      name: 'Configuración',
-      href: '/gestion/configuracion',
-      icon: Settings,
-      show: isAdminOrSupervisor,
-      description: 'Configuración del sistema'
     },
 
     // === SECCIÓN VECINOS ===
@@ -277,6 +294,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mi-panel',
       icon: Home,
       show: isVecino,
+      categoria: 'Mi cuenta',
       description: 'Tu panel personal'
     },
     {
@@ -284,6 +302,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mis-reclamos',
       icon: ClipboardList,
       show: isVecino,
+      categoria: 'Mi cuenta',
       description: 'Ver tus reclamos',
       badgeKey: 'reclamos',
     },
@@ -292,6 +311,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mis-tramites',
       icon: FileCheck,
       show: isVecino,
+      categoria: 'Mi cuenta',
       description: 'Ver tus trámites',
       badgeKey: 'tramites',
     },
@@ -300,6 +320,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mis-tasas',
       icon: BarChart3,
       show: isVecino,
+      categoria: 'Mi cuenta',
       description: 'Tasas y boletas pendientes (ABL, patente, multas)',
       badgeKey: 'tasas',
     },
@@ -308,6 +329,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mapa',
       icon: Map,
       show: isVecino,
+      categoria: 'Mi cuenta',
       description: 'Ver mapa de reclamos'
     },
     {
@@ -315,6 +337,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/logros',
       icon: Trophy,
       show: isVecino,
+      categoria: 'Mi cuenta',
       description: 'Tus logros y puntos'
     },
   ].filter(item => item.show && !hrefsOcultos.has(item.href));
