@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Wallet, Loader2 } from 'lucide-react';
+import { Wallet, Loader2, ClipboardList, FileCheck, Receipt, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -16,13 +16,40 @@ interface ModuloDef {
 
 const MODULOS: ModuloDef[] = [
   {
+    key: 'reclamos',
+    name: 'Reclamos',
+    icon: ClipboardList,
+    description: 'Vecinos cargan reclamos de servicios públicos. Asignación a dependencias, seguimiento de estado y resolución.',
+    color: '#3b82f6',
+  },
+  {
+    key: 'tramites',
+    name: 'Trámites',
+    icon: FileCheck,
+    description: 'Solicitudes formales con documentos requeridos: licencias, habilitaciones, certificados. Workflow de aprobación.',
+    color: '#8b5cf6',
+  },
+  {
+    key: 'tasas',
+    name: 'Tasas',
+    icon: Receipt,
+    description: 'Cobranza de tasas municipales: ABL, comercio, contribuciones. Padrón y cuentas corrientes.',
+    color: '#f59e0b',
+  },
+  {
+    key: 'pagos',
+    name: 'Pagos',
+    icon: Wrench,
+    description: 'Histórico transaccional para contaduría: cobros de tasas/trámites + conciliación con caja.',
+    color: '#06b6d4',
+  },
+  {
     key: 'tesoreria',
     name: 'Tesorería',
     icon: Wallet,
     description: 'Control de gastos del intendente: registra pagos, cargá la agenda de contactos, ubicalos en el mapa y proyectá cobros futuros.',
     color: '#22c55e',
   },
-  // Futuros modulos van acá.
 ];
 
 /**

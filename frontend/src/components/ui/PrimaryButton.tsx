@@ -65,15 +65,17 @@ export function primaryButtonStyle(
   variant: Variant,
   themePrimary: string,
   themePrimaryHover: string | undefined,
-  themeCard?: string,
-  themeText?: string,
-  themeBorder?: string,
 ): CSSProperties {
   if (variant === 'ghost') {
+    // Tinta sutil del acento sobre fondo card -> diagonal pareja para que
+    // se note el gradient. Border ligeramente teñido del acento.
     return {
-      background: `linear-gradient(${GRADIENT_ANGLE}, ${themePrimary}12 0%, ${themeCard || 'transparent'} 100%)`,
-      color: themeText || '#ffffff',
-      border: `1px solid ${themeBorder || themePrimary}30`,
+      background:
+        `linear-gradient(${GRADIENT_ANGLE},` +
+        ` color-mix(in srgb, ${themePrimary} 18%, transparent) 0%,` +
+        ` color-mix(in srgb, ${themePrimary} 6%, transparent) 100%)`,
+      color: themePrimary,
+      border: `1px solid color-mix(in srgb, ${themePrimary} 35%, transparent)`,
     };
   }
   const { base, hover } = resolvePrimaryColors(variant, themePrimary, themePrimaryHover);
@@ -110,7 +112,7 @@ export function PrimaryButton({
         ${fullWidth ? 'w-full' : ''}
         ${className}
       `}
-      style={primaryButtonStyle(variant, theme.primary, theme.primaryHover, theme.card, theme.text, theme.border)}
+      style={primaryButtonStyle(variant, theme.primary, theme.primaryHover)}
     >
       {/* Ripple horizontal al hover (gloss) */}
       <span

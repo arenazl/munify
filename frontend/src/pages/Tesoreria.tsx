@@ -627,7 +627,7 @@ export default function Tesoreria() {
 
   // Accesos rapidos como headerActions. Look canonico: gradient ghost del
   // acento del tema (primaryButtonStyle 'ghost' = tinta sutil + border 30).
-  const ghostStyle = primaryButtonStyle('ghost', theme.primary, theme.primaryHover, theme.card, theme.text, theme.border);
+  const ghostStyle = primaryButtonStyle('ghost', theme.primary, theme.primaryHover);
   const ghostClass = "inline-flex items-center gap-2 h-[34px] px-3 rounded-lg text-[12px] font-semibold transition-all hover:scale-105 hover:-translate-y-0.5 active:scale-95";
   const headerActions = (
     <>
@@ -1183,7 +1183,7 @@ export default function Tesoreria() {
       )}
 
       <ABMPage
-        title="Tesorería"
+        title="Pagos"
         icon={<Wallet className="h-5 w-5" />}
         buttonLabel="Nuevo Gasto"
         onAdd={() => setWizardOpen(true)}

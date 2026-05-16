@@ -183,15 +183,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Histórico transaccional para contaduría'
     },
     {
-      name: 'Tesorería',
+      name: 'Pagos',
       href: '/gestion/tesoreria',
       icon: Receipt,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Tesorería',
-      description: 'Control de gastos del municipio'
+      description: 'Listado de gastos del municipio'
     },
     {
-      name: 'Pagos',
+      name: 'Pagos programados',
       href: '/gestion/tesoreria/agenda',
       icon: CalendarClock,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
