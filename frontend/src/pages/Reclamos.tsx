@@ -10,6 +10,7 @@ import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsi
 import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { StatusPill } from '../components/ui/StatusPill';
+import { RevisionIAPanel, RevisionIAItem } from '../components/ui/RevisionIAPanel';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
 import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
@@ -149,6 +150,10 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
+
+  // Revisión IA — items sugeridos por el backend (Gemini). Cacheados 1h.
+  const [revisionIA, setRevisionIA] = useState<RevisionIAItem[]>([]);
+  const [revisionIALoading, setRevisionIALoading] = useState(false);
 
   // Vista guiada (Inbox) vs vista grilla clásica.
   // Misma lógica que GestionTramites: clasifica reclamos en secciones por
@@ -446,6 +451,33 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         setDependenciasDisponibles([]);
       });
     }
+  }, [soloMisTrabajos]);
+
+  // Revisión IA — carga al montar (solo admin/supervisor, no para empleados).
+  // El backend cachea 1h por muni, asi que es barato volver a montar.
+  useEffect(() => {
+    if (soloMisTrabajos) return;
+    let cancelled = false;
+    setRevisionIALoading(true);
+    reclamosApi.getRevisionIA(false)
+      .then((res) => {
+        if (cancelled) return;
+        const raw = res.data?.items || [];
+        const mapped: RevisionIAItem[] = raw.map((it: any) => ({
+          resourceId: it.reclamo_id || 0,
+          tipo: it.tipo || 'sospechoso',
+          confianza: Number(it.confianza) || 0,
+          hint: it.hint || '',
+          titulo: it.titulo || '',
+          categoria: it.categoria || undefined,
+          fecha: it.fecha || undefined,
+          es_demo: !!it.es_demo,
+        }));
+        setRevisionIA(mapped);
+      })
+      .catch((e) => console.error('[Reclamos] Error cargando Revision IA:', e))
+      .finally(() => { if (!cancelled) setRevisionIALoading(false); });
+    return () => { cancelled = true; };
   }, [soloMisTrabajos]);
 
   // Para empleados: calcular conteos desde los reclamos cargados
@@ -4338,6 +4370,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         sheetDescription=""
         onSheetClose={() => {}}
         extraFilters={undefined}
+        sidePanel={!soloMisTrabajos ? (
+          <RevisionIAPanel
+            items={revisionIA}
+            loading={revisionIALoading}
+            onEdit={(it) => {
+              const target = reclamos.find(r => r.id === it.resourceId);
+              if (target) openViewSheet(target);
+            }}
+            onDismiss={(it) => {
+              setRevisionIA(prev => prev.filter(x => x.resourceId !== it.resourceId));
+            }}
+          />
+        ) : undefined}
         headerActions={
           <div className="flex items-center gap-1.5">
             <button

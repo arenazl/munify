@@ -942,6 +942,66 @@ async def get_mi_historial(
 
 
 # ===========================================
+# ===========================================
+# Revision IA — analiza los ultimos reclamos del muni con Gemini y devuelve
+# items que vale la pena revisar (duplicados, sospechosos, sin asignar, etc).
+# Resultado cacheado 1h por muni. Solo admin/supervisor.
+# ===========================================
+@router.get("/revision-ia")
+async def reclamos_revision_ia(
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve `{ items: [{ reclamo_id, tipo, confianza, hint, titulo, categoria, fecha, es_demo }] }`.
+    Usar `?force=true` para saltear el cache.
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor")
+    if not current_user.municipio_id:
+        return {"items": []}
+
+    from services.revision_ia import analizar_reclamos
+
+    # Cargamos los ultimos 80 reclamos del muni (suficiente contexto sin
+    # explotar el prompt). Solo campos relevantes para el analisis.
+    result = await db.execute(
+        select(Reclamo)
+        .options(
+            selectinload(Reclamo.categoria),
+            selectinload(Reclamo.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
+        )
+        .where(Reclamo.municipio_id == current_user.municipio_id)
+        .order_by(Reclamo.created_at.desc())
+        .limit(80)
+    )
+    reclamos = result.scalars().all()
+    payload = [
+        {
+            "id": r.id,
+            "titulo": r.titulo,
+            "descripcion": r.descripcion,
+            "estado": r.estado.value if r.estado else None,
+            "direccion": r.direccion,
+            "fecha_iso": r.created_at.isoformat() if r.created_at else None,
+            "categoria": r.categoria.nombre if r.categoria else None,
+            "dependencia": (
+                r.dependencia_asignada.dependencia.nombre
+                if r.dependencia_asignada and r.dependencia_asignada.dependencia
+                else None
+            ),
+        }
+        for r in reclamos
+    ]
+    items = await analizar_reclamos(
+        municipio_id=current_user.municipio_id,
+        reclamos=payload,
+        force=force,
+    )
+    return {"items": items}
+
+
+# ===========================================
 # RUTAS CON PARÁMETRO {reclamo_id}
 # ===========================================
 

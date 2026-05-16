@@ -304,6 +304,7 @@ export const reclamosApi = {
   getAll: (params?: Record<string, string | number>) => api.get('/reclamos', { params }),
   getMisReclamos: (params?: { skip?: number; limit?: number }) => api.get('/reclamos/mis-reclamos', { params }),
   getMisEstadisticas: () => api.get('/reclamos/mis-estadisticas'),
+  getRevisionIA: (force = false) => api.get('/reclamos/revision-ia', { params: { force } }),
   getMiHistorial: (params?: { skip?: number; limit?: number; estado?: string }) =>
     api.get('/reclamos/mi-historial', { params }),
   getOne: (id: number) => api.get(`/reclamos/${id}`),
