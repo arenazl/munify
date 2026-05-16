@@ -575,7 +575,7 @@ export default function TesoreriaMapa() {
         buttonLabel="Nuevo Gasto"
         onAdd={() => setWizardOpen(true)}
         loading={loading}
-        isEmpty={!loading && listaContactos.length === 0}
+        isEmpty={!loading && contactos.length === 0}
         emptyMessage="No hay contactos visibles. Ajustá los filtros o agregá ubicaciones a los contactos."
       >
         <div className="col-span-full grid grid-cols-1 lg:grid-cols-4 gap-3" style={{ height: 'calc(100vh - 200px)' }}>
