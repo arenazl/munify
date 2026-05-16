@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Outlet, Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet } from 'lucide-react';
+import { Menu, X, LogOut, Palette, Settings, ChevronLeft, ChevronRight, User, ChevronDown, Bell, Home, ClipboardList, Wrench, Map, Trophy, BarChart3, History, FileCheck, AlertCircle, BellRing, Check, Image, Upload, Loader2, Plus, Building2, MapPin, HelpCircle, Sparkles, Wallet, ScanLine, Calendar, TrendingUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
@@ -26,11 +26,11 @@ const getMobileTabs = (userRole: string) => {
   const isAdminOrSupervisor = isAdmin || isSupervisor;
 
   if (isAdminOrSupervisor) {
-    // Admin/Supervisor: Reclamos es la acción principal (centro), Trámites al lado
+    // Admin/Supervisor: 4 tabs + boton "+" central que abre menu con todo.
     return [
       { path: '/gestion', icon: Home, label: 'Inicio', end: true },
-      { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
       { path: '/gestion/reclamos', icon: ClipboardList, label: 'Reclamos', end: false },
+      { isCreateMenu: true as const, label: 'Más', icon: Plus },
       { path: '/gestion/tramites', icon: FileCheck, label: 'Trámites', end: false },
       { path: '/gestion/tesoreria', icon: Wallet, label: 'Tesorería', end: false },
     ];
@@ -1296,54 +1296,48 @@ export default function Layout() {
                 animation: 'slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)'
               }}
             >
-              <div className="flex items-center justify-around gap-2">
-                {/* Reclamo */}
-                <button
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    navigate('/gestion/crear-reclamo');
-                  }}
-                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1.5px solid ${theme.border}`,
-                    minWidth: '80px'
-                  }}
-                >
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: '#ef444415' }}
-                  >
-                    <AlertCircle className="h-6 w-6" style={{ color: '#ef4444' }} />
-                  </div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#ef4444' }}>
-                    Reclamo
-                  </span>
-                </button>
-
-                {/* Trámite */}
-                <button
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    navigate('/gestion/crear-tramite');
-                  }}
-                  className="flex flex-col items-center gap-2 px-4 py-3 rounded-2xl transition-all active:scale-95"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1.5px solid ${theme.border}`,
-                    minWidth: '80px'
-                  }}
-                >
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: '#10b98115' }}
-                  >
-                    <FileCheck className="h-6 w-6" style={{ color: '#10b981' }} />
-                  </div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: '#10b981' }}>
-                    Trámite
-                  </span>
-                </button>
+              <div className="grid grid-cols-3 gap-2">
+                {(() => {
+                  // Items del menu central. Admin/Supervisor ve accesos a todas
+                  // las pantallas relevantes. Vecino solo ve Reclamo/Tramite.
+                  const items: Array<{ label: string; icon: any; color: string; onClick: () => void }> = [];
+                  if (user?.rol === 'admin' || user?.rol === 'supervisor') {
+                    items.push(
+                      { label: 'Mapa', icon: Map, color: '#3b82f6', onClick: () => navigate('/gestion/mapa') },
+                      { label: 'Mostrador', icon: ScanLine, color: '#8b5cf6', onClick: () => navigate('/gestion/mostrador') },
+                      { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
+                      { label: 'Contactos', icon: User, color: '#06b6d4', onClick: () => navigate('/gestion/tesoreria/contactos') },
+                      { label: 'Resumen', icon: TrendingUp, color: '#10b981', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
+                      { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
+                    );
+                  } else {
+                    items.push(
+                      { label: 'Reclamo', icon: AlertCircle, color: '#ef4444', onClick: () => navigate('/gestion/crear-reclamo') },
+                      { label: 'Trámite', icon: FileCheck, color: '#10b981', onClick: () => navigate('/gestion/crear-tramite') },
+                    );
+                  }
+                  return items.map((it) => (
+                    <button
+                      key={it.label}
+                      onClick={() => { setCreateMenuOpen(false); it.onClick(); }}
+                      className="flex flex-col items-center gap-1 px-2 py-3 rounded-2xl transition-all active:scale-95"
+                      style={{
+                        backgroundColor: theme.backgroundSecondary,
+                        border: `1.5px solid ${theme.border}`,
+                      }}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: `${it.color}15` }}
+                      >
+                        <it.icon className="h-5 w-5" style={{ color: it.color }} />
+                      </div>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: it.color }}>
+                        {it.label}
+                      </span>
+                    </button>
+                  ));
+                })()}
               </div>
             </div>
           )}

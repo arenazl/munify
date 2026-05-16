@@ -270,6 +270,23 @@ def _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependen
     return query
 
 
+# Dashboard IA (declarado ANTES de /{gasto_id} para que no caiga en esa ruta).
+@router.get("/dashboard-ia")
+async def tesoreria_dashboard_ia_top(
+    request: Request,
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin(current_user)
+    from core.tenancy import get_effective_municipio_id
+    municipio_id = get_effective_municipio_id(request, current_user)
+    if not municipio_id:
+        return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
+    from services.dashboard_ia import build_tesoreria_dashboard
+    return await build_tesoreria_dashboard(db, municipio_id, force=force)
+
+
 @router.get("", response_model=List[GastoResponse])
 async def list_gastos(
     response: Response,

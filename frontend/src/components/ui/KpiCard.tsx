@@ -134,8 +134,17 @@ interface KpiRowProps {
 export function KpiRow({ kpis, trailing, className = '' }: KpiRowProps) {
   // Hard-limit a 4 KPIs (regla del proyecto).
   const items = kpis.slice(0, 4);
+  // Grid se adapta a la cantidad real para que no queden cards huerfanas
+  // en la ultima fila (ej. 3 kpis en grilla de 4 dejaba 1 solo abajo).
+  const gridCols = items.length === 1
+    ? 'grid-cols-1'
+    : items.length === 2
+      ? 'grid-cols-2'
+      : items.length === 3
+        ? 'grid-cols-1 sm:grid-cols-3'
+        : 'grid-cols-2 lg:grid-cols-4';
   return (
-    <div className={`grid grid-cols-2 lg:grid-cols-4 gap-3 ${className}`}>
+    <div className={`grid ${gridCols} gap-3 ${className}`}>
       {items.map((k, i) => (
         <KpiCard key={k.label + i} {...k} />
       ))}
