@@ -72,6 +72,9 @@ async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
                         "temperature": 0.2,
                         "maxOutputTokens": max_tokens,
                         "responseMimeType": "application/json",
+                        # gemini-2.5-flash usa "thinking" interno que duplica
+                        # latencia con prompts grandes. Lo desactivamos.
+                        "thinkingConfig": {"thinkingBudget": 0},
                     },
                 },
             )
