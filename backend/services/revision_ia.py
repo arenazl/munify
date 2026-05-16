@@ -62,7 +62,7 @@ async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
             f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
         )
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.post(
                 url,
                 headers={"Content-Type": "application/json"},
@@ -101,7 +101,7 @@ async def _call_groq(prompt: str, max_tokens: int = 8000) -> Optional[str]:
         return None
     try:
         url = "https://api.groq.com/openai/v1/chat/completions"
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.post(
                 url,
                 headers={
@@ -173,6 +173,20 @@ def _parse_json_safely(text: str) -> Optional[Any]:
         return json.loads(candidate)
     except Exception as e:
         logger.warning("[RevisionIA] JSON inválido (%s) — intento recuperar. body=%s", e, candidate[:500])
+
+    # 2.bis: a veces Groq devuelve { "items": [...] } o varios objetos seguidos
+    # sin wrapper. Intentamos rescatar items con regex iterativo.
+    items_match = re.findall(r"\{[^{}]*\"reclamo_id\"[^{}]*\}|\{[^{}]*\"solicitud_id\"[^{}]*\}", candidate)
+    if items_match:
+        rescued = []
+        for it in items_match:
+            try:
+                rescued.append(json.loads(it))
+            except Exception:
+                continue
+        if rescued:
+            logger.info("[RevisionIA] Rescatados %d items via regex iterativo", len(rescued))
+            return rescued
 
     # 3. Recuperar array truncado: cortar hasta la ultima '},' que parsea OK
     if candidate.startswith('['):
