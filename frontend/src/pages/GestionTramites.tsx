@@ -1302,19 +1302,25 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             const tipoTramite = t.tramite?.categoria_tramite;
             const tipoColor = tipoTramite?.color || theme.primary;
             return (
-              <div className="flex items-center gap-2 min-w-0">
-                <DynamicIcon
-                  name={t.tramite?.icono || tipoTramite?.icono || 'FileText'}
-                  className="h-4 w-4 flex-shrink-0"
-                  style={{ color: tipoColor }}
-                  fallback={<FileText className="h-4 w-4" style={{ color: tipoColor }} />}
-                />
+              <div className="flex items-center gap-2.5 min-w-0">
+                {/* Icon tile: cuadrado pastel con icono del color de la categoria */}
+                <div
+                  className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${tipoColor}18` }}
+                >
+                  <DynamicIcon
+                    name={t.tramite?.icono || tipoTramite?.icono || 'FileText'}
+                    className="h-4 w-4"
+                    style={{ color: tipoColor }}
+                    fallback={<FileText className="h-4 w-4" style={{ color: tipoColor }} />}
+                  />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium truncate leading-tight" style={{ color: theme.text }}>
+                  <div className="text-xs font-semibold truncate leading-tight" style={{ color: theme.text }}>
                     {t.tramite?.nombre || '—'}
                   </div>
                   {tipoTramite?.nombre && (
-                    <div className="text-[10px] truncate leading-tight" style={{ color: tipoColor }}>
+                    <div className="text-[10px] truncate leading-tight mt-0.5" style={{ color: tipoColor }}>
                       {tipoTramite.nombre}
                     </div>
                   )}
