@@ -249,8 +249,16 @@ async def mostrador_home(
     current_user: User = Depends(get_current_user),
 ):
     _asegurar_operador(current_user)
+    # Superadmin en modo Global (sin muni): devolver metricas vacias en
+    # lugar de 400 para no romper la pantalla cross-tenant. El mostrador
+    # como tal solo tiene sentido dentro de un muni puntual.
     if not current_user.municipio_id:
-        raise HTTPException(status_code=400, detail="Usuario sin municipio")
+        return MostradorMetricas(
+            tramites_hoy=0,
+            pagados_hoy=0,
+            monto_hoy="0",
+            operador_nombre=current_user.nombre or current_user.email,
+        )
 
     hoy_inicio = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     t_q = await db.execute(

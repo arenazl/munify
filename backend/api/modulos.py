@@ -16,7 +16,7 @@ from core.database import get_db
 from core.security import get_current_user
 from models import MunicipioModulo, User, RolUsuario
 from schemas.tesoreria import ModuloBase, ModuloResponse
-from core.tenancy import get_effective_municipio_id
+from core.tenancy import get_effective_municipio_id, resolve_municipio_id
 
 router = APIRouter()
 
@@ -27,8 +27,12 @@ async def list_modulos(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista todos los modulos configurados del municipio del usuario actual."""
-    municipio_id = get_effective_municipio_id(request, current_user)
+    """Lista todos los modulos configurados del municipio del usuario actual.
+
+    En modo Global (superadmin sin muni resuelto) devuelve [] en lugar de 400
+    para no romper el sidebar cross-tenant.
+    """
+    municipio_id = resolve_municipio_id(request, current_user)
     if not municipio_id:
         return []
     result = await db.execute(
@@ -46,8 +50,9 @@ async def get_modulo(
 ):
     """Devuelve `{ activo: bool }` para el modulo pedido.
     Si no hay fila, devuelve activo=False (no configurado = desactivado).
+    En modo Global devuelve activo=False sin levantar 400.
     """
-    municipio_id = get_effective_municipio_id(request, current_user)
+    municipio_id = resolve_municipio_id(request, current_user)
     if not municipio_id:
         return {"activo": False, "modulo": nombre}
     result = await db.execute(
