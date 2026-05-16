@@ -1451,6 +1451,9 @@ interface ABMTableProps<T> {
   defaultSortDirection?: 'asc' | 'desc';
   // Render alternativo para mobile (cards)
   renderMobileCard?: (item: T, actions?: ReactNode) => ReactNode;
+  /** Si true, se omite el <thead> completo. Pensado para listas tipo "feed"
+   *  donde la tabla tiene un solo nivel visual (avatar + titulo + meta). */
+  hideHeader?: boolean;
   /** Agrupacion opcional. Inserta una fila-separador antes de cada grupo con
    *  label izq + subtotal der. Solo se aplica cuando el sort actual es por
    *  `sortKey` (columna sobre la que la agrupacion tiene sentido). Si el user
@@ -1475,6 +1478,7 @@ export function ABMTable<T>({
   defaultSortKey,
   defaultSortDirection,
   renderMobileCard,
+  hideHeader,
   groupBy,
 }: ABMTableProps<T>) {
   const { theme } = useTheme();
@@ -1599,6 +1603,7 @@ export function ABMTable<T>({
     >
       <div className="overflow-x-auto">
         <table className="w-full">
+          {!hideHeader && (
           <thead>
             <tr style={{ backgroundColor: theme.backgroundSecondary }}>
               {columns.map((col) => {
@@ -1627,6 +1632,7 @@ export function ABMTable<T>({
               )}
             </tr>
           </thead>
+          )}
           <tbody>
             {(() => {
               const colSpan = columns.length + (actions ? 1 : 0);
@@ -1757,21 +1763,22 @@ export function ABMTableAction({ icon, onClick, title, variant = 'primary' }: AB
       <button
         onClick={handleClick}
         className={`
-          p-2 rounded-lg transition-all duration-200
-          hover:scale-110 active:scale-95
-          relative overflow-hidden
+          w-7 h-7 rounded-md inline-flex items-center justify-center transition-all duration-200
+          hover:scale-110 active:scale-95 hover:-translate-y-0.5
+          relative overflow-hidden flex-shrink-0
           ${isAnimating ? 'animate-table-action-click' : ''}
         `}
         style={{
           color: baseColor,
-          backgroundColor: 'transparent',
+          backgroundColor: `${baseColor}15`,
+          border: `1px solid ${baseColor}30`,
         }}
         title={title}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = `${baseColor}20`;
+          e.currentTarget.style.backgroundColor = `${baseColor}30`;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.backgroundColor = `${baseColor}15`;
         }}
       >
         {/* Ripple effect */}

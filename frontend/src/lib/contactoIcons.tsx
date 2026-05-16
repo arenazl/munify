@@ -41,6 +41,17 @@ export const TIPO_CONTACTO_LABELS: Record<string, string> = {
   otro: 'Otros',
 };
 
+/** Labels en singular (uso en celdas de tabla / pills de un item). */
+export const TIPO_CONTACTO_LABELS_SINGULAR: Record<string, string> = {
+  concejal: 'Concejal',
+  empleado: 'Empleado',
+  profesional: 'Profesional',
+  proveedor: 'Proveedor',
+  contratista: 'Contratista',
+  beneficiario: 'Beneficiario',
+  otro: 'Otro',
+};
+
 export function contactoIconByTipo(tipo: string | null | undefined): LucideIcon {
   if (!tipo) return User;
   return ICON_BY_TIPO[tipo] || User;

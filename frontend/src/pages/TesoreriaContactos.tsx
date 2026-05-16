@@ -7,28 +7,14 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import { StatusPill } from '../components/ui/StatusPill';
 import { contactosApi, tesoreriaImportApi, tiposEmpleadoApi, parajesApi } from '../lib/api';
+import {
+  contactoIconByTipo,
+  TIPO_CONTACTO_COLORS as TIPO_COLORS,
+  TIPO_CONTACTO_LABELS_SINGULAR as TIPO_LABELS,
+} from '../lib/contactoIcons';
 import type { Contacto, TipoContacto, TipoEmpleadoCatalogo, Paraje } from '../types';
-
-const TIPO_LABELS: Record<TipoContacto, string> = {
-  concejal: 'Concejal',
-  empleado: 'Empleado',
-  profesional: 'Profesional',
-  proveedor: 'Proveedor',
-  contratista: 'Contratista',
-  beneficiario: 'Beneficiario',
-  otro: 'Otro',
-};
-
-const TIPO_COLORS: Record<TipoContacto, string> = {
-  concejal: '#8b5cf6',
-  empleado: '#3b82f6',
-  profesional: '#f59e0b',
-  proveedor: '#10b981',
-  contratista: '#06b6d4',
-  beneficiario: '#ec4899',
-  otro: '#71717a',
-};
 
 export default function TesoreriaContactos() {
   const { theme } = useTheme();
@@ -416,20 +402,27 @@ export default function TesoreriaContactos() {
               {
                 key: 'nombre',
                 header: 'Nombre',
-                render: (c) => (
-                  <span className="font-medium">{c.nombre} {c.apellido || ''}</span>
-                ),
+                render: (c) => {
+                  const Icon = contactoIconByTipo(c.tipo);
+                  const color = TIPO_COLORS[c.tipo] || '#71717a';
+                  return (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: `${color}20` }}
+                      >
+                        <Icon className="h-3 w-3" style={{ color }} />
+                      </span>
+                      <span className="font-medium">{c.nombre} {c.apellido || ''}</span>
+                    </span>
+                  );
+                },
               },
               {
                 key: 'tipo',
                 header: 'Tipo',
                 render: (c) => (
-                  <span
-                    className="inline-block text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
-                    style={{ backgroundColor: `${TIPO_COLORS[c.tipo]}20`, color: TIPO_COLORS[c.tipo] }}
-                  >
-                    {TIPO_LABELS[c.tipo]}
-                  </span>
+                  <StatusPill label={TIPO_LABELS[c.tipo]} color={TIPO_COLORS[c.tipo] || '#71717a'} size="xs" />
                 ),
               },
               {
