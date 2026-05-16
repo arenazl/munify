@@ -466,16 +466,13 @@ export function ABMPage({
 
   return (
     <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y' }}>
-      {/* KPIs (opt-in). Si es un array de KpiSpec, lo renderizamos con KpiRow
-          (look outlined estandar, hard-limit 4). Si es un ReactNode arma JSX
-          libre. Se wrappea con el mismo padding-x que usa el sticky header,
-          asi quedan visualmente alineados al toolbar del ABM (no full-bleed). */}
+      {/* KPIs (opt-in). Renderizados al ancho exacto del root del ABMPage
+          (mismo ancho que el header + toolbar de abajo). Si la pagina padre
+          le da padding al wrapper de ABMPage, los KPIs lo respetan. */}
       {kpis && (
-        <div className="px-3 sm:px-6 lg:px-8 -mx-3 sm:-mx-6 lg:-mx-8">
-          {Array.isArray(kpis)
-            ? <KpiRow kpis={kpis as KpiSpec[]} />
-            : <div>{kpis}</div>}
-        </div>
+        Array.isArray(kpis)
+          ? <KpiRow kpis={kpis as KpiSpec[]} />
+          : <div>{kpis}</div>
       )}
 
       {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
