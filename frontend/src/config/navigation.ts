@@ -1,7 +1,8 @@
 import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers
+  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers,
+  CalendarClock, Users, MapPin, TrendingUp,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -190,6 +191,38 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Control de gastos del municipio'
     },
     {
+      name: 'Pagos',
+      href: '/gestion/tesoreria/agenda',
+      icon: CalendarClock,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Agenda de pagos recurrentes'
+    },
+    {
+      name: 'Contactos',
+      href: '/gestion/tesoreria/contactos',
+      icon: Users,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Personas y proveedores'
+    },
+    {
+      name: 'Ubicación',
+      href: '/gestion/tesoreria/mapa',
+      icon: MapPin,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Mapa de contactos y gastos'
+    },
+    {
+      name: 'Proyección',
+      href: '/gestion/tesoreria/proyecciones',
+      icon: TrendingUp,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Resumen y proyecciones financieras'
+    },
+    {
       name: 'Tablero',
       href: '/gestion/tablero',
       icon: Wrench,
@@ -221,12 +254,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Operación',
       description: 'Consultas y análisis con IA'
     },
-    // === ABMs per-municipio ===
+    // === ABMs per-municipio (solo si el modulo correspondiente esta activo) ===
     {
       name: 'Categorías Reclamo',
       href: '/gestion/categorias-reclamo',
       icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
+      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('reclamos'),
       categoria: 'Configuración',
       description: 'Categorías de reclamos del municipio'
     },
@@ -234,7 +267,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Categorías Trámite',
       href: '/gestion/categorias-tramite',
       icon: FolderTree,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
+      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
       categoria: 'Configuración',
       description: 'Categorías de trámites del municipio'
     },
@@ -242,13 +275,20 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Tipos de Trámite',
       href: '/gestion/tramites-config',
       icon: FileText,
-      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin,
+      show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
       categoria: 'Configuración',
       description: 'Trámites específicos del municipio'
     },
     {
+      // Si el muni solo tiene Tesoreria activa, "Configuracion" entra
+      // directo a la config de Tesoreria (no a la config general que esta vacia).
       name: 'Configuración',
-      href: '/gestion/configuracion',
+      href: (
+        modulosActivos.has('tesoreria') &&
+        !moduloOn('reclamos') && !moduloOn('tramites') && !moduloOn('tasas') && !moduloOn('pagos')
+      )
+        ? '/gestion/configuracion/tesoreria'
+        : '/gestion/configuracion',
       icon: Settings,
       show: isAdminOrSupervisor,
       categoria: 'Configuración',
