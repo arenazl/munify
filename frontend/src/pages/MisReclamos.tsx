@@ -845,15 +845,15 @@ export default function MisReclamos() {
       <div className="h-6 w-px flex-shrink-0" style={{ backgroundColor: theme.border }} />
 
       {/* Filtros de estado */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {/* Chip "Todos" */}
         <button
           onClick={() => setFiltroEstado('todos')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+          className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
           style={{
-            backgroundColor: filtroEstado === 'todos' ? theme.primary : theme.backgroundSecondary,
-            color: filtroEstado === 'todos' ? '#ffffff' : theme.textSecondary,
+            backgroundColor: filtroEstado === 'todos' ? `${theme.primary}15` : 'transparent',
             border: `1px solid ${filtroEstado === 'todos' ? theme.primary : theme.border}`,
+            color: filtroEstado === 'todos' ? theme.primary : theme.textSecondary,
           }}
         >
           Todos
@@ -866,17 +866,14 @@ export default function MisReclamos() {
             <button
               key={estado}
               onClick={() => setFiltroEstado(estado)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: isSelected ? estadoColor.bg : theme.backgroundSecondary,
-                color: isSelected ? estadoColor.text : theme.textSecondary,
+                backgroundColor: isSelected ? `${estadoColor.text}20` : 'transparent',
                 border: `1px solid ${isSelected ? estadoColor.text : theme.border}`,
+                color: isSelected ? estadoColor.text : theme.text,
               }}
+              title={estadoLabels[estado]}
             >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: estadoColor.text }}
-              />
               {estadoLabels[estado]}
             </button>
           );

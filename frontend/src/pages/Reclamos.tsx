@@ -2936,19 +2936,32 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       key: 'vecino',
       header: 'Vecino',
       sortValue: (r: Reclamo) => `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`,
-      render: (r: Reclamo) => (
-        <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${theme.primary}15` }}
-          >
-            <User className="h-3 w-3" style={{ color: theme.primary }} />
+      render: (r: Reclamo) => {
+        const dep = r.dependencia_asignada as any;
+        const depNombre = dep?.dependencia?.nombre || dep?.nombre;
+        const depColor = dep?.color || dep?.dependencia?.color || theme.primary;
+        const nombre = r.creador ? `${r.creador.nombre} ${r.creador.apellido}` : r.es_anonimo ? 'Anónimo' : '-';
+        return (
+          <div className="flex items-start gap-2 min-w-0">
+            <span
+              className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+              style={{ backgroundColor: `${depColor}20` }}
+            >
+              <User className="h-3.5 w-3.5" style={{ color: depColor }} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs truncate font-medium" style={{ color: theme.text }} title={nombre}>
+                {nombre}
+              </div>
+              {depNombre && (
+                <div className="text-[10px] truncate" style={{ color: depColor }} title={depNombre}>
+                  {depNombre}
+                </div>
+              )}
+            </div>
           </div>
-          <span className="truncate" style={{ color: theme.text }}>
-            {r.creador ? `${r.creador.nombre} ${r.creador.apellido}` : r.es_anonimo ? 'Anónimo' : '-'}
-          </span>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'dependencia',

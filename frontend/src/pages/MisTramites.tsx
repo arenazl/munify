@@ -611,14 +611,14 @@ export default function MisTramites() {
       <div className="h-5 w-px flex-shrink-0" style={{ backgroundColor: theme.border }} />
 
       {/* Filtros de estado - chips */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
         <button
           onClick={() => setFiltroEstado('todos')}
-          className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
+          className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
           style={{
-            backgroundColor: filtroEstado === 'todos' ? theme.primary : theme.backgroundSecondary,
+            backgroundColor: filtroEstado === 'todos' ? `${theme.primary}15` : 'transparent',
             border: `1px solid ${filtroEstado === 'todos' ? theme.primary : theme.border}`,
-            color: filtroEstado === 'todos' ? '#ffffff' : theme.textSecondary,
+            color: filtroEstado === 'todos' ? theme.primary : theme.textSecondary,
           }}
         >
           Todos
@@ -626,17 +626,20 @@ export default function MisTramites() {
         {estadosUnicos.map(estado => {
           const info = getEstadoInfo(estado);
           const isSelected = filtroEstado === info.key;
+          const Icon = info.icon;
           return (
             <button
               key={info.key}
               onClick={() => setFiltroEstado(info.key)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
               style={{
-                backgroundColor: isSelected ? info.color : theme.backgroundSecondary,
+                backgroundColor: isSelected ? `${info.color}20` : 'transparent',
                 border: `1px solid ${isSelected ? info.color : theme.border}`,
-                color: isSelected ? '#ffffff' : theme.textSecondary,
+                color: isSelected ? info.color : theme.text,
               }}
+              title={info.label}
             >
+              {Icon && <Icon className="h-3 w-3" />}
               {info.label}
             </button>
           );

@@ -1340,11 +1340,31 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           key: 'solicitante',
           header: 'Solicitante',
           sortValue: (t) => `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim(),
-          render: (t) => (
-            <span className="text-xs truncate block" style={{ color: theme.text }} title={`${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim()}>
-              {t.nombre_solicitante} {t.apellido_solicitante}
-            </span>
-          ),
+          render: (t) => {
+            const dep = t.dependencia_asignada as any;
+            const depNombre = dep?.dependencia?.nombre || dep?.nombre;
+            const depColor = dep?.color || dep?.dependencia?.color || theme.primary;
+            return (
+              <div className="flex items-start gap-2 min-w-0">
+                <span
+                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ backgroundColor: `${depColor}20` }}
+                >
+                  <User className="h-3.5 w-3.5" style={{ color: depColor }} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs truncate font-medium" style={{ color: theme.text }} title={`${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim()}>
+                    {t.nombre_solicitante} {t.apellido_solicitante}
+                  </div>
+                  {depNombre && (
+                    <div className="text-[10px] truncate" style={{ color: depColor }} title={depNombre}>
+                      {depNombre}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          },
         },
         {
           key: 'asunto',

@@ -424,54 +424,46 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
           />
 
           {/* Fila 2: Estados */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => props.onEstadoChange(null)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95"
+              className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
               style={{
                 backgroundColor:
-                  props.filtroEstado === null
-                    ? theme.primary
-                    : `${theme.textSecondary}15`,
-                color:
-                  props.filtroEstado === null
-                    ? '#ffffff'
-                    : theme.textSecondary,
+                  props.filtroEstado === null ? `${theme.primary}15` : 'transparent',
                 border: `1px solid ${
                   props.filtroEstado === null ? theme.primary : theme.border
                 }`,
+                color:
+                  props.filtroEstado === null ? theme.primary : theme.textSecondary,
               }}
             >
-              <span className="text-xs font-medium">Todos los estados</span>
-              <span className="text-xs font-bold">
-                ({props.totalEnRangoTiempo})
-              </span>
+              Todos
+              {props.totalEnRangoTiempo > 0 && (
+                <span className="opacity-70">({props.totalEnRangoTiempo})</span>
+              )}
             </button>
             {Object.entries(props.statusColors).map(([estado, color]) => {
               const count = props.conteosPorEstado[estado] || 0;
-              if (count === 0) return null;
               const isActive = props.filtroEstado === estado;
+              const hasItems = count > 0;
               return (
                 <button
                   key={estado}
                   onClick={() =>
                     props.onEstadoChange(isActive ? null : estado)
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95"
+                  className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
                   style={{
-                    backgroundColor: isActive ? color : `${color}15`,
-                    color: isActive ? '#ffffff' : color,
-                    border: `1px solid ${isActive ? color : `${color}40`}`,
+                    backgroundColor: isActive ? `${color}20` : 'transparent',
+                    border: `1px solid ${isActive ? color : theme.border}`,
+                    color: isActive ? color : (hasItems ? theme.text : theme.textSecondary),
+                    opacity: hasItems ? 1 : 0.45,
                   }}
+                  title={props.statusLabels[estado] || estado}
                 >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: isActive ? '#ffffff' : color }}
-                  />
-                  <span className="text-xs font-medium">
-                    {props.statusLabels[estado] || estado}
-                  </span>
-                  <span className="text-xs font-bold">({count})</span>
+                  {props.statusLabels[estado] || estado}
+                  {hasItems && <span className="opacity-70">({count})</span>}
                 </button>
               );
             })}
