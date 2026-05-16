@@ -365,13 +365,11 @@ export default function TesoreriaContactos() {
 
   return (
     <>
-      <div className="px-4 pt-3">
-        <TesoreriaHint titulo="Agenda de Contactos" storageKey="contactos">
-          Acá guardás a las personas con las que hacés movimientos. Cada uno
-          puede tener su <b>alias de transferencia</b> y <b>ubicación en el mapa</b>.
-          Podés cargarlos a mano o importar el Excel del intendente.
-        </TesoreriaHint>
-      </div>
+      <TesoreriaHint titulo="Agenda de Contactos" storageKey="contactos">
+        Acá guardás a las personas con las que hacés movimientos. Cada uno
+        puede tener su <b>alias de transferencia</b> y <b>ubicación en el mapa</b>.
+        Podés cargarlos a mano o importar el Excel del intendente.
+      </TesoreriaHint>
 
       <ABMPage
         title="Contactos"

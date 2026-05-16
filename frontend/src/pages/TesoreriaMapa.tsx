@@ -732,13 +732,17 @@ export default function TesoreriaMapa() {
             className={`lg:col-span-3 rounded-xl overflow-hidden relative ${isDarkTheme ? 'tesoreria-mapa-dark' : ''}`}
             style={{ border: `1px solid ${theme.border}` }}
           >
-            {isDarkTheme && (
-              <style>{`
-                .tesoreria-mapa-dark .leaflet-tile-pane {
-                  filter: invert(0.92) hue-rotate(180deg) brightness(0.95) contrast(0.9);
-                }
-              `}</style>
-            )}
+            <style>{`
+              .tesoreria-mapa-dark .leaflet-tile-pane {
+                filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.85) saturate(0.7);
+              }
+              /* Los pines (markers) NO deben invertirse — viven en otro pane. */
+              .tesoreria-mapa-dark .leaflet-marker-pane,
+              .tesoreria-mapa-dark .leaflet-popup-pane,
+              .tesoreria-mapa-dark .leaflet-shadow-pane {
+                filter: none;
+              }
+            `}</style>
             <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
               <TileLayer
                 key={tileProvider}
