@@ -572,7 +572,7 @@ export default function Dashboard() {
           compita visualmente con el contenido (el banner es decorativo). */}
       <div
         className="relative overflow-hidden rounded-2xl"
-        style={{ minHeight: '200px', opacity: isLightTheme ? 0.6 : 1 }}
+        style={{ minHeight: '200px', opacity: isLightTheme ? 0.85 : 1 }}
       >
         {/* Imagen de fondo - usa imagen_portada si existe, sino logo_url, sino placeholder */}
         <div className="absolute inset-0">
