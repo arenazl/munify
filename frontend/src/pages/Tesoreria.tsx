@@ -350,6 +350,40 @@ export default function Tesoreria() {
       .reduce((acc, g) => acc + parseFloat(g.monto_pesos), 0);
   }, [gastos]);
 
+  // KPIs por tipo de concepto. Agrupa los gastos filtrados por nombre del
+  // tipo de concepto y devuelve los top 3 por monto. La primera card del
+  // dashboard es el total general; estas son las 3 categorias secundarias.
+  const kpisData = useMemo(() => {
+    type Bucket = { nombre: string; color: string; total: number; count: number };
+    const byTipo = new Map<string, Bucket>();
+    let sinTipoTotal = 0;
+    let sinTipoCount = 0;
+    for (const g of filtered) {
+      const tipo = conceptoToTipoMap.get(g.concepto.toLowerCase());
+      const monto = parseFloat(g.monto_pesos || '0');
+      if (tipo && tipo.nombre) {
+        const key = tipo.nombre;
+        const prev = byTipo.get(key) || {
+          nombre: tipo.nombre,
+          color: tipo.color || theme.primary,
+          total: 0,
+          count: 0,
+        };
+        prev.total += monto;
+        prev.count += 1;
+        byTipo.set(key, prev);
+      } else {
+        sinTipoTotal += monto;
+        sinTipoCount += 1;
+      }
+    }
+    const buckets: Bucket[] = Array.from(byTipo.values()).sort((a, b) => b.total - a.total);
+    if (sinTipoTotal > 0) {
+      buckets.push({ nombre: 'Otros', color: theme.textSecondary, total: sinTipoTotal, count: sinTipoCount });
+    }
+    return buckets.slice(0, 3);
+  }, [filtered, conceptoToTipoMap, theme]);
+
   const dependenciasMap = useMemo(() => {
     const m = new Map<number, DependenciaOption>();
     dependencias.forEach(d => m.set(d.id, d));
@@ -760,6 +794,296 @@ export default function Tesoreria() {
     return { count: list.length, monto };
   }, [gastos]);
 
+  // Render de una card de gasto (vista cards). Extraido para poder usarlo
+  // desde groupBy.renderItem manteniendo el mismo look-and-feel.
+  const renderGastoCard = (g: Gasto) => {
+    const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+    const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
+    return (
+      <div
+        key={g.id}
+        onClick={() => openDetalle(g)}
+        className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
+                <Calendar className="h-2.5 w-2.5" />
+                {new Date(g.fecha).toLocaleDateString('es-AR')}
+              </span>
+              {g.destino_tipo === 'contacto' ? (
+                <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
+                  <Home className="h-2.5 w-2.5" /> Contacto
+                </span>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
+                  style={{
+                    backgroundColor: `${dep?.color || theme.primary}15`,
+                    color: dep?.color || theme.primary,
+                  }}
+                >
+                  <Building2 className="h-2.5 w-2.5" />
+                  <span className="truncate max-w-[100px]">{dep?.nombre || 'Secretaría'}</span>
+                </span>
+              )}
+            </div>
+          </div>
+          <span
+            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
+          >
+            {g.tipo_financiacion}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>
+            ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </p>
+          <span
+            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: estMeta.bg, color: estMeta.color, border: `1px solid ${estMeta.color}30` }}
+          >
+            {estMeta.label}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  // Periodo activo en label corto para el KPI principal.
+  const periodoLabel = todosLosMeses
+    ? 'todos los períodos'
+    : modoPeriodo === 'anio'
+      ? `Año ${anioActual}`
+      : `${MESES_LARGO[mesActual]} ${anioActual}`;
+
+  // ===================================================================
+  // KPIs row — total destacado + top 3 tipos
+  // ===================================================================
+  const kpisRow = (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Card 1: Total destacado (verde primary) */}
+      <div
+        className="rounded-xl p-4"
+        style={{
+          backgroundColor: theme.primary,
+          color: theme.primaryText || '#ffffff',
+        }}
+      >
+        <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">
+          Gastado · {periodoLabel}
+        </div>
+        <div className="text-2xl font-bold tabular-nums mt-1">
+          ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+        </div>
+        <div className="text-[11px] mt-1 opacity-80">
+          {totales.cantidad} {totales.cantidad === 1 ? 'movimiento' : 'movimientos'}
+        </div>
+      </div>
+
+      {/* Cards 2-4: top 3 tipos de concepto */}
+      {kpisData.map((k) => {
+        const pct = totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0;
+        return (
+          <div
+            key={k.nombre}
+            className="rounded-xl p-4"
+            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: k.color }}
+              />
+              <div
+                className="text-[10px] uppercase font-bold tracking-wider truncate"
+                style={{ color: theme.textSecondary }}
+              >
+                {k.nombre}
+              </div>
+            </div>
+            <div className="text-2xl font-bold tabular-nums mt-1" style={{ color: theme.text }}>
+              ${k.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+              {pct.toFixed(1)}% · {k.count} {k.count === 1 ? 'mov.' : 'mov.'}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // ===================================================================
+  // Side panel "Bandeja IA" — 3 cards demo hardcodeadas (placeholders).
+  // Solo aparece en desktop (lg+). Mas adelante se va a conectar con la
+  // curacion real de Bartolo, pero por ahora es solo presentacion.
+  // ===================================================================
+  const bandejaIaDemo = [
+    { id: 1, ia: 94, fecha: '09/05', titulo: 'Combustible YPF · Camión recolector', proveedor: 'YPF San Pedro Norte', monto: 182500, categoria: 'Servicios', categoriaColor: '#22c55e', hint: 'Categoría sugerida: Combustibles' },
+    { id: 2, ia: 62, fecha: '09/05', titulo: 'Compras varias',                       proveedor: 'Ferretería Don Aldo',  monto: 48200,  categoria: 'Insumos',   categoriaColor: '#f59e0b', hint: 'Sin proveedor cargado' },
+    { id: 3, ia: 78, fecha: '09/05', titulo: 'Mantenimiento alumbrado público',      proveedor: 'Elec. Norte SRL',      monto: 96000,  categoria: 'Servicios', categoriaColor: '#a855f7', hint: 'Monto inusual para este proveedor' },
+  ];
+  const bandejaTotal = bandejaIaDemo.reduce((s, b) => s + b.monto, 0);
+
+  const sidePanelContent = (
+    <div className="space-y-3 sticky top-4">
+      {/* Header bandeja */}
+      <div
+        className="rounded-xl p-3 flex items-center gap-2"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
+        <div className="flex-1 min-w-0">
+          <div className="text-[11px] font-semibold" style={{ color: theme.textSecondary }}>
+            {bandejaIaDemo.length} gastos esperando aprobación
+          </div>
+        </div>
+      </div>
+
+      {/* Total a revisar + aprobar todo */}
+      <div
+        className="rounded-xl p-3 flex items-center justify-between gap-2"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        <div>
+          <div className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
+            Total a revisar
+          </div>
+          <div className="text-lg font-bold tabular-nums" style={{ color: theme.text }}>
+            ${bandejaTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </div>
+        </div>
+        <button
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap"
+          style={{ backgroundColor: theme.text, color: theme.card }}
+        >
+          Aprobar todo
+        </button>
+      </div>
+
+      {/* Cards de items sugeridos */}
+      {bandejaIaDemo.map((b) => (
+        <div
+          key={b.id}
+          className="rounded-xl p-3"
+          style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+              style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+            >
+              <Sparkles className="h-3 w-3" />
+              IA · {b.ia}%
+            </span>
+            <span className="text-[11px]" style={{ color: theme.textSecondary }}>{b.fecha}</span>
+          </div>
+          <div className="font-semibold text-sm" style={{ color: theme.text }}>{b.titulo}</div>
+          <div className="text-[11px] mb-2" style={{ color: theme.textSecondary }}>{b.proveedor}</div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg font-bold tabular-nums" style={{ color: theme.text }}>
+              ${b.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+            </span>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+              style={{ backgroundColor: `${b.categoriaColor}15`, color: b.categoriaColor }}
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: b.categoriaColor }} />
+              {b.categoria}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[10px] mb-3" style={{ color: theme.textSecondary }}>
+            <Sparkles className="h-3 w-3" />
+            {b.hint}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              className="flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold"
+              style={{ backgroundColor: theme.primary, color: theme.primaryText || '#ffffff' }}
+            >
+              ✓ Aprobar
+            </button>
+            <button
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+            >
+              Editar
+            </button>
+            <button
+              className="px-2 py-1.5 rounded-lg text-xs"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ))}
+
+      <div
+        className="rounded-xl p-3 text-center text-[11px] italic"
+        style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
+      >
+        La IA aprende de tus decisiones · cada confirmación mejora la categorización
+      </div>
+    </div>
+  );
+
+  // ===================================================================
+  // Group by date config — solo aplica en vista cards. ABMPage agrupa los
+  // items y renderiza headers [DD MES · Hoy/Ayer · N mov] + subtotal.
+  // ===================================================================
+  const groupByConfig = {
+    items: paginatedFiltered,
+    getKey: (g: Gasto) => g.fecha,
+    renderLabel: (key: string, items: Gasto[]) => {
+      const d = new Date(key + 'T12:00:00');
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const ayer = new Date(hoy);
+      ayer.setDate(ayer.getDate() - 1);
+      const dStripped = new Date(d);
+      dStripped.setHours(0, 0, 0, 0);
+      let label: string;
+      if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
+      else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
+      else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+      return (
+        <div className="flex items-center gap-3">
+          <div
+            className="w-12 text-center px-1 py-0.5 rounded-md text-[10px] uppercase font-bold leading-tight"
+            style={{ backgroundColor: theme.card, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
+          >
+            <div className="text-base font-bold" style={{ color: theme.text }}>{d.getDate().toString().padStart(2, '0')}</div>
+            <div>{d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</div>
+          </div>
+          <div>
+            <div className="font-bold" style={{ color: theme.text }}>{label}</div>
+            <div className="text-[11px]" style={{ color: theme.textSecondary }}>
+              {items.length} {items.length === 1 ? 'movimiento' : 'movimientos'}
+            </div>
+          </div>
+        </div>
+      );
+    },
+    renderSubtotal: (_key: string, items: Gasto[]) => {
+      const sum = items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
+      return (
+        <div className="text-right">
+          <div className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Subtotal</div>
+          <div className="text-base font-bold tabular-nums" style={{ color: theme.text }}>
+            ${sum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </div>
+        </div>
+      );
+    },
+    renderItem: (g: Gasto) => renderGastoCard(g),
+  };
+
   return (
     <>
       <div className="pt-3">
@@ -919,65 +1243,13 @@ export default function Tesoreria() {
         }
         viewStorageKey="tesoreria_view"
         defaultViewMode="table"
+        kpis={kpisRow}
+        groupBy={groupByConfig}
+        sidePanel={sidePanelContent}
       >
-        {/* Card view */}
-        {paginatedFiltered.map(g => {
-          const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
-          const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
-          return (
-            <div
-              key={g.id}
-              onClick={() => openDetalle(g)}
-              className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
-              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-            >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
-                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
-                      <Calendar className="h-2.5 w-2.5" />
-                      {new Date(g.fecha).toLocaleDateString('es-AR')}
-                    </span>
-                    {g.destino_tipo === 'contacto' ? (
-                      <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
-                        <Home className="h-2.5 w-2.5" /> Contacto
-                      </span>
-                    ) : (
-                      <span
-                        className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
-                        style={{
-                          backgroundColor: `${dep?.color || theme.primary}15`,
-                          color: dep?.color || theme.primary,
-                        }}
-                      >
-                        <Building2 className="h-2.5 w-2.5" />
-                        <span className="truncate max-w-[100px]">{dep?.nombre || 'Secretaría'}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
-                >
-                  {g.tipo_financiacion}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>
-                  ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </p>
-                <span
-                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: estMeta.bg, color: estMeta.color, border: `1px solid ${estMeta.color}30` }}
-                >
-                  {estMeta.label}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+        {/* Fallback: si por algun motivo no se usa groupBy/renderItem,
+            mantenemos el render legacy. ABMPage los ignora cuando hay groupBy. */}
+        {paginatedFiltered.map(g => renderGastoCard(g))}
       </ABMPage>
 
       <CrearGastoWizard

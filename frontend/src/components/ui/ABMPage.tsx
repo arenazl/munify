@@ -90,6 +90,37 @@ interface ABMPageProps {
   // para mantener los margenes/centrado alineados con el resto del contenido.
   paginationSummary?: ReactNode;
 
+  // Slot opcional que se renderiza ARRIBA del header (fila de KPIs / metricas
+  // destacadas). La pagina arma su propio grid. ABMPage solo le da margen
+  // inferior antes del header.
+  kpis?: ReactNode;
+
+  // Agrupacion opcional por algun key (ej: fecha ISO). Cuando se pasa,
+  // ABMPage inserta separadores entre grupos en la vista cards (full-row)
+  // y en la tabla (filas separadoras). Para que funcione, la pagina debe
+  // pasar `items` ordenados — ABMPage NO reordena.
+  groupBy?: {
+    /** items debe venir ordenado (asc o desc, segun la pagina). */
+    items: any[];
+    /** key del grupo (ej: '2026-05-09'). */
+    getKey: (item: any) => string;
+    /** Label a la izquierda del header (ej: 'Hoy · 4 movimientos'). */
+    renderLabel: (key: string, items: any[]) => ReactNode;
+    /** Subtotal a la derecha del header (ej: '$13.565.000'). Opcional. */
+    renderSubtotal?: (key: string, items: any[]) => ReactNode;
+    /**
+     * Render de cada item dentro del grupo. Devolver el JSX de la card o
+     * fila de tabla. Si no se pasa, ABMPage cae en `children` (compat).
+     */
+    renderItem?: (item: any, indexInGroup: number) => ReactNode;
+  };
+
+  // Panel lateral derecho (solo desktop, lg+). Si se pasa, el grid de cards
+  // se reduce a 2 columnas (en lg) y el panel queda a la derecha como
+  // columna fija de ancho `sidePanelWidth` (default 360px).
+  sidePanel?: ReactNode;
+  sidePanelWidth?: number;
+
   // Sheet (opcional - para páginas que manejan su propio Sheet)
   sheetOpen?: boolean;
   sheetTitle?: string;
@@ -146,6 +177,10 @@ export function ABMPage({
   loading = false,
   pagination,
   paginationSummary,
+  kpis,
+  groupBy,
+  sidePanel,
+  sidePanelWidth = 360,
   sheetOpen,
   sheetTitle,
   sheetDescription,
@@ -221,8 +256,30 @@ export function ABMPage({
     );
   }
 
+  // Agrupacion: pre-computa los grupos en orden de aparicion de items.
+  // ABMPage NO ordena — confia en el orden que viene de la pagina.
+  const groupedItems = (() => {
+    if (!groupBy) return null;
+    const groups: { key: string; items: any[] }[] = [];
+    const map = new Map<string, any[]>();
+    for (const it of groupBy.items) {
+      const k = groupBy.getKey(it);
+      if (!map.has(k)) {
+        const arr: any[] = [];
+        map.set(k, arr);
+        groups.push({ key: k, items: arr });
+      }
+      map.get(k)!.push(it);
+    }
+    return groups;
+  })();
+
   return (
     <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y' }}>
+      {/* KPIs (opt-in). Slot libre que la pagina renderiza arriba del header.
+          Mantenemos margen consistente con el resto del flow (space-y-6). */}
+      {kpis && <div>{kpis}</div>}
+
       {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
       <div
         className={stickyHeader ? 'sticky top-0 z-30 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-1 pb-1' : ''}
@@ -517,27 +574,83 @@ export function ABMPage({
           espacio blanco al final por vistas inactivas con position:absolute
           que igual contribuian a la altura virtual via children render). */}
       {!isEmpty ? (
-        <div className="mt-4">
-          {effectiveViewMode === 'cards' && (
-            <div
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 animate-in fade-in duration-200"
-            >
-              {children}
-            </div>
-          )}
-          {effectiveViewMode === 'table' && tableView && (
-            <div className="animate-in fade-in duration-200">
-              {tableView}
-            </div>
-          )}
-          {effectiveViewMode === 'guided' && guidedView && (
-            <div className="animate-in fade-in duration-200">
-              {guidedView}
-            </div>
-          )}
+        <div className={`mt-4 ${sidePanel ? 'lg:flex lg:gap-4' : ''}`}>
+          {/* Columna principal: lista (cards/table/guided) */}
+          <div className={sidePanel ? 'flex-1 min-w-0' : ''}>
+            {effectiveViewMode === 'cards' && (
+              <div className="animate-in fade-in duration-200">
+                {groupedItems && groupBy?.renderItem ? (
+                  // Cards agrupadas por grupo. Cada grupo: header sticky
+                  // [label · subtotal] + grid de cards del grupo.
+                  <div className="space-y-4">
+                    {groupedItems.map((g) => (
+                      <div key={g.key}>
+                        <div
+                          className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-2 rounded-lg mb-3"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            border: `1px solid ${theme.border}`,
+                          }}
+                        >
+                          <div className="text-sm font-semibold" style={{ color: theme.text }}>
+                            {groupBy.renderLabel(g.key, g.items)}
+                          </div>
+                          {groupBy.renderSubtotal && (
+                            <div className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>
+                              {groupBy.renderSubtotal(g.key, g.items)}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          className={
+                            sidePanel
+                              ? 'grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5'
+                              : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5'
+                          }
+                        >
+                          {g.items.map((it, i) => groupBy.renderItem!(it, i))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Compat: children como siempre.
+                  <div
+                    className={
+                      sidePanel
+                        ? 'grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5'
+                        : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5'
+                    }
+                  >
+                    {children}
+                  </div>
+                )}
+              </div>
+            )}
+            {effectiveViewMode === 'table' && tableView && (
+              <div className="animate-in fade-in duration-200">
+                {tableView}
+              </div>
+            )}
+            {effectiveViewMode === 'guided' && guidedView && (
+              <div className="animate-in fade-in duration-200">
+                {guidedView}
+              </div>
+            )}
 
-          {/* Sección de deshabilitados - visible en ambas vistas */}
-          {disabledSection}
+            {/* Sección de deshabilitados - visible en ambas vistas */}
+            {disabledSection}
+          </div>
+
+          {/* Panel lateral derecho (solo desktop lg+). */}
+          {sidePanel && (
+            <aside
+              className="hidden lg:block flex-shrink-0"
+              style={{ width: sidePanelWidth }}
+            >
+              {sidePanel}
+            </aside>
+          )}
         </div>
       ) : (
         <div
