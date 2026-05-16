@@ -20,7 +20,21 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
+
+
+def _json_default(o: Any) -> Any:
+    """Serializa tipos que json.dumps no maneja por defecto (Decimal de SQLAlchemy)."""
+    if isinstance(o, Decimal):
+        return float(o)
+    if isinstance(o, datetime):
+        return o.isoformat()
+    raise TypeError(f"Object of type {type(o).__name__} is not JSON serializable")
+
+
+def _safe_dumps(obj: Any) -> str:
+    return json.dumps(obj, ensure_ascii=False, default=_json_default)
 
 import httpx
 from sqlalchemy import func, select, text
@@ -263,8 +277,8 @@ async def build_reclamos_dashboard(db: AsyncSession, municipio_id: int, force: b
     recomendaciones: List[Dict[str, Any]] = []
     if (settings.GEMINI_API_KEY or settings.GROQ_API_KEY) and items_criticos:
         prompt = RECLAMOS_PROMPT.format(
-            stats_json=json.dumps(stats, ensure_ascii=False),
-            items_json=json.dumps(items_criticos, ensure_ascii=False),
+            stats_json=_safe_dumps(stats),
+            items_json=_safe_dumps(items_criticos),
         )
         text_resp = await _call_gemini(prompt)
         parsed = _parse_json_safely(text_resp) if text_resp else None
@@ -398,8 +412,8 @@ async def build_tramites_dashboard(db: AsyncSession, municipio_id: int, force: b
     recomendaciones: List[Dict[str, Any]] = []
     if (settings.GEMINI_API_KEY or settings.GROQ_API_KEY) and items_criticos:
         prompt = TRAMITES_PROMPT.format(
-            stats_json=json.dumps(stats, ensure_ascii=False),
-            items_json=json.dumps(items_criticos, ensure_ascii=False),
+            stats_json=_safe_dumps(stats),
+            items_json=_safe_dumps(items_criticos),
         )
         text_resp = await _call_gemini(prompt)
         parsed = _parse_json_safely(text_resp) if text_resp else None
@@ -543,8 +557,8 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
     recomendaciones: List[Dict[str, Any]] = []
     if (settings.GEMINI_API_KEY or settings.GROQ_API_KEY) and items_criticos:
         prompt = TESORERIA_PROMPT.format(
-            stats_json=json.dumps(stats, ensure_ascii=False),
-            items_json=json.dumps(items_criticos, ensure_ascii=False),
+            stats_json=_safe_dumps(stats),
+            items_json=_safe_dumps(items_criticos),
         )
         text_resp = await _call_gemini(prompt)
         parsed = _parse_json_safely(text_resp) if text_resp else None

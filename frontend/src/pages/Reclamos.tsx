@@ -2934,8 +2934,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       sortValue: (r: Reclamo) => r.direccion,
       render: (r: Reclamo) => (
         <div className="flex items-center gap-2 max-w-[200px]" title={r.direccion}>
-          <MapPin className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-          <span className="truncate" style={{ color: theme.textSecondary }}>{r.direccion}</span>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${theme.primary}20` }}>
+            <MapPin className="h-3.5 w-3.5" style={{ color: theme.primary }} />
+          </div>
+          <span className="truncate text-sm" style={{ color: theme.text }}>{r.direccion}</span>
         </div>
       ),
     },

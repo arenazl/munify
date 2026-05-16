@@ -1353,16 +1353,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           },
         },
         {
-          key: 'asunto',
-          header: 'Asunto',
-          sortValue: (t) => t.asunto,
-          render: (t) => (
-            <p className="text-xs truncate" style={{ color: theme.text }} title={t.asunto}>
-              {t.asunto}
-            </p>
-          ),
-        },
-        {
           key: 'dependencia',
           header: 'Dependencia',
           sortValue: (t) => t.dependencia_asignada?.nombre || '',
@@ -1390,27 +1380,31 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           },
         },
         {
-          // Columna unica "Fecha": 2 renglones (Creacion arriba, Modif abajo).
-          // Formato DD/M/YY. El binding completo (year incluido) se mantiene
-          // para sorting y filtros.
-          key: 'fecha',
-          header: 'Fecha',
+          key: 'created_at',
+          header: 'Creación',
+          sortValue: (t) => new Date(t.created_at).getTime(),
+          render: (t) => {
+            const d = new Date(t.created_at);
+            const yy = String(d.getFullYear()).slice(-2);
+            return (
+              <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+                {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
+              </span>
+            );
+          },
+        },
+        {
+          key: 'updated_at',
+          header: 'Modificación',
           sortValue: (t) => new Date(t.updated_at || t.created_at).getTime(),
           render: (t) => {
-            const fmt = (iso: string) => {
-              const d = new Date(iso);
-              const yy = String(d.getFullYear()).slice(-2);
-              return `${d.getDate()}/${d.getMonth() + 1}/${yy}`;
-            };
+            const iso = t.updated_at || t.created_at;
+            const d = new Date(iso);
+            const yy = String(d.getFullYear()).slice(-2);
             return (
-              <div className="flex flex-col leading-tight">
-                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                  {fmt(t.created_at)}
-                </span>
-                <span className="text-[10px] font-semibold" style={{ color: theme.text }}>
-                  {fmt(t.updated_at || t.created_at)}
-                </span>
-              </div>
+              <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
+                {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
+              </span>
             );
           },
         },
