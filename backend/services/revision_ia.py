@@ -62,7 +62,7 @@ async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
             f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
         )
-        async with httpx.AsyncClient(timeout=12.0) as client:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.post(
                 url,
                 headers={"Content-Type": "application/json"},
