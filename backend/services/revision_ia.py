@@ -53,7 +53,7 @@ def cache_invalidate(municipio_id: int, kind: Optional[str] = None) -> None:
         _CACHE.pop((municipio_id, kind), None)
 
 
-async def _call_gemini(prompt: str, max_tokens: int = 4000) -> Optional[str]:
+async def _call_gemini(prompt: str, max_tokens: int = 8000) -> Optional[str]:
     """Llama a Gemini REST y devuelve el texto plano de la respuesta.
     Devuelve None si no hay key configurada o falla la llamada.
     """
@@ -98,24 +98,46 @@ async def _call_gemini(prompt: str, max_tokens: int = 4000) -> Optional[str]:
 
 
 def _parse_json_safely(text: str) -> Optional[Any]:
-    """Gemini a veces devuelve texto con prefijo/sufijo. Extrae el primer JSON valido."""
+    """Gemini a veces devuelve texto con prefijo/sufijo, o trunca por
+    maxOutputTokens. Intentamos:
+      1. JSON puro
+      2. Extraer primer bloque { ... } o [ ... ]
+      3. Si el array fue truncado mid-item, cerramos a mano hasta el ultimo
+         item completo.
+    """
     if not text:
         return None
     text = text.strip()
-    # Si ya es JSON puro
+    # 1. JSON puro
     try:
         return json.loads(text)
     except Exception:
         pass
-    # Buscar primer { ... } o [ ... ]
+    # 2. Buscar primer { ... } o [ ... ]
     match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", text)
     if not match:
+        logger.warning("[RevisionIA] No se encontro JSON en respuesta (len=%d): %s", len(text), text[:400])
         return None
+    candidate = match.group()
     try:
-        return json.loads(match.group())
-    except Exception:
-        logger.warning("[RevisionIA] JSON inválido: %s", text[:200])
-        return None
+        return json.loads(candidate)
+    except Exception as e:
+        logger.warning("[RevisionIA] JSON inválido (%s) — intento recuperar. body=%s", e, candidate[:500])
+
+    # 3. Recuperar array truncado: cortar hasta la ultima '},' que parsea OK
+    if candidate.startswith('['):
+        # Busca el ultimo '}' que cierre un item bien formado
+        for cut in range(len(candidate) - 1, 0, -1):
+            if candidate[cut] == '}':
+                attempt = candidate[: cut + 1] + ']'
+                try:
+                    parsed = json.loads(attempt)
+                    logger.info("[RevisionIA] Recuperado array truncado, items=%d", len(parsed) if isinstance(parsed, list) else 0)
+                    return parsed
+                except Exception:
+                    continue
+    logger.warning("[RevisionIA] No se pudo recuperar JSON truncado")
+    return None
 
 
 # ===================================================================
@@ -126,39 +148,49 @@ def _parse_json_safely(text: str) -> Optional[Any]:
 # El output debe ser un JSON array con shape:
 #   [{ "reclamo_id": int, "tipo": "duplicado"|"sospechoso"|"sin_asignar"|"datos_pobres",
 #      "confianza": 0-100, "hint": "<frase corta para el supervisor>" }, ...]
-RECLAMOS_PROMPT_TEMPLATE = """Sos un asistente que ayuda a un supervisor municipal a priorizar reclamos
-vecinales. Te paso una lista de reclamos recientes. Detectá los que valen la
-pena revisar y devolvé un JSON array con hasta 6 items. Tipos posibles:
+RECLAMOS_PROMPT_TEMPLATE = """Sos un asistente que ayuda a un supervisor municipal a priorizar reclamos.
+Analizá los reclamos y devolvé un JSON array con MÁXIMO 6 items (los más
+relevantes). Tipos posibles:
 
-- "duplicado": el reclamo describe la misma cosa que otro (mismo lugar / mismo
-  problema / dentro de pocos días). Incluí en el hint los IDs de los duplicados.
-- "sospechoso": descripción muy corta, palabras random, texto que parece
-  autogenerado o spam, dirección incoherente.
-- "sin_asignar": creado hace más de 7 días y todavía está en estado "nuevo"
-  sin empleado asignado (atención del supervisor para asignar dependencia).
-- "datos_pobres": falta dirección concreta o descripción detallada, debería
-  pedirse más info al vecino.
+- "duplicado": describe lo mismo que otro reclamo (mismo lugar / mismo problema).
+  Incluí en hint el ID del duplicado.
+- "sospechoso": texto corto, random, spam, dirección incoherente.
+- "sin_asignar": creado hace >7 días y sigue en estado "nuevo" sin dependencia.
+- "datos_pobres": falta dirección concreta o descripción.
 
-Formato de cada item del array:
-  {{ "reclamo_id": <int>, "tipo": "<tipo>", "confianza": <0-100>, "hint": "<frase corta en español>" }}
+Formato exacto de cada item (hint MUY corto, max 80 chars):
+  {{"reclamo_id": <int>, "tipo": "<tipo>", "confianza": <0-100>, "hint": "<frase corta>"}}
 
-Devolvé SOLO el JSON array, sin texto extra. Si no encontrás nada interesante,
-devolvé [].
+REGLAS DURAS:
+- Devolvé SOLO el array JSON, sin texto antes ni después.
+- MÁXIMO 6 items. Si no encontrás nada, devolvé [].
+- hint no debe superar 80 caracteres.
 
-Reclamos (JSON):
+Reclamos:
 {reclamos_json}
 """
 
 
-def _build_reclamos_demo() -> List[Dict[str, Any]]:
-    """Fallback cuando no hay API key o falla Gemini. Marca explicitamente
-    'demo' para que el frontend lo pueda distinguir si quiere."""
+def _is_demo_items(items: List[Dict[str, Any]]) -> bool:
+    """Detecta si lo que esta en cache son items DEMO (para no cachearlos)."""
+    return any(it.get("es_demo") for it in items)
+
+
+def _build_reclamos_demo(reason: str = "no_key") -> List[Dict[str, Any]]:
+    """Fallback. `reason` ayuda a saber por que cayo:
+      - "no_key": GEMINI_API_KEY no configurada.
+      - "ia_fail": la IA respondio pero no se pudo parsear.
+    """
+    hints = {
+        "no_key":  "[DEMO] Configurar GEMINI_API_KEY para análisis real",
+        "ia_fail": "[DEMO] La IA no devolvió un análisis válido en este intento. Reintentar más tarde.",
+    }
     return [
         {
             "reclamo_id": 0,
             "tipo": "sin_asignar",
             "confianza": 75,
-            "hint": "[DEMO] Configurar GEMINI_API_KEY para análisis real",
+            "hint": hints.get(reason, hints["no_key"]),
             "titulo": "Ejemplo de revisión",
             "fecha": "",
             "es_demo": True,
@@ -186,7 +218,7 @@ async def analizar_reclamos(
 
     if not settings.GEMINI_API_KEY:
         # Sin IA configurada: devolvemos demo claramente marcado.
-        return _build_reclamos_demo()
+        return _build_reclamos_demo("no_key")
 
     # Recortamos las descripciones a 200 chars para no explotar el prompt.
     compact = []
@@ -205,12 +237,18 @@ async def analizar_reclamos(
     prompt = RECLAMOS_PROMPT_TEMPLATE.format(reclamos_json=json.dumps(compact, ensure_ascii=False))
     text = await _call_gemini(prompt)
     if not text:
-        return _build_reclamos_demo()
+        logger.warning("[RevisionIA] Gemini no respondio (vacio o error HTTP)")
+        return _build_reclamos_demo("ia_fail")
 
     parsed = _parse_json_safely(text)
     if not isinstance(parsed, list):
-        logger.warning("[RevisionIA] Gemini no devolvio array, devuelve demo")
-        return _build_reclamos_demo()
+        logger.warning("[RevisionIA] Parse fallo. Body len=%d head=%s", len(text), text[:400])
+        return _build_reclamos_demo("ia_fail")
+    if len(parsed) == 0:
+        # IA dijo "no encontre nada interesante" — eso es valido. Cacheamos
+        # array vacio para no repetir la llamada.
+        _cache_set(municipio_id, "reclamos", [])
+        return []
 
     # Sanitizamos cada item — solo pasa los que tienen reclamo_id valido y
     # cuyo id existe realmente en el set que mandamos.
