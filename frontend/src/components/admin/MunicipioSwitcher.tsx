@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Building2, Globe, Check } from 'lucide-react';
 import { municipiosApi } from '../../lib/api';
@@ -26,6 +27,7 @@ export default function MunicipioSwitcher() {
   const [municipios, setMunicipios] = useState<Municipio[]>([]);
   const [currentMuniId, setCurrentMuniId] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Cargar lista de munis al montar
   useEffect(() => {
@@ -50,10 +52,14 @@ export default function MunicipioSwitcher() {
     return () => window.removeEventListener('municipio-changed', syncFromStorage);
   }, []);
 
-  // Click outside close
+  // Click outside close. Chequea contra el dropdown Y el boton (que estan
+  // en distintos arboles del DOM por el portal).
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideDropdown = dropdownRef.current?.contains(target);
+      const insideButton = buttonRef.current?.contains(target);
+      if (!insideDropdown && !insideButton) {
         setOpen(false);
       }
     };
@@ -81,11 +87,90 @@ export default function MunicipioSwitcher() {
   const current = currentMuniId ? municipios.find((m) => m.id === currentMuniId) : null;
   const label = current ? current.nombre : 'Global';
 
-  return (
-    <div className="relative" ref={dropdownRef}>
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  // Posiciona el dropdown justo debajo del boton usando coords absolutas
+  // del viewport. Lo renderizamos via portal (document.body) para evitar que
+  // el overflow del sidebar lo recorte o tape los items de navegacion.
+  useEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const update = () => {
+      const r = buttonRef.current!.getBoundingClientRect();
+      setCoords({ top: r.bottom + 6, left: r.left, width: Math.max(r.width, 240) });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open]);
+
+  const dropdown = open && coords ? createPortal(
+    <div
+      ref={dropdownRef}
+      className="fixed rounded-xl border shadow-xl overflow-hidden"
+      style={{
+        top: coords.top,
+        left: coords.left,
+        width: coords.width,
+        zIndex: 9999,
+        backgroundColor: theme.card,
+        borderColor: theme.border,
+      }}
+    >
+      <div
+        className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider"
+        style={{ color: theme.textSecondary, borderBottom: `1px solid ${theme.border}` }}
+      >
+        Cambiar contexto
+      </div>
       <button
+        onClick={handleGlobal}
+        className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
+        style={{ color: theme.text }}
+      >
+        <Globe className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold">Global</div>
+          <div className="text-xs" style={{ color: theme.textSecondary }}>Vista cross-tenant</div>
+        </div>
+        {!current && <Check className="h-4 w-4" style={{ color: theme.primary }} />}
+      </button>
+      <div className="max-h-72 overflow-y-auto" style={{ borderTop: `1px solid ${theme.border}` }}>
+        {municipios.length === 0 ? (
+          <p className="px-3 py-4 text-sm text-center" style={{ color: theme.textSecondary }}>
+            Sin municipios
+          </p>
+        ) : (
+          municipios.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => handleSelectMuni(m)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
+              style={{ color: theme.text }}
+            >
+              <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: m.color_primario || theme.textSecondary }} />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold truncate">{m.nombre}</div>
+                <div className="text-xs font-mono" style={{ color: theme.textSecondary }}>{m.codigo}</div>
+              </div>
+              {current?.id === m.id && <Check className="h-4 w-4" style={{ color: theme.primary }} />}
+            </button>
+          ))
+        )}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors w-full"
         style={{
           backgroundColor: theme.card,
           borderColor: theme.border,
@@ -93,62 +178,14 @@ export default function MunicipioSwitcher() {
         }}
       >
         {current ? (
-          <Building2 className="h-4 w-4" style={{ color: theme.primary }} />
+          <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
         ) : (
-          <Globe className="h-4 w-4" style={{ color: theme.primary }} />
+          <Globe className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
         )}
-        <span className="max-w-[160px] truncate">{label}</span>
-        <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <span className="flex-1 text-left truncate">{label}</span>
+        <ChevronDown className={`h-4 w-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-
-      {open && (
-        <div
-          className="absolute right-0 mt-2 w-64 rounded-xl border shadow-xl z-50 overflow-hidden"
-          style={{ backgroundColor: theme.card, borderColor: theme.border }}
-        >
-          <div
-            className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider"
-            style={{ color: theme.textSecondary, borderBottom: `1px solid ${theme.border}` }}
-          >
-            Cambiar contexto
-          </div>
-          <button
-            onClick={handleGlobal}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
-            style={{ color: theme.text }}
-          >
-            <Globe className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold">Global</div>
-              <div className="text-xs" style={{ color: theme.textSecondary }}>Vista cross-tenant</div>
-            </div>
-            {!current && <Check className="h-4 w-4" style={{ color: theme.primary }} />}
-          </button>
-          <div className="max-h-72 overflow-y-auto" style={{ borderTop: `1px solid ${theme.border}` }}>
-            {municipios.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-center" style={{ color: theme.textSecondary }}>
-                Sin municipios
-              </p>
-            ) : (
-              municipios.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => handleSelectMuni(m)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
-                  style={{ color: theme.text }}
-                >
-                  <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: m.color_primario || theme.textSecondary }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold truncate">{m.nombre}</div>
-                    <div className="text-xs font-mono" style={{ color: theme.textSecondary }}>{m.codigo}</div>
-                  </div>
-                  {current?.id === m.id && <Check className="h-4 w-4" style={{ color: theme.primary }} />}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {dropdown}
     </div>
   );
 }
