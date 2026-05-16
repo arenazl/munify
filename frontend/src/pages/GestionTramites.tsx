@@ -206,6 +206,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   useEffect(() => {
     loadData();
+    // Pre-cargar dependencias del muni para que el combo "Dependencias" del
+    // toolbar tenga opciones desde el primer render (sin esperar a que el
+    // user abra el sheet de un tramite).
+    loadEmpleadosDisponibilidad();
   }, []);
 
   // Recargar trámites cuando cambien los filtros o búsqueda
@@ -1010,7 +1014,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
               setFiltroTipo(v ? parseInt(v, 10) : null);
             }}
             options={[
-              { value: '', label: 'Tipos' },
+              { value: '', label: 'Categorías' },
               ...tipos.filter(t => t.activo).map(tipo => {
                 const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
                 return {
@@ -1020,7 +1024,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
                 };
               }),
             ]}
-            placeholder="Tipos"
+            placeholder="Categorías"
             searchable
           />
         </div>
