@@ -3048,18 +3048,20 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         const vecinoRechazo = r.confirmado_vecino === false;
         const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
         return (
-          <span
-            className="w-5 h-5 rounded-md inline-flex items-center justify-center mx-auto"
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); openViewSheet(r); }}
+            className="w-5 h-5 rounded-md inline-flex items-center justify-center mx-auto transition-transform hover:scale-110"
             style={{
               backgroundColor: `${bg}18`,
               border: `1px solid ${bg}40`,
             }}
             title={vecinoRechazo
-              ? 'El vecino marcó que el problema NO se solucionó'
-              : 'Actividad reciente'}
+              ? 'El vecino marcó que el problema NO se solucionó · click para ver notas'
+              : 'Actividad reciente · click para ver notas'}
           >
             <MessageCircle className="h-3 w-3" style={{ color: bg }} />
-          </span>
+          </button>
         );
       },
     },
