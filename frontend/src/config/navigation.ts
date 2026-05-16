@@ -175,7 +175,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Partidas del padrón y deudas'
     },
     {
-      name: 'Comprobantes',
+      name: 'Recibos',
       href: '/gestion/pagos',
       icon: Wallet,
       show: isAdminOrSupervisor && moduloOn('pagos'),
