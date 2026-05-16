@@ -2940,16 +2940,16 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';
               return (
                 <span
-                  className={`w-6 h-6 rounded-full flex items-center justify-center ${vecinoRechazo ? 'animate-pulse' : 'animate-bounce'}`}
+                  className="w-5 h-5 rounded-md inline-flex items-center justify-center"
                   style={{
-                    backgroundColor: bg,
-                    boxShadow: `0 0 10px ${bg}, 0 0 20px ${bg}80`
+                    backgroundColor: `${bg}18`,
+                    border: `1px solid ${bg}40`,
                   }}
                   title={vecinoRechazo
                     ? 'El vecino marcó que el problema NO se solucionó'
                     : 'Actividad reciente'}
                 >
-                  <MessageCircle className="h-3.5 w-3.5" style={{ color: '#ffffff' }} />
+                  <MessageCircle className="h-3 w-3" style={{ color: bg }} />
                 </span>
               );
             })()}
@@ -4339,12 +4339,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
       <PageHint pageId="reclamos-list" />
 
-      {vistaInbox ? (
-        <>
-          {inboxView}
-          {/* Sheet del reclamo sigue funcionando con selectedReclamo más abajo */}
-        </>
-      ) : (
       <ABMPage
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
         buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
@@ -4477,7 +4471,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           })
         )}
       </ABMPage>
-      )}
 
       {/* Sentinel para infinite scroll + spinner de carga.
           Solo en vista clásica — en vista Inbox la lista no se pagina igual. */}
