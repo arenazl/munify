@@ -59,6 +59,11 @@ export interface AbmToolbar {
   combos?: ToolbarComboSpec[];
   statusPills?: ToolbarStatusPillsSpec;
   actions?: ToolbarActionSpec[];
+  /** Slots custom (PeriodNavigator, DateRangePicker, etc) intercalados despues
+   *  de los combos y antes de los pills. Cada item es un nodo React. */
+  customAfterCombos?: ReactNode[];
+  /** Lo mismo, pero al final (despues de los pills). */
+  customAtEnd?: ReactNode[];
   /** 'left' = todo pegado a la izquierda. 'split' = combos izq, pills der. Default 'left'. */
   layout?: 'left' | 'split';
 }
@@ -348,10 +353,10 @@ export function ABMPage({
   // -------------------------------------------------------------------
   const renderToolbarFilters = (): ReactNode => {
     if (!toolbar) return null;
-    const { combos = [], statusPills, layout = 'left' } = toolbar;
+    const { combos = [], statusPills, customAfterCombos = [], customAtEnd = [], layout = 'left' } = toolbar;
     const visibleCombos = combos.filter(c => c.visible !== false);
     const hasPills = !!statusPills;
-    if (visibleCombos.length === 0 && !hasPills) return null;
+    if (visibleCombos.length === 0 && !hasPills && customAfterCombos.length === 0 && customAtEnd.length === 0) return null;
 
     return (
       <div className={`flex flex-wrap items-center gap-2 ${layout === 'split' ? 'justify-between' : 'justify-start'}`}>
@@ -370,7 +375,13 @@ export function ABMPage({
             ))}
           </div>
         )}
+        {customAfterCombos.map((node, i) => (
+          <div key={`tb-after-${i}`} className="flex-shrink-0">{node}</div>
+        ))}
         {hasPills && renderStatusPills(statusPills!)}
+        {customAtEnd.map((node, i) => (
+          <div key={`tb-end-${i}`} className="flex-shrink-0">{node}</div>
+        ))}
       </div>
     );
   };

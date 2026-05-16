@@ -16,7 +16,7 @@ import {
   GastoDetalleSheet, calcEstadoAgregado, ESTADO_AGREGADO_META,
   type EstadoAgregado,
 } from '../components/tesoreria/GastoDetalleSheet';
-import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
@@ -568,66 +568,51 @@ export default function Tesoreria() {
   // Iguala altura/padding/radius de TODOS los triggers (ModernSelect)
   // y del navegador de meses (que usa <button> directo). Una sola CSS,
   // un solo wrapper class. Esto da look orgnico.
-  const secondaryFilters = (
-    <div className="flex flex-wrap items-center gap-2 tesoreria-filters-row">
-      <style>{`
-        .tesoreria-filters-row .ts-fitem button {
-          height: 40px !important;
-          padding-top: 0 !important;
-          padding-bottom: 0 !important;
-          font-size: 0.875rem !important;
-          border-radius: 0.75rem !important;
-        }
-      `}</style>
-
-      <div className="min-w-[170px] flex-shrink-0 ts-fitem">
-        <ModernSelect
-          value={tipoContactoFiltro}
-          onChange={(v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); }}
-          options={tipoContactoOptions}
-          placeholder="Contactos"
-          searchable
-        />
-      </div>
-
-      {/* Combo dinamico: solo si elegiste "empleado" */}
-      {tipoContactoFiltro === 'empleado' && subtiposEmpleado.length > 0 && (
-        <div className="min-w-[180px] flex-shrink-0 ts-fitem">
-          <ModernSelect
-            value={subtipoEmpleadoFiltro}
-            onChange={setSubtipoEmpleadoFiltro}
-            options={subtipoEmpleadoOptions}
-            placeholder="Empleados"
-            searchable
-          />
-        </div>
-      )}
-
-      <div className="min-w-[190px] flex-shrink-0 ts-fitem">
-        <ModernSelect
-          value={dependenciaFiltro}
-          onChange={setDependenciaFiltro}
-          options={dependenciaOptions}
-          placeholder="Dependencias"
-          searchable
-        />
-      </div>
-
-      {/* Filtro 'Tipo de concepto' eliminado — listado plano (1 nivel). */}
-
-      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
-        <ModernSelect
-          value={conceptoFiltro}
-          onChange={setConceptoFiltro}
-          options={conceptoOptions}
-          placeholder="Conceptos"
-          searchable
-        />
-      </div>
-
-      {/* Navegador de periodos: switch Mes/Año integrado + flechas + Todos.
-          Si hay rango de fechas activo, este nav queda atenuado y no filtra. */}
-      <div className="flex-shrink-0" style={{ opacity: rangoActivo ? 0.45 : 1, pointerEvents: rangoActivo ? 'none' : 'auto' }}>
+  // Toolbar declarativo (API nueva). ABMPage lo renderiza con su layout estandar.
+  const tesoreriaToolbar: AbmToolbar = {
+    combos: [
+      {
+        key: 'tipoContacto',
+        placeholder: 'Contactos',
+        value: tipoContactoFiltro,
+        onChange: (v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); },
+        // tipoContactoOptions ya trae el item '' como placeholder, lo sacamos
+        // porque ABMPage lo re-inyecta.
+        options: tipoContactoOptions.filter(o => o.value !== ''),
+        searchable: true,
+        minWidth: 170,
+      },
+      {
+        key: 'subtipoEmpleado',
+        placeholder: 'Empleados',
+        value: subtipoEmpleadoFiltro,
+        onChange: setSubtipoEmpleadoFiltro,
+        options: subtipoEmpleadoOptions.filter(o => o.value !== ''),
+        searchable: true,
+        minWidth: 180,
+        visible: tipoContactoFiltro === 'empleado' && subtiposEmpleado.length > 0,
+      },
+      {
+        key: 'dependencia',
+        placeholder: 'Dependencias',
+        value: dependenciaFiltro,
+        onChange: setDependenciaFiltro,
+        options: dependenciaOptions.filter(o => o.value !== ''),
+        searchable: true,
+        minWidth: 190,
+      },
+      {
+        key: 'concepto',
+        placeholder: 'Conceptos',
+        value: conceptoFiltro,
+        onChange: setConceptoFiltro,
+        options: conceptoOptions.filter(o => o.value !== ''),
+        searchable: true,
+        minWidth: 180,
+      },
+    ],
+    customAfterCombos: [
+      <div key="period" style={{ opacity: rangoActivo ? 0.45 : 1, pointerEvents: rangoActivo ? 'none' : 'auto' }}>
         <PeriodNavigator
           modo={modoPeriodo}
           onModoChange={(m) => { setModoPeriodo(m); setTodosLosMeses(false); }}
@@ -638,25 +623,17 @@ export default function Tesoreria() {
           onNext={irAdelante}
           onToggleTodos={() => setTodosLosMeses(v => !v)}
         />
-      </div>
-
-      {/* Rango de fechas puntual. Si esta seteado, pisa al PeriodNavigator. */}
-      <div className="flex-shrink-0">
-        <DateRangePicker
-          value={rangoFechas}
-          onChange={setRangoFechas}
-          placeholder="Rango de fechas"
-          allowClear
-        />
-      </div>
-
-      {/* Pills de estado: inline al final, sin push agresivo a la derecha
-          (en tablet/mobile evita que se apilen verticalmente). */}
-      <div className="flex-shrink-0 ml-auto max-w-full overflow-hidden">
-        {estadoChips}
-      </div>
-    </div>
-  );
+      </div>,
+      <DateRangePicker
+        key="rango"
+        value={rangoFechas}
+        onChange={setRangoFechas}
+        placeholder="Rango de fechas"
+        allowClear
+      />,
+    ],
+    customAtEnd: [estadoChips],
+  };
 
   // Accesos rápidos como headerActions
   const headerActions = (
@@ -1218,7 +1195,7 @@ export default function Tesoreria() {
         searchPlaceholder="Buscar por concepto, contacto o descripción..."
         searchValue={search}
         onSearchChange={setSearch}
-        secondaryFilters={secondaryFilters}
+        toolbar={tesoreriaToolbar}
         headerActions={headerActions}
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
