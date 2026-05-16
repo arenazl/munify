@@ -490,7 +490,7 @@ export default function TesoreriaAgenda() {
       </div>
 
       <ABMPage
-        title="Agenda de Pagos"
+        title="Agenda"
         icon={<CalendarClock className="h-5 w-5" />}
         backLink="/gestion/tesoreria"
         buttonLabel="Nuevo Pago Programado"

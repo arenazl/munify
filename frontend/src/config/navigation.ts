@@ -191,7 +191,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Listado de gastos del municipio'
     },
     {
-      name: 'Pagos programados',
+      name: 'Agenda',
       href: '/gestion/tesoreria/agenda',
       icon: CalendarClock,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
