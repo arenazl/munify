@@ -1428,7 +1428,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           },
         },
     ];
-    const columns = allColumns.filter(c => !((soloMiArea || !iaCollapsed) && c.key === 'dependencia'));
+    const columns = allColumns;
     return (
       <ABMTable<Solicitud>
         key={`table-${ordenamiento}`}

@@ -2951,26 +2951,31 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       },
     },
     {
-      // Columna unica "Fecha": 2 renglones (Creacion arriba, Modif abajo).
-      // Binding completo (year) se mantiene para sorting y filtros.
-      key: 'fecha',
-      header: 'Fecha',
+      key: 'creacion',
+      header: 'Creación',
+      sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
+      render: (r: Reclamo) => {
+        const d = new Date(r.created_at);
+        const yy = String(d.getFullYear()).slice(-2);
+        return (
+          <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+            {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'modificacion',
+      header: 'Modificación',
       sortValue: (r: Reclamo) => new Date(r.updated_at || r.created_at).getTime(),
       render: (r: Reclamo) => {
-        const fmt = (iso: string) => {
-          const d = new Date(iso);
-          const yy = String(d.getFullYear()).slice(-2);
-          return `${d.getDate()}/${d.getMonth() + 1}/${yy}`;
-        };
+        const iso = r.updated_at || r.created_at;
+        const d = new Date(iso);
+        const yy = String(d.getFullYear()).slice(-2);
         return (
-          <div className="flex flex-col leading-tight">
-            <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-              {fmt(r.created_at)}
-            </span>
-            <span className="text-[10px] font-semibold" style={{ color: theme.text }}>
-              {fmt(r.updated_at || r.created_at)}
-            </span>
-          </div>
+          <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
+            {`${d.getDate()}/${d.getMonth() + 1}/${yy}`}
+          </span>
         );
       },
     },
@@ -3040,7 +3045,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         );
       },
     },
-  ].filter(c => !((soloMiArea || !iaCollapsed) && c.key === 'dependencia'));
+  ];
 
   // Renderizar contenido del Sheet de ver
   const renderViewContent = () => {

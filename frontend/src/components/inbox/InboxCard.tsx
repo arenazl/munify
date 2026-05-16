@@ -149,8 +149,8 @@ export function InboxCard({
           </span>
         )}
         <div
-          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-white flex-shrink-0 transition-all group-hover:brightness-110"
-          style={{ backgroundColor: accentColor }}
+          className="inline-flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0 transition-all group-hover:brightness-110"
+          style={{ backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }}
         >
           <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
         </div>
@@ -243,11 +243,7 @@ export function InboxCard({
 
         <div
           className="inline-flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all group-hover:brightness-110 mt-auto"
-          style={
-            urgente
-              ? { backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }
-              : { backgroundColor: accentColor, color: '#fff' }
-          }
+          style={{ backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }}
         >
           <span>{ctaLabel}</span>
           <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -351,15 +347,10 @@ export function InboxCard({
         ))}
       </div>
 
-      {/* CTA — color de la SECCION (etapa) para coherencia visual.
-          Urgente = outlined (regla del proyecto: importantes nunca fill). */}
+      {/* CTA — siempre outlined (regla del proyecto: nunca fill). */}
       <div
         className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all group-hover:brightness-110 mt-1"
-        style={
-          urgente
-            ? { backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }
-            : { backgroundColor: accentColor, color: '#fff' }
-        }
+        style={{ backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }}
       >
         <span>{ctaLabel}</span>
         <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
