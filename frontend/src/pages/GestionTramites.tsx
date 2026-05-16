@@ -124,6 +124,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
   // Filtros visuales estilo Reclamos
   const [filtroTipo, setFiltroTipo] = useState<number | null>(null);
+  // Dependencia: filtro client-side sobre filteredTramites (no se envia al backend).
+  const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
+  const [dependenciasOpts, setDependenciasOpts] = useState<Array<{ id: number; nombre: string; color?: string }>>([]);
   const [filtroTramite, setFiltroTramite] = useState<number | null>(null); // Filtro por servicio específico
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
@@ -443,7 +446,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         id: number;
         nombre: string;
         descripcion?: string;
+        color?: string;
       }>;
+      // Guardamos las opciones para el combo de filtro de la barra de filtros.
+      setDependenciasOpts(deps.map(d => ({ id: d.id, nombre: d.nombre, color: d.color })));
       setEmpleadosDisponibilidad(deps.map((d) => ({
         id: d.id,
         nombre: d.nombre,
@@ -811,8 +817,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     return Object.values(grouped).sort((a, b) => a.tipo.nombre.localeCompare(b.tipo.nombre));
   }, [servicios, tipos]);
 
-  // Aplicar ordenamiento según botones del header
-  const filteredTramites = [...tramites].sort((a, b) => {
+  // Aplicar filtro de dependencia (client-side) + ordenamiento del header
+  const filteredTramites = tramites
+    .filter(t => filtroDependencia === null || t.dependencia_asignada?.id === filtroDependencia)
+    .sort((a, b) => {
     if (ordenamiento === 'por_vencer') {
       // Ordenar por fecha de vencimiento (más próxima primero)
       const tiempoA = a.tramite?.tiempo_estimado_dias || 0;
@@ -988,94 +996,62 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     });
   };
 
-  // Secondary filters (tipos + estados)
+  // Secondary filters — patron canonico: combos taxonomicos a la IZQUIERDA,
+  // status pills a la DERECHA, todo en UNA sola fila (regla APP_GUIDE).
   const renderSecondaryFilters = () => (
-    <div className="flex flex-col gap-1.5">
-      {/* Tipos de trámite - botón Todos fijo + scroll horizontal */}
-      <div className="flex gap-1">
-        {/* Botón Todos fijo - outlined */}
-        <button
-          onClick={() => {
-            setFilterLoading('tipo-all');
-            setFiltroTipo(null);
-          }}
-          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
-          style={{
-            background: 'transparent',
-            border: `1.5px solid ${filtroTipo === null ? theme.primary : theme.border}`,
-          }}
-        >
-          <FileText className={`h-3 w-3 ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }} />
-          <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'tipo-all' ? 'animate-pulse' : ''}`} style={{ color: filtroTipo === null ? theme.primary : theme.textSecondary }}>
-            Todos
-          </span>
-        </button>
-
-        {/* Scroll de tipos */}
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-          {/* Skeleton mientras cargan los tipos */}
-          {loading || tipos.length === 0 ? (
-            <FilterRowSkeleton count={6} height={28} widths={[60, 80, 70, 90, 65, 85]} />
-          ) : (
-            <>
-              {/* Chips por tipo de trámite */}
-              {tipos.filter(t => t.activo).map((tipo) => {
-                const isSelected = filtroTipo === tipo.id;
-                const tipoColor = tipo.color || theme.primary;
+    <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-between">
+      {/* Combos taxonomicos: Tipo + Dependencia */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-[180px]">
+          <ModernSelect
+            value={filtroTipo === null ? '' : String(filtroTipo)}
+            onChange={(v) => {
+              setFilterLoading(v ? `tipo-${v}` : 'tipo-all');
+              setFiltroTipo(v ? parseInt(v, 10) : null);
+            }}
+            options={[
+              { value: '', label: 'Tipos' },
+              ...tipos.filter(t => t.activo).map(tipo => {
                 const conteo = conteosTipos.find(c => c.id === tipo.id)?.cantidad || 0;
-                const isLoadingThis = filterLoading === `tipo-${tipo.id}`;
-                return (
-                  <button
-                    key={tipo.id}
-                    onClick={() => {
-                      setFilterLoading(`tipo-${tipo.id}`);
-                      setFiltroTipo(isSelected ? null : tipo.id);
-                    }}
-                    title={tipo.nombre}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
-                    style={{
-                      background: isSelected ? tipoColor : theme.backgroundSecondary,
-                      border: `1px solid ${isSelected ? tipoColor : theme.border}`,
-                    }}
-                  >
-                    <DynamicIcon
-                      name={tipo.icono || 'FileText'}
-                      className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse' : ''}`}
-                      style={{ color: isSelected ? '#ffffff' : tipoColor }}
-                      fallback={<FileText className={`h-3 w-3 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isSelected ? '#ffffff' : tipoColor }} />}
-                    />
-                    <span
-                      className={`text-[10px] font-medium whitespace-nowrap truncate ${isLoadingThis ? 'animate-pulse' : ''}`}
-                      style={{ color: isSelected ? '#ffffff' : theme.text, maxWidth: '140px' }}
-                    >
-                      {tipo.nombre}
-                    </span>
-                    <span
-                      className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse' : ''}`}
-                      style={{
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${tipoColor}30`,
-                        color: isSelected ? '#ffffff' : tipoColor,
-                      }}
-                    >
-                      {conteo}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
+                return {
+                  value: String(tipo.id),
+                  label: `${tipo.nombre} (${conteo})`,
+                  color: tipo.color || theme.primary,
+                };
+              }),
+            ]}
+            placeholder="Tipos"
+            searchable
+          />
+        </div>
+        {/* Dependencia — filtro client-side al lado de Tipos */}
+        <div className="min-w-[180px]">
+          <ModernSelect
+            value={filtroDependencia === null ? '' : String(filtroDependencia)}
+            onChange={(v) => setFiltroDependencia(v ? parseInt(v, 10) : null)}
+            options={[
+              { value: '', label: 'Dependencias' },
+              ...dependenciasOpts.map(d => ({
+                value: String(d.id),
+                label: d.nombre,
+                color: d.color || '#6366f1',
+              })),
+            ]}
+            placeholder="Dependencias"
+            searchable
+          />
         </div>
       </div>
 
-      {/* Estados - botón Todos fijo + scroll horizontal */}
-      <div className="flex gap-1">
-        {/* Botón Todos fijo - outlined */}
+      {/* Estados — status pills a la derecha */}
+      <div className="flex gap-1 items-center">
+        {/* Boton "Todos" outlined */}
         <button
           onClick={() => {
             setFilterLoading('estado-all');
             setFiltroEstado('');
           }}
-          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
+          className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
           style={{
             background: 'transparent',
             border: `1.5px solid ${filtroEstado === '' ? theme.primary : theme.border}`,
@@ -1090,52 +1066,48 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           </span>
         </button>
 
-        {/* Scroll de estados */}
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide flex-1 min-w-0">
-          {loading && !conteosLoaded ? (
-            <FilterRowSkeleton count={6} height={28} widths={[55, 65, 60, 70, 55, 65]} />
-          ) : (
-            [
-              // 1-a-1 con EstadoSolicitud (backend/models/tramite.py).
-              // El conteo de `recibido` absorbe el legacy `INICIADO`.
-              { key: 'recibido', label: 'Recib.', icon: Inbox, color: '#3b82f6', count: (conteosEstados['recibido'] || 0) + (conteosEstados['iniciado'] || 0) + (conteosEstados['INICIADO'] || 0) },
-              { key: 'pendiente_pago', label: 'Pago', icon: CreditCard, color: '#f59e0b', count: conteosEstados['pendiente_pago'] || 0 },
-              { key: 'en_curso', label: 'Curso', icon: Play, color: '#0ea5e9', count: conteosEstados['en_curso'] || 0 },
-              { key: 'finalizado', label: 'Final.', icon: CheckCircle2, color: '#10b981', count: conteosEstados['finalizado'] || 0 },
-              { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: '#6b7280', count: conteosEstados['pospuesto'] || 0 },
-              { key: 'rechazado', label: 'Rech.', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
-            ].map((estado) => {
-              const Icon = estado.icon;
-              const isActive = filtroEstado === estado.key;
-              const isLoadingThis = filterLoading === `estado-${estado.key}`;
-              return (
-                <button
-                  key={estado.key}
-                  onClick={() => {
-                    setFilterLoading(`estado-${estado.key}`);
-                    setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
-                  style={{
-                    background: isActive ? estado.color : `${estado.color}15`,
-                    border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
-                  }}
+        {/* Pills de estado — 6 estados (= 6, se quedan como pills) */}
+        {loading && !conteosLoaded ? (
+          <FilterRowSkeleton count={6} height={26} widths={[55, 65, 60, 70, 55, 65]} />
+        ) : (
+          [
+            { key: 'recibido', label: 'Recib.', icon: Inbox, color: '#3b82f6', count: (conteosEstados['recibido'] || 0) + (conteosEstados['iniciado'] || 0) + (conteosEstados['INICIADO'] || 0) },
+            { key: 'pendiente_pago', label: 'Pago', icon: CreditCard, color: '#f59e0b', count: conteosEstados['pendiente_pago'] || 0 },
+            { key: 'en_curso', label: 'Curso', icon: Play, color: '#0ea5e9', count: conteosEstados['en_curso'] || 0 },
+            { key: 'finalizado', label: 'Final.', icon: CheckCircle2, color: '#10b981', count: conteosEstados['finalizado'] || 0 },
+            { key: 'pospuesto', label: 'Posp.', icon: PauseCircle, color: '#6b7280', count: conteosEstados['pospuesto'] || 0 },
+            { key: 'rechazado', label: 'Rech.', icon: XCircle, color: '#ef4444', count: conteosEstados['rechazado'] || 0 },
+          ].map((estado) => {
+            const Icon = estado.icon;
+            const isActive = filtroEstado === estado.key;
+            const isLoadingThis = filterLoading === `estado-${estado.key}`;
+            return (
+              <button
+                key={estado.key}
+                onClick={() => {
+                  setFilterLoading(`estado-${estado.key}`);
+                  setFiltroEstado(filtroEstado === estado.key ? '' : estado.key);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[26px] flex-shrink-0"
+                style={{
+                  background: isActive ? estado.color : `${estado.color}15`,
+                  border: `1px solid ${isActive ? estado.color : `${estado.color}40`}`,
+                }}
+              >
+                <Icon className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }} />
+                <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }}>
+                  {estado.label}
+                </span>
+                <span
+                  className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse' : ''}`}
+                  style={{ color: isActive ? '#ffffff' : estado.color }}
                 >
-                  <Icon className={`h-3 w-3 flex-shrink-0 ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }} />
-                  <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse' : ''}`} style={{ color: isActive ? '#ffffff' : estado.color }}>
-                    {estado.label}
-                  </span>
-                  <span
-                    className={`text-[9px] font-bold ${isLoadingThis ? 'animate-pulse' : ''}`}
-                    style={{ color: isActive ? '#ffffff' : estado.color }}
-                  >
-                    {estado.count}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
+                  {estado.count}
+                </span>
+              </button>
+            );
+          })
+        )}
       </div>
     </div>
   );
@@ -1666,6 +1638,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
+        searchMaxWidth={280}
         loading={false}
         isEmpty={!loading && filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
