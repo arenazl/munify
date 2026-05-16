@@ -545,11 +545,13 @@ export function ABMPage({
           : <div>{kpis}</div>
       )}
 
-      {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
+      {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro.
+          z-40 + fondo opaco para que tape lo que pasa por debajo al hacer scroll. */}
       <div
-        className={stickyHeader ? 'sticky top-0 z-30 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-1 pb-1' : ''}
+        className={stickyHeader ? 'sticky top-0 z-40 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-2 pb-2' : ''}
         style={{
           backgroundColor: stickyHeader ? theme.background : 'transparent',
+          boxShadow: stickyHeader ? `0 4px 12px ${theme.background}80` : undefined,
         }}
       >
         {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
