@@ -4331,23 +4331,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
       <PageHint pageId="reclamos-list" />
-      {/* Toggle vista guiada / clásica */}
-      <div className="flex justify-end mb-3">
-        <button
-          type="button"
-          onClick={toggleVista}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95"
-          style={{
-            backgroundColor: vistaInbox ? `${theme.primary}15` : theme.backgroundSecondary,
-            border: `1px solid ${vistaInbox ? theme.primary + '60' : theme.border}`,
-            color: vistaInbox ? theme.primary : theme.textSecondary,
-          }}
-          title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
-        >
-          {vistaInbox ? <LayoutList className="w-3.5 h-3.5" /> : <LayoutGrid className="w-3.5 h-3.5" />}
-          {vistaInbox ? 'Vista clásica' : 'Vista guiada'}
-        </button>
-      </div>
 
       {vistaInbox ? (
         <>
@@ -4362,6 +4345,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}
+        searchMaxWidth={280}
         loading={false}
         isEmpty={!loading && filteredReclamos.length === 0}
         emptyMessage={debouncedSearch ? `No se encontraron reclamos para "${debouncedSearch}"` : "No se encontraron reclamos"}
@@ -4409,18 +4393,53 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               <Calendar className="h-3 w-3" />
               Por vencer
             </button>
+            <button
+              type="button"
+              onClick={toggleVista}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+              style={{
+                backgroundColor: vistaInbox ? `${theme.primary}15` : theme.backgroundSecondary,
+                border: `1px solid ${vistaInbox ? theme.primary : theme.border}`,
+                color: vistaInbox ? theme.primary : theme.textSecondary,
+              }}
+              title={vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada'}
+            >
+              {vistaInbox ? <LayoutList className="h-3 w-3" /> : <LayoutGrid className="h-3 w-3" />}
+              {vistaInbox ? 'Vista clásica' : 'Vista guiada'}
+            </button>
           </div>
         }
         stickyHeader={true}
         secondaryFilters={
-          <div className="w-full flex flex-col gap-1.5">
-            {/* Fila 1 — combos taxonomicos (Dependencia + Categoria).
-                Regla APP_GUIDE master: combos taxonomicos siempre como
-                ModernSelect, status pills solo para flujo (debajo). */}
-            <div className="flex flex-wrap gap-2 items-center">
-              {/* Dependencia — solo supervisor */}
+          // Una sola fila: combos taxonomicos a la IZQUIERDA, status pills
+          // a la DERECHA. Patron Tesoreria de la APP_GUIDE master.
+          <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-between">
+            {/* Combos: Categoria + Dependencia (si supervisor) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="min-w-[180px]">
+                <ModernSelect
+                  value={filtroCategoria === null ? '' : String(filtroCategoria)}
+                  onChange={(v) => {
+                    setFilterLoading(v ? `cat-${v}` : 'cat-all');
+                    setFiltroCategoria(v ? parseInt(v, 10) : null);
+                  }}
+                  options={[
+                    { value: '', label: 'Categorías' },
+                    ...categorias
+                      .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
+                      .map(cat => ({
+                        value: String(cat.id),
+                        label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
+                        color: cat.color || DEFAULT_CATEGORY_COLOR,
+                      })),
+                  ]}
+                  placeholder="Categorías"
+                  searchable
+                />
+              </div>
+              {/* Dependencia — solo para supervisor, al lado de Categorias */}
               {user?.rol === 'supervisor' && (
-                <div className="min-w-[200px]">
+                <div className="min-w-[180px]">
                   <ModernSelect
                     value={filtroDependencia === null ? '' : String(filtroDependencia)}
                     onChange={(v) => {
@@ -4442,34 +4461,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   />
                 </div>
               )}
-
-              {/* Categoria — 11 opciones, ModernSelect con searchable */}
-              <div className="min-w-[200px]">
-                <ModernSelect
-                  value={filtroCategoria === null ? '' : String(filtroCategoria)}
-                  onChange={(v) => {
-                    setFilterLoading(v ? `cat-${v}` : 'cat-all');
-                    setFiltroCategoria(v ? parseInt(v, 10) : null);
-                  }}
-                  options={[
-                    { value: '', label: 'Categorías' },
-                    ...categorias
-                      .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
-                      .map(cat => ({
-                        value: String(cat.id),
-                        label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
-                        color: cat.color || DEFAULT_CATEGORY_COLOR,
-                      })),
-                  ]}
-                  placeholder="Categorías"
-                  searchable
-                />
-              </div>
             </div>
 
-
-            {/* Estados - botón Todos fijo + scroll horizontal */}
-            <div className="flex gap-1">
+            {/* Estados — status pills a la derecha */}
+            <div className="flex gap-1 items-center">
               {/* Botón Todos fijo - outlined */}
               <button
                 onClick={() => {
