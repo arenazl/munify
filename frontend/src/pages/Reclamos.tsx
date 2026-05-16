@@ -4413,236 +4413,60 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         }
         stickyHeader={true}
         secondaryFilters={
-          <div className="w-full flex flex-col gap-1">
-            {/* Dependencias - solo para supervisor (fila 1) */}
-            {user?.rol === 'supervisor' && (
-              <div className="flex gap-1">
-                {/* Botón Todas fijo - outlined con tinte primario */}
-                <button
-                  onClick={() => {
-                    setFilterLoading('dep-all');
-                    setFiltroDependencia(null);
-                  }}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all duration-200 h-[28px] flex-shrink-0 hover:scale-[1.03] active:scale-95"
-                  style={{
-                    background: filtroDependencia === null ? `${theme.primary}12` : 'transparent',
-                    border: `1.5px solid ${filtroDependencia === null ? theme.primary : theme.border}`,
-                    boxShadow: filtroDependencia === null ? `0 2px 6px ${theme.primary}25` : 'none',
-                  }}
-                >
-                  <Building2 className={`h-3 w-3 ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }} />
-                  <span className={`text-[10px] font-semibold whitespace-nowrap tracking-wide ${filterLoading === 'dep-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroDependencia === null ? theme.primary : theme.textSecondary }}>
-                    Todas
-                  </span>
-                </button>
-
-                {/* Chips de dependencias — wrap si no entran */}
-                <div className="flex flex-wrap gap-1 pb-1 flex-1 min-w-0">
-                  {dependenciasDisponibles.length === 0 ? (
-                    <FilterRowSkeleton count={4} height={28} widths={[100, 120, 110, 105]} />
-                  ) : (
-                    dependenciasDisponibles
-                      .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
-                      .map((dep) => {
-                      const isSelected = filtroDependencia === dep.id;
-                      const count = conteosDependencias[dep.id] || 0;
-                      const isLoadingThis = filterLoading === `dep-${dep.id}`;
-                      const depColor = dep.color || '#6366f1';
-                      const depIcon = dep.icono || 'Building2';
-                      return (
-                        <button
-                          key={dep.id}
-                          onClick={() => {
-                            setFilterLoading(`dep-${dep.id}`);
-                            setFiltroDependencia(isSelected ? null : dep.id);
-                          }}
-                          title={dep.nombre}
-                          className="group flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all duration-200 h-[28px] flex-shrink-0 hover:scale-[1.03] active:scale-95"
-                          style={{
-                            background: isSelected
-                              ? `linear-gradient(135deg, ${depColor} 0%, ${depColor}dd 100%)`
-                              : `${depColor}12`,
-                            border: `1px solid ${isSelected ? depColor : `${depColor}40`}`,
-                            boxShadow: isSelected
-                              ? `0 2px 8px ${depColor}55, inset 0 1px 0 rgba(255,255,255,0.2)`
-                              : `0 1px 2px ${depColor}10`,
-                          }}
-                        >
-                          <span
-                            className={`[&>svg]:h-3 [&>svg]:w-3 transition-transform group-hover:scale-110 ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                            style={{ color: isSelected ? '#ffffff' : depColor }}
-                          >
-                            <DynamicIcon name={depIcon} className="h-3 w-3" />
-                          </span>
-                          <span
-                            className={`text-[10px] font-semibold whitespace-nowrap tracking-tight ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                            style={{ color: isSelected ? '#ffffff' : theme.text }}
-                          >
-                            {dep.nombre}
-                          </span>
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-px rounded-full leading-none ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                            style={{
-                              backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : `${depColor}25`,
-                              color: isSelected ? '#ffffff' : depColor,
-                              minWidth: '16px',
-                              textAlign: 'center',
-                            }}
-                          >
-                            {count}
-                          </span>
-                        </button>
-                      );
-                    })
-                  )}
+          <div className="w-full flex flex-col gap-1.5">
+            {/* Fila 1 — combos taxonomicos (Dependencia + Categoria).
+                Regla APP_GUIDE master: combos taxonomicos siempre como
+                ModernSelect, status pills solo para flujo (debajo). */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Dependencia — solo supervisor */}
+              {user?.rol === 'supervisor' && (
+                <div className="min-w-[200px]">
+                  <ModernSelect
+                    value={filtroDependencia === null ? '' : String(filtroDependencia)}
+                    onChange={(v) => {
+                      setFilterLoading(v ? `dep-${v}` : 'dep-all');
+                      setFiltroDependencia(v ? parseInt(v, 10) : null);
+                    }}
+                    options={[
+                      { value: '', label: 'Dependencias' },
+                      ...dependenciasDisponibles
+                        .filter(dep => (conteosDependencias[dep.id] || 0) > 0 || filtroDependencia === dep.id)
+                        .map(dep => ({
+                          value: String(dep.id),
+                          label: `${dep.nombre} (${conteosDependencias[dep.id] || 0})`,
+                          color: dep.color || '#6366f1',
+                        })),
+                    ]}
+                    placeholder="Dependencias"
+                    searchable
+                  />
                 </div>
-              </div>
-            )}
-
-            {/* Categorías - botón Todas fijo + scroll horizontal (fila 2).
-                Solo se renderiza si hay al menos una categoría con conteo
-                (o una seleccionada). Si todas estan vacias, escondemos la
-                fila entera para no dejar un "Todas" suelto sin contexto. */}
-            {(categorias.some(c => (conteosCategorias[c.id] || 0) > 0) || filtroCategoria !== null) && (
-            <div className="flex gap-1">
-              {/* Botón Todas fijo - outlined */}
-              <button
-                onClick={() => {
-                  setFilterLoading('cat-all');
-                  setFiltroCategoria(null);
-                }}
-                className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
-                style={{
-                  background: 'transparent',
-                  border: `1.5px solid ${filtroCategoria === null ? theme.primary : theme.border}`,
-                }}
-              >
-                <Tag className={`h-3 w-3 ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? theme.primary : theme.textSecondary }} />
-                <span className={`text-[10px] font-medium whitespace-nowrap ${filterLoading === 'cat-all' ? 'animate-pulse-fade' : ''}`} style={{ color: filtroCategoria === null ? theme.primary : theme.textSecondary }}>
-                  Todas
-                </span>
-              </button>
-
-              {/* Chips de categorías — contenedor wrapper + clon invisible
-                  para medir overflow.
-                  - `catsWrapRef` = visible, con max-h dinámico = 2 renglones
-                  - `catsMeasureRef` = clon oculto, sin max-h, para medir
-                    scrollHeight real y comparar contra 2 líneas */}
-              <div className="flex-1 min-w-0 relative">
-                {/* Contenedor visible */}
-                <div
-                  ref={catsWrapRef}
-                  className="flex flex-wrap gap-1 pb-1"
-                  style={{
-                    maxHeight: catsChipsExpanded ? undefined : chipLineHeight * 2 + 4,
-                    overflow: catsChipsExpanded ? 'visible' : 'hidden',
-                  }}
-                >
-                {/* Skeleton solo mientras las categorías del municipio aún
-                    no se cargaron. */}
-                {categorias.length === 0 ? (
-                  <FilterRowSkeleton count={6} height={28} widths={[50, 65, 80, 50, 65, 80]} />
-                ) : (
-                <>
-                {categorias.filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id).map((cat) => {
-                  const isSelected = filtroCategoria === cat.id;
-                  const catColor = cat.color || DEFAULT_CATEGORY_COLOR;
-                  const count = conteosCategorias[cat.id] || 0;
-                  const isLoadingThis = filterLoading === `cat-${cat.id}`;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => {
-                        setFilterLoading(`cat-${cat.id}`);
-                        setFiltroCategoria(isSelected ? null : cat.id);
-                      }}
-                      title={cat.nombre}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md transition-all h-[28px] flex-shrink-0"
-                      style={{
-                        background: isSelected ? catColor : theme.backgroundSecondary,
-                        border: `1px solid ${isSelected ? catColor : theme.border}`,
-                      }}
-                    >
-                      <span className={`[&>svg]:h-3 [&>svg]:w-3 ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : catColor }}>
-                        {getCategoryIcon(cat.nombre)}
-                      </span>
-                      <span className={`text-[10px] font-medium whitespace-nowrap ${isLoadingThis ? 'animate-pulse-fade' : ''}`} style={{ color: isSelected ? '#ffffff' : theme.text }}>
-                        {cat.nombre}
-                      </span>
-                      <span
-                        className={`text-[9px] font-bold px-1 rounded-full ${isLoadingThis ? 'animate-pulse-fade' : ''}`}
-                        style={{
-                          backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : `${catColor}30`,
-                          color: isSelected ? '#ffffff' : catColor,
-                        }}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-                </>
-                )}
-                </div>
-
-                {/* Clon invisible usado SOLO para medir overflow real.
-                    Mismo ancho y contenido que el visible, pero sin max-h
-                    ni overflow:hidden — así scrollHeight siempre refleja el
-                    alto real de N renglones sin restricción. */}
-                <div
-                  ref={catsMeasureRef}
-                  aria-hidden="true"
-                  className="flex flex-wrap gap-1 pb-1 absolute top-0 left-0 right-0 pointer-events-none invisible"
-                  style={{ visibility: 'hidden' }}
-                >
-                  {categorias.filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id).map((cat) => (
-                    <button
-                      key={`measure-${cat.id}`}
-                      type="button"
-                      tabIndex={-1}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md h-[28px] flex-shrink-0"
-                      style={{ border: '1px solid transparent' }}
-                    >
-                      <span className="[&>svg]:h-3 [&>svg]:w-3">
-                        {getCategoryIcon(cat.nombre)}
-                      </span>
-                      <span className="text-[10px] font-medium whitespace-nowrap">
-                        {cat.nombre}
-                      </span>
-                      <span className="text-[9px] font-bold px-1 rounded-full">
-                        {conteosCategorias[cat.id] || 0}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Toggle "Ver todas / Menos" — solo si hay overflow o expandido */}
-              {(catsChipsOverflow || catsChipsExpanded) && (
-                <button
-                  type="button"
-                  onClick={() => setCatsChipsExpanded(v => !v)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium flex-shrink-0 self-start transition-colors hover:brightness-110"
-                  style={{
-                    backgroundColor: theme.backgroundSecondary,
-                    border: `1px solid ${theme.border}`,
-                    color: theme.textSecondary,
-                    height: 28,
-                  }}
-                >
-                  {catsChipsExpanded ? (
-                    <>
-                      <ChevronUp className="h-3 w-3" /> Menos
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-3 w-3" /> Ver todas
-                    </>
-                  )}
-                </button>
               )}
+
+              {/* Categoria — 11 opciones, ModernSelect con searchable */}
+              <div className="min-w-[200px]">
+                <ModernSelect
+                  value={filtroCategoria === null ? '' : String(filtroCategoria)}
+                  onChange={(v) => {
+                    setFilterLoading(v ? `cat-${v}` : 'cat-all');
+                    setFiltroCategoria(v ? parseInt(v, 10) : null);
+                  }}
+                  options={[
+                    { value: '', label: 'Categorías' },
+                    ...categorias
+                      .filter(c => (conteosCategorias[c.id] || 0) > 0 || filtroCategoria === c.id)
+                      .map(cat => ({
+                        value: String(cat.id),
+                        label: `${cat.nombre} (${conteosCategorias[cat.id] || 0})`,
+                        color: cat.color || DEFAULT_CATEGORY_COLOR,
+                      })),
+                  ]}
+                  placeholder="Categorías"
+                  searchable
+                />
+              </div>
             </div>
-            )}
+
 
             {/* Estados - botón Todos fijo + scroll horizontal */}
             <div className="flex gap-1">

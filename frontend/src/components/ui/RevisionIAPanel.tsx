@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Check, Pencil, X as XIcon, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { Sparkles, Check, Pencil, X as XIcon, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // RevisionIAPanel — side panel reusable que muestra items sugeridos por IA
@@ -91,6 +91,8 @@ export function RevisionIAPanel({
   const subtitleResolved = subtitle ?? `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
 
   // Collapse persistido en localStorage. Default expandido.
+  // Cuando esta colapsado, el panel se vuelve una barra vertical fina
+  // pegada a la DERECHA (solo icono + count rotado).
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
   });
@@ -102,6 +104,46 @@ export function RevisionIAPanel({
     });
   };
 
+  // Modo colapsado: barra vertical fina a la derecha, sin contenido.
+  if (collapsed) {
+    return (
+      <button
+        onClick={toggle}
+        className="sticky top-4 w-full h-full min-h-[120px] rounded-lg flex flex-col items-center justify-start gap-2 py-3 transition-all hover:shadow-sm"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        title={`Expandir ${title}`}
+        aria-label={`Expandir ${title}`}
+      >
+        <ChevronLeft className="h-3 w-3" style={{ color: theme.textSecondary }} />
+        <div
+          className="w-7 h-7 rounded-md flex items-center justify-center"
+          style={{ backgroundColor: `${theme.primary}18` }}
+        >
+          <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
+        </div>
+        {hasItems && (
+          <span
+            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+            style={{ backgroundColor: theme.primary, color: theme.primaryText || '#fff' }}
+          >
+            {items.length}
+          </span>
+        )}
+        {/* Label rotado 90deg para que se lea vertical */}
+        <span
+          className="text-[10px] font-semibold uppercase tracking-wider mt-1"
+          style={{
+            color: theme.textSecondary,
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+          }}
+        >
+          {title}
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div className="space-y-2 sticky top-4 text-[12px]">
       {/* Header (siempre visible, clickeable para colapsar) */}
@@ -109,7 +151,7 @@ export function RevisionIAPanel({
         onClick={toggle}
         className="w-full rounded-lg p-2.5 flex items-center gap-2 transition-all hover:shadow-sm text-left"
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-        title={collapsed ? 'Expandir panel IA' : 'Colapsar panel IA'}
+        title="Colapsar panel IA"
       >
         <div
           className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
@@ -121,9 +163,7 @@ export function RevisionIAPanel({
           <div className="text-[12px] font-bold leading-tight" style={{ color: theme.text }}>{title}</div>
           <div className="text-[10px] leading-tight" style={{ color: theme.textSecondary }}>{subtitleResolved}</div>
         </div>
-        {collapsed
-          ? <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-          : <ChevronUp className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />}
+        <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
       </button>
 
       {!collapsed && (<>
