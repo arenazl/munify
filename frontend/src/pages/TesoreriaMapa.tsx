@@ -684,6 +684,10 @@ export default function TesoreriaMapa() {
                         </div>
                         <p className="text-[10px] truncate opacity-70" style={{ color: theme.textSecondary }}>
                           {TIPO_LABELS[c.tipo]}
+                          {(() => {
+                            const n = gastosPorContacto[c.id]?.length || 0;
+                            return n > 0 ? ` (${n} ${n === 1 ? 'pago' : 'pagos'})` : '';
+                          })()}
                         </p>
                         {total > 0 && (
                           <p className="text-[11px] font-bold tabular-nums mt-0.5" style={{ color: theme.primary }}>
