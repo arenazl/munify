@@ -44,37 +44,40 @@ export function TesoreriaHint({ titulo, children, storageKey }: Props) {
 
   return (
     <div
-      className="rounded-xl p-4 flex items-start gap-3 mb-4"
+      className="relative mb-4 overflow-hidden rounded-xl shadow-sm"
       style={{
-        backgroundColor: `${theme.primary}10`,
+        background: `linear-gradient(135deg, ${theme.primary}12 0%, ${theme.primary}06 60%, ${theme.card} 100%)`,
         border: `1px solid ${theme.primary}30`,
       }}
     >
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${theme.primary}25`, color: theme.primary }}
-      >
-        <Lightbulb className="h-5 w-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-bold text-base mb-1" style={{ color: theme.text }}>
-          {titulo}
-        </h3>
-        <div className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
-          {children}
-        </div>
-      </div>
-      {storageKey && (
-        <button
-          type="button"
-          onClick={dismiss}
-          className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
-          style={{ color: theme.textSecondary }}
-          aria-label="Cerrar consejo"
+      <div className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: theme.primary }} />
+      <div className="p-4 flex items-start gap-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
+          style={{ backgroundColor: `${theme.primary}25`, color: theme.primary }}
         >
-          <X className="h-4 w-4" />
-        </button>
-      )}
+          <Lightbulb className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-base mb-1" style={{ color: theme.text }}>
+            {titulo}
+          </h3>
+          <div className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
+            {children}
+          </div>
+        </div>
+        {storageKey && (
+          <button
+            type="button"
+            onClick={dismiss}
+            className="p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
+            style={{ color: theme.textSecondary }}
+            aria-label="Cerrar consejo"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

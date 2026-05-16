@@ -185,14 +185,14 @@ export default function PageHint({ pageId }: PageHintProps) {
       {/* Barra de acento decorativa arriba */}
       <div className="absolute inset-x-0 top-0 h-0.5" style={{ backgroundColor: primary }} />
 
-      <div className="p-2.5 md:p-3">
-        <div className="flex items-start gap-2.5">
+      <div className="p-4">
+        <div className="flex items-start gap-3">
           {/* Ícono */}
           <div
-            className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center shadow-sm"
-            style={{ backgroundColor: `${primary}20`, color: primary }}
+            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+            style={{ backgroundColor: `${primary}25`, color: primary }}
           >
-            <IconComponent className="h-3.5 w-3.5" strokeWidth={2.2} />
+            <IconComponent className="h-5 w-5" strokeWidth={2.2} />
           </div>
 
           {/* Contenido */}
@@ -200,18 +200,18 @@ export default function PageHint({ pageId }: PageHintProps) {
             {/* Chip superior (solo en wizard) */}
             {isWizard && (
               <div
-                className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full mb-1"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mb-1.5"
                 style={{ backgroundColor: `${primary}20`, color: primary }}
               >
-                <Sparkles className="h-2.5 w-2.5" />
+                <Sparkles className="h-3 w-3" />
                 Tutorial · {stepIdx + 1}/{steps.length}
               </div>
             )}
 
-            <h3 className="text-sm font-bold mb-0.5 leading-tight" style={{ color: theme.text }}>
+            <h3 className="text-base font-bold mb-1 leading-tight" style={{ color: theme.text }}>
               {isWizard ? currentStep?.title : hint.title}
             </h3>
-            <p className="text-xs leading-snug" style={{ color: theme.textSecondary }}>
+            <p className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
               {isWizard ? currentStep?.description : hint.description}
             </p>
 
@@ -290,11 +290,11 @@ export default function PageHint({ pageId }: PageHintProps) {
           {/* Botón cerrar */}
           <button
             onClick={handleDismiss}
-            className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:brightness-125"
-            style={{ backgroundColor: `${primary}15`, color: primary }}
+            className="flex-shrink-0 p-1.5 rounded-lg transition-all hover:scale-110 active:scale-95"
+            style={{ color: theme.textSecondary }}
             aria-label="Ocultar sugerencia"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>

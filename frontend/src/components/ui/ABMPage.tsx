@@ -1627,7 +1627,7 @@ export function ABMTable<T>({
               )}
             </tr>
           </thead>
-          <tbody className="divide-y" style={{ borderColor: theme.border }}>
+          <tbody>
             {(() => {
               const colSpan = columns.length + (actions ? 1 : 0);
               // groupBy aplica SOLO si el sort actual coincide con el sortKey
