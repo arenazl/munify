@@ -242,8 +242,12 @@ export function InboxCard({
         )}
 
         <div
-          className="inline-flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold text-white transition-all group-hover:brightness-110 mt-auto"
-          style={{ backgroundColor: accentColor }}
+          className="inline-flex items-center justify-between gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all group-hover:brightness-110 mt-auto"
+          style={
+            urgente
+              ? { backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }
+              : { backgroundColor: accentColor, color: '#fff' }
+          }
         >
           <span>{ctaLabel}</span>
           <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -347,10 +351,15 @@ export function InboxCard({
         ))}
       </div>
 
-      {/* CTA — color de la SECCION (etapa) para coherencia visual */}
+      {/* CTA — color de la SECCION (etapa) para coherencia visual.
+          Urgente = outlined (regla del proyecto: importantes nunca fill). */}
       <div
-        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all group-hover:brightness-110 mt-1"
-        style={{ backgroundColor: accentColor }}
+        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all group-hover:brightness-110 mt-1"
+        style={
+          urgente
+            ? { backgroundColor: `${accentColor}18`, color: accentColor, border: `1px solid ${accentColor}40` }
+            : { backgroundColor: accentColor, color: '#fff' }
+        }
       >
         <span>{ctaLabel}</span>
         <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
