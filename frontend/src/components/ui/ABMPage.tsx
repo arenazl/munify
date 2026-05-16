@@ -539,13 +539,16 @@ export function ABMPage({
           : <div>{kpis}</div>
       )}
 
-      {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro.
-          z-40 + fondo opaco para que tape lo que pasa por debajo al hacer scroll. */}
+      {/* Contenedor sticky para header y secondary filters.
+          top:48px = arranca debajo de la barra superior del Layout (que es sticky
+          top:0 z-50 con pt-4 pb-2). Asi el header del ABM queda VISIBLE al
+          scrollear, debajo de la barra superior, no oculto detras. */}
       <div
-        className={stickyHeader ? 'sticky top-0 z-40 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-2 pb-2' : ''}
+        className={stickyHeader ? 'sticky z-40 -mx-3 sm:-mx-6 lg:-mx-8 px-3 sm:px-6 lg:px-8 pt-2 pb-2' : ''}
         style={{
           backgroundColor: stickyHeader ? theme.background : 'transparent',
           boxShadow: stickyHeader ? `0 4px 12px ${theme.background}80` : undefined,
+          top: stickyHeader ? 48 : undefined,
         }}
       >
         {/* Header unificado: Título + Buscador + Filtros + Botón en una línea */}
@@ -891,11 +894,9 @@ export function ABMPage({
               style={{
                 width: sidePanelWidth,
                 position: 'sticky',
-                // Top calculado para quedar JUSTO debajo del header sticky del ABMPage
-                // (que mide ~120px con sus filtros). Asi al hacer scroll los dos
-                // quedan visibles uno arriba del otro.
-                top: 120,
-                maxHeight: 'calc(100vh - 130px)',
+                // Top = barra superior del Layout (48) + header ABM con filtros (~120) = 168.
+                top: 168,
+                maxHeight: 'calc(100vh - 180px)',
                 overflowY: 'auto',
                 zIndex: 20,
               }}
