@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from 'react';
-import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -675,19 +675,15 @@ export function ABMPage({
               {guidedView && (
                 <button
                   onClick={() => setViewMode('guided')}
-                  className={`relative p-2 rounded-md transition-all duration-300 ease-out ${viewMode === 'guided' ? 'text-white' : ''}`}
-                  style={{ color: viewMode === 'guided' ? '#ffffff' : theme.textSecondary }}
+                  className="p-2 rounded-md transition-all duration-200 ease-out inline-flex items-center justify-center"
+                  style={{
+                    backgroundColor: viewMode === 'guided' ? `${theme.primary}18` : 'transparent',
+                    color: viewMode === 'guided' ? theme.primary : theme.textSecondary,
+                    border: viewMode === 'guided' ? `1px solid ${theme.primary}40` : '1px solid transparent',
+                  }}
                   title="Vista guiada"
                 >
-                  {viewMode === 'guided' && (
-                    <div className="absolute inset-0 rounded-md transition-all duration-300 ease-out"
-                      style={{
-                        background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover} 100%)`,
-                        boxShadow: `0 2px 8px ${theme.primary}40`,
-                      }}
-                    />
-                  )}
-                  <Wand2 className="h-4 w-4 relative z-10" />
+                  <MessageCircle className="h-4 w-4" />
                 </button>
               )}
             </div>
