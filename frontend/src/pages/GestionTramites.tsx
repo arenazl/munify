@@ -1755,7 +1755,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             }}
           />
         ) : undefined}
-        sidePanelWidth={iaCollapsed ? 48 : 280}
+        sidePanelWidth={iaCollapsed ? 44 : 240}
         sheetOpen={false}
         sheetTitle=""
         onSheetClose={() => {}}

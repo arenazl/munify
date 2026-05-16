@@ -4375,7 +4375,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             }}
           />
         ) : undefined}
-        sidePanelWidth={iaCollapsed ? 48 : 280}
+        sidePanelWidth={iaCollapsed ? 44 : 240}
         stickyHeader={true}
         toolbar={{
           combos: [
@@ -4449,6 +4449,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             onRowClick={(r) => openViewSheet(r)}
             defaultSortKey={ordenamiento === 'programado' ? 'fecha_programada' : 'creacion'}
             defaultSortDirection={ordenamiento === 'programado' ? 'asc' : 'desc'}
+            defaultGroupByDateKey="created_at"
+            defaultGroupByItemLabel={{ singular: 'reclamo', plural: 'reclamos' }}
           />
         }
         sheetContent={null}

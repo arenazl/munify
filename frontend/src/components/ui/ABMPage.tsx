@@ -321,7 +321,7 @@ export function ABMPage({
   kpis,
   groupBy,
   sidePanel,
-  sidePanelWidth = 280,
+  sidePanelWidth = 240,
   sheetOpen,
   sheetTitle,
   sheetDescription,
@@ -1524,6 +1524,13 @@ interface ABMTableProps<T> {
    *  sistema: tablas en estilo lista/feed (avatar + titulo + meta), sin
    *  cabecera. Pasar `hideHeader={false}` para mostrar la cabecera. */
   hideHeader?: boolean;
+  /** Atajo: si se pasa, ABMTable arma automaticamente el `groupBy` por dia
+   *  con el header canonico (chip 2-lineas + count). El valor es el path al
+   *  campo fecha del item (ej. 'created_at', 'fecha'). Si tambien pasas
+   *  `groupBy` explicito, tiene prioridad. */
+  defaultGroupByDateKey?: string;
+  /** Label de items para el header de dia ('reclamo'/'reclamos'). */
+  defaultGroupByItemLabel?: { singular: string; plural: string };
   /** Agrupacion opcional. Inserta una fila-separador antes de cada grupo con
    *  label izq + subtotal der. Solo se aplica cuando el sort actual es por
    *  `sortKey` (columna sobre la que la agrupacion tiene sentido). Si el user
@@ -1548,7 +1555,9 @@ export function ABMTable<T>({
   defaultSortKey,
   defaultSortDirection,
   renderMobileCard,
-  hideHeader = true,
+  hideHeader = false,
+  defaultGroupByDateKey,
+  defaultGroupByItemLabel,
   groupBy,
 }: ABMTableProps<T>) {
   const { theme } = useTheme();
@@ -1706,6 +1715,28 @@ export function ABMTable<T>({
           <tbody>
             {(() => {
               const colSpan = columns.length + (actions ? 1 : 0);
+              // Si la tabla no declaro groupBy explicito pero pasa
+              // defaultGroupByDateKey, armamos uno auto con el header canonico.
+              if (!groupBy && defaultGroupByDateKey) {
+                groupBy = {
+                  sortKey: defaultGroupByDateKey,
+                  getKey: (it: T) => {
+                    const v = (it as Record<string, unknown>)[defaultGroupByDateKey];
+                    if (typeof v === 'string') return v.slice(0, 10);
+                    if (v instanceof Date) return v.toISOString().slice(0, 10);
+                    return String(v || '');
+                  },
+                  renderLabel: (key: string, items: T[]) => renderGroupDayLabel({
+                    isoDate: key,
+                    count: items.length,
+                    itemLabel: defaultGroupByItemLabel,
+                    themeCard: theme.card,
+                    themeBorder: theme.border,
+                    themeText: theme.text,
+                    themeTextSecondary: theme.textSecondary,
+                  }),
+                };
+              }
               // groupBy aplica SOLO si el sort actual coincide con el sortKey
               // declarado por la agrupacion (o si no hay sort y la data viene
               // del padre ya ordenada por ese campo).
