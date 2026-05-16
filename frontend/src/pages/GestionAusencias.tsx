@@ -271,7 +271,7 @@ export default function GestionAusencias() {
         <ABMSelect
           value={filterAprobado}
           onChange={(e) => setFilterAprobado(e.target.value)}
-          placeholder="Todos los estados"
+          placeholder="Estados"
           options={[
             { value: '', label: 'Todos' },
             { value: 'pendientes', label: 'Pendientes' },

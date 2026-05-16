@@ -174,21 +174,25 @@ export function PeriodNavigator({
         </button>
       </div>
 
-      {/* Boton "Todos" — opt-in via onToggleTodos */}
+      {/* Toggle "Todos los periodos" — solo icono, pegado a la flecha derecha.
+          Icono cambia segun modo: LayoutList = ver todos, Calendar = filtrar por periodo.
+          El title da el contexto en hover. Texto removido para ahorrar ancho. */}
       {onToggleTodos && (
         <button
           onClick={onToggleTodos}
-          className="inline-flex items-center gap-1.5 h-[34px] px-2.5 rounded-lg text-[12px] font-semibold transition-all hover:brightness-110"
+          className="inline-flex items-center justify-center h-[34px] w-[34px] rounded-lg transition-all hover:brightness-110"
           style={{
             backgroundColor: modoTodos ? theme.primary : theme.backgroundSecondary,
             color: modoTodos ? '#fff' : theme.textSecondary,
             border: `1px solid ${modoTodos ? theme.primary : theme.border}`,
           }}
-          title={modoTodos ? 'Volver a vista por período' : 'Ver todos'}
+          title={modoTodos ? (todosLabelActivo || 'Ver todos los períodos') : (todosLabel || 'Ver todos')}
+          aria-label={modoTodos ? 'Filtrar por período' : 'Ver todos los períodos'}
           type="button"
         >
-          <LayoutList className="h-3.5 w-3.5" />
-          {modoTodos ? todosLabelActivo : todosLabel}
+          {modoTodos
+            ? <Calendar className="h-4 w-4" />
+            : <LayoutList className="h-4 w-4" />}
         </button>
       )}
     </div>

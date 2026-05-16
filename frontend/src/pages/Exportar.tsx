@@ -257,7 +257,7 @@ export default function Exportar() {
                   <DateRangePicker
                     value={{ desde: filters.fecha_desde, hasta: filters.fecha_hasta }}
                     onChange={(r) => setFilters({ ...filters, fecha_desde: r.desde, fecha_hasta: r.hasta })}
-                    placeholder="Todas las fechas"
+                    placeholder="Fechas"
                     allowClear
                   />
                 </div>

@@ -415,7 +415,7 @@ export default function Tesoreria() {
 
   // Opciones de tipo de contacto
   const tipoContactoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los contactos' },
+    { value: '', label: 'Contactos' },
     ...(Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(tc => ({
       value: tc,
       label: TIPO_CONTACTO_LABELS[tc],
@@ -428,12 +428,12 @@ export default function Tesoreria() {
     const items = tiposEmpleado.length > 0
       ? tiposEmpleado.map(t => ({ value: t.nombre, label: t.nombre, color: t.color || undefined }))
       : subtiposEmpleado.map(s => ({ value: s, label: s, color: undefined as string | undefined }));
-    return [{ value: '', label: 'Todos los empleados' }, ...items];
+    return [{ value: '', label: 'Empleados' }, ...items];
   }, [tiposEmpleado, subtiposEmpleado]);
 
   // Opciones de tipo de concepto (desde el catalogo per-muni)
   const tipoConceptoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los tipos' },
+    { value: '', label: 'Tipos' },
     ...tiposConcepto.map(t => ({
       value: String(t.id),
       label: t.nombre,
@@ -443,7 +443,7 @@ export default function Tesoreria() {
 
   // Opciones de concepto (filtradas por tipo si hay seleccionado)
   const conceptoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los conceptos' },
+    { value: '', label: 'Conceptos' },
     ...conceptosDelTipo.map(c => ({
       value: c.nombre,
       label: c.nombre,
@@ -489,7 +489,7 @@ export default function Tesoreria() {
 
   // Opciones de dependencia
   const dependenciaOptions = useMemo(() => ([
-    { value: '', label: 'Todas las dependencias' },
+    { value: '', label: 'Dependencias' },
     ...dependencias.map(d => ({
       value: String(d.id),
       label: d.nombre,
@@ -517,7 +517,7 @@ export default function Tesoreria() {
           value={tipoContactoFiltro}
           onChange={(v) => { setTipoContactoFiltro(v as TipoContacto | ''); setSubtipoEmpleadoFiltro(''); }}
           options={tipoContactoOptions}
-          placeholder="Todos los contactos"
+          placeholder="Contactos"
           searchable
         />
       </div>
@@ -529,7 +529,7 @@ export default function Tesoreria() {
             value={subtipoEmpleadoFiltro}
             onChange={setSubtipoEmpleadoFiltro}
             options={subtipoEmpleadoOptions}
-            placeholder="Todos los empleados"
+            placeholder="Empleados"
             searchable
           />
         </div>
@@ -540,7 +540,7 @@ export default function Tesoreria() {
           value={dependenciaFiltro}
           onChange={setDependenciaFiltro}
           options={dependenciaOptions}
-          placeholder="Todas las dependencias"
+          placeholder="Dependencias"
           searchable
         />
       </div>
@@ -552,7 +552,7 @@ export default function Tesoreria() {
           value={conceptoFiltro}
           onChange={setConceptoFiltro}
           options={conceptoOptions}
-          placeholder="Todos los conceptos"
+          placeholder="Conceptos"
           searchable
         />
       </div>

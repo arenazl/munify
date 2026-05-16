@@ -1,4 +1,5 @@
-import { Sparkles, Check, Pencil, X as XIcon, AlertCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Sparkles, Check, Pencil, X as XIcon, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 // RevisionIAPanel — side panel reusable que muestra items sugeridos por IA
@@ -87,49 +88,67 @@ export function RevisionIAPanel({
 }: RevisionIAPanelProps) {
   const { theme } = useTheme();
   const hasItems = items.length > 0;
-  const subtitleResolved = subtitle ?? `${items.length} ${items.length === 1 ? 'item esperando aprobación' : 'items esperando aprobación'}`;
+  const subtitleResolved = subtitle ?? `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+
+  // Collapse persistido en localStorage. Default expandido.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
+  });
+  const toggle = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('revision_ia_collapsed', next ? '1' : '0'); } catch (e) { void e; }
+      return next;
+    });
+  };
 
   return (
-    <div className="space-y-3 sticky top-4">
-      {/* Header */}
-      <div
-        className="rounded-xl p-3 flex items-center gap-2"
+    <div className="space-y-2 sticky top-4 text-[12px]">
+      {/* Header (siempre visible, clickeable para colapsar) */}
+      <button
+        onClick={toggle}
+        className="w-full rounded-lg p-2.5 flex items-center gap-2 transition-all hover:shadow-sm text-left"
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+        title={collapsed ? 'Expandir panel IA' : 'Colapsar panel IA'}
       >
         <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
           style={{ backgroundColor: `${theme.primary}18` }}
         >
-          <Sparkles className="h-5 w-5" style={{ color: theme.primary }} />
+          <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold" style={{ color: theme.text }}>{title}</div>
-          <div className="text-[11px]" style={{ color: theme.textSecondary }}>{subtitleResolved}</div>
+          <div className="text-[12px] font-bold leading-tight" style={{ color: theme.text }}>{title}</div>
+          <div className="text-[10px] leading-tight" style={{ color: theme.textSecondary }}>{subtitleResolved}</div>
         </div>
-      </div>
+        {collapsed
+          ? <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+          : <ChevronUp className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />}
+      </button>
 
+      {!collapsed && (<>
       {/* Aprobar todo (solo si hay items y onApproveAll) */}
       {hasItems && onApproveAll && (
         <button
           onClick={onApproveAll}
-          className="w-full rounded-xl p-3 flex items-center justify-between gap-2 transition-all hover:shadow-md"
+          className="w-full rounded-lg p-2.5 flex items-center justify-between gap-2 transition-all hover:shadow-sm"
           style={{ backgroundColor: theme.text, color: theme.card }}
         >
           <div className="text-left">
-            <div className="text-[10px] uppercase font-bold opacity-70">A revisar</div>
-            <div className="text-base font-bold">{items.length} {items.length === 1 ? 'item' : 'items'}</div>
+            <div className="text-[9px] uppercase font-bold opacity-70">A revisar</div>
+            <div className="text-[13px] font-bold">{items.length} {items.length === 1 ? 'item' : 'items'}</div>
           </div>
-          <span className="text-xs font-semibold">Aprobar todos →</span>
+          <span className="text-[11px] font-semibold">Aprobar todos →</span>
         </button>
       )}
 
       {/* Loading */}
       {loading && !hasItems && (
         <div
-          className="rounded-xl p-6 text-center text-xs"
+          className="rounded-lg p-3 text-center text-[11px]"
           style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
         >
-          <Sparkles className="h-5 w-5 mx-auto mb-2 animate-pulse" style={{ color: theme.primary }} />
+          <Sparkles className="h-4 w-4 mx-auto mb-1.5 animate-pulse" style={{ color: theme.primary }} />
           Analizando con IA…
         </div>
       )}
@@ -137,10 +156,10 @@ export function RevisionIAPanel({
       {/* Empty */}
       {!loading && !hasItems && (
         <div
-          className="rounded-xl p-6 text-center text-xs"
+          className="rounded-lg p-3 text-center text-[11px]"
           style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
         >
-          <Check className="h-5 w-5 mx-auto mb-2" style={{ color: '#22c55e' }} />
+          <Check className="h-4 w-4 mx-auto mb-1.5" style={{ color: '#22c55e' }} />
           No hay nada para revisar
         </div>
       )}
@@ -151,97 +170,93 @@ export function RevisionIAPanel({
         return (
           <div
             key={`${it.resourceId}-${i}`}
-            className="rounded-xl p-3"
+            className="rounded-lg p-2.5"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
-            {/* Header: IA · X% + fecha */}
-            <div className="flex items-center justify-between mb-2">
+            {/* Header: IA · X% + tipo + fecha (todo en una linea) */}
+            <div className="flex items-center justify-between gap-1.5 mb-1.5 flex-wrap">
               <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-1"
                 style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
               >
-                <Sparkles className="h-3 w-3" />
-                IA · {it.confianza}%
+                <Sparkles className="h-2.5 w-2.5" />
+                IA·{it.confianza}%
               </span>
+              <span
+                className="text-[9px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-1"
+                style={{ backgroundColor: `${tipoColor}15`, color: tipoColor }}
+              >
+                <span className="inline-block h-1 w-1 rounded-full" style={{ backgroundColor: tipoColor }} />
+                {tipoLabel(it.tipo)}
+              </span>
+              {it.es_demo && (
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-1"
+                  style={{ backgroundColor: '#fbbf2418', color: '#b45309' }}
+                  title="Item de demo, sin IA real"
+                >
+                  <AlertCircle className="h-2.5 w-2.5" />
+                  DEMO
+                </span>
+              )}
               {it.fecha && (
-                <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+                <span className="text-[10px] ml-auto" style={{ color: theme.textSecondary }}>
                   {formatFecha(it.fecha)}
                 </span>
               )}
             </div>
 
             {/* Titulo + categoria */}
-            <div className="font-semibold text-sm leading-tight" style={{ color: theme.text }}>
+            <div className="font-semibold text-[12px] leading-tight truncate" style={{ color: theme.text }}>
               {it.titulo || `#${it.resourceId}`}
             </div>
             {it.categoria && (
-              <div className="text-[11px] mb-2" style={{ color: theme.textSecondary }}>
+              <div className="text-[10px] truncate" style={{ color: theme.textSecondary }}>
                 {it.categoria}
               </div>
             )}
 
-            {/* Tipo + demo flag */}
-            <div className="flex items-center gap-1.5 mb-2 mt-1 flex-wrap">
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-                style={{ backgroundColor: `${tipoColor}15`, color: tipoColor }}
-              >
-                <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tipoColor }} />
-                {tipoLabel(it.tipo)}
-              </span>
-              {it.es_demo && (
-                <span
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
-                  style={{ backgroundColor: '#fbbf2418', color: '#b45309' }}
-                  title="Item de demo, sin IA real"
-                >
-                  <AlertCircle className="h-3 w-3" />
-                  DEMO
-                </span>
-              )}
-            </div>
-
             {/* Hint */}
             {it.hint && (
               <div
-                className="flex items-start gap-1.5 text-[11px] mb-3 leading-snug"
+                className="flex items-start gap-1 text-[10px] mt-1.5 mb-2 leading-snug"
                 style={{ color: theme.textSecondary }}
               >
-                <Sparkles className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
+                <Sparkles className="h-2.5 w-2.5 mt-0.5 flex-shrink-0" style={{ color: theme.primary }} />
                 <span>{it.hint}</span>
               </div>
             )}
 
-            {/* Acciones */}
-            <div className="flex items-center gap-1.5">
+            {/* Acciones — todas iconicas para ahorrar ancho */}
+            <div className="flex items-center gap-1">
               {onApprove && (
                 <button
                   onClick={() => onApprove(it)}
-                  className="flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-all hover:brightness-110"
+                  className="flex-1 px-2 py-1 rounded text-[10px] font-semibold inline-flex items-center justify-center gap-1 transition-all hover:brightness-110"
                   style={{ backgroundColor: theme.primary, color: theme.primaryText || '#ffffff' }}
                 >
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3 w-3" />
                   Aprobar
                 </button>
               )}
               {onEdit && (
                 <button
                   onClick={() => onEdit(it)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
+                  className="px-2 py-1 rounded text-[10px] font-semibold inline-flex items-center gap-1"
                   style={{
                     backgroundColor: theme.backgroundSecondary,
                     color: theme.text,
                     border: `1px solid ${theme.border}`,
                   }}
+                  title="Editar"
                 >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Editar
+                  <Pencil className="h-3 w-3" />
                 </button>
               )}
               {onDismiss && (
                 <button
                   onClick={() => onDismiss(it)}
-                  className="px-2 py-1.5 rounded-lg text-xs"
+                  className="px-2 py-1 rounded text-[10px]"
                   style={{
                     backgroundColor: theme.backgroundSecondary,
                     color: theme.textSecondary,
@@ -249,7 +264,7 @@ export function RevisionIAPanel({
                   }}
                   title="Descartar"
                 >
-                  <XIcon className="h-3.5 w-3.5" />
+                  <XIcon className="h-3 w-3" />
                 </button>
               )}
             </div>
@@ -260,12 +275,13 @@ export function RevisionIAPanel({
       {/* Footnote */}
       {hasItems && (
         <div
-          className="rounded-xl p-3 text-center text-[11px] italic"
+          className="rounded-lg p-2 text-center text-[10px] italic"
           style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}
         >
-          La IA aprende de tus decisiones · cada confirmación mejora la categorización
+          La IA aprende de tus decisiones
         </div>
       )}
+      </>)}
     </div>
   );
 }

@@ -351,7 +351,7 @@ export default function Dashboard() {
   // y el segundo (loading=false) los ejecuta → React #310 (more hooks).
   const showDepFilter = user?.rol === 'admin' || user?.rol === 'supervisor';
   const dependenciaOptions = useMemo(() => [
-    { value: '', label: 'Todas las dependencias' },
+    { value: '', label: 'Dependencias' },
     ...dependencias.map(d => ({
       value: String(d.id),
       label: d.nombre,

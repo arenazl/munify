@@ -182,7 +182,7 @@ export function ABMPage({
   kpis,
   groupBy,
   sidePanel,
-  sidePanelWidth = 360,
+  sidePanelWidth = 280,
   sheetOpen,
   sheetTitle,
   sheetDescription,

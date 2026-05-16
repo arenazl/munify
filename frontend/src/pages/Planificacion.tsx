@@ -388,7 +388,7 @@ export default function Planificacion() {
   // Opciones para ModernSelect - Empleados
   const empleadoOptions: SelectOption[] = useMemo(() => {
     const options: SelectOption[] = [
-      { value: '', label: 'Todos los empleados', icon: <Users className="w-4 h-4" /> }
+      { value: '', label: 'Empleados', icon: <Users className="w-4 h-4" /> }
     ];
     empleados.forEach(e => {
       const zonaText = e.zona ? ` • ${e.zona.nombre}` : '';
@@ -406,7 +406,7 @@ export default function Planificacion() {
 
   // Opciones para ModernSelect - Tipo
   const tipoOptions: SelectOption[] = useMemo(() => [
-    { value: '', label: 'Todos los tipos', icon: <Users className="w-4 h-4" /> },
+    { value: '', label: 'Tipos', icon: <Users className="w-4 h-4" /> },
     { value: 'operario', label: 'Operarios', description: 'Personal de campo', icon: <HardHat className="w-4 h-4" />, color: '#3b82f6' },
     { value: 'administrativo', label: 'Administrativos', description: 'Personal de oficina', icon: <Briefcase className="w-4 h-4" />, color: '#8b5cf6' },
   ], []);
@@ -414,7 +414,7 @@ export default function Planificacion() {
   // Opciones para ModernSelect - Dependencias
   const dependenciaOptions: SelectOption[] = useMemo(() => {
     const options: SelectOption[] = [
-      { value: '', label: 'Todas las dependencias', icon: <Building2 className="w-4 h-4" /> }
+      { value: '', label: 'Dependencias', icon: <Building2 className="w-4 h-4" /> }
     ];
     dependenciasDisponibles.forEach(dep => {
       options.push({
@@ -430,7 +430,7 @@ export default function Planificacion() {
   // Opciones para ModernSelect - Categorías
   const categoriaOptions: SelectOption[] = useMemo(() => {
     const options: SelectOption[] = [
-      { value: '', label: 'Todas las categorías', icon: <Tag className="w-4 h-4" /> }
+      { value: '', label: 'Categorías', icon: <Tag className="w-4 h-4" /> }
     ];
     categoriasUnicas.forEach(cat => {
       options.push({
@@ -460,7 +460,7 @@ export default function Planificacion() {
           value={filtroEmpleado?.toString() || ''}
           onChange={(value) => setFiltroEmpleado(value ? parseInt(value) : null)}
           options={empleadoOptions}
-          placeholder="Todos los empleados"
+          placeholder="Empleados"
           label="Empleado"
           searchable={true}
         />
@@ -470,7 +470,7 @@ export default function Planificacion() {
           value={filtroTipo}
           onChange={(value) => setFiltroTipo(value)}
           options={tipoOptions}
-          placeholder="Todos los tipos"
+          placeholder="Tipos"
           label="Tipo"
         />
 
@@ -479,7 +479,7 @@ export default function Planificacion() {
           value={filtroDependencia?.toString() || ''}
           onChange={(value) => setFiltroDependencia(value ? parseInt(value) : null)}
           options={dependenciaOptions}
-          placeholder="Todas las dependencias"
+          placeholder="Dependencias"
           label="Dependencia"
           searchable={true}
         />
@@ -489,7 +489,7 @@ export default function Planificacion() {
           value={filtroCategoria?.toString() || ''}
           onChange={(value) => setFiltroCategoria(value ? parseInt(value) : null)}
           options={categoriaOptions}
-          placeholder="Todas las categorías"
+          placeholder="Categorías"
           label="Categoría / Skill"
           searchable={true}
         />

@@ -205,21 +205,21 @@ export default function TesoreriaResumen() {
 
   // ========================== Opciones combos ==========================
   const tipoContactoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los contactos' },
+    { value: '', label: 'Contactos' },
     ...(Object.keys(TIPO_CONTACTO_LABELS) as TipoContacto[]).map(t => ({
       value: t, label: TIPO_CONTACTO_LABELS[t], color: TIPO_CONTACTO_COLORS[t],
     })),
   ]), []);
   const subtipoEmpleadoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los empleados' },
+    { value: '', label: 'Empleados' },
     ...tiposEmpleado.map(t => ({ value: t.nombre, label: t.nombre, color: t.color || undefined })),
   ]), [tiposEmpleado]);
   const dependenciaOptions = useMemo(() => ([
-    { value: '', label: 'Todas las dependencias' },
+    { value: '', label: 'Dependencias' },
     ...dependencias.map(d => ({ value: String(d.id), label: d.nombre, color: d.color || undefined })),
   ]), [dependencias]);
   const tipoConceptoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los tipos' },
+    { value: '', label: 'Tipos' },
     ...tiposConcepto.map(t => ({ value: String(t.id), label: t.nombre, color: t.color || undefined })),
   ]), [tiposConcepto]);
   const conceptosFiltradosPorTipo = useMemo(() => {
@@ -228,15 +228,15 @@ export default function TesoreriaResumen() {
     return conceptos.filter(c => c.tipo_concepto_id === tid);
   }, [conceptos, tipoConceptoFiltro]);
   const conceptoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los conceptos' },
+    { value: '', label: 'Conceptos' },
     ...conceptosFiltradosPorTipo.map(c => ({ value: c.nombre, label: c.nombre })),
   ]), [conceptosFiltradosPorTipo]);
   const formaPagoOptions = useMemo(() => ([
-    { value: '', label: 'Todas las formas' },
+    { value: '', label: 'Formas de pago' },
     ...(Object.keys(FORMA_PAGO_LABELS) as FormaPago[]).map(fp => ({ value: fp, label: FORMA_PAGO_LABELS[fp] })),
   ]), []);
   const cajaOptions = useMemo(() => ([
-    { value: '', label: 'Todas las cajas' },
+    { value: '', label: 'Cajas' },
     ...cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
   ]), [cajas]);
 

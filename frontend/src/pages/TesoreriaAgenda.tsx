@@ -199,12 +199,12 @@ export default function TesoreriaAgenda() {
 
   // ==================== Opciones combos ====================
   const contactoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los contactos' },
+    { value: '', label: 'Contactos' },
     ...contactos.map(c => ({ value: String(c.id), label: `${c.nombre} ${c.apellido || ''}`.trim() })),
   ]), [contactos]);
 
   const cajaOptions = useMemo(() => ([
-    { value: '', label: 'Todas las cajas' },
+    { value: '', label: 'Cajas' },
     ...cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined })),
   ]), [cajas]);
 
@@ -214,7 +214,7 @@ export default function TesoreriaAgenda() {
   ]), [cajas]);
 
   const frecuenciaOptions = useMemo(() => ([
-    { value: '', label: 'Todas las frecuencias' },
+    { value: '', label: 'Frecuencias' },
     ...(Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).map(f => ({
       value: f, label: FRECUENCIA_LABELS[f], color: FRECUENCIA_COLORS[f],
     })),

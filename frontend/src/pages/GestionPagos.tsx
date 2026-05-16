@@ -386,10 +386,10 @@ export default function GestionPagos() {
             value={dependenciaId === '' ? '' : String(dependenciaId)}
             onChange={(v) => setDependenciaId(v ? Number(v) : '')}
             options={[
-              { value: '', label: 'Todas las dependencias' },
+              { value: '', label: 'Dependencias' },
               ...dependencias.map((d) => ({ value: String(d.id), label: d.nombre })),
             ]}
-            placeholder="Todas las dependencias"
+            placeholder="Dependencias"
             searchable={dependencias.length > 8}
           />
         </div>

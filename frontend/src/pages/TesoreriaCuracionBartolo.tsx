@@ -65,7 +65,7 @@ export default function TesoreriaCuracionBartolo() {
   );
 
   const conceptosFilter = useMemo(
-    () => [{ value: '', label: 'Todos los conceptos' }, ...conceptosOpts],
+    () => [{ value: '', label: 'Conceptos' }, ...conceptosOpts],
     [conceptosOpts]
   );
 
@@ -251,7 +251,7 @@ export default function TesoreriaCuracionBartolo() {
               value={conceptoFiltro}
               onChange={setConceptoFiltro}
               options={conceptosFilter}
-              placeholder="Todos los conceptos"
+              placeholder="Conceptos"
               searchable
             />
           </div>

@@ -21,18 +21,24 @@ import { abreviarPalabras } from '../../lib/textAbbreviation';
  * (que vive dentro de un container con overflow-hidden).
  *
  * Patrón canónico (autocomplete combo de filtrado):
+ *
+ * REGLA DURA: el placeholder + el label del item "vacio" debe ser corto, en
+ * plural sin "Todos los / Todas las". Ej: "Contactos", "Dependencias",
+ * "Conceptos", "Estados". El usuario no necesita leer "Todos los X" cada vez —
+ * con el plural alcanza, y ahorramos ancho horizontal.
+ *
  * ```tsx
  * const options = useMemo(() => ([
- *   { value: '', label: 'Todas las opciones' },
+ *   { value: '', label: 'Opciones' },               // sin "Todas las"
  *   { value: 'a', label: 'Opción A', color: theme.success },
  * ]), []);
  *
- * <div className="min-w-[200px] flex-shrink-0">
+ * <div className="min-w-[160px] flex-shrink-0">
  *   <ModernSelect
  *     value={filtro}
  *     onChange={setFiltro}
  *     options={options}
- *     placeholder="Todas las opciones"
+ *     placeholder="Opciones"
  *     searchable
  *   />
  * </div>

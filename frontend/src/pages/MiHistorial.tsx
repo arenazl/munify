@@ -170,7 +170,7 @@ export default function MiHistorial() {
             value={filtroEstado}
             onChange={(val) => setFiltroEstado(val)}
             options={[
-              { value: '', label: 'Todos los estados' },
+              { value: '', label: 'Estados' },
               { value: 'resuelto', label: 'Resueltos' },
               { value: 'en_curso', label: 'En Proceso' },
               { value: 'asignado', label: 'Asignados' },

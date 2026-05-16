@@ -196,7 +196,7 @@ export default function TesoreriaContactos() {
   };
 
   const tipoEmpleadoOptions = useMemo(() => ([
-    { value: '', label: 'Todos los empleados' },
+    { value: '', label: 'Empleados' },
     ...tiposEmpleado.map(t => ({
       value: t.nombre, label: t.nombre, color: t.color || undefined,
     })),
@@ -255,7 +255,7 @@ export default function TesoreriaContactos() {
                   value={tipoEmpleadoFiltro}
                   onChange={setTipoEmpleadoFiltro}
                   options={tipoEmpleadoOptions}
-                  placeholder="Todos los empleados"
+                  placeholder="Empleados"
                   searchable
                 />
               </div>
