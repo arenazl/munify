@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
+import { StatusPill } from '../components/ui/StatusPill';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
 import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
@@ -2898,20 +2899,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           new Date(r.updated_at).getTime() > new Date(r.created_at).getTime() + 60000;
         return (
           <div className="flex items-center gap-2">
-            <span
-              className="px-2.5 py-1 text-[11px] font-medium rounded-md whitespace-nowrap inline-flex items-center gap-1.5 shadow-sm"
-              style={{
-                backgroundColor: `${color}18`,
-                color: color,
-                border: `1px solid ${color}40`,
-              }}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              {estadoLabels[r.estado]}
-            </span>
+            <StatusPill label={estadoLabels[r.estado]} color={color} />
             {tieneActividadReciente && (() => {
               const vecinoRechazo = r.confirmado_vecino === false;
               const bg = vecinoRechazo ? '#ef4444' : '#3b82f6';

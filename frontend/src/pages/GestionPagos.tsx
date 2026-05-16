@@ -5,6 +5,7 @@ import {
   History, ClipboardCheck, BarChart3,
 } from 'lucide-react';
 import { ABMPage, ABMTable, ABMTableColumn } from '../components/ui/ABMPage';
+import { StatusPill } from '../components/ui/StatusPill';
 import { DateRangePicker, DateRange, currentMonthRange } from '../components/ui/DateRangePicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { useTheme } from '../contexts/ThemeContext';
@@ -324,15 +325,7 @@ export default function GestionPagos() {
       render: (it) => {
         const color = estadoColors[it.estado] || '#6b7280';
         const label = estadoLabels[it.estado] || it.estado;
-        return (
-          <span
-            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap"
-            style={{ backgroundColor: `${color}20`, color }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-            {label}
-          </span>
-        );
+        return <StatusPill label={label} color={color} />;
       },
       sortValue: (it) => it.estado,
     },

@@ -43,6 +43,7 @@ import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizar
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import PageHint from '../components/ui/PageHint';
@@ -1157,28 +1158,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           ),
         },
         {
-          key: 'tipo',
-          header: 'Tipo',
-          sortValue: (t) => t.tramite?.categoria_tramite?.nombre || '',
-          render: (t) => {
-            const tipoTramite = t.tramite?.categoria_tramite;
-            const tipoColor = tipoTramite?.color || theme.primary;
-            return (
-              <div className="flex items-center gap-1">
-                <DynamicIcon
-                  name={tipoTramite?.icono || 'FileText'}
-                  className="h-3.5 w-3.5 flex-shrink-0"
-                  style={{ color: tipoColor }}
-                  fallback={<FileText className="h-3.5 w-3.5" style={{ color: tipoColor }} />}
-                />
-                <span className="text-xs truncate max-w-[60px]" style={{ color: theme.text }}>
-                  {tipoTramite?.nombre || 'Sin tipo'}
-                </span>
-              </div>
-            );
-          },
-        },
-        {
           key: 'tramite',
           sortable: false, // Deshabilitar sorting para esta columna (tiene dropdown custom)
           header: (
@@ -1320,18 +1299,26 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           ),
           sortValue: (t) => t.tramite?.nombre || '',
           render: (t) => {
-            const tipoColor = t.tramite?.categoria_tramite?.color || theme.primary;
+            const tipoTramite = t.tramite?.categoria_tramite;
+            const tipoColor = tipoTramite?.color || theme.primary;
             return (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2 min-w-0">
                 <DynamicIcon
-                  name={t.tramite?.icono || 'FileText'}
-                  className="h-3.5 w-3.5 flex-shrink-0"
+                  name={t.tramite?.icono || tipoTramite?.icono || 'FileText'}
+                  className="h-4 w-4 flex-shrink-0"
                   style={{ color: tipoColor }}
-                  fallback={<FileText className="h-3.5 w-3.5" style={{ color: tipoColor }} />}
+                  fallback={<FileText className="h-4 w-4" style={{ color: tipoColor }} />}
                 />
-                <span className="text-xs truncate max-w-[80px]" style={{ color: theme.text }}>
-                  {t.tramite?.nombre || '—'}
-                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium truncate leading-tight" style={{ color: theme.text }}>
+                    {t.tramite?.nombre || '—'}
+                  </div>
+                  {tipoTramite?.nombre && (
+                    <div className="text-[10px] truncate leading-tight" style={{ color: tipoColor }}>
+                      {tipoTramite.nombre}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           },
@@ -1341,7 +1328,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           header: 'Solicitante',
           sortValue: (t) => `${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim(),
           render: (t) => (
-            <span className="text-xs truncate max-w-[90px] block" style={{ color: theme.text }}>
+            <span className="text-xs truncate block" style={{ color: theme.text }} title={`${t.nombre_solicitante || ''} ${t.apellido_solicitante || ''}`.trim()}>
               {t.nombre_solicitante} {t.apellido_solicitante}
             </span>
           ),
@@ -1351,7 +1338,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           header: 'Asunto',
           sortValue: (t) => t.asunto,
           render: (t) => (
-            <p className="text-xs truncate max-w-[100px]" style={{ color: theme.text }} title={t.asunto}>
+            <p className="text-xs truncate" style={{ color: theme.text }} title={t.asunto}>
               {t.asunto}
             </p>
           ),
@@ -1364,7 +1351,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             if (!t.dependencia_asignada?.nombre) return null;
             return (
               <span
-                className="text-xs truncate max-w-[80px] block"
+                className="text-xs truncate block"
                 style={{ color: t.dependencia_asignada.color || theme.text }}
                 title={t.dependencia_asignada.nombre}
               >
@@ -1379,16 +1366,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           sortValue: (t) => getEstadoConfig(t.estado).label,
           render: (t) => {
             const config = getEstadoConfig(t.estado);
-            const IconEstado = config.icon;
-            return (
-              <span
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap"
-                style={{ backgroundColor: config.bg, color: config.color }}
-              >
-                <IconEstado className="h-2.5 w-2.5" />
-                {config.label}
-              </span>
-            );
+            return <StatusPill label={config.label} color={config.color} />;
           },
         },
         {
