@@ -888,7 +888,17 @@ export function ABMPage({
           {sidePanel && (
             <aside
               className="hidden lg:block flex-shrink-0 self-start"
-              style={{ width: sidePanelWidth, position: 'sticky', top: 0 }}
+              style={{
+                width: sidePanelWidth,
+                position: 'sticky',
+                // Top calculado para quedar JUSTO debajo del header sticky del ABMPage
+                // (que mide ~120px con sus filtros). Asi al hacer scroll los dos
+                // quedan visibles uno arriba del otro.
+                top: 120,
+                maxHeight: 'calc(100vh - 130px)',
+                overflowY: 'auto',
+                zIndex: 20,
+              }}
             >
               {sidePanel}
             </aside>
