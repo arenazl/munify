@@ -1456,6 +1456,9 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         onRowClick={(t) => openTramite(t)}
         defaultSortKey={ordenamiento === 'por_vencer' ? 'por_vencer' : 'fecha'}
         defaultSortDirection={ordenamiento === 'por_vencer' ? 'asc' : 'desc'}
+        defaultGroupByDateKey="created_at"
+        defaultGroupBySortKeys={['created_at', 'fecha', 'por_vencer']}
+        defaultGroupByItemLabel={{ singular: 'trámite', plural: 'trámites' }}
       />
     );
   };

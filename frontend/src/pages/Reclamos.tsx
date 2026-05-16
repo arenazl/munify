@@ -4434,6 +4434,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           onPageChange: setPageClient,
           onPageSizeChange: (s) => { setPageSizeClient(s); setPageClient(1); },
         }}
+        guidedView={inboxView}
         tableView={
           <ABMTable
             key={`table-${ordenamiento}`}
@@ -4444,6 +4445,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             defaultSortKey={ordenamiento === 'programado' ? 'fecha_programada' : 'creacion'}
             defaultSortDirection={ordenamiento === 'programado' ? 'asc' : 'desc'}
             defaultGroupByDateKey="created_at"
+            defaultGroupBySortKeys={['created_at', 'creacion', 'fecha', 'fecha_programada']}
             defaultGroupByItemLabel={{ singular: 'reclamo', plural: 'reclamos' }}
           />
         }
