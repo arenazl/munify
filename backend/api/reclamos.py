@@ -973,7 +973,7 @@ async def reclamos_revision_ia(
         )
         .where(Reclamo.municipio_id == current_user.municipio_id)
         .order_by(Reclamo.created_at.desc())
-        .limit(10)
+        .limit(80)
     )
     reclamos = result.scalars().all()
     payload = [
