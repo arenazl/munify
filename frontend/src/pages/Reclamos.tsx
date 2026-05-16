@@ -3061,7 +3061,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         );
       },
     },
-  ].filter(c => !(soloMiArea && c.key === 'dependencia'));
+  ].filter(c => !((soloMiArea || !iaCollapsed) && c.key === 'dependencia'));
 
   // Renderizar contenido del Sheet de ver
   const renderViewContent = () => {

@@ -113,7 +113,7 @@ export function RevisionIAPanel({
     return (
       <button
         onClick={toggle}
-        className="sticky top-4 w-full h-full min-h-[120px] rounded-lg flex flex-col items-center justify-start gap-2 py-3 transition-all hover:shadow-sm"
+        className="sticky top-0 w-full min-h-[120px] rounded-lg flex flex-col items-center justify-start gap-2 py-3 transition-all hover:shadow-sm"
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
         title={`Expandir ${title}`}
         aria-label={`Expandir ${title}`}
