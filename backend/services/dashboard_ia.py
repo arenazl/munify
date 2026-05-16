@@ -498,21 +498,21 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
         LIMIT 5
     """), {"mid": municipio_id, "desde": hace_30d.date()})).fetchall()
 
-    # Cajas - saldo
+    # Cajas - saldo (tabla: tesoreria_cajas)
     cajas = (await db.execute(text("""
         SELECT cj.nombre,
                COALESCE((SELECT SUM(monto_pesos) FROM gastos WHERE caja_id = cj.id AND activo = 1 AND fecha >= :desde), 0) as gastado_30d
-        FROM cajas cj
+        FROM tesoreria_cajas cj
         WHERE cj.municipio_id = :mid AND cj.activa = 1
         ORDER BY gastado_30d DESC
         LIMIT 5
     """), {"mid": municipio_id, "desde": hace_30d.date()})).fetchall()
 
-    # Próximos pagos (agenda)
+    # Próximos pagos (agenda: tesoreria_pagos_programados)
     proximos = (await db.execute(text("""
         SELECT p.id, p.concepto, c.nombre, c.apellido, p.monto_pesos, p.proximo_pago,
                DATEDIFF(p.proximo_pago, CURDATE()) as dias
-        FROM pagos_programados p
+        FROM tesoreria_pagos_programados p
         LEFT JOIN contactos c ON c.id = p.contacto_id
         WHERE p.municipio_id = :mid AND p.activo = 1
           AND p.proximo_pago <= DATE_ADD(CURDATE(), INTERVAL 14 DAY)
@@ -520,11 +520,11 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
         LIMIT 8
     """), {"mid": municipio_id})).fetchall()
 
-    # Items críticos: gastos con monto atípico o sin clasificar bien + pagos vencidos
+    # Items críticos: pagos vencidos
     vencidos = (await db.execute(text("""
         SELECT p.id, p.concepto, c.nombre, p.monto_pesos,
                DATEDIFF(CURDATE(), p.proximo_pago) as dias_vencido
-        FROM pagos_programados p
+        FROM tesoreria_pagos_programados p
         LEFT JOIN contactos c ON c.id = p.contacto_id
         WHERE p.municipio_id = :mid AND p.activo = 1
           AND p.proximo_pago < CURDATE()
