@@ -592,7 +592,7 @@ export default function GestionPagos() {
   if (tab === 'imputacion') {
     return (
       <ABMPage
-        title="Gestión de Pagos"
+        title="Comprobantes"
         icon={<Wallet className="w-5 h-5" />}
         searchPlaceholder=""
         searchValue=""
@@ -612,7 +612,7 @@ export default function GestionPagos() {
   if (tab === 'dashboard') {
     return (
       <ABMPage
-        title="Gestión de Pagos"
+        title="Comprobantes"
         icon={<Wallet className="w-5 h-5" />}
         searchPlaceholder=""
         searchValue=""
@@ -631,7 +631,7 @@ export default function GestionPagos() {
 
   return (
     <ABMPage
-      title="Gestión de Pagos"
+      title="Comprobantes"
       icon={<Wallet className="w-5 h-5" />}
       searchPlaceholder="Buscar por concepto o N° de operación…"
       searchValue={search}
