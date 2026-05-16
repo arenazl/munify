@@ -738,6 +738,39 @@ export default function Tesoreria() {
       data={paginatedFiltered}
       keyExtractor={(g) => g.id}
       onRowClick={openDetalle}
+      groupBy={{
+        getKey: (g) => g.fecha,
+        renderLabel: (key, items) => {
+          const d = new Date(key + 'T12:00:00');
+          const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+          const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
+          const dStripped = new Date(d); dStripped.setHours(0, 0, 0, 0);
+          let label: string;
+          if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
+          else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
+          else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+          return (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-bold tabular-nums px-1.5 py-0.5 rounded" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.textSecondary }}>
+                {d.getDate().toString().padStart(2, '0')} {d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}
+              </span>
+              <span className="font-bold text-xs" style={{ color: theme.text }}>{label}</span>
+              <span className="text-[11px]" style={{ color: theme.textSecondary }}>· {items.length} {items.length === 1 ? 'mov.' : 'mov.'}</span>
+            </div>
+          );
+        },
+        renderSubtotal: (_key, items) => {
+          const sum = items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
+          return (
+            <div className="text-right">
+              <span className="text-[10px] uppercase font-bold mr-2" style={{ color: theme.textSecondary }}>Subtotal</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>
+                ${sum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+              </span>
+            </div>
+          );
+        },
+      }}
       columns={[
         {
           key: 'fecha',

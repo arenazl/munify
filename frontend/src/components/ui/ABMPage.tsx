@@ -1468,6 +1468,13 @@ interface ABMTableProps<T> {
   defaultSortDirection?: 'asc' | 'desc';
   // Render alternativo para mobile (cards)
   renderMobileCard?: (item: T, actions?: ReactNode) => ReactNode;
+  /** Agrupacion opcional. Inserta una fila-separador antes de cada grupo con
+   *  label izq + subtotal der. La data DEBE venir ordenada por el padre. */
+  groupBy?: {
+    getKey: (item: T) => string;
+    renderLabel: (key: string, items: T[]) => ReactNode;
+    renderSubtotal?: (key: string, items: T[]) => ReactNode;
+  };
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -1481,6 +1488,7 @@ export function ABMTable<T>({
   defaultSortKey,
   defaultSortDirection,
   renderMobileCard,
+  groupBy,
 }: ABMTableProps<T>) {
   const { theme } = useTheme();
   // Estado de ordenamiento - inicializar con valores por defecto si se proporcionan
@@ -1633,43 +1641,77 @@ export function ABMTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y" style={{ borderColor: theme.border }}>
-            {sortedData.map((item, index) => (
-              <tr
-                key={keyExtractor(item)}
-                onClick={() => onRowClick?.(item)}
-                className={`
-                  transition-all duration-200
-                  ${onRowClick ? 'cursor-pointer hover:scale-[1.01]' : ''}
-                `}
-                style={{
-                  backgroundColor: index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`,
-                  animationDelay: `${index * 30}ms`,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = `${theme.primary}10`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`;
-                }}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={`px-2 py-2 text-xs first:pl-4 ${col.className || ''}`}
-                    style={{ color: theme.text }}
-                  >
-                    {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as ReactNode}
-                  </td>
-                ))}
-                {actions && (
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                      {actions(item)}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
+            {(() => {
+              const colSpan = columns.length + (actions ? 1 : 0);
+              // Si hay groupBy, particiono en bloques contiguos por key.
+              // La data debe venir ordenada por el padre.
+              const blocks: Array<{ key: string; items: T[] }> = [];
+              if (groupBy) {
+                let cur: { key: string; items: T[] } | null = null;
+                for (const it of sortedData) {
+                  const k = groupBy.getKey(it);
+                  if (!cur || cur.key !== k) {
+                    cur = { key: k, items: [] };
+                    blocks.push(cur);
+                  }
+                  cur.items.push(it);
+                }
+              }
+              const renderRow = (item: T, index: number) => (
+                <tr
+                  key={String(keyExtractor(item))}
+                  onClick={() => onRowClick?.(item)}
+                  className={`transition-all duration-200 ${onRowClick ? 'cursor-pointer' : ''}`}
+                  style={{
+                    backgroundColor: index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`,
+                    borderBottom: `1px solid ${theme.border}40`,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = `${theme.primary}10`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'transparent' : `${theme.backgroundSecondary}50`; }}
+                >
+                  {columns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={`px-2 py-2 text-xs first:pl-4 ${col.className || ''}`}
+                      style={{ color: theme.text }}
+                    >
+                      {col.render ? col.render(item) : (item as Record<string, unknown>)[col.key] as ReactNode}
+                    </td>
+                  ))}
+                  {actions && (
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        {actions(item)}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+              if (!groupBy) {
+                return sortedData.map((item, index) => renderRow(item, index));
+              }
+              const out: ReactNode[] = [];
+              let runningIdx = 0;
+              for (const b of blocks) {
+                out.push(
+                  <tr key={`grp-${b.key}`} style={{ backgroundColor: theme.backgroundSecondary }}>
+                    <td colSpan={colSpan} className="px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">{groupBy.renderLabel(b.key, b.items)}</div>
+                        {groupBy.renderSubtotal && (
+                          <div className="flex-shrink-0">{groupBy.renderSubtotal(b.key, b.items)}</div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+                for (const it of b.items) {
+                  out.push(renderRow(it, runningIdx));
+                  runningIdx++;
+                }
+              }
+              return out;
+            })()}
           </tbody>
         </table>
       </div>
