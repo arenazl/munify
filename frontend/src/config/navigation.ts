@@ -243,6 +243,13 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Alta y gestión de municipios (cross-tenant)'
     },
     {
+      name: 'Suscripciones',
+      href: '/gestion/admin/suscripciones',
+      icon: Building2,
+      show: isSuperAdmin,
+      description: 'Municipios suscriptos, plan, estado y próxima facturación'
+    },
+    {
       name: 'Auditoría',
       href: '/gestion/admin/audit-logs',
       icon: Activity,
