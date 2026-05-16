@@ -28,12 +28,12 @@ interface SuscripcionRow {
 // PLACEHOLDER: 6 municipios falsos para demo de venta. No representan
 // clientes reales — son alias inventados con datos de ejemplo.
 const SUSCRIPCIONES_DEMO: SuscripcionRow[] = [
-  { id: 1, alias: 'San Pedro Norte',  codigo: 'sanpedro-n', plan: 'Express',  estado: 'activo',  altaIso: '2025-08-12', proximaFacturaIso: '2026-06-12', montoMensual: 1000000 },
-  { id: 2, alias: 'Villa del Lago',   codigo: 'villalago',  plan: 'Premium',  estado: 'activo',  altaIso: '2025-06-03', proximaFacturaIso: '2026-06-03', montoMensual: 2500000 },
+  { id: 1, alias: 'San Pedro Norte',  codigo: 'sanpedro-n', plan: 'Express',  estado: 'activo',  altaIso: '2025-08-12', proximaFacturaIso: '2026-06-12', montoMensual: 1450000 },
+  { id: 2, alias: 'Villa del Lago',   codigo: 'villalago',  plan: 'Premium',  estado: 'activo',  altaIso: '2025-06-03', proximaFacturaIso: '2026-06-03', montoMensual: 2800000 },
   { id: 3, alias: 'Los Algarrobos',   codigo: 'algarrobos', plan: 'Estandar', estado: 'trial',   altaIso: '2026-04-22', proximaFacturaIso: '2026-07-22', montoMensual: 0 },
-  { id: 4, alias: 'Costa Brava',      codigo: 'costabrava', plan: 'Express',  estado: 'activo',  altaIso: '2025-11-09', proximaFacturaIso: '2026-06-09', montoMensual: 1000000 },
-  { id: 5, alias: 'Sierra Chica',     codigo: 'sierra-c',   plan: 'Estandar', estado: 'activo',  altaIso: '2025-10-01', proximaFacturaIso: '2026-06-01', montoMensual: 1000000 },
-  { id: 6, alias: 'Puerto Esperanza', codigo: 'pto-esp',    plan: 'Premium',  estado: 'vencido', altaIso: '2025-03-15', proximaFacturaIso: '2026-05-15', montoMensual: 2500000 },
+  { id: 4, alias: 'Costa Brava',      codigo: 'costabrava', plan: 'Express',  estado: 'activo',  altaIso: '2025-11-09', proximaFacturaIso: '2026-06-09', montoMensual: 1680000 },
+  { id: 5, alias: 'Sierra Chica',     codigo: 'sierra-c',   plan: 'Estandar', estado: 'activo',  altaIso: '2025-10-01', proximaFacturaIso: '2026-06-01', montoMensual: 920000 },
+  { id: 6, alias: 'Puerto Esperanza', codigo: 'pto-esp',    plan: 'Premium',  estado: 'vencido', altaIso: '2025-03-15', proximaFacturaIso: '2026-05-15', montoMensual: 3200000 },
 ];
 
 const ESTADO_META: Record<EstadoSusc, { label: string; color: string; icon: typeof CheckCircle2 }> = {
