@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Users, Map as MapIcon, TrendingUp, Trash2, Eye,
   Building2, Home, Calendar, Briefcase, ChevronLeft, ChevronRight, CalendarClock, Settings,
-  Sparkles,
+  Sparkles, Wrench, Package, Tag, ArrowUpRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -796,59 +796,82 @@ export default function Tesoreria() {
 
   // Render de una card de gasto (vista cards). Extraido para poder usarlo
   // desde groupBy.renderItem manteniendo el mismo look-and-feel.
+  // Iniciales y color estable para el avatar del destino.
+  // Hash simple del string -> hue HSL para que cada destino mantenga su color.
+  const getAvatarMeta = (label: string) => {
+    const clean = (label || '?').trim();
+    const parts = clean.split(/\s+/).filter(Boolean);
+    const initials = parts.length >= 2
+      ? (parts[0][0] + parts[1][0]).toUpperCase()
+      : clean.slice(0, 2).toUpperCase();
+    let hash = 0;
+    for (let i = 0; i < clean.length; i++) hash = (hash * 31 + clean.charCodeAt(i)) | 0;
+    const hue = Math.abs(hash) % 360;
+    return {
+      initials: initials || '?',
+      bg: `hsl(${hue}, 70%, 92%)`,
+      fg: `hsl(${hue}, 55%, 38%)`,
+    };
+  };
+
   const renderGastoCard = (g: Gasto) => {
     const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;
+    const contacto = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
+    const destinoLabel = g.destino_tipo === 'contacto'
+      ? (contacto ? `${contacto.nombre || ''} ${contacto.apellido || ''}`.trim() || 'Contacto' : 'Contacto')
+      : (dep?.nombre || 'Secretaría');
+    const avatar = getAvatarMeta(destinoLabel);
+    const tipoMeta = conceptoToTipoMap.get(g.concepto.toLowerCase());
     const estMeta = ESTADO_AGREGADO_META[calcEstadoAgregado(g)];
     return (
       <div
         key={g.id}
         onClick={() => openDetalle(g)}
-        className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
+        className="rounded-xl p-3 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] flex items-center gap-3"
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
       >
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold truncate" style={{ color: theme.text }}>{g.concepto}</p>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
-                <Calendar className="h-2.5 w-2.5" />
-                {new Date(g.fecha).toLocaleDateString('es-AR')}
-              </span>
-              {g.destino_tipo === 'contacto' ? (
-                <span className="inline-flex items-center gap-1 text-[10px]" style={{ color: theme.textSecondary }}>
-                  <Home className="h-2.5 w-2.5" /> Contacto
-                </span>
-              ) : (
-                <span
-                  className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
-                  style={{
-                    backgroundColor: `${dep?.color || theme.primary}15`,
-                    color: dep?.color || theme.primary,
-                  }}
-                >
-                  <Building2 className="h-2.5 w-2.5" />
-                  <span className="truncate max-w-[100px]">{dep?.nombre || 'Secretaría'}</span>
-                </span>
-              )}
-            </div>
-          </div>
-          <span
-            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
-          >
-            {g.tipo_financiacion}
-          </span>
+        {/* Avatar circular con iniciales */}
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+          style={{ backgroundColor: avatar.bg, color: avatar.fg }}
+        >
+          {avatar.initials}
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>
-            ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </p>
+
+        {/* Concepto + destino + tipo (badge) */}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold truncate text-sm" style={{ color: theme.text }}>{g.concepto}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+              {destinoLabel}
+            </span>
+            {tipoMeta?.nombre && (
+              <>
+                <span className="text-[11px]" style={{ color: theme.textSecondary }}>·</span>
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold"
+                  style={{ color: tipoMeta.color || theme.primary }}
+                >
+                  <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tipoMeta.color || theme.primary }} />
+                  {tipoMeta.nombre}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Monto + estado */}
+        <div className="flex items-center gap-3 flex-shrink-0">
           <span
-            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
+            className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
             style={{ backgroundColor: estMeta.bg, color: estMeta.color, border: `1px solid ${estMeta.color}30` }}
           >
+            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: estMeta.color }} />
             {estMeta.label}
           </span>
+          <p className="text-base font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>
+            ${parseFloat(g.monto_pesos).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </p>
         </div>
       </div>
     );
@@ -862,55 +885,91 @@ export default function Tesoreria() {
       : `${MESES_LARGO[mesActual]} ${anioActual}`;
 
   // ===================================================================
-  // KPIs row — total destacado + top 3 tipos
+  // KPIs row — total destacado + top 3 tipos. Look moderno: card destacada
+  // con icono grande translucido al fondo, jerarquia tipografica fuerte,
+  // iconos por categoria en las cards secundarias.
   // ===================================================================
+  const iconByTipo = (nombre: string) => {
+    const n = nombre.toLowerCase();
+    if (n.includes('personal') || n.includes('suel') || n.includes('honor')) return Users;
+    if (n.includes('servic') || n.includes('mantenim')) return Wrench;
+    if (n.includes('insumo') || n.includes('compra') || n.includes('mater')) return Package;
+    return Tag;
+  };
+
   const kpisRow = (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {/* Card 1: Total destacado (verde primary) */}
+      {/* Card 1: Total destacado */}
       <div
-        className="rounded-xl p-4"
+        className="relative rounded-2xl p-4 overflow-hidden"
         style={{
           backgroundColor: theme.primary,
           color: theme.primaryText || '#ffffff',
         }}
       >
-        <div className="text-[10px] uppercase font-bold tracking-wider opacity-80">
-          Gastado · {periodoLabel}
-        </div>
-        <div className="text-2xl font-bold tabular-nums mt-1">
-          ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-        </div>
-        <div className="text-[11px] mt-1 opacity-80">
-          {totales.cantidad} {totales.cantidad === 1 ? 'movimiento' : 'movimientos'}
+        {/* Icono decorativo al fondo */}
+        <Wallet
+          className="absolute -right-4 -bottom-4 h-24 w-24 opacity-10"
+          style={{ color: theme.primaryText || '#ffffff' }}
+          strokeWidth={1.5}
+        />
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
+            >
+              <Wallet className="h-4 w-4" />
+            </div>
+            <div className="text-[10px] uppercase font-bold tracking-wider opacity-90">
+              Gastado · {periodoLabel}
+            </div>
+          </div>
+          <div className="text-[28px] leading-none font-bold tabular-nums">
+            ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+          </div>
+          <div className="flex items-center gap-1.5 mt-2 text-[11px] opacity-90">
+            <ArrowUpRight className="h-3 w-3" />
+            {totales.cantidad} {totales.cantidad === 1 ? 'movimiento' : 'movimientos'}
+          </div>
         </div>
       </div>
 
-      {/* Cards 2-4: top 3 tipos de concepto */}
+      {/* Cards 2-4: top 3 tipos con icono */}
       {kpisData.map((k) => {
         const pct = totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0;
+        const Icon = iconByTipo(k.nombre);
         return (
           <div
             key={k.nombre}
-            className="rounded-xl p-4"
+            className="rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
-            <div className="flex items-center gap-1.5">
-              <span
-                className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: k.color }}
-              />
+            <div className="flex items-center gap-2 mb-3">
               <div
-                className="text-[10px] uppercase font-bold tracking-wider truncate"
+                className="w-8 h-8 rounded-lg flex items-center justify-center"
+                style={{ backgroundColor: `${k.color}18` }}
+              >
+                <Icon className="h-4 w-4" style={{ color: k.color }} />
+              </div>
+              <div
+                className="text-[10px] uppercase font-bold tracking-wider truncate flex-1"
                 style={{ color: theme.textSecondary }}
               >
                 {k.nombre}
               </div>
             </div>
-            <div className="text-2xl font-bold tabular-nums mt-1" style={{ color: theme.text }}>
+            <div className="text-[28px] leading-none font-bold tabular-nums" style={{ color: theme.text }}>
               ${k.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
-              {pct.toFixed(1)}% · {k.count} {k.count === 1 ? 'mov.' : 'mov.'}
+            <div className="flex items-center gap-2 mt-2 text-[11px]" style={{ color: theme.textSecondary }}>
+              <span className="font-semibold" style={{ color: k.color }}>{pct.toFixed(1)}%</span>
+              <span>·</span>
+              <span>{k.count} {k.count === 1 ? 'mov.' : 'mov.'}</span>
+              {/* Barrita de proporcion bajo la metrica */}
+              <div className="ml-auto w-12 h-1 rounded-full overflow-hidden" style={{ backgroundColor: theme.backgroundSecondary }}>
+                <div className="h-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: k.color }} />
+              </div>
             </div>
           </div>
         );
@@ -1098,9 +1157,9 @@ export default function Tesoreria() {
       </div>
 
       {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes.
-          Alineado al mismo container que el ABMPage (no px-4 extra). */}
+          Margen vertical generoso para separarlo del hint y del header. */}
       {dudosos.count > 0 && (
-        <div>
+        <div className="my-4">
           <Link
             to="/gestion/tesoreria/curacion-bartolo"
             className="block rounded-xl p-3 transition-all hover:-translate-y-0.5 hover:shadow-md"
@@ -1245,7 +1304,7 @@ export default function Tesoreria() {
         defaultViewMode="table"
         kpis={kpisRow}
         groupBy={groupByConfig}
-        sidePanel={sidePanelContent}
+        /* sidePanel={sidePanelContent}  — oculta por ahora */
       >
         {/* Fallback: si por algun motivo no se usa groupBy/renderItem,
             mantenemos el render legacy. ABMPage los ignora cuando hay groupBy. */}
