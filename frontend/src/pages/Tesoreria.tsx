@@ -17,6 +17,7 @@ import {
   type EstadoAgregado,
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
+import { StatusPill } from '../components/ui/StatusPill';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
@@ -723,14 +724,7 @@ export default function Tesoreria() {
   const renderEstadoBadge = (g: Gasto) => {
     const est = calcEstadoAgregado(g);
     const meta = ESTADO_AGREGADO_META[est];
-    return (
-      <span
-        className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-        style={{ backgroundColor: meta.bg, color: meta.color, border: `1px solid ${meta.color}30` }}
-      >
-        {meta.label}
-      </span>
-    );
+    return <StatusPill label={meta.label} color={meta.color} size="xs" />;
   };
 
   const tableView = (
@@ -812,15 +806,7 @@ export default function Tesoreria() {
           render: (g) => {
             const t = conceptoToTipoMap.get(g.concepto.toLowerCase());
             if (!t || !t.nombre) return <span className="text-xs opacity-50">—</span>;
-            const c = t.color || theme.primary;
-            return (
-              <span
-                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                style={{ backgroundColor: `${c}20`, color: c }}
-              >
-                {t.nombre}
-              </span>
-            );
+            return <StatusPill label={t.nombre} color={t.color || theme.primary} size="xs" />;
           },
           sortValue: (g) => conceptoToTipoMap.get(g.concepto.toLowerCase())?.nombre || '',
         },
@@ -847,14 +833,7 @@ export default function Tesoreria() {
         {
           key: 'tipo_financiacion',
           header: 'Financ.',
-          render: (g) => (
-            <span
-              className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: `${TIPO_FIN_COLORS[g.tipo_financiacion]}20`, color: TIPO_FIN_COLORS[g.tipo_financiacion] }}
-            >
-              {g.tipo_financiacion}
-            </span>
-          ),
+          render: (g) => <StatusPill label={g.tipo_financiacion} color={TIPO_FIN_COLORS[g.tipo_financiacion]} size="xs" />,
           sortValue: (g) => g.tipo_financiacion,
         },
         {
