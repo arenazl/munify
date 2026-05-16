@@ -1,6 +1,21 @@
-import { ReactNode } from 'react';
+import { ReactNode, CSSProperties } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+
+// =====================================================================
+// Constantes del lenguaje visual del KpiCard (estaticas, NO del tema):
+// ajustar aca si se quiere cambiar el look del gradient/border. Lo unico
+// que viene del tema son los COLORES (--color-primary y --bg-card via CSS
+// vars + color-mix), porque eso si cambia con dark/light/preset.
+// =====================================================================
+const GRADIENT_ANGLE = '135deg';
+const GRADIENT_STOP_MID = '45%';
+const TINT_ACCENT     = '10%';
+const TINT_COLOR      = '12%';
+const TINT_ACCENT_HI  = '18%';
+const TINT_COLOR_HI   = '20%';
+const BORDER_W    = '1px';
+const BORDER_W_HI = '2px';
 
 // KpiCard — card de metrica unificada para ABM pages.
 // Look outlined: bg theme.card + border 1px del color del KPI + icon-tile
@@ -51,21 +66,24 @@ export function KpiCard({
   className = '',
 }: KpiCardProps) {
   const { theme } = useTheme();
-  // Gradiente con DOS tintas: acento del tema (theme.primary) arriba-izq +
-  // color propio del KPI abajo-der. Asi todas las cards comparten lenguaje
-  // visual (acento del tema), pero cada una mantiene su identidad por el
-  // color del icon-tile/border. Highlighted usa tintas mas fuertes.
-  const tintAccent = highlighted ? '2E' : '1A'; // ~18% / 10%
-  const tintColor  = highlighted ? '33' : '1F'; // ~20% / 12%
-  const gradient = `linear-gradient(135deg, ${theme.primary}${tintAccent} 0%, ${theme.card} 45%, ${color}${tintColor} 100%)`;
+  // Colores vienen del tema (via CSS vars + color-mix nativo). Tintas/angulo/
+  // paradas son constantes del componente (no dependen del tema).
+  const tintAccent = highlighted ? TINT_ACCENT_HI : TINT_ACCENT;
+  const tintColor  = highlighted ? TINT_COLOR_HI  : TINT_COLOR;
+  const borderW    = highlighted ? BORDER_W_HI    : BORDER_W;
+  const cardStyle: CSSProperties = {
+    background:
+      `linear-gradient(${GRADIENT_ANGLE},` +
+      ` color-mix(in srgb, var(--color-primary) ${tintAccent}, transparent) 0%,` +
+      ` var(--bg-card) ${GRADIENT_STOP_MID},` +
+      ` color-mix(in srgb, ${color} ${tintColor}, transparent) 100%)`,
+    backgroundColor: theme.card,
+    border: `${borderW} solid ${color}`,
+  };
   return (
     <div
       className={`rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${className}`}
-      style={{
-        background: gradient,
-        backgroundColor: theme.card,
-        border: `${highlighted ? 2 : 1}px solid ${color}`,
-      }}
+      style={cardStyle}
     >
       <div className="flex items-center gap-2 mb-3">
         <div
