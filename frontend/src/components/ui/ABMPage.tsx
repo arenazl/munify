@@ -1529,6 +1529,11 @@ interface ABMTableProps<T> {
    *  campo fecha del item (ej. 'created_at', 'fecha'). Si tambien pasas
    *  `groupBy` explicito, tiene prioridad. */
   defaultGroupByDateKey?: string;
+  /** Sortkeys validos para que el groupBy auto siga activo. Default: la misma
+   *  defaultGroupByDateKey. Pasar las keys de columnas de fecha que la tabla
+   *  ofrece como sort (ej. ['creacion','fecha']) para que el agrupamiento se
+   *  mantenga aunque el user sortee por otro campo de fecha. */
+  defaultGroupBySortKeys?: string[];
   /** Label de items para el header de dia ('reclamo'/'reclamos'). */
   defaultGroupByItemLabel?: { singular: string; plural: string };
   /** Agrupacion opcional. Inserta una fila-separador antes de cada grupo con
@@ -1555,15 +1560,18 @@ export function ABMTable<T>({
   defaultSortKey,
   defaultSortDirection,
   renderMobileCard,
-  hideHeader = false,
+  hideHeader = true,
   defaultGroupByDateKey,
+  defaultGroupBySortKeys,
   defaultGroupByItemLabel,
   groupBy,
 }: ABMTableProps<T>) {
   const { theme } = useTheme();
   // Estado de ordenamiento - inicializar con valores por defecto si se proporcionan
-  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection || null);
+  // Si la tabla declaro un campo de groupBy por fecha y no se paso defaultSortKey,
+  // usamos ese campo como sort inicial para que el groupBy se vea de entrada.
+  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey || defaultGroupByDateKey || null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection || (defaultGroupByDateKey ? 'desc' : null));
 
   const handleSort = (col: ABMTableColumn<T>) => {
     if (col.sortable === false) return;
@@ -1719,7 +1727,9 @@ export function ABMTable<T>({
               // defaultGroupByDateKey, armamos uno auto con el header canonico.
               if (!groupBy && defaultGroupByDateKey) {
                 groupBy = {
-                  sortKey: defaultGroupByDateKey,
+                  sortKey: defaultGroupBySortKeys && defaultGroupBySortKeys.length > 0
+                    ? defaultGroupBySortKeys
+                    : defaultGroupByDateKey,
                   getKey: (it: T) => {
                     const v = (it as Record<string, unknown>)[defaultGroupByDateKey];
                     if (typeof v === 'string') return v.slice(0, 10);
