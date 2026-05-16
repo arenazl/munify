@@ -17,6 +17,7 @@ import {
   type EstadoAgregado,
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
 import { CalendarView } from '../components/ui/CalendarView';
@@ -884,11 +885,7 @@ export default function Tesoreria() {
       ? `Año ${anioActual}`
       : `${MESES_LARGO[mesActual]} ${anioActual}`;
 
-  // ===================================================================
-  // KPIs row — total destacado + top 3 tipos. Look moderno: card destacada
-  // con icono grande translucido al fondo, jerarquia tipografica fuerte,
-  // iconos por categoria en las cards secundarias.
-  // ===================================================================
+  // KPIs outlined estandar — 4 fijos. ABMPage los renderiza con <KpiRow>.
   const iconByTipo = (nombre: string) => {
     const n = nombre.toLowerCase();
     if (n.includes('personal') || n.includes('suel') || n.includes('honor')) return Users;
@@ -897,85 +894,24 @@ export default function Tesoreria() {
     return Tag;
   };
 
-  const kpisRow = (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {/* Card 1: Total destacado */}
-      <div
-        className="relative rounded-2xl p-4 overflow-hidden"
-        style={{
-          backgroundColor: theme.primary,
-          color: theme.primaryText || '#ffffff',
-        }}
-      >
-        {/* Icono decorativo al fondo */}
-        <Wallet
-          className="absolute -right-4 -bottom-4 h-24 w-24 opacity-10"
-          style={{ color: theme.primaryText || '#ffffff' }}
-          strokeWidth={1.5}
-        />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-3">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
-            >
-              <Wallet className="h-4 w-4" />
-            </div>
-            <div className="text-[10px] uppercase font-bold tracking-wider opacity-90">
-              Gastado · {periodoLabel}
-            </div>
-          </div>
-          <div className="text-[28px] leading-none font-bold tabular-nums">
-            ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-          </div>
-          <div className="flex items-center gap-1.5 mt-2 text-[11px] opacity-90">
-            <ArrowUpRight className="h-3 w-3" />
-            {totales.cantidad} {totales.cantidad === 1 ? 'movimiento' : 'movimientos'}
-          </div>
-        </div>
-      </div>
-
-      {/* Cards 2-4: top 3 tipos con icono */}
-      {kpisData.map((k) => {
-        const pct = totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0;
-        const Icon = iconByTipo(k.nombre);
-        return (
-          <div
-            key={k.nombre}
-            className="rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: `${k.color}18` }}
-              >
-                <Icon className="h-4 w-4" style={{ color: k.color }} />
-              </div>
-              <div
-                className="text-[10px] uppercase font-bold tracking-wider truncate flex-1"
-                style={{ color: theme.textSecondary }}
-              >
-                {k.nombre}
-              </div>
-            </div>
-            <div className="text-[28px] leading-none font-bold tabular-nums" style={{ color: theme.text }}>
-              ${k.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-            </div>
-            <div className="flex items-center gap-2 mt-2 text-[11px]" style={{ color: theme.textSecondary }}>
-              <span className="font-semibold" style={{ color: k.color }}>{pct.toFixed(1)}%</span>
-              <span>·</span>
-              <span>{k.count} {k.count === 1 ? 'mov.' : 'mov.'}</span>
-              {/* Barrita de proporcion bajo la metrica */}
-              <div className="ml-auto w-12 h-1 rounded-full overflow-hidden" style={{ backgroundColor: theme.backgroundSecondary }}>
-                <div className="h-full" style={{ width: `${Math.min(100, pct)}%`, backgroundColor: k.color }} />
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  const kpisSpec: KpiSpec[] = [
+    {
+      label: `Gastado · ${periodoLabel}`,
+      value: `$${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
+      icon: Wallet,
+      color: theme.primary,
+      footnote: `${totales.cantidad} ${totales.cantidad === 1 ? 'movimiento' : 'movimientos'}`,
+      highlighted: true,
+    },
+    ...kpisData.map<KpiSpec>((k) => ({
+      label: k.nombre,
+      value: `$${k.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
+      icon: iconByTipo(k.nombre),
+      color: k.color,
+      footnote: `${(totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0).toFixed(1)}% · ${k.count} mov.`,
+      pct: totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0,
+    })),
+  ].slice(0, 4);
 
   // ===================================================================
   // Side panel "Bandeja IA" — 3 cards demo hardcodeadas (placeholders).
@@ -1302,7 +1238,7 @@ export default function Tesoreria() {
         }
         viewStorageKey="tesoreria_view"
         defaultViewMode="table"
-        kpis={kpisRow}
+        kpis={kpisSpec}
         groupBy={groupByConfig}
         /* sidePanel={sidePanelContent}  — oculta por ahora */
       >

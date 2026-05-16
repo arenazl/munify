@@ -1355,13 +1355,21 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           sortValue: (t) => t.dependencia_asignada?.nombre || '',
           render: (t) => {
             if (!t.dependencia_asignada?.nombre) return null;
+            const depColor = t.dependencia_asignada.color || theme.textSecondary;
+            // Look estandar: dot del color de la dependencia + texto neutro
+            // (text-secondary) en vez de pintar todo el texto del color.
             return (
               <span
-                className="text-xs truncate block"
-                style={{ color: t.dependencia_asignada.color || theme.text }}
+                className="inline-flex items-center gap-1.5 text-xs min-w-0"
                 title={t.dependencia_asignada.nombre}
               >
-                {t.dependencia_asignada.nombre}
+                <span
+                  className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: depColor }}
+                />
+                <span className="truncate" style={{ color: theme.textSecondary }}>
+                  {t.dependencia_asignada.nombre}
+                </span>
               </span>
             );
           },

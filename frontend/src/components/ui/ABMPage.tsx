@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import { Plus, Search, Sparkles, LayoutGrid, List, ChevronDown, ArrowLeft, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../../contexts/ThemeContext';
+import { KpiRow, KpiSpec } from './KpiCard';
 import { Sheet } from './Sheet';
 import { ConfirmModal } from './ConfirmModal';
 
@@ -90,10 +91,11 @@ interface ABMPageProps {
   // para mantener los margenes/centrado alineados con el resto del contenido.
   paginationSummary?: ReactNode;
 
-  // Slot opcional que se renderiza ARRIBA del header (fila de KPIs / metricas
-  // destacadas). La pagina arma su propio grid. ABMPage solo le da margen
-  // inferior antes del header.
-  kpis?: ReactNode;
+  // Fila de KPIs arriba del header. Acepta dos formatos:
+  //   - ReactNode (legacy): la pagina arma su propio JSX libre.
+  //   - KpiSpec[]: array de specs (max 4) que ABMPage renderiza con <KpiRow>
+  //     outlined estandar. Es la API recomendada nueva.
+  kpis?: ReactNode | KpiSpec[];
 
   // Agrupacion opcional por algun key (ej: fecha ISO). Cuando se pasa,
   // ABMPage inserta separadores entre grupos en la vista cards (full-row)
@@ -276,9 +278,14 @@ export function ABMPage({
 
   return (
     <div className="space-y-6 pb-4" style={{ touchAction: 'pan-y' }}>
-      {/* KPIs (opt-in). Slot libre que la pagina renderiza arriba del header.
-          Mantenemos margen consistente con el resto del flow (space-y-6). */}
-      {kpis && <div>{kpis}</div>}
+      {/* KPIs (opt-in). Si es un array de KpiSpec, lo renderizamos con KpiRow
+          (look outlined estandar, hard-limit 4). Si es un ReactNode arma JSX
+          libre. */}
+      {kpis && (
+        Array.isArray(kpis)
+          ? <KpiRow kpis={kpis as KpiSpec[]} />
+          : <div>{kpis}</div>
+      )}
 
       {/* Contenedor sticky para header y secondary filters - usando CSS sticky puro */}
       <div

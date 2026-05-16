@@ -3,6 +3,7 @@ import { Building2, Calendar, CheckCircle2, AlertCircle, Clock } from 'lucide-re
 import { useTheme } from '../../contexts/ThemeContext';
 import { ABMPage } from '../../components/ui/ABMPage';
 import { PillsOrSelect } from '../../components/ui/PillsOrSelect';
+import type { KpiSpec } from '../../components/ui/KpiCard';
 
 // Suscripciones — vista superadmin (read-only) con el listado de
 // municipios suscriptos, su plan, estado y proxima fecha de facturacion.
@@ -77,11 +78,45 @@ export default function Suscripciones() {
 
   const totales = useMemo(() => {
     const activos = SUSCRIPCIONES_DEMO.filter(s => s.estado === 'activo').length;
+    const trial = SUSCRIPCIONES_DEMO.filter(s => s.estado === 'trial').length;
+    const vencidos = SUSCRIPCIONES_DEMO.filter(s => s.estado === 'vencido').length;
     const mrr = SUSCRIPCIONES_DEMO
       .filter(s => s.estado === 'activo')
       .reduce((acc, s) => acc + s.montoMensual, 0);
-    return { activos, mrr, total: SUSCRIPCIONES_DEMO.length };
+    return { activos, trial, vencidos, mrr, total: SUSCRIPCIONES_DEMO.length };
   }, []);
+
+  const kpisSpec: KpiSpec[] = [
+    {
+      label: 'Activos',
+      value: `${totales.activos}`,
+      icon: CheckCircle2,
+      color: ESTADO_META.activo.color,
+      footnote: `de ${totales.total} municipios`,
+      highlighted: true,
+    },
+    {
+      label: 'En trial',
+      value: `${totales.trial}`,
+      icon: Clock,
+      color: ESTADO_META.trial.color,
+      footnote: 'sin cargo',
+    },
+    {
+      label: 'Vencidos',
+      value: `${totales.vencidos}`,
+      icon: AlertCircle,
+      color: ESTADO_META.vencido.color,
+      footnote: 'requieren acción',
+    },
+    {
+      label: 'MRR estimado',
+      value: `$${totales.mrr.toLocaleString('es-AR')}`,
+      icon: Building2,
+      color: '#3b82f6',
+      footnote: 'mensual recurrente',
+    },
+  ];
 
   const estadoOptions = [
     { value: '',        label: 'Todos' },
@@ -111,32 +146,7 @@ export default function Suscripciones() {
         headerActions={extraFilters}
         isEmpty={filtered.length === 0}
         emptyMessage="No hay municipios que coincidan con el filtro."
-        paginationSummary={(
-          <div
-            className="rounded-xl px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
-                Activos
-              </span>
-              <span className="text-lg font-bold tabular-nums" style={{ color: theme.primary }}>
-                {totales.activos} <span className="text-xs font-normal" style={{ color: theme.textSecondary }}>de {totales.total}</span>
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase font-semibold" style={{ color: theme.textSecondary }}>
-                MRR estimado
-              </span>
-              <span className="text-lg font-bold tabular-nums" style={{ color: theme.text }}>
-                ${totales.mrr.toLocaleString('es-AR')}
-              </span>
-            </div>
-            <div className="ml-auto text-[11px]" style={{ color: theme.textSecondary }}>
-              Datos demo · placeholders
-            </div>
-          </div>
-        )}
+        kpis={kpisSpec}
       >
         {filtered.map(s => {
           const meta = ESTADO_META[s.estado];
