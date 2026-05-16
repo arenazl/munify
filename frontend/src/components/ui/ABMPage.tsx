@@ -1469,8 +1469,12 @@ interface ABMTableProps<T> {
   // Render alternativo para mobile (cards)
   renderMobileCard?: (item: T, actions?: ReactNode) => ReactNode;
   /** Agrupacion opcional. Inserta una fila-separador antes de cada grupo con
-   *  label izq + subtotal der. La data DEBE venir ordenada por el padre. */
+   *  label izq + subtotal der. Solo se aplica cuando el sort actual es por
+   *  `sortKey` (columna sobre la que la agrupacion tiene sentido). Si el user
+   *  sortea por otra columna, ABMTable rinde plano sin headers. */
   groupBy?: {
+    /** Columna(s) por las que la agrupacion tiene sentido (ej: 'fecha'). */
+    sortKey: string | string[];
     getKey: (item: T) => string;
     renderLabel: (key: string, items: T[]) => ReactNode;
     renderSubtotal?: (key: string, items: T[]) => ReactNode;
@@ -1643,10 +1647,19 @@ export function ABMTable<T>({
           <tbody className="divide-y" style={{ borderColor: theme.border }}>
             {(() => {
               const colSpan = columns.length + (actions ? 1 : 0);
-              // Si hay groupBy, particiono en bloques contiguos por key.
-              // La data debe venir ordenada por el padre.
+              // groupBy aplica SOLO si el sort actual coincide con el sortKey
+              // declarado por la agrupacion (o si no hay sort y la data viene
+              // del padre ya ordenada por ese campo).
+              const groupSortKeys = groupBy
+                ? (Array.isArray(groupBy.sortKey) ? groupBy.sortKey : [groupBy.sortKey])
+                : [];
+              const groupingActive = !!groupBy && (
+                sortKey === null
+                  ? true // sin sort explicito: confiamos en el orden del padre
+                  : groupSortKeys.includes(sortKey)
+              );
               const blocks: Array<{ key: string; items: T[] }> = [];
-              if (groupBy) {
+              if (groupBy && groupingActive) {
                 let cur: { key: string; items: T[] } | null = null;
                 for (const it of sortedData) {
                   const k = groupBy.getKey(it);
@@ -1687,7 +1700,7 @@ export function ABMTable<T>({
                   )}
                 </tr>
               );
-              if (!groupBy) {
+              if (!groupBy || !groupingActive) {
                 return sortedData.map((item, index) => renderRow(item, index));
               }
               const out: ReactNode[] = [];

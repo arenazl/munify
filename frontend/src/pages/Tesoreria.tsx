@@ -739,6 +739,7 @@ export default function Tesoreria() {
       keyExtractor={(g) => g.id}
       onRowClick={openDetalle}
       groupBy={{
+        sortKey: 'fecha',
         getKey: (g) => g.fecha,
         renderLabel: (key, items) => {
           const d = new Date(key + 'T12:00:00');
