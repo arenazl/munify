@@ -2951,31 +2951,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       },
     },
     {
-      key: 'dependencia',
-      header: 'Dependencia',
-      sortValue: (r: Reclamo) => r.dependencia_asignada?.nombre || '',
-      render: (r: Reclamo) => {
-        if (!r.dependencia_asignada?.nombre) return null;
-        return (
-          <span
-            className="text-xs"
-            style={{
-              color: theme.text,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              lineHeight: 1.2,
-              maxWidth: '140px',
-            }}
-            title={r.dependencia_asignada.nombre}
-          >
-            {r.dependencia_asignada.nombre}
-          </span>
-        );
-      },
-    },
-    {
       // Columna unica "Fecha": 2 renglones (Creacion arriba, Modif abajo).
       // Binding completo (year) se mantiene para sorting y filtros.
       key: 'fecha',

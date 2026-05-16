@@ -1353,24 +1353,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           },
         },
         {
-          key: 'dependencia',
-          header: 'Dependencia',
-          sortValue: (t) => t.dependencia_asignada?.nombre || '',
-          render: (t) => {
-            if (!t.dependencia_asignada?.nombre) return null;
-            // 2 renglones, texto blanco, sin dot (look Reclamos > ASIGNADO).
-            return (
-              <span
-                className="block text-xs font-semibold leading-tight line-clamp-2"
-                style={{ color: theme.text, maxWidth: 160 }}
-                title={t.dependencia_asignada.nombre}
-              >
-                {t.dependencia_asignada.nombre}
-              </span>
-            );
-          },
-        },
-        {
           key: 'estado',
           header: 'Estado',
           sortValue: (t) => getEstadoConfig(t.estado).label,
