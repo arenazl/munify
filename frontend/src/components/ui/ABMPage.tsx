@@ -77,15 +77,7 @@ export function renderGroupDayLabel(opts: {
   const { isoDate, count, themeCard, themeBorder, themeText, themeTextSecondary, themePrimary } = opts;
   const itemLabel = opts.itemLabel || { singular: 'movimiento', plural: 'movimientos' };
   const d = new Date(isoDate.length === 10 ? `${isoDate}T12:00:00` : isoDate);
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
-  const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
-  const dStripped = new Date(d); dStripped.setHours(0, 0, 0, 0);
-  let label: string;
-  if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
-  else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
-  else if (dStripped.getTime() === manana.getTime()) label = 'Mañana';
-  else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+  const label = d.toLocaleDateString('es-AR', { day: 'numeric', month: 'long' });
   return (
     <div className="flex items-center gap-3">
       <div
@@ -116,13 +108,13 @@ export function renderGroupSubtotal(opts: {
 }): ReactNode {
   const { amount, label = 'Subtotal', themeText, themeTextSecondary } = opts;
   return (
-    <div className="text-right">
-      <span className="text-[10px] uppercase font-bold mr-2" style={{ color: themeTextSecondary }}>
+    <div className="text-right leading-tight">
+      <div className="text-[10px] uppercase font-bold tracking-wide" style={{ color: themeTextSecondary }}>
         {label}
-      </span>
-      <span className="text-sm font-bold tabular-nums" style={{ color: themeText }}>
+      </div>
+      <div className="text-base font-bold tabular-nums" style={{ color: themeText }}>
         ${amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-      </span>
+      </div>
     </div>
   );
 }
