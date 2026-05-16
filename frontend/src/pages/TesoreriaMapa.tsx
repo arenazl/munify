@@ -177,6 +177,16 @@ function MapController({
 export default function TesoreriaMapa() {
   const { theme } = useTheme();
   const { user } = useAuth();
+  // Detecta tema oscuro por luminancia del background (mismo patron que Dashboard).
+  // Si es oscuro, aplicamos un filter CSS al tile layer para que el mapa no
+  // brille blanco contra una UI dark.
+  const isDarkTheme = (() => {
+    const hex = (theme.background || '#ffffff').replace('#', '');
+    const r = parseInt(hex.slice(0, 2), 16) || 0;
+    const g = parseInt(hex.slice(2, 4), 16) || 0;
+    const b = parseInt(hex.slice(4, 6), 16) || 0;
+    return ((r * 299 + g * 587 + b * 114) / 1000) <= 155;
+  })();
 
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -719,9 +729,16 @@ export default function TesoreriaMapa() {
 
           {/* Mapa 75% */}
           <div
-            className="lg:col-span-3 rounded-xl overflow-hidden relative"
+            className={`lg:col-span-3 rounded-xl overflow-hidden relative ${isDarkTheme ? 'tesoreria-mapa-dark' : ''}`}
             style={{ border: `1px solid ${theme.border}` }}
           >
+            {isDarkTheme && (
+              <style>{`
+                .tesoreria-mapa-dark .leaflet-tile-pane {
+                  filter: invert(0.92) hue-rotate(180deg) brightness(0.95) contrast(0.9);
+                }
+              `}</style>
+            )}
             <MapContainer center={ARG_DEFAULT_CENTER} zoom={13} style={{ width: '100%', height: '100%' }}>
               <TileLayer
                 key={tileProvider}
