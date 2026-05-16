@@ -42,7 +42,7 @@ import { Sheet } from '../components/ui/Sheet';
 import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizard';
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
-import { ABMPage, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
@@ -996,10 +996,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     });
   };
 
-  // Secondary filters — patron canonico: combos taxonomicos a la IZQUIERDA,
-  // status pills a la DERECHA, todo en UNA sola fila (regla APP_GUIDE).
+  // Secondary filters — patron canonico: todos los controles PEGADOS a la
+  // IZQUIERDA, una sola fila (regla APP_GUIDE).
   const renderSecondaryFilters = () => (
-    <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-between">
+    <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-start">
       {/* Combos taxonomicos: Tipo + Dependencia */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-[180px]">
@@ -1024,23 +1024,25 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             searchable
           />
         </div>
-        {/* Dependencia — filtro client-side al lado de Tipos */}
-        <div className="min-w-[180px]">
-          <ModernSelect
-            value={filtroDependencia === null ? '' : String(filtroDependencia)}
-            onChange={(v) => setFiltroDependencia(v ? parseInt(v, 10) : null)}
-            options={[
-              { value: '', label: 'Dependencias' },
-              ...dependenciasOpts.map(d => ({
-                value: String(d.id),
-                label: d.nombre,
-                color: d.color || '#6366f1',
-              })),
-            ]}
-            placeholder="Dependencias"
-            searchable
-          />
-        </div>
+        {/* Dependencia — admin o supervisor, oculto si modo dependencia (soloMiArea) */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea && (
+          <div className="min-w-[180px]">
+            <ModernSelect
+              value={filtroDependencia === null ? '' : String(filtroDependencia)}
+              onChange={(v) => setFiltroDependencia(v ? parseInt(v, 10) : null)}
+              options={[
+                { value: '', label: 'Dependencias' },
+                ...dependenciasOpts.map(d => ({
+                  value: String(d.id),
+                  label: d.nombre,
+                  color: d.color || '#6366f1',
+                })),
+              ]}
+              placeholder="Dependencias"
+              searchable
+            />
+          </div>
+        )}
       </div>
 
       {/* Estados — status pills a la derecha */}
@@ -1114,11 +1116,8 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
 
   // Table view
-  const renderTableView = () => (
-    <ABMTable
-      key={`table-${ordenamiento}`}
-      data={paginatedTramites}
-      columns={[
+  const renderTableView = () => {
+    const allColumns: ABMTableColumn<Solicitud>[] = [
         {
           key: 'numero_tramite',
           header: 'ID',
@@ -1327,21 +1326,14 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           sortValue: (t) => t.dependencia_asignada?.nombre || '',
           render: (t) => {
             if (!t.dependencia_asignada?.nombre) return null;
-            const depColor = t.dependencia_asignada.color || theme.textSecondary;
-            // Look estandar: dot del color de la dependencia + texto neutro
-            // (text-secondary) en vez de pintar todo el texto del color.
+            // 2 renglones, texto blanco, sin dot (look Reclamos > ASIGNADO).
             return (
               <span
-                className="inline-flex items-center gap-1.5 text-xs min-w-0"
+                className="block text-xs font-semibold leading-tight line-clamp-2"
+                style={{ color: theme.text, maxWidth: 160 }}
                 title={t.dependencia_asignada.nombre}
               >
-                <span
-                  className="inline-block h-2 w-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: depColor }}
-                />
-                <span className="truncate" style={{ color: theme.textSecondary }}>
-                  {t.dependencia_asignada.nombre}
-                </span>
+                {t.dependencia_asignada.nombre}
               </span>
             );
           },
@@ -1356,28 +1348,27 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           },
         },
         {
-          key: 'creacion',
-          header: 'Creación',
-          sortValue: (t) => new Date(t.created_at).getTime(),
-          render: (t) => {
-            const creacion = new Date(t.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-            return (
-              <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                {creacion}
-              </span>
-            );
-          },
-        },
-        {
-          key: 'modificacion',
-          header: 'Modif.',
+          // Columna unica "Fecha": 2 renglones (Creacion arriba, Modif abajo).
+          // Formato DD/M/YY. El binding completo (year incluido) se mantiene
+          // para sorting y filtros.
+          key: 'fecha',
+          header: 'Fecha',
           sortValue: (t) => new Date(t.updated_at || t.created_at).getTime(),
           render: (t) => {
-            const modificacion = new Date(t.updated_at || t.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const fmt = (iso: string) => {
+              const d = new Date(iso);
+              const yy = String(d.getFullYear()).slice(-2);
+              return `${d.getDate()}/${d.getMonth() + 1}/${yy}`;
+            };
             return (
-              <span className="text-[10px]" style={{ color: theme.text }}>
-                {modificacion}
-              </span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                  {fmt(t.created_at)}
+                </span>
+                <span className="text-[10px] font-semibold" style={{ color: theme.text }}>
+                  {fmt(t.updated_at || t.created_at)}
+                </span>
+              </div>
             );
           },
         },
@@ -1418,13 +1409,20 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             );
           },
         },
-      ]}
-      keyExtractor={(t) => t.id}
-      onRowClick={(t) => openTramite(t)}
-      defaultSortKey={ordenamiento === 'por_vencer' ? 'por_vencer' : 'creacion'}
-      defaultSortDirection={ordenamiento === 'por_vencer' ? 'asc' : 'desc'}
-    />
-  );
+    ];
+    const columns = allColumns.filter(c => !(soloMiArea && c.key === 'dependencia'));
+    return (
+      <ABMTable<Solicitud>
+        key={`table-${ordenamiento}`}
+        data={paginatedTramites}
+        columns={columns}
+        keyExtractor={(t) => t.id}
+        onRowClick={(t) => openTramite(t)}
+        defaultSortKey={ordenamiento === 'por_vencer' ? 'por_vencer' : 'fecha'}
+        defaultSortDirection={ordenamiento === 'por_vencer' ? 'asc' : 'desc'}
+      />
+    );
+  };
 
   // ============================================================
   // INBOX (vista guiada) — secciones por urgencia/estado

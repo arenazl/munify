@@ -2974,7 +2974,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     },
     {
       key: 'dependencia',
-      header: 'Asignado',
+      header: 'Dependencia',
       sortValue: (r: Reclamo) => r.dependencia_asignada?.nombre || '',
       render: (r: Reclamo) => {
         if (!r.dependencia_asignada?.nombre) return null;
@@ -2998,24 +2998,28 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       },
     },
     {
-      key: 'creacion',
-      header: 'Creación',
-      sortValue: (r: Reclamo) => new Date(r.created_at).getTime(),
-      render: (r: Reclamo) => (
-        <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-          {new Date(r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
-        </span>
-      ),
-    },
-    {
-      key: 'modificacion',
-      header: 'Modif.',
+      // Columna unica "Fecha": 2 renglones (Creacion arriba, Modif abajo).
+      // Binding completo (year) se mantiene para sorting y filtros.
+      key: 'fecha',
+      header: 'Fecha',
       sortValue: (r: Reclamo) => new Date(r.updated_at || r.created_at).getTime(),
-      render: (r: Reclamo) => (
-        <span className="text-[10px]" style={{ color: theme.text }}>
-          {new Date(r.updated_at || r.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
-        </span>
-      ),
+      render: (r: Reclamo) => {
+        const fmt = (iso: string) => {
+          const d = new Date(iso);
+          const yy = String(d.getFullYear()).slice(-2);
+          return `${d.getDate()}/${d.getMonth() + 1}/${yy}`;
+        };
+        return (
+          <div className="flex flex-col leading-tight">
+            <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+              {fmt(r.created_at)}
+            </span>
+            <span className="text-[10px] font-semibold" style={{ color: theme.text }}>
+              {fmt(r.updated_at || r.created_at)}
+            </span>
+          </div>
+        );
+      },
     },
     {
       key: 'vencimiento',
@@ -3054,7 +3058,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         );
       },
     },
-  ];
+  ].filter(c => !(soloMiArea && c.key === 'dependencia'));
 
   // Renderizar contenido del Sheet de ver
   const renderViewContent = () => {
@@ -4411,9 +4415,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         }
         stickyHeader={true}
         secondaryFilters={
-          // Una sola fila: combos taxonomicos a la IZQUIERDA, status pills
-          // a la DERECHA. Patron Tesoreria de la APP_GUIDE master.
-          <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-between">
+          // Una sola fila: todo PEGADO a la izquierda (combos + pills).
+          // Patron canonico de la APP_GUIDE master.
+          <div className="w-full flex flex-wrap items-center gap-x-3 gap-y-1.5 justify-start">
             {/* Combos: Categoria + Dependencia (si supervisor) */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="min-w-[180px]">
@@ -4437,8 +4441,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                   searchable
                 />
               </div>
-              {/* Dependencia — solo para supervisor, al lado de Categorias */}
-              {user?.rol === 'supervisor' && (
+              {/* Dependencia — admin o supervisor, oculto si modo dependencia (soloMiArea) */}
+              {(user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea && (
                 <div className="min-w-[180px]">
                   <ModernSelect
                     value={filtroDependencia === null ? '' : String(filtroDependencia)}
