@@ -301,6 +301,7 @@ export default function TesoreriaAgenda() {
           themeBorder: theme.border,
           themeText: theme.text,
           themeTextSecondary: theme.textSecondary,
+          themePrimary: theme.primary,
         }),
         renderSubtotal: (_key, items) => renderGroupSubtotal({
           amount: items.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0),

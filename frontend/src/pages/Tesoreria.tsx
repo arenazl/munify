@@ -19,6 +19,7 @@ import {
 import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
 import { StatusPill } from '../components/ui/StatusPill';
 import { primaryButtonStyle } from '../components/ui/PrimaryButton';
+import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
@@ -108,6 +109,22 @@ export default function Tesoreria() {
   // Paginación client-side (50 items por página)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
+
+  // Dashboard IA
+  const [dashboardIA, setDashboardIA] = useState<DashboardIAData | null>(null);
+  const [dashboardIALoading, setDashboardIALoading] = useState(false);
+  const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
+  });
+  useEffect(() => {
+    let cancelled = false;
+    setDashboardIALoading(true);
+    gastosApi.getDashboardIA(false)
+      .then((res) => { if (!cancelled) setDashboardIA(res.data as DashboardIAData); })
+      .catch((e) => console.error('[Tesoreria] Error cargando Dashboard IA:', e))
+      .finally(() => { if (!cancelled) setDashboardIALoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return (
@@ -711,6 +728,7 @@ export default function Tesoreria() {
           themeBorder: theme.border,
           themeText: theme.text,
           themeTextSecondary: theme.textSecondary,
+          themePrimary: theme.primary,
         }),
         renderSubtotal: (_key, items) => renderGroupSubtotal({
           amount: items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0),
@@ -1273,7 +1291,15 @@ export default function Tesoreria() {
         defaultViewMode="table"
         kpis={kpisSpec}
         groupBy={groupByConfig}
-        /* sidePanel={sidePanelContent}  — oculta por ahora */
+        sidePanel={
+          <DashboardIAPanel
+            data={dashboardIA}
+            loading={dashboardIALoading}
+            title="Tesorería · IA"
+            onCollapsedChange={setIaCollapsed}
+          />
+        }
+        sidePanelWidth={iaCollapsed ? 44 : 280}
       >
         {/* Fallback: si por algun motivo no se usa groupBy/renderItem,
             mantenemos el render legacy. ABMPage los ignora cuando hay groupBy. */}

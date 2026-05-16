@@ -71,8 +71,10 @@ export function renderGroupDayLabel(opts: {
   themeBorder: string;
   themeText: string;
   themeTextSecondary: string;
+  /** Color de acento usado para el numero del dia. Si no se pasa, usa themeText. */
+  themePrimary?: string;
 }): ReactNode {
-  const { isoDate, count, themeCard, themeBorder, themeText, themeTextSecondary } = opts;
+  const { isoDate, count, themeCard, themeBorder, themeText, themeTextSecondary, themePrimary } = opts;
   const itemLabel = opts.itemLabel || { singular: 'movimiento', plural: 'movimientos' };
   const d = new Date(isoDate.length === 10 ? `${isoDate}T12:00:00` : isoDate);
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -90,7 +92,7 @@ export function renderGroupDayLabel(opts: {
         className="w-12 text-center px-1 py-0.5 rounded-md text-[10px] uppercase font-bold leading-tight"
         style={{ backgroundColor: themeCard, color: themeTextSecondary, border: `1px solid ${themeBorder}` }}
       >
-        <div className="text-base font-bold" style={{ color: themeText }}>
+        <div className="text-base font-bold" style={{ color: themePrimary || themeText }}>
           {d.getDate().toString().padStart(2, '0')}
         </div>
         <div>{d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</div>
@@ -1742,6 +1744,7 @@ export function ABMTable<T>({
                     themeBorder: theme.border,
                     themeText: theme.text,
                     themeTextSecondary: theme.textSecondary,
+                    themePrimary: theme.primary,
                   }),
                 };
               }
