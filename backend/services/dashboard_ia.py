@@ -503,7 +503,7 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
         SELECT cj.nombre,
                COALESCE((SELECT SUM(monto_pesos) FROM gastos WHERE caja_id = cj.id AND activo = 1 AND fecha >= :desde), 0) as gastado_30d
         FROM tesoreria_cajas cj
-        WHERE cj.municipio_id = :mid AND cj.activa = 1
+        WHERE cj.municipio_id = :mid AND cj.activo = 1
         ORDER BY gastado_30d DESC
         LIMIT 5
     """), {"mid": municipio_id, "desde": hace_30d.date()})).fetchall()
