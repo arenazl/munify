@@ -23,7 +23,7 @@ from schemas.categoria_reclamo import (
     CategoriaReclamoResponse,
 )
 
-from core.tenancy import get_effective_municipio_id  # noqa: E402
+from core.tenancy import get_effective_municipio_id, resolve_municipio_id  # noqa: E402
 
 router = APIRouter()
 
@@ -35,8 +35,12 @@ async def listar_categorias_reclamo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista las categorías de reclamo del municipio actual."""
-    municipio_id = get_effective_municipio_id(request, current_user)
+    """Lista las categorías de reclamo del municipio actual.
+    En modo Global (superadmin sin muni) devuelve [] sin 400.
+    """
+    municipio_id = resolve_municipio_id(request, current_user)
+    if not municipio_id:
+        return []
 
     query = select(CategoriaReclamo).where(
         CategoriaReclamo.municipio_id == municipio_id

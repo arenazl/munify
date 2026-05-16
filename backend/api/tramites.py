@@ -62,7 +62,7 @@ router = APIRouter()
 
 # Resolución de municipio centralizada en core/tenancy.py (antes había 10
 # copias duplicadas, una por archivo de API). Ahora todas usan la misma.
-from core.tenancy import get_effective_municipio_id  # noqa: E402
+from core.tenancy import get_effective_municipio_id, resolve_municipio_id  # noqa: E402
 
 
 async def enviar_notificacion_solicitud(db, solicitud, tramite_nombre=None):
@@ -260,7 +260,7 @@ async def listar_tramites(
     # Para usuarios no logueados (vecinos navegando), permitir municipio_id en query
     municipio_id = None
     if current_user:
-        municipio_id = get_effective_municipio_id(request, current_user)
+        municipio_id = resolve_municipio_id(request, current_user)
     else:
         header_id = request.headers.get("X-Municipio-ID")
         if header_id:
@@ -269,8 +269,9 @@ async def listar_tramites(
             except (ValueError, TypeError):
                 pass
 
+    # En modo Global (superadmin sin muni) devolver [] en vez de 400.
     if not municipio_id:
-        raise HTTPException(status_code=400, detail="municipio_id requerido")
+        return []
 
     query = select(Tramite).where(Tramite.municipio_id == municipio_id)
     if categoria_tramite_id is not None:

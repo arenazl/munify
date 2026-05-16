@@ -22,7 +22,7 @@ from schemas.categoria_tramite import (
     CategoriaTramiteResponse,
 )
 
-from core.tenancy import get_effective_municipio_id  # noqa: E402
+from core.tenancy import get_effective_municipio_id, resolve_municipio_id  # noqa: E402
 
 router = APIRouter()
 
@@ -34,8 +34,12 @@ async def listar_categorias_tramite(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista las categorías de trámite del municipio actual."""
-    municipio_id = get_effective_municipio_id(request, current_user)
+    """Lista las categorías de trámite del municipio actual.
+    En modo Global (superadmin sin muni) devuelve [] sin 400.
+    """
+    municipio_id = resolve_municipio_id(request, current_user)
+    if not municipio_id:
+        return []
 
     query = select(CategoriaTramite).where(
         CategoriaTramite.municipio_id == municipio_id
