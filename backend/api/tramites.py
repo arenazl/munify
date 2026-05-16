@@ -582,7 +582,7 @@ async def solicitudes_revision_ia(
         )
         .where(Solicitud.municipio_id == current_user.municipio_id)
         .order_by(Solicitud.created_at.desc())
-        .limit(40)
+        .limit(10)
     )
     solicitudes = result.scalars().all()
     payload = []
