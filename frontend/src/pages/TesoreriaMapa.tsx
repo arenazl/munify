@@ -738,9 +738,9 @@ export default function TesoreriaMapa() {
           >
             <style>{`
               .tesoreria-mapa-dark .leaflet-tile-pane {
-                filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.85) saturate(0.7);
+                filter: brightness(0.55) saturate(0.6) hue-rotate(200deg);
               }
-              /* Los pines (markers) NO deben invertirse — viven en otro pane. */
+              /* Los pines (markers) NO deben afectarse. */
               .tesoreria-mapa-dark .leaflet-marker-pane,
               .tesoreria-mapa-dark .leaflet-popup-pane,
               .tesoreria-mapa-dark .leaflet-shadow-pane {
