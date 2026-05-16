@@ -1136,15 +1136,15 @@ export default function Layout() {
               {/* Notificaciones */}
               <NotificacionesDropdown />
 
-              {/* Asistente IA */}
-              <button
+              {/* Asistente IA — OCULTO temporalmente por pedido del user. */}
+              {/* <button
                 onClick={() => window.dispatchEvent(new Event('munify:toggle-chat'))}
                 className="p-1.5 rounded-md transition-all duration-200 hover:scale-105 active:scale-95"
                 style={{ color: theme.primary }}
                 title="Asistente IA"
               >
                 <Sparkles className="h-4 w-4" strokeWidth={2.5} />
-              </button>
+              </button> */}
 
               {/* Ajustes */}
               <Link
@@ -1682,8 +1682,9 @@ export default function Layout() {
         }
       `}</style>
 
-      {/* Chat Widget con IA - Oculto en móvil porque interfiere con el footer */}
-      {!isMobile && <ChatWidget />}
+      {/* Chat Widget con IA — OCULTO temporalmente por pedido del user.
+          Cuando se quiera volver, descomentar la linea de abajo. */}
+      {/* {!isMobile && <ChatWidget />} */}
 
       {/* Modal de configuración de notificaciones push */}
       <NotificationSettings
