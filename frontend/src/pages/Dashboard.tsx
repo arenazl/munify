@@ -102,7 +102,16 @@ interface MetricasDetalle {
 
 export default function Dashboard() {
   console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
-  const { theme, currentVariant } = useTheme();
+  const { theme } = useTheme();
+  // Detecta tema claro a partir de la luminancia del background del tema activo
+  // (mas robusto que mirar nombres de preset/variant).
+  const isLightTheme = (() => {
+    const hex = (theme.background || '#000000').replace('#', '');
+    const r = parseInt(hex.slice(0, 2), 16) || 0;
+    const g = parseInt(hex.slice(2, 4), 16) || 0;
+    const b = parseInt(hex.slice(4, 6), 16) || 0;
+    return ((r * 299 + g * 587 + b * 114) / 1000) > 155;
+  })();
   const { municipioActual, user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -563,7 +572,7 @@ export default function Dashboard() {
           compita visualmente con el contenido (el banner es decorativo). */}
       <div
         className="relative overflow-hidden rounded-2xl"
-        style={{ minHeight: '200px', opacity: currentVariant === 'light' ? 0.3 : 1 }}
+        style={{ minHeight: '200px', opacity: isLightTheme ? 0.3 : 1 }}
       >
         {/* Imagen de fondo - usa imagen_portada si existe, sino logo_url, sino placeholder */}
         <div className="absolute inset-0">

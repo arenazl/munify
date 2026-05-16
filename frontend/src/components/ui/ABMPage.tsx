@@ -56,6 +56,75 @@ export interface ToolbarActionSpec {
   visible?: boolean;
 }
 
+// =====================================================================
+// Helpers canonicos para groupBy de tablas (chip de fecha 2-lineas + subtotal).
+// =====================================================================
+
+/** Renderiza el chip de fecha estandar del groupBy: caja DD + MES de 2 lineas
+ *  + label relativo ("Hoy/Ayer/Mañana") o fecha absoluta + count de items.
+ *  Uso en groupBy.renderLabel para que todas las tablas se vean igual. */
+export function renderGroupDayLabel(opts: {
+  isoDate: string;             // ej. '2026-05-09' o '2026-05-09T12:00:00'
+  count: number;
+  itemLabel?: { singular: string; plural: string }; // default 'movimiento' / 'movimientos'
+  themeCard: string;
+  themeBorder: string;
+  themeText: string;
+  themeTextSecondary: string;
+}): ReactNode {
+  const { isoDate, count, themeCard, themeBorder, themeText, themeTextSecondary } = opts;
+  const itemLabel = opts.itemLabel || { singular: 'movimiento', plural: 'movimientos' };
+  const d = new Date(isoDate.length === 10 ? `${isoDate}T12:00:00` : isoDate);
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
+  const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
+  const dStripped = new Date(d); dStripped.setHours(0, 0, 0, 0);
+  let label: string;
+  if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
+  else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
+  else if (dStripped.getTime() === manana.getTime()) label = 'Mañana';
+  else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className="w-12 text-center px-1 py-0.5 rounded-md text-[10px] uppercase font-bold leading-tight"
+        style={{ backgroundColor: themeCard, color: themeTextSecondary, border: `1px solid ${themeBorder}` }}
+      >
+        <div className="text-base font-bold" style={{ color: themeText }}>
+          {d.getDate().toString().padStart(2, '0')}
+        </div>
+        <div>{d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</div>
+      </div>
+      <div>
+        <div className="font-bold text-xs" style={{ color: themeText }}>{label}</div>
+        <div className="text-[11px]" style={{ color: themeTextSecondary }}>
+          {count} {count === 1 ? itemLabel.singular : itemLabel.plural}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Renderiza el bloque subtotal estandar del groupBy: caption "Subtotal" + monto. */
+export function renderGroupSubtotal(opts: {
+  amount: number;
+  label?: string;              // default 'Subtotal'
+  themeText: string;
+  themeTextSecondary: string;
+}): ReactNode {
+  const { amount, label = 'Subtotal', themeText, themeTextSecondary } = opts;
+  return (
+    <div className="text-right">
+      <span className="text-[10px] uppercase font-bold mr-2" style={{ color: themeTextSecondary }}>
+        {label}
+      </span>
+      <span className="text-sm font-bold tabular-nums" style={{ color: themeText }}>
+        ${amount.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+      </span>
+    </div>
+  );
+}
+
 export interface AbmToolbar {
   combos?: ToolbarComboSpec[];
   statusPills?: ToolbarStatusPillsSpec;

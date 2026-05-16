@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
-import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -293,36 +293,20 @@ export default function TesoreriaAgenda() {
       groupBy={{
         sortKey: 'proximo_pago',
         getKey: (p) => p.proximo_pago.slice(0, 10),
-        renderLabel: (key, items) => {
-          const d = new Date(key + 'T12:00:00');
-          const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-          const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
-          const manana = new Date(hoy); manana.setDate(hoy.getDate() + 1);
-          const dStripped = new Date(d); dStripped.setHours(0, 0, 0, 0);
-          let label: string;
-          if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
-          else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
-          else if (dStripped.getTime() === manana.getTime()) label = 'Mañana';
-          else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-          return (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase font-bold tabular-nums px-1.5 py-0.5 rounded" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.textSecondary }}>
-                {d.getDate().toString().padStart(2, '0')} {d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}
-              </span>
-              <span className="font-bold text-xs" style={{ color: theme.text }}>{label}</span>
-              <span className="text-[11px]" style={{ color: theme.textSecondary }}>· {items.length} {items.length === 1 ? 'pago' : 'pagos'}</span>
-            </div>
-          );
-        },
-        renderSubtotal: (_key, items) => {
-          const sum = items.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0);
-          return (
-            <div className="text-right">
-              <span className="text-[10px] uppercase font-bold mr-2" style={{ color: theme.textSecondary }}>Subtotal</span>
-              <span className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>{fmtMoney(sum)}</span>
-            </div>
-          );
-        },
+        renderLabel: (key, items) => renderGroupDayLabel({
+          isoDate: key,
+          count: items.length,
+          itemLabel: { singular: 'pago', plural: 'pagos' },
+          themeCard: theme.card,
+          themeBorder: theme.border,
+          themeText: theme.text,
+          themeTextSecondary: theme.textSecondary,
+        }),
+        renderSubtotal: (_key, items) => renderGroupSubtotal({
+          amount: items.reduce((s, p) => s + parseFloat(p.monto_pesos || '0'), 0),
+          themeText: theme.text,
+          themeTextSecondary: theme.textSecondary,
+        }),
       }}
       columns={[
         {

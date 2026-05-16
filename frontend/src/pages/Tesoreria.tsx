@@ -16,7 +16,7 @@ import {
   GastoDetalleSheet, calcEstadoAgregado, ESTADO_AGREGADO_META,
   type EstadoAgregado,
 } from '../components/tesoreria/GastoDetalleSheet';
-import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
+import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
 import { StatusPill } from '../components/ui/StatusPill';
 import { primaryButtonStyle } from '../components/ui/PrimaryButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
@@ -704,44 +704,19 @@ export default function Tesoreria() {
       groupBy={{
         sortKey: 'fecha',
         getKey: (g) => g.fecha,
-        renderLabel: (key, items) => {
-          const d = new Date(key + 'T12:00:00');
-          const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-          const ayer = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
-          const dStripped = new Date(d); dStripped.setHours(0, 0, 0, 0);
-          let label: string;
-          if (dStripped.getTime() === hoy.getTime()) label = 'Hoy';
-          else if (dStripped.getTime() === ayer.getTime()) label = 'Ayer';
-          else label = d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
-          return (
-            <div className="flex items-center gap-3">
-              <div
-                className="w-12 text-center px-1 py-0.5 rounded-md text-[10px] uppercase font-bold leading-tight"
-                style={{ backgroundColor: theme.card, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
-              >
-                <div className="text-base font-bold" style={{ color: theme.text }}>{d.getDate().toString().padStart(2, '0')}</div>
-                <div>{d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</div>
-              </div>
-              <div>
-                <div className="font-bold text-xs" style={{ color: theme.text }}>{label}</div>
-                <div className="text-[11px]" style={{ color: theme.textSecondary }}>
-                  {items.length} {items.length === 1 ? 'movimiento' : 'movimientos'}
-                </div>
-              </div>
-            </div>
-          );
-        },
-        renderSubtotal: (_key, items) => {
-          const sum = items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0);
-          return (
-            <div className="text-right">
-              <span className="text-[10px] uppercase font-bold mr-2" style={{ color: theme.textSecondary }}>Subtotal</span>
-              <span className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>
-                ${sum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-              </span>
-            </div>
-          );
-        },
+        renderLabel: (key, items) => renderGroupDayLabel({
+          isoDate: key,
+          count: items.length,
+          themeCard: theme.card,
+          themeBorder: theme.border,
+          themeText: theme.text,
+          themeTextSecondary: theme.textSecondary,
+        }),
+        renderSubtotal: (_key, items) => renderGroupSubtotal({
+          amount: items.reduce((s, g) => s + parseFloat(g.monto_pesos || '0'), 0),
+          themeText: theme.text,
+          themeTextSecondary: theme.textSecondary,
+        }),
       }}
       columns={[
         {
