@@ -277,3 +277,123 @@ async def analizar_reclamos(
 
     _cache_set(municipio_id, "reclamos", out)
     return out
+
+
+# ===================================================================
+# Tramites (Solicitudes)
+# ===================================================================
+
+TRAMITES_PROMPT_TEMPLATE = """Sos un asistente que ayuda a un supervisor municipal a priorizar solicitudes de tramites.
+Analizá las solicitudes y devolvé un JSON array con MÁXIMO 6 items (los más
+relevantes). Tipos posibles:
+
+- "duplicado": misma solicitud que otra (mismo solicitante + mismo tramite, o asunto repetido).
+  Incluí en hint el ID del duplicado.
+- "sospechoso": asunto/descripcion corto, random, spam, datos del solicitante incoherentes.
+- "sin_asignar": creado hace >7 días y sigue en estado "recibido" sin dependencia.
+- "datos_pobres": falta descripcion o datos del solicitante.
+- "atrasado": hace mas de 15 dias en "en_curso" sin resolverse.
+
+Formato exacto de cada item (hint MUY corto, max 80 chars):
+  {{"solicitud_id": <int>, "tipo": "<tipo>", "confianza": <0-100>, "hint": "<frase corta>"}}
+
+REGLAS DURAS:
+- Devolvé SOLO el array JSON, sin texto antes ni después.
+- MÁXIMO 6 items. Si no encontrás nada, devolvé [].
+- hint no debe superar 80 caracteres.
+
+Solicitudes:
+{solicitudes_json}
+"""
+
+
+def _build_tramites_demo(reason: str = "no_key") -> List[Dict[str, Any]]:
+    hints = {
+        "no_key":  "[DEMO] Configurar GEMINI_API_KEY para análisis real",
+        "ia_fail": "[DEMO] La IA no devolvió un análisis válido en este intento. Reintentar más tarde.",
+    }
+    return [
+        {
+            "solicitud_id": 0,
+            "tipo": "sin_asignar",
+            "confianza": 75,
+            "hint": hints.get(reason, hints["no_key"]),
+            "titulo": "Ejemplo de revisión",
+            "fecha": "",
+            "es_demo": True,
+        }
+    ]
+
+
+async def analizar_tramites(
+    municipio_id: int,
+    solicitudes: List[Dict[str, Any]],
+    *,
+    force: bool = False,
+) -> List[Dict[str, Any]]:
+    """Devuelve los items revisables del set de solicitudes pasado.
+
+    `solicitudes` debe ser una lista de dicts con al menos:
+      { id, asunto, descripcion, estado, tramite, solicitante, fecha_iso, categoria, dependencia }
+    """
+    if not force:
+        cached = _cache_get(municipio_id, "tramites")
+        if cached is not None:
+            return cached
+
+    if not settings.GEMINI_API_KEY:
+        return _build_tramites_demo("no_key")
+
+    compact = []
+    for s in solicitudes:
+        compact.append({
+            "id": s.get("id"),
+            "asunto": (s.get("asunto") or "")[:120],
+            "descripcion": (s.get("descripcion") or "")[:200],
+            "estado": s.get("estado"),
+            "tramite": (s.get("tramite") or "")[:120],
+            "solicitante": (s.get("solicitante") or "")[:120],
+            "fecha": s.get("fecha_iso"),
+            "categoria": s.get("categoria"),
+            "dependencia": s.get("dependencia"),
+        })
+
+    prompt = TRAMITES_PROMPT_TEMPLATE.format(solicitudes_json=json.dumps(compact, ensure_ascii=False))
+    text = await _call_gemini(prompt)
+    if not text:
+        logger.warning("[RevisionIA] Gemini no respondio (tramites)")
+        return _build_tramites_demo("ia_fail")
+
+    parsed = _parse_json_safely(text)
+    if not isinstance(parsed, list):
+        logger.warning("[RevisionIA][tramites] Parse fallo. head=%s", text[:400])
+        return _build_tramites_demo("ia_fail")
+    if len(parsed) == 0:
+        _cache_set(municipio_id, "tramites", [])
+        return []
+
+    valid_ids = {s.get("id") for s in compact}
+    by_id = {s.get("id"): s for s in compact}
+    out: List[Dict[str, Any]] = []
+    for it in parsed:
+        if not isinstance(it, dict):
+            continue
+        sid = it.get("solicitud_id")
+        if sid not in valid_ids:
+            continue
+        original = by_id.get(sid, {})
+        out.append({
+            "solicitud_id": sid,
+            "tipo": str(it.get("tipo") or "sospechoso")[:30],
+            "confianza": int(it.get("confianza") or 50),
+            "hint": str(it.get("hint") or "")[:200],
+            "titulo": original.get("asunto", "") or original.get("tramite", ""),
+            "categoria": original.get("categoria"),
+            "fecha": original.get("fecha"),
+            "es_demo": False,
+        })
+        if len(out) >= 6:
+            break
+
+    _cache_set(municipio_id, "tramites", out)
+    return out

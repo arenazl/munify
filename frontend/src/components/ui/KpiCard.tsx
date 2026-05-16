@@ -51,10 +51,15 @@ export function KpiCard({
   className = '',
 }: KpiCardProps) {
   const { theme } = useTheme();
+  // Gradiente suave: tinta del color del KPI arriba-izq → card neutra abajo-der.
+  // El `${color}1F` = ~12% opacity, suficiente para dar presencia sin tapar el texto.
+  // Si highlighted, levantamos un poco la tinta (`${color}33` ~20%).
+  const gradient = `linear-gradient(135deg, ${color}${highlighted ? '33' : '1F'} 0%, ${theme.card} 70%)`;
   return (
     <div
       className={`rounded-2xl p-4 transition-all hover:-translate-y-0.5 hover:shadow-md ${className}`}
       style={{
+        background: gradient,
         backgroundColor: theme.card,
         border: `${highlighted ? 2 : 1}px solid ${color}`,
       }}

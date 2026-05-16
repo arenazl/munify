@@ -154,6 +154,9 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // Revisión IA — items sugeridos por el backend (Gemini). Cacheados 1h.
   const [revisionIA, setRevisionIA] = useState<RevisionIAItem[]>([]);
   const [revisionIALoading, setRevisionIALoading] = useState(false);
+  const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
+  });
 
   // Vista guiada (Inbox) vs vista grilla clásica.
   // Misma lógica que GestionTramites: clasifica reclamos en secciones por
@@ -4362,6 +4365,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           <RevisionIAPanel
             items={revisionIA}
             loading={revisionIALoading}
+            onCollapsedChange={setIaCollapsed}
             onEdit={(it) => {
               const target = reclamos.find(r => r.id === it.resourceId);
               if (target) openViewSheet(target);
@@ -4371,6 +4375,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             }}
           />
         ) : undefined}
+        sidePanelWidth={iaCollapsed ? 48 : 280}
         headerActions={
           <div className="flex items-center gap-1.5">
             <button

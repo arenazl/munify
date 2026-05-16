@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Check, Pencil, X as XIcon, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -50,6 +50,8 @@ interface RevisionIAPanelProps {
   onDismiss?: (item: RevisionIAItem) => void;
   /** Callback "aprobar todos" (boton superior). */
   onApproveAll?: () => void;
+  /** Notifica al padre cuando cambia el estado collapsed (para que reduzca el ancho del slot). */
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 const TIPO_COLOR: Record<string, string> = {
@@ -85,6 +87,7 @@ export function RevisionIAPanel({
   onEdit,
   onDismiss,
   onApproveAll,
+  onCollapsedChange,
 }: RevisionIAPanelProps) {
   const { theme } = useTheme();
   const hasItems = items.length > 0;
@@ -96,6 +99,7 @@ export function RevisionIAPanel({
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
   });
+  useEffect(() => { onCollapsedChange?.(collapsed); }, [collapsed, onCollapsedChange]);
   const toggle = () => {
     setCollapsed(prev => {
       const next = !prev;

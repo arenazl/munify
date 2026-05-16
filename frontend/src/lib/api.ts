@@ -1326,6 +1326,7 @@ export const tramitesApi = {
     return api.get('/tramites/solicitudes/list', { params: { ...params, municipio_id: municipioId } });
   },
   getMisSolicitudes: () => api.get('/tramites/solicitudes/mis-solicitudes'),
+  getRevisionIA: (force = false) => api.get('/tramites/solicitudes/revision-ia', { params: { force } }),
   getSolicitud: (id: number) => api.get(`/tramites/solicitudes/detalle/${id}`),
   consultarSolicitud: (numeroTramite: string) =>
     api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),

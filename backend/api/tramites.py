@@ -552,6 +552,71 @@ async def eliminar_documento_requerido(
 # SOLICITUDES (instancias del trámite)
 # ============================================================
 
+# ===========================================
+# Revision IA — analiza las ultimas solicitudes del muni con Gemini y devuelve
+# items que vale la pena revisar (duplicados, sospechosos, sin asignar, atrasados).
+# Resultado cacheado 1h por muni. Solo admin/supervisor.
+# ===========================================
+@router.get("/solicitudes/revision-ia")
+async def solicitudes_revision_ia(
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Devuelve `{ items: [{ solicitud_id, tipo, confianza, hint, titulo, categoria, fecha, es_demo }] }`.
+    Usar `?force=true` para saltear el cache.
+    """
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor")
+    if not current_user.municipio_id:
+        return {"items": []}
+
+    from services.revision_ia import analizar_tramites
+
+    result = await db.execute(
+        select(Solicitud)
+        .options(
+            selectinload(Solicitud.tramite).selectinload(Tramite.categoria_tramite),
+            selectinload(Solicitud.solicitante),
+            selectinload(Solicitud.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
+        )
+        .where(Solicitud.municipio_id == current_user.municipio_id)
+        .order_by(Solicitud.created_at.desc())
+        .limit(80)
+    )
+    solicitudes = result.scalars().all()
+    payload = []
+    for s in solicitudes:
+        if s.solicitante:
+            solicitante_nombre = f"{s.solicitante.nombre or ''} {s.solicitante.apellido or ''}".strip()
+        else:
+            solicitante_nombre = f"{s.nombre_solicitante or ''} {s.apellido_solicitante or ''}".strip()
+        payload.append({
+            "id": s.id,
+            "asunto": s.asunto,
+            "descripcion": s.descripcion,
+            "estado": s.estado.value if s.estado else None,
+            "tramite": s.tramite.nombre if s.tramite else None,
+            "solicitante": solicitante_nombre or None,
+            "fecha_iso": s.created_at.isoformat() if s.created_at else None,
+            "categoria": (
+                s.tramite.categoria_tramite.nombre
+                if s.tramite and s.tramite.categoria_tramite else None
+            ),
+            "dependencia": (
+                s.dependencia_asignada.dependencia.nombre
+                if s.dependencia_asignada and s.dependencia_asignada.dependencia
+                else None
+            ),
+        })
+    items = await analizar_tramites(
+        municipio_id=current_user.municipio_id,
+        solicitudes=payload,
+        force=force,
+    )
+    return {"items": items}
+
+
 @router.get("/solicitudes/list", response_model=List[SolicitudResponse])
 async def listar_solicitudes(
     municipio_id: int = Query(..., description="ID del municipio"),
