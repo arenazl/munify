@@ -636,6 +636,37 @@ export default function TesoreriaMapa() {
                   );
                 })}
               </div>
+
+              {/* Filtro por tipo de contacto: pills con count por tipo */}
+              <div className="flex flex-wrap gap-1">
+                {(() => {
+                  const countsByTipo = contactos.reduce((acc, c) => {
+                    acc[c.tipo] = (acc[c.tipo] || 0) + 1;
+                    return acc;
+                  }, {} as Record<string, number>);
+                  return (Object.keys(TIPO_LABELS) as TipoContacto[])
+                    .filter(t => (countsByTipo[t] || 0) > 0)
+                    .map(t => {
+                      const active = tipoFiltro === t;
+                      const color = TIPO_COLORS[t];
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setTipoFiltro(active ? '' : t)}
+                          className="text-[10px] font-semibold px-2 py-0.5 rounded-full transition-all"
+                          style={{
+                            backgroundColor: active ? color : `${color}18`,
+                            color: active ? '#fff' : color,
+                            border: `1px solid ${color}40`,
+                          }}
+                        >
+                          {TIPO_LABELS[t]} <span className="opacity-70">({countsByTipo[t]})</span>
+                        </button>
+                      );
+                    });
+                })()}
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
               {listaContactos.length === 0 ? (
