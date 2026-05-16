@@ -947,6 +947,22 @@ async def get_mi_historial(
 # items que vale la pena revisar (duplicados, sospechosos, sin asignar, etc).
 # Resultado cacheado 1h por muni. Solo admin/supervisor.
 # ===========================================
+@router.get("/dashboard-ia")
+async def reclamos_dashboard_ia(
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Dashboard operativo IA: urgentes + recomendaciones (LLM) + secciones SQL.
+    Usar `?force=true` para saltear cache (TTL 15min)."""
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor")
+    if not current_user.municipio_id:
+        return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
+    from services.dashboard_ia import build_reclamos_dashboard
+    return await build_reclamos_dashboard(db, current_user.municipio_id, force=force)
+
+
 @router.get("/revision-ia")
 async def reclamos_revision_ia(
     force: bool = False,

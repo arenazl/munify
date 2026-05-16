@@ -10,7 +10,7 @@ import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsi
 import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { StatusPill } from '../components/ui/StatusPill';
-import { RevisionIAPanel, RevisionIAItem } from '../components/ui/RevisionIAPanel';
+import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
 import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
@@ -151,11 +151,11 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
 
-  // Revisión IA — items sugeridos por el backend (Gemini). Cacheados 1h.
-  const [revisionIA, setRevisionIA] = useState<RevisionIAItem[]>([]);
-  const [revisionIALoading, setRevisionIALoading] = useState(false);
+  // Dashboard IA operativo: urgentes + recomendaciones (LLM) + secciones (SQL).
+  const [dashboardIA, setDashboardIA] = useState<DashboardIAData | null>(null);
+  const [dashboardIALoading, setDashboardIALoading] = useState(false);
   const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
+    try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
   });
 
   // Vista guiada (Inbox) vs vista grilla clásica.
@@ -456,30 +456,15 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     }
   }, [soloMisTrabajos]);
 
-  // Revisión IA — carga al montar (solo admin/supervisor, no para empleados).
-  // El backend cachea 1h por muni, asi que es barato volver a montar.
+  // Dashboard IA — carga al montar (solo admin/supervisor).
   useEffect(() => {
     if (soloMisTrabajos) return;
     let cancelled = false;
-    setRevisionIALoading(true);
-    reclamosApi.getRevisionIA(false)
-      .then((res) => {
-        if (cancelled) return;
-        const raw = res.data?.items || [];
-        const mapped: RevisionIAItem[] = raw.map((it: any) => ({
-          resourceId: it.reclamo_id || 0,
-          tipo: it.tipo || 'sospechoso',
-          confianza: Number(it.confianza) || 0,
-          hint: it.hint || '',
-          titulo: it.titulo || '',
-          categoria: it.categoria || undefined,
-          fecha: it.fecha || undefined,
-          es_demo: !!it.es_demo,
-        }));
-        setRevisionIA(mapped);
-      })
-      .catch((e) => console.error('[Reclamos] Error cargando Revision IA:', e))
-      .finally(() => { if (!cancelled) setRevisionIALoading(false); });
+    setDashboardIALoading(true);
+    reclamosApi.getDashboardIA(false)
+      .then((res) => { if (!cancelled) setDashboardIA(res.data as DashboardIAData); })
+      .catch((e) => console.error('[Reclamos] Error cargando Dashboard IA:', e))
+      .finally(() => { if (!cancelled) setDashboardIALoading(false); });
     return () => { cancelled = true; };
   }, [soloMisTrabajos]);
 
@@ -2913,26 +2898,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       },
     },
     {
-      key: 'direccion',
-      header: 'Ubicación',
-      sortValue: (r: Reclamo) => r.direccion,
-      render: (r: Reclamo) => (
-        <div className="flex items-center gap-2 max-w-[200px]" title={r.direccion}>
-          <MapPin className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
-          <span className="truncate" style={{ color: theme.textSecondary }}>{r.direccion}</span>
-        </div>
-      ),
-    },
-    {
-      key: 'estado',
-      header: 'Estado',
-      sortValue: (r: Reclamo) => r.estado,
-      render: (r: Reclamo) => {
-        const color = estadoColors[r.estado]?.bg || '#6366f1';
-        return <StatusPill label={estadoLabels[r.estado]} color={color} />;
-      },
-    },
-    {
       key: 'vecino',
       header: 'Vecino',
       sortValue: (r: Reclamo) => `${r.creador?.nombre || ''} ${r.creador?.apellido || ''}`,
@@ -2961,6 +2926,26 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             </div>
           </div>
         );
+      },
+    },
+    {
+      key: 'direccion',
+      header: 'Ubicación',
+      sortValue: (r: Reclamo) => r.direccion,
+      render: (r: Reclamo) => (
+        <div className="flex items-center gap-2 max-w-[200px]" title={r.direccion}>
+          <MapPin className="h-4 w-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
+          <span className="truncate" style={{ color: theme.textSecondary }}>{r.direccion}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortValue: (r: Reclamo) => r.estado,
+      render: (r: Reclamo) => {
+        const color = estadoColors[r.estado]?.bg || '#6366f1';
+        return <StatusPill label={estadoLabels[r.estado]} color={color} />;
       },
     },
     {
@@ -4373,20 +4358,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         onSheetClose={() => {}}
         extraFilters={undefined}
         sidePanel={!soloMisTrabajos ? (
-          <RevisionIAPanel
-            items={revisionIA}
-            loading={revisionIALoading}
+          <DashboardIAPanel
+            data={dashboardIA}
+            loading={dashboardIALoading}
+            title="Reclamos · IA"
             onCollapsedChange={setIaCollapsed}
-            onEdit={(it) => {
-              const target = reclamos.find(r => r.id === it.resourceId);
-              if (target) openViewSheet(target);
-            }}
-            onDismiss={(it) => {
-              setRevisionIA(prev => prev.filter(x => x.resourceId !== it.resourceId));
+            onTipClick={(tip) => {
+              const firstId = tip.items?.[0];
+              if (firstId) {
+                const target = reclamos.find(r => r.id === firstId);
+                if (target) openViewSheet(target);
+              }
             }}
           />
         ) : undefined}
-        sidePanelWidth={iaCollapsed ? 44 : 240}
+        sidePanelWidth={iaCollapsed ? 44 : 280}
         stickyHeader={true}
         toolbar={{
           combos: [

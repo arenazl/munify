@@ -557,6 +557,20 @@ async def eliminar_documento_requerido(
 # items que vale la pena revisar (duplicados, sospechosos, sin asignar, atrasados).
 # Resultado cacheado 1h por muni. Solo admin/supervisor.
 # ===========================================
+@router.get("/solicitudes/dashboard-ia")
+async def tramites_dashboard_ia(
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(status_code=403, detail="Solo admin/supervisor")
+    if not current_user.municipio_id:
+        return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
+    from services.dashboard_ia import build_tramites_dashboard
+    return await build_tramites_dashboard(db, current_user.municipio_id, force=force)
+
+
 @router.get("/solicitudes/revision-ia")
 async def solicitudes_revision_ia(
     force: bool = False,

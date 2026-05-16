@@ -305,6 +305,7 @@ export const reclamosApi = {
   getMisReclamos: (params?: { skip?: number; limit?: number }) => api.get('/reclamos/mis-reclamos', { params }),
   getMisEstadisticas: () => api.get('/reclamos/mis-estadisticas'),
   getRevisionIA: (force = false) => api.get('/reclamos/revision-ia', { params: { force } }),
+  getDashboardIA: (force = false) => api.get('/reclamos/dashboard-ia', { params: { force } }),
   getMiHistorial: (params?: { skip?: number; limit?: number; estado?: string }) =>
     api.get('/reclamos/mi-historial', { params }),
   getOne: (id: number) => api.get(`/reclamos/${id}`),
@@ -1327,6 +1328,7 @@ export const tramitesApi = {
   },
   getMisSolicitudes: () => api.get('/tramites/solicitudes/mis-solicitudes'),
   getRevisionIA: (force = false) => api.get('/tramites/solicitudes/revision-ia', { params: { force } }),
+  getDashboardIA: (force = false) => api.get('/tramites/solicitudes/dashboard-ia', { params: { force } }),
   getSolicitud: (id: number) => api.get(`/tramites/solicitudes/detalle/${id}`),
   consultarSolicitud: (numeroTramite: string) =>
     api.get(`/tramites/solicitudes/consultar/${numeroTramite}`),
@@ -1941,6 +1943,7 @@ export const contactosApi = {
 };
 
 export const gastosApi = {
+  getDashboardIA: (force = false) => api.get('/tesoreria/gastos/dashboard-ia', { params: { force } }),
   list: (params?: {
     destino_tipo?: string;
     contacto_id?: number;

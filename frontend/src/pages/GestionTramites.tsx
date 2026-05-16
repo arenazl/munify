@@ -43,7 +43,7 @@ import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizar
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
-import { RevisionIAPanel, RevisionIAItem } from '../components/ui/RevisionIAPanel';
+import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
@@ -203,34 +203,20 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const [revisionIA, setRevisionIA] = useState<RevisionIAItem[]>([]);
-  const [revisionIALoading, setRevisionIALoading] = useState(false);
+  const [dashboardIA, setDashboardIA] = useState<DashboardIAData | null>(null);
+  const [dashboardIALoading, setDashboardIALoading] = useState(false);
   const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
-    try { return localStorage.getItem('revision_ia_collapsed') === '1'; } catch { return false; }
+    try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
   });
 
   useEffect(() => {
     if (soloMiArea) return;
     let cancelled = false;
-    setRevisionIALoading(true);
-    tramitesApi.getRevisionIA(false)
-      .then((res) => {
-        if (cancelled) return;
-        const raw = res.data?.items || [];
-        const mapped: RevisionIAItem[] = raw.map((it: any) => ({
-          resourceId: it.solicitud_id || 0,
-          tipo: it.tipo || 'sospechoso',
-          confianza: Number(it.confianza) || 0,
-          hint: it.hint || '',
-          titulo: it.titulo || '',
-          categoria: it.categoria || undefined,
-          fecha: it.fecha || undefined,
-          es_demo: !!it.es_demo,
-        }));
-        setRevisionIA(mapped);
-      })
-      .catch((e) => console.error('[Tramites] Error cargando Revision IA:', e))
-      .finally(() => { if (!cancelled) setRevisionIALoading(false); });
+    setDashboardIALoading(true);
+    tramitesApi.getDashboardIA(false)
+      .then((res) => { if (!cancelled) setDashboardIA(res.data as DashboardIAData); })
+      .catch((e) => console.error('[Tramites] Error cargando Dashboard IA:', e))
+      .finally(() => { if (!cancelled) setDashboardIALoading(false); });
     return () => { cancelled = true; };
   }, [soloMiArea]);
   const LIMIT = 30;
@@ -1765,20 +1751,21 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         }}
         tableView={renderTableView()}
         sidePanel={!soloMiArea ? (
-          <RevisionIAPanel
-            items={revisionIA}
-            loading={revisionIALoading}
+          <DashboardIAPanel
+            data={dashboardIA}
+            loading={dashboardIALoading}
+            title="Trámites · IA"
             onCollapsedChange={setIaCollapsed}
-            onEdit={(it) => {
-              const target = tramites.find(t => t.id === it.resourceId);
-              if (target) openTramite(target);
-            }}
-            onDismiss={(it) => {
-              setRevisionIA(prev => prev.filter(x => x.resourceId !== it.resourceId));
+            onTipClick={(tip) => {
+              const firstId = tip.items?.[0];
+              if (firstId) {
+                const target = tramites.find(t => t.id === firstId);
+                if (target) openTramite(target);
+              }
             }}
           />
         ) : undefined}
-        sidePanelWidth={iaCollapsed ? 44 : 240}
+        sidePanelWidth={iaCollapsed ? 44 : 280}
         sheetOpen={false}
         sheetTitle=""
         onSheetClose={() => {}}
