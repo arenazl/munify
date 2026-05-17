@@ -306,7 +306,12 @@ export const router = createBrowserRouter([
         path: 'tasas',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionTasas /></ProtectedRoute>
       },
-      // Gestión de pagos — vista contaduría (histórico transaccional)
+      // Cobros — vista contaduría (histórico transaccional). Antes 'pagos'.
+      {
+        path: 'cobros',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionPagos /></ProtectedRoute>
+      },
+      // Alias legacy para no romper bookmarks viejos / WhatsApp
       {
         path: 'pagos',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><GestionPagos /></ProtectedRoute>

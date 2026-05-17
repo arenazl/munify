@@ -5,6 +5,7 @@ import {
   History, ClipboardCheck, BarChart3,
 } from 'lucide-react';
 import { ABMPage, ABMTable, ABMTableColumn } from '../components/ui/ABMPage';
+import type { KpiSpec } from '../components/ui/KpiCard';
 import { StatusPill } from '../components/ui/StatusPill';
 import { DateRangePicker, DateRange, currentMonthRange } from '../components/ui/DateRangePicker';
 import { ModernSelect } from '../components/ui/ModernSelect';
@@ -240,34 +241,37 @@ export default function GestionPagos() {
   };
 
   // Cards de totales
-  const cards = resumen ? [
+  // KPIs canonicos (mismo patron que Reclamos / Tramites / Tesoreria / Mapa).
+  // Se pasan via prop `kpis` a ABMPage para que aparezcan arriba del header.
+  const kpisSpec: KpiSpec[] = resumen ? [
     {
-      title: 'Total aprobado',
+      label: 'Total aprobado',
       value: formatMoney(resumen.totales.monto_aprobado),
-      subtitle: `${resumen.totales.cantidad_aprobados} pagos`,
       icon: CheckCircle2,
       color: '#22c55e',
+      footnote: `${resumen.totales.cantidad_aprobados} pagos`,
+      highlighted: true,
     },
     {
-      title: 'Pendientes',
+      label: 'Pendientes',
       value: formatMoney(resumen.totales.monto_pendiente),
-      subtitle: `${resumen.totales.cantidad_pendientes} intentos`,
       icon: Clock,
       color: '#f59e0b',
+      footnote: `${resumen.totales.cantidad_pendientes} intentos`,
     },
     {
-      title: 'Rechazados',
+      label: 'Rechazados',
       value: formatMoney(resumen.totales.monto_rechazado),
-      subtitle: `${resumen.totales.cantidad_rechazados} fallidos`,
       icon: XCircle,
       color: '#ef4444',
+      footnote: `${resumen.totales.cantidad_rechazados} fallidos`,
     },
     {
-      title: 'Ticket promedio',
+      label: 'Ticket promedio',
       value: formatMoney(resumen.totales.ticket_promedio),
-      subtitle: 'Por pago aprobado',
       icon: TrendingUp,
       color: theme.primary,
+      footnote: 'Por pago aprobado',
     },
   ] : [];
 
@@ -445,48 +449,8 @@ export default function GestionPagos() {
     </div>
   );
 
-  // Stat cards
-  const statCards = (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map((c) => {
-        const Icon = c.icon;
-        return (
-          <div
-            key={c.title}
-            className="rounded-xl p-4 relative overflow-hidden transition-all duration-300 hover:-translate-y-1"
-            style={{
-              backgroundColor: theme.card,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            <div
-              className="absolute top-0 right-0 w-24 h-24 rounded-full -translate-y-8 translate-x-8 opacity-10"
-              style={{ backgroundColor: c.color }}
-            />
-            <div className="flex items-start justify-between relative z-10">
-              <div className="min-w-0">
-                <p className="text-xs font-medium mb-1 truncate" style={{ color: theme.textSecondary }}>
-                  {c.title}
-                </p>
-                <p className="text-2xl font-bold tabular-nums truncate" style={{ color: theme.text }} title={c.value}>
-                  {c.value}
-                </p>
-                <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
-                  {c.subtitle}
-                </p>
-              </div>
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ backgroundColor: `${c.color}20` }}
-              >
-                <Icon className="w-5 h-5" style={{ color: c.color }} />
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  // statCards: removed. KPIs now flow through ABMPage prop `kpis={kpisSpec}`
+  // (regla #9: KPIs canonicos arriba, mismo patron que Reclamos/Tramites/Tesoreria/Mapa).
 
   // Breakdown por medio (barra horizontal simple)
   const porMedio = resumen?.por_medio || [];
@@ -592,7 +556,7 @@ export default function GestionPagos() {
   if (tab === 'imputacion') {
     return (
       <ABMPage
-        title="Comprobantes"
+        title="Cobros"
         icon={<Wallet className="w-5 h-5" />}
         searchPlaceholder=""
         searchValue=""
@@ -612,7 +576,7 @@ export default function GestionPagos() {
   if (tab === 'dashboard') {
     return (
       <ABMPage
-        title="Comprobantes"
+        title="Cobros"
         icon={<Wallet className="w-5 h-5" />}
         searchPlaceholder=""
         searchValue=""
@@ -631,8 +595,9 @@ export default function GestionPagos() {
 
   return (
     <ABMPage
-      title="Comprobantes"
+      title="Cobros"
       icon={<Wallet className="w-5 h-5" />}
+      kpis={kpisSpec}
       searchPlaceholder="Buscar por concepto o N° de operación…"
       searchValue={search}
       onSearchChange={setSearch}
@@ -648,7 +613,6 @@ export default function GestionPagos() {
       emptyMessage="No hay pagos para el rango y filtros seleccionados"
       tableView={(
         <div className="space-y-4">
-          {statCards}
           {mixBreakdown}
           <ABMTable
             data={items}
@@ -701,8 +665,8 @@ export default function GestionPagos() {
         </div>
       )}
     >
-      {/* Vista cards (fallback cuando el usuario toggleea) */}
-      {statCards}
+      {/* Vista cards: el mixBreakdown queda como contenido alternativo */}
+      {mixBreakdown}
     </ABMPage>
   );
 }

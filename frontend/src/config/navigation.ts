@@ -175,8 +175,8 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Partidas del padrón y deudas'
     },
     {
-      name: 'Recibos',
-      href: '/gestion/pagos',
+      name: 'Cobros',
+      href: '/gestion/cobros',
       icon: Wallet,
       show: isAdminOrSupervisor && moduloOn('pagos'),
       categoria: 'Atención al vecino',
