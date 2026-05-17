@@ -424,7 +424,7 @@ function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="rounded-2xl p-5 max-w-md"
       style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
       <div className="flex items-center gap-2">
@@ -440,8 +440,8 @@ function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
             value={dni}
             onChange={(e) => { setDni(e.target.value.replace(/\D/g, '').slice(0, 9)); setSinResultados(false); }}
             onKeyDown={handleKeyDown}
-            placeholder="DNI del vecino (sin puntos)"
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm font-mono"
+            placeholder="DNI sin puntos"
+            className="flex-1 min-w-0 bg-transparent outline-none text-sm font-mono tabular-nums tracking-wider"
             style={{ color: theme.text }}
             maxLength={9}
           />
