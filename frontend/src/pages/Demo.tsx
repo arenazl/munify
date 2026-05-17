@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, Building2, Sparkles, ArrowRight, Trash2, Check, Search, ShieldCheck, CreditCard } from 'lucide-react';
+import { Loader2, LogIn, Sparkles, ArrowRight, Trash2, Check, Search, ShieldCheck, CreditCard } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
 import DemoCreationProgress from '../components/DemoCreationProgress';
@@ -306,45 +306,59 @@ export default function Demo() {
                 {filteredMunicipios.map((municipio) => {
                   const primaryColor = municipio.color_primario || '#0088cc';
                   const isEliminando = eliminando === municipio.codigo;
+                  const inicial = municipio.nombre.trim().charAt(0).toUpperCase();
                   return (
                     <div
                       key={municipio.id}
-                      className="relative group rounded-2xl border border-white/70 bg-white/75 backdrop-blur-md overflow-hidden transition-all duration-200 hover:bg-white/90 hover:-translate-y-0.5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.12),0_1px_4px_-1px_rgba(15,23,42,0.04)] hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18),0_2px_6px_-1px_rgba(15,23,42,0.06)]"
-                      style={{
-                        // Glow sutil del color del muni en hover (via box-shadow inset top).
-                        boxShadow: undefined,
-                      }}
+                      className="relative group rounded-2xl border border-white/70 bg-white/75 backdrop-blur-md overflow-hidden transition-all duration-300 hover:bg-white hover:-translate-y-0.5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.12),0_1px_4px_-1px_rgba(15,23,42,0.04)] hover:shadow-[0_16px_40px_-12px_rgba(15,23,42,0.22),0_2px_8px_-2px_rgba(15,23,42,0.08)]"
                     >
-                      {/* Top stripe del color del muni — identidad visual + jerarquía. */}
+                      {/* Inicial gigante de marca de agua. Se tiñe del color del muni en hover. */}
                       <div
-                        className="absolute top-0 left-0 right-0 h-[3px] opacity-70 group-hover:opacity-100 transition-opacity"
+                        aria-hidden="true"
+                        className="absolute -right-2 -bottom-6 text-[8rem] leading-none font-black select-none pointer-events-none transition-all duration-500 text-slate-100 group-hover:scale-105"
                         style={{
-                          background: `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}80 100%)`,
+                          fontFamily: 'ui-serif, Georgia, "Times New Roman", serif',
+                        }}
+                      >
+                        <span className="block transition-colors duration-300 group-hover:hidden">
+                          {inicial}
+                        </span>
+                        <span
+                          className="hidden group-hover:block"
+                          style={{ color: `${primaryColor}25` }}
+                        >
+                          {inicial}
+                        </span>
+                      </div>
+
+                      {/* Top stripe del color del muni — sutil, refuerza identidad. */}
+                      <div
+                        className="absolute top-0 left-0 right-0 h-[2px] opacity-60 group-hover:opacity-100 transition-opacity"
+                        style={{
+                          background: `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}00 100%)`,
                         }}
                       />
+
                       <button
                         onClick={() => handleSelectMunicipio(municipio)}
                         disabled={isEliminando}
-                        className="w-full text-left p-4 flex items-center gap-3 active:scale-[0.98] transition-transform disabled:opacity-50"
+                        className="relative w-full text-left px-5 py-5 active:scale-[0.98] transition-transform disabled:opacity-50"
                       >
+                        <h3 className="font-bold text-slate-900 text-base leading-tight truncate pr-8">
+                          {municipio.nombre}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-[0.15em] mt-1.5 font-semibold truncate">
+                          {municipio.codigo}
+                        </p>
+
+                        {/* Flecha que entra en hover, alineada con el código. */}
                         <div
-                          className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: `${primaryColor}15` }}
-                        >
-                          {municipio.logo_url ? (
-                            <img src={municipio.logo_url} alt={municipio.nombre} className="w-7 h-7 object-contain" />
-                          ) : (
-                            <Building2 className="h-5 w-5" style={{ color: primaryColor }} />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold truncate text-slate-800 text-sm">{municipio.nombre}</h3>
-                          <p className="text-xs text-slate-400 truncate">{municipio.codigo}</p>
-                        </div>
-                        <ArrowRight
-                          className="h-4 w-4 flex-shrink-0 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all"
+                          className="flex items-center gap-1.5 mt-3 text-xs font-semibold opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300"
                           style={{ color: primaryColor }}
-                        />
+                        >
+                          <span>Entrar</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </div>
                       </button>
 
                       <button
@@ -353,7 +367,7 @@ export default function Demo() {
                           setToDelete(municipio);
                         }}
                         disabled={isEliminando}
-                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-lg flex items-center justify-center bg-white/0 hover:bg-red-50 text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                        className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/0 hover:bg-red-50 text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
                         title={`Eliminar demo ${municipio.nombre}`}
                         aria-label={`Eliminar demo ${municipio.nombre}`}
                       >
