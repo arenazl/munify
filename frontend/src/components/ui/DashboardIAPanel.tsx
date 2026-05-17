@@ -80,12 +80,11 @@ export function DashboardIAPanel({
     });
   };
 
-  // Acordeones — urgentes y recomendaciones abiertos por default
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    urgentes: true,
-    recomendaciones: true,
-  });
-  const toggleSection = (k: string) => setOpenSections(s => ({ ...s, [k]: !s[k] }));
+  // Acordeones — TODAS las secciones arrancan abiertas. Si el user las cierra
+  // se guarda en el state local pero el default es abierto (key undefined = open).
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (k: string) => setOpenSections(s => ({ ...s, [k]: s[k] === false ? true : false }));
+  const isSectionOpen = (k: string) => openSections[k] !== false; // default: true
 
   // Colapsado: barra vertical fina
   if (collapsed) {
@@ -157,7 +156,7 @@ export function DashboardIAPanel({
           titulo="Urgente"
           icono={AlertTriangle}
           color="#ef4444"
-          open={openSections.urgentes}
+          open={isSectionOpen('urgentes')}
           onToggle={() => toggleSection('urgentes')}
           badge={data.urgentes.length}
         >
@@ -173,7 +172,7 @@ export function DashboardIAPanel({
           titulo="Recomendaciones"
           icono={Sparkles}
           color="#f59e0b"
-          open={openSections.recomendaciones}
+          open={isSectionOpen('recomendaciones')}
           onToggle={() => toggleSection('recomendaciones')}
           badge={data.recomendaciones.length}
         >
@@ -192,7 +191,7 @@ export function DashboardIAPanel({
             titulo={s.titulo}
             icono={Icon}
             color={s.color}
-            open={!!openSections[s.key]}
+            open={isSectionOpen(s.key)}
             onToggle={() => toggleSection(s.key)}
             badge={s.items.length}
           >
