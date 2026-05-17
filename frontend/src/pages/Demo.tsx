@@ -130,7 +130,17 @@ export default function Demo() {
   const showSearch = municipios.length >= SEARCH_THRESHOLD;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex flex-col">
+    <div className="relative min-h-screen bg-slate-50 flex flex-col overflow-hidden">
+      {/* Mesh gradient de fondo — blobs blurreados que dan profundidad sin ruido. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -left-32 w-[480px] h-[480px] rounded-full bg-blue-300/40 blur-[120px]" />
+        <div className="absolute top-1/3 -right-40 w-[520px] h-[520px] rounded-full bg-cyan-200/50 blur-[130px]" />
+        <div className="absolute -bottom-40 left-1/3 w-[420px] h-[420px] rounded-full bg-violet-200/40 blur-[120px]" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+      </div>
+
+      {/* Wrapper relative para que todo lo de abajo quede sobre los blobs. */}
+      <div className="relative z-10 flex flex-col flex-1">
       {creando && (
         <DemoCreationProgress done={creandoDone} municipioNombre={nuevoNombre} />
       )}
@@ -179,7 +189,9 @@ export default function Demo() {
             </p>
           </div>
 
-          <div className="mb-6 bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-4 sm:p-6">
+          <div className="mb-6 bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.12),0_2px_8px_-2px_rgba(15,23,42,0.06)] p-4 sm:p-6 relative overflow-hidden">
+            {/* Top stripe gradient — refuerza que es el CTA principal. */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 via-cyan-400 to-violet-400" />
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="h-5 w-5 text-blue-500" />
               <span className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">
@@ -285,7 +297,7 @@ export default function Demo() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Buscar municipio..."
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-slate-200 focus:border-blue-500 focus:outline-none text-sm text-slate-800 placeholder-slate-400 transition-colors"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-white/60 bg-white/70 backdrop-blur-md focus:border-blue-400 focus:bg-white/90 focus:outline-none focus:ring-4 focus:ring-blue-500/10 text-sm text-slate-800 placeholder-slate-400 transition-all"
                   />
                 </div>
               )}
@@ -297,8 +309,19 @@ export default function Demo() {
                   return (
                     <div
                       key={municipio.id}
-                      className="relative group rounded-2xl border-2 border-slate-200 bg-white overflow-hidden transition-all duration-200 hover:border-slate-300 hover:shadow-md"
+                      className="relative group rounded-2xl border border-white/70 bg-white/75 backdrop-blur-md overflow-hidden transition-all duration-200 hover:bg-white/90 hover:-translate-y-0.5 shadow-[0_4px_20px_-8px_rgba(15,23,42,0.12),0_1px_4px_-1px_rgba(15,23,42,0.04)] hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.18),0_2px_6px_-1px_rgba(15,23,42,0.06)]"
+                      style={{
+                        // Glow sutil del color del muni en hover (via box-shadow inset top).
+                        boxShadow: undefined,
+                      }}
                     >
+                      {/* Top stripe del color del muni — identidad visual + jerarquía. */}
+                      <div
+                        className="absolute top-0 left-0 right-0 h-[3px] opacity-70 group-hover:opacity-100 transition-opacity"
+                        style={{
+                          background: `linear-gradient(90deg, ${primaryColor} 0%, ${primaryColor}80 100%)`,
+                        }}
+                      />
                       <button
                         onClick={() => handleSelectMunicipio(municipio)}
                         disabled={isEliminando}
@@ -360,6 +383,7 @@ export default function Demo() {
           Munify - Conectando al gobierno con las necesidades del vecino
         </p>
       </footer>
+      </div>
     </div>
   );
 }
