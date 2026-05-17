@@ -420,9 +420,7 @@ export default function GestionPagos() {
             </button>
           );
         })}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mx-2 h-5 w-px" style={{ backgroundColor: theme.border }} />
         <span className="text-[11px] font-semibold uppercase tracking-wider mr-1" style={{ color: theme.textSecondary }}>
           Medios:
         </span>
