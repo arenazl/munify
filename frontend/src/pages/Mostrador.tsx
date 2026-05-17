@@ -13,6 +13,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { operadorApi, capturaMovilApi, type CapturaMovilEstado } from '../lib/api';
 import PageHint from '../components/ui/PageHint';
+import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
 
 interface MostradorMetricas {
   tramites_hoy: number;
@@ -140,13 +141,37 @@ export default function Mostrador() {
           </div>
         </div>
 
-        {metricas && (
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            <MetricaCard color="#3b82f6" icon={<FileText className="w-4 h-4" />} label="Trámites hoy" value={metricas.tramites_hoy} />
-            <MetricaCard color="#22c55e" icon={<CheckCircle2 className="w-4 h-4" />} label="Pagados" value={metricas.pagados_hoy} />
-            <MetricaCard color="#8b5cf6" icon={<Receipt className="w-4 h-4" />} label="Recaudado" value={metricas.monto_hoy} formatMoney />
-          </div>
-        )}
+        {metricas && (() => {
+          const recaudadoNum = Number(metricas.monto_hoy);
+          const kpis: KpiSpec[] = [
+            {
+              label: 'Trámites hoy',
+              value: metricas.tramites_hoy.toLocaleString('es-AR'),
+              icon: FileText,
+              color: theme.primary,
+              highlighted: true,
+            },
+            {
+              label: 'Pagados',
+              value: metricas.pagados_hoy.toLocaleString('es-AR'),
+              icon: CheckCircle2,
+              color: '#22c55e',
+              footnote: metricas.tramites_hoy > 0
+                ? `${((metricas.pagados_hoy / metricas.tramites_hoy) * 100).toFixed(0)}% del total`
+                : undefined,
+              pct: metricas.tramites_hoy > 0 ? (metricas.pagados_hoy / metricas.tramites_hoy) * 100 : 0,
+            },
+            {
+              label: 'Recaudado',
+              value: Number.isFinite(recaudadoNum)
+                ? `$${recaudadoNum.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
+                : String(metricas.monto_hoy),
+              icon: Receipt,
+              color: '#8b5cf6',
+            },
+          ];
+          return <KpiRow kpis={kpis} />;
+        })()}
       </div>
 
       <PageHint pageId="mostrador" />
@@ -189,44 +214,6 @@ export default function Mostrador() {
           onReset={reset}
         />
       )}
-    </div>
-  );
-}
-
-// ============================================================
-// MetricaCard
-// ============================================================
-function MetricaCard({ color, icon, label, value, formatMoney }: {
-  color: string;
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  formatMoney?: boolean;
-}) {
-  const { theme } = useTheme();
-  const display = formatMoney
-    ? `$${Number(value).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
-    : String(value);
-  return (
-    <div
-      className="rounded-xl p-2.5 sm:p-3 transition-all hover:scale-[1.02] min-w-0"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
-      <div className="flex items-start justify-between gap-1.5 min-w-0">
-        <span
-          className="text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold leading-tight min-w-0 flex-1"
-          style={{ color: theme.textSecondary }}
-        >
-          {label}
-        </span>
-        <span
-          className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${color}20`, color }}
-        >
-          {icon}
-        </span>
-      </div>
-      <p className="text-base sm:text-xl font-bold tabular-nums mt-1 truncate" style={{ color: theme.text }}>{display}</p>
     </div>
   );
 }
