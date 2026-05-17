@@ -341,7 +341,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
       if (tipoFiltro) params.categoria_tramite_id = tipoFiltro;
       if (tramiteFiltro) params.tramite_id = tramiteFiltro;
-      if (estadoFiltro) params.estado = estadoFiltro.toUpperCase();
+      if (estadoFiltro) params.estado = estadoFiltro.toLowerCase();
       if (searchFiltro && searchFiltro.trim()) params.search = searchFiltro.trim();
       if (soloMiArea && user?.dependencia?.id) {
         params.municipio_dependencia_id = user.dependencia.id;
@@ -371,7 +371,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
 
       if (filtroTipo) params.categoria_tramite_id = filtroTipo;
       if (filtroTramite) params.tramite_id = filtroTramite;
-      if (filtroEstado) params.estado = filtroEstado.toUpperCase();
+      if (filtroEstado) params.estado = filtroEstado.toLowerCase();
       if (searchTerm && searchTerm.trim()) params.search = searchTerm.trim();
 
       const res = await tramitesApi.getGestionSolicitudes(params as any);
