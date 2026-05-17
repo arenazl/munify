@@ -245,11 +245,11 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
   const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
 
   return (
-    <div className="space-y-3">
+    <div className="max-w-3xl mx-auto space-y-3">
       <ModePicker modo={modo} setModo={setModo} />
 
       <div className="relative overflow-hidden">
-        <div key={modo} className="animate-tab-slide">
+        <div key={modo} className="animate-tab-slide flex justify-center">
           {modo === 'dni' && <PanelDni onUsar={onClienteRegistrado} />}
           {modo === 'celular' && (
             <PanelCelular onAprobado={onBiometriaOk} onCargarManual={onCargarManual} />
@@ -269,7 +269,7 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
         className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs"
         style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span>¿No tenés el dato exacto?</span>
           <button
             onClick={() => setBusquedaLibreAbierta((v) => !v)}
@@ -291,10 +291,12 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
       </div>
 
       {busquedaLibreAbierta && (
-        <BusquedaLibre
-          onUsar={onClienteRegistrado}
-          onCargarManual={onCargarManual}
-        />
+        <div className="flex justify-center">
+          <BusquedaLibre
+            onUsar={onClienteRegistrado}
+            onCargarManual={onCargarManual}
+          />
+        </div>
       )}
     </div>
   );
@@ -424,7 +426,7 @@ function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
 
   return (
     <div
-      className="rounded-2xl p-5 max-w-md"
+      className="rounded-2xl p-5 w-full max-w-xl"
       style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
       <div className="flex items-center gap-2">
@@ -610,7 +612,7 @@ function BusquedaLibre({ onUsar, onCargarManual }: {
 
   return (
     <div
-      className="rounded-2xl p-4 space-y-3"
+      className="rounded-2xl p-4 space-y-3 w-full max-w-xl"
       style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
       <div>
@@ -1092,7 +1094,7 @@ function PanelCelular({ onAprobado, onCargarManual }: {
 
   return (
     <div
-      className="rounded-2xl p-5"
+      className="rounded-2xl p-6 w-full max-w-2xl"
       style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
       {phase === 'idle' && (
@@ -1142,7 +1144,7 @@ function PanelCelular({ onAprobado, onCargarManual }: {
       )}
 
       {(phase === 'awaiting' || phase === 'in_progress') && qrValue && (
-        <div className="grid grid-cols-1 md:grid-cols-[auto,1fr] gap-5 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[220px,1fr] gap-6 items-start">
           {/* QR del lado izquierdo */}
           <div className="flex flex-col items-center gap-2">
             <div
@@ -1165,7 +1167,7 @@ function PanelCelular({ onAprobado, onCargarManual }: {
           </div>
 
           {/* Steps + progreso del lado derecho */}
-          <div className="space-y-2">
+          <div className="space-y-2 min-w-0">
             <div>
               <h3 className="text-base font-bold" style={{ color: theme.text }}>
                 {phase === 'in_progress' ? 'Capturando en el celular…' : 'Escaneá con tu celular'}
