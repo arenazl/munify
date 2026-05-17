@@ -592,13 +592,15 @@ export function ABMPage({
           {/* Separador vertical - se oculta en mobile cuando search enfocado */}
           <div className={`h-8 w-px hidden sm:block ${searchFocused ? 'sm:hidden md:block' : ''}`} style={{ backgroundColor: theme.border }} />
 
-          {/* Buscador que se expande en mobile al focus */}
+          {/* Buscador — mismo look que el input del Mostrador (DNI):
+              fondo backgroundSecondary, border accent suave, rounded grande,
+              icono lupa a la izquierda. */}
           <div
             className={`relative group transition-all duration-300 ${searchFocused ? 'flex-1' : 'flex-1 sm:flex-1'}`}
             style={searchMaxWidth ? { maxWidth: searchMaxWidth, flex: '0 1 auto', width: '100%' } : undefined}
           >
             <Search
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 transition-all duration-300 group-focus-within:scale-110"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 transition-all duration-300 group-focus-within:scale-110"
               style={{ color: theme.textSecondary }}
             />
             <input
@@ -608,11 +610,11 @@ export function ABMPage({
               onChange={(e) => onSearchChange(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              className="w-full h-[34px] pl-8 pr-3 rounded-lg text-[12px] focus:ring-2 focus:outline-none transition-all duration-300"
+              className="w-full h-[38px] pl-9 pr-3 rounded-xl text-[13px] focus:outline-none transition-all duration-300"
               style={{
-                backgroundColor: theme.background,
+                backgroundColor: theme.backgroundSecondary,
                 color: theme.text,
-                border: `1px solid ${theme.border}`,
+                border: `1.5px solid ${searchFocused ? `${theme.primary}80` : `${theme.primary}30`}`,
               }}
             />
           </div>
