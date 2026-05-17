@@ -3,18 +3,16 @@ import {
   Building2,
   Calendar,
   ChevronDown,
-  Clock,
   Filter,
   Flame,
-  Layers,
   Pause,
   Play,
   RotateCcw,
   Square,
-  Tag,
   X,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { ModernSelect, type SelectOption } from '../ui/ModernSelect';
 
 // =====================================================================
 // Tipos públicos (los re-exporta el padre)
@@ -367,215 +365,86 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
           id="mapa-filtros-body"
           className="flex flex-col gap-2 mt-3 animate-in fade-in slide-in-from-top-2 duration-200"
         >
-          {/* Fila 1: Categorías */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => props.onCategoriaChange(null)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95"
-              style={{
-                backgroundColor:
-                  props.filtroCategoria === null
-                    ? theme.primary
-                    : `${theme.textSecondary}15`,
-                color:
-                  props.filtroCategoria === null
-                    ? '#ffffff'
-                    : theme.textSecondary,
-                border: `1px solid ${
-                  props.filtroCategoria === null ? theme.primary : theme.border
-                }`,
+          {/* FILA 1 — Combos modernos: Categoría · Estado · Dependencia · Tiempo */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            {/* Categoría */}
+            <ModernSelect
+              value={props.filtroCategoria ?? ''}
+              onChange={(v) => props.onCategoriaChange(v === '' ? null : v)}
+              placeholder={`Todas las categorías (${props.totalReclamos})`}
+              searchable={props.categoriasDisponibles.length > 6}
+              options={[
+                { value: '', label: `Todas las categorías (${props.totalReclamos})` } as SelectOption,
+                ...props.categoriasDisponibles.map<SelectOption>((c) => ({
+                  value: c.key,
+                  label: `${c.label} (${c.count})`,
+                  color: c.color,
+                  emphasized: c.count > 0,
+                })),
+              ]}
+            />
+            {/* Estado */}
+            <ModernSelect
+              value={props.filtroEstado ?? ''}
+              onChange={(v) => props.onEstadoChange(v === '' ? null : v)}
+              placeholder={`Todos los estados (${props.totalEnRangoTiempo})`}
+              options={[
+                { value: '', label: `Todos los estados (${props.totalEnRangoTiempo})` } as SelectOption,
+                ...Object.entries(props.statusColors).map<SelectOption>(([estado, color]) => {
+                  const count = props.conteosPorEstado[estado] || 0;
+                  const labelBase = props.statusLabels[estado] || estado;
+                  return {
+                    value: estado,
+                    label: `${labelBase} (${count})`,
+                    color,
+                    emphasized: count > 0,
+                  };
+                }),
+              ]}
+            />
+            {/* Dependencia (solo si hay) */}
+            {props.dependenciasDisponibles.length > 0 ? (
+              <ModernSelect
+                value={props.filtroDependencia == null ? '' : String(props.filtroDependencia)}
+                onChange={(v) => props.onDependenciaChange(v === '' ? null : Number(v))}
+                placeholder="Todas las dependencias"
+                searchable={props.dependenciasDisponibles.length > 6}
+                options={[
+                  { value: '', label: 'Todas las dependencias' } as SelectOption,
+                  ...props.dependenciasDisponibles.map<SelectOption>((d) => ({
+                    value: String(d.id),
+                    label: `${d.nombre} (${d.count})`,
+                    color: d.color,
+                    emphasized: d.count > 0,
+                  })),
+                ]}
+              />
+            ) : (
+              <div />
+            )}
+            {/* Tiempo */}
+            <ModernSelect
+              value={props.timePreset}
+              onChange={(v) => {
+                if (props.isPlaying) props.onPause();
+                props.onTimePresetChange(v as TimePreset);
               }}
-            >
-              <Tag className="h-3 w-3" />
-              <span className="text-xs font-medium">Todas las categorías</span>
-              <span className="text-xs font-bold">({props.totalReclamos})</span>
-            </button>
-            {props.categoriasDisponibles.map((cat) => {
-              const isActive = props.filtroCategoria === cat.key;
-              return (
-                <button
-                  key={cat.key}
-                  onClick={() =>
-                    props.onCategoriaChange(isActive ? null : cat.key)
-                  }
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95"
-                  style={{
-                    backgroundColor: isActive ? cat.color : `${cat.color}15`,
-                    color: isActive ? '#ffffff' : cat.color,
-                    border: `1px solid ${isActive ? cat.color : `${cat.color}40`}`,
-                  }}
-                >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{
-                      backgroundColor: isActive ? '#ffffff' : cat.color,
-                    }}
-                  />
-                  <span className="text-xs font-medium">{cat.label}</span>
-                  <span className="text-xs font-bold">({cat.count})</span>
-                </button>
-              );
-            })}
+              placeholder="Periodo"
+              options={[
+                { value: '7', label: 'Últimos 7 días' } as SelectOption,
+                { value: '30', label: 'Últimos 30 días' } as SelectOption,
+                { value: '90', label: 'Últimos 90 días' } as SelectOption,
+                { value: '365', label: 'Último año' } as SelectOption,
+                { value: 'all', label: 'Todo el período' } as SelectOption,
+              ]}
+            />
           </div>
 
-          <div
-            className="h-px w-full"
-            style={{ backgroundColor: theme.border }}
-          />
-
-          {/* Fila 2: Estados */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              onClick={() => props.onEstadoChange(null)}
-              className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor:
-                  props.filtroEstado === null ? `${theme.primary}15` : 'transparent',
-                border: `1px solid ${
-                  props.filtroEstado === null ? theme.primary : theme.border
-                }`,
-                color:
-                  props.filtroEstado === null ? theme.primary : theme.textSecondary,
-              }}
-            >
-              Todos
-              {props.totalEnRangoTiempo > 0 && (
-                <span className="opacity-70">({props.totalEnRangoTiempo})</span>
-              )}
-            </button>
-            {Object.entries(props.statusColors).map(([estado, color]) => {
-              const count = props.conteosPorEstado[estado] || 0;
-              const isActive = props.filtroEstado === estado;
-              const hasItems = count > 0;
-              return (
-                <button
-                  key={estado}
-                  onClick={() =>
-                    props.onEstadoChange(isActive ? null : estado)
-                  }
-                  className="inline-flex items-center gap-1.5 h-[28px] px-3 rounded-full text-[11px] font-semibold transition-all hover:scale-105 active:scale-95"
-                  style={{
-                    backgroundColor: isActive ? `${color}20` : 'transparent',
-                    border: `1px solid ${isActive ? color : theme.border}`,
-                    color: isActive ? color : (hasItems ? theme.text : theme.textSecondary),
-                    opacity: hasItems ? 1 : 0.45,
-                  }}
-                  title={props.statusLabels[estado] || estado}
-                >
-                  {props.statusLabels[estado] || estado}
-                  {hasItems && <span className="opacity-70">({count})</span>}
-                </button>
-              );
-            })}
-          </div>
-
-          {props.dependenciasDisponibles.length > 0 && (
-            <>
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: theme.border }}
-              />
-              {/* Fila 3: Dependencias */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => props.onDependenciaChange(null)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95"
-                  style={{
-                    backgroundColor:
-                      props.filtroDependencia === null
-                        ? theme.primary
-                        : `${theme.textSecondary}15`,
-                    color:
-                      props.filtroDependencia === null
-                        ? '#ffffff'
-                        : theme.textSecondary,
-                    border: `1px solid ${
-                      props.filtroDependencia === null
-                        ? theme.primary
-                        : theme.border
-                    }`,
-                  }}
-                >
-                  <Building2 className="h-3 w-3" />
-                  <span className="text-xs font-medium">
-                    Todas las dependencias
-                  </span>
-                </button>
-                {props.dependenciasDisponibles.map((d) => {
-                  const isActive = props.filtroDependencia === d.id;
-                  return (
-                    <button
-                      key={d.id}
-                      onClick={() =>
-                        props.onDependenciaChange(isActive ? null : d.id)
-                      }
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95"
-                      style={{
-                        backgroundColor: isActive ? d.color : `${d.color}15`,
-                        color: isActive ? '#ffffff' : d.color,
-                        border: `1px solid ${
-                          isActive ? d.color : `${d.color}40`
-                        }`,
-                      }}
-                    >
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{
-                          backgroundColor: isActive ? '#ffffff' : d.color,
-                        }}
-                      />
-                      <span className="text-xs font-medium">{d.nombre}</span>
-                      <span className="text-xs font-bold">({d.count})</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          <div
-            className="h-px w-full"
-            style={{ backgroundColor: theme.border }}
-          />
-
-          {/* Fila 4: Tiempo + Vista + Hotspots + Cobertura + Dibujar */}
+          {/* FILA 2 — Botones del mapa: Time-lapse · Vista · Hotspots · Cobertura · Dibujar */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Time presets */}
+            {/* Time-lapse */}
             <div
-              className="flex items-center gap-1 p-1 rounded-lg"
-              style={{
-                backgroundColor: `${theme.textSecondary}10`,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              <Clock
-                className="h-3 w-3 mx-1"
-                style={{ color: theme.textSecondary }}
-              />
-              {(['7', '30', '90', '365', 'all'] as TimePreset[]).map((p) => {
-                const isActive = props.timePreset === p && !props.isPlaying;
-                return (
-                  <button
-                    key={p}
-                    onClick={() => {
-                      if (props.isPlaying) props.onPause();
-                      props.onTimePresetChange(p);
-                    }}
-                    className="px-2 py-0.5 rounded text-xs font-medium transition-all duration-200 ease-in-out active:scale-95"
-                    style={{
-                      backgroundColor: isActive ? theme.primary : 'transparent',
-                      color: isActive ? '#fff' : theme.textSecondary,
-                    }}
-                  >
-                    {p === 'all' ? 'Todo' : p === '365' ? '1 año' : `${p}d`}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Time-lapse controls */}
-            <div
-              className="flex items-center gap-1 p-1 rounded-lg"
+              className="inline-flex items-center gap-1 px-1 py-0.5 rounded-lg"
               style={{
                 backgroundColor: `${theme.textSecondary}10`,
                 border: `1px solid ${theme.border}`,
@@ -585,26 +454,26 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
                 <button
                   onClick={props.onPlay}
                   disabled={!props.hasDateRange}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all duration-200 ease-in-out active:scale-95 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all duration-200 active:scale-95 disabled:opacity-50"
                   style={{ color: theme.primary }}
                   title="Reproducir time-lapse"
                 >
                   <Play className="h-3 w-3" />
-                  <span className="hidden sm:inline">Time-lapse</span>
+                  Time-lapse
                 </button>
               ) : (
                 <button
                   onClick={props.onPause}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all duration-200 ease-in-out active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-all duration-200 active:scale-95"
                   style={{ color: theme.primary }}
                 >
                   <Pause className="h-3 w-3" />
-                  <span className="hidden sm:inline">Pausar</span>
+                  Pausar
                 </button>
               )}
               <button
                 onClick={props.onReset}
-                className="px-1.5 py-0.5 rounded transition-all duration-200 ease-in-out active:scale-95"
+                className="p-1 rounded transition-all duration-200 active:scale-95"
                 style={{ color: theme.textSecondary }}
                 title="Reiniciar"
               >
@@ -612,27 +481,22 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
               </button>
             </div>
 
-            {/* View mode toggle */}
+            {/* Vista (pins / calor / ambos) */}
             <div
-              className="flex items-center gap-1 p-1 rounded-lg"
+              className="inline-flex items-center gap-0.5 p-0.5 rounded-lg"
               style={{
                 backgroundColor: `${theme.textSecondary}10`,
                 border: `1px solid ${theme.border}`,
               }}
             >
-              <Layers
-                className="h-3 w-3 mx-1"
-                style={{ color: theme.textSecondary }}
-              />
               {(['pins', 'heat', 'both'] as ViewMode[]).map((m) => {
                 const isActive = props.viewMode === m;
-                const label =
-                  m === 'pins' ? 'Pins' : m === 'heat' ? 'Calor' : 'Ambos';
+                const label = m === 'pins' ? 'Pins' : m === 'heat' ? 'Calor' : 'Ambos';
                 return (
                   <button
                     key={m}
                     onClick={() => props.onViewModeChange(m)}
-                    className="px-2 py-0.5 rounded text-xs font-medium transition-all duration-200 ease-in-out active:scale-95"
+                    className="px-2.5 py-1 rounded text-xs font-semibold transition-all duration-200 active:scale-95"
                     style={{
                       backgroundColor: isActive ? theme.primary : 'transparent',
                       color: isActive ? '#fff' : theme.textSecondary,
@@ -644,18 +508,14 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
               })}
             </div>
 
-            {/* Hotspots toggle */}
+            {/* Hotspots */}
             <button
               onClick={props.onToggleHotspots}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-in-out active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-95"
               style={{
-                backgroundColor: props.showHotspots
-                  ? '#ef444420'
-                  : `${theme.textSecondary}10`,
+                backgroundColor: props.showHotspots ? '#ef444420' : `${theme.textSecondary}10`,
                 color: props.showHotspots ? '#ef4444' : theme.textSecondary,
-                border: `1px solid ${
-                  props.showHotspots ? '#ef4444' : theme.border
-                }`,
+                border: `1px solid ${props.showHotspots ? '#ef4444' : theme.border}`,
               }}
             >
               <Flame className="h-3 w-3" />
@@ -663,46 +523,33 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
               {props.hotspotsCount > 0 && ` (${props.hotspotsCount})`}
             </button>
 
-            {/* Cobertura toggle (solo si hay dependencia activa) */}
-            {props.filtroDependencia != null && (
-              <button
-                onClick={props.onToggleCoverage}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-in-out active:scale-95"
-                style={{
-                  backgroundColor: props.showCoverage
-                    ? `${
-                        props.dependenciasDisponibles.find(
-                          (d) => d.id === props.filtroDependencia,
-                        )?.color || theme.primary
-                      }20`
-                    : `${theme.textSecondary}10`,
-                  color: props.showCoverage
-                    ? props.dependenciasDisponibles.find(
-                        (d) => d.id === props.filtroDependencia,
-                      )?.color || theme.primary
-                    : theme.textSecondary,
-                  border: `1px solid ${
-                    props.showCoverage
-                      ? props.dependenciasDisponibles.find(
-                          (d) => d.id === props.filtroDependencia,
-                        )?.color || theme.primary
-                      : theme.border
-                  }`,
-                }}
-              >
-                <Building2 className="h-3 w-3" />
-                Cobertura
-              </button>
-            )}
+            {/* Cobertura (solo si hay dependencia) */}
+            {props.filtroDependencia != null && (() => {
+              const depColor = props.dependenciasDisponibles.find(
+                (d) => d.id === props.filtroDependencia,
+              )?.color || theme.primary;
+              return (
+                <button
+                  onClick={props.onToggleCoverage}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-95"
+                  style={{
+                    backgroundColor: props.showCoverage ? `${depColor}20` : `${theme.textSecondary}10`,
+                    color: props.showCoverage ? depColor : theme.textSecondary,
+                    border: `1px solid ${props.showCoverage ? depColor : theme.border}`,
+                  }}
+                >
+                  <Building2 className="h-3 w-3" />
+                  Cobertura
+                </button>
+              );
+            })()}
 
             {/* Dibujar zona */}
             <button
               onClick={props.onToggleDraw}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ease-in-out active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 active:scale-95"
               style={{
-                backgroundColor: props.drawMode
-                  ? theme.primary
-                  : `${theme.primary}15`,
+                backgroundColor: props.drawMode ? theme.primary : `${theme.primary}15`,
                 color: props.drawMode ? '#fff' : theme.primary,
                 border: `1px solid ${theme.primary}`,
               }}
