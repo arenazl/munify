@@ -7,6 +7,7 @@ import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboard
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
+import type { KpiSpec } from '../components/ui/KpiCard';
 import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { StatusPill } from '../components/ui/StatusPill';
@@ -4319,6 +4320,51 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     try { localStorage.setItem('reclamos_vista_inbox', nuevo ? '1' : '0'); } catch { /* ignore */ }
   };
 
+  // KPIs arriba del ABMPage (mismo patrón que Tesorería/Trámites).
+  // Lee de conteosEstados que ya carga la pagina por filtro.
+  const kpisSpec: KpiSpec[] = useMemo(() => {
+    const c = conteosEstados;
+    const recibidos = (c['recibido'] || 0) + (c['nuevo'] || 0) + (c['asignado'] || 0);
+    const enCurso = (c['en_curso'] || 0) + (c['en_proceso'] || 0) + (c['pendiente_confirmacion'] || 0);
+    const finalizados = (c['finalizado'] || 0) + (c['resuelto'] || 0);
+    const total = Object.values(c).reduce((a, b) => a + (b || 0), 0);
+    const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+    return [
+      {
+        label: 'Total Reclamos',
+        value: total.toLocaleString('es-AR'),
+        icon: FileText,
+        color: theme.primary,
+        footnote: `${reclamos.length} en pantalla`,
+        highlighted: true,
+      },
+      {
+        label: 'Recibidos',
+        value: recibidos.toLocaleString('es-AR'),
+        icon: Inbox,
+        color: '#3b82f6',
+        footnote: `${pct(recibidos).toFixed(1)}% del total`,
+        pct: pct(recibidos),
+      },
+      {
+        label: 'En Curso',
+        value: enCurso.toLocaleString('es-AR'),
+        icon: PlayCircle,
+        color: '#f59e0b',
+        footnote: `${pct(enCurso).toFixed(1)}% del total`,
+        pct: pct(enCurso),
+      },
+      {
+        label: 'Finalizados',
+        value: finalizados.toLocaleString('es-AR'),
+        icon: CheckCircle,
+        color: '#22c55e',
+        footnote: `${pct(finalizados).toFixed(1)}% del total`,
+        pct: pct(finalizados),
+      },
+    ];
+  }, [conteosEstados, reclamos.length, theme.primary]);
+
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>
       <PageHint pageId="reclamos-list" />
@@ -4327,6 +4373,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         title={soloMiArea ? "Reclamos del Área" : (soloMisTrabajos ? "Mis Trabajos" : "Reclamos")}
         buttonLabel={soloMisTrabajos || soloMiArea || false ? undefined : "Nuevo Reclamo"}
         onAdd={soloMisTrabajos || soloMiArea || false ? undefined : openWizard}
+        kpis={kpisSpec}
         searchPlaceholder="Buscar reclamos..."
         searchValue={search}
         onSearchChange={setSearch}

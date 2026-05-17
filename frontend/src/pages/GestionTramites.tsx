@@ -43,6 +43,7 @@ import { CrearSolicitudWizard } from '../components/tramites/CrearSolicitudWizar
 import { ChecklistDocumentosVerificacion } from '../components/tramites/ChecklistDocumentosVerificacion';
 import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal';
 import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
+import type { KpiSpec } from '../components/ui/KpiCard';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
@@ -1647,6 +1648,51 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
     setTimeout(() => loadTramites(filtroTipo, filtroEstado, searchTerm, filtroTramite), 0);
   };
 
+  // KPIs arriba del ABMPage (mismo patrón que Tesorería).
+  // Lee de resumen.por_estado que viene del backend en loadData().
+  const kpisSpec: KpiSpec[] = useMemo(() => {
+    const porEstado = resumen?.por_estado || {};
+    const total = resumen?.total || 0;
+    const recibidos = porEstado['recibido'] || 0;
+    const enCurso = porEstado['en_curso'] || 0;
+    const finalizados = porEstado['finalizado'] || 0;
+    const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+    return [
+      {
+        label: 'Total Trámites',
+        value: total.toLocaleString('es-AR'),
+        icon: FileText,
+        color: theme.primary,
+        footnote: `${resumen?.hoy || 0} hoy`,
+        highlighted: true,
+      },
+      {
+        label: 'Recibidos',
+        value: recibidos.toLocaleString('es-AR'),
+        icon: Inbox,
+        color: '#3b82f6',
+        footnote: `${pct(recibidos).toFixed(1)}% del total`,
+        pct: pct(recibidos),
+      },
+      {
+        label: 'En Curso',
+        value: enCurso.toLocaleString('es-AR'),
+        icon: PlayCircle,
+        color: '#f59e0b',
+        footnote: `${pct(enCurso).toFixed(1)}% del total`,
+        pct: pct(enCurso),
+      },
+      {
+        label: 'Finalizados',
+        value: finalizados.toLocaleString('es-AR'),
+        icon: CheckCircle2,
+        color: '#22c55e',
+        footnote: `${pct(finalizados).toFixed(1)}% del total`,
+        pct: pct(finalizados),
+      },
+    ];
+  }, [resumen, theme.primary]);
+
   return (
     <PullToRefresh onRefresh={async () => { await loadData(); }}>
       <PageHint pageId="tramites-list" />
@@ -1654,6 +1700,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         title="Trámites"
         buttonLabel="Nuevo Trámite"
         onAdd={() => setWizardOpen(true)}
+        kpis={kpisSpec}
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
