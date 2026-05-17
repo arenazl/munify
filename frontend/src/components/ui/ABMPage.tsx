@@ -833,8 +833,8 @@ export function ABMPage({
                         <div
                           className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-2 rounded-lg mb-3"
                           style={{
-                            backgroundColor: theme.backgroundSecondary,
-                            border: `1px solid ${theme.border}`,
+                            backgroundColor: `color-mix(in srgb, ${theme.primary} 10%, transparent)`,
+                            border: `1px solid color-mix(in srgb, ${theme.primary} 25%, transparent)`,
                           }}
                         >
                           <div className="text-sm font-semibold" style={{ color: theme.text }}>
@@ -1811,7 +1811,13 @@ export function ABMTable<T>({
               let runningIdx = 0;
               for (const b of blocks) {
                 out.push(
-                  <tr key={`grp-${b.key}`} style={{ backgroundColor: theme.backgroundSecondary }}>
+                  <tr
+                    key={`grp-${b.key}`}
+                    style={{
+                      // Tinta del acento del tema con opacity sutil (no hardcoded gris).
+                      backgroundColor: `color-mix(in srgb, ${theme.primary} 10%, transparent)`,
+                    }}
+                  >
                     <td colSpan={colSpan} className="px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">{groupBy.renderLabel(b.key, b.items)}</div>
