@@ -313,10 +313,10 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
       {/* Filtros siempre visibles (sin botón colapsable) */}
       <div
         id="mapa-filtros-body"
-        className="flex flex-col gap-2"
+        className="flex flex-col xl:flex-row xl:items-center gap-2"
       >
           {/* FILA 1 — Combos modernos: Categoría · Estado · Dependencia · Tiempo */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:flex xl:flex-1 xl:min-w-0 gap-2 [&>*]:xl:min-w-0 [&>*]:xl:flex-1">
             {/* Categoría */}
             <ModernSelect
               value={props.filtroCategoria ?? ''}
