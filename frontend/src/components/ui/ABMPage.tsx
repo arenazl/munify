@@ -830,13 +830,13 @@ export function ABMPage({
                   <div className="space-y-4">
                     {groupedItems.map((g) => (
                       <div key={g.key}>
-                        <div className="sticky top-0 z-10 px-4 py-2 rounded-lg mb-3 relative overflow-hidden">
-                          {/* Capa bg con opacity 0.4 — contenido sin opacity */}
-                          <div
-                            className="absolute inset-0 pointer-events-none rounded-lg"
-                            style={{ backgroundColor: theme.primary, opacity: 0.06 }}
-                          />
-                          <div className="relative flex items-center justify-between gap-3">
+                        <div
+                          className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-2 rounded-lg mb-3"
+                          style={{
+                            backgroundColor: theme.backgroundSecondary,
+                            border: `1px solid ${theme.border}`,
+                          }}
+                        >
                           <div className="text-sm font-semibold" style={{ color: theme.text }}>
                             {groupBy.renderLabel(g.key, g.items)}
                           </div>
@@ -845,7 +845,6 @@ export function ABMPage({
                               {groupBy.renderSubtotal(g.key, g.items)}
                             </div>
                           )}
-                          </div>
                         </div>
                         <div
                           className={
@@ -1812,17 +1811,9 @@ export function ABMTable<T>({
               let runningIdx = 0;
               for (const b of blocks) {
                 out.push(
-                  <tr key={`grp-${b.key}`}>
-                    <td colSpan={colSpan} className="px-3 py-2 relative">
-                      {/* Capa de fondo con opacity 0.4 — el contenido queda sin opacity */}
-                      <div
-                        className="absolute inset-0 pointer-events-none"
-                        style={{
-                          backgroundColor: theme.primary,
-                          opacity: 0.4,
-                        }}
-                      />
-                      <div className="relative flex items-center justify-between gap-2">
+                  <tr key={`grp-${b.key}`} style={{ backgroundColor: theme.backgroundSecondary }}>
+                    <td colSpan={colSpan} className="px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">{groupBy.renderLabel(b.key, b.items)}</div>
                         {groupBy.renderSubtotal && (
                           <div className="flex-shrink-0">{groupBy.renderSubtotal(b.key, b.items)}</div>
