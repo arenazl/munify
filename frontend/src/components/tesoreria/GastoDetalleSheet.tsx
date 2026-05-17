@@ -97,6 +97,23 @@ export function GastoDetalleSheet({
   const [obsDirty, setObsDirty] = useState(false);
   const [savingObs, setSavingObs] = useState(false);
   const [pagandoCuotaId, setPagandoCuotaId] = useState<number | null>(null);
+  const [togglingEstado, setTogglingEstado] = useState(false);
+
+  // Toggle estado concretado <-> pendiente
+  const handleToggleEstado = async () => {
+    const actual = (gasto as any).estado_pago || 'concretado';
+    const next = actual === 'concretado' ? 'pendiente' : 'concretado';
+    setTogglingEstado(true);
+    try {
+      await gastosApi.update(gasto.id, { estado_pago: next } as any);
+      toast.success(next === 'concretado' ? 'Marcado como concretado' : 'Marcado como pendiente');
+      onUpdated?.();
+    } catch {
+      toast.error('Error actualizando estado');
+    } finally {
+      setTogglingEstado(false);
+    }
+  };
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -190,15 +207,34 @@ export function GastoDetalleSheet({
 
   // ============ Render ============
   const sheetFooter = (
-    <div className="flex items-center justify-between gap-2 w-full">
-      <button
-        onClick={() => setConfirmDelete(true)}
-        disabled={deleting}
-        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-        style={{ backgroundColor: '#ef444415', color: '#ef4444', border: '1px solid #ef444440' }}
-      >
-        <Trash2 className="h-3.5 w-3.5" /> Eliminar
-      </button>
+    <div className="flex items-center justify-between gap-2 w-full flex-wrap">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setConfirmDelete(true)}
+          disabled={deleting}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: '#ef444415', color: '#ef4444', border: '1px solid #ef444440' }}
+        >
+          <Trash2 className="h-3.5 w-3.5" /> Eliminar
+        </button>
+        {(() => {
+          const ep = (gasto as any).estado_pago || 'concretado';
+          const isPend = ep === 'pendiente';
+          const color = isPend ? '#f59e0b' : '#10b981';
+          return (
+            <button
+              onClick={handleToggleEstado}
+              disabled={togglingEstado}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+              style={{ backgroundColor: `${color}15`, color, border: `1px solid ${color}40` }}
+              title={isPend ? 'Marcar como concretado' : 'Marcar como pendiente'}
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+              {isPend ? 'Pendiente · marcar pago' : 'Concretado · marcar pendiente'}
+            </button>
+          );
+        })()}
+      </div>
       <div className="flex items-center gap-2">
         {onEdit && (
           <button

@@ -231,6 +231,17 @@ export default function TesoreriaMapa() {
   };
 
   // Persiste lat/lon en el contacto y refresca el estado local.
+  // Borra la ubicacion de un contacto (lat/lon -> null).
+  const clearContactoGeo = async (contactoId: number) => {
+    try {
+      await contactosApi.update(contactoId, { latitud: null, longitud: null });
+      setContactos(prev => prev.map(x => x.id === contactoId ? { ...x, latitud: null, longitud: null } : x));
+      toast.success('Ubicación borrada');
+    } catch {
+      toast.error('No se pudo borrar la ubicación');
+    }
+  };
+
   const saveContactoGeo = async (contactoId: number, lat: number, lon: number) => {
     setSavingGeo(true);
     try {
@@ -750,6 +761,26 @@ export default function TesoreriaMapa() {
                             title={isPending ? 'Cancelar' : 'Click en el mapa para fijar ubicación'}
                           >
                             {isPending ? 'Cancelar' : 'Ubicar'}
+                          </button>
+                        )}
+                        {tieneGeo && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm(`Borrar ubicación de ${c.nombre} ${c.apellido || ''}?`)) {
+                                clearContactoGeo(c.id);
+                              }
+                            }}
+                            className="text-[10px] font-semibold px-2 py-1 rounded-md transition-all hover:scale-105"
+                            style={{
+                              backgroundColor: '#ef444415',
+                              color: '#ef4444',
+                              border: '1px solid #ef444440',
+                            }}
+                            title="Borrar ubicación"
+                          >
+                            Borrar
                           </button>
                         )}
                       </div>
