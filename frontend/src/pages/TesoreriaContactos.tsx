@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
-import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction } from '../components/ui/ABMPage';
+import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
 import { StatusPill } from '../components/ui/StatusPill';
 import { contactosApi, tesoreriaImportApi, tiposEmpleadoApi, parajesApi } from '../lib/api';
 import {
@@ -380,7 +380,32 @@ export default function TesoreriaContactos() {
         searchPlaceholder="Buscar por nombre, DNI…"
         searchValue={search}
         onSearchChange={setSearch}
-        headerActions={<>{headerActions}{extraFilters}</>}
+        headerActions={headerActions}
+        toolbar={{
+          statusPills: {
+            value: tipoFiltro,
+            onChange: (v) => { setSearching(v || '*'); setPage(1); setTipoFiltro(v as TipoContacto | ''); },
+            todosCount: tipoFiltro === '' ? totalItems : undefined,
+            items: TIPOS_KEYS.map(t => ({
+              key: t,
+              label: TIPO_LABELS[t],
+              color: TIPO_COLORS[t],
+              icon: contactoIconByTipo(t),
+              count: tipoFiltro === t ? totalItems : undefined,
+            })),
+          },
+          customAtEnd: tipoFiltro === 'empleado' && tiposEmpleado.length > 0 ? [
+            <div key="empleado-sub" className="min-w-[180px]">
+              <ModernSelect
+                value={tipoEmpleadoFiltro}
+                onChange={setTipoEmpleadoFiltro}
+                options={tipoEmpleadoOptions}
+                placeholder="Empleados"
+                searchable
+              />
+            </div>,
+          ] : [],
+        } satisfies AbmToolbar}
         loading={loading}
         isEmpty={!loading && filtered.length === 0}
         emptyMessage="No hay contactos. Importá el Excel o agregalos con 'Nuevo'."
