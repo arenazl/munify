@@ -273,98 +273,48 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
   // ===================================================================
   return (
     <div className="flex flex-col">
-      {/* HEADER siempre visible */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={toggleOpen}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all duration-200 ease-in-out active:scale-95 flex-shrink-0"
-          style={{
-            backgroundColor: open ? `${theme.primary}15` : 'transparent',
-            border: `1px solid ${open ? theme.primary : theme.border}`,
-            color: open ? theme.primary : theme.textSecondary,
-          }}
-          aria-expanded={open}
-          aria-controls="mapa-filtros-body"
-        >
-          <Filter className="h-3.5 w-3.5" />
-          <span className="text-xs font-semibold">Filtros</span>
-          {activeCount > 0 && (
+      {/* Chips activos + Limpiar todo (solo aparece si hay filtros aplicados) */}
+      {activeCount > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0 mb-2">
+          {activeChips.map((chip) => (
             <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+              key={chip.key}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200"
               style={{
-                backgroundColor: theme.primary,
-                color: '#fff',
+                backgroundColor: `${chip.color}18`,
+                color: chip.color,
+                border: `1px solid ${chip.color}40`,
               }}
             >
-              {activeCount}
-            </span>
-          )}
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform duration-200 ${
-              open ? 'rotate-180' : 'rotate-0'
-            }`}
-          />
-        </button>
-
-        {/* Chips activos resumidos */}
-        {activeCount > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            {visibleChips.map((chip) => (
-              <span
-                key={chip.key}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all duration-200"
-                style={{
-                  backgroundColor: `${chip.color}18`,
-                  color: chip.color,
-                  border: `1px solid ${chip.color}40`,
-                }}
-              >
-                <span className="truncate max-w-[140px]">{chip.label}</span>
-                <button
-                  onClick={chip.onClear}
-                  className="rounded-full p-0.5 transition-all duration-150 hover:bg-black/10 active:scale-90"
-                  aria-label={`Quitar ${chip.label}`}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-            {hiddenChipsCount > 0 && (
+              <span className="truncate max-w-[140px]">{chip.label}</span>
               <button
-                onClick={() => {
-                  if (!open) toggleOpen();
-                }}
-                className="text-[11px] font-medium px-2 py-1 rounded-md transition-all duration-200 hover:opacity-80"
-                style={{
-                  color: theme.textSecondary,
-                  backgroundColor: `${theme.textSecondary}10`,
-                  border: `1px solid ${theme.border}`,
-                }}
+                onClick={chip.onClear}
+                className="rounded-full p-0.5 transition-all duration-150 hover:bg-black/10 active:scale-90"
+                aria-label={`Quitar ${chip.label}`}
               >
-                …+{hiddenChipsCount} más
+                <X className="h-3 w-3" />
               </button>
-            )}
-            <button
-              onClick={props.onClearAll}
-              className="text-[11px] font-semibold px-2 py-1 rounded-md transition-all duration-200 active:scale-95"
-              style={{
-                color: '#ef4444',
-                backgroundColor: '#ef444412',
-                border: '1px solid #ef444440',
-              }}
-            >
-              Limpiar todo
-            </button>
-          </div>
-        )}
-      </div>
+            </span>
+          ))}
+          <button
+            onClick={props.onClearAll}
+            className="text-[11px] font-semibold px-2 py-1 rounded-md transition-all duration-200 active:scale-95"
+            style={{
+              color: '#ef4444',
+              backgroundColor: '#ef444412',
+              border: '1px solid #ef444440',
+            }}
+          >
+            Limpiar todo
+          </button>
+        </div>
+      )}
 
-      {/* BODY colapsable */}
-      {open && (
-        <div
-          id="mapa-filtros-body"
-          className="flex flex-col gap-2 mt-3 animate-in fade-in slide-in-from-top-2 duration-200"
-        >
+      {/* Filtros siempre visibles (sin botón colapsable) */}
+      <div
+        id="mapa-filtros-body"
+        className="flex flex-col gap-2"
+      >
           {/* FILA 1 — Combos modernos: Categoría · Estado · Dependencia · Tiempo */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             {/* Categoría */}
@@ -608,7 +558,6 @@ export default function MapaFiltrosPanel(props: MapaFiltrosPanelProps) {
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }
