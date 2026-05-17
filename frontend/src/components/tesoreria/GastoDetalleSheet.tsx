@@ -101,6 +101,7 @@ export function GastoDetalleSheet({
 
   // Toggle estado concretado <-> pendiente
   const handleToggleEstado = async () => {
+    if (!gasto) return;
     const actual = (gasto as any).estado_pago || 'concretado';
     const next = actual === 'concretado' ? 'pendiente' : 'concretado';
     setTogglingEstado(true);
