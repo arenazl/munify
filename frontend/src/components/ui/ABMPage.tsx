@@ -834,7 +834,7 @@ export function ABMPage({
                           {/* Capa bg con opacity 0.4 — contenido sin opacity */}
                           <div
                             className="absolute inset-0 pointer-events-none rounded-lg"
-                            style={{ backgroundColor: theme.primary, opacity: 0.4 }}
+                            style={{ backgroundColor: theme.primary, opacity: 0.06 }}
                           />
                           <div className="relative flex items-center justify-between gap-3">
                           <div className="text-sm font-semibold" style={{ color: theme.text }}>
