@@ -833,8 +833,8 @@ export function ABMPage({
                         <div
                           className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-2 rounded-lg mb-3"
                           style={{
-                            backgroundColor: `color-mix(in srgb, ${theme.primary} 8%, transparent)`,
-                            border: `1px solid color-mix(in srgb, ${theme.primary} 25%, transparent)`,
+                            backgroundColor: `color-mix(in srgb, ${theme.primary} 12%, transparent)`,
+                            border: `1px solid color-mix(in srgb, ${theme.primary} 12%, transparent)`,
                           }}
                         >
                           <div className="text-sm font-semibold" style={{ color: theme.text }}>
@@ -1815,7 +1815,7 @@ export function ABMTable<T>({
                     key={`grp-${b.key}`}
                     style={{
                       // Tinta del acento del tema con opacity sutil (no hardcoded gris).
-                      backgroundColor: `color-mix(in srgb, ${theme.primary} 8%, transparent)`,
+                      backgroundColor: `color-mix(in srgb, ${theme.primary} 12%, transparent)`,
                     }}
                   >
                     <td colSpan={colSpan} className="px-3 py-2">
