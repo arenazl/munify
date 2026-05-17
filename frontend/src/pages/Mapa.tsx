@@ -932,7 +932,7 @@ export default function Mapa() {
 
       <StickyPageHeader filterPanel={filterPanel}>
         <PageTitleIcon icon={<MapIcon className="h-4 w-4" />} />
-        <PageTitle>Mapa de Reclamos</PageTitle>
+        <PageTitle>Mapa</PageTitle>
         {loadingMore && (
           <>
             <HeaderSeparator />
