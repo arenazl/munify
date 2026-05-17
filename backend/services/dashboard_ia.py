@@ -158,30 +158,31 @@ def _tendencia_arrow(pct: float) -> str:
 # RECLAMOS
 # ===================================================================
 
-RECLAMOS_PROMPT = """Sos un asistente que analiza datos operativos de reclamos municipales para el intendente.
-Te paso STATS agregados + una lista corta de items críticos. Devolvé un JSON con DOS arrays:
-
+RECLAMOS_PROMPT = """Analista de reclamos municipales. Devolvé JSON con DOS arrays:
 {{
-  "urgentes": [
-    {{"titulo": "...", "descripcion": "...", "accion": "...", "severidad": "alta"|"media", "items": [id1, id2]}}
-  ],
-  "recomendaciones": [
-    {{"titulo": "...", "descripcion": "...", "accion": "...", "items": [id1, id2]}}
-  ]
+  "urgentes": [{{"titulo","descripcion","accion","severidad":"alta"|"media","items":[ids]}}],
+  "recomendaciones": [{{"titulo","descripcion","accion","items":[ids]}}]
 }}
 
-REGLAS:
-- urgentes: máximo 3, cosas que requieren acción HOY (palabras clave críticas como gas/agua/incendio, SLA vencido, sin asignar >7d).
-- recomendaciones: máximo 4, decisiones operativas (foco de barrio, dependencia saturada, pico categoría, comunicación pendiente).
-- "accion" tiene que ser un imperativo corto (ej: "Asigná los 12 reclamos sin dependencia").
-- "items" es el array de ids de reclamos relacionados (max 5 por tip).
-- Texto en castellano rioplatense, sin emojis.
+REGLAS DURAS — TIPS PUNTUALES, NO VERBORRAGICOS:
+- urgentes: max 3. recomendaciones: max 4.
+- "titulo": MAX 7 palabras. Concreto, no genérico.
+- "descripcion": UNA frase, MAX 15 palabras. Dato + número, no explicación larga.
+- "accion": imperativo MAX 8 palabras (ej: "Asigná los 12 sin dependencia").
+- "items": max 5 ids relacionados.
+- Castellano rioplatense, SIN emojis, SIN MAYUSCULAS gritando.
+- Prohibido relleno tipo "se observa", "podría indicar", "para mejorar", "es necesario".
 
-STATS:
-{stats_json}
+EJEMPLOS BUENOS:
+- titulo: "12 reclamos de agua sin asignar"
+  descripcion: "Hace 7+ días sin dependencia."
+  accion: "Asigná a Obras Sanitarias."
+- titulo: "Higiene Urbana saturada"
+  descripcion: "41 abiertos, 26 atrasados."
+  accion: "Reforzá cuadrilla o redistribuí."
 
-ITEMS_CRITICOS:
-{items_json}
+STATS: {stats_json}
+ITEMS_CRITICOS: {items_json}
 """
 
 
@@ -328,11 +329,20 @@ async def build_reclamos_dashboard(db: AsyncSession, municipio_id: int, force: b
 # TRAMITES
 # ===================================================================
 
-TRAMITES_PROMPT = """Asistente operativo para trámites municipales.
-Devolvé JSON con urgentes (max 3) y recomendaciones (max 4) en formato:
+TRAMITES_PROMPT = """Analista de tramites municipales. Devolvé JSON:
 {{ "urgentes": [{{"titulo","descripcion","accion","severidad","items"}}], "recomendaciones": [{{"titulo","descripcion","accion","items"}}] }}
 
-REGLAS: castellano rioplatense, sin emojis. accion es imperativo corto. items = array de ids.
+REGLAS DURAS — TIPS PUNTUALES NO VERBORRAGICOS:
+- urgentes max 3, recomendaciones max 4.
+- titulo: MAX 7 palabras. descripcion: 1 frase MAX 15 palabras (dato + numero).
+- accion: imperativo MAX 8 palabras.
+- items: max 5 ids.
+- Castellano rioplatense, SIN emojis, sin relleno.
+
+EJEMPLO:
+- titulo: "8 tramites >15d sin avanzar"
+  descripcion: "5 son de Catastro, sin doc faltante."
+  accion: "Asigná a operador y notificá vecino."
 
 STATS: {stats_json}
 ITEMS_CRITICOS: {items_json}
@@ -452,14 +462,25 @@ async def build_tramites_dashboard(db: AsyncSession, municipio_id: int, force: b
 # TESORERIA
 # ===================================================================
 
-TESORERIA_PROMPT = """Asistente financiero para gastos del intendente.
-Devolvé JSON {{ "urgentes": [...], "recomendaciones": [...] }} con detección de:
-- pagos programados vencidos
-- gastos atípicos (monto inusual vs histórico)
-- contactos con muchos pagos sin geolocalizar
-- conceptos posiblemente mal clasificados
+TESORERIA_PROMPT = """Analista financiero de gastos del intendente. Devolvé JSON:
+{{ "urgentes": [{{"titulo","descripcion","accion","severidad","items"}}], "recomendaciones": [{{"titulo","descripcion","accion","items"}}] }}
 
-REGLAS: castellano rioplatense, sin emojis. accion = imperativo. items = ids.
+Detectar:
+- pagos vencidos
+- montos atipicos
+- conceptos mal clasificados
+
+REGLAS DURAS — TIPS PUNTUALES NO VERBORRAGICOS:
+- urgentes max 3, recomendaciones max 4.
+- titulo: MAX 7 palabras. descripcion: 1 frase MAX 15 palabras (dato + monto).
+- accion: imperativo MAX 8 palabras.
+- items: max 5 ids.
+- Castellano rioplatense, SIN emojis, sin relleno tipo "se observa", "podria".
+
+EJEMPLO:
+- titulo: "3 sueldos vencidos hace 10 días"
+  descripcion: "Total $450.000, no se descuentaron de la caja."
+  accion: "Pagá ya o marcá como pendiente."
 
 STATS: {stats_json}
 ITEMS_CRITICOS: {items_json}
