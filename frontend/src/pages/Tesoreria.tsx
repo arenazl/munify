@@ -90,7 +90,8 @@ export default function Tesoreria() {
   const [modoPeriodo, setModoPeriodo] = useState<PeriodModo>('mes');
   const [mesActual, setMesActual] = useState<number>(today.getMonth());  // 0-11
   const [anioActual, setAnioActual] = useState<number>(today.getFullYear());
-  const [todosLosMeses, setTodosLosMeses] = useState<boolean>(false);
+  // Default TRUE: la pantalla arranca mostrando TODOS los meses (panorama completo).
+  const [todosLosMeses, setTodosLosMeses] = useState<boolean>(true);
   // Rango de fechas (desde/hasta). Si esta seteado, PISA al PeriodNavigator.
   const [rangoFechas, setRangoFechas] = useState<DateRange>({ desde: '', hasta: '' });
   const rangoActivo = !!(rangoFechas.desde && rangoFechas.hasta);

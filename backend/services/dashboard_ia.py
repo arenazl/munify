@@ -473,7 +473,9 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
             return cached
 
     now = datetime.now(timezone.utc)
-    hace_30d = now - timedelta(days=30)
+    # Ventana de 12 meses (cubre todo el ejercicio activo). Si en el futuro
+    # se quiere "mes actual" se filtra en el frontend.
+    hace_30d = now - timedelta(days=365)
 
     # Top conceptos (por monto total)
     conceptos = (await db.execute(text("""
