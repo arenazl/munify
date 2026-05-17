@@ -45,7 +45,6 @@ interface VecinoEncontrado {
 }
 
 type Paso = 'identificar' | 'hub';
-type ModoId = 'dni' | 'celular';
 
 /**
  * Mostrador — consola de operador de ventanilla (v4, basado en handoff de Claude Design).
@@ -233,7 +232,8 @@ function MetricaCard({ color, icon, label, value, formatMoney }: {
 }
 
 // ============================================================
-// PasoIdentificar — ModePicker (2 cards grandes) + contenido del modo
+// PasoIdentificar — 2 columnas 50/50 SIEMPRE visibles (DNI | Celular)
+// Sin tabs, sin cambio de modo: las 2 opciones a la par.
 // ============================================================
 function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }: {
   onClienteRegistrado: (v: VecinoEncontrado) => void;
@@ -241,27 +241,30 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
   onCargarManual: () => void;
 }) {
   const { theme } = useTheme();
-  const [modo, setModo] = useState<ModoId>('dni');
   const [busquedaLibreAbierta, setBusquedaLibreAbierta] = useState(false);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-3">
-      <ModePicker modo={modo} setModo={setModo} />
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-stretch">
+        {/* Columna izquierda — DNI */}
+        <ColumnaModo
+          color={theme.primary}
+          icon={<IdCard className="w-5 h-5" />}
+          label="Por DNI"
+          sub="Cliente ya registrado en el padrón municipal"
+        >
+          <PanelDni onUsar={onClienteRegistrado} />
+        </ColumnaModo>
 
-      <div className="relative overflow-hidden">
-        <div key={modo} className="animate-tab-slide flex justify-center">
-          {modo === 'dni' && <PanelDni onUsar={onClienteRegistrado} />}
-          {modo === 'celular' && (
-            <PanelCelular onAprobado={onBiometriaOk} onCargarManual={onCargarManual} />
-          )}
-        </div>
-        <style>{`
-          @keyframes tabSlide {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .animate-tab-slide { animation: tabSlide 0.25s ease-out; }
-        `}</style>
+        {/* Columna derecha — Celular / RENAPER */}
+        <ColumnaModo
+          color="#22c55e"
+          icon={<Smartphone className="w-5 h-5" />}
+          label="Por celular"
+          sub="Generamos un QR · RENAPER + selfie del lado del vecino"
+        >
+          <PanelCelular onAprobado={onBiometriaOk} onCargarManual={onCargarManual} />
+        </ColumnaModo>
       </div>
 
       {/* Footer con búsqueda libre y carga manual */}
@@ -291,87 +294,49 @@ function PasoIdentificar({ onClienteRegistrado, onBiometriaOk, onCargarManual }:
       </div>
 
       {busquedaLibreAbierta && (
-        <div className="flex justify-center">
-          <BusquedaLibre
-            onUsar={onClienteRegistrado}
-            onCargarManual={onCargarManual}
-          />
-        </div>
+        <BusquedaLibre
+          onUsar={onClienteRegistrado}
+          onCargarManual={onCargarManual}
+        />
       )}
     </div>
   );
 }
 
-// ============================================================
-// ModePicker — 2 cards grandes DNI / Celular
-// ============================================================
-function ModePicker({ modo, setModo }: { modo: ModoId; setModo: (m: ModoId) => void }) {
+// ColumnaModo — wrapper de cada columna con header (icono + título + sub)
+// y el contenido del modo dentro. Card unificada con borde + altura 100%.
+function ColumnaModo({ color, icon, label, sub, children }: {
+  color: string;
+  icon: React.ReactNode;
+  label: string;
+  sub: string;
+  children: React.ReactNode;
+}) {
   const { theme } = useTheme();
-  const modos: Array<{ id: ModoId; label: string; sub: string; icon: React.ReactNode; kbd: string; color: string }> = [
-    {
-      id: 'dni',
-      label: 'Por DNI',
-      sub: 'Cliente ya registrado en el padrón municipal',
-      icon: <IdCard className="w-5 h-5" />,
-      kbd: '⌘1',
-      color: theme.primary,
-    },
-    {
-      id: 'celular',
-      label: 'Por celular',
-      sub: 'Generamos un QR · RENAPER + selfie del lado del vecino',
-      icon: <Smartphone className="w-5 h-5" />,
-      kbd: '⌘2',
-      color: '#22c55e',
-    },
-  ];
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {modos.map((m) => {
-        const activo = modo === m.id;
-        return (
-          <button
-            key={m.id}
-            onClick={() => setModo(m.id)}
-            aria-pressed={activo}
-            className="text-left rounded-2xl p-4 flex items-start gap-3 transition-all hover:scale-[1.01] active:scale-[0.99]"
-            style={{
-              backgroundColor: activo ? `${m.color}10` : theme.card,
-              border: `1.5px solid ${activo ? m.color : theme.border}`,
-              boxShadow: activo ? `0 4px 16px ${m.color}25` : 'none',
-            }}
-          >
-            <span
-              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{
-                backgroundColor: activo ? m.color : `${m.color}18`,
-                color: activo ? '#fff' : m.color,
-              }}
-            >
-              {m.icon}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold leading-tight" style={{ color: theme.text }}>
-                {m.label}
-              </div>
-              <div className="text-[11px] mt-0.5 leading-snug" style={{ color: theme.textSecondary }}>
-                {m.sub}
-              </div>
-            </div>
-            <kbd
-              className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold flex-shrink-0"
-              style={{
-                backgroundColor: activo ? `${m.color}20` : theme.backgroundSecondary,
-                color: activo ? m.color : theme.textSecondary,
-                border: `1px solid ${activo ? `${m.color}30` : theme.border}`,
-              }}
-            >
-              {m.kbd}
-            </kbd>
-          </button>
-        );
-      })}
+    <div
+      className="rounded-2xl p-5 flex flex-col gap-4 h-full"
+      style={{ backgroundColor: theme.card, border: `1.5px solid ${color}30` }}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${color}18`, color }}
+        >
+          {icon}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold leading-tight" style={{ color: theme.text }}>
+            {label}
+          </div>
+          <div className="text-[11px] mt-0.5 leading-snug" style={{ color: theme.textSecondary }}>
+            {sub}
+          </div>
+        </div>
+      </div>
+      <div className="flex-1 min-w-0">
+        {children}
+      </div>
     </div>
   );
 }
@@ -425,14 +390,11 @@ function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
   };
 
   return (
-    <div
-      className="rounded-2xl p-5 w-full max-w-xl"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
+    <div className="w-full">
       <div className="flex items-center gap-2">
         <div
           className="flex items-center gap-2 px-3 py-2 rounded-xl flex-1 min-w-0"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1.5px solid ${theme.primary}30` }}
         >
           <Search className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
           <input
@@ -1093,10 +1055,7 @@ function PanelCelular({ onAprobado, onCargarManual }: {
   };
 
   return (
-    <div
-      className="rounded-2xl p-6 w-full max-w-2xl"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-    >
+    <div className="w-full">
       {phase === 'idle' && (
         <div className="text-center space-y-4">
           <div
