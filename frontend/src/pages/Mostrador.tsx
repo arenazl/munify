@@ -315,18 +315,18 @@ function ColumnaModo({ color, icon, label, sub, children }: {
   const { theme } = useTheme();
   return (
     <div
-      className="rounded-2xl p-5 flex flex-col gap-4 h-full"
-      style={{ backgroundColor: theme.card, border: `1.5px solid ${color}30` }}
+      className="rounded-xl p-4 flex flex-col gap-4 h-full"
+      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 pb-3" style={{ borderBottom: `1px solid ${theme.border}` }}>
         <span
-          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ backgroundColor: `${color}18`, color }}
+          className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${color}15`, color }}
         >
           {icon}
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-bold leading-tight" style={{ color: theme.text }}>
+          <div className="text-sm font-semibold leading-tight" style={{ color: theme.text }}>
             {label}
           </div>
           <div className="text-[11px] mt-0.5 leading-snug" style={{ color: theme.textSecondary }}>
@@ -334,7 +334,7 @@ function ColumnaModo({ color, icon, label, sub, children }: {
           </div>
         </div>
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col">
         {children}
       </div>
     </div>
@@ -393,8 +393,8 @@ function PanelDni({ onUsar }: { onUsar: (v: VecinoEncontrado) => void }) {
     <div className="w-full">
       <div className="flex items-center gap-2">
         <div
-          className="flex items-center gap-2 px-3 py-2 rounded-xl flex-1 min-w-0"
-          style={{ backgroundColor: theme.backgroundSecondary, border: `1.5px solid ${theme.primary}30` }}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg flex-1 min-w-0"
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
         >
           <Search className="w-4 h-4 flex-shrink-0" style={{ color: theme.textSecondary }} />
           <input
@@ -1055,9 +1055,9 @@ function PanelCelular({ onAprobado, onCargarManual }: {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full h-full flex flex-col">
       {phase === 'idle' && (
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 flex flex-col items-center justify-center flex-1 py-4">
           <div
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mx-auto"
             style={{ backgroundColor: '#22c55e15' }}
