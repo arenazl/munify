@@ -112,26 +112,43 @@ Inventario completo y demás reemplazos: **BUILD_GUIDE.md §5 y §6**.
 ### 8. Emojis Unicode prohibidos
 - Cero emojis en UI, código, commits, labels. Sólo iconos `lucide-react` vía `<DynamicIcon name="Building2" />` o import directo.
 
+### 9. Header de ABMPage: input al 100%, botón "Nuevo" anclado a la derecha
+La primera línea de toda pantalla ABM (la del título + input + controles + botón "Nuevo") **siempre tiene que llegar al 100% del ancho disponible**, con esta distribución horizontal:
+
+```
+[Título] [|] [Input búsqueda  ──── crece a llenar ────] [Toggle vista] [HeaderActions] [+ Nuevo]
+```
+
+Reglas:
+- **El input de búsqueda es el "flex grow"**: ocupa TODO el espacio sobrante entre el título y los controles de la derecha. Si hay pocos controles, el input se hace más largo; si hay muchos, se achica. Nunca un gap muerto.
+- **El botón "Nuevo" siempre dockeado a la derecha**, como último elemento.
+- **No usar `searchMaxWidth` para "limitar" el input** — eso crea gaps muertos entre input y los controles. Si alguna pantalla lo está usando, removerlo.
+- Los chips/combos del medio (`toolbar.combos`, filtros, toggles de vista) van entre el input y el botón Nuevo, en su tamaño natural.
+
+**Why:** El user lo marcó como regla dura tras ver pantallas (Reclamos) con input chico y un hueco vacío al lado. La fila del header tiene que sentirse "completa" — el input absorbe el sobrante, no se deja espacio en blanco.
+
+**How to apply:** Ante cualquier ABMPage nuevo o existente, jamás pasar `searchMaxWidth`. Si encontrás `searchMaxWidth={N}` en código existente, borralo en el mismo cambio.
+
 ---
 
 ## REGLAS DE TRABAJO CON EL USER
 
-### 9. Jamás modificar módulos centrales sin consentimiento explícito
+### 10. Jamás modificar módulos centrales sin consentimiento explícito
 Proponer en texto primero (qué archivo, qué cambio, por qué). Esperar "dale" /
 "hacelo" / "aplicalo". "Aplicá los cambios que consideres" NO es carta blanca.
 
-### 10. Respuestas en UNA línea por defecto
+### 11. Respuestas en UNA línea por defecto
 Excepción: cuando el user pide explícitamente listas, detalle, o roadmap.
 
-### 11. No adivinar — verificar con datos reales
+### 12. No adivinar — verificar con datos reales
 Si el user duda de un resultado o pregunta "¿esto es real?", ejecutar query/script
 contra la fuente real (DB, API, código), no responder con hipótesis.
 
-### 12. CLIs primero, dashboard después
+### 13. CLIs primero, dashboard después
 El user tiene `gh`, `heroku`, `netlify`, `git`, `npm`, `node`, `python`, `docker`
 autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI.
 
-### 13. Deploy
+### 14. Deploy
 
 **Pipeline canónico — usar SIEMPRE este, no inventar atajos:**
 
@@ -156,7 +173,7 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 - Netlify production branch: `master`. Pushear a otra rama solo genera preview.
 - Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
 
-### 14. Cuando el user hace varias preguntas
+### 15. Cuando el user hace varias preguntas
 NO contestar todo de una. Responder de a una y esperar antes de seguir.
 
 ---

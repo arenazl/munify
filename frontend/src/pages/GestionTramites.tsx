@@ -1704,7 +1704,6 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
-        searchMaxWidth={280}
         loading={false}
         isEmpty={!loading && filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
