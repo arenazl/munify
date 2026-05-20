@@ -171,15 +171,42 @@ class GastoCreate(GastoBase):
 
 
 class GastoUpdate(BaseModel):
+    """Update abierto: el user puede editar cualquier campo del gasto desde
+    el detalle. Algunos campos (monto_pesos, fecha, tipo_financiacion,
+    cuotas_total, frecuencia, fecha_fin_recurrencia) regeneran las cuotas
+    pendientes/vencidas. Si hay cuotas YA PAGADAS, el endpoint rechaza el
+    cambio con 409 — el user tiene que cancelar la cuota pagada primero.
+    """
+    # Destino — permite reasignar a otro contacto o dependencia
+    destino_tipo: Optional[DestinoGastoStr] = None
+    destino_contacto_id: Optional[int] = None
+    destino_dependencia_id: Optional[int] = None
+
+    # Descripcion
     concepto: Optional[str] = Field(None, min_length=1, max_length=150)
     descripcion: Optional[str] = None
     observaciones: Optional[str] = None
-    activo: Optional[bool] = None
-    # Cambiar estado de pago: pendiente <-> concretado.
+
+    # Monto + cotizacion (regenera cuotas)
+    monto_pesos: Optional[Decimal] = Field(None, gt=0)
+    cotizacion_usd: Optional[Decimal] = Field(None, gt=0)
+
+    # Fecha (regenera cuotas)
+    fecha: Optional[date] = None
+
+    # Financiacion
+    tipo_financiacion: Optional[TipoFinanciacionStr] = None   # regenera cuotas
+    forma_pago: Optional[FormaPagoStr] = None
     estado_pago: Optional[EstadoPagoStr] = None
-    # Permitir reasignar la caja del pago (ej. el user se equivoco y eligio
-    # la caja incorrecta). Solo se aplica si viene en el payload.
+    cuotas_total: Optional[int] = Field(None, ge=1, le=120)   # regenera cuotas
+    frecuencia: Optional[FrecuenciaStr] = None                # regenera cuotas
+    fecha_fin_recurrencia: Optional[date] = None              # regenera cuotas
+
+    # Caja del pago
     caja_id: Optional[int] = None
+
+    # Otros
+    activo: Optional[bool] = None
     # Si se manda, reemplaza las imputaciones existentes. Si se omite,
     # quedan como estaban.
     proyectos: Optional[List[GastoProyectoAssignment]] = None

@@ -3,15 +3,18 @@ import {
   Calendar, Wallet, DollarSign, CreditCard, Receipt,
   CheckCircle2, Clock, AlertTriangle, Ban, Building2,
   Home, Save, Loader2,
-  Trash2, Pencil, X,
+  Trash2, Pencil, X, User as UserIcon, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet } from '../ui/Sheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
+import { ModernSelect } from '../ui/ModernSelect';
+import { DatePicker } from '../ui/DatePicker';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
 import type {
   Gasto, GastoCuota, EstadoGastoCuota, Contacto, Caja,
+  DestinoGasto, TipoFinanciacion, FormaPago, FrecuenciaRecurrencia,
 } from '../../types';
 
 // ============================================================
@@ -94,7 +97,32 @@ export function GastoDetalleSheet({
   const [contacto, setContacto] = useState<Contacto | null>(null);
   const [dependencia, setDependencia] = useState<DependenciaLite | null>(null);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [allContactos, setAllContactos] = useState<Contacto[]>([]);
+  const [allDependencias, setAllDependencias] = useState<DependenciaLite[]>([]);
   const [observaciones, setObservaciones] = useState('');
+
+  // ============ Edit mode ============
+  // Toggle "Editar" arriba del Sheet. Cuando editMode=true, los campos
+  // del header/resumen/destino se vuelven inputs. Footer cambia a
+  // Guardar/Cancelar. Por ahora todo es editable; en el futuro va a
+  // haber un control en settings para restringir.
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    concepto: string;
+    descripcion: string;
+    monto_pesos: string;
+    fecha: string;
+    forma_pago: FormaPago;
+    tipo_financiacion: TipoFinanciacion;
+    cuotas_total: number;
+    frecuencia: FrecuenciaRecurrencia;
+    fecha_fin_recurrencia: string;
+    caja_id: number | null;
+    destino_tipo: DestinoGasto;
+    destino_contacto_id: number | null;
+    destino_dependencia_id: number | null;
+  } | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [obsDirty, setObsDirty] = useState(false);
   const [savingObs, setSavingObs] = useState(false);
   const [pagandoCuotaId, setPagandoCuotaId] = useState<number | null>(null);
@@ -139,14 +167,27 @@ export function GastoDetalleSheet({
     }
   }, [gasto?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cargar cajas una sola vez al montar el componente. Son pocas (max ~10),
-  // no cambian entre gastos. Solo se usan para resolver caja_id -> nombre.
+  // Cargar catalogos cuando se abre el sheet. Cajas son pocas; contactos
+  // y dependencias se cargan completos para el modo edicion (combos del
+  // destino). En modo solo-vista contactos no hace falta porque ya tenemos
+  // el `contacto` puntual del gasto.
   useEffect(() => {
     if (!open) return;
-    if (cajas.length > 0) return;
-    cajasApi.list({ activo: true })
-      .then(res => setCajas(res.data || []))
-      .catch(() => setCajas([]));
+    if (cajas.length === 0) {
+      cajasApi.list({ activo: true })
+        .then(res => setCajas(res.data || []))
+        .catch(() => setCajas([]));
+    }
+    if (allContactos.length === 0) {
+      contactosApi.list({ activo: true, limit: 5000 })
+        .then(res => setAllContactos(res.data || []))
+        .catch(() => setAllContactos([]));
+    }
+    if (allDependencias.length === 0) {
+      dependenciasApi.getMunicipio({ activo: true })
+        .then(res => setAllDependencias(res.data || []))
+        .catch(() => setAllDependencias([]));
+    }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============ Derived ============
@@ -172,6 +213,81 @@ export function GastoDetalleSheet({
   const meta = ESTADO_AGREGADO_META[estadoAgregado];
   const monto = parseFloat(gasto.monto_pesos);
   const montoUsd = gasto.monto_usd ? parseFloat(gasto.monto_usd) : null;
+
+  // ============ Edit mode handlers ============
+  const entrarEnEdicion = () => {
+    if (!gasto) return;
+    setEditForm({
+      concepto: gasto.concepto || '',
+      descripcion: gasto.descripcion || '',
+      monto_pesos: gasto.monto_pesos || '',
+      fecha: (gasto.fecha || '').slice(0, 10),
+      forma_pago: gasto.forma_pago,
+      tipo_financiacion: gasto.tipo_financiacion,
+      cuotas_total: gasto.cuotas_total || 1,
+      frecuencia: gasto.frecuencia || 'mensual',
+      fecha_fin_recurrencia: (gasto.fecha_fin_recurrencia || '').slice(0, 10),
+      caja_id: (gasto as any).caja_id ?? null,
+      destino_tipo: gasto.destino_tipo,
+      destino_contacto_id: gasto.destino_contacto_id ?? null,
+      destino_dependencia_id: gasto.destino_dependencia_id ?? null,
+    });
+    setEditMode(true);
+  };
+
+  const cancelarEdicion = () => {
+    setEditMode(false);
+    setEditForm(null);
+  };
+
+  const guardarEdicion = async () => {
+    if (!gasto || !editForm) return;
+    // Validaciones basicas
+    if (!editForm.concepto.trim()) return toast.error('Falta el concepto');
+    if (!editForm.monto_pesos || parseFloat(editForm.monto_pesos) <= 0) {
+      return toast.error('Monto invalido');
+    }
+    if (!editForm.caja_id) return toast.error('Elegi una caja');
+    if (editForm.destino_tipo === 'contacto' && !editForm.destino_contacto_id) {
+      return toast.error('Elegi un contacto');
+    }
+    if (editForm.destino_tipo === 'dependencia' && !editForm.destino_dependencia_id) {
+      return toast.error('Elegi una secretaria');
+    }
+
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, unknown> = {
+        concepto: editForm.concepto.trim(),
+        descripcion: editForm.descripcion.trim() || null,
+        monto_pesos: editForm.monto_pesos,
+        fecha: editForm.fecha,
+        forma_pago: editForm.forma_pago,
+        tipo_financiacion: editForm.tipo_financiacion,
+        caja_id: editForm.caja_id,
+        destino_tipo: editForm.destino_tipo,
+        destino_contacto_id: editForm.destino_tipo === 'contacto' ? editForm.destino_contacto_id : null,
+        destino_dependencia_id: editForm.destino_tipo === 'dependencia' ? editForm.destino_dependencia_id : null,
+      };
+      if (editForm.tipo_financiacion === 'cuotas' || editForm.tipo_financiacion === 'prestamo') {
+        payload.cuotas_total = editForm.cuotas_total;
+      }
+      if (editForm.tipo_financiacion === 'recurrente') {
+        payload.frecuencia = editForm.frecuencia;
+        payload.fecha_fin_recurrencia = editForm.fecha_fin_recurrencia || null;
+      }
+      await gastosApi.update(gasto.id, payload);
+      toast.success('Gasto actualizado');
+      setEditMode(false);
+      setEditForm(null);
+      onUpdated?.();
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || 'Error guardando';
+      toast.error(detail);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   // ============ Handlers ============
   const handleSaveObs = async () => {
@@ -218,6 +334,27 @@ export function GastoDetalleSheet({
   };
 
   // ============ Render ============
+  // Footer en modo edicion: Guardar + Cancelar reemplazan todo lo demas
+  const sheetFooterEdit = (
+    <div className="flex items-center justify-end gap-2 w-full">
+      <button
+        onClick={cancelarEdicion}
+        disabled={savingEdit}
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+        style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+      >
+        <X className="h-3.5 w-3.5" /> Cancelar
+      </button>
+      <PrimaryButton
+        onClick={guardarEdicion}
+        disabled={savingEdit}
+        icon={savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+      >
+        Guardar cambios
+      </PrimaryButton>
+    </div>
+  );
+
   const sheetFooter = (
     <div className="flex items-center justify-between gap-2 w-full flex-wrap">
       <div className="flex items-center gap-2">
@@ -248,28 +385,255 @@ export function GastoDetalleSheet({
         })()}
       </div>
       <div className="flex items-center gap-2">
-        {onEdit && (
-          <button
-            onClick={() => onEdit(gasto)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
-            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-          >
-            <Pencil className="h-3.5 w-3.5" /> Editar
-          </button>
-        )}
+        <button
+          onClick={entrarEnEdicion}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
+          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+        >
+          <Pencil className="h-3.5 w-3.5" /> Editar
+        </button>
         <PrimaryButton onClick={onClose}>Cerrar</PrimaryButton>
       </div>
     </div>
   );
 
+  // Si la prop onEdit del padre todavia se usa, lo conservamos (compatibilidad).
+  // Pero la edicion principal ahora es el modo embebido (editMode).
+  void onEdit;
+
   return (
     <Sheet
       open={open}
-      onClose={onClose}
-      title="Detalle del gasto"
+      onClose={editMode ? cancelarEdicion : onClose}
+      title={editMode ? 'Editar gasto' : 'Detalle del gasto'}
       description={gasto.concepto}
-      stickyFooter={sheetFooter}
+      stickyFooter={editMode ? sheetFooterEdit : sheetFooter}
     >
+      {editMode && editForm ? (
+        // ============================================================
+        // MODO EDICION: form completo con todos los campos editables
+        // ============================================================
+        <div className="space-y-4">
+          {/* Aviso si va a regenerar cuotas */}
+          {(() => {
+            const cambiaMonto = String(editForm.monto_pesos) !== String(gasto.monto_pesos);
+            const cambiaFecha = editForm.fecha !== gasto.fecha?.slice(0, 10);
+            const cambiaFinan = editForm.tipo_financiacion !== gasto.tipo_financiacion;
+            const cambiaCuotas = editForm.cuotas_total !== (gasto.cuotas_total || 1);
+            const regenera = cambiaMonto || cambiaFecha || cambiaFinan || cambiaCuotas;
+            if (!regenera) return null;
+            return (
+              <div
+                className="p-3 rounded-xl text-xs flex items-start gap-2"
+                style={{ backgroundColor: '#f59e0b15', border: '1px solid #f59e0b40', color: theme.text }}
+              >
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#f59e0b' }} />
+                <span>
+                  Cambiar monto, fecha, financiación o cantidad de cuotas <b>regenera el plan de cuotas</b>.
+                  Si ya hay cuotas pagadas, el guardado va a fallar.
+                </span>
+              </div>
+            );
+          })()}
+
+          {/* Concepto */}
+          <div>
+            <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+              Concepto
+            </label>
+            <input
+              type="text"
+              value={editForm.concepto}
+              onChange={(e) => setEditForm({ ...editForm, concepto: e.target.value })}
+              className="w-full px-3 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            />
+          </div>
+
+          {/* Descripcion */}
+          <div>
+            <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+              Descripción
+            </label>
+            <textarea
+              value={editForm.descripcion}
+              onChange={(e) => setEditForm({ ...editForm, descripcion: e.target.value })}
+              rows={2}
+              className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+            />
+          </div>
+
+          {/* Monto + Fecha */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                Monto en pesos
+              </label>
+              <input
+                type="number"
+                value={editForm.monto_pesos}
+                onChange={(e) => setEditForm({ ...editForm, monto_pesos: e.target.value })}
+                min="0"
+                step="0.01"
+                className="w-full px-3 py-2 rounded-lg text-sm tabular-nums"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                Fecha
+              </label>
+              <DatePicker
+                value={editForm.fecha}
+                onChange={(v) => setEditForm({ ...editForm, fecha: v })}
+              />
+            </div>
+          </div>
+
+          {/* Destino: tabs contacto/dependencia + select */}
+          <div>
+            <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+              Destino
+            </label>
+            <div className="flex gap-2 mb-2">
+              {(['contacto', 'dependencia'] as DestinoGasto[]).map(t => {
+                const active = editForm.destino_tipo === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, destino_tipo: t })}
+                    className="flex-1 px-3 py-2 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5"
+                    style={{
+                      backgroundColor: active ? theme.primary : theme.backgroundSecondary,
+                      color: active ? '#fff' : theme.text,
+                      border: `1px solid ${active ? theme.primary : theme.border}`,
+                    }}
+                  >
+                    {t === 'contacto' ? <UserIcon className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
+                    {t === 'contacto' ? 'A una persona' : 'A una secretaría'}
+                  </button>
+                );
+              })}
+            </div>
+            {editForm.destino_tipo === 'contacto' ? (
+              <ModernSelect
+                value={editForm.destino_contacto_id ? String(editForm.destino_contacto_id) : ''}
+                onChange={(v) => setEditForm({ ...editForm, destino_contacto_id: v ? Number(v) : null })}
+                options={allContactos.map(c => ({
+                  value: String(c.id),
+                  label: `${c.nombre}${c.apellido ? ' ' + c.apellido : ''}`,
+                }))}
+                placeholder="Elegí un contacto"
+                searchable
+              />
+            ) : (
+              <ModernSelect
+                value={editForm.destino_dependencia_id ? String(editForm.destino_dependencia_id) : ''}
+                onChange={(v) => setEditForm({ ...editForm, destino_dependencia_id: v ? Number(v) : null })}
+                options={allDependencias.map(d => ({
+                  value: String(d.id),
+                  label: d.nombre,
+                  color: d.color || undefined,
+                }))}
+                placeholder="Elegí una secretaría"
+                searchable
+              />
+            )}
+          </div>
+
+          {/* Caja + Forma de pago */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                Caja
+              </label>
+              <ModernSelect
+                value={editForm.caja_id ? String(editForm.caja_id) : ''}
+                onChange={(v) => setEditForm({ ...editForm, caja_id: v ? Number(v) : null })}
+                options={cajas.map(c => ({
+                  value: String(c.id),
+                  label: c.nombre,
+                  color: c.color || undefined,
+                }))}
+                placeholder="Elegí una caja"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                Forma de pago
+              </label>
+              <ModernSelect
+                value={editForm.forma_pago}
+                onChange={(v) => setEditForm({ ...editForm, forma_pago: v as FormaPago })}
+                options={Object.entries(FORMA_PAGO_LABEL).map(([k, l]) => ({ value: k, label: l }))}
+              />
+            </div>
+          </div>
+
+          {/* Financiacion */}
+          <div>
+            <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+              Tipo de financiación
+            </label>
+            <ModernSelect
+              value={editForm.tipo_financiacion}
+              onChange={(v) => setEditForm({ ...editForm, tipo_financiacion: v as TipoFinanciacion })}
+              options={Object.entries(TIPO_FIN_LABEL).map(([k, l]) => ({ value: k, label: l }))}
+            />
+          </div>
+
+          {/* Campos condicionales segun tipo de financiacion */}
+          {(editForm.tipo_financiacion === 'cuotas' || editForm.tipo_financiacion === 'prestamo') && (
+            <div>
+              <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                Cantidad de cuotas
+              </label>
+              <input
+                type="number"
+                value={editForm.cuotas_total}
+                onChange={(e) => setEditForm({ ...editForm, cuotas_total: parseInt(e.target.value || '1', 10) })}
+                min="1"
+                max="120"
+                className="w-32 px-3 py-2 rounded-lg text-sm tabular-nums"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              />
+            </div>
+          )}
+          {editForm.tipo_financiacion === 'recurrente' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                  Frecuencia
+                </label>
+                <ModernSelect
+                  value={editForm.frecuencia}
+                  onChange={(v) => setEditForm({ ...editForm, frecuencia: v as FrecuenciaRecurrencia })}
+                  options={[
+                    { value: 'semanal', label: 'Semanal' },
+                    { value: 'quincenal', label: 'Quincenal' },
+                    { value: 'mensual', label: 'Mensual' },
+                    { value: 'bimestral', label: 'Bimestral' },
+                    { value: 'trimestral', label: 'Trimestral' },
+                    { value: 'anual', label: 'Anual' },
+                  ]}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                  Hasta fecha (opcional)
+                </label>
+                <DatePicker
+                  value={editForm.fecha_fin_recurrencia}
+                  onChange={(v) => setEditForm({ ...editForm, fecha_fin_recurrencia: v })}
+                  allowClear
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="space-y-3">
 
         {/* ============ Header: concepto + monto + badge estado ============ */}
@@ -478,6 +842,7 @@ export function GastoDetalleSheet({
         </div>
 
       </div>
+      )}
 
       {/* ============ Confirmación eliminar ============ */}
       {confirmDelete && (

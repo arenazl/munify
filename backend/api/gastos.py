@@ -467,8 +467,69 @@ async def update_gasto(
 
     payload_data = payload.model_dump(exclude_unset=True)
     payload_data.pop("proyectos", None)  # se procesa aparte
+
+    # Detectar si cambian campos que regeneran las cuotas.
+    # Comparacion en string para tolerar Decimal vs float vs date.
+    CAMPOS_REGEN = ("monto_pesos", "fecha", "tipo_financiacion",
+                    "cuotas_total", "frecuencia", "fecha_fin_recurrencia")
+    requiere_regen = False
+    for f in CAMPOS_REGEN:
+        if f in payload_data:
+            actual = getattr(gasto, f)
+            nuevo = payload_data[f]
+            # Para enums comparamos por .value cuando aplica
+            actual_str = actual.value if hasattr(actual, "value") else str(actual) if actual is not None else None
+            nuevo_str = str(nuevo) if nuevo is not None else None
+            if actual_str != nuevo_str:
+                requiere_regen = True
+                break
+
+    # Si regenera cuotas, no permitir si ya hay cuotas pagadas (cambiarias
+    # el historial de pagos). El user puede primero cancelar la cuota
+    # pagada desde el side panel de cuotas y despues editar.
+    if requiere_regen:
+        cuotas_pagadas = [c for c in (gasto.cuotas or []) if c.estado == EstadoGastoCuota.PAGADA]
+        if cuotas_pagadas:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "No se puede editar monto/fecha/financiacion porque ya hay "
+                    f"{len(cuotas_pagadas)} cuota(s) pagada(s). Cancelalas primero "
+                    "si necesitas reconstruir el plan de pagos."
+                ),
+            )
+
+    # Si cambian destino_tipo, limpiar el FK del otro lado para evitar
+    # gastos con destino_tipo=contacto pero destino_dependencia_id seteado.
+    if "destino_tipo" in payload_data:
+        if payload_data["destino_tipo"] == "contacto":
+            payload_data.setdefault("destino_dependencia_id", None)
+            if not payload_data.get("destino_contacto_id") and not gasto.destino_contacto_id:
+                raise HTTPException(422, "destino_contacto_id requerido")
+        elif payload_data["destino_tipo"] == "dependencia":
+            payload_data.setdefault("destino_contacto_id", None)
+            if not payload_data.get("destino_dependencia_id") and not gasto.destino_dependencia_id:
+                raise HTTPException(422, "destino_dependencia_id requerido")
+
+    # Aplicar cambios
     for k, v in payload_data.items():
         setattr(gasto, k, v)
+
+    # Recalcular monto_usd si cambio monto o cotizacion
+    if "monto_pesos" in payload_data or "cotizacion_usd" in payload_data:
+        if gasto.cotizacion_usd and Decimal(gasto.cotizacion_usd) > 0:
+            gasto.monto_usd = (Decimal(gasto.monto_pesos) / Decimal(gasto.cotizacion_usd)).quantize(Decimal("0.01"))
+        else:
+            gasto.monto_usd = None
+
+    # Si regenera cuotas: borrar las viejas y crear nuevas con _generar_cuotas
+    if requiere_regen:
+        for c in list(gasto.cuotas or []):
+            await db.delete(c)
+        await db.flush()
+        gasto.cuotas = []
+        nuevas = _generar_cuotas(gasto)
+        db.add_all(nuevas)
 
     # Si vinieron proyectos en el payload (incluso lista vacia), reasignar.
     if payload.proyectos is not None:
