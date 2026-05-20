@@ -1,8 +1,11 @@
-// Service Worker para Push Notifications
-// VERSION: 2.4.0 - Soporte de SKIP_WAITING via postMessage para auto-update
-// sin que el usuario tenga que hacer hard-refresh manual
+// Service Worker para Push Notifications + auto-update
+// VERSION: 2.4.0 - Soporte de SKIP_WAITING via postMessage
+// BUILD_ID se reemplaza en cada build por scripts/stamp-sw.mjs.
+// Esto garantiza que el browser detecte un sw.js byte-diferente en cada
+// deploy y dispare el flujo de "Nueva version disponible" del ServiceWorkerUpdater.
 const SW_VERSION = '2.4.0';
-const CACHE_NAME = `app-cache-v${SW_VERSION}`;
+const SW_BUILD = '__BUILD_ID__';
+const CACHE_NAME = `app-cache-v${SW_VERSION}-${SW_BUILD}`;
 
 // Handler de mensajes desde la app. Permite que el componente
 // ServiceWorkerUpdater le diga al SW que active la versión nueva
