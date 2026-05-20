@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2, Loader2 } from 'lucide-react';
+import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2, Loader2, GitMerge } from 'lucide-react';
+import { UnificarContactosModal } from '../components/tesoreria/UnificarContactosModal';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +42,9 @@ export default function TesoreriaContactos() {
   const [saving, setSaving] = useState(false);
 
   const [importing, setImporting] = useState<'excel' | 'kmz' | null>(null);
+
+  // Modal de unificacion de duplicados
+  const [unificarOpen, setUnificarOpen] = useState(false);
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return <p className="p-6 text-sm">Sin permisos.</p>;
@@ -254,7 +258,24 @@ export default function TesoreriaContactos() {
 
   // Botones Excel/KMZ sacados del header a pedido del user — accesibles
   // desde una pantalla aparte si hace falta importar.
-  const headerActions = null;
+  // Boton "Unificar" para detectar y fusionar contactos duplicados
+  // (caso tipico: el mismo proveedor cargado 2-3 veces con tipos distintos
+  // por el import del Excel).
+  const headerActions = (
+    <button
+      onClick={() => setUnificarOpen(true)}
+      className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105 active:scale-95"
+      style={{
+        backgroundColor: `${theme.primary}15`,
+        color: theme.primary,
+        border: `1px solid ${theme.primary}40`,
+      }}
+      title="Detectar y fusionar contactos duplicados"
+    >
+      <GitMerge className="h-3.5 w-3.5" />
+      Unificar
+    </button>
+  );
 
   const sheetContent = (
     <div className="space-y-3">
@@ -525,6 +546,12 @@ export default function TesoreriaContactos() {
           </ABMCard>
         ))}
       </ABMPage>
+
+      <UnificarContactosModal
+        open={unificarOpen}
+        onClose={() => setUnificarOpen(false)}
+        onMerged={() => fetch()}
+      />
     </>
   );
 }

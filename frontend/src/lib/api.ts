@@ -1940,6 +1940,14 @@ export const contactosApi = {
   update: (id: number, data: Record<string, unknown>) =>
     api.put(`/tesoreria/contactos/${id}`, data),
   delete: (id: number) => api.delete(`/tesoreria/contactos/${id}`),
+  duplicados: (threshold = 0.9) =>
+    api.get('/tesoreria/contactos/duplicados', { params: { threshold } }),
+  merge: (data: {
+    keep_id: number;
+    merge_ids: number[];
+    tipo_final?: string;
+    overrides?: Record<string, unknown>;
+  }) => api.post('/tesoreria/contactos/merge', data),
 };
 
 export const gastosApi = {
