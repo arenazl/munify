@@ -284,7 +284,7 @@ export default function TesoreriaProyectos() {
         onSearchChange={setSearch}
         extraFilters={extraFilters}
         loading={loading}
-        isEmpty={!loading && filtered.length === 0}
+        isEmpty={filtered.length === 0}
         emptyMessage="No hay proyectos cargados. Creá uno con 'Nuevo Proyecto'."
         defaultViewMode="cards"
         pagination={{

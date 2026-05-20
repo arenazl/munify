@@ -1187,7 +1187,7 @@ export default function Tesoreria() {
         toolbar={tesoreriaToolbar}
         headerActions={headerActions}
         loading={loading}
-        isEmpty={!loading && filtered.length === 0}
+        isEmpty={filtered.length === 0}
         emptyMessage="No hay gastos que coincidan con los filtros."
         pagination={{
           page,

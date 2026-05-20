@@ -512,7 +512,7 @@ export default function TesoreriaAgenda() {
           onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
         }}
         loading={loading}
-        isEmpty={!loading && filtered.length === 0}
+        isEmpty={filtered.length === 0}
         emptyMessage="No hay pagos con esos filtros."
         defaultViewMode="table"
         viewStorageKey="agenda_view"

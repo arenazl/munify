@@ -369,11 +369,13 @@ export function ABMPage({
   // se respeta porque tipicamente esta diseñada para todos los anchos.
   const effectiveViewMode: ViewMode = isMobile && viewMode === 'table' ? 'cards' : viewMode;
 
-  // Spinner full-page SOLO en carga inicial (cuando no hay nada para mostrar
-  // todavía). Si hay paginacion, NO usamos este spinner — el footer ya tiene
-  // su propio indicador y los items previos se mantienen visibles mientras
-  // llegan los nuevos (sin flicker en blanco).
-  if (loading && !pagination && isEmpty) {
+  // Spinner full-page en carga inicial (loading=true Y no hay items todavia).
+  // Si hay items visibles y se esta haciendo un refetch, NO mostramos spinner
+  // — los items siguen visibles y el footer de paginacion (si hay) muestra
+  // su propio indicador. Convencion: `isEmpty` debe representar "no hay
+  // items" sin chequear loading. La logica de no mostrar el cartel "Sin
+  // resultados" mientras carga la maneja este componente, no el padre.
+  if (loading && isEmpty) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <div className="relative">

@@ -1705,7 +1705,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
         loading={false}
-        isEmpty={!loading && filteredTramites.length === 0 && !vistaInbox}
+        isEmpty={filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
         pagination={{
           page,

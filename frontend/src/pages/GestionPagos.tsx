@@ -607,7 +607,7 @@ export default function GestionPagos() {
       }
       headerActions={headerActions}
       loading={loading && !resumen}
-      isEmpty={!loading && items.length === 0}
+      isEmpty={items.length === 0}
       emptyMessage="No hay pagos para el rango y filtros seleccionados"
       tableView={(
         <div className="space-y-4">

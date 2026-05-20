@@ -317,7 +317,7 @@ export default function TesoreriaResumen() {
         onSearchChange={() => {}}
         extraFilters={extraFilters}
         loading={loading}
-        isEmpty={!loading && filtered.length === 0}
+        isEmpty={filtered.length === 0}
         emptyMessage={`No hay gastos en ${labelPeriodo} con esos filtros.`}
         defaultViewMode="cards"
       >

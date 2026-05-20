@@ -4378,7 +4378,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         searchValue={search}
         onSearchChange={setSearch}
         loading={false}
-        isEmpty={!loading && filteredReclamos.length === 0}
+        isEmpty={filteredReclamos.length === 0}
         emptyMessage={debouncedSearch ? `No se encontraron reclamos para "${debouncedSearch}"` : "No se encontraron reclamos"}
         sheetOpen={false}
         sheetTitle=""

@@ -273,7 +273,7 @@ export default function TesoreriaCuracionBartolo() {
         </div>
       }
       loading={loading}
-      isEmpty={!loading && filtered.length === 0}
+      isEmpty={filtered.length === 0}
       emptyMessage={gastos.length === 0 ? '🎉 No hay gastos dudosos.' : 'Sin resultados.'}
       tableView={tableView}
       defaultViewMode="table"

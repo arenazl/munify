@@ -427,7 +427,7 @@ export default function TesoreriaContactos() {
           ] : [],
         } satisfies AbmToolbar}
         loading={loading}
-        isEmpty={!loading && filtered.length === 0}
+        isEmpty={filtered.length === 0}
         emptyMessage="No hay contactos. Importá el Excel o agregalos con 'Nuevo'."
         defaultViewMode="table"
         pagination={{
