@@ -1525,9 +1525,11 @@ interface ABMTableProps<T> {
   defaultSortDirection?: 'asc' | 'desc';
   // Render alternativo para mobile (cards)
   renderMobileCard?: (item: T, actions?: ReactNode) => ReactNode;
-  /** Si true (default), se omite el <thead> completo — patron canonico del
-   *  sistema: tablas en estilo lista/feed (avatar + titulo + meta), sin
-   *  cabecera. Pasar `hideHeader={false}` para mostrar la cabecera. */
+  /** Si true, se omite el <thead> completo. Default ahora es `false`: el
+   *  header se muestra en estilo MUY fino y sutil (alto reducido, font
+   *  pequeño, sin uppercase, color tenue) para que aporte legibilidad sin
+   *  pesar visualmente. Pasar `hideHeader={true}` para volver al estilo
+   *  feed sin cabecera. */
   hideHeader?: boolean;
   /** Atajo: si se pasa, ABMTable arma automaticamente el `groupBy` por dia
    *  con el header canonico (chip 2-lineas + count). El valor es el path al
@@ -1565,7 +1567,7 @@ export function ABMTable<T>({
   defaultSortKey,
   defaultSortDirection,
   renderMobileCard,
-  hideHeader = true,
+  hideHeader = false,
   defaultGroupByDateKey,
   defaultGroupBySortKeys,
   defaultGroupByItemLabel,
@@ -1697,14 +1699,14 @@ export function ABMTable<T>({
         <table className="w-full">
           {!hideHeader && (
           <thead>
-            <tr style={{ backgroundColor: theme.backgroundSecondary }}>
+            <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
               {columns.map((col) => {
                 const isSortable = col.sortable !== false;
                 return (
                   <th
                     key={col.key}
-                    className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider first:pl-4 ${col.className || ''} ${isSortable ? 'cursor-pointer select-none hover:opacity-80' : ''}`}
-                    style={{ color: theme.textSecondary }}
+                    className={`px-2 py-1.5 text-left text-[10px] font-medium first:pl-4 ${col.className || ''} ${isSortable ? 'cursor-pointer select-none hover:opacity-100' : ''}`}
+                    style={{ color: theme.textSecondary, opacity: 0.7 }}
                     onClick={() => isSortable && handleSort(col)}
                   >
                     <div className="flex items-center">
@@ -1716,8 +1718,8 @@ export function ABMTable<T>({
               })}
               {actions && (
                 <th
-                  className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: theme.textSecondary }}
+                  className="px-4 py-1.5 text-right text-[10px] font-medium"
+                  style={{ color: theme.textSecondary, opacity: 0.7 }}
                 >
                   Acciones
                 </th>
