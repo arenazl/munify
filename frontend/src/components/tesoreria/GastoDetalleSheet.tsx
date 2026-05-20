@@ -9,9 +9,9 @@ import { toast } from 'sonner';
 import { Sheet } from '../ui/Sheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { useTheme } from '../../contexts/ThemeContext';
-import { gastosApi, contactosApi, dependenciasApi } from '../../lib/api';
+import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
 import type {
-  Gasto, GastoCuota, EstadoGastoCuota, Contacto,
+  Gasto, GastoCuota, EstadoGastoCuota, Contacto, Caja,
 } from '../../types';
 
 // ============================================================
@@ -93,6 +93,7 @@ export function GastoDetalleSheet({
   // ============ State ============
   const [contacto, setContacto] = useState<Contacto | null>(null);
   const [dependencia, setDependencia] = useState<DependenciaLite | null>(null);
+  const [cajas, setCajas] = useState<Caja[]>([]);
   const [observaciones, setObservaciones] = useState('');
   const [obsDirty, setObsDirty] = useState(false);
   const [savingObs, setSavingObs] = useState(false);
@@ -137,6 +138,16 @@ export function GastoDetalleSheet({
         .catch(() => setDependencia(null));
     }
   }, [gasto?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cargar cajas una sola vez al montar el componente. Son pocas (max ~10),
+  // no cambian entre gastos. Solo se usan para resolver caja_id -> nombre.
+  useEffect(() => {
+    if (!open) return;
+    if (cajas.length > 0) return;
+    cajasApi.list({ activo: true })
+      .then(res => setCajas(res.data || []))
+      .catch(() => setCajas([]));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ============ Derived ============
   const estadoAgregado = useMemo<EstadoAgregado>(
@@ -376,6 +387,16 @@ export function GastoDetalleSheet({
             icon={<Wallet className="h-3.5 w-3.5" />}
             label="Financiación"
             value={TIPO_FIN_LABEL[gasto.tipo_financiacion] || gasto.tipo_financiacion}
+          />
+          <InfoTile
+            icon={<Wallet className="h-3.5 w-3.5" />}
+            label="Caja"
+            value={(() => {
+              const cajaId = (gasto as any).caja_id;
+              if (!cajaId) return 'Sin asignar';
+              const c = cajas.find(x => x.id === cajaId);
+              return c ? c.nombre : `#${cajaId}`;
+            })()}
           />
           <InfoTile
             icon={<DollarSign className="h-3.5 w-3.5" />}

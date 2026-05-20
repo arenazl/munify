@@ -156,6 +156,15 @@ class Gasto(Base):
     )
     fecha_fin_recurrencia = Column(Date, nullable=True)
 
+    # ============ CAJA ============
+    # De que caja sale este pago. Necesario para arqueo (sumar egresos por
+    # caja y compararlos con el saldo). La columna se creo via migracion
+    # ad-hoc (migrate_tesoreria_extras.py) — aca solo la declaramos en el
+    # ORM. Nullable en DB para gastos historicos cargados antes de esta
+    # feature; el wizard nuevo la pide obligatoria.
+    caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True)
+    caja = relationship("TesoreriaCaja", foreign_keys=[caja_id])
+
     # ============ AUDITORIA ============
     activo = Column(Boolean, default=True, nullable=False)
 

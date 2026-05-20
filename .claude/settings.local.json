@@ -37,7 +37,8 @@
       "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
       "WebFetch(domain:app.munify.com.ar)",
       "WebFetch(domain:munify.com.ar)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $procId = $_.OwningProcess; Write-Host \"Killing PID $procId\"; Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue }; Start-Sleep 3; $still = Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction SilentlyContinue; if \\($still\\) { Write-Host \"Still listening\"; $still | Select-Object OwningProcess } else { Write-Host \"Port 8002 FREE\" })"
+      "PowerShell(Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { $procId = $_.OwningProcess; Write-Host \"Killing PID $procId\"; Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue }; Start-Sleep 3; $still = Get-NetTCPConnection -LocalPort 8002 -State Listen -ErrorAction SilentlyContinue; if \\($still\\) { Write-Host \"Still listening\"; $still | Select-Object OwningProcess } else { Write-Host \"Port 8002 FREE\" })",
+      "PowerShell($files = @\\('contacto.html','index.html','precios.html','reclamos-vecinales.html','software-gestion-municipal.html','tramites-municipales.html','tesoreria.html'\\); $utf8NoBom = New-Object System.Text.UTF8Encoding\\($false\\); foreach \\($f in $files\\) { $path = \"d:\\\\Code\\\\sugerenciasMun\\\\landing\\\\$f\"; $content = [System.IO.File]::ReadAllText\\($path\\); $content = $content -replace '5491160223474','5491171480178'; $content = $content -replace '\\\\+54 9 11 6022 3474','+54 9 11 7148 0178'; $content = $content -replace '\\\\+54-9-11-6022-3474','+54-9-11-7148-0178'; [System.IO.File]::WriteAllText\\($path, $content, $utf8NoBom\\); Write-Host \"OK $f\" })"
     ],
     "deny": [],
     "ask": []

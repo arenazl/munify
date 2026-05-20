@@ -355,6 +355,18 @@ async def create_gasto(
     else:
         raise HTTPException(status_code=422, detail="destino_tipo invalido")
 
+    # Validar caja_id si viene (debe pertenecer al muni del user)
+    if payload.caja_id is not None:
+        from models import TesoreriaCaja
+        caja = (await db.execute(
+            select(TesoreriaCaja).where(
+                TesoreriaCaja.id == payload.caja_id,
+                TesoreriaCaja.municipio_id == municipio_id,
+            )
+        )).scalar_one_or_none()
+        if not caja:
+            raise HTTPException(status_code=422, detail="caja_id invalido para este municipio")
+
     # Calcular monto_usd si hay cotizacion
     monto_usd = None
     if payload.cotizacion_usd and payload.cotizacion_usd > 0:
@@ -440,6 +452,18 @@ async def update_gasto(
     gasto = result.scalar_one_or_none()
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
+
+    # Validar caja_id si viene en el update (pertenece al mismo muni)
+    if payload.caja_id is not None:
+        from models import TesoreriaCaja
+        caja = (await db.execute(
+            select(TesoreriaCaja).where(
+                TesoreriaCaja.id == payload.caja_id,
+                TesoreriaCaja.municipio_id == municipio_id,
+            )
+        )).scalar_one_or_none()
+        if not caja:
+            raise HTTPException(status_code=422, detail="caja_id invalido para este municipio")
 
     payload_data = payload.model_dump(exclude_unset=True)
     payload_data.pop("proyectos", None)  # se procesa aparte

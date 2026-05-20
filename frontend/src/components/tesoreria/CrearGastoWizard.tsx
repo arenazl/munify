@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X } from 'lucide-react';
+import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
@@ -7,12 +7,12 @@ import { PrimaryButton } from '../ui/PrimaryButton';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
-  contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi, proyectosApi,
+  contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi, proyectosApi, cajasApi,
 } from '../../lib/api';
 import type {
   Contacto, ConceptosCatalogo, CotizacionUSD, TipoFinanciacion,
   FrecuenciaRecurrencia, FormaPago, DestinoGasto, Proyecto, GastoProyectoAssignment,
-  TipoContacto,
+  TipoContacto, Caja,
 } from '../../types';
 
 import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_COLORS } from '../../lib/contactoIcons';
@@ -62,6 +62,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [dependencias, setDependencias] = useState<DepOption[]>([]);
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [cotizacion, setCotizacion] = useState<CotizacionUSD | null>(null);
+  const [cajas, setCajas] = useState<Caja[]>([]);
 
   // Form state
   const [concepto, setConcepto] = useState('');
@@ -78,6 +79,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrencia>('mensual');
   const [fechaFinRec, setFechaFinRec] = useState<string>('');
   const [descripcion, setDescripcion] = useState('');
+  const [cajaId, setCajaId] = useState<number | null>(null);
 
   // Imputaciones a proyectos (opcional). Persisten cuando se usa
   // "Guardar y agregar otro" para no recargar el mismo proyecto.
@@ -110,6 +112,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       setProyectoAsignaciones([]);
       setContactoSearch('');
       setContactoTipoFiltro('');
+      setCajaId(null);
     }
   }, [open]);
 
@@ -118,15 +121,17 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     if (!open) return;
     (async () => {
       try {
-        const [cRes, depRes, projRes, usdRes] = await Promise.all([
+        const [cRes, depRes, projRes, usdRes, cajasRes] = await Promise.all([
           tesoreriaCatalogoApi.conceptos(),
           dependenciasApi.getMunicipio({ activo: true }),
           proyectosApi.list({ activo: true, include_resumen: false, limit: 5000 }).catch(() => ({ data: [] as Proyecto[] })),
           cotizacionApi.usd().catch(() => null),
+          cajasApi.list({ activo: true, include_saldos: true }).catch(() => ({ data: [] as Caja[] })),
         ]);
         setConceptos(cRes.data);
         setDependencias(depRes.data || []);
         setProyectos(projRes.data || []);
+        setCajas(cajasRes.data || []);
         if (usdRes?.data?.valor_sugerido) {
           setCotizacion(usdRes.data);
           setCotizacionUsd(String(usdRes.data.valor_sugerido));
@@ -185,6 +190,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     if (destinoTipo === 'contacto' && !contactoId) return toast.error('Elegí un contacto');
     if (destinoTipo === 'dependencia' && !dependenciaId) return toast.error('Elegí una secretaría');
     if (!montoPesos || parseFloat(montoPesos) <= 0) return toast.error('Ingresá el monto');
+    if (!cajaId) return toast.error('Elegí de qué caja sale el pago');
 
     const monto = parseFloat(montoPesos);
     if (totalImputado > monto + 0.001) {
@@ -208,6 +214,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         cuotas_total: tipoFinanciacion === 'cuotas' || tipoFinanciacion === 'prestamo' ? cuotasTotal : null,
         frecuencia: tipoFinanciacion === 'recurrente' ? frecuencia : null,
         fecha_fin_recurrencia: tipoFinanciacion === 'recurrente' && fechaFinRec ? fechaFinRec : null,
+        caja_id: cajaId,
         proyectos: proyectoAsignaciones.length > 0 ? proyectoAsignaciones : [],
       });
       toast.success(continueAdding ? 'Gasto cargado · cargá el siguiente' : 'Gasto cargado correctamente');
@@ -812,6 +819,11 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
           {tipoFinanciacion === 'cuotas' && ` — ${cuotasTotal} cuotas`}
           {tipoFinanciacion === 'recurrente' && ` — ${frecuencia}`}
         </p>
+
+        <p className="text-[10px] uppercase font-bold mt-3" style={{ color: theme.textSecondary }}>Caja</p>
+        <p className="text-base" style={{ color: theme.text }}>
+          {cajas.find(c => c.id === cajaId)?.nombre || '—'}
+        </p>
       </div>
 
       <div className="p-3 rounded-xl flex items-start gap-2" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98140' }}>
@@ -820,6 +832,77 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
           Al confirmar se va a crear el gasto y se generarán las cuotas correspondientes automáticamente.
         </p>
       </div>
+    </div>
+  );
+
+  // Paso "Caja": de que fondo sale el pago. Obligatorio — sin caja no se
+  // puede arquear despues. Muestra el saldo actual para que el user vea
+  // de un vistazo de donde le conviene sacar la plata.
+  const stepCaja = (
+    <div className="space-y-3">
+      <p className="text-sm" style={{ color: theme.textSecondary }}>
+        ¿De qué caja sale el pago? Esto es lo que después permite hacer el arqueo.
+      </p>
+      {cajas.length === 0 ? (
+        <div
+          className="p-3 rounded-xl text-sm"
+          style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.textSecondary }}
+        >
+          No hay cajas cargadas en el municipio. Pedile al admin que cree al menos una desde "Configuración → Tesorería".
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {cajas.map(c => {
+            const saldo = parseFloat(c.saldo_actual || '0');
+            const isSelected = cajaId === c.id;
+            const color = c.color || theme.primary;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCajaId(c.id)}
+                className="w-full p-3 rounded-xl text-left transition-all hover:scale-[1.005]"
+                style={{
+                  backgroundColor: isSelected ? `${color}15` : theme.backgroundSecondary,
+                  border: `2px solid ${isSelected ? color : 'transparent'}`,
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${color}25`, color }}
+                  >
+                    <Wallet className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm" style={{ color: theme.text }}>
+                        {c.nombre}
+                      </span>
+                      {c.codigo && (
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}25`, color }}>
+                          {c.codigo}
+                        </span>
+                      )}
+                    </div>
+                    {c.descripcion && (
+                      <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                        {c.descripcion}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Saldo</p>
+                    <p className="text-sm font-bold tabular-nums" style={{ color: theme.text }}>
+                      ${saldo.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 
@@ -841,6 +924,10 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     {
       id: 'finan', title: 'Pago', description: 'Forma y plazos',
       icon: <Calendar className="h-4 w-4" />, content: step4, isValid: true,
+    },
+    {
+      id: 'caja', title: 'Caja', description: 'De qué fondo sale',
+      icon: <Wallet className="h-4 w-4" />, content: stepCaja, isValid: !!cajaId,
     },
     {
       id: 'proyectos', title: 'Proyectos', description: 'Imputar a obras (opcional)',

@@ -159,6 +159,10 @@ class GastoBase(BaseModel):
     frecuencia: Optional[FrecuenciaStr] = None
     fecha_fin_recurrencia: Optional[date] = None
 
+    # Caja de la que sale el pago. Nullable para compat con gastos viejos;
+    # el wizard la pide obligatoria desde el frontend.
+    caja_id: Optional[int] = None
+
 
 class GastoCreate(GastoBase):
     # Imputaciones opcionales a proyectos. La suma de monto_asignado
@@ -173,6 +177,9 @@ class GastoUpdate(BaseModel):
     activo: Optional[bool] = None
     # Cambiar estado de pago: pendiente <-> concretado.
     estado_pago: Optional[EstadoPagoStr] = None
+    # Permitir reasignar la caja del pago (ej. el user se equivoco y eligio
+    # la caja incorrecta). Solo se aplica si viene en el payload.
+    caja_id: Optional[int] = None
     # Si se manda, reemplaza las imputaciones existentes. Si se omite,
     # quedan como estaban.
     proyectos: Optional[List[GastoProyectoAssignment]] = None
