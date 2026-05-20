@@ -267,7 +267,7 @@ export default function TesoreriaMapa() {
     (async () => {
       try {
         const [c, g] = await Promise.all([
-          contactosApi.list({ limit: 500, activo: true }),
+          contactosApi.list({ limit: 5000, activo: true }),
           gastosApi.list({ destino_tipo: 'contacto', limit: 1000 }),
         ]);
         setContactos(c.data);

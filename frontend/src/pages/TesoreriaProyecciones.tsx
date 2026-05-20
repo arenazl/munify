@@ -89,7 +89,7 @@ export default function TesoreriaResumen() {
   // El filtrado por periodo (mes/año) es 100% client-side -> sin flicker.
   useEffect(() => {
     if (sinPermisos) return;
-    contactosApi.list({ activo: true, limit: 1000 }).then(r => setContactos(r.data || [])).catch(() => {});
+    contactosApi.list({ activo: true, limit: 5000 }).then(r => setContactos(r.data || [])).catch(() => {});
     dependenciasApi.getMunicipio({ activo: true }).then(r => setDependencias(r.data || [])).catch(() => {});
     tiposConceptoApi.list({ activo: true }).then(r => setTiposConcepto(r.data || [])).catch(() => {});
     conceptosAbmApi.list({ activo: true }).then(r => setConceptos(r.data || [])).catch(() => {});

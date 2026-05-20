@@ -180,7 +180,7 @@ export default function Tesoreria() {
 
   const fetchContactos = async () => {
     try {
-      const res = await contactosApi.list({ activo: true, limit: 500 });
+      const res = await contactosApi.list({ activo: true, limit: 5000 });
       setContactos(res.data || []);
     } catch {
       setContactos([]);

@@ -113,20 +113,18 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     }
   }, [open]);
 
-  // Cargar catálogos al abrir
+  // Cargar catálogos estáticos al abrir (todo menos contactos)
   useEffect(() => {
     if (!open) return;
     (async () => {
       try {
-        const [cRes, ctRes, depRes, projRes, usdRes] = await Promise.all([
+        const [cRes, depRes, projRes, usdRes] = await Promise.all([
           tesoreriaCatalogoApi.conceptos(),
-          contactosApi.list({ activo: true, limit: 500 }),
           dependenciasApi.getMunicipio({ activo: true }),
-          proyectosApi.list({ activo: true, include_resumen: false, limit: 500 }).catch(() => ({ data: [] as Proyecto[] })),
+          proyectosApi.list({ activo: true, include_resumen: false, limit: 5000 }).catch(() => ({ data: [] as Proyecto[] })),
           cotizacionApi.usd().catch(() => null),
         ]);
         setConceptos(cRes.data);
-        setContactos(ctRes.data);
         setDependencias(depRes.data || []);
         setProyectos(projRes.data || []);
         if (usdRes?.data?.valor_sugerido) {
@@ -138,6 +136,24 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       }
     })();
   }, [open]);
+
+  // Contactos: fetch server-side con filtro `tipo` + `search` (debounce 300ms).
+  // Antes traíamos un slice de 500 ordenado alfabético; en munis con más
+  // contactos el proveedor recién creado quedaba afuera del corte y no aparecía
+  // en el paso 2. Ahora la query viaja al backend con índices, escala sin tope.
+  useEffect(() => {
+    if (!open) return;
+    const params: Record<string, unknown> = { activo: true, limit: 200 };
+    if (contactoTipoFiltro) params.tipo = contactoTipoFiltro;
+    const q = contactoSearch.trim();
+    if (q) params.search = q;
+    const t = setTimeout(() => {
+      contactosApi.list(params)
+        .then(r => setContactos(r.data || []))
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [open, contactoTipoFiltro, contactoSearch]);
 
   // Conceptos filtrados por busqueda
   const conceptosFiltrados = useMemo(() => {

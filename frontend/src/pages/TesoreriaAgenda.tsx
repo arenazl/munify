@@ -80,7 +80,7 @@ export default function TesoreriaAgenda() {
     try {
       const [p, c, cj] = await Promise.all([
         agendaPagosApi.list({ activo: true }),
-        contactosApi.list({ activo: true, limit: 500 }),
+        contactosApi.list({ activo: true, limit: 5000 }),
         cajasApi.list({ activo: true, include_saldos: true }),
       ]);
       setPagos(p.data || []);
