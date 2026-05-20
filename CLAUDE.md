@@ -183,4 +183,4 @@ NO contestar todo de una. Responder de a una y esperar antes de seguir.
 - **`BUILD_GUIDE.md`** se actualiza cuando aparece un patrón canónico nuevo o un componente reutilizable nuevo. El §6 (inventario UI) se regenera con `python scripts/generate_ui_inventory.py`.
 - **Este archivo (`CLAUDE.md`)** se actualiza cuando aparece una regla dura nueva o el user da feedback que se vuelve regla.
 - **NO** ensuciar `CLAUDE.md` ni `BUILD_GUIDE.md` con "estado actual del desarrollo", "fixes recientes" o decisiones de producto. Eso vive en commits, PRs e issues.
-- Docs viejos (planes terminados, specs ya implementadas) → `docs/archive/`.
+- Docs viejos (planes terminados, specs ya implementadas) → `docs/legacy/`.

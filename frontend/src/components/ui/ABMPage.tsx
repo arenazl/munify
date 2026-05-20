@@ -10,7 +10,7 @@ import { ModernSelect, type SelectOption } from './ModernSelect';
 import { PrimaryButton } from './PrimaryButton';
 
 // =====================================================================
-// Toolbar declarativo (API nueva, ver REINGENIERIA_ABMPAGE_TOOLBAR.md)
+// Toolbar declarativo (API nueva, ver docs/legacy/REINGENIERIA_ABMPAGE_TOOLBAR.md)
 // =====================================================================
 
 export interface ToolbarComboSpec {

@@ -1,181 +1,125 @@
-# Deployment Guide
+# Deploy · Munify
 
-## Arquitectura de Producción
+Pipeline canónico de deploy. **Reglas duras en [`CLAUDE.md`](../CLAUDE.md) §14** — esto es la versión expandida.
+
+## Arquitectura de prod
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│    Netlify      │────▶│     Heroku      │────▶│   Aiven MySQL   │
-│   (Frontend)    │     │    (Backend)    │     │   (Database)    │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+┌──────────────────┐       ┌──────────────────┐       ┌──────────────────┐
+│     Netlify      │──────▶│      Heroku      │──────▶│   Aiven MySQL    │
+│  app.munify...   │       │ munify-backend   │       │  (cloud-managed) │
+└──────────────────┘       └──────────────────┘       └──────────────────┘
+        │                            │
+        └── git push origin ─────────┴── git push heroku
 ```
 
----
+| Componente | Producto | URL | Branch que deploya |
+|---|---|---|---|
+| App frontend | Netlify | `app.munify.com.ar` | `master` |
+| Landing | Netlify (otro site) | `munify.com.ar` | `master` del repo separado `landing/` |
+| Backend API | Heroku | `munify-backend.herokuapp.com` (interno) | `main` (push como `master:main`) |
+| Base de datos | Aiven MySQL | (privada) | — |
 
-## Backend (Heroku)
+Site IDs Netlify:
+- App: `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`
+- Landing: `522eac1f-fa1f-43d1-86ca-128e5467a27d`
 
-### 1. Crear app en Heroku
+## Pipeline (USAR SIEMPRE ESTE)
+
+### 1. Antes de pushear front — build local
 ```bash
-heroku create tu-app-backend
+cd frontend && npm run build
 ```
 
-### 2. Configurar variables de entorno
+Si `tsc -b` falla, **Netlify también va a fallar** y prod se queda con el bundle viejo *silenciosamente*. **Sin excepciones.**
+
+### 2. Push a git
 ```bash
-# Database
-heroku config:set DATABASE_URL="mysql+aiomysql://user:pass@host:port/db"
-
-# JWT
-heroku config:set SECRET_KEY="tu_secret_key_generado"
-heroku config:set ACCESS_TOKEN_EXPIRE_MINUTES=1440
-
-# Cloudinary
-heroku config:set CLOUDINARY_CLOUD_NAME="xxx"
-heroku config:set CLOUDINARY_API_KEY="xxx"
-heroku config:set CLOUDINARY_API_SECRET="xxx"
-
-# App
-heroku config:set ENVIRONMENT="production"
-heroku config:set FRONTEND_URL="https://tu-app.netlify.app"
-
-# AI (Gemini)
-heroku config:set GEMINI_API_KEY="xxx"
-
-# WhatsApp
-heroku config:set WHATSAPP_PHONE_NUMBER_ID="xxx"
-heroku config:set WHATSAPP_ACCESS_TOKEN="xxx"
-heroku config:set WHATSAPP_BUSINESS_ACCOUNT_ID="xxx"
-
-# CORS (importante!)
-heroku config:set CORS_ORIGINS="https://tu-app.netlify.app"
+git push origin master                  # Netlify rebuildea automático
+git push heroku master:main             # SOLO si tocaste backend (Heroku usa rama main)
 ```
 
-### 3. Deploy
+Netlify usa su integración nativa de GitHub (NO el workflow `.github/workflows/cd.yml`, que está roto/legacy).
+
+### 3. Verificar que llegó
 ```bash
-cd backend
-git subtree push --prefix backend heroku main
+# Hash del bundle en prod vs local
+curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'
+# Comparar contra frontend/dist/index.html local. Si difieren, el build falló.
 ```
 
-O configurar el repo para deploy automático desde GitHub.
+## Lo que NO hay que hacer
 
----
+| Anti-patrón | Por qué |
+|---|---|
+| `netlify deploy --prod --dir dist` desde CLI | Rompe trazabilidad (deploy sin commit asociado). Pipeline es `git push` → auto-build, punto. |
+| Pushear sin correr `npm run build` local | El error de TS te lo come Netlify y prod queda con bundle viejo. Cero error visible salvo mirando el dashboard. |
+| Pushear a `main`/`feature/X` esperando que llegue a prod | Netlify production branch es `master`. Otras ramas generan solo previews. |
+| Forzar deploy del workflow CI | Está legacy/roto, ignorarlo. |
 
-## Frontend (Netlify)
+## Variables de entorno
 
-### 1. Conectar repositorio
-- Ir a Netlify > New site from Git
-- Seleccionar repositorio
-- Configurar:
-  - **Base directory:** `frontend`
-  - **Build command:** `npm run build`
-  - **Publish directory:** `frontend/dist`
+### Backend (Heroku — usar `heroku config:set`)
 
-### 2. Configurar variables de entorno
-En Netlify > Site settings > Environment variables:
+| Variable | Para qué |
+|---|---|
+| `DATABASE_URL` | MySQL Aiven (`mysql+aiomysql://...`) |
+| `SECRET_KEY` | JWT (generar con `openssl rand -hex 32`) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Default 1440 |
+| `ENVIRONMENT` | `production` |
+| `FRONTEND_URL` | `https://app.munify.com.ar` (usado en links de WhatsApp y email) |
+| `CORS_ORIGINS` | `https://app.munify.com.ar,https://munify.com.ar` |
+| `CLOUDINARY_*` | Storage de imágenes (3 vars: name, key, secret) |
+| `GEMINI_API_KEY` | IA clasificación reclamos / asistente |
+| `BREVO_SMTP_*` | Transactional email |
+| `WHATSAPP_*` | Meta Cloud API (phone_number_id, access_token, business_account_id) |
+| `RENAPER_*` | Validación biométrica de identidad |
 
-```
-VITE_API_URL=https://tu-app-backend.herokuapp.com/api
-```
+Valores reales en `d:/Code/APP_GUIDE/.env.master` — **nunca pegar valores literales en docs ni código**.
 
-### 3. Deploy
-El deploy es automático con cada push a `main`.
+### Frontend (Netlify — Site settings → Environment variables)
 
----
+| Variable | Para qué |
+|---|---|
+| `VITE_API_URL` | URL del backend en Heroku |
 
-## Variables de Entorno - Resumen
+## Checklist pre-deploy
 
-### Backend (Heroku)
-| Variable | Descripción | Ejemplo Producción |
-|----------|-------------|-------------------|
-| `DATABASE_URL` | URL de la base de datos | `mysql+aiomysql://...` |
-| `SECRET_KEY` | JWT secret (generar aleatorio) | `openssl rand -hex 32` |
-| `ENVIRONMENT` | Entorno actual | `production` |
-| `FRONTEND_URL` | URL del frontend (para WhatsApp) | `https://tu-app.netlify.app` |
-| `CORS_ORIGINS` | Orígenes permitidos | `https://tu-app.netlify.app` |
-| `CLOUDINARY_*` | Credenciales Cloudinary | - |
-| `GEMINI_API_KEY` | API Key de Google AI | - |
-| `WHATSAPP_*` | Credenciales Meta WhatsApp | - |
-
-### Frontend (Netlify)
-| Variable | Descripción | Ejemplo Producción |
-|----------|-------------|-------------------|
-| `VITE_API_URL` | URL del backend | `https://tu-app-backend.herokuapp.com/api` |
-
----
-
-## Landing Page Comercial (Netlify)
-
-**URL:** https://gestion-municipal-landing.netlify.app
-
-### Deploy automático
-
-El sitio ya está configurado y linkeado. Para hacer deploy:
-
-```bash
-cd landing
-netlify deploy --prod --message="Actualización de landing"
-```
-
-### Configuración inicial (ya completada)
-
-Este proceso ya fue realizado automáticamente:
-
-```bash
-# 1. Obtener account slug
-netlify api listAccountsForUser
-
-# 2. Crear sitio
-netlify api createSiteInTeam --data '{"account_slug":"arenazl","body":{"name":"gestion-municipal-landing"}}'
-
-# 3. Linkear directorio
-mkdir -p .netlify
-echo '{"siteId":"522eac1f-fa1f-43d1-86ca-128e5467a27d"}' > .netlify/state.json
-
-# 4. Deploy inicial
-netlify deploy --prod --dir=. --message="Initial deploy"
-```
-
-### Actualizar contenido
-
-Para actualizar links o datos de contacto:
-
-1. Editar `landing/index.html`
-2. Buscar y reemplazar:
-   - `href="#demos"` → URL de la app React en producción
-   - `ventas@gestionmunicipal.com` → Email real
-   - `+54 9 11 1234-5678` → WhatsApp real
-   - `www.gestionmunicipal.com` → Sitio web real
-3. Deploy:
-   ```bash
-   cd landing
-   netlify deploy --prod
-   ```
-
----
-
-## Checklist Pre-Deploy
-
-- [ ] `.env` NO está en el repo (verificar `.gitignore`)
-- [ ] `FRONTEND_URL` apunta a Netlify
-- [ ] `CORS_ORIGINS` incluye el dominio de Netlify
+- [ ] `.env` está en `.gitignore` (verificar `git status --ignored` no lo lista)
+- [ ] `FRONTEND_URL` apunta a `app.munify.com.ar`
+- [ ] `CORS_ORIGINS` incluye `app.munify.com.ar` y `munify.com.ar` (sin `/` final)
 - [ ] `ENVIRONMENT=production` en Heroku
-- [ ] Credenciales de WhatsApp actualizadas
-- [ ] Base de datos accesible desde Heroku
-
----
+- [ ] Backend builds local sin errores (`uvicorn main:app` arranca limpio)
+- [ ] Frontend builds local sin errores (`npm run build`)
+- [ ] La IP de Heroku está en whitelist de Aiven (problema típico al cambiar de dyno)
 
 ## Troubleshooting
 
-### CORS Errors
-Si ves errores de CORS en producción:
-1. Verificar que `CORS_ORIGINS` tenga la URL exacta de Netlify
-2. No incluir `/` al final de la URL
-3. Reiniciar el dyno: `heroku restart`
+### CORS errors en prod
+1. `heroku config:get CORS_ORIGINS` — confirmar que tiene la URL exacta.
+2. Sin `/` al final.
+3. `heroku restart` para forzar reload del config.
 
-### WhatsApp no envía mensajes
-1. Verificar que `FRONTEND_URL` sea la URL de producción
-2. Verificar credenciales de WhatsApp en Heroku
-3. Revisar logs: `heroku logs --tail`
+### WhatsApp no envía
+1. `heroku config:get FRONTEND_URL` — debe ser la URL de prod.
+2. Confirmar credenciales de Meta válidas y dentro del template aprobado.
+3. `heroku logs --tail` filtrar por `whatsapp`.
 
-### Database connection
-Si hay errores de conexión:
-1. Verificar que la IP de Heroku esté en whitelist de Aiven
-2. Probar conexión: `heroku run python -c "from core.database import engine; print(engine)"`
+### DB connection
+1. IP de Heroku whitelisteada en Aiven.
+2. Test: `heroku run python -c "from core.database import engine; print(engine)"`.
+
+### Bundle viejo en prod después de push
+- El build de Netlify falló silencioso. Mirar Netlify dashboard → builds.
+- Solución: arreglar el error de TS local, `npm run build`, push de nuevo.
+
+## Landing (repo separado)
+
+La landing comercial vive en su propio repo (`d:/Code/sugerenciasMun/landing/` apunta a `github.com/arenazl/landing.git`). Mismo pipeline:
+
+```bash
+cd landing
+git add . && git commit -m "..." && git push origin master
+```
+
+Netlify rebuildea sola. **No `netlify deploy --prod` acá tampoco.**
