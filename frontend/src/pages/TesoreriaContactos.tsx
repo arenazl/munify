@@ -256,24 +256,23 @@ export default function TesoreriaContactos() {
     </div>
   );
 
-  // Botones Excel/KMZ sacados del header a pedido del user — accesibles
-  // desde una pantalla aparte si hace falta importar.
-  // Boton "Unificar" para detectar y fusionar contactos duplicados
-  // (caso tipico: el mismo proveedor cargado 2-3 veces con tipos distintos
-  // por el import del Excel).
+  // Boton "Unificar duplicados" — prominente para que el user lo encuentre.
+  // Caso tipico: el mismo proveedor cargado 2-3 veces con tipos distintos
+  // por imports sucesivos de Excel. Estilo fuerte (gradient sobre primary)
+  // para destacar al lado del boton "Nuevo".
   const headerActions = (
     <button
       onClick={() => setUnificarOpen(true)}
-      className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105 active:scale-95"
+      className="inline-flex items-center gap-2 px-4 h-[34px] rounded-lg text-[12px] font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
       style={{
-        backgroundColor: `${theme.primary}15`,
-        color: theme.primary,
-        border: `1px solid ${theme.primary}40`,
+        background: `linear-gradient(135deg, ${theme.primary}, ${theme.primaryHover || theme.primary})`,
+        color: '#fff',
+        border: `1px solid ${theme.primary}`,
       }}
-      title="Detectar y fusionar contactos duplicados"
+      title="Detectar y fusionar contactos duplicados (mismo nombre, distinto tipo)"
     >
-      <GitMerge className="h-3.5 w-3.5" />
-      Unificar
+      <GitMerge className="h-4 w-4" />
+      Unificar duplicados
     </button>
   );
 
