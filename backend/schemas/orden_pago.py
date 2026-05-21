@@ -22,6 +22,9 @@ class OrdenPagoBase(BaseModel):
     fecha_emision: date
     fecha_vencimiento: Optional[date] = None
 
+    nro_factura: Optional[str] = Field(None, max_length=50)
+    factura_url: Optional[str] = Field(None, max_length=500)
+
     notas: Optional[str] = None
 
 
@@ -40,6 +43,8 @@ class OrdenPagoUpdate(BaseModel):
     caja_id: Optional[int] = None
     fecha_emision: Optional[date] = None
     fecha_vencimiento: Optional[date] = None
+    nro_factura: Optional[str] = Field(None, max_length=50)
+    factura_url: Optional[str] = Field(None, max_length=500)
     notas: Optional[str] = None
 
 

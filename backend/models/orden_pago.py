@@ -56,6 +56,13 @@ class OrdenPago(Base):
     descripcion = Column(Text, nullable=True)
     monto_pesos = Column(Numeric(15, 2), nullable=False)
 
+    # Factura del proveedor que respalda esta OP. Para muni chico (SPN)
+    # cada OP suele tener 1 factura. Si en el futuro un muni grande
+    # necesita 1 OP <-> N facturas, se separa a entidad propia. Por ahora
+    # campos sueltos: nro + URL al PDF (Cloudinary u otro storage).
+    nro_factura = Column(String(50), nullable=True, index=True)
+    factura_url = Column(String(500), nullable=True)
+
     # Caja desde donde se va a pagar (puede definirse en la creacion o al pagar)
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True)
     caja = relationship("TesoreriaCaja", foreign_keys=[caja_id])

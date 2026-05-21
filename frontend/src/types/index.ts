@@ -669,6 +669,8 @@ export interface OrdenPago {
   descripcion?: string | null;
   monto_pesos: string;
   caja_id?: number | null;
+  nro_factura?: string | null;
+  factura_url?: string | null;
   estado: EstadoOrdenPago;
   fecha_emision: string;
   fecha_vencimiento?: string | null;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   FileCheck, Clock, CheckCircle2, XCircle, Ban, Plus, Edit2, MoreVertical,
   Calendar, Wallet, Building2, User as UserIcon, FileText, Sparkles, Receipt,
+  Paperclip, Upload, ExternalLink, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -72,9 +73,12 @@ export default function OrdenesPago() {
     caja_id: 0,
     fecha_emision: new Date().toISOString().slice(0, 10),
     fecha_vencimiento: '',
+    nro_factura: '',
+    factura_url: '',
     notas: '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingFactura, setUploadingFactura] = useState(false);
 
   // Pagar modal
   const [pagarOP, setPagarOP] = useState<OrdenPago | null>(null);
@@ -152,7 +156,7 @@ export default function OrdenesPago() {
       concepto: '', descripcion: '', monto_pesos: '',
       caja_id: cajas[0]?.id || 0,
       fecha_emision: new Date().toISOString().slice(0, 10),
-      fecha_vencimiento: '', notas: '',
+      fecha_vencimiento: '', nro_factura: '', factura_url: '', notas: '',
     });
     setSheetOpen(true);
   };
@@ -173,6 +177,8 @@ export default function OrdenesPago() {
       caja_id: op.caja_id || 0,
       fecha_emision: op.fecha_emision.slice(0, 10),
       fecha_vencimiento: (op.fecha_vencimiento || '').slice(0, 10),
+      nro_factura: op.nro_factura || '',
+      factura_url: op.factura_url || '',
       notas: op.notas || '',
     });
     setSheetOpen(true);
@@ -196,6 +202,8 @@ export default function OrdenesPago() {
         caja_id: form.caja_id || null,
         fecha_emision: form.fecha_emision,
         fecha_vencimiento: form.fecha_vencimiento || null,
+        nro_factura: form.nro_factura.trim() || null,
+        factura_url: form.factura_url || null,
         notas: form.notas.trim() || null,
       };
       if (editing) await ordenesPagoApi.update(editing.id, data);
@@ -518,6 +526,92 @@ export default function OrdenesPago() {
             <div>
               <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Vencimiento (opcional)</label>
               <DatePicker value={form.fecha_vencimiento} onChange={(v) => setForm(f => ({ ...f, fecha_vencimiento: v }))} allowClear />
+            </div>
+          </div>
+
+          {/* Factura: nro + upload PDF */}
+          <div
+            className="rounded-xl p-3"
+            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            <p className="text-[10px] uppercase font-bold mb-2 inline-flex items-center gap-1" style={{ color: theme.textSecondary }}>
+              <Paperclip className="h-3 w-3" />
+              Factura del proveedor (opcional)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[10px] font-semibold mb-1" style={{ color: theme.textSecondary }}>Nº de factura</label>
+                <input
+                  type="text"
+                  value={form.nro_factura}
+                  onChange={(e) => setForm(f => ({ ...f, nro_factura: e.target.value }))}
+                  placeholder="Ej: A-0001-00012345"
+                  className="w-full px-3 py-2 rounded-lg text-sm font-mono"
+                  style={{ backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` }}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold mb-1" style={{ color: theme.textSecondary }}>Archivo PDF / imagen</label>
+                {form.factura_url ? (
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href={form.factura_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold truncate"
+                      style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
+                      Ver factura
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, factura_url: '' }))}
+                      className="px-2 py-2 rounded-lg text-xs font-semibold"
+                      style={{ backgroundColor: '#ef444415', color: '#ef4444', border: '1px solid #ef444440' }}
+                      title="Quitar factura"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <label
+                    className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-all hover:scale-[1.005]"
+                    style={{ backgroundColor: theme.card, color: theme.text, border: `1px dashed ${theme.border}` }}
+                  >
+                    {uploadingFactura ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo...</>
+                    ) : (
+                      <><Upload className="h-3.5 w-3.5" /> Subir archivo</>
+                    )}
+                    <input
+                      type="file"
+                      accept="application/pdf,image/*"
+                      className="hidden"
+                      disabled={uploadingFactura}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast.error('Archivo demasiado grande (max 10MB)');
+                          return;
+                        }
+                        setUploadingFactura(true);
+                        try {
+                          const res = await ordenesPagoApi.uploadFactura(file);
+                          setForm(f => ({ ...f, factura_url: res.data.url }));
+                          toast.success('Factura subida');
+                        } catch (err: any) {
+                          toast.error(err?.response?.data?.detail || 'Error subiendo factura');
+                        } finally {
+                          setUploadingFactura(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
           </div>
 

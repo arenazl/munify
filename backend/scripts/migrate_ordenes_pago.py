@@ -72,11 +72,30 @@ CREATE TABLE IF NOT EXISTS ordenes_pago (
 """
 
 
+async def _column_exists(conn, table: str, column: str) -> bool:
+    r = await conn.execute(text(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :t AND COLUMN_NAME = :c"
+    ), {"t": table, "c": column})
+    row = r.fetchone()
+    return bool(row and row[0])
+
+
 async def migrate():
     engine = create_async_engine(settings.DATABASE_URL)
     async with engine.begin() as conn:
         await conn.execute(text(SQL))
         print("[OK] tabla ordenes_pago creada (o ya existia)")
+
+        # ALTERs idempotentes: nro_factura + factura_url (sumados despues
+        # del create inicial).
+        if not await _column_exists(conn, "ordenes_pago", "nro_factura"):
+            await conn.execute(text("ALTER TABLE ordenes_pago ADD COLUMN nro_factura VARCHAR(50) NULL"))
+            await conn.execute(text("CREATE INDEX ix_op_nro_factura ON ordenes_pago(nro_factura)"))
+            print("[OK] columna nro_factura agregada")
+        if not await _column_exists(conn, "ordenes_pago", "factura_url"):
+            await conn.execute(text("ALTER TABLE ordenes_pago ADD COLUMN factura_url VARCHAR(500) NULL"))
+            print("[OK] columna factura_url agregada")
     await engine.dispose()
 
 

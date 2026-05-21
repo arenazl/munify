@@ -2083,6 +2083,13 @@ export const ordenesPagoApi = {
   anular: (id: number, motivo: string) =>
     api.post(`/contaduria/ordenes-pago/${id}/anular`, { motivo }),
   resumen: () => api.get('/contaduria/ordenes-pago/stats/resumen'),
+  uploadFactura: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/contaduria/ordenes-pago/upload-factura', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export const parajesApi = {

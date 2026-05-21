@@ -14,7 +14,8 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response
+import cloudinary.uploader
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response, UploadFile, File
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -391,6 +392,51 @@ async def anular_op(
     await db.commit()
     await db.refresh(op)
     return await _enrich(db, op)
+
+
+# ============================================================
+# Upload de factura adjunta (a Cloudinary)
+# ============================================================
+
+@router.post("/upload-factura")
+async def upload_factura(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Sube el PDF/imagen de la factura a Cloudinary y devuelve la URL.
+    El frontend despues guarda esa URL en factura_url al crear/editar la OP.
+    PDFs van como resource_type='raw' (Cloudinary los preserva tal cual).
+    Imagenes como 'image' (con CDN + transformaciones).
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    if not file.content_type:
+        raise HTTPException(422, "Tipo de archivo desconocido")
+    ct = file.content_type
+    is_pdf = ct == "application/pdf"
+    if is_pdf:
+        resource_type = "raw"
+    elif ct.startswith("image/"):
+        resource_type = "image"
+    else:
+        raise HTTPException(422, "Solo se permiten PDF o imagenes")
+
+    try:
+        result = cloudinary.uploader.upload(
+            file.file,
+            folder=f"facturas-op/muni-{municipio_id}",
+            resource_type=resource_type,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Error subiendo factura: {e}")
+
+    return {
+        "url": result.get("secure_url") or result.get("url"),
+        "public_id": result.get("public_id"),
+        "resource_type": resource_type,
+    }
 
 
 # ============================================================
