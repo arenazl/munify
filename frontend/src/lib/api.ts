@@ -1981,6 +1981,7 @@ export const gastosApi = {
     tipo_financiacion?: string;
     concepto?: string;
   }) => api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
+  reportes: () => api.get('/tesoreria/gastos/reportes'),
   proyeccionesCuotasDelMes: (params: {
     anio: number;
     mes: number;
@@ -2048,6 +2049,7 @@ export const agendaPagosApi = {
     premio_ids?: number[];
     notas?: string;
   }) => api.post(`/tesoreria/agenda/${id}/ejecutar`, data),
+  reportes: () => api.get('/tesoreria/agenda/reportes'),
 };
 
 /** Catalogo de premios (plus variables) por municipio. Se cargan desde
@@ -2083,6 +2085,7 @@ export const ordenesPagoApi = {
   anular: (id: number, motivo: string) =>
     api.post(`/contaduria/ordenes-pago/${id}/anular`, { motivo }),
   resumen: () => api.get('/contaduria/ordenes-pago/stats/resumen'),
+  reportes: () => api.get('/contaduria/ordenes-pago/reportes'),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

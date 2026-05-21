@@ -919,3 +919,118 @@ async def tesoreria_dashboard_ia(
     from services.dashboard_ia import build_tesoreria_dashboard
     return await build_tesoreria_dashboard(db, municipio_id, force=force)
 
+
+@router.get("/reportes")
+async def reportes_tesoreria(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reportes para Tesoreria:
+      - por_caja: movimientos del mes actual agrupados por caja.
+      - top_conceptos: conceptos con mas gasto del mes.
+      - top_dependencias: dependencias con mas gasto del mes.
+      - mensuales: ultimos 6 meses de gasto total.
+    """
+    from datetime import timedelta
+    from models import TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja, MunicipioDependencia
+    from models.dependencia import Dependencia
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    hoy = date.today()
+    inicio_mes = hoy.replace(day=1)
+    desde_6m = (inicio_mes - timedelta(days=180)).replace(day=1)
+
+    # Movimientos por caja (mes actual)
+    por_caja_rows = (await db.execute(
+        select(
+            TesoreriaCaja.id, TesoreriaCaja.nombre, TesoreriaCaja.color,
+            func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0),
+            func.count(TesoreriaMovimientoCaja.id),
+        )
+        .join(TesoreriaMovimientoCaja, TesoreriaMovimientoCaja.caja_id == TesoreriaCaja.id)
+        .where(
+            TesoreriaCaja.municipio_id == municipio_id,
+            TesoreriaMovimientoCaja.tipo == TipoMovimientoCaja.EGRESO,
+            TesoreriaMovimientoCaja.fecha >= inicio_mes,
+        )
+        .group_by(TesoreriaCaja.id, TesoreriaCaja.nombre, TesoreriaCaja.color)
+        .order_by(func.sum(TesoreriaMovimientoCaja.monto).desc())
+    )).all()
+    por_caja = [
+        {"id": int(i), "nombre": n, "color": c, "monto": str(m), "cantidad": int(cnt)}
+        for i, n, c, m, cnt in por_caja_rows
+    ]
+
+    # Top conceptos del mes
+    top_conceptos_rows = (await db.execute(
+        select(
+            Gasto.concepto,
+            func.count(Gasto.id),
+            func.coalesce(func.sum(Gasto.monto_pesos), 0),
+        )
+        .where(
+            Gasto.municipio_id == municipio_id,
+            Gasto.activo == True,  # noqa: E712
+            Gasto.fecha >= inicio_mes,
+        )
+        .group_by(Gasto.concepto)
+        .order_by(func.sum(Gasto.monto_pesos).desc())
+        .limit(10)
+    )).all()
+    top_conceptos = [
+        {"concepto": c, "cantidad": int(cnt), "monto": str(m)}
+        for c, cnt, m in top_conceptos_rows
+    ]
+
+    # Top dependencias del mes
+    top_dep_rows = (await db.execute(
+        select(
+            Dependencia.nombre,
+            func.count(Gasto.id),
+            func.coalesce(func.sum(Gasto.monto_pesos), 0),
+        )
+        .join(MunicipioDependencia, MunicipioDependencia.dependencia_id == Dependencia.id)
+        .join(Gasto, Gasto.destino_dependencia_id == MunicipioDependencia.id)
+        .where(
+            Gasto.municipio_id == municipio_id,
+            Gasto.activo == True,  # noqa: E712
+            Gasto.fecha >= inicio_mes,
+        )
+        .group_by(Dependencia.nombre)
+        .order_by(func.sum(Gasto.monto_pesos).desc())
+        .limit(10)
+    )).all()
+    top_dependencias = [
+        {"nombre": n, "cantidad": int(cnt), "monto": str(m)}
+        for n, cnt, m in top_dep_rows
+    ]
+
+    # Mensuales: ultimos 6 meses
+    mens_rows = (await db.execute(
+        select(
+            func.extract("year", Gasto.fecha).label("anio"),
+            func.extract("month", Gasto.fecha).label("mes"),
+            func.count(Gasto.id),
+            func.coalesce(func.sum(Gasto.monto_pesos), 0),
+        )
+        .where(
+            Gasto.municipio_id == municipio_id,
+            Gasto.activo == True,  # noqa: E712
+            Gasto.fecha >= desde_6m,
+        )
+        .group_by("anio", "mes")
+        .order_by("anio", "mes")
+    )).all()
+    mensuales = [
+        {"anio": int(a), "mes": int(m), "cantidad": int(c), "monto": str(monto)}
+        for a, m, c, monto in mens_rows
+    ]
+
+    return {
+        "por_caja": por_caja,
+        "top_conceptos": top_conceptos,
+        "top_dependencias": top_dependencias,
+        "mensuales": mensuales,
+    }
+

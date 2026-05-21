@@ -191,6 +191,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Autorización formal de pagos'
     },
     {
+      name: 'Reportes',
+      href: '/gestion/contaduria/reportes',
+      icon: BarChart3,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Contaduría',
+      description: 'OPs vencidas, próximas, top beneficiarios'
+    },
+    {
       name: 'Movimientos',
       href: '/gestion/tesoreria',
       icon: Receipt,
@@ -231,6 +239,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Personas y proveedores'
     },
     {
+      name: 'Reportes',
+      href: '/gestion/tesoreria/reportes',
+      icon: BarChart3,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Egresos por caja, top conceptos, evolución'
+    },
+    {
       name: 'Liquidaciones',
       href: '/gestion/tesoreria/agenda',
       icon: CalendarClock,
@@ -253,6 +269,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Sueldos',
       description: 'Catálogo de plus aplicables a sueldos'
+    },
+    {
+      name: 'Reportes',
+      href: '/gestion/sueldos/reportes',
+      icon: BarChart3,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Sueldos',
+      description: 'Masa salarial, top sueldos, próximos pagos'
     },
     {
       name: 'Tablero',

@@ -76,6 +76,9 @@ import ConfiguracionTesoreria from './pages/ConfiguracionTesoreria';
 import OrdenesPago from './pages/OrdenesPago';
 import TesoreriaCajas from './pages/TesoreriaCajas';
 import SueldosEmpleados from './pages/SueldosEmpleados';
+import ReportesContaduria from './pages/ReportesContaduria';
+import ReportesTesoreria from './pages/ReportesTesoreria';
+import ReportesSueldos from './pages/ReportesSueldos';
 
 // Demos de diseño
 import DemosIndex from './pages/demos';
@@ -204,6 +207,9 @@ export const router = createBrowserRouter([
       { path: 'contaduria/ordenes-pago', element: <ProtectedRoute roles={['admin', 'supervisor']}><OrdenesPago /></ProtectedRoute> },
       { path: 'tesoreria/cajas', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaCajas /></ProtectedRoute> },
       { path: 'sueldos/empleados', element: <ProtectedRoute roles={['admin', 'supervisor']}><SueldosEmpleados /></ProtectedRoute> },
+      { path: 'contaduria/reportes', element: <ProtectedRoute roles={['admin', 'supervisor']}><ReportesContaduria /></ProtectedRoute> },
+      { path: 'tesoreria/reportes', element: <ProtectedRoute roles={['admin', 'supervisor']}><ReportesTesoreria /></ProtectedRoute> },
+      { path: 'sueldos/reportes', element: <ProtectedRoute roles={['admin', 'supervisor']}><ReportesSueldos /></ProtectedRoute> },
       { path: 'tesoreria/curacion-bartolo', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaCuracionBartolo /></ProtectedRoute> },
       { path: 'configuracion/tesoreria', element: <ProtectedRoute roles={['admin', 'supervisor']}><ConfiguracionTesoreria /></ProtectedRoute> },
       { path: 'tesoreria/mapa', element: <ProtectedRoute roles={['admin', 'supervisor']}><TesoreriaMapa /></ProtectedRoute> },

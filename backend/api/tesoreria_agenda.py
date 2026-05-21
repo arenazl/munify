@@ -284,3 +284,117 @@ async def ejecutar_pago(
         premios_aplicados=premios_aplicados,
         proximo_pago=pp.proximo_pago.isoformat() if pp.activo else None,
     )
+
+
+@router.get("/reportes")
+async def reportes_sueldos(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reportes de Sueldos / Liquidaciones:
+      - masa_salarial: total mensual programado (suma de monto_pesos de activos).
+      - cantidad_empleados: cuantos contactos tipo=empleado activos.
+      - top_sueldos: top 10 empleados por sueldo base.
+      - proximos_pagos: pagos programados que vencen en los proximos 30 dias.
+      - frecuencias: cuantos pagos hay por cada frecuencia.
+    """
+    from datetime import timedelta
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+    hoy = date.today()
+    en_30 = hoy + timedelta(days=30)
+
+    # Masa salarial total programada
+    total_row = (await db.execute(
+        select(
+            func.count(TesoreriaPagoProgramado.id),
+            func.coalesce(func.sum(TesoreriaPagoProgramado.monto_pesos), 0),
+        )
+        .where(
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.activo == True,  # noqa: E712
+        )
+    )).one()
+    cantidad_pagos = int(total_row[0] or 0)
+    masa_total = str(total_row[1] or 0)
+
+    # Cantidad empleados activos
+    cant_empleados = (await db.execute(
+        select(func.count(Contacto.id))
+        .where(
+            Contacto.municipio_id == muni_id,
+            Contacto.activo == True,  # noqa: E712
+            Contacto.tipo == "empleado",
+        )
+    )).scalar_one()
+
+    # Top sueldos
+    top_rows = (await db.execute(
+        select(
+            Contacto.nombre, Contacto.apellido,
+            TesoreriaPagoProgramado.monto_pesos,
+            TesoreriaPagoProgramado.concepto,
+            TesoreriaPagoProgramado.frecuencia,
+        )
+        .join(Contacto, TesoreriaPagoProgramado.contacto_id == Contacto.id)
+        .where(
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.activo == True,  # noqa: E712
+        )
+        .order_by(TesoreriaPagoProgramado.monto_pesos.desc())
+        .limit(10)
+    )).all()
+    top_sueldos = [
+        {
+            "nombre": f"{n} {a or ''}".strip(),
+            "monto": str(m),
+            "concepto": c,
+            "frecuencia": f.value if hasattr(f, "value") else str(f),
+        }
+        for n, a, m, c, f in top_rows
+    ]
+
+    # Proximos pagos (30 dias)
+    prox_rows = (await db.execute(
+        select(TesoreriaPagoProgramado)
+        .where(
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.activo == True,  # noqa: E712
+            TesoreriaPagoProgramado.proximo_pago <= en_30,
+        )
+        .order_by(TesoreriaPagoProgramado.proximo_pago.asc())
+        .limit(50)
+    )).scalars().all()
+    proximos_pagos = [await _enrich(db, p) for p in prox_rows]
+
+    # Cantidad por frecuencia
+    frec_rows = (await db.execute(
+        select(
+            TesoreriaPagoProgramado.frecuencia,
+            func.count(TesoreriaPagoProgramado.id),
+            func.coalesce(func.sum(TesoreriaPagoProgramado.monto_pesos), 0),
+        )
+        .where(
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.activo == True,  # noqa: E712
+        )
+        .group_by(TesoreriaPagoProgramado.frecuencia)
+    )).all()
+    frecuencias = [
+        {
+            "frecuencia": f.value if hasattr(f, "value") else str(f),
+            "cantidad": int(c),
+            "monto": str(m),
+        }
+        for f, c, m in frec_rows
+    ]
+
+    return {
+        "masa_salarial_mes": masa_total,
+        "cantidad_pagos_activos": cantidad_pagos,
+        "cantidad_empleados": int(cant_empleados or 0),
+        "top_sueldos": top_sueldos,
+        "proximos_pagos": proximos_pagos,
+        "frecuencias": frecuencias,
+    }

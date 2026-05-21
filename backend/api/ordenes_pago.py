@@ -474,3 +474,108 @@ async def resumen(
         "por_estado": out,
         "total_activas": {"cantidad": total_cantidad, "monto": str(total_monto)},
     }
+
+
+@router.get("/reportes")
+async def reportes(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reportes para Contaduría:
+      - vencidas: OPs no pagadas con fecha_vencimiento < hoy.
+      - proximas: OPs no pagadas con fecha_vencimiento en los proximos 7 dias.
+      - top_beneficiarios: ranking por monto autorizado/pagado del mes.
+      - mensuales: total autorizado por mes (ultimos 6 meses).
+    """
+    from datetime import timedelta
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    hoy = date.today()
+    en_7 = hoy + timedelta(days=7)
+    inicio_mes = hoy.replace(day=1)
+
+    # Vencidas
+    vencidas_rows = (await db.execute(
+        select(OrdenPago)
+        .where(
+            OrdenPago.municipio_id == municipio_id,
+            OrdenPago.estado.in_([EstadoOrdenPago.PENDIENTE, EstadoOrdenPago.AUTORIZADA]),
+            OrdenPago.fecha_vencimiento.isnot(None),
+            OrdenPago.fecha_vencimiento < hoy,
+        )
+        .order_by(OrdenPago.fecha_vencimiento.asc())
+        .limit(20)
+    )).scalars().all()
+    vencidas = [await _enrich(db, op) for op in vencidas_rows]
+
+    # Proximas a vencer
+    proximas_rows = (await db.execute(
+        select(OrdenPago)
+        .where(
+            OrdenPago.municipio_id == municipio_id,
+            OrdenPago.estado.in_([EstadoOrdenPago.PENDIENTE, EstadoOrdenPago.AUTORIZADA]),
+            OrdenPago.fecha_vencimiento.isnot(None),
+            OrdenPago.fecha_vencimiento >= hoy,
+            OrdenPago.fecha_vencimiento <= en_7,
+        )
+        .order_by(OrdenPago.fecha_vencimiento.asc())
+        .limit(20)
+    )).scalars().all()
+    proximas = [await _enrich(db, op) for op in proximas_rows]
+
+    # Top beneficiarios (contactos + dependencias separados, mes actual,
+    # solo OPs autorizadas o pagadas)
+    top_contactos_rows = (await db.execute(
+        select(
+            Contacto.id, Contacto.nombre, Contacto.apellido,
+            func.count(OrdenPago.id),
+            func.coalesce(func.sum(OrdenPago.monto_pesos), 0),
+        )
+        .join(Contacto, OrdenPago.destino_contacto_id == Contacto.id)
+        .where(
+            OrdenPago.municipio_id == municipio_id,
+            OrdenPago.fecha_emision >= inicio_mes,
+            OrdenPago.estado.in_([EstadoOrdenPago.AUTORIZADA, EstadoOrdenPago.PAGADA]),
+        )
+        .group_by(Contacto.id, Contacto.nombre, Contacto.apellido)
+        .order_by(func.sum(OrdenPago.monto_pesos).desc())
+        .limit(10)
+    )).all()
+    top_beneficiarios = [
+        {
+            "nombre": f"{nombre} {apellido or ''}".strip(),
+            "cantidad": int(cantidad),
+            "monto": str(monto),
+        }
+        for _id, nombre, apellido, cantidad, monto in top_contactos_rows
+    ]
+
+    # Mensuales: ultimos 6 meses de monto autorizado/pagado
+    desde_6m = (hoy.replace(day=1) - timedelta(days=180)).replace(day=1)
+    mensuales_rows = (await db.execute(
+        select(
+            func.extract("year", OrdenPago.fecha_emision).label("anio"),
+            func.extract("month", OrdenPago.fecha_emision).label("mes"),
+            func.count(OrdenPago.id),
+            func.coalesce(func.sum(OrdenPago.monto_pesos), 0),
+        )
+        .where(
+            OrdenPago.municipio_id == municipio_id,
+            OrdenPago.fecha_emision >= desde_6m,
+            OrdenPago.estado != EstadoOrdenPago.ANULADA,
+        )
+        .group_by("anio", "mes")
+        .order_by("anio", "mes")
+    )).all()
+    mensuales = [
+        {"anio": int(a), "mes": int(m), "cantidad": int(c), "monto": str(monto)}
+        for a, m, c, monto in mensuales_rows
+    ]
+
+    return {
+        "vencidas": vencidas,
+        "proximas": proximas,
+        "top_beneficiarios": top_beneficiarios,
+        "mensuales": mensuales,
+    }
