@@ -713,9 +713,15 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const remanente = Math.max(0, monto - totalImputado);
   const proyectoOptions = useMemo(
     () => proyectos
-      .filter(p => p.estado === 'activo')
+      // No filtramos por estado: un proyecto "finalizado" o "pausado" puede
+      // recibir un gasto historico imputado. El backend ya filtra por
+      // activo=true (soft delete). Mostramos el estado al lado del nombre
+      // cuando no es activo, asi el user lo ve y decide.
       .filter(p => !proyectoAsignaciones.some(a => a.proyecto_id === p.id))
-      .map(p => ({ value: String(p.id), label: p.nombre })),
+      .map(p => ({
+        value: String(p.id),
+        label: p.estado === 'activo' ? p.nombre : `${p.nombre} · ${p.estado}`,
+      })),
     [proyectos, proyectoAsignaciones]
   );
 

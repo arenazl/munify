@@ -143,77 +143,92 @@ export default function SueldosEmpleados() {
         </Link>
       }
     >
-      {filtered.map(e => {
-        const pago = pagoPorContacto.get(e.id);
-        const nombreCompleto = `${e.nombre}${e.apellido ? ' ' + e.apellido : ''}`;
-        return (
-          <div
-            key={e.id}
-            className="rounded-xl p-4 transition-all hover:scale-[1.005]"
-            style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
-          >
-            <div className="flex items-start justify-between mb-2">
-              <div className="min-w-0 flex-1">
-                <p className="font-bold truncate" style={{ color: theme.text }}>{nombreCompleto}</p>
-                {e.subtipo && (
-                  <p className="text-[11px] uppercase font-semibold" style={{ color: theme.primary }}>{e.subtipo}</p>
-                )}
-              </div>
-              {pago ? (
-                <span
-                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ backgroundColor: '#10b98120', color: '#10b981' }}
-                >
-                  Con liquidación
-                </span>
-              ) : (
-                <span
-                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
-                  style={{ backgroundColor: '#6b728020', color: '#6b7280' }}
-                >
-                  Sin liquidación
-                </span>
-              )}
-            </div>
-
-            {pago && (
+      <div
+        className="col-span-full rounded-xl overflow-hidden"
+        style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      >
+        {filtered.map((e, idx) => {
+          const pago = pagoPorContacto.get(e.id);
+          const nombreCompleto = `${e.nombre}${e.apellido ? ' ' + e.apellido : ''}`;
+          const inicial = (e.nombre[0] || '?').toUpperCase() + (e.apellido?.[0] || '').toUpperCase();
+          // Hash simple para color estable por nombre
+          let hash = 0;
+          for (let i = 0; i < nombreCompleto.length; i++) hash = (hash * 31 + nombreCompleto.charCodeAt(i)) | 0;
+          const hue = Math.abs(hash) % 360;
+          const avatarBg = `hsl(${hue}, 70%, 92%)`;
+          const avatarFg = `hsl(${hue}, 55%, 38%)`;
+          return (
+            <div
+              key={e.id}
+              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-opacity-50"
+              style={{
+                borderBottom: idx < filtered.length - 1 ? `1px solid ${theme.border}` : undefined,
+                backgroundColor: 'transparent',
+              }}
+            >
+              {/* Avatar */}
               <div
-                className="rounded-lg p-2 mb-2"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                style={{ backgroundColor: avatarBg, color: avatarFg }}
               >
-                <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Sueldo base</p>
-                <p className="text-xl font-bold tabular-nums" style={{ color: theme.text }}>{fmtMoney(pago.monto_pesos)}</p>
-                <p className="text-[10px]" style={{ color: theme.textSecondary }}>
-                  Próximo pago: {pago.proximo_pago} · {pago.frecuencia}
-                </p>
+                {inicial}
               </div>
-            )}
 
-            <div className="space-y-1 text-[11px]" style={{ color: theme.textSecondary }}>
-              {e.dni && <p>DNI: {e.dni}</p>}
-              {e.telefono && (
-                <p className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {e.telefono}</p>
-              )}
-              {e.email && (
-                <p className="inline-flex items-center gap-1 truncate"><Mail className="h-3 w-3" /> {e.email}</p>
-              )}
-              {e.direccion && (
-                <p className="inline-flex items-center gap-1 truncate"><MapPin className="h-3 w-3" /> {e.direccion}</p>
-              )}
-            </div>
+              {/* Nombre + subtipo */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate" style={{ color: theme.text }}>{nombreCompleto}</p>
+                <div className="flex items-center gap-2 flex-wrap text-[11px]" style={{ color: theme.textSecondary }}>
+                  {e.subtipo && (
+                    <span className="font-semibold" style={{ color: theme.primary }}>{e.subtipo}</span>
+                  )}
+                  {e.dni && <span>DNI {e.dni}</span>}
+                  {e.telefono && (
+                    <span className="inline-flex items-center gap-1"><Phone className="h-2.5 w-2.5" />{e.telefono}</span>
+                  )}
+                </div>
+              </div>
 
-            {!pago && (
-              <Link
-                to="/gestion/tesoreria/agenda"
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold transition-all hover:scale-105"
-                style={{ color: theme.primary }}
+              {/* Sueldo (si hay) */}
+              {pago ? (
+                <div className="text-right flex-shrink-0 hidden sm:block">
+                  <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Sueldo base</p>
+                  <p className="text-base font-bold tabular-nums" style={{ color: theme.text }}>
+                    {fmtMoney(pago.monto_pesos)}
+                  </p>
+                  <p className="text-[10px]" style={{ color: theme.textSecondary }}>
+                    {pago.frecuencia} · próx {pago.proximo_pago}
+                  </p>
+                </div>
+              ) : (
+                <div className="hidden sm:block flex-shrink-0">
+                  <Link
+                    to="/gestion/tesoreria/agenda"
+                    className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-md transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: `${theme.primary}15`,
+                      color: theme.primary,
+                      border: `1px solid ${theme.primary}40`,
+                    }}
+                  >
+                    + Cargar liquidación
+                  </Link>
+                </div>
+              )}
+
+              {/* Estado pill */}
+              <span
+                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
+                style={{
+                  backgroundColor: pago ? '#10b98120' : '#6b728020',
+                  color: pago ? '#10b981' : '#6b7280',
+                }}
               >
-                + Cargar liquidación →
-              </Link>
-            )}
-          </div>
-        );
-      })}
+                {pago ? 'OK' : 'Pendiente'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </ABMPage>
   );
 }
