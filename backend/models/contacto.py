@@ -47,6 +47,12 @@ class Contacto(Base):
     apellido = Column(String(100), nullable=True)
     dni = Column(String(20), nullable=True, index=True)
 
+    # Datos fiscales (para OP impresa y comprobantes contables)
+    cuit = Column(String(20), nullable=True, index=True)
+    iibb = Column(String(20), nullable=True)
+    condicion_iva = Column(String(50), nullable=True)        # "Resp. Inscripto" | "Monotributo" | "Exento"
+    codigo_tributario = Column(String(20), nullable=True)    # codigo interno del muni para el contacto
+
     # Contacto
     telefono = Column(String(30), nullable=True)
     email = Column(String(150), nullable=True)

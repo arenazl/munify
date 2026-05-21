@@ -42,6 +42,12 @@ class Municipio(Base):
     email = Column(String(100), nullable=True)
     sitio_web = Column(String(200), nullable=True)
 
+    # Datos fiscales / firmantes default (para documentos impresos: Orden de Pago, etc.)
+    cuit = Column(String(20), nullable=True)
+    intendente_nombre = Column(String(150), nullable=True)
+    secretario_nombre = Column(String(150), nullable=True)
+    contador_nombre = Column(String(150), nullable=True)
+
     # Configuracion del sistema
     zoom_mapa_default = Column(Integer, default=13)
     max_reclamos_dia_vecino = Column(Integer, default=5)

@@ -1997,6 +1997,26 @@ export const gastosApi = {
     tipo_financiacion?: string;
     concepto?: string;
   }) => api.get('/tesoreria/gastos/proyecciones/cobros/cuotas', { params }),
+  // Genera (o reutiliza) la Orden de Pago asociada a un gasto pagado.
+  generarOP: (gastoId: number, data?: {
+    codigo_imputacion?: string;
+    imputacion_descripcion?: string;
+    tipo_pago?: string;
+    nro_comprobante_pago?: string;
+    cuenta_destino?: string;
+    contaduria_nombre?: string;
+    secretario_nombre?: string;
+    intendente_nombre?: string;
+    nro_factura?: string;
+  }) => api.post<{ ya_existe: boolean; op_id: number; numero: string }>(
+    `/tesoreria/gastos/${gastoId}/generar-op`,
+    data || {},
+  ),
+  // Descarga el PDF de una OP como Blob (para abrir en nueva pestania).
+  descargarOPPdf: (opId: number) => api.get<Blob>(
+    `/contaduria/ordenes-pago/${opId}/pdf`,
+    { responseType: 'blob' },
+  ),
 };
 
 export const cotizacionApi = {

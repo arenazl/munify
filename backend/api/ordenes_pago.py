@@ -16,6 +16,7 @@ from typing import List, Optional
 
 import cloudinary.uploader
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response, UploadFile, File
+from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +26,7 @@ from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import (
     OrdenPago, EstadoOrdenPago, Contacto, TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja,
-    Gasto, GastoCuota, User, RolUsuario,
+    Gasto, GastoCuota, User, RolUsuario, Municipio,
 )
 from models.dependencia import Dependencia
 from models.gasto import EstadoGastoCuota
@@ -33,6 +34,7 @@ from schemas.orden_pago import (
     OrdenPagoCreate, OrdenPagoUpdate, OrdenPagoResponse,
     AnularRequest, PagarOPRequest,
 )
+from services.op_pdf_generator import build_op_pdf
 
 router = APIRouter()
 
@@ -442,6 +444,99 @@ async def upload_factura(
 # ============================================================
 # Resumen / KPIs
 # ============================================================
+
+@router.get("/{op_id}/pdf")
+async def descargar_op_pdf(
+    op_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Genera el PDF de la OP con el layout institucional (modelo SPN /
+    Tribunal de Cuentas). Lo devuelve inline para abrir en navegador.
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    op = (await db.execute(
+        select(OrdenPago).where(OrdenPago.id == op_id, OrdenPago.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not op:
+        raise HTTPException(404, "OP no encontrada")
+
+    # Datos del muni para el header + firmantes default
+    muni = (await db.execute(
+        select(Municipio).where(Municipio.id == municipio_id)
+    )).scalar_one()
+
+    # Datos del beneficiario
+    benef_nombre = ""
+    benef_cuit = ""
+    benef_iibb = ""
+    benef_iva = ""
+    benef_dir = ""
+    benef_codigo = ""
+
+    if op.destino_contacto_id:
+        c = (await db.execute(select(Contacto).where(Contacto.id == op.destino_contacto_id))).scalar_one_or_none()
+        if c:
+            benef_nombre = f"{c.apellido or ''} {c.nombre}".strip().upper() if c.apellido else c.nombre.upper()
+            benef_cuit = c.cuit or ""
+            benef_iibb = c.iibb or ""
+            benef_iva = c.condicion_iva or ""
+            benef_dir = c.direccion or ""
+            benef_codigo = c.codigo_tributario or ""
+    elif op.destino_dependencia_id:
+        from models import MunicipioDependencia
+        md = (await db.execute(
+            select(MunicipioDependencia)
+            .options(selectinload(MunicipioDependencia.dependencia))
+            .where(MunicipioDependencia.id == op.destino_dependencia_id)
+        )).scalar_one_or_none()
+        if md and md.dependencia:
+            benef_nombre = md.dependencia.nombre.upper()
+
+    # Fecha en formato AR
+    fecha_str = op.fecha_emision.strftime("%d/%m/%Y") if op.fecha_emision else ""
+
+    # Firmantes: lo que tiene la OP override los defaults del muni
+    contaduria = op.contaduria_nombre or muni.contador_nombre or ""
+    secretario = op.secretario_nombre or muni.secretario_nombre or ""
+    intendente = op.intendente_nombre or muni.intendente_nombre or ""
+
+    pdf_bytes = build_op_pdf(
+        muni_nombre=muni.nombre,
+        muni_direccion=muni.direccion or "",
+        muni_telefono=muni.telefono or "",
+        muni_cuit=muni.cuit or "",
+        numero=op.numero,
+        fecha_emision=fecha_str,
+        beneficiario_nombre=benef_nombre,
+        beneficiario_cuit=benef_cuit,
+        beneficiario_iibb=benef_iibb,
+        beneficiario_iva=benef_iva,
+        beneficiario_direccion=benef_dir,
+        beneficiario_codigo=benef_codigo,
+        concepto=op.concepto,
+        imputacion_codigo=op.codigo_imputacion or "",
+        imputacion_descripcion=op.imputacion_descripcion or op.concepto,
+        monto=op.monto_pesos,
+        recibos_texto=op.nro_factura or "",
+        contaduria_nombre=contaduria,
+        secretario_nombre=secretario,
+        intendente_nombre=intendente,
+        tipo_pago=op.tipo_pago or "",
+        nro_comprobante_pago=op.nro_comprobante_pago or "",
+        cuenta_destino=op.cuenta_destino or "",
+    )
+
+    filename = f"OP-{op.numero}.pdf"
+    return FastAPIResponse(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
 
 @router.get("/stats/resumen")
 async def resumen(

@@ -1130,3 +1130,116 @@ async def reportes_tesoreria(
         "mensuales": mensuales,
     }
 
+
+# ============================================================
+# Generar Orden de Pago a partir de un Gasto pagado
+# ============================================================
+
+from pydantic import BaseModel, Field as _Field
+
+
+class GenerarOPRequest(BaseModel):
+    """Body opcional para refinar los datos contables que van a la OP.
+    Si no vienen, se intenta inferir del gasto o se dejan vacios (el PDF
+    los imprime como "—" para que se completen a mano si hace falta)."""
+    codigo_imputacion: Optional[str] = _Field(None, max_length=50)
+    imputacion_descripcion: Optional[str] = _Field(None, max_length=150)
+    tipo_pago: Optional[str] = _Field(None, max_length=30)
+    nro_comprobante_pago: Optional[str] = _Field(None, max_length=50)
+    cuenta_destino: Optional[str] = _Field(None, max_length=100)
+    contaduria_nombre: Optional[str] = _Field(None, max_length=150)
+    secretario_nombre: Optional[str] = _Field(None, max_length=150)
+    intendente_nombre: Optional[str] = _Field(None, max_length=150)
+    nro_factura: Optional[str] = _Field(None, max_length=50)
+
+
+@router.post("/{gasto_id}/generar-op")
+async def generar_op_desde_gasto(
+    gasto_id: int,
+    payload: Optional[GenerarOPRequest] = None,
+    request: Request = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Genera una Orden de Pago a partir de un Gasto ya cargado.
+
+    La OP nace en estado `pagada` (es el documento de respaldo posterior
+    al pago, no la autorizacion previa). Hereda destino, concepto, monto,
+    caja y fecha del gasto. Los campos contables especificos del documento
+    (imputacion, tipo de pago, nro comprobante, cuenta destino) se reciben
+    en el body y se guardan en la OP para que aparezcan en el PDF.
+
+    Si el gasto ya tiene una OP asociada (op.gasto_id == gasto_id), devuelve
+    409 con el id de la OP existente.
+    """
+    from datetime import datetime
+    from models import OrdenPago, EstadoOrdenPago, Municipio
+    from api.ordenes_pago import _siguiente_numero
+
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    gasto = (await db.execute(
+        select(Gasto).where(Gasto.id == gasto_id, Gasto.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not gasto:
+        raise HTTPException(404, "Gasto no encontrado")
+
+    # Si ya hay una OP para este gasto, no crear otra
+    op_existente = (await db.execute(
+        select(OrdenPago).where(
+            OrdenPago.gasto_id == gasto_id,
+            OrdenPago.municipio_id == municipio_id,
+        )
+    )).scalar_one_or_none()
+    if op_existente:
+        return {
+            "ya_existe": True,
+            "op_id": op_existente.id,
+            "numero": op_existente.numero,
+        }
+
+    p = payload or GenerarOPRequest()
+
+    # Defaults de firmantes desde el muni si no vienen en el body
+    muni = (await db.execute(select(Municipio).where(Municipio.id == municipio_id))).scalar_one()
+
+    numero = await _siguiente_numero(db, municipio_id)
+    op = OrdenPago(
+        municipio_id=municipio_id,
+        numero=numero,
+        creador_id=current_user.id,
+        estado=EstadoOrdenPago.PAGADA,                      # nace pagada (respaldo posterior)
+        destino_tipo=gasto.destino_tipo,
+        destino_contacto_id=gasto.destino_contacto_id,
+        destino_dependencia_id=gasto.destino_dependencia_id,
+        concepto=gasto.concepto,
+        descripcion=gasto.descripcion,
+        monto_pesos=gasto.monto_pesos,
+        caja_id=gasto.caja_id,
+        fecha_emision=gasto.fecha,
+        fecha_pago=datetime.utcnow(),
+        nro_factura=p.nro_factura or gasto.nro_factura,
+        factura_url=gasto.factura_url,
+        codigo_imputacion=p.codigo_imputacion,
+        imputacion_descripcion=p.imputacion_descripcion,
+        tipo_pago=p.tipo_pago or gasto.forma_pago,
+        nro_comprobante_pago=p.nro_comprobante_pago,
+        cuenta_destino=p.cuenta_destino,
+        contaduria_nombre=p.contaduria_nombre or muni.contador_nombre,
+        secretario_nombre=p.secretario_nombre or muni.secretario_nombre,
+        intendente_nombre=p.intendente_nombre or muni.intendente_nombre,
+        gasto_id=gasto.id,
+        autorizado_por_id=current_user.id,
+        fecha_autorizacion=datetime.utcnow(),
+    )
+    db.add(op)
+    await db.commit()
+    await db.refresh(op)
+
+    return {
+        "ya_existe": False,
+        "op_id": op.id,
+        "numero": op.numero,
+    }
+

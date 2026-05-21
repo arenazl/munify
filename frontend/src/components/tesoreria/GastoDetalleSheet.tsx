@@ -102,6 +102,7 @@ export function GastoDetalleSheet({
   const [allContactos, setAllContactos] = useState<Contacto[]>([]);
   const [allDependencias, setAllDependencias] = useState<DependenciaLite[]>([]);
   const [observaciones, setObservaciones] = useState('');
+  const [generandoOP, setGenerandoOP] = useState(false);
 
   // ============ Edit mode ============
   // Toggle "Editar" arriba del Sheet. Cuando editMode=true, los campos
@@ -446,6 +447,33 @@ export function GastoDetalleSheet({
     </div>
   );
 
+  const handleGenerarOP = async () => {
+    if (!gasto) return;
+    setGenerandoOP(true);
+    try {
+      const res = await gastosApi.generarOP(gasto.id);
+      const { op_id, numero, ya_existe } = res.data;
+      // Bajar el PDF con auth (no se puede usar window.open(url) porque
+      // el endpoint requiere el header Authorization).
+      const pdfRes = await gastosApi.descargarOPPdf(op_id);
+      const blob = new Blob([pdfRes.data as BlobPart], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      // Liberar el ObjectURL despues de un rato (la pestania ya lo tiene cargado)
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success(
+        ya_existe
+          ? `Orden de Pago ${numero} (ya existia, se reabrio el PDF)`
+          : `Orden de Pago ${numero} generada`,
+      );
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'No se pudo generar la OP';
+      toast.error(msg);
+    } finally {
+      setGenerandoOP(false);
+    }
+  };
+
   const sheetFooter = (
     <div className="flex items-center justify-between gap-2 w-full flex-wrap">
       <div className="flex items-center gap-2">
@@ -476,6 +504,16 @@ export function GastoDetalleSheet({
         })()}
       </div>
       <div className="flex items-center gap-2">
+        <button
+          onClick={handleGenerarOP}
+          disabled={generandoOP}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+          style={{ backgroundColor: theme.primary + '15', color: theme.primary, border: `1px solid ${theme.primary}40` }}
+          title="Generar Orden de Pago en PDF"
+        >
+          {generandoOP ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+          Generar OP
+        </button>
         <button
           onClick={entrarEnEdicion}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"

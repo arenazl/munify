@@ -25,6 +25,20 @@ class OrdenPagoBase(BaseModel):
     nro_factura: Optional[str] = Field(None, max_length=50)
     factura_url: Optional[str] = Field(None, max_length=500)
 
+    # Imputacion contable (para imprimir en el documento de la OP)
+    codigo_imputacion: Optional[str] = Field(None, max_length=50)
+    imputacion_descripcion: Optional[str] = Field(None, max_length=150)
+
+    # Forma de pago detallada (lo que va en el pie del documento)
+    tipo_pago: Optional[str] = Field(None, max_length=30)
+    nro_comprobante_pago: Optional[str] = Field(None, max_length=50)
+    cuenta_destino: Optional[str] = Field(None, max_length=100)
+
+    # Firmantes internos (override por OP; si vienen None se usa el default del muni)
+    contaduria_nombre: Optional[str] = Field(None, max_length=150)
+    secretario_nombre: Optional[str] = Field(None, max_length=150)
+    intendente_nombre: Optional[str] = Field(None, max_length=150)
+
     notas: Optional[str] = None
 
 
@@ -45,6 +59,14 @@ class OrdenPagoUpdate(BaseModel):
     fecha_vencimiento: Optional[date] = None
     nro_factura: Optional[str] = Field(None, max_length=50)
     factura_url: Optional[str] = Field(None, max_length=500)
+    codigo_imputacion: Optional[str] = Field(None, max_length=50)
+    imputacion_descripcion: Optional[str] = Field(None, max_length=150)
+    tipo_pago: Optional[str] = Field(None, max_length=30)
+    nro_comprobante_pago: Optional[str] = Field(None, max_length=50)
+    cuenta_destino: Optional[str] = Field(None, max_length=100)
+    contaduria_nombre: Optional[str] = Field(None, max_length=150)
+    secretario_nombre: Optional[str] = Field(None, max_length=150)
+    intendente_nombre: Optional[str] = Field(None, max_length=150)
     notas: Optional[str] = None
 
 

@@ -63,6 +63,24 @@ class OrdenPago(Base):
     nro_factura = Column(String(50), nullable=True, index=True)
     factura_url = Column(String(500), nullable=True)
 
+    # Imputacion contable (partida presupuestaria). Ej: "1.1.01.03" / "SEGURO (ART)".
+    # Lo exige el Tribunal de Cuentas en el documento impreso.
+    codigo_imputacion = Column(String(50), nullable=True)
+    imputacion_descripcion = Column(String(150), nullable=True)
+
+    # Forma de pago concreta (lo que va al pie de la OP impresa).
+    # tipo_pago = "transferencia" | "cheque" | "efectivo" | "vep"
+    tipo_pago = Column(String(30), nullable=True)
+    nro_comprobante_pago = Column(String(50), nullable=True)   # nro de transferencia/cheque
+    cuenta_destino = Column(String(100), nullable=True)        # cuenta bancaria / sucursal
+
+    # Firmantes internos para imprimir en la OP. Strings sueltos (no FK a User)
+    # porque son cargos del muni que pueden no tener login en el sistema.
+    # Default: se llenan automaticamente desde Municipio.{contador,secretario,intendente}_nombre.
+    contaduria_nombre = Column(String(150), nullable=True)
+    secretario_nombre = Column(String(150), nullable=True)
+    intendente_nombre = Column(String(150), nullable=True)
+
     # Caja desde donde se va a pagar (puede definirse en la creacion o al pagar)
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True)
     caja = relationship("TesoreriaCaja", foreign_keys=[caja_id])
