@@ -129,26 +129,33 @@ Reglas:
 
 **How to apply:** Ante cualquier ABMPage nuevo o existente, jamás pasar `searchMaxWidth`. Si encontrás `searchMaxWidth={N}` en código existente, borralo en el mismo cambio.
 
+### 10. Sidebar: items de UNA SOLA palabra
+Los `name` de items del sidebar (`frontend/src/config/navigation.ts`) **siempre tienen que ser una sola palabra**. Si la función natural se nombra con dos ("Mis Reclamos", "Categorías Trámite", "Órdenes de Pago"), se reduce a la palabra que **abarque** la función completa ("Reclamos", "Trámites", "Órdenes").
+
+**Why:** El sidebar es angosto (`13rem` expandido) y cualquier label de dos palabras se corta con ellipsis. El user marcó esto como regla dura tras ver pantallas con "Cajas y Saldo…" y "Movimiento…" cortados. Una palabra siempre entra; dos nunca.
+
+**How to apply:** Antes de agregar un item nuevo a `navigation.ts`, si el nombre natural tiene espacio, buscar la palabra que abarque las dos. Si hay colisión con otro item del sidebar (ej. "Reclamos" del admin vs "Mis Reclamos" del vecino), confirmar que las `show` conditions son mutuamente excluyentes — si lo son, ambos pueden llamarse igual sin problema. La distinción visual la hace la categoría de arriba. Las páginas/títulos/funciones internas mantienen su nombre completo; la regla aplica **solo al label del sidebar**.
+
 ---
 
 ## REGLAS DE TRABAJO CON EL USER
 
-### 10. Jamás modificar módulos centrales sin consentimiento explícito
+### 11. Jamás modificar módulos centrales sin consentimiento explícito
 Proponer en texto primero (qué archivo, qué cambio, por qué). Esperar "dale" /
 "hacelo" / "aplicalo". "Aplicá los cambios que consideres" NO es carta blanca.
 
-### 11. Respuestas en UNA línea por defecto
+### 12. Respuestas en UNA línea por defecto
 Excepción: cuando el user pide explícitamente listas, detalle, o roadmap.
 
-### 12. No adivinar — verificar con datos reales
+### 13. No adivinar — verificar con datos reales
 Si el user duda de un resultado o pregunta "¿esto es real?", ejecutar query/script
 contra la fuente real (DB, API, código), no responder con hipótesis.
 
-### 13. CLIs primero, dashboard después
+### 14. CLIs primero, dashboard después
 El user tiene `gh`, `heroku`, `netlify`, `git`, `npm`, `node`, `python`, `docker`
 autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI.
 
-### 14. Deploy
+### 15. Deploy
 
 **Pipeline canónico — usar SIEMPRE este, no inventar atajos:**
 
@@ -173,7 +180,7 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 - Netlify production branch: `master`. Pushear a otra rama solo genera preview.
 - Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
 
-### 15. Cuando el user hace varias preguntas
+### 16. Cuando el user hace varias preguntas
 NO contestar todo de una. Responder de a una y esperar antes de seguir.
 
 ---

@@ -85,7 +85,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   return [
     // === SECCIÓN DEPENDENCIA (usuarios de dependencia) ===
     {
-      name: 'Mi Área',
+      name: 'Panel',
       href: '/gestion/mi-area',
       icon: Building2,
       show: isDependencia,
@@ -303,7 +303,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Gestión de SLA'
     },
     {
-      name: 'Panel BI',
+      name: 'Análisis',
       href: '/gestion/panel-bi',
       icon: LayoutDashboard,
       show: isAdminOrSupervisor && moduloOn('panel-bi'),
@@ -312,7 +312,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
     },
     // === ABMs per-municipio (solo si el modulo correspondiente esta activo) ===
     {
-      name: 'Categorías Reclamo',
+      name: 'Reclamos',
       href: '/gestion/categorias-reclamo',
       icon: FolderTree,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('reclamos'),
@@ -320,7 +320,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Categorías de reclamos del municipio'
     },
     {
-      name: 'Categorías Trámite',
+      name: 'Trámites',
       href: '/gestion/categorias-tramite',
       icon: FolderTree,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
@@ -328,7 +328,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Categorías de trámites del municipio'
     },
     {
-      name: 'Tipos de Trámite',
+      name: 'Tipos',
       href: '/gestion/tramites-config',
       icon: FileText,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('tramites'),
@@ -376,7 +376,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Consola de auditoría cross-municipio'
     },
     {
-      name: 'Config sidebar',
+      name: 'Sidebar',
       href: '/gestion/sidebar-config',
       icon: Layers,
       show: isSuperAdmin,
@@ -386,7 +386,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
 
     // === SECCIÓN VECINOS ===
     {
-      name: 'Mi Panel',
+      name: 'Panel',
       href: '/gestion/mi-panel',
       icon: Home,
       show: isVecino,
@@ -394,7 +394,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Tu panel personal'
     },
     {
-      name: 'Mis Reclamos',
+      name: 'Reclamos',
       href: '/gestion/mis-reclamos',
       icon: ClipboardList,
       show: isVecino,
@@ -403,7 +403,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       badgeKey: 'reclamos',
     },
     {
-      name: 'Mis Trámites',
+      name: 'Trámites',
       href: '/gestion/mis-tramites',
       icon: FileCheck,
       show: isVecino,
@@ -412,7 +412,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       badgeKey: 'tramites',
     },
     {
-      name: 'Mis Tasas',
+      name: 'Tasas',
       href: '/gestion/mis-tasas',
       icon: BarChart3,
       show: isVecino,

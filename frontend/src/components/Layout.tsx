@@ -349,7 +349,7 @@ export default function Layout() {
 
   // Anchos dinámicos con medidas relativas para mejor responsividad
   // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
-  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4rem' : '10.5rem');
+  const sidebarWidth = isMobile ? '12rem' : (sidebarCollapsed ? '4rem' : '13rem');
 
   // En móvil el sidebar siempre se muestra expandido (no colapsado)
   const isCollapsed = isMobile ? false : sidebarCollapsed;
@@ -651,7 +651,7 @@ export default function Layout() {
                 )}
               <Link
                 to={item.href}
-                className="flex items-center py-2.5 rounded-lg text-sm font-medium active:scale-[0.98] group relative overflow-hidden"
+                className="flex items-center py-2.5 rounded-lg text-xs font-medium active:scale-[0.98] group relative overflow-hidden"
                 style={{
                   backgroundColor: isActive ? theme.primary : 'transparent',
                   color: isActive ? '#ffffff' : theme.sidebarTextSecondary,
