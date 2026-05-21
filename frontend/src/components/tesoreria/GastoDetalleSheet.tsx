@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Calendar, Wallet, DollarSign, CreditCard, Receipt,
   CheckCircle2, Clock, AlertTriangle, Ban, Building2,
@@ -124,7 +124,37 @@ export function GastoDetalleSheet({
     destino_tipo: DestinoGasto;
     destino_contacto_id: number | null;
     destino_dependencia_id: number | null;
+    nro_factura: string;
+    factura_url: string;
   } | null>(null);
+  const [editUploadingFactura, setEditUploadingFactura] = useState(false);
+  const editFacturaInputRef = useRef<HTMLInputElement>(null);
+
+  // ============ Handlers de factura adjunta en modo edicion ============
+  const handleEditUploadFactura = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editForm) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('El archivo supera 10MB');
+      return;
+    }
+    setEditUploadingFactura(true);
+    try {
+      const res = await gastosApi.uploadFactura(file);
+      setEditForm({ ...editForm, factura_url: res.data.url });
+      toast.success('Factura adjuntada');
+    } catch {
+      toast.error('No se pudo subir el archivo');
+    } finally {
+      setEditUploadingFactura(false);
+      if (editFacturaInputRef.current) editFacturaInputRef.current.value = '';
+    }
+  };
+
+  const handleEditRemoveFactura = () => {
+    if (!editForm) return;
+    setEditForm({ ...editForm, factura_url: '' });
+  };
   const [savingEdit, setSavingEdit] = useState(false);
   // Si el backend devuelve 409 (cuotas pagadas existentes), guardamos
   // el payload + cantidad para mostrar el ConfirmModal y reintentar
@@ -241,6 +271,8 @@ export function GastoDetalleSheet({
       destino_tipo: gasto.destino_tipo,
       destino_contacto_id: gasto.destino_contacto_id ?? null,
       destino_dependencia_id: gasto.destino_dependencia_id ?? null,
+      nro_factura: (gasto as Gasto & { nro_factura?: string }).nro_factura || '',
+      factura_url: (gasto as Gasto & { factura_url?: string }).factura_url || '',
     });
     setEditMode(true);
   };
@@ -317,6 +349,19 @@ export function GastoDetalleSheet({
         if (editForm.fecha_fin_recurrencia !== fechaFinActual) {
           payload.fecha_fin_recurrencia = editForm.fecha_fin_recurrencia || null;
         }
+      }
+
+      // Factura adjunta: nro + URL. Comparamos con el original del gasto;
+      // si cambio (borraron, agregaron o reemplazaron) mandamos el nuevo
+      // valor. null borra el campo en la DB.
+      const nroFacturaActual = (gasto as Gasto & { nro_factura?: string }).nro_factura || '';
+      const facturaUrlActual = (gasto as Gasto & { factura_url?: string }).factura_url || '';
+      const nroNuevo = editForm.nro_factura.trim();
+      if (nroNuevo !== nroFacturaActual) {
+        payload.nro_factura = nroNuevo || null;
+      }
+      if (editForm.factura_url !== facturaUrlActual) {
+        payload.factura_url = editForm.factura_url || null;
       }
 
       // Si no cambio nada, no llamamos al backend.
@@ -759,6 +804,88 @@ export function GastoDetalleSheet({
               </div>
             </div>
           )}
+
+          {/* ============ Factura adjunta (editable) ============ */}
+          <div
+            className="p-3 rounded-xl space-y-2"
+            style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+          >
+            <label className="block text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
+              Factura del proveedor (opcional)
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] mb-1" style={{ color: theme.textSecondary }}>N° de factura</p>
+                <input
+                  type="text"
+                  value={editForm.nro_factura}
+                  onChange={(e) => setEditForm({ ...editForm, nro_factura: e.target.value })}
+                  placeholder="Ej: A-0001-00012345"
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
+                />
+              </div>
+              <div>
+                <p className="text-[10px] mb-1" style={{ color: theme.textSecondary }}>Archivo PDF / imagen</p>
+                <input
+                  ref={editFacturaInputRef}
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={handleEditUploadFactura}
+                  className="hidden"
+                />
+                {editForm.factura_url ? (
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+                  >
+                    <FileText className="h-4 w-4 flex-shrink-0" style={{ color: theme.primary }} />
+                    <a
+                      href={editForm.factura_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 truncate hover:underline"
+                      style={{ color: theme.primary }}
+                    >
+                      Ver archivo adjunto
+                    </a>
+                    <button
+                      type="button"
+                      onClick={handleEditRemoveFactura}
+                      className="p-1 rounded hover:bg-red-100 transition-colors"
+                      title="Quitar archivo"
+                    >
+                      <X className="h-4 w-4" style={{ color: '#ef4444' }} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => editFacturaInputRef.current?.click()}
+                    disabled={editUploadingFactura}
+                    className="w-full px-3 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-[1.005] active:scale-[0.995] disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{
+                      backgroundColor: theme.card,
+                      border: `1px dashed ${theme.border}`,
+                      color: theme.text,
+                    }}
+                  >
+                    {editUploadingFactura ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Subiendo...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4" />
+                        Subir archivo
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
       <div className="space-y-3">

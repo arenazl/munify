@@ -87,6 +87,11 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [facturaUrl, setFacturaUrl] = useState('');
   const [uploadingFactura, setUploadingFactura] = useState(false);
 
+  // En el step final, si esto esta tildado, al guardar el gasto se
+  // genera ademas la Orden de Pago (documento PDF para Tribunal de Cuentas)
+  // y se abre en una pestania nueva.
+  const [generarOPDespues, setGenerarOPDespues] = useState(false);
+
   // Imputaciones a proyectos (opcional). Persisten cuando se usa
   // "Guardar y agregar otro" para no recargar el mismo proyecto.
   const [proyectoAsignaciones, setProyectoAsignaciones] = useState<GastoProyectoAssignment[]>([]);
@@ -121,6 +126,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       setCajaId(null);
       setNroFactura('');
       setFacturaUrl('');
+      setGenerarOPDespues(false);
     }
   }, [open]);
 
@@ -207,7 +213,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
 
     setSaving(true);
     try {
-      await gastosApi.create({
+      const createRes = await gastosApi.create({
         destino_tipo: destinoTipo,
         destino_contacto_id: destinoTipo === 'contacto' ? contactoId : null,
         destino_dependencia_id: destinoTipo === 'dependencia' ? dependenciaId : null,
@@ -229,6 +235,26 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
       });
       toast.success(continueAdding ? 'Gasto cargado · cargá el siguiente' : 'Gasto cargado correctamente');
       onSuccess?.();
+
+      // Si el usuario tildo "generar OP", disparar la generacion y abrir
+      // el PDF en una pestania nueva. Esto es opcional — el gasto ya esta
+      // guardado independientemente del exito de la OP.
+      const gastoCreado = (createRes?.data as { id?: number } | undefined);
+      if (generarOPDespues && gastoCreado?.id) {
+        try {
+          const opRes = await gastosApi.generarOP(gastoCreado.id);
+          const opId = opRes.data.op_id;
+          const pdfRes = await gastosApi.descargarOPPdf(opId);
+          const blob = new Blob([pdfRes.data as BlobPart], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank');
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+          toast.success(`Orden de Pago ${opRes.data.numero} generada`);
+        } catch (opErr: unknown) {
+          const msg = (opErr as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'No se pudo generar la OP';
+          toast.error(`Gasto guardado, pero la OP falló: ${msg}`);
+        }
+      }
 
       if (continueAdding) {
         // Reset todo MENOS proyectos imputados y fecha. Vuelve al step 0.
@@ -955,6 +981,38 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
           {cajas.find(c => c.id === cajaId)?.nombre || '—'}
         </p>
       </div>
+
+      {/* Toggle "Generar Orden de Pago" — si esta tildado, al guardar el
+          gasto se crea ademas la OP (documento PDF para Tribunal de Cuentas)
+          y se abre en una pestania nueva. Opcional: gastos chicos no la
+          necesitan. */}
+      <button
+        type="button"
+        onClick={() => setGenerarOPDespues(v => !v)}
+        className="w-full p-3 rounded-xl flex items-start gap-3 transition-all text-left hover:scale-[1.005] active:scale-[0.995]"
+        style={{
+          backgroundColor: generarOPDespues ? `${theme.primary}15` : theme.backgroundSecondary,
+          border: `2px solid ${generarOPDespues ? theme.primary : theme.border}`,
+        }}
+      >
+        <div
+          className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center mt-0.5"
+          style={{
+            backgroundColor: generarOPDespues ? theme.primary : 'transparent',
+            border: `2px solid ${generarOPDespues ? theme.primary : theme.border}`,
+          }}
+        >
+          {generarOPDespues && <CheckCircle2 className="h-3 w-3" style={{ color: '#fff' }} />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold" style={{ color: theme.text }}>
+            Generar Orden de Pago al guardar
+          </p>
+          <p className="text-[11px] mt-0.5" style={{ color: theme.textSecondary }}>
+            Crea el documento PDF para el Tribunal de Cuentas y lo abre en otra pestaña para imprimir.
+          </p>
+        </div>
+      </button>
 
       <div className="p-3 rounded-xl flex items-start gap-2" style={{ backgroundColor: '#10b98115', border: '1px solid #10b98140' }}>
         <Sparkles className="h-5 w-5 flex-shrink-0" style={{ color: '#10b981' }} />
