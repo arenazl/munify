@@ -1982,6 +1982,13 @@ export const gastosApi = {
     concepto?: string;
   }) => api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
   reportes: () => api.get('/tesoreria/gastos/stats/reportes'),
+  uploadFactura: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/tesoreria/gastos/upload-factura', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   proyeccionesCuotasDelMes: (params: {
     anio: number;
     mes: number;

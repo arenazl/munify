@@ -145,6 +145,8 @@ class GastoBase(BaseModel):
     concepto: str = Field(..., min_length=1, max_length=150)
     descripcion: Optional[str] = None
     observaciones: Optional[str] = None
+    nro_factura: Optional[str] = Field(None, max_length=50)
+    factura_url: Optional[str] = Field(None, max_length=500)
 
     monto_pesos: Decimal = Field(..., gt=0)
     cotizacion_usd: Optional[Decimal] = Field(None, gt=0)
@@ -177,6 +179,8 @@ class GastoUpdate(BaseModel):
     pendientes/vencidas. Si hay cuotas YA PAGADAS, el endpoint rechaza el
     cambio con 409 — el user tiene que cancelar la cuota pagada primero.
     """
+    nro_factura: Optional[str] = Field(None, max_length=50)
+    factura_url: Optional[str] = Field(None, max_length=500)
     # Destino — permite reasignar a otro contacto o dependencia
     destino_tipo: Optional[DestinoGastoStr] = None
     destino_contacto_id: Optional[int] = None

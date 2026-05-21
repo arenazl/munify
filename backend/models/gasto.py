@@ -109,6 +109,11 @@ class Gasto(Base):
     # Se edita desde el side modal de Tesoreria. No se muestra al beneficiario.
     observaciones = Column(Text, nullable=True)
 
+    # Factura del proveedor que respalda el gasto (mismo patron que en
+    # OrdenPago). Nullable para gastos cargados antes de la feature.
+    nro_factura = Column(String(50), nullable=True, index=True)
+    factura_url = Column(String(500), nullable=True)
+
     # ============ MONTO + COTIZACION ============
     # Monto en pesos al momento del gasto (siempre).
     monto_pesos = Column(Numeric(15, 2), nullable=False)

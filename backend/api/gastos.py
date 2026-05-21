@@ -16,7 +16,8 @@ from decimal import Decimal
 from typing import List, Optional
 from calendar import monthrange
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response
+import cloudinary.uploader
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Response, UploadFile, File
 from sqlalchemy import select, and_, or_, func, extract, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,8 +28,9 @@ from core.tenancy import get_effective_municipio_id
 from models import (
     Gasto, GastoCuota, Contacto, MunicipioDependencia, User, RolUsuario,
     EstadoGastoCuota, Proyecto, GastoProyecto,
+    TesoreriaMovimientoCaja, TipoMovimientoCaja,
 )
-from models.gasto import TipoFinanciacion
+from models.gasto import TipoFinanciacion, EstadoPagoGasto
 from models.dependencia import Dependencia
 from schemas.tesoreria import (
     GastoCreate, GastoUpdate, GastoResponse, GastoProyectoResponse,
@@ -46,6 +48,35 @@ def _require_admin(user: User):
     # gastos. Los supervisores de dependencia y vecinos no.
     if user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
         raise HTTPException(status_code=403, detail="Sin permisos para gestionar gastos")
+
+
+async def _sincronizar_movimiento_caja(db: AsyncSession, gasto: Gasto, municipio_id: int) -> None:
+    """Sincroniza TesoreriaMovimientoCaja del gasto con su estado actual.
+
+    Reglas:
+      - Solo aplica para gastos tipo CONTADO. Para cuotas/prestamo/recurrente,
+        cada cuota al pagarse crea su propio movimiento (ver `pagar_cuota`).
+      - Borra movimientos previos del gasto.
+      - Si el gasto tiene caja_id y esta CONCRETADO, crea movimiento de
+        egreso por el monto total. Si no (sin caja o pendiente), no crea
+        nada — la caja queda intacta hasta que se concrete el pago.
+    """
+    from sqlalchemy import delete as sa_delete
+    if gasto.tipo_financiacion != TipoFinanciacion.CONTADO:
+        return
+    await db.execute(
+        sa_delete(TesoreriaMovimientoCaja).where(TesoreriaMovimientoCaja.gasto_id == gasto.id)
+    )
+    if gasto.caja_id and gasto.estado_pago == EstadoPagoGasto.CONCRETADO:
+        db.add(TesoreriaMovimientoCaja(
+            municipio_id=municipio_id,
+            caja_id=gasto.caja_id,
+            gasto_id=gasto.id,
+            tipo=TipoMovimientoCaja.EGRESO,
+            monto=gasto.monto_pesos,
+            fecha=gasto.fecha,
+            concepto=gasto.concepto,
+        ))
 
 
 def _gasto_to_response(gasto: Gasto) -> GastoResponse:
@@ -389,6 +420,9 @@ async def create_gasto(
     if payload.proyectos:
         await _crear_imputaciones(db, gasto, payload.proyectos, municipio_id)
 
+    # Movimiento de caja (descuenta la caja si es contado + concretado).
+    await _sincronizar_movimiento_caja(db, gasto, municipio_id)
+
     await db.commit()
 
     # Re-cargar el gasto con todas las relaciones eagerly, para evitar
@@ -598,6 +632,10 @@ async def update_gasto(
     if payload.proyectos is not None:
         await _reemplazar_imputaciones(db, gasto, payload.proyectos, municipio_id)
 
+    # Sincronizar movimiento de caja con el nuevo estado del gasto.
+    # Maneja cambios de caja_id, monto, estado_pago (pendiente <-> concretado).
+    await _sincronizar_movimiento_caja(db, gasto, municipio_id)
+
     await db.commit()
 
     # Expirar la cache de la session para que el re-query no devuelva
@@ -635,6 +673,12 @@ async def delete_gasto(
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
     gasto.activo = False
+    # Borrar movimientos de caja asociados — el gasto eliminado ya no
+    # debe seguir descontando la caja.
+    from sqlalchemy import delete as sa_delete
+    await db.execute(
+        sa_delete(TesoreriaMovimientoCaja).where(TesoreriaMovimientoCaja.gasto_id == gasto.id)
+    )
     await db.commit()
     return {"ok": True, "id": gasto_id}
 
@@ -657,6 +701,7 @@ async def pagar_cuota(
     result = await db.execute(
         select(GastoCuota)
         .join(Gasto, GastoCuota.gasto_id == Gasto.id)
+        .options(selectinload(GastoCuota.gasto))
         .where(GastoCuota.id == cuota_id, Gasto.municipio_id == municipio_id)
     )
     cuota = result.scalar_one_or_none()
@@ -671,6 +716,22 @@ async def pagar_cuota(
         cuota.comprobante = payload.comprobante
     if payload.notas:
         cuota.notas = payload.notas
+
+    # Si el gasto madre tiene caja_id, descontamos el monto de la cuota
+    # individual de esa caja. Solo aplica para gastos a cuotas/prestamo/
+    # recurrente — el contado ya tuvo su movimiento al crearse.
+    gasto = cuota.gasto
+    if gasto and gasto.caja_id and gasto.tipo_financiacion != TipoFinanciacion.CONTADO:
+        db.add(TesoreriaMovimientoCaja(
+            municipio_id=municipio_id,
+            caja_id=gasto.caja_id,
+            gasto_id=gasto.id,
+            tipo=TipoMovimientoCaja.EGRESO,
+            monto=cuota.monto,
+            fecha=cuota.fecha_pago,
+            concepto=f"{gasto.concepto} · Cuota {cuota.numero}/{gasto.cuotas_total or '?'}",
+        ))
+
     await db.commit()
     return {"ok": True, "cuota_id": cuota_id, "estado": "pagada"}
 
@@ -918,6 +979,41 @@ async def tesoreria_dashboard_ia(
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
     from services.dashboard_ia import build_tesoreria_dashboard
     return await build_tesoreria_dashboard(db, municipio_id, force=force)
+
+
+@router.post("/upload-factura")
+async def upload_factura_gasto(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Sube el PDF/imagen de la factura asociada a un gasto a Cloudinary.
+    Devuelve la URL para guardar en factura_url. Mismo patron que OPs."""
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    if not file.content_type:
+        raise HTTPException(422, "Tipo de archivo desconocido")
+    ct = file.content_type
+    is_pdf = ct == "application/pdf"
+    if is_pdf:
+        resource_type = "raw"
+    elif ct.startswith("image/"):
+        resource_type = "image"
+    else:
+        raise HTTPException(422, "Solo se permiten PDF o imagenes")
+    try:
+        result = cloudinary.uploader.upload(
+            file.file,
+            folder=f"facturas-gasto/muni-{municipio_id}",
+            resource_type=resource_type,
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Error subiendo factura: {e}")
+    return {
+        "url": result.get("secure_url") or result.get("url"),
+        "public_id": result.get("public_id"),
+        "resource_type": resource_type,
+    }
 
 
 @router.get("/stats/reportes")

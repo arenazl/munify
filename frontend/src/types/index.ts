@@ -537,6 +537,9 @@ export interface Gasto {
   cuotas_total?: number | null;
   frecuencia?: FrecuenciaRecurrencia | null;
   fecha_fin_recurrencia?: string | null;
+  caja_id?: number | null;
+  nro_factura?: string | null;
+  factura_url?: string | null;
   activo: boolean;
   created_at: string;
   updated_at: string;

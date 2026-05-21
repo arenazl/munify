@@ -183,7 +183,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Histórico transaccional para contaduría'
     },
     {
-      name: 'Órdenes de Pago',
+      name: 'Órdenes',
       href: '/gestion/contaduria/ordenes-pago',
       icon: FileCheck,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
@@ -207,7 +207,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Gastos cargados del municipio'
     },
     {
-      name: 'Cajas y Saldos',
+      name: 'Cajas',
       href: '/gestion/tesoreria/cajas',
       icon: PiggyBank,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
