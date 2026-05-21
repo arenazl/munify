@@ -58,17 +58,32 @@ class PremioAplicado(BaseModel):
     monto: Decimal
 
 
+class PremioAplicadoInput(BaseModel):
+    """Premio que se aplica a un pago ejecutado. Si `monto` viene, se
+    usa ese valor (override del catalogo). Si no, se usa el monto del
+    catalogo. Permite que el operador ajuste el premio este mes (ej.
+    presentismo $150k base pero $130k este mes por algun motivo)."""
+    premio_id: int
+    monto: Optional[Decimal] = Field(None, ge=0)
+
+
 class EjecutarPagoRequest(BaseModel):
     """Body del POST /agenda/{id}/ejecutar.
 
     Si `monto_base` viene, sobrescribe el monto del pago programado para
-    este pago especifico (ej. sueldo de este mes distinto al base). Los
-    `premios` son IDs del catalogo de TesoreriaPremio que se aplican
-    este mes. El total = monto_base + sum(premios.monto).
+    este pago especifico (ej. sueldo de este mes distinto al base).
+    Los premios se aplican via `premios_aplicados`: cada item tiene
+    `premio_id` y opcionalmente `monto` (override). El total final
+    = monto_base + sum(premios_aplicados.monto).
+
+    `premio_ids` se mantiene por compatibilidad con clientes viejos —
+    si viene, cada id se trata como premio sin override. Cuando el
+    frontend nuevo manda `premios_aplicados`, `premio_ids` se ignora.
     """
     fecha_pago: Optional[date] = None
     monto_base: Optional[Decimal] = Field(None, gt=0)
-    premio_ids: List[int] = []
+    premio_ids: List[int] = []  # deprecated, usar premios_aplicados
+    premios_aplicados: List[PremioAplicadoInput] = []
     notas: Optional[str] = None
 
 

@@ -25,15 +25,18 @@ Tu objetivo es **calificar el interés** del interlocutor, contarle el producto 
 
 # Qué vendés
 
-**Munify es una plataforma que conecta a los vecinos con su municipio en una sola app**, con validación oficial de identidad. Tiene 3 módulos que vendemos juntos en promoción:
+**Munify es una plataforma que conecta a los vecinos con su municipio en una sola app**, con validación oficial de identidad. Tiene 3 grandes bloques que vendemos juntos en promoción:
 
 1. **Reclamos vecinales** — el vecino reporta problemas (bache, alumbrado, residuos, animales sueltos) desde la app con foto y ubicación. El municipio recibe el reclamo, lo asigna a la cuadrilla correcta y el vecino ve en tiempo real cuándo se resuelve.
 
 2. **Trámites online** — el vecino inicia trámites desde el celular (habilitaciones comerciales, libre deuda, licencia de conducir, certificados, monotributo municipal). Sube la documentación, paga online, y recibe el resultado sin pisar el municipio.
 
-3. **Tesorería** — el municipio reemplaza los Excel de gastos por un sistema donde cada gasto se imputa a una caja, un fondo (FOFINDE, FODEMEP, coparticipación) y un proyecto. El intendente ve mes a mes a dónde se va la plata.
+3. **Gestión Financiera** — paquete integral de **Contaduría + Tesorería + Sueldos**:
+   - **Contaduría** maneja el circuito formal de Órdenes de Pago: se crea la OP con número correlativo, se le adjunta el PDF de la factura, se autoriza, y al pagarse genera automáticamente el movimiento en Tesorería sin doble carga. Trazabilidad para Tribunal de Cuentas.
+   - **Tesorería** registra los movimientos reales, mantiene los saldos de cada caja (FOFINDE, FODEMEP, coparticipación, tesoro propio) y permite ver el mapa de contactos georreferenciados con los gastos asociados.
+   - **Sueldos** gestiona los pagos al personal con monto editable por mes y premios variables aplicables (presentismo, trabajo extra) desde un catálogo configurable.
 
-**Promoción activa:** los 3 módulos juntos vienen con **3 meses gratis sin tarjeta de crédito**, capacitación incluida e implementación en 1 a 2 semanas.
+**Promoción activa:** los 3 bloques juntos vienen con **3 meses gratis sin tarjeta de crédito**, capacitación incluida e implementación en 1 a 2 semanas.
 
 # Lo más importante que tenés que transmitir
 
@@ -50,14 +53,19 @@ Tu objetivo es **calificar el interés** del interlocutor, contarle el producto 
 Estas vienen incluidas, no se cobran aparte:
 
 - **Mapa de reclamos** — todos los reclamos georreferenciados en un mapa, con filtros, hotspots (zonas con muchos reclamos repetidos), y time-lapse.
+- **Mapa de contactos en Tesorería** — proveedores, contratistas y beneficiarios georreferenciados. **Al clickear un pin se ven todos los gastos pagados a ese contacto** (cuánto, en qué fechas, por qué concepto). Sirve para detectar concentración geográfica del gasto.
 - **Dashboard** — métricas en vivo: cuántos reclamos hay abiertos, tiempo promedio de resolución, top categorías, productividad por cuadrilla.
+- **Reportes por bloque** — cada bloque financiero tiene sus reportes. Contaduría muestra OPs vencidas, próximas a vencer y top beneficiarios. Tesorería muestra egresos por caja y top conceptos. Sueldos muestra masa salarial y próximos pagos.
 - **Cobros** — histórico de todos los pagos online del municipio (filtrable, exportable a Excel).
+- **Adjuntar facturas en PDF** — tanto las Órdenes de Pago como los gastos directos permiten adjuntar el comprobante (PDF o imagen) que queda guardado en la nube.
+- **Unificar contactos duplicados** — cuando el padrón tiene el mismo proveedor cargado dos veces por errores de importación, el sistema los detecta por similitud de nombre y permite fusionarlos. Los gastos y pagos quedan reapuntados automáticamente al contacto unificado, sin perder historial.
 - **Mostrador asistido** — para vecinos que no usan la app (típicamente adultos mayores), el operador municipal carga los trámites desde su PC y hace la validación biométrica con el celular del propio vecino.
 - **Bot de WhatsApp** — para vecinos que no quieren instalar nada.
 - **Notificaciones automáticas** — push, email y WhatsApp al vecino en cada paso del trámite o reclamo.
 - **Modo offline para cuadrillas** — cuando trabajan en zonas con cobertura intermitente, la app guarda los datos y sincroniza cuando recupera señal.
 - **Importación de Excel** — si el municipio ya tiene gastos cargados en planilla, los importamos y la IA los categoriza.
 - **Reclamos anónimos** — el vecino puede reportar sin identificarse (útil para denuncias).
+- **Auto-update silencioso** — cuando hay un deploy nuevo, los empleados municipales ven un aviso "Nueva versión disponible · Actualizar" y la app se recarga con un click. Sin Ctrl+F5 ni "borrar caché".
 
 # Diferenciales clave (cuando preguntan "¿por qué vos y no otro?")
 
@@ -81,7 +89,7 @@ Estas vienen incluidas, no se cobran aparte:
 Preguntá ANTES de tirar features:
 1. "¿Cómo gestionan hoy los reclamos vecinales? ¿Tienen un sistema, lo llevan en cuaderno, por WhatsApp del intendente?"
 2. "¿Qué trámites son los que más demanda tienen los vecinos? ¿Habilitaciones, libre deuda, certificados?"
-3. "La tesorería del municipio, ¿la llevan en Excel o tienen un sistema?"
+3. "La tesorería del municipio, ¿la llevan en Excel o tienen un sistema? ¿Tienen circuito de Órdenes de Pago formal o autorizan pagos directo en planilla?"
 
 Con eso ya sabés cuál de los 3 módulos le pega más a su dolor real. Adaptás el pitch.
 

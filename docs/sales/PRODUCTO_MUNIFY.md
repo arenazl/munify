@@ -10,11 +10,14 @@
 
 El vecino reclama un bache, inicia un trámite o paga una tasa desde el celular. El municipio recibe el pedido, lo asigna a la dependencia correcta, lo resuelve y notifica al vecino — todo en tiempo real, con foto, GPS y firma digital cuando hace falta.
 
-**Los 3 módulos que se venden juntos en promoción:**
+**Los 3 grandes bloques que se venden juntos en promoción:**
 
 1. **Reclamos** — gestión de reclamos vecinales (baches, alumbrado, residuos, etc.)
 2. **Trámites** — trámites municipales online (habilitaciones, libre deuda, licencias, etc.)
-3. **Tesorería** — control de gastos, cajas, fondos y proyectos del municipio
+3. **Gestión Financiera** — paquete integral compuesto por:
+   - **Contaduría** (Órdenes de Pago con autorización formal y trazabilidad).
+   - **Tesorería** (movimientos, cajas y saldos, proyección, mapa).
+   - **Sueldos** (liquidaciones a personal con premios variables, empleados, catálogo de bonificaciones).
 
 > **Promoción activa:** los 3 módulos contratados juntos vienen con **3 meses gratis sin tarjeta de crédito** y precio combinado por debajo de la suma de los 3 sueltos.
 
@@ -31,7 +34,11 @@ Hoy los reclamos llegan por mil canales: el celular del intendente, el cuaderno 
 Habilitación comercial, libre deuda, certificado de domicilio, licencia de conducir — todo eso obliga al vecino a venir, hacer cola y volver al otro día porque le falta un papel. Munify permite que el vecino **inicie el trámite desde el celular**, mande la documentación por la app, pague online si corresponde y reciba el certificado o el turno presencial — sin pisar el municipio hasta el día de la entrega.
 
 ### Dolor 3 — "La tesorería se lleva en Excel y nadie sabe en qué se gasta"
-La mayoría de los municipios chicos y medianos llevan la tesorería en planillas. El intendente firma órdenes de pago sin saber realmente en qué se está gastando, qué obra consumió cuánto, qué fondo (FOFINDE, FODEMEP, coparticipación) está más cerca del límite. El módulo de Tesorería de Munify reemplaza esos Excel con una herramienta donde **cada gasto se imputa a un proyecto, una caja y un fondo**, y el intendente ve mes a mes a dónde va la plata.
+La mayoría de los municipios chicos y medianos llevan la tesorería en planillas. El intendente firma órdenes de pago sin saber realmente en qué se está gastando, qué obra consumió cuánto, qué fondo (FOFINDE, FODEMEP, coparticipación) está más cerca del límite. El módulo de **Gestión Financiera** de Munify reemplaza esos Excel con tres herramientas integradas:
+
+- **Contaduría** maneja el circuito formal: se crea una Orden de Pago, se autoriza, y al pagarse genera automáticamente el movimiento en Tesorería (sin doble carga). Cada OP tiene número correlativo (OP-2026-0001), permite adjuntar el PDF de la factura del proveedor, y queda con trazabilidad completa para mostrar al Tribunal de Cuentas.
+- **Tesorería** registra cada movimiento real de plata, descuenta la caja correspondiente y mantiene los saldos en vivo. El intendente ve mes a mes a dónde va la plata, filtrado por caja, proyecto, proveedor o dependencia.
+- **Sueldos** gestiona los pagos recurrentes al personal. Permite ajustar el monto cada mes (porque varía) y aplicar premios variables (presentismo, trabajo extra) desde un catálogo configurable.
 
 ### Dolor 4 — "Los vecinos no confían en el sistema porque cualquiera podría reclamar por otro"
 Si yo quiero hacer un trámite a nombre tuyo, ¿cómo me prueba el municipio que soy yo? Munify resuelve esto con **validación biométrica oficial vía RENAPER**. El vecino saca foto de su DNI, una selfie con prueba de vida, y el sistema confirma contra el registro nacional que es esa persona. Es lo mismo que pide hoy el banco para abrir una cuenta — y le da validez gubernamental al trámite, así puede generar turnos para licencia de conducir, habilitaciones, todo lo que necesita identidad probada.
@@ -78,24 +85,59 @@ Para vecinos que NO tienen la app (típicamente adultos mayores), el operador mu
 
 ---
 
-### MÓDULO 3 — Tesorería municipal
+### MÓDULO 3 — Gestión Financiera (Contaduría + Tesorería + Sueldos)
 
-**Para el municipio:** reemplaza el Excel que hoy lleva el contador o la tesorera. Permite cargar **cada gasto del municipio** con:
-- Concepto, monto, fecha, medio de pago (efectivo, transferencia, cheque, tarjeta).
-- **Caja o fondo** que lo financia (FOFINDE, FODEMEP, FOMEP, coparticipación, rentas generales, fondos provinciales, etc.).
-- **Proyecto u obra** al que se imputa (obra de cordón cuneta en barrio Centro, compra de combustible para recolección, sueldos de marzo, etc.).
-- **Contacto / proveedor** (con CUIT, dirección, opcional georreferenciado).
-- Documentación adjunta (factura escaneada, orden de pago).
+Este módulo es el más nuevo y completo. Reemplaza el Excel que hoy lleva el contador o la tesorera. Se compone de **tres sub-módulos integrados** que comparten la misma base de datos: lo que se autoriza en Contaduría termina como movimiento en Tesorería, y los sueldos del personal viven en su propio espacio con su lógica de premios.
 
-**Lo que el intendente ve:**
-- Dashboard mensual con gasto total, breakdown por categoría, por fondo, por dependencia.
-- Resumen mes a mes y año a año (para comparar contra el presupuesto).
-- Agenda de pagos recurrentes (sueldos, honorarios, servicios) que se vienen.
-- Proyecciones de caja a 30/60/90 días.
-- Mapa con los proveedores georreferenciados (útil para ver concentración geográfica del gasto).
-- Bandeja de "curación IA": cuando se importan gastos masivamente (desde un Excel del intendente o desde el banco), la IA propone categorización y el supervisor aprueba.
+#### Sub-módulo 3.A — Contaduría (autoriza los pagos)
 
-**Importación de Excel:** el módulo recibe el Excel típico que ya usan los municipios y lo categoriza con IA automáticamente. Sin obligar a re-cargar todo a mano.
+El circuito formal de aprobación de cualquier pago al muni:
+
+1. Se crea una **Orden de Pago** con número correlativo automático (`OP-2026-0001` por muni). Cargás: beneficiario (proveedor o dependencia), concepto, monto, fecha de emisión y vencimiento, nº de factura del proveedor, y **podés subir el PDF de la factura** que respalda el gasto (queda guardada en la nube). Opcionalmente, se elige la caja desde la que va a salir el pago.
+2. La OP queda en estado **pendiente**.
+3. El responsable de Contaduría la revisa y le da **autorizada**.
+4. Al apretar **"Pagar"** se elige la caja final, fecha y forma de pago. Acto seguido, el sistema crea automáticamente un Gasto en Tesorería y descuenta el saldo de la caja. Sin doble carga.
+5. La OP queda **pagada** y vinculada al movimiento por trazabilidad bidireccional.
+6. Si la OP es incorrecta, se puede **anular** con motivo registrado (mientras no esté pagada).
+
+**Reportes de Contaduría:** OPs vencidas (con vencimiento pasado sin pagar), próximas a vencer (próximos 7 días), top beneficiarios del mes, evolución mensual de gasto autorizado. Útil para mostrar al concejo o al Tribunal de Cuentas.
+
+#### Sub-módulo 3.B — Tesorería (la plata real)
+
+Acá vive cada movimiento de plata del municipio:
+
+- **Movimientos** — cada gasto cargado, creado a mano o automáticamente desde una OP pagada. Se imputa a:
+  - **Caja o fondo** (FOFINDE, FODEMEP, FOMEP, coparticipación, tesoro propio, etc.).
+  - **Proyecto u obra** opcional (obra de cordón cuneta en barrio Centro, balneario, gimnasio, etc.).
+  - **Contacto / proveedor** o dependencia destinataria.
+  - Documentación adjunta (factura PDF al gasto, mismo flujo que en OPs).
+  - Forma de pago, tipo de financiación (contado / cuotas / préstamo / recurrente).
+- **Cajas y Saldos** — todas las cajas del municipio con ingresos acumulados, egresos acumulados y saldo en vivo. Cada egreso se imputa a una caja, por eso se puede hacer arqueo real.
+- **Proyección** — proyección de caja a 30/60/90 días basada en cuotas pendientes.
+- **Mapa de contactos** — mapa geográfico con todos los proveedores/beneficiarios georreferenciados. Al hacer click en un contacto, **se ven los gastos asociados** a esa persona o proveedor (cuánto se le pagó, en qué fechas, qué concepto). Útil para detectar concentración geográfica del gasto.
+- **Contactos** — padrón unificado de proveedores, contratistas, empleados y beneficiarios. Permite **unificar contactos duplicados** (cuando el mismo proveedor aparece cargado dos veces por errores de importación), reapuntando automáticamente todos los gastos y pagos al contacto unificado.
+- **Reportes de Tesorería** — egresos por caja del mes, top conceptos, top dependencias, evolución mensual.
+
+#### Sub-módulo 3.C — Sueldos (pagos al personal)
+
+Caso especial del pago recurrente al personal del muni. Distinto a un proveedor porque el sueldo varía mes a mes (presentismo, horas extras, etc.):
+
+- **Liquidaciones** — lista de empleados con su sueldo base programado. Al ejecutar el pago de cada mes, se abre un panel donde el operador:
+  - Ajusta el monto base de ese mes (porque puede variar).
+  - Marca cuáles **premios** se le pagan ese mes (presentismo, trabajo extra, etc.).
+  - Ve el total dinámico calculado.
+  - Confirma — y se crea el gasto en Tesorería con el descuento de caja correspondiente.
+- **Empleados** — vista de todo el personal del muni, con su estado de liquidación (con/sin sueldo programado), datos de contacto, e indicador de quién falta cargar.
+- **Premios** — catálogo configurable de plus variables. Cada premio tiene un nombre y monto fijo (ej. Presentismo $150.000, Trabajo extra $150.000). Al ejecutar la liquidación, el operador marca los que aplican ese mes.
+- **Reportes de Sueldos** — masa salarial total programada, empleados activos, top sueldos, distribución por frecuencia (mensual, quincenal, etc.), próximos pagos en 30 días.
+
+#### Otras capacidades del módulo Gestión Financiera
+
+- **Cotización USD automática** (Bluelytics) — cada gasto guarda la cotización del día para poder ver montos en USD históricos sin depender de fluctuaciones futuras.
+- **Imputación a obras / proyectos** — cada gasto puede dividirse entre 1 o N proyectos. Sirve para llevar control de cuánto se llevó cada obra.
+- **Importación de Excel** — el módulo recibe el Excel típico que ya usan los municipios y lo categoriza con IA automáticamente.
+- **Bandeja de "curación IA"** — cuando se importan gastos masivamente, la IA propone categorización y el supervisor aprueba.
+- **Auto-update silencioso** — cuando hay un deploy nuevo, los usuarios ven un toast "Nueva versión disponible · Actualizar" que recarga la página sin necesidad de Ctrl+F5.
 
 ---
 
@@ -113,11 +155,19 @@ Estas no son módulos extra que se cobran aparte — vienen incluidos cuando se 
 | **Mostrador** | Trámites (operador) | Consola del operador de ventanilla. Identifica al vecino por DNI (si ya está registrado) o por celular (genera QR + validación biométrica vía RENAPER si es vecino nuevo). Desde acá inicia reclamos, trámites o paga tasas a nombre del vecino. |
 | **Mis trámites / Mis reclamos / Mis tasas** | Los 3 módulos | Vista del vecino: el historial de todo lo que hizo con el municipio. |
 | **Gestión de obras públicas** | Tesorería + Reclamos | Las obras del municipio se cargan como proyectos y los gastos se imputan ahí. El vecino puede ver el avance de las obras públicas desde la app. |
-| **Tesorería · Mapa** | Tesorería | Mapa con los proveedores y contactos georreferenciados. |
-| **Tesorería · Agenda** | Tesorería | Agenda de pagos recurrentes (sueldos, honorarios, servicios). Avisos cuando se vienen vencimientos. |
-| **Tesorería · Proyecciones** | Tesorería | Proyección de caja a 30/60/90 días basada en pagos comprometidos. |
+| **Contaduría · Órdenes de Pago** | Contaduría | Circuito formal de autorización: pendiente → autorizada → pagada (o anulada). Nº correlativo automático. Adjuntar PDF de factura. Trazabilidad bidireccional con el gasto en Tesorería. |
+| **Contaduría · Reportes** | Contaduría | OPs vencidas, próximas a vencer, top beneficiarios del mes, evolución mensual. |
+| **Tesorería · Movimientos** | Tesorería | Cada gasto del municipio (manual o auto desde OP). Incluye factura adjunta, caja, proyecto, dependencia, forma de pago. |
+| **Tesorería · Cajas y Saldos** | Tesorería | Todas las cajas con saldo en vivo, ingresos y egresos acumulados. Arqueo real. |
+| **Tesorería · Mapa** | Tesorería | Mapa con los proveedores y contactos georreferenciados. Al clickear un pin se ven los gastos asociados. |
+| **Tesorería · Proyección** | Tesorería | Proyección de caja a 30/60/90 días basada en pagos comprometidos. |
+| **Tesorería · Contactos** | Tesorería | Padrón unificado de proveedores, contratistas, empleados y beneficiarios. Detecta duplicados y permite unificarlos reapuntando gastos. |
 | **Tesorería · Proyectos** | Tesorería | Cada obra o proyecto del municipio. Permite imputar gastos y ver cuánto se gastó vs. presupuesto. |
-| **Tesorería · Contactos** | Tesorería | Padrón de proveedores y contactos. |
+| **Tesorería · Reportes** | Tesorería | Egresos por caja, top conceptos, top dependencias, evolución mensual. |
+| **Sueldos · Liquidaciones** | Sueldos | Pagos recurrentes al personal con monto editable mes a mes + premios aplicables. |
+| **Sueldos · Empleados** | Sueldos | Vista del personal del municipio con estado de liquidación. |
+| **Sueldos · Premios** | Sueldos | Catálogo de plus variables (presentismo, trabajo extra) que se marcan al pagar. |
+| **Sueldos · Reportes** | Sueldos | Masa salarial total, top sueldos, próximos pagos, distribución por frecuencia. |
 | **Notificaciones** | Los 3 módulos | Push notifications a la app del vecino, email, WhatsApp y bot conversacional. |
 | **Configuración del municipio** | Los 3 módulos | El admin configura colores, logo, dependencias, categorías de reclamo, trámites disponibles, usuarios, roles, módulos activos. |
 | **Roles y permisos** | Los 3 módulos | Admin, supervisor, operador, cuadrilla, vecino. Cada rol ve solo lo que le corresponde. |
@@ -245,10 +295,10 @@ Si el municipio contrata **los 3 módulos juntos** (Reclamos + Trámites + Tesor
 
 ## 10. Lo que NO somos (importante para no sobrevender)
 
-- **NO somos un sistema contable completo.** Tesorería de Munify reemplaza el Excel de gastos del intendente y el control de caja, pero **no reemplaza al sistema de contabilidad oficial** (SIPAF, RAFAM, sistemas provinciales). Convivimos con ellos vía API.
+- **NO somos un sistema contable completo.** Contaduría + Tesorería de Munify cubren el circuito de Órdenes de Pago, autorización, gestión de cajas y trazabilidad — pero **no reemplazan al sistema contable oficial** (SIPAF, RAFAM, sistemas provinciales) que lleva los libros formales y la rendición ante el Tribunal de Cuentas. Convivimos con ellos vía API.
 - **NO emitimos facturación electrónica AFIP.** Eso lo hace el sistema contable.
-- **NO somos un sistema de RRHH.** No liquidamos sueldos, no controlamos asistencia. Solo registramos los pagos de sueldo como gasto en Tesorería.
-- **NO somos un GIS profesional.** Tenemos mapas con reclamos y proveedores, pero no es ArcGIS — no se hace catastro ni planos urbanísticos.
+- **NO somos un sistema de RRHH completo.** El módulo de Sueldos maneja liquidaciones simples (monto base + premios variables del catálogo), pero **no calcula aportes, retenciones ni conceptos remunerativos/no-remunerativos**. No controlamos asistencia ni gestionamos legajos. Para liquidación formal completa hay que seguir usando el sistema de personal. Lo que sí hacemos es registrar el pago como gasto en Tesorería con su descuento de caja.
+- **NO somos un GIS profesional.** Tenemos mapas con reclamos, proveedores y gastos georreferenciados, pero no es ArcGIS — no se hace catastro ni planos urbanísticos.
 - **NO somos un CRM genérico.** No vendemos esto a empresas privadas — es exclusivo para gobiernos locales argentinos.
 
 ---
@@ -256,7 +306,8 @@ Si el municipio contrata **los 3 módulos juntos** (Reclamos + Trámites + Tesor
 ## 11. Resumen para el agente de IA — los 5 mensajes clave
 
 1. **Munify conecta vecinos con su municipio** en una sola app, con validez gubernamental.
-2. **Vendemos 3 módulos juntos** (Reclamos + Trámites + Tesorería) en promoción combo con 3 meses gratis.
+2. **Vendemos 3 grandes bloques juntos** en promoción combo con 3 meses gratis: Reclamos + Trámites + Gestión Financiera (Contaduría + Tesorería + Sueldos).
 3. **El vecino no paga** — la app es gratis. El municipio paga por habitante.
 4. **Validamos biométricamente** vía RENAPER, por eso los trámites tienen validez oficial (licencias de conducir, habilitaciones, etc.).
-5. **La demo dura 5 minutos** por videollamada y la coordina un vendedor humano. El agente IA deriva al round-robin.
+5. **Contaduría con OPs formales** (numeradas, autorizadas, con factura PDF adjunta) que se transforman automáticamente en movimientos de Tesorería con descuento de caja. Sin doble carga. Trazabilidad para Tribunal de Cuentas.
+6. **La demo dura 5 minutos** por videollamada y la coordina un vendedor humano. El agente IA deriva al round-robin.

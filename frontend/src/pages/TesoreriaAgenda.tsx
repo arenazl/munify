@@ -71,7 +71,9 @@ export default function TesoreriaAgenda() {
   const [ejecutarPago, setEjecutarPago] = useState<PagoProgramado | null>(null);
   const [ejecutarMonto, setEjecutarMonto] = useState<string>('');
   const [ejecutarFecha, setEjecutarFecha] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [ejecutarPremiosSel, setEjecutarPremiosSel] = useState<Set<number>>(new Set());
+  // Map<premio_id, monto override> — null o '' = usa el monto del catalogo.
+  // Si el premio no esta en el map, no esta seleccionado.
+  const [ejecutarPremiosSel, setEjecutarPremiosSel] = useState<Map<number, string>>(new Map());
   const [ejecutarNotas, setEjecutarNotas] = useState<string>('');
   // Paginación client-side (50 items por página)
   const [page, setPage] = useState(1);
@@ -206,23 +208,28 @@ export default function TesoreriaAgenda() {
     setEjecutarPago(p);
     setEjecutarMonto(p.monto_pesos);
     setEjecutarFecha(new Date().toISOString().slice(0, 10));
-    setEjecutarPremiosSel(new Set());
+    setEjecutarPremiosSel(new Map());
     setEjecutarNotas('');
   };
 
   const cerrarEjecutar = () => {
     setEjecutarPago(null);
     setEjecutarMonto('');
-    setEjecutarPremiosSel(new Set());
+    setEjecutarPremiosSel(new Map());
     setEjecutarNotas('');
   };
 
-  // Total dinamico del Sheet de ejecutar = monto base + premios marcados.
+  // Total dinamico del Sheet de ejecutar = monto base + premios marcados
+  // (con override si se edito el monto del premio).
   const ejecutarTotal = useMemo(() => {
     const base = parseFloat(ejecutarMonto || '0') || 0;
     let extras = 0;
     premios.forEach(p => {
-      if (ejecutarPremiosSel.has(p.id)) extras += parseFloat(p.monto || '0') || 0;
+      if (ejecutarPremiosSel.has(p.id)) {
+        const override = ejecutarPremiosSel.get(p.id) || '';
+        const monto = override !== '' ? parseFloat(override) : parseFloat(p.monto || '0');
+        extras += monto || 0;
+      }
     });
     return base + extras;
   }, [ejecutarMonto, ejecutarPremiosSel, premios]);
@@ -236,10 +243,16 @@ export default function TesoreriaAgenda() {
     }
     setExecutingId(ejecutarPago.id);
     try {
+      // Armar premios_aplicados con override de monto cuando corresponda.
+      const premiosAplicados = Array.from(ejecutarPremiosSel.entries()).map(([premio_id, override]) => {
+        const item: { premio_id: number; monto?: string } = { premio_id };
+        if (override && override !== '') item.monto = override;
+        return item;
+      });
       const res = await agendaPagosApi.ejecutar(ejecutarPago.id, {
         fecha_pago: ejecutarFecha,
         monto_base: ejecutarMonto,
-        premio_ids: Array.from(ejecutarPremiosSel),
+        premios_aplicados: premiosAplicados,
         notas: ejecutarNotas.trim() || undefined,
       });
       toast.success(`Pago de ${fmtMoney(res.data.monto_total)} ejecutado`);
@@ -723,32 +736,44 @@ export default function TesoreriaAgenda() {
                 <div className="space-y-1.5">
                   {premios.map(pr => {
                     const sel = ejecutarPremiosSel.has(pr.id);
+                    const override = ejecutarPremiosSel.get(pr.id) || '';
                     const color = pr.color || theme.primary;
+                    const toggle = () => {
+                      const next = new Map(ejecutarPremiosSel);
+                      if (sel) next.delete(pr.id);
+                      else next.set(pr.id, ''); // arranca sin override -> usa el del catalogo
+                      setEjecutarPremiosSel(next);
+                    };
+                    const setOverride = (v: string) => {
+                      const next = new Map(ejecutarPremiosSel);
+                      next.set(pr.id, v);
+                      setEjecutarPremiosSel(next);
+                    };
                     return (
-                      <button
+                      <div
                         key={pr.id}
-                        type="button"
-                        onClick={() => {
-                          const next = new Set(ejecutarPremiosSel);
-                          if (sel) next.delete(pr.id); else next.add(pr.id);
-                          setEjecutarPremiosSel(next);
-                        }}
-                        className="w-full flex items-center gap-3 p-2.5 rounded-lg transition-all hover:scale-[1.005] text-left"
+                        className="w-full flex items-center gap-3 p-2.5 rounded-lg transition-all"
                         style={{
                           backgroundColor: sel ? `${color}15` : theme.backgroundSecondary,
                           border: `2px solid ${sel ? color : 'transparent'}`,
                         }}
                       >
-                        <div
-                          className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
                           style={{
                             backgroundColor: sel ? color : 'transparent',
                             border: `2px solid ${sel ? color : theme.border}`,
                           }}
                         >
                           {sel && <CheckCircle2 className="h-3 w-3 text-white" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toggle}
+                          className="flex-1 min-w-0 text-left"
+                        >
                           <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
                             {pr.nombre}
                           </p>
@@ -757,11 +782,27 @@ export default function TesoreriaAgenda() {
                               {pr.descripcion}
                             </p>
                           )}
-                        </div>
-                        <span className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color }}>
-                          + {fmtMoney(pr.monto)}
-                        </span>
-                      </button>
+                        </button>
+                        {sel ? (
+                          <div className="flex-shrink-0 w-32">
+                            <MoneyInput
+                              value={override}
+                              onChange={setOverride}
+                              placeholder={pr.monto || '0'}
+                              className="w-full px-2 py-1.5 rounded-md text-sm font-bold tabular-nums text-right"
+                              style={{
+                                backgroundColor: theme.card,
+                                border: `1px solid ${color}40`,
+                                color: color,
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-sm font-bold tabular-nums flex-shrink-0 w-32 text-right" style={{ color }}>
+                            + {fmtMoney(pr.monto)}
+                          </span>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

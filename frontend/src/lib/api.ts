@@ -2074,6 +2074,7 @@ export const agendaPagosApi = {
     fecha_pago?: string;
     monto_base?: string;
     premio_ids?: number[];
+    premios_aplicados?: { premio_id: number; monto?: string }[];
     notas?: string;
   }) => api.post(`/tesoreria/agenda/${id}/ejecutar`, data),
   reportes: () => api.get('/tesoreria/agenda/reportes'),

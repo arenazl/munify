@@ -210,19 +210,31 @@ async def ejecutar_pago(
     premios_aplicados: list[PremioAplicado] = []
     desglose: list[str] = []
     monto_premios = Decimal(0)
-    if payload.premio_ids:
+    # Soporte para los 2 formatos: nuevo (premios_aplicados con override)
+    # y viejo (premio_ids). Si vienen ambos, gana premios_aplicados.
+    items_premios = payload.premios_aplicados or [
+        type('I', (), {'premio_id': pid, 'monto': None})() for pid in payload.premio_ids
+    ]
+    if items_premios:
+        ids_a_cargar = [it.premio_id for it in items_premios]
         premios = list((await db.execute(
             select(TesoreriaPremio).where(
-                TesoreriaPremio.id.in_(payload.premio_ids),
+                TesoreriaPremio.id.in_(ids_a_cargar),
                 TesoreriaPremio.municipio_id == muni_id,
             )
         )).scalars().all())
-        if len(premios) != len(set(payload.premio_ids)):
+        if len(premios) != len(set(ids_a_cargar)):
             raise HTTPException(422, "Algun premio invalido para este municipio")
-        for pr in premios:
-            monto_premios += Decimal(str(pr.monto))
-            premios_aplicados.append(PremioAplicado(premio_id=pr.id, monto=Decimal(str(pr.monto))))
-            desglose.append(f"{pr.nombre}: ${pr.monto:,.0f}")
+        premios_by_id = {p.id: p for p in premios}
+        for it in items_premios:
+            pr = premios_by_id[it.premio_id]
+            # Si el operador puso un override del monto este mes, lo usamos.
+            # Si no, usamos el del catalogo. >= 0 por si se quiere desmarcar
+            # el efecto del premio sin desmarcarlo (raro pero valido).
+            monto_pr = Decimal(str(it.monto)) if (getattr(it, 'monto', None) is not None) else Decimal(str(pr.monto))
+            monto_premios += monto_pr
+            premios_aplicados.append(PremioAplicado(premio_id=pr.id, monto=monto_pr))
+            desglose.append(f"{pr.nombre}: ${monto_pr:,.0f}")
 
     monto_total = monto_base + monto_premios
 
