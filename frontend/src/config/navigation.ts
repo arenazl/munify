@@ -2,7 +2,7 @@ import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers,
-  CalendarClock, Users, MapPin, TrendingUp,
+  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Gift,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -199,20 +199,12 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Gastos cargados del municipio'
     },
     {
-      name: 'Contactos',
-      href: '/gestion/tesoreria/contactos',
-      icon: Users,
+      name: 'Cajas y Saldos',
+      href: '/gestion/tesoreria/cajas',
+      icon: PiggyBank,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Tesorería',
-      description: 'Personas y proveedores'
-    },
-    {
-      name: 'Ubicación',
-      href: '/gestion/tesoreria/mapa',
-      icon: MapPin,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Mapa de contactos y gastos'
+      description: 'Saldo de cada caja con ingresos y egresos'
     },
     {
       name: 'Proyección',
@@ -223,12 +215,44 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Resumen y proyecciones financieras'
     },
     {
+      name: 'Ubicación',
+      href: '/gestion/tesoreria/mapa',
+      icon: MapPin,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Mapa de contactos y gastos'
+    },
+    {
+      name: 'Contactos',
+      href: '/gestion/tesoreria/contactos',
+      icon: Users,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Personas y proveedores'
+    },
+    {
       name: 'Liquidaciones',
       href: '/gestion/tesoreria/agenda',
       icon: CalendarClock,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Sueldos',
       description: 'Pago de sueldos y recurrentes con premios'
+    },
+    {
+      name: 'Empleados',
+      href: '/gestion/sueldos/empleados',
+      icon: Users,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Sueldos',
+      description: 'Personal del muni con sueldo asignado'
+    },
+    {
+      name: 'Premios',
+      href: '/gestion/configuracion/tesoreria?tab=premios',
+      icon: Gift,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Sueldos',
+      description: 'Catálogo de plus aplicables a sueldos'
     },
     {
       name: 'Tablero',
