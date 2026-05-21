@@ -1129,7 +1129,7 @@ export default function Tesoreria() {
   return (
     <>
       <div className="pt-3">
-        <TesoreriaHint titulo="Bienvenido a Tesorería" storageKey="home">
+        <TesoreriaHint titulo="Movimientos de Tesorería" storageKey="home">
           Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
           préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o
           a un <b>Contacto</b>. Total este mes:{' '}
@@ -1177,7 +1177,7 @@ export default function Tesoreria() {
       )}
 
       <ABMPage
-        title="Pagos"
+        title="Movimientos"
         icon={<Wallet className="h-5 w-5" />}
         buttonLabel="Nuevo Gasto"
         onAdd={() => setWizardOpen(true)}

@@ -660,7 +660,7 @@ export default function Configuracion() {
         { id: 'tesoreria-cajas', label: 'Cajas / Fondos', description: 'FOFINDE, FODEMEP, FOMEP, Coparticipación. Saldo, ingresos y egresos', icon: PiggyBank, color: '#f59e0b', link: '/gestion/configuracion/tesoreria?tab=cajas', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-parajes', label: 'Parajes', description: 'Regiones del muni con polígono en el mapa', icon: Trees, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=parajes', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'tesoreria-proyectos', label: 'Proyectos', description: 'Obras e iniciativas que agrupan gastos (con presupuesto y % imputado)', icon: Briefcase, color: '#10b981', link: '/gestion/configuracion/tesoreria?tab=proyectos', show: isAdminOrSupervisor && !isSuperAdmin },
-        { id: 'tesoreria-agenda', label: 'Agenda de pagos', description: 'Programá pagos recurrentes con ejecución 1-click', icon: CalendarClock, color: '#ec4899', link: '/gestion/tesoreria/agenda', show: isAdminOrSupervisor && !isSuperAdmin },
+        { id: 'tesoreria-agenda', label: 'Liquidaciones de sueldo', description: 'Sueldos y pagos recurrentes con premios + ejecución 1-click', icon: CalendarClock, color: '#ec4899', link: '/gestion/tesoreria/agenda', show: isAdminOrSupervisor && !isSuperAdmin },
       ],
     },
     {

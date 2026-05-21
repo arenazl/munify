@@ -539,13 +539,13 @@ export default function TesoreriaAgenda() {
 
   return (
     <>
-      <TesoreriaHint titulo="Agenda de pagos" storageKey="agenda">
+      <TesoreriaHint titulo="Liquidaciones de sueldo" storageKey="agenda">
         Programá pagos <b>recurrentes</b> (sueldos, honorarios, alquileres). El sistema te
         recuerda cuándo toca pagar y con un click crea el gasto + descuenta la caja correspondiente.
       </TesoreriaHint>
 
       <ABMPage
-        title="Agenda"
+        title="Liquidaciones"
         icon={<CalendarClock className="h-5 w-5" />}
         backLink="/gestion/tesoreria"
         buttonLabel="Nuevo Pago Programado"
