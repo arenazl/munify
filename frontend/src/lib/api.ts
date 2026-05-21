@@ -2039,8 +2039,25 @@ export const agendaPagosApi = {
   create: (data: Record<string, unknown>) => api.post('/tesoreria/agenda', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/tesoreria/agenda/${id}`, data),
   delete: (id: number) => api.delete(`/tesoreria/agenda/${id}`),
-  ejecutar: (id: number, fechaPago?: string) =>
-    api.post(`/tesoreria/agenda/${id}/ejecutar`, null, { params: fechaPago ? { fecha_pago: fechaPago } : undefined }),
+  /** Ejecuta el pago programado. Permite override del monto base y aplicar
+   *  premios del catalogo (TesoreriaPremio). El backend suma todo y crea
+   *  el Gasto + descuenta caja. */
+  ejecutar: (id: number, data: {
+    fecha_pago?: string;
+    monto_base?: string;
+    premio_ids?: number[];
+    notas?: string;
+  }) => api.post(`/tesoreria/agenda/${id}/ejecutar`, data),
+};
+
+/** Catalogo de premios (plus variables) por municipio. Se cargan desde
+ *  Configuracion de Tesoreria y se aplican al ejecutar pagos programados. */
+export const premiosApi = {
+  list: (params?: { activo?: boolean }) =>
+    api.get('/tesoreria/premios', { params }),
+  create: (data: Record<string, unknown>) => api.post('/tesoreria/premios', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tesoreria/premios/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/premios/${id}`),
 };
 
 export const parajesApi = {

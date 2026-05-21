@@ -1,5 +1,5 @@
 """Schemas Pydantic para los modelos extra de Tesoreria:
-TipoEmpleado, Caja, MovimientoCaja, PagoProgramado.
+TipoEmpleado, Caja, MovimientoCaja, PagoProgramado, Premio.
 """
 from datetime import date, datetime
 from decimal import Decimal
@@ -8,6 +8,77 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
 from models.tesoreria_extra import TipoMovimientoCaja, FrecuenciaPago
+
+
+# ============================================================
+# Premio (catalogo global de plus/bonificaciones variables)
+# ============================================================
+
+class PremioBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=100)
+    monto: Decimal = Field(..., ge=0)
+    descripcion: Optional[str] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    orden: int = 0
+
+
+class PremioCreate(PremioBase):
+    pass
+
+
+class PremioUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=1, max_length=100)
+    monto: Optional[Decimal] = Field(None, ge=0)
+    descripcion: Optional[str] = None
+    color: Optional[str] = None
+    icono: Optional[str] = None
+    orden: Optional[int] = None
+    activo: Optional[bool] = None
+
+
+class PremioResponse(PremioBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    municipio_id: int
+    activo: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+# ============================================================
+# Ejecutar pago programado (con monto custom + premios)
+# ============================================================
+
+class PremioAplicado(BaseModel):
+    """Item de premio que se aplico en este pago. Snapshoteamos el monto al
+    momento del pago para que si despues se edita el catalogo, el historico
+    no cambie."""
+    premio_id: int
+    monto: Decimal
+
+
+class EjecutarPagoRequest(BaseModel):
+    """Body del POST /agenda/{id}/ejecutar.
+
+    Si `monto_base` viene, sobrescribe el monto del pago programado para
+    este pago especifico (ej. sueldo de este mes distinto al base). Los
+    `premios` son IDs del catalogo de TesoreriaPremio que se aplican
+    este mes. El total = monto_base + sum(premios.monto).
+    """
+    fecha_pago: Optional[date] = None
+    monto_base: Optional[Decimal] = Field(None, gt=0)
+    premio_ids: List[int] = []
+    notas: Optional[str] = None
+
+
+class EjecutarPagoResponse(BaseModel):
+    ok: bool
+    gasto_id: int
+    monto_total: Decimal
+    monto_base: Decimal
+    premios_aplicados: List[PremioAplicado] = []
+    proximo_pago: Optional[str] = None
 
 
 # ============================================================

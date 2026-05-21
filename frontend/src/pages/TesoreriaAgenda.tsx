@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CalendarClock, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Loader2, Calendar,
-  Home, Briefcase,
+  Home, Briefcase, Wallet, Sparkles, Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -11,14 +11,15 @@ import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel,
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { Sheet } from '../components/ui/Sheet';
 import { conceptoIcon } from '../lib/conceptoIcons';
 import { contactoIconByTipo, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { CalendarView } from '../components/ui/CalendarView';
-import { agendaPagosApi, contactosApi, cajasApi } from '../lib/api';
-import type { PagoProgramado, Contacto, Caja, FrecuenciaPago } from '../types';
+import { agendaPagosApi, contactosApi, cajasApi, premiosApi } from '../lib/api';
+import type { PagoProgramado, Contacto, Caja, FrecuenciaPago, Premio } from '../types';
 
 const FRECUENCIA_LABELS: Record<FrecuenciaPago, string> = {
   semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual',
@@ -62,6 +63,16 @@ export default function TesoreriaAgenda() {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PagoProgramado | null>(null);
+
+  // Sheet "Ejecutar pago" — reemplaza al confirm() nativo.
+  // Permite al user ajustar el monto del mes (varia por persona/mes) y
+  // marcar premios del catalogo que se aplican (presentismo, etc.).
+  const [premios, setPremios] = useState<Premio[]>([]);
+  const [ejecutarPago, setEjecutarPago] = useState<PagoProgramado | null>(null);
+  const [ejecutarMonto, setEjecutarMonto] = useState<string>('');
+  const [ejecutarFecha, setEjecutarFecha] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [ejecutarPremiosSel, setEjecutarPremiosSel] = useState<Set<number>>(new Set());
+  const [ejecutarNotas, setEjecutarNotas] = useState<string>('');
   // Paginación client-side (50 items por página)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -79,14 +90,16 @@ export default function TesoreriaAgenda() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [p, c, cj] = await Promise.all([
+      const [p, c, cj, pr] = await Promise.all([
         agendaPagosApi.list({ activo: true }),
         contactosApi.list({ activo: true, limit: 5000 }),
         cajasApi.list({ activo: true, include_saldos: true }),
+        premiosApi.list({ activo: true }).catch(() => ({ data: [] as Premio[] })),
       ]);
       setPagos(p.data || []);
       setContactos(c.data || []);
       setCajas(cj.data || []);
+      setPremios(pr.data || []);
     } catch { toast.error('Error cargando agenda'); } finally { setLoading(false); }
   };
   useEffect(() => { fetchAll(); }, []);
@@ -187,14 +200,56 @@ export default function TesoreriaAgenda() {
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error guardando'); } finally { setSaving(false); }
   };
 
-  const handleEjecutar = async (p: PagoProgramado) => {
-    if (!confirm(`¿Ejecutar pago de ${fmtMoney(p.monto_pesos)} a ${p.contacto_nombre}? Se crea el gasto y descuenta la caja.`)) return;
-    setExecutingId(p.id);
+  // Abre el Sheet para ejecutar. NO ejecuta directo — el user puede
+  // ajustar monto del mes y aplicar premios antes de confirmar.
+  const handleEjecutar = (p: PagoProgramado) => {
+    setEjecutarPago(p);
+    setEjecutarMonto(p.monto_pesos);
+    setEjecutarFecha(new Date().toISOString().slice(0, 10));
+    setEjecutarPremiosSel(new Set());
+    setEjecutarNotas('');
+  };
+
+  const cerrarEjecutar = () => {
+    setEjecutarPago(null);
+    setEjecutarMonto('');
+    setEjecutarPremiosSel(new Set());
+    setEjecutarNotas('');
+  };
+
+  // Total dinamico del Sheet de ejecutar = monto base + premios marcados.
+  const ejecutarTotal = useMemo(() => {
+    const base = parseFloat(ejecutarMonto || '0') || 0;
+    let extras = 0;
+    premios.forEach(p => {
+      if (ejecutarPremiosSel.has(p.id)) extras += parseFloat(p.monto || '0') || 0;
+    });
+    return base + extras;
+  }, [ejecutarMonto, ejecutarPremiosSel, premios]);
+
+  const confirmarEjecutar = async () => {
+    if (!ejecutarPago) return;
+    const baseNum = parseFloat(ejecutarMonto || '0');
+    if (!baseNum || baseNum <= 0) {
+      toast.error('Monto inválido');
+      return;
+    }
+    setExecutingId(ejecutarPago.id);
     try {
-      const res = await agendaPagosApi.ejecutar(p.id);
-      toast.success(`Gasto #${res.data.gasto_id} creado`);
+      const res = await agendaPagosApi.ejecutar(ejecutarPago.id, {
+        fecha_pago: ejecutarFecha,
+        monto_base: ejecutarMonto,
+        premio_ids: Array.from(ejecutarPremiosSel),
+        notas: ejecutarNotas.trim() || undefined,
+      });
+      toast.success(`Pago de ${fmtMoney(res.data.monto_total)} ejecutado`);
+      cerrarEjecutar();
       fetchAll();
-    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error ejecutando'); } finally { setExecutingId(null); }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Error ejecutando');
+    } finally {
+      setExecutingId(null);
+    }
   };
 
   const handleDelete = async (p: PagoProgramado) => {
@@ -587,6 +642,165 @@ export default function TesoreriaAgenda() {
       >
         {cardsView}
       </ABMPage>
+
+      {/* Sheet "Ejecutar pago" — reemplaza al confirm() nativo. */}
+      <Sheet
+        open={!!ejecutarPago}
+        onClose={cerrarEjecutar}
+        title="Ejecutar pago programado"
+        description={ejecutarPago?.contacto_nombre || ''}
+        stickyFooter={
+          <ABMSheetFooter
+            onCancel={cerrarEjecutar}
+            onSave={confirmarEjecutar}
+            saving={executingId === ejecutarPago?.id}
+            saveLabel={`Confirmar pago · ${fmtMoney(ejecutarTotal)}`}
+          />
+        }
+      >
+        {ejecutarPago && (
+          <div className="space-y-4">
+            {/* Resumen del programado */}
+            <div
+              className="rounded-xl p-3"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+            >
+              <p className="text-xs uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
+                Recordatorio del programado
+              </p>
+              <p className="text-sm font-semibold" style={{ color: theme.text }}>
+                {ejecutarPago.concepto} · {ejecutarPago.contacto_nombre}
+              </p>
+              <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                Vencimiento: {ejecutarPago.proximo_pago} ·
+                Caja: {ejecutarPago.caja_nombre || '—'} ·
+                Base: {fmtMoney(ejecutarPago.monto_pesos)}
+              </p>
+            </div>
+
+            {/* Monto base editable */}
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
+                Monto base del mes
+              </label>
+              <MoneyInput
+                value={ejecutarMonto}
+                onChange={setEjecutarMonto}
+                className="w-full px-3 py-2 rounded-xl text-lg font-bold tabular-nums"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              />
+              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                Si el monto de este mes es distinto al programado, ajustalo acá.
+              </p>
+            </div>
+
+            {/* Fecha */}
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
+                Fecha del pago
+              </label>
+              <DatePicker value={ejecutarFecha} onChange={setEjecutarFecha} />
+            </div>
+
+            {/* Premios (catalogo global) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold inline-flex items-center gap-1.5" style={{ color: theme.text }}>
+                  <Gift className="h-3.5 w-3.5" />
+                  Premios / plus que aplican este mes
+                </label>
+                {premios.length === 0 && (
+                  <span className="text-[10px]" style={{ color: theme.textSecondary }}>
+                    Cargá premios desde Configuración → Tesorería
+                  </span>
+                )}
+              </div>
+              {premios.length === 0 ? (
+                <p className="text-xs italic" style={{ color: theme.textSecondary }}>
+                  Sin premios configurados.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {premios.map(pr => {
+                    const sel = ejecutarPremiosSel.has(pr.id);
+                    const color = pr.color || theme.primary;
+                    return (
+                      <button
+                        key={pr.id}
+                        type="button"
+                        onClick={() => {
+                          const next = new Set(ejecutarPremiosSel);
+                          if (sel) next.delete(pr.id); else next.add(pr.id);
+                          setEjecutarPremiosSel(next);
+                        }}
+                        className="w-full flex items-center gap-3 p-2.5 rounded-lg transition-all hover:scale-[1.005] text-left"
+                        style={{
+                          backgroundColor: sel ? `${color}15` : theme.backgroundSecondary,
+                          border: `2px solid ${sel ? color : 'transparent'}`,
+                        }}
+                      >
+                        <div
+                          className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
+                          style={{
+                            backgroundColor: sel ? color : 'transparent',
+                            border: `2px solid ${sel ? color : theme.border}`,
+                          }}
+                        >
+                          {sel && <CheckCircle2 className="h-3 w-3 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
+                            {pr.nombre}
+                          </p>
+                          {pr.descripcion && (
+                            <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                              {pr.descripcion}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-sm font-bold tabular-nums flex-shrink-0" style={{ color }}>
+                          + {fmtMoney(pr.monto)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Notas */}
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>
+                Notas (opcional)
+              </label>
+              <textarea
+                value={ejecutarNotas}
+                onChange={(e) => setEjecutarNotas(e.target.value)}
+                rows={2}
+                placeholder="Detalle adicional del pago..."
+                className="w-full px-3 py-2 rounded-lg text-sm resize-none"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
+              />
+            </div>
+
+            {/* Total final */}
+            <div
+              className="rounded-xl p-3 flex items-center justify-between"
+              style={{ background: `linear-gradient(135deg, ${theme.primary}15, ${theme.primary}05)`, border: `1px solid ${theme.primary}40` }}
+            >
+              <div>
+                <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>
+                  Total a pagar
+                </p>
+                <p className="text-2xl font-bold tabular-nums" style={{ color: theme.primary }}>
+                  {fmtMoney(ejecutarTotal)}
+                </p>
+              </div>
+              <Wallet className="h-8 w-8" style={{ color: theme.primary }} />
+            </div>
+          </div>
+        )}
+      </Sheet>
     </>
   );
 }

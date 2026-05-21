@@ -38,6 +38,38 @@ class TesoreriaTipoEmpleado(Base):
         return f"<TipoEmpleado {self.id} {self.nombre}>"
 
 
+class TesoreriaPremio(Base):
+    """Catalogo global de premios/plus variables que se pueden sumar a un
+    pago programado al momento de ejecutarlo. El monto del pago programado
+    es el monto BASE; cuando se ejecuta el pago, el operador puede marcar
+    cuales de estos premios se cumplieron este mes y el sistema los suma.
+
+    Ejemplos:
+      - "Presentismo" + $50.000
+      - "Trabajo extra fin de semana" + $30.000
+      - "Bonus por puntualidad" + $15.000
+
+    Multi-tenant via municipio_id. Cuando un premio se elimina, los
+    pagos historicos que lo aplicaron NO se ven afectados (la suma ya
+    quedo en el monto_pesos del Gasto). Por eso el "delete" es soft."""
+    __tablename__ = "tesoreria_premios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
+    nombre = Column(String(100), nullable=False, index=True)
+    monto = Column(Numeric(15, 2), nullable=False, default=0)
+    descripcion = Column(Text, nullable=True)
+    color = Column(String(20), nullable=True)
+    icono = Column(String(60), nullable=True)
+    orden = Column(Integer, default=0, nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<Premio {self.id} {self.nombre} ${self.monto}>"
+
+
 class TipoMovimientoCaja(str, enum.Enum):
     INGRESO = "ingreso"
     EGRESO = "egreso"

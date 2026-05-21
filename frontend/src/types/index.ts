@@ -642,6 +642,20 @@ export interface Caja {
 export type TipoMovimientoCaja = 'ingreso' | 'egreso';
 export type FrecuenciaPago = 'semanal' | 'quincenal' | 'mensual' | 'bimestral' | 'trimestral' | 'anual';
 
+export interface Premio {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  monto: string;
+  descripcion?: string | null;
+  color?: string | null;
+  icono?: string | null;
+  orden: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MovimientoCaja {
   id: number;
   municipio_id: number;

@@ -13,11 +13,12 @@ from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import (
     TesoreriaPagoProgramado, FrecuenciaPago, TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja,
-    Contacto, Gasto, GastoCuota, User, RolUsuario,
+    Contacto, Gasto, GastoCuota, TesoreriaPremio, User, RolUsuario,
 )
 from models.gasto import EstadoGastoCuota
 from schemas.tesoreria_extra import (
     PagoProgramadoCreate, PagoProgramadoUpdate, PagoProgramadoResponse,
+    EjecutarPagoRequest, EjecutarPagoResponse, PremioAplicado,
 )
 
 router = APIRouter()
@@ -169,16 +170,26 @@ async def delete_pago(
     return {"ok": True, "id": pp_id}
 
 
-@router.post("/{pp_id}/ejecutar", response_model=dict)
+@router.post("/{pp_id}/ejecutar", response_model=EjecutarPagoResponse)
 async def ejecutar_pago(
     pp_id: int,
+    payload: EjecutarPagoRequest,
     request: Request,
-    fecha_pago: Optional[date] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Ejecuta un pago programado: crea un Gasto real, descuenta la caja
-    si aplica, y avanza proximo_pago al siguiente periodo."""
+    si aplica, y avanza proximo_pago al siguiente periodo.
+
+    El monto total se compone de:
+      - monto_base: viene en el payload o default al monto del programado.
+        Permite ajustar el sueldo de este mes (varia entre meses).
+      - premios: lista de TesoreriaPremio.id que se aplican este mes. Los
+        montos se snapshotean en `premios_aplicados` para historico.
+
+    El total se persiste como monto_pesos del Gasto + descuenta caja por
+    el TOTAL (no solo el base).
+    """
     _require_admin(current_user)
     muni_id = get_effective_municipio_id(request, current_user)
 
@@ -190,9 +201,42 @@ async def ejecutar_pago(
     if not pp:
         raise HTTPException(404, "No encontrado")
 
-    fecha = fecha_pago or date.today()
+    fecha = payload.fecha_pago or date.today()
+    monto_base = Decimal(str(payload.monto_base)) if payload.monto_base is not None else Decimal(str(pp.monto_pesos))
 
-    # Crear el Gasto contado
+    # Validar y cargar premios (deben ser del mismo muni, activos al momento
+    # de ejecutar — pero si despues se desactivan, el historico no se ve
+    # afectado porque snapshoteamos el monto).
+    premios_aplicados: list[PremioAplicado] = []
+    desglose: list[str] = []
+    monto_premios = Decimal(0)
+    if payload.premio_ids:
+        premios = list((await db.execute(
+            select(TesoreriaPremio).where(
+                TesoreriaPremio.id.in_(payload.premio_ids),
+                TesoreriaPremio.municipio_id == muni_id,
+            )
+        )).scalars().all())
+        if len(premios) != len(set(payload.premio_ids)):
+            raise HTTPException(422, "Algun premio invalido para este municipio")
+        for pr in premios:
+            monto_premios += Decimal(str(pr.monto))
+            premios_aplicados.append(PremioAplicado(premio_id=pr.id, monto=Decimal(str(pr.monto))))
+            desglose.append(f"{pr.nombre}: ${pr.monto:,.0f}")
+
+    monto_total = monto_base + monto_premios
+
+    # Armar descripcion enriquecida con desglose y notas opcionales
+    desc_lines = []
+    if pp.descripcion:
+        desc_lines.append(pp.descripcion)
+    if desglose:
+        desc_lines.append("Premios aplicados: " + ", ".join(desglose))
+    if payload.notas:
+        desc_lines.append(payload.notas)
+    descripcion_final = "\n".join(desc_lines) or None
+
+    # Crear el Gasto contado con el TOTAL
     gasto = Gasto(
         municipio_id=muni_id,
         creador_id=current_user.id,
@@ -200,17 +244,18 @@ async def ejecutar_pago(
         destino_contacto_id=pp.contacto_id,
         destino_dependencia_id=None,
         concepto=pp.concepto,
-        descripcion=pp.descripcion,
-        monto_pesos=pp.monto_pesos,
+        descripcion=descripcion_final,
+        monto_pesos=monto_total,
         fecha=fecha,
         tipo_financiacion='contado',
         forma_pago=pp.forma_pago,
+        caja_id=pp.caja_id,
     )
     db.add(gasto)
     await db.flush()
     # Cuota unica pagada
     db.add(GastoCuota(
-        gasto_id=gasto.id, numero=1, monto=pp.monto_pesos,
+        gasto_id=gasto.id, numero=1, monto=monto_total,
         fecha_vencimiento=fecha, fecha_pago=fecha, estado=EstadoGastoCuota.PAGADA,
         forma_pago=pp.forma_pago,
     ))
@@ -219,7 +264,7 @@ async def ejecutar_pago(
     if pp.caja_id:
         db.add(TesoreriaMovimientoCaja(
             municipio_id=muni_id, caja_id=pp.caja_id, gasto_id=gasto.id,
-            tipo=TipoMovimientoCaja.EGRESO, monto=pp.monto_pesos, fecha=fecha,
+            tipo=TipoMovimientoCaja.EGRESO, monto=monto_total, fecha=fecha,
             concepto=pp.concepto,
         ))
 
@@ -230,4 +275,12 @@ async def ejecutar_pago(
         pp.activo = False
 
     await db.commit()
-    return {"ok": True, "gasto_id": gasto.id, "proximo_pago": pp.proximo_pago.isoformat() if pp.activo else None}
+
+    return EjecutarPagoResponse(
+        ok=True,
+        gasto_id=gasto.id,
+        monto_total=monto_total,
+        monto_base=monto_base,
+        premios_aplicados=premios_aplicados,
+        proximo_pago=pp.proximo_pago.isoformat() if pp.activo else None,
+    )
