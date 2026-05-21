@@ -656,6 +656,41 @@ export interface Premio {
   updated_at: string;
 }
 
+export type EstadoOrdenPago = 'pendiente' | 'autorizada' | 'pagada' | 'anulada';
+
+export interface OrdenPago {
+  id: number;
+  municipio_id: number;
+  numero: string;
+  destino_tipo: 'contacto' | 'dependencia';
+  destino_contacto_id?: number | null;
+  destino_dependencia_id?: number | null;
+  concepto: string;
+  descripcion?: string | null;
+  monto_pesos: string;
+  caja_id?: number | null;
+  estado: EstadoOrdenPago;
+  fecha_emision: string;
+  fecha_vencimiento?: string | null;
+  fecha_autorizacion?: string | null;
+  fecha_pago?: string | null;
+  fecha_anulacion?: string | null;
+  creador_id: number;
+  autorizado_por_id?: number | null;
+  anulado_por_id?: number | null;
+  gasto_id?: number | null;
+  motivo_anulacion?: string | null;
+  notas?: string | null;
+  // Enriquecidos
+  contacto_nombre?: string | null;
+  dependencia_nombre?: string | null;
+  caja_nombre?: string | null;
+  creador_nombre?: string | null;
+  autorizado_por_nombre?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MovimientoCaja {
   id: number;
   municipio_id: number;

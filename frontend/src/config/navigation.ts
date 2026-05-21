@@ -183,20 +183,20 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Histórico transaccional para contaduría'
     },
     {
-      name: 'Pagos',
+      name: 'Órdenes de Pago',
+      href: '/gestion/contaduria/ordenes-pago',
+      icon: FileCheck,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Contaduría',
+      description: 'Autorización formal de pagos'
+    },
+    {
+      name: 'Movimientos',
       href: '/gestion/tesoreria',
       icon: Receipt,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Tesorería',
-      description: 'Listado de gastos del municipio'
-    },
-    {
-      name: 'Agenda',
-      href: '/gestion/tesoreria/agenda',
-      icon: CalendarClock,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Tesorería',
-      description: 'Agenda de pagos recurrentes'
+      description: 'Gastos cargados del municipio'
     },
     {
       name: 'Contactos',
@@ -221,6 +221,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Tesorería',
       description: 'Resumen y proyecciones financieras'
+    },
+    {
+      name: 'Liquidaciones',
+      href: '/gestion/tesoreria/agenda',
+      icon: CalendarClock,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Sueldos',
+      description: 'Pago de sueldos y recurrentes con premios'
     },
     {
       name: 'Tablero',

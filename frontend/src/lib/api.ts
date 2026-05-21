@@ -2060,6 +2060,31 @@ export const premiosApi = {
   delete: (id: number) => api.delete(`/tesoreria/premios/${id}`),
 };
 
+/** Ordenes de Pago (Contaduria). Workflow:
+ *    pendiente -> autorizada -> pagada
+ *              \\-> anulada (en cualquier momento salvo pagada)
+ *  Al pagar se crea automaticamente un Gasto en Tesoreria. */
+export const ordenesPagoApi = {
+  list: (params?: {
+    estado?: string;
+    search?: string;
+    desde?: string;
+    hasta?: string;
+    contacto_id?: number;
+    skip?: number;
+    limit?: number;
+  }) => api.get('/contaduria/ordenes-pago', { params }),
+  get: (id: number) => api.get(`/contaduria/ordenes-pago/${id}`),
+  create: (data: Record<string, unknown>) => api.post('/contaduria/ordenes-pago', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/contaduria/ordenes-pago/${id}`, data),
+  autorizar: (id: number) => api.post(`/contaduria/ordenes-pago/${id}/autorizar`),
+  pagar: (id: number, data: { caja_id?: number; fecha_pago?: string; forma_pago?: string }) =>
+    api.post(`/contaduria/ordenes-pago/${id}/pagar`, data),
+  anular: (id: number, motivo: string) =>
+    api.post(`/contaduria/ordenes-pago/${id}/anular`, { motivo }),
+  resumen: () => api.get('/contaduria/ordenes-pago/stats/resumen'),
+};
+
 export const parajesApi = {
   list: (params?: { activo?: boolean; include_count?: boolean }) =>
     api.get('/tesoreria/parajes', { params }),

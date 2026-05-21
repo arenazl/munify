@@ -200,6 +200,7 @@ from .tesoreria_extra import (
     TesoreriaPremio,
 )
 from .paraje import TesoreriaParaje
+from .orden_pago import OrdenPago, EstadoOrdenPago
 
 __all__ += [
     "MunicipioModulo",
@@ -225,4 +226,6 @@ __all__ += [
     "FrecuenciaPago",
     "TesoreriaPremio",
     "TesoreriaParaje",
+    "OrdenPago",
+    "EstadoOrdenPago",
 ]

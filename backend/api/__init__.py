@@ -58,6 +58,7 @@ from .tesoreria_tipos_empleado import router as tesoreria_tipos_empleado_router
 from .tesoreria_cajas import router as tesoreria_cajas_router
 from .tesoreria_agenda import router as tesoreria_agenda_router
 from .tesoreria_premios import router as tesoreria_premios_router
+from .ordenes_pago import router as ordenes_pago_router
 from .tesoreria_parajes import router as tesoreria_parajes_router
 from .tesoreria_import import router as tesoreria_import_router
 
@@ -122,6 +123,8 @@ api_router.include_router(tesoreria_tipos_empleado_router, prefix="/tesoreria/ti
 api_router.include_router(tesoreria_cajas_router, prefix="/tesoreria/cajas", tags=["Tesoreria - Cajas"])
 api_router.include_router(tesoreria_agenda_router, prefix="/tesoreria/agenda", tags=["Tesoreria - Agenda Pagos"])
 api_router.include_router(tesoreria_premios_router, prefix="/tesoreria/premios", tags=["Tesoreria - Premios"])
+# Contaduria
+api_router.include_router(ordenes_pago_router, prefix="/contaduria/ordenes-pago", tags=["Contaduria - Ordenes de Pago"])
 api_router.include_router(tesoreria_parajes_router, prefix="/tesoreria/parajes", tags=["Tesoreria - Parajes"])
 api_router.include_router(tesoreria_import_router, prefix="/tesoreria/import", tags=["Tesoreria - Importadores"])
 
