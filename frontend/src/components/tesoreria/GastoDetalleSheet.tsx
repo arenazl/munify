@@ -257,25 +257,67 @@ export function GastoDetalleSheet({
 
     setSavingEdit(true);
     try {
-      const payload: Record<string, unknown> = {
-        concepto: editForm.concepto.trim(),
-        descripcion: editForm.descripcion.trim() || null,
-        monto_pesos: editForm.monto_pesos,
-        fecha: editForm.fecha,
-        forma_pago: editForm.forma_pago,
-        tipo_financiacion: editForm.tipo_financiacion,
-        caja_id: editForm.caja_id,
-        destino_tipo: editForm.destino_tipo,
-        destino_contacto_id: editForm.destino_tipo === 'contacto' ? editForm.destino_contacto_id : null,
-        destino_dependencia_id: editForm.destino_tipo === 'dependencia' ? editForm.destino_dependencia_id : null,
-      };
+      // Solo mandar los campos que realmente cambiaron. Si mandamos todos,
+      // el backend ve `monto_pesos` siempre presente y dispara la regla
+      // "requiere regenerar cuotas" -> falla con 409 aunque el monto sea
+      // el mismo (comparacion str vs Decimal con formato distinto).
+      const payload: Record<string, unknown> = {};
+      const conceptoNuevo = editForm.concepto.trim();
+      if (conceptoNuevo !== (gasto.concepto || '')) payload.concepto = conceptoNuevo;
+      const descNueva = editForm.descripcion.trim() || null;
+      if (descNueva !== (gasto.descripcion || null)) payload.descripcion = descNueva;
+
+      // Numericos: comparar como float para no chocar con formato
+      // ('45000' vs '45000.00').
+      const montoActual = parseFloat(gasto.monto_pesos || '0');
+      const montoNuevo = parseFloat(editForm.monto_pesos || '0');
+      if (montoNuevo !== montoActual) payload.monto_pesos = editForm.monto_pesos;
+
+      // Fechas: comparar las primeras 10 chars (YYYY-MM-DD).
+      const fechaActual = (gasto.fecha || '').slice(0, 10);
+      if (editForm.fecha !== fechaActual) payload.fecha = editForm.fecha;
+
+      if (editForm.forma_pago !== gasto.forma_pago) payload.forma_pago = editForm.forma_pago;
+      if (editForm.tipo_financiacion !== gasto.tipo_financiacion) payload.tipo_financiacion = editForm.tipo_financiacion;
+      if (editForm.caja_id !== ((gasto as any).caja_id ?? null)) payload.caja_id = editForm.caja_id;
+
+      // Destino: si cambia el tipo, mandamos el tipo + el id correspondiente.
+      // Si solo cambia el id (dentro del mismo tipo), mandamos solo el id.
+      if (editForm.destino_tipo !== gasto.destino_tipo) {
+        payload.destino_tipo = editForm.destino_tipo;
+        payload.destino_contacto_id = editForm.destino_tipo === 'contacto' ? editForm.destino_contacto_id : null;
+        payload.destino_dependencia_id = editForm.destino_tipo === 'dependencia' ? editForm.destino_dependencia_id : null;
+      } else if (editForm.destino_tipo === 'contacto' && editForm.destino_contacto_id !== (gasto.destino_contacto_id ?? null)) {
+        payload.destino_contacto_id = editForm.destino_contacto_id;
+      } else if (editForm.destino_tipo === 'dependencia' && editForm.destino_dependencia_id !== (gasto.destino_dependencia_id ?? null)) {
+        payload.destino_dependencia_id = editForm.destino_dependencia_id;
+      }
+
+      // Campos condicionales segun tipo de financiacion.
       if (editForm.tipo_financiacion === 'cuotas' || editForm.tipo_financiacion === 'prestamo') {
-        payload.cuotas_total = editForm.cuotas_total;
+        if (editForm.cuotas_total !== (gasto.cuotas_total || 1)) {
+          payload.cuotas_total = editForm.cuotas_total;
+        }
       }
       if (editForm.tipo_financiacion === 'recurrente') {
-        payload.frecuencia = editForm.frecuencia;
-        payload.fecha_fin_recurrencia = editForm.fecha_fin_recurrencia || null;
+        if (editForm.frecuencia !== (gasto.frecuencia || 'mensual')) {
+          payload.frecuencia = editForm.frecuencia;
+        }
+        const fechaFinActual = (gasto.fecha_fin_recurrencia || '').slice(0, 10);
+        if (editForm.fecha_fin_recurrencia !== fechaFinActual) {
+          payload.fecha_fin_recurrencia = editForm.fecha_fin_recurrencia || null;
+        }
       }
+
+      // Si no cambio nada, no llamamos al backend.
+      if (Object.keys(payload).length === 0) {
+        toast.info('No hay cambios para guardar');
+        setEditMode(false);
+        setEditForm(null);
+        setSavingEdit(false);
+        return;
+      }
+
       await gastosApi.update(gasto.id, payload);
       toast.success('Gasto actualizado');
       setEditMode(false);
