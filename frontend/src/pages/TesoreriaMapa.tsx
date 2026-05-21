@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   MapPin, Home, ChevronDown, ChevronRight, Loader2, Phone, Mail,
@@ -279,6 +279,31 @@ export default function TesoreriaMapa() {
       }
     })();
   }, []);
+
+  // Soporte para query param ?ubicar=<contactoId>. Lo dispara el wizard
+  // de gasto cuando el user pide "Guardar y ubicar en el mapa". Activa
+  // el modo pendingGeoId (mismo flujo que el boton "Ubicar" de la fila)
+  // sobre ese contacto, asi al hacer click en el mapa fija el pin.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const ubicar = searchParams.get('ubicar');
+    if (!ubicar || contactos.length === 0) return;
+    const id = parseInt(ubicar, 10);
+    if (!Number.isFinite(id)) return;
+    const c = contactos.find(x => x.id === id);
+    if (!c) return;
+    setPendingGeoId(id);
+    setHoveredContacto(id);
+    // Si ya tiene coords, centramos el mapa ahi para que el user vea de
+    // donde esta saliendo. Si no, el user va a hacer click en el mapa.
+    if (c.latitud && c.longitud && mapRef.current) {
+      mapRef.current.flyTo([c.latitud, c.longitud], 17, { duration: 0.9 });
+    }
+    // Limpiar el param para que un refresh no reactive el modo.
+    const next = new URLSearchParams(searchParams);
+    next.delete('ubicar');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, contactos]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Gastos agrupados por contacto (ya recortados al rango si hay rango).
   const gastosPorContacto = useMemo(() => {

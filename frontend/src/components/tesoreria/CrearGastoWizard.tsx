@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X, Wallet } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CheckCircle2, DollarSign, Building2, User as UserIcon, FileText, Loader2, Sparkles, Calendar, Briefcase, X, Wallet, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
@@ -54,6 +55,7 @@ const FRECUENCIAS: { value: FrecuenciaRecurrencia; label: string }[] = [
  */
 export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const { theme } = useTheme();
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -441,13 +443,13 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                       showCurrentLocationButton={false}
                       inputClassName="py-1.5"
                     />
-                    <PrimaryButton
-                      type="button"
-                      fullWidth
-                      size="sm"
-                      disabled={!direccionEditable.trim()}
-                      onClick={async () => {
-                        if (!direccionEditable.trim()) return;
+                    {(() => {
+                      // Guardado de la direccion. Si `redirigirAMapa` es true,
+                      // al guardar cerramos el wizard y llevamos al user al
+                      // /mapa con el contacto en modo Ubicar (query param
+                      // ?ubicar=ID que el TesoreriaMapa lee al montar).
+                      const guardarDireccion = async (redirigirAMapa: boolean): Promise<boolean> => {
+                        if (!direccionEditable.trim()) return false;
                         const pending = (window as any).__tesoreriaPendingLatLon;
                         const hasCoords = pending && pending.contactoId === c.id;
                         try {
@@ -464,14 +466,50 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
                           } : x));
                           setDireccionEditable('');
                           (window as any).__tesoreriaPendingLatLon = null;
-                          toast.success(hasCoords ? 'Dirección + ubicación guardadas' : 'Dirección agregada');
+                          if (!redirigirAMapa) {
+                            toast.success(hasCoords ? 'Dirección + ubicación guardadas' : 'Dirección agregada');
+                          }
+                          return true;
                         } catch {
                           toast.error('Error guardando dirección');
+                          return false;
                         }
-                      }}
-                    >
-                      Guardar en el contacto
-                    </PrimaryButton>
+                      };
+                      return (
+                        <div className="space-y-2">
+                          <PrimaryButton
+                            type="button"
+                            fullWidth
+                            size="sm"
+                            disabled={!direccionEditable.trim()}
+                            onClick={() => guardarDireccion(false)}
+                          >
+                            Guardar en el contacto
+                          </PrimaryButton>
+                          <button
+                            type="button"
+                            disabled={!direccionEditable.trim()}
+                            onClick={async () => {
+                              const ok = await guardarDireccion(true);
+                              if (ok) {
+                                onClose();
+                                navigate(`/gestion/tesoreria/mapa?ubicar=${c.id}`);
+                              }
+                            }}
+                            className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                            style={{
+                              backgroundColor: `${theme.primary}15`,
+                              color: theme.primary,
+                              border: `1px solid ${theme.primary}40`,
+                            }}
+                            title="Guarda la dirección y te lleva al mapa para marcar el punto"
+                          >
+                            <MapPin className="h-3.5 w-3.5" />
+                            Guardar y ubicar en el mapa
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
                 {c.latitud && c.longitud && (
