@@ -11,6 +11,7 @@ import { PrimaryButton } from '../ui/PrimaryButton';
 import { ModernSelect } from '../ui/ModernSelect';
 import { DatePicker } from '../ui/DatePicker';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import { MoneyInput } from '../ui/MoneyInput';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
 import type {
@@ -561,12 +562,9 @@ export function GastoDetalleSheet({
               <label className="block text-[10px] uppercase font-bold mb-1" style={{ color: theme.textSecondary }}>
                 Monto en pesos
               </label>
-              <input
-                type="number"
+              <MoneyInput
                 value={editForm.monto_pesos}
-                onChange={(e) => setEditForm({ ...editForm, monto_pesos: e.target.value })}
-                min="0"
-                step="0.01"
+                onChange={(v) => setEditForm({ ...editForm, monto_pesos: v })}
                 className="w-full px-3 py-2 rounded-lg text-sm tabular-nums"
                 style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
               />

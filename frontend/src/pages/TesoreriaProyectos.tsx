@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
+import { MoneyInput } from '../components/ui/MoneyInput';
 import {
   ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter,
   ABMTable, ABMTableAction,
@@ -208,13 +209,18 @@ export default function TesoreriaProyectos() {
           placeholder="Descripción del proyecto u obra"
         />
       </div>
-      <ABMInput
-        label="Presupuesto (opcional)"
-        type="number"
-        value={form.presupuesto ? String(form.presupuesto) : ''}
-        onChange={(e) => setForm(f => ({ ...f, presupuesto: e.target.value }))}
-        placeholder="0"
-      />
+      <div>
+        <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
+          Presupuesto (opcional)
+        </label>
+        <MoneyInput
+          value={form.presupuesto ? String(form.presupuesto) : ''}
+          onChange={(v) => setForm(f => ({ ...f, presupuesto: v }))}
+          placeholder="0"
+          className="w-full px-3 py-2 rounded-lg text-sm tabular-nums"
+          style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+        />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>Fecha inicio</label>

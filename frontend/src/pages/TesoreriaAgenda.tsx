@@ -15,6 +15,7 @@ import { conceptoIcon } from '../lib/conceptoIcons';
 import { contactoIconByTipo, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
+import { MoneyInput } from '../components/ui/MoneyInput';
 import { CalendarView } from '../components/ui/CalendarView';
 import { agendaPagosApi, contactosApi, cajasApi } from '../lib/api';
 import type { PagoProgramado, Contacto, Caja, FrecuenciaPago } from '../types';
@@ -537,7 +538,7 @@ export default function TesoreriaAgenda() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Monto *</label>
-                <input type="number" value={form.monto_pesos} onChange={(e) => setForm(f => ({ ...f, monto_pesos: e.target.value }))}
+                <MoneyInput value={form.monto_pesos} onChange={(v) => setForm(f => ({ ...f, monto_pesos: v }))}
                   className="w-full px-3 py-2 rounded-lg text-sm tabular-nums"
                   style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
               </div>

@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { Sheet } from '../components/ui/Sheet';
+import { MoneyInput } from '../components/ui/MoneyInput';
 import { PolygonDrawer } from '../components/tesoreria/PolygonDrawer';
 import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesApi } from '../lib/api';
 import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje } from '../types';
@@ -844,7 +845,7 @@ function CajasTab() {
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Saldo inicial</label>
-            <input type="number" value={form.saldo_inicial} onChange={(e) => setForm(f => ({ ...f, saldo_inicial: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-sm tabular-nums" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+            <MoneyInput value={form.saldo_inicial} onChange={(v) => setForm(f => ({ ...f, saldo_inicial: v }))} className="w-full px-3 py-2 rounded-lg text-sm tabular-nums" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
             <p className="text-[10px] mt-1" style={{ color: theme.textSecondary }}>Saldo de apertura. Después se ajusta con ingresos y egresos.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -921,7 +922,7 @@ function CajasTab() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Monto *</label>
-                  <input type="number" value={fondosForm.monto} onChange={(e) => setFondosForm(f => ({ ...f, monto: e.target.value }))} className="w-full px-3 py-2 rounded-lg text-sm tabular-nums" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder="500000" />
+                  <MoneyInput value={fondosForm.monto} onChange={(v) => setFondosForm(f => ({ ...f, monto: v }))} className="w-full px-3 py-2 rounded-lg text-sm tabular-nums" style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} placeholder="500.000" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Fecha</label>

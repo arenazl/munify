@@ -5,6 +5,7 @@ import { WizardModal, type WizardStep } from '../ui/WizardModal';
 import { ModernSelect } from '../ui/ModernSelect';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
+import { MoneyInput } from '../ui/MoneyInput';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
   contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi, proyectosApi, cajasApi,
@@ -512,13 +513,10 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         <label className="block text-xs font-semibold mb-1" style={{ color: theme.text }}>Monto en pesos</label>
         <div className="relative">
           <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5" style={{ color: theme.textSecondary }} />
-          <input
-            type="number"
+          <MoneyInput
             value={montoPesos}
-            onChange={(e) => setMontoPesos(e.target.value)}
+            onChange={setMontoPesos}
             placeholder="0"
-            min="0"
-            step="0.01"
             className="w-full pl-10 pr-4 py-3 rounded-xl text-lg font-bold"
             style={{ backgroundColor: theme.backgroundSecondary, border: `2px solid ${theme.border}`, color: theme.text }}
           />
