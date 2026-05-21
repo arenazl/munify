@@ -369,29 +369,16 @@ export function ABMPage({
   // se respeta porque tipicamente esta diseñada para todos los anchos.
   const effectiveViewMode: ViewMode = isMobile && viewMode === 'table' ? 'cards' : viewMode;
 
-  // Spinner full-page en carga inicial (loading=true Y no hay items todavia).
-  // Si hay items visibles y se esta haciendo un refetch, NO mostramos spinner
-  // — los items siguen visibles y el footer de paginacion (si hay) muestra
-  // su propio indicador. Convencion: `isEmpty` debe representar "no hay
-  // items" sin chequear loading. La logica de no mostrar el cartel "Sin
-  // resultados" mientras carga la maneja este componente, no el padre.
-  if (loading && isEmpty) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4">
-        <div className="relative">
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent"
-            style={{ borderColor: `${theme.primary}33`, borderTopColor: theme.primary }}
-          />
-          <Sparkles
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-5 w-5 animate-pulse"
-            style={{ color: theme.primary }}
-          />
-        </div>
-        <p className="text-sm animate-pulse" style={{ color: theme.textSecondary }}>Cargando...</p>
-      </div>
-    );
-  }
+  // IMPORTANTE: NO interrumpimos el render aunque `loading` sea true.
+  // El header (titulo, search, filtros, boton "Nuevo") debe verse desde
+  // el primer momento — la pantalla NO bloquea todo con un spinner global.
+  // Mas abajo, en la zona del cuerpo, mostramos skeletons placeholder
+  // (cards o filas) cuando `loading && isEmpty`. Asi el usuario ve
+  // estructura inmediatamente y los datos se van rellenando.
+  //
+  // Convencion: `isEmpty` debe representar "no hay items" sin chequear
+  // loading. Que aparezca el cartel "Sin resultados" o el skeleton lo
+  // decide este componente segun el estado de carga.
 
   // Agrupacion: pre-computa los grupos en orden de aparicion de items.
   // ABMPage NO ordena — confia en el orden que viene de la pagina.
@@ -818,11 +805,45 @@ export function ABMPage({
           que usan ABMPage. */}
       {(tableView || guidedView) && <ViewToggleHint hasGuided={!!guidedView} hasTable={!!tableView} />}
 
-      {/* Grid de contenido. Solo renderizamos la vista activa para que la
-          altura de la pagina sea exactamente la de su contenido (sin
-          espacio blanco al final por vistas inactivas con position:absolute
-          que igual contribuian a la altura virtual via children render). */}
-      {!isEmpty ? (
+      {/* Grid de contenido. Tres estados posibles:
+          1. loading + isEmpty -> skeletons placeholder (cards o filas).
+          2. !isEmpty -> items reales.
+          3. !loading + isEmpty -> empty state ("Sin resultados").
+          El header NUNCA se reemplaza por spinner: arriba siempre se
+          ven titulo + filtros + boton Nuevo. */}
+      {loading && isEmpty ? (
+        <div className="mt-4 animate-in fade-in duration-200">
+          {effectiveViewMode === 'table' ? (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+            >
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={`sk-row-${i}`}
+                  className="flex items-center gap-3 px-4 py-3 animate-pulse"
+                  style={{
+                    borderBottom: i < 5 ? `1px solid ${theme.border}` : undefined,
+                    animationDelay: `${i * 60}ms`,
+                  }}
+                >
+                  <div className="h-3 rounded w-20 flex-shrink-0" style={{ backgroundColor: theme.backgroundSecondary }} />
+                  <div className="h-3 rounded flex-1" style={{ backgroundColor: theme.backgroundSecondary }} />
+                  <div className="h-3 rounded w-24 flex-shrink-0" style={{ backgroundColor: theme.backgroundSecondary }} />
+                  <div className="h-3 rounded w-16 flex-shrink-0" style={{ backgroundColor: theme.backgroundSecondary }} />
+                  <div className="h-6 w-16 rounded-full flex-shrink-0" style={{ backgroundColor: theme.backgroundSecondary }} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <ABMCardSkeleton key={`sk-card-${i}`} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : !isEmpty ? (
         <div className={`mt-4 ${sidePanel ? 'lg:flex lg:gap-4' : ''}`}>
           {/* Columna principal: lista (cards/table/guided) */}
           <div className={sidePanel ? 'flex-1 min-w-0' : ''}>
