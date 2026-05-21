@@ -1966,8 +1966,10 @@ export const gastosApi = {
   }) => api.get('/tesoreria/gastos', { params }),
   get: (id: number) => api.get(`/tesoreria/gastos/${id}`),
   create: (data: Record<string, unknown>) => api.post('/tesoreria/gastos', data),
-  update: (id: number, data: Record<string, unknown>) =>
-    api.put(`/tesoreria/gastos/${id}`, data),
+  update: (id: number, data: Record<string, unknown>, forceRegenerate = false) =>
+    api.put(`/tesoreria/gastos/${id}`, data, {
+      params: forceRegenerate ? { force_regenerate: true } : undefined,
+    }),
   delete: (id: number) => api.delete(`/tesoreria/gastos/${id}`),
   pagarCuota: (cuotaId: number, data: Record<string, unknown>) =>
     api.post(`/tesoreria/gastos/cuotas/${cuotaId}/pagar`, data),

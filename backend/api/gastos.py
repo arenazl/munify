@@ -435,6 +435,14 @@ async def update_gasto(
     gasto_id: int,
     payload: GastoUpdate,
     request: Request,
+    force_regenerate: bool = Query(
+        False,
+        description=(
+            "Si true, regenera cuotas aunque haya cuotas pagadas. Se usa cuando "
+            "el frontend ya le pidio confirmacion al user. Para gastos contado "
+            "no hace falta — la unica cuota se actualiza in-place sin perder data."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -469,34 +477,70 @@ async def update_gasto(
     payload_data.pop("proyectos", None)  # se procesa aparte
 
     # Detectar si cambian campos que regeneran las cuotas.
-    # Comparacion en string para tolerar Decimal vs float vs date.
+    # Comparacion robusta: Decimal y date no se comparan con str().
     CAMPOS_REGEN = ("monto_pesos", "fecha", "tipo_financiacion",
                     "cuotas_total", "frecuencia", "fecha_fin_recurrencia")
-    requiere_regen = False
-    for f in CAMPOS_REGEN:
-        if f in payload_data:
-            actual = getattr(gasto, f)
-            nuevo = payload_data[f]
-            # Para enums comparamos por .value cuando aplica
-            actual_str = actual.value if hasattr(actual, "value") else str(actual) if actual is not None else None
-            nuevo_str = str(nuevo) if nuevo is not None else None
-            if actual_str != nuevo_str:
-                requiere_regen = True
-                break
 
-    # Si regenera cuotas, no permitir si ya hay cuotas pagadas (cambiarias
-    # el historial de pagos). El user puede primero cancelar la cuota
-    # pagada desde el side panel de cuotas y despues editar.
-    if requiere_regen:
+    def _campo_cambio(field: str) -> bool:
+        if field not in payload_data:
+            return False
+        actual = getattr(gasto, field)
+        nuevo = payload_data[field]
+        if actual is None and nuevo is None:
+            return False
+        if actual is None or nuevo is None:
+            return True
+        # Decimal: comparar como Decimal
+        if field == "monto_pesos":
+            try:
+                return Decimal(str(actual)) != Decimal(str(nuevo))
+            except Exception:
+                return True
+        # date: comparar como date (puede venir como str ISO)
+        if field in ("fecha", "fecha_fin_recurrencia"):
+            actual_s = actual.isoformat() if hasattr(actual, "isoformat") else str(actual)
+            nuevo_s = nuevo.isoformat() if hasattr(nuevo, "isoformat") else str(nuevo)
+            return actual_s != nuevo_s
+        # enums: comparar por value
+        actual_v = actual.value if hasattr(actual, "value") else actual
+        nuevo_v = nuevo.value if hasattr(nuevo, "value") else nuevo
+        return actual_v != nuevo_v
+
+    requiere_regen = any(_campo_cambio(f) for f in CAMPOS_REGEN)
+
+    # Tipo de financiacion FINAL del gasto despues del update. Si no cambia,
+    # mantiene el actual.
+    tipo_fin_final = (
+        payload_data.get("tipo_financiacion")
+        or (gasto.tipo_financiacion.value if hasattr(gasto.tipo_financiacion, "value") else gasto.tipo_financiacion)
+    )
+
+    # Caso especial CONTADO: la unica "cuota pagada" no es un plan de pago
+    # real, es un reflejo del gasto en si. Si el tipo era contado y sigue
+    # siendo contado, NO regeneramos cuotas — solo actualizamos la unica
+    # cuota in-place con el nuevo monto/fecha (mas abajo). No chequeamos
+    # cuotas pagadas, no hay 409.
+    es_contado_puro = (
+        tipo_fin_final == "contado"
+        and (gasto.tipo_financiacion.value if hasattr(gasto.tipo_financiacion, "value") else gasto.tipo_financiacion) == "contado"
+    )
+
+    # Si regenera cuotas Y NO es contado puro Y hay cuotas pagadas reales:
+    # bloquear con 409 a menos que el frontend pase force_regenerate=true
+    # (lo va a hacer despues de que el user confirme en el ConfirmModal).
+    if requiere_regen and not es_contado_puro and not force_regenerate:
         cuotas_pagadas = [c for c in (gasto.cuotas or []) if c.estado == EstadoGastoCuota.PAGADA]
         if cuotas_pagadas:
             raise HTTPException(
                 status_code=409,
-                detail=(
-                    "No se puede editar monto/fecha/financiacion porque ya hay "
-                    f"{len(cuotas_pagadas)} cuota(s) pagada(s). Cancelalas primero "
-                    "si necesitas reconstruir el plan de pagos."
-                ),
+                detail={
+                    "code": "cuotas_pagadas_existentes",
+                    "cuotas_pagadas": len(cuotas_pagadas),
+                    "message": (
+                        f"Hay {len(cuotas_pagadas)} cuota(s) pagada(s). Regenerar "
+                        "el plan de pagos las va a borrar. Confirma para continuar."
+                    ),
+                },
             )
 
     # Si cambian destino_tipo, limpiar el FK del otro lado para evitar
@@ -522,8 +566,27 @@ async def update_gasto(
         else:
             gasto.monto_usd = None
 
-    # Si regenera cuotas: borrar las viejas y crear nuevas con _generar_cuotas
-    if requiere_regen:
+    # Ajuste de cuotas tras los cambios:
+    #   - Contado puro: la cuota unica es reflejo del gasto. Solo updateamos
+    #     monto/fecha de esa cuota, sin borrar nada. Si por algun motivo
+    #     no hay cuota (raro), la creamos.
+    #   - Otros tipos: si requiere regen, borrar todas las cuotas (incluso
+    #     las pagadas si force_regenerate=true) y crear el plan nuevo.
+    if requiere_regen and es_contado_puro:
+        cuotas = list(gasto.cuotas or [])
+        if cuotas:
+            unica = cuotas[0]
+            unica.monto = gasto.monto_pesos
+            unica.fecha_vencimiento = gasto.fecha
+            unica.fecha_pago = gasto.fecha
+            unica.estado = EstadoGastoCuota.PAGADA
+            unica.forma_pago = gasto.forma_pago
+            # Borrar cuotas extra (si hubiera mas de 1 por alguna migracion)
+            for extra in cuotas[1:]:
+                await db.delete(extra)
+        else:
+            db.add_all(_generar_cuotas(gasto))
+    elif requiere_regen:
         for c in list(gasto.cuotas or []):
             await db.delete(c)
         await db.flush()

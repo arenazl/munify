@@ -10,6 +10,7 @@ import { Sheet } from '../ui/Sheet';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { ModernSelect } from '../ui/ModernSelect';
 import { DatePicker } from '../ui/DatePicker';
+import { ConfirmModal } from '../ui/ConfirmModal';
 import { useTheme } from '../../contexts/ThemeContext';
 import { gastosApi, contactosApi, dependenciasApi, cajasApi } from '../../lib/api';
 import type {
@@ -123,6 +124,13 @@ export function GastoDetalleSheet({
     destino_dependencia_id: number | null;
   } | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  // Si el backend devuelve 409 (cuotas pagadas existentes), guardamos
+  // el payload + cantidad para mostrar el ConfirmModal y reintentar
+  // con force_regenerate=true si el user confirma.
+  const [regenConfirm, setRegenConfirm] = useState<{
+    payload: Record<string, unknown>;
+    cuotasPagadas: number;
+  } | null>(null);
   const [obsDirty, setObsDirty] = useState(false);
   const [savingObs, setSavingObs] = useState(false);
   const [pagandoCuotaId, setPagandoCuotaId] = useState<number | null>(null);
@@ -318,14 +326,54 @@ export function GastoDetalleSheet({
         return;
       }
 
-      await gastosApi.update(gasto.id, payload);
+      await persistirEdicion(payload, false);
+    } catch (e: any) {
+      // Cualquier error que no sea 409 lo mostramos como toast.
+      // El 409 lo maneja persistirEdicion (abre ConfirmModal).
+      const detail = e?.response?.data?.detail;
+      if (typeof detail === 'string') {
+        toast.error(detail);
+      } else {
+        toast.error('Error guardando');
+      }
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // Llamada real al backend. Si el backend devuelve 409 con cuotas
+  // pagadas, abrimos un ConfirmModal y dejamos el payload pendiente
+  // para reintentar con force_regenerate=true.
+  const persistirEdicion = async (payload: Record<string, unknown>, forceRegenerate: boolean) => {
+    if (!gasto) return;
+    try {
+      await gastosApi.update(gasto.id, payload, forceRegenerate);
       toast.success('Gasto actualizado');
       setEditMode(false);
       setEditForm(null);
+      setRegenConfirm(null);
       onUpdated?.();
     } catch (e: any) {
-      const detail = e?.response?.data?.detail || 'Error guardando';
-      toast.error(detail);
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      // 409 estructurado del backend: cuotas pagadas que se van a borrar.
+      if (status === 409 && detail && typeof detail === 'object' && detail.code === 'cuotas_pagadas_existentes') {
+        setRegenConfirm({ payload, cuotasPagadas: detail.cuotas_pagadas || 0 });
+        setSavingEdit(false);
+        return;
+      }
+      throw e; // lo agarra el caller
+    }
+  };
+
+  const confirmarRegenerar = async () => {
+    if (!regenConfirm) return;
+    setSavingEdit(true);
+    try {
+      await persistirEdicion(regenConfirm.payload, true);
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Error guardando');
     } finally {
       setSavingEdit(false);
     }
@@ -444,6 +492,7 @@ export function GastoDetalleSheet({
   void onEdit;
 
   return (
+    <>
     <Sheet
       open={open}
       onClose={editMode ? cancelarEdicion : onClose}
@@ -472,7 +521,7 @@ export function GastoDetalleSheet({
                 <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#f59e0b' }} />
                 <span>
                   Cambiar monto, fecha, financiación o cantidad de cuotas <b>regenera el plan de cuotas</b>.
-                  Si ya hay cuotas pagadas, el guardado va a fallar.
+                  Si el gasto es a cuotas y hay alguna pagada, te vamos a pedir confirmación antes de borrarla.
                 </span>
               </div>
             );
@@ -938,6 +987,33 @@ export function GastoDetalleSheet({
         </div>
       )}
     </Sheet>
+
+    <ConfirmModal
+      isOpen={!!regenConfirm}
+      onClose={() => setRegenConfirm(null)}
+      onConfirm={confirmarRegenerar}
+      loading={savingEdit}
+      title="¿Regenerar plan de pagos?"
+      variant="warning"
+      confirmText="Sí, regenerar"
+      cancelText="Cancelar"
+      message={
+        regenConfirm ? (
+          <div className="space-y-2">
+            <p>
+              Este gasto tiene <b>{regenConfirm.cuotasPagadas} cuota(s) pagada(s)</b>.
+              Al cambiar monto, fecha o financiación, esas cuotas se van a
+              borrar y se va a crear un plan nuevo desde cero.
+            </p>
+            <p className="text-sm opacity-75">
+              Si solo querés corregir un dato menor (ej. concepto, caja, proveedor),
+              cancelá y guardá sin tocar monto/fecha/financiación.
+            </p>
+          </div>
+        ) : ''
+      }
+    />
+  </>
   );
 }
 
