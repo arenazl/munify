@@ -1981,7 +1981,7 @@ export const gastosApi = {
     tipo_financiacion?: string;
     concepto?: string;
   }) => api.get('/tesoreria/gastos/proyecciones/cobros', { params }),
-  reportes: () => api.get('/tesoreria/gastos/reportes'),
+  reportes: () => api.get('/tesoreria/gastos/stats/reportes'),
   proyeccionesCuotasDelMes: (params: {
     anio: number;
     mes: number;
@@ -2085,7 +2085,7 @@ export const ordenesPagoApi = {
   anular: (id: number, motivo: string) =>
     api.post(`/contaduria/ordenes-pago/${id}/anular`, { motivo }),
   resumen: () => api.get('/contaduria/ordenes-pago/stats/resumen'),
-  reportes: () => api.get('/contaduria/ordenes-pago/reportes'),
+  reportes: () => api.get('/contaduria/ordenes-pago/stats/reportes'),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

@@ -920,7 +920,7 @@ async def tesoreria_dashboard_ia(
     return await build_tesoreria_dashboard(db, municipio_id, force=force)
 
 
-@router.get("/reportes")
+@router.get("/stats/reportes")
 async def reportes_tesoreria(
     request: Request,
     db: AsyncSession = Depends(get_db),

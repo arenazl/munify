@@ -476,7 +476,7 @@ async def resumen(
     }
 
 
-@router.get("/reportes")
+@router.get("/stats/reportes")
 async def reportes(
     request: Request,
     db: AsyncSession = Depends(get_db),
