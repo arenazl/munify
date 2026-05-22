@@ -22,6 +22,7 @@ import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi, retencionesApi
 import type { OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, Caja, ContaduriaRetencion, RetencionAplicada } from '../types';
 import { ETAPAS_LIST, getEtapaInfo } from '../lib/etapaContable';
 import { CuentaCorrienteSheet } from '../components/contaduria/CuentaCorrienteSheet';
+import { CrearOPWizard } from '../components/contaduria/CrearOPWizard';
 
 // Steps del tour de Órdenes de Pago. Cada `target` apunta a un atributo
 // `data-tour` que existe en el JSX (algunos via prop tourAnchors del ABMPage).
@@ -124,6 +125,9 @@ export default function OrdenesPago() {
   // Sheet cuenta corriente
   const [ctaCteId, setCtaCteId] = useState<number | null>(null);
 
+  // Wizard "Nueva OP"
+  const [wizardOpen, setWizardOpen] = useState(false);
+
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
   }
@@ -187,18 +191,9 @@ export default function OrdenesPago() {
   ];
 
   // ============ Handlers ============
-  const openNew = () => {
-    setEditing(null);
-    setForm({
-      destino_tipo: 'contacto', destino_contacto_id: 0, destino_dependencia_id: 0,
-      concepto: '', descripcion: '', monto_pesos: '',
-      caja_id: cajas[0]?.id || 0,
-      fecha_emision: new Date().toISOString().slice(0, 10),
-      fecha_vencimiento: '', nro_factura: '', factura_url: '', notas: '',
-    });
-    setRetencionesSel(new Set());
-    setSheetOpen(true);
-  };
+  // Crear nuevo: wizard guiado (4 pasos).
+  // Editar: Sheet directo (mas rapido cuando ya hay datos cargados).
+  const openNew = () => setWizardOpen(true);
 
   const openEdit = (op: OrdenPago) => {
     if (op.estado !== 'pendiente') {
@@ -935,6 +930,12 @@ export default function OrdenesPago() {
       />
 
       <CuentaCorrienteSheet contactoId={ctaCteId} onClose={() => setCtaCteId(null)} />
+
+      <CrearOPWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onSuccess={() => fetchAll()}
+      />
 
       <MunifyTour tourKey="contaduria-op" steps={TOUR_STEPS_OP} />
     </>
