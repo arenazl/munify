@@ -2,7 +2,7 @@ import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers,
-  CalendarClock, Users, MapPin, TrendingUp, PiggyBank,
+  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -213,6 +213,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Tesorería',
       description: 'Saldo de cada caja con ingresos y egresos'
+    },
+    {
+      name: 'Conciliación',
+      href: '/gestion/tesoreria/conciliacion',
+      icon: Banknote,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Importar extracto bancario y matchear contra movimientos de caja'
     },
     {
       name: 'Proyección',

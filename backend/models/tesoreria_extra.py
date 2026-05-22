@@ -126,6 +126,13 @@ class TesoreriaMovimientoCaja(Base):
     concepto = Column(String(150), nullable=False)
     descripcion = Column(Text, nullable=True)
 
+    # Conciliacion bancaria: cuando se importa el extracto del banco y
+    # se hace match con este movimiento, se setea conciliado=True y se
+    # guarda la referencia del extracto (linea, nro de transaccion del banco).
+    conciliado = Column(Boolean, default=False, nullable=False, index=True)
+    ref_extracto = Column(String(120), nullable=True)
+    fecha_conciliacion = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

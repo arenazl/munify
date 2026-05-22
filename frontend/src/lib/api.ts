@@ -2133,6 +2133,23 @@ export const ordenesPagoApi = {
   },
 };
 
+export const conciliacionApi = {
+  importExtracto: (file: File, cajaId: number, diasTolerancia = 2) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post('/tesoreria/conciliacion/import', fd, {
+      params: { caja_id: cajaId, dias_tolerancia: diasTolerancia },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  pendientes: (cajaId: number) =>
+    api.get('/tesoreria/conciliacion/pendientes', { params: { caja_id: cajaId } }),
+  marcarManual: (movimientoId: number, refExtracto?: string) =>
+    api.post('/tesoreria/conciliacion/manual', { movimiento_id: movimientoId, ref_extracto: refExtracto }),
+  desmarcar: (movimientoId: number) =>
+    api.post(`/tesoreria/conciliacion/desmarcar/${movimientoId}`),
+};
+
 export const retencionesApi = {
   list: (params?: { activo?: boolean }) =>
     api.get('/contaduria/retenciones', { params }),
