@@ -171,6 +171,15 @@ interface ABMPageProps {
   icon?: ReactNode; // Icono decorativo del título (igual que StickyPageHeader)
   backLink?: string; // Link para volver (muestra flecha antes del título)
   buttonLabel?: string;
+  /** Atributos `data-tour=<key>` para anclar tours de onboarding a partes
+   *  internas del ABMPage (KPIs, botón Nuevo, toolbar). Si se omite, no
+   *  se agregan atributos. */
+  tourAnchors?: {
+    kpis?: string;
+    addButton?: string;
+    toolbar?: string;
+    content?: string;
+  };
   buttonIcon?: ReactNode;
   onAdd?: () => void;
 
@@ -295,6 +304,7 @@ export function ABMPage({
   icon,
   backLink,
   buttonLabel,
+  tourAnchors,
   buttonIcon,
   onAdd,
   searchPlaceholder = 'Buscar...',
@@ -523,9 +533,11 @@ export function ABMPage({
           (mismo ancho que el header + toolbar de abajo). Si la pagina padre
           le da padding al wrapper de ABMPage, los KPIs lo respetan. */}
       {kpis && (
-        Array.isArray(kpis)
-          ? <KpiRow kpis={kpis as KpiSpec[]} />
-          : <div>{kpis}</div>
+        <div data-tour={tourAnchors?.kpis}>
+          {Array.isArray(kpis)
+            ? <KpiRow kpis={kpis as KpiSpec[]} />
+            : kpis}
+        </div>
       )}
 
       {/* Contenedor sticky para header y secondary filters.
@@ -686,12 +698,14 @@ export function ABMPage({
 
             {/* Botón agregar: usa PrimaryButton canonico. */}
             {onAdd && buttonLabel && (
-              <PrimaryButton
-                onClick={onAdd}
-                icon={buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
-              >
-                {buttonLabel}
-              </PrimaryButton>
+              <span data-tour={tourAnchors?.addButton}>
+                <PrimaryButton
+                  onClick={onAdd}
+                  icon={buttonIcon || <Plus className="h-4 w-4 mr-1.5 transition-transform duration-300 group-hover:rotate-90" />}
+                >
+                  {buttonLabel}
+                </PrimaryButton>
+              </span>
             )}
           </div>
 

@@ -15,9 +15,35 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi } from '../lib/api';
 import type { OrdenPago, EstadoOrdenPago, Contacto, Caja } from '../types';
+
+// Steps del tour de Órdenes de Pago. Cada `target` apunta a un atributo
+// `data-tour` que existe en el JSX (algunos via prop tourAnchors del ABMPage).
+const TOUR_STEPS_OP = [
+  {
+    target: '[data-tour="op-kpis"]',
+    content: 'Acá ves los KPIs en vivo de las OPs por estado: pendientes, autorizadas, pagadas y anuladas.',
+    title: 'Resumen de Órdenes de Pago',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="op-nueva"]',
+    content: 'Apretás "Nueva OP" para crear una orden formal. Cargás beneficiario, monto, fecha, y opcionalmente adjuntás el PDF de la factura.',
+    title: 'Crear una OP nueva',
+    placement: 'bottom' as const,
+  },
+  {
+    target: '[data-tour="op-tabla"]',
+    content: 'En cada fila ves los botones de acción según el estado: Autorizar, Pagar o Anular. Al pagar, automáticamente se crea el gasto en Tesorería y se descuenta la caja.',
+    title: 'Acciones por OP',
+    placement: 'top' as const,
+  },
+];
 
 // ============================================================
 // Constantes
@@ -323,6 +349,8 @@ export default function OrdenesPago() {
         searchValue={search}
         onSearchChange={setSearch}
         kpis={kpisSpec}
+        tourAnchors={{ kpis: 'op-kpis', addButton: 'op-nueva' }}
+        headerActions={<TourButton tourKey="contaduria-op" title="Ver tutorial de Órdenes de Pago" />}
         loading={loading}
         isEmpty={items.length === 0}
         emptyMessage="No hay órdenes de pago. Creá una con 'Nueva OP'."
@@ -339,6 +367,7 @@ export default function OrdenesPago() {
           },
         }}
         tableView={
+          <div data-tour="op-tabla">
           <ABMTable<OrdenPago>
             data={items}
             keyExtractor={(op) => op.id}
@@ -381,6 +410,7 @@ export default function OrdenesPago() {
               </>
             )}
           />
+          </div>
         }
       >
         {/* Vista cards: por ahora reusamos la tabla. */}
@@ -714,6 +744,8 @@ export default function OrdenesPago() {
         promptLabel="Motivo de la anulación"
         promptPlaceholder="Ej: Error en el monto, beneficiario incorrecto..."
       />
+
+      <MunifyTour tourKey="contaduria-op" steps={TOUR_STEPS_OP} />
     </>
   );
 }
