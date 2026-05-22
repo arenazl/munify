@@ -8,6 +8,24 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
+
+const TOUR_STEPS_LIQ = [
+  {
+    target: '[data-tour="liq-kpis"]',
+    content: 'Resumen rápido: cuántas liquidaciones tenés activas, próximos vencimientos y masa salarial total.',
+    title: 'Resumen de Liquidaciones',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="liq-nueva"]',
+    content: 'Creás una liquidación recurrente para un empleado: monto base, frecuencia (mensual/quincenal), día de pago y caja. En cada card después aparece el botón "Pagar" verde para ejecutar el pago con monto editable y premios aplicables (presentismo, trabajo extra).',
+    title: 'Nueva liquidación + ejecución',
+    placement: 'bottom' as const,
+  },
+];
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
@@ -563,6 +581,8 @@ export default function TesoreriaAgenda() {
         backLink="/gestion/tesoreria"
         buttonLabel="Nuevo Pago Programado"
         onAdd={() => openSheet()}
+        tourAnchors={{ kpis: 'liq-kpis', addButton: 'liq-nueva' }}
+        headerActions={<TourButton tourKey="sueldos-liquidaciones" title="Ver tutorial de Liquidaciones" />}
         searchPlaceholder="Buscar por concepto o contacto..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -842,6 +862,8 @@ export default function TesoreriaAgenda() {
           </div>
         )}
       </Sheet>
+
+      <MunifyTour tourKey="sueldos-liquidaciones" steps={TOUR_STEPS_LIQ} />
     </>
   );
 }

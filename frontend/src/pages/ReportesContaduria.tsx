@@ -3,6 +3,18 @@ import { BarChart3, AlertTriangle, Calendar, TrendingUp, Loader2 } from 'lucide-
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
+
+const TOUR_STEPS = [
+  {
+    target: '[data-tour="rep-cont"]',
+    content: 'Cuatro listados clave: OPs vencidas (rojo), próximas a vencer en 7 días (amarillo), top beneficiarios del mes y evolución mensual con gráfico de barras.',
+    title: 'Reportes de Contaduría',
+    placement: 'top' as const,
+    disableBeacon: true,
+  },
+];
 import { StatusPill } from '../components/ui/StatusPill';
 import { ordenesPagoApi } from '../lib/api';
 
@@ -41,17 +53,19 @@ export default function ReportesContaduria() {
   const maxMonto = Math.max(...mensuales.map((m: any) => parseFloat(m.monto || '0')), 1);
 
   return (
+    <>
     <ABMPage
       title="Reportes de Contaduría"
       icon={<BarChart3 className="h-5 w-5" />}
       searchPlaceholder=""
       searchValue=""
       onSearchChange={() => {}}
+      headerActions={<TourButton tourKey="contaduria-reportes" title="Ver tutorial de Reportes" />}
       loading={false}
       isEmpty={false}
       emptyMessage=""
     >
-      <div className="col-span-full space-y-4">
+      <div className="col-span-full space-y-4" data-tour="rep-cont">
         {/* Vencidas */}
         <Section
           title="OPs vencidas"
@@ -151,6 +165,8 @@ export default function ReportesContaduria() {
         </Section>
       </div>
     </ABMPage>
+    <MunifyTour tourKey="contaduria-reportes" steps={TOUR_STEPS} />
+    </>
   );
 }
 

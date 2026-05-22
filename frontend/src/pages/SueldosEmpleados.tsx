@@ -6,9 +6,21 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { contactosApi, tiposEmpleadoApi, agendaPagosApi } from '../lib/api';
 import type { Contacto, TipoEmpleadoCatalogo, PagoProgramado } from '../types';
+
+const TOUR_STEPS_EMP = [
+  {
+    target: '[data-tour="emp-kpis"]',
+    content: 'Cantidad de empleados activos del muni, cuántos ya tienen liquidación cargada y masa salarial total.',
+    title: 'Padrón de Personal',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+];
 
 function fmtMoney(v: string | number): string {
   const n = typeof v === 'string' ? parseFloat(v) : v;
@@ -108,6 +120,7 @@ export default function SueldosEmpleados() {
   }, [tipos, empleados]);
 
   return (
+    <>
     <ABMPage
       title="Empleados"
       icon={<Users className="h-5 w-5" />}
@@ -115,6 +128,7 @@ export default function SueldosEmpleados() {
       searchValue={search}
       onSearchChange={setSearch}
       kpis={kpis}
+      tourAnchors={{ kpis: 'emp-kpis' }}
       loading={loading}
       isEmpty={filtered.length === 0}
       emptyMessage="No hay empleados. Cargalos en Contactos con tipo=Empleado."
@@ -132,15 +146,18 @@ export default function SueldosEmpleados() {
         ],
       }}
       headerActions={
-        <Link
-          to="/gestion/tesoreria/contactos"
-          className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105"
-          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
-          title="Gestionar todos los contactos"
-        >
-          <LinkIcon className="h-3.5 w-3.5" />
-          Ir a Contactos
-        </Link>
+        <div className="inline-flex items-center gap-2">
+          <TourButton tourKey="sueldos-empleados" title="Ver tutorial de Empleados" />
+          <Link
+            to="/gestion/tesoreria/contactos"
+            className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105"
+            style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+            title="Gestionar todos los contactos"
+          >
+            <LinkIcon className="h-3.5 w-3.5" />
+            Ir a Contactos
+          </Link>
+        </div>
       }
     >
       <div
@@ -230,5 +247,7 @@ export default function SueldosEmpleados() {
         })}
       </div>
     </ABMPage>
+    <MunifyTour tourKey="sueldos-empleados" steps={TOUR_STEPS_EMP} />
+    </>
   );
 }

@@ -8,7 +8,25 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { DireccionAutocomplete } from '../components/ui/DireccionAutocomplete';
 import { ABMPage, ABMCard, ABMCardActions, ABMInput, ABMSheetFooter, ABMTable, ABMTableAction, type AbmToolbar } from '../components/ui/ABMPage';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
 import { StatusPill } from '../components/ui/StatusPill';
+
+const TOUR_STEPS_CONTACTOS = [
+  {
+    target: '[data-tour="ctc-nuevo"]',
+    content: 'Cargás un contacto (proveedor, empleado, contratista, beneficiario). Soporta dirección georreferenciada para el mapa.',
+    title: 'Nuevo contacto',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="ctc-unificar"]',
+    content: 'Si tras importar el Excel quedan duplicados (Juan Gonzalez / Juan González), acá los detectamos por similitud y los fusionás. Los gastos se reapuntan al contacto unificado.',
+    title: 'Unificar duplicados',
+    placement: 'bottom' as const,
+  },
+];
 import { contactosApi, tesoreriaImportApi, tiposEmpleadoApi, parajesApi } from '../lib/api';
 import {
   contactoIconByTipo,
@@ -261,7 +279,10 @@ export default function TesoreriaContactos() {
   // por imports sucesivos de Excel. Estilo fuerte (gradient sobre primary)
   // para destacar al lado del boton "Nuevo".
   const headerActions = (
+    <div className="inline-flex items-center gap-2">
+    <TourButton tourKey="tesoreria-contactos" title="Ver tutorial de Contactos" />
     <button
+      data-tour="ctc-unificar"
       onClick={() => setUnificarOpen(true)}
       className="inline-flex items-center gap-2 px-4 h-[34px] rounded-lg text-[12px] font-bold transition-all hover:scale-105 active:scale-95 shadow-sm"
       style={{
@@ -274,6 +295,7 @@ export default function TesoreriaContactos() {
       <GitMerge className="h-4 w-4" />
       Unificar duplicados
     </button>
+    </div>
   );
 
   const sheetContent = (
@@ -397,6 +419,7 @@ export default function TesoreriaContactos() {
         backLink="/gestion/tesoreria"
         buttonLabel="Nuevo"
         onAdd={() => openSheet()}
+        tourAnchors={{ addButton: 'ctc-nuevo' }}
         searchPlaceholder="Buscar por nombre, DNI…"
         searchValue={search}
         onSearchChange={setSearch}
@@ -551,6 +574,8 @@ export default function TesoreriaContactos() {
         onClose={() => setUnificarOpen(false)}
         onMerged={() => fetch()}
       />
+
+      <MunifyTour tourKey="tesoreria-contactos" steps={TOUR_STEPS_CONTACTOS} />
     </>
   );
 }

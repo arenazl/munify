@@ -16,6 +16,18 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage } from '../components/ui/ABMPage';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PeriodNavigator } from '../components/ui/PeriodNavigator';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
+
+const TOUR_STEPS_RES = [
+  {
+    target: '[data-tour="res-content"]',
+    content: 'Mirá el gasto del muni por mes o por año. Usá ← → para navegar y los combos para filtrar por dependencia, contacto, tipo, concepto, forma de pago o caja.',
+    title: 'Resumen de Gastos',
+    placement: 'top' as const,
+    disableBeacon: true,
+  },
+];
 import { TIPO_CONTACTO_LABELS, TIPO_CONTACTO_COLORS } from '../lib/contactoIcons';
 import {
   gastosApi, dependenciasApi, contactosApi, conceptosAbmApi, tiposConceptoApi,
@@ -315,13 +327,14 @@ export default function TesoreriaResumen() {
         searchPlaceholder="Buscar..."
         searchValue=""
         onSearchChange={() => {}}
+        headerActions={<TourButton tourKey="tesoreria-resumen" title="Ver tutorial de Resumen" />}
         extraFilters={extraFilters}
         loading={loading}
         isEmpty={filtered.length === 0}
         emptyMessage={`No hay gastos en ${labelPeriodo} con esos filtros.`}
         defaultViewMode="cards"
       >
-        <div className="col-span-full space-y-3">
+        <div className="col-span-full space-y-3" data-tour="res-content">
           {/* Total prominente */}
           <div
             className="rounded-xl p-4 flex items-center gap-4"
@@ -365,6 +378,7 @@ export default function TesoreriaResumen() {
           ))}
         </div>
       </ABMPage>
+      <MunifyTour tourKey="tesoreria-resumen" steps={TOUR_STEPS_RES} />
     </>
   );
 }

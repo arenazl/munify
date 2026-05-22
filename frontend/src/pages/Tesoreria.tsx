@@ -17,6 +17,24 @@ import {
   type EstadoAgregado,
 } from '../components/tesoreria/GastoDetalleSheet';
 import { ABMPage, ABMTable, ABMTableAction, type AbmToolbar, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
+
+const TOUR_STEPS_TES_MOVIMIENTOS = [
+  {
+    target: '[data-tour="tes-mov-kpis"]',
+    content: 'KPIs en vivo de los gastos del muni: total del periodo activo, ticket promedio y desgloses.',
+    title: 'Resumen de Tesorería',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="tes-mov-nuevo"]',
+    content: 'Cargás un gasto directo desde acá: concepto, beneficiario, monto, caja, factura adjunta y proyecto opcional. Al guardar se descuenta la caja.',
+    title: 'Nuevo gasto',
+    placement: 'bottom' as const,
+  },
+];
 import { StatusPill } from '../components/ui/StatusPill';
 import { primaryButtonStyle } from '../components/ui/PrimaryButton';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
@@ -649,6 +667,7 @@ export default function Tesoreria() {
   const ghostClass = "inline-flex items-center gap-2 h-[34px] px-3 rounded-lg text-[12px] font-semibold transition-all hover:scale-105 hover:-translate-y-0.5 active:scale-95";
   const headerActions = (
     <>
+      <TourButton tourKey="tesoreria-movimientos" title="Ver tutorial de Movimientos" />
       <Link to="/gestion/tesoreria/agenda" className={ghostClass} style={ghostStyle}>
         <CalendarClock className="h-3.5 w-3.5" /> Pagos
       </Link>
@@ -1184,6 +1203,7 @@ export default function Tesoreria() {
         searchPlaceholder="Buscar por concepto, contacto o descripción..."
         searchValue={search}
         onSearchChange={setSearch}
+        tourAnchors={{ kpis: 'tes-mov-kpis', addButton: 'tes-mov-nuevo' }}
         toolbar={tesoreriaToolbar}
         headerActions={headerActions}
         loading={loading}
@@ -1320,6 +1340,8 @@ export default function Tesoreria() {
         onUpdated={fetchGastos}
         onDeleted={fetchGastos}
       />
+
+      <MunifyTour tourKey="tesoreria-movimientos" steps={TOUR_STEPS_TES_MOVIMIENTOS} />
     </>
   );
 }

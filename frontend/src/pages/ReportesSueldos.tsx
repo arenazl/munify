@@ -3,7 +3,26 @@ import { BarChart3, Users, Briefcase, Calendar, Repeat, Loader2 } from 'lucide-r
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
 import { agendaPagosApi } from '../lib/api';
+
+const TOUR_STEPS = [
+  {
+    target: '[data-tour="rep-sue-kpis"]',
+    content: 'KPIs del muni: masa salarial total, empleados activos y cantidad de liquidaciones programadas.',
+    title: 'KPIs de Sueldos',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="rep-sue"]',
+    content: 'Tres bloques: ranking de sueldos más altos, distribución por frecuencia (mensual/quincenal/etc.) y próximos pagos en 30 días.',
+    title: 'Análisis de Sueldos',
+    placement: 'top' as const,
+    disableBeacon: true,
+  },
+];
 
 function fmtMoney(v: string | number): string {
   const n = typeof v === 'string' ? parseFloat(v) : v;
@@ -39,12 +58,15 @@ export default function ReportesSueldos() {
   const totalFrecuencias = frecuencias.reduce((s: number, f: any) => s + parseFloat(f.monto || '0'), 0);
 
   return (
+    <>
     <ABMPage
       title="Reportes de Sueldos"
       icon={<BarChart3 className="h-5 w-5" />}
       searchPlaceholder=""
       searchValue=""
       onSearchChange={() => {}}
+      headerActions={<TourButton tourKey="sueldos-reportes" title="Ver tutorial de Reportes" />}
+      tourAnchors={{ kpis: 'rep-sue-kpis' }}
       loading={false}
       isEmpty={false}
       emptyMessage=""
@@ -65,7 +87,7 @@ export default function ReportesSueldos() {
         },
       ]}
     >
-      <div className="col-span-full space-y-4">
+      <div className="col-span-full space-y-4" data-tour="rep-sue">
         {/* Top sueldos */}
         <Section title="Top sueldos" subtitle="Empleados con mayor sueldo base" icon={<Briefcase className="h-4 w-4" />} accent={theme.primary}>
           {top_sueldos.length === 0 ? (
@@ -163,6 +185,8 @@ export default function ReportesSueldos() {
         </Section>
       </div>
     </ABMPage>
+    <MunifyTour tourKey="sueldos-reportes" steps={TOUR_STEPS} />
+    </>
   );
 }
 

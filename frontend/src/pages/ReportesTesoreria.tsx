@@ -3,6 +3,18 @@ import { BarChart3, PiggyBank, Tag, Building2, TrendingUp, Loader2 } from 'lucid
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
+
+const TOUR_STEPS = [
+  {
+    target: '[data-tour="rep-tes"]',
+    content: 'Cuatro vistas del gasto del muni: egresos por caja (barras de %), top conceptos del mes, top dependencias y evolución mensual.',
+    title: 'Reportes de Tesorería',
+    placement: 'top' as const,
+    disableBeacon: true,
+  },
+];
 import { gastosApi } from '../lib/api';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -41,17 +53,19 @@ export default function ReportesTesoreria() {
   const maxMonto = Math.max(...mensuales.map((m: any) => parseFloat(m.monto || '0')), 1);
 
   return (
+    <>
     <ABMPage
       title="Reportes de Tesorería"
       icon={<BarChart3 className="h-5 w-5" />}
       searchPlaceholder=""
       searchValue=""
       onSearchChange={() => {}}
+      headerActions={<TourButton tourKey="tesoreria-reportes" title="Ver tutorial de Reportes" />}
       loading={false}
       isEmpty={false}
       emptyMessage=""
     >
-      <div className="col-span-full space-y-4">
+      <div className="col-span-full space-y-4" data-tour="rep-tes">
         {/* Egresos por caja */}
         <Section
           title="Egresos por caja (mes actual)"
@@ -154,6 +168,8 @@ export default function ReportesTesoreria() {
         </Section>
       </div>
     </ABMPage>
+    <MunifyTour tourKey="tesoreria-reportes" steps={TOUR_STEPS} />
+    </>
   );
 }
 

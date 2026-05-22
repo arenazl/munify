@@ -9,9 +9,27 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
+import { MunifyTour } from '../components/ui/MunifyTour';
+import { TourButton } from '../components/ui/TourButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { cajasApi } from '../lib/api';
 import type { Caja } from '../types';
+
+const TOUR_STEPS = [
+  {
+    target: '[data-tour="cajas-kpis"]',
+    content: 'Resumen total de las cajas del muni: saldo, ingresos y egresos acumulados.',
+    title: 'Saldos en vivo',
+    placement: 'bottom' as const,
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tour="cajas-grid"]',
+    content: 'Cada caja muestra su saldo actual con desglose (inicial, ingresos, egresos). Al cargar un gasto, la caja correspondiente se descuenta automáticamente.',
+    title: 'Cajas del municipio',
+    placement: 'top' as const,
+  },
+];
 
 function fmtMoney(v: string | number | null | undefined): string {
   const n = typeof v === 'string' ? parseFloat(v) : (v || 0);
@@ -85,6 +103,7 @@ export default function TesoreriaCajas() {
   ];
 
   return (
+    <>
     <ABMPage
       title="Cajas y Saldos"
       icon={<PiggyBank className="h-5 w-5" />}
@@ -92,21 +111,26 @@ export default function TesoreriaCajas() {
       searchValue={search}
       onSearchChange={setSearch}
       kpis={kpis}
+      tourAnchors={{ kpis: 'cajas-kpis' }}
       loading={loading}
       isEmpty={filtered.length === 0}
       emptyMessage="No hay cajas. Creá una desde Configuración → Tesorería → Cajas."
       headerActions={
-        <Link
-          to="/gestion/configuracion/tesoreria?tab=cajas"
-          className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105"
-          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
-          title="Crear o editar cajas en Configuración"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nueva caja
-        </Link>
+        <div className="inline-flex items-center gap-2">
+          <TourButton tourKey="tesoreria-cajas" title="Ver tutorial de Cajas" />
+          <Link
+            to="/gestion/configuracion/tesoreria?tab=cajas"
+            className="inline-flex items-center gap-1.5 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105"
+            style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+            title="Crear o editar cajas en Configuración"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nueva caja
+          </Link>
+        </div>
       }
     >
+      <div className="col-span-full" data-tour="cajas-grid" />
       {filtered.map(c => {
         const saldo = parseFloat(c.saldo_actual || '0') || 0;
         const ingresos = parseFloat(c.total_ingresos || '0') || 0;
@@ -189,5 +213,7 @@ export default function TesoreriaCajas() {
         );
       })}
     </ABMPage>
+    <MunifyTour tourKey="tesoreria-cajas" steps={TOUR_STEPS} />
+    </>
   );
 }
