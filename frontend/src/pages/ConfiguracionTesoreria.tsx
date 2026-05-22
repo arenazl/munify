@@ -71,8 +71,12 @@ export default function ConfiguracionTesoreria() {
         </div>
       </div>
 
-      {/* Tabs — tipos eliminado, conceptos quedan planos */}
-      <div className="flex gap-1 border-b" style={{ borderColor: theme.border }}>
+      {/* Tabs — scrollable en mobile para que no se corten los labels */}
+      <div
+        className="flex gap-1 border-b overflow-x-auto"
+        style={{ borderColor: theme.border, scrollbarWidth: 'none' }}
+      >
+        <style>{`.cfg-tabs::-webkit-scrollbar { display: none; }`}</style>
         {([
           { id: 'conceptos', label: 'Conceptos', icon: <FileText className="h-4 w-4" /> },
           { id: 'tipos-empleado', label: 'Tipos de empleado', icon: <Users className="h-4 w-4" /> },
@@ -86,7 +90,7 @@ export default function ConfiguracionTesoreria() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="px-4 py-2.5 text-sm font-medium transition-all inline-flex items-center gap-2 border-b-2"
+              className="px-4 py-2.5 text-sm font-medium transition-all inline-flex items-center gap-2 border-b-2 whitespace-nowrap flex-shrink-0"
               style={{
                 color: active ? theme.primary : theme.textSecondary,
                 borderColor: active ? theme.primary : 'transparent',
@@ -197,7 +201,7 @@ function TiposConceptoTab() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {tipos.length} tipos. Categorizan los conceptos de gasto. Cada uno tiene color e ícono propio.
         </p>
@@ -557,7 +561,7 @@ function TiposEmpleadoTab() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {tipos.length} tipos. Sub-clasificación de los contactos tipo "empleado" (albañil, MMO, arquitecto, etc).
         </p>
@@ -769,7 +773,7 @@ function CajasTab() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {cajas.length} cajas. De acá se descuentan los gastos. Los ingresos suman saldo.
         </p>
@@ -1050,7 +1054,7 @@ function ParajesTab() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
         <p className="text-xs" style={{ color: theme.textSecondary }}>
           {parajes.length} parajes. Regiones del muni (Santa Rita, Los Álamos, etc). Al crear un contacto podés elegir un paraje en lugar de cargar la dirección exacta.
         </p>
@@ -1210,8 +1214,8 @@ function PremiosTab() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="min-w-0">
           <h2 className="text-base font-bold inline-flex items-center gap-2" style={{ color: theme.text }}>
             <Gift className="h-5 w-5" style={{ color: theme.primary }} />
             Catálogo de Premios
