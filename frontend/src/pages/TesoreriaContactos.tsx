@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2, Loader2, GitMerge } from 'lucide-react';
+import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2, Loader2, GitMerge, FileText } from 'lucide-react';
+import { CuentaCorrienteSheet } from '../components/contaduria/CuentaCorrienteSheet';
 import { UnificarContactosModal } from '../components/tesoreria/UnificarContactosModal';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -56,6 +57,8 @@ export default function TesoreriaContactos() {
   // Sheet (form)
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Contacto | null>(null);
+  // Sheet de cuenta corriente (read-only)
+  const [ctaCteId, setCtaCteId] = useState<number | null>(null);
   const [form, setForm] = useState<Partial<Contacto>>({ nombre: '', tipo: 'beneficiario' });
   const [saving, setSaving] = useState(false);
 
@@ -519,6 +522,7 @@ export default function TesoreriaContactos() {
             ]}
             actions={(c) => (
               <>
+                <ABMTableAction title="Cuenta corriente" onClick={() => setCtaCteId(c.id)} icon={<FileText className="h-4 w-4" />} />
                 <ABMTableAction title="Editar" onClick={() => openSheet(c)} variant="primary" icon={<Edit2 className="h-4 w-4" />} />
                 <ABMTableAction title="Eliminar" onClick={() => handleDelete(c.id)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
               </>
@@ -545,7 +549,17 @@ export default function TesoreriaContactos() {
                   {TIPO_LABELS[c.tipo]}
                 </span>
               </div>
-              <ABMCardActions onEdit={() => openSheet(c)} onDelete={() => handleDelete(c.id)} />
+              <div className="inline-flex items-center gap-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setCtaCteId(c.id); }}
+                  className="p-1.5 rounded-md transition-all hover:scale-110"
+                  style={{ color: theme.primary, backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+                  title="Ver cuenta corriente"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                </button>
+                <ABMCardActions onEdit={() => openSheet(c)} onDelete={() => handleDelete(c.id)} />
+              </div>
             </div>
             {c.alias_pago && (
               <p className="text-[11px] truncate font-mono mb-1" style={{ color: theme.textSecondary }}>
@@ -574,6 +588,8 @@ export default function TesoreriaContactos() {
         onClose={() => setUnificarOpen(false)}
         onMerged={() => fetch()}
       />
+
+      <CuentaCorrienteSheet contactoId={ctaCteId} onClose={() => setCtaCteId(null)} />
 
       <MunifyTour tourKey="tesoreria-contactos" steps={TOUR_STEPS_CONTACTOS} />
     </>

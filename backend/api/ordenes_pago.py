@@ -587,6 +587,90 @@ async def descargar_op_pdf(
     )
 
 
+@router.get("/contacto/{contacto_id}/cuenta-corriente")
+async def cuenta_corriente_contacto(
+    contacto_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cuenta corriente de un contacto (proveedor o beneficiario): todas las
+    OPs emitidas a su nombre + totales agregados.
+
+    Totales:
+      - facturado: suma de OPs no anuladas.
+      - pagado: suma de OPs pagadas.
+      - pendiente: suma de OPs pendientes o autorizadas (saldo a pagar).
+      - devengado: suma de OPs en etapa contable 'devengado' pero aun no pagadas.
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    contacto = (await db.execute(
+        select(Contacto).where(Contacto.id == contacto_id, Contacto.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not contacto:
+        raise HTTPException(404, "Contacto no encontrado")
+
+    rows = (await db.execute(
+        select(OrdenPago)
+        .where(
+            OrdenPago.municipio_id == municipio_id,
+            OrdenPago.destino_tipo == "contacto",
+            OrdenPago.destino_contacto_id == contacto_id,
+        )
+        .order_by(OrdenPago.fecha_emision.desc(), OrdenPago.id.desc())
+    )).scalars().all()
+
+    facturado = Decimal(0)
+    pagado = Decimal(0)
+    pendiente = Decimal(0)
+    devengado_no_pagado = Decimal(0)
+    items = []
+    for op in rows:
+        monto = Decimal(op.monto_pesos or 0)
+        estado_v = op.estado.value if hasattr(op.estado, "value") else str(op.estado)
+        etapa_v = op.etapa_contable.value if hasattr(op.etapa_contable, "value") else str(op.etapa_contable)
+        if estado_v != "anulada":
+            facturado += monto
+        if estado_v == "pagada":
+            pagado += monto
+        elif estado_v in ("pendiente", "autorizada"):
+            pendiente += monto
+            if etapa_v == "devengado":
+                devengado_no_pagado += monto
+        items.append({
+            "id": op.id,
+            "numero": op.numero,
+            "fecha_emision": op.fecha_emision.isoformat() if op.fecha_emision else None,
+            "fecha_vencimiento": op.fecha_vencimiento.isoformat() if op.fecha_vencimiento else None,
+            "fecha_pago": op.fecha_pago.isoformat() if op.fecha_pago else None,
+            "concepto": op.concepto,
+            "monto_pesos": str(monto),
+            "estado": estado_v,
+            "etapa_contable": etapa_v,
+            "nro_factura": op.nro_factura,
+            "gasto_id": op.gasto_id,
+        })
+
+    return {
+        "contacto": {
+            "id": contacto.id,
+            "nombre": f"{contacto.nombre} {contacto.apellido or ''}".strip(),
+            "dni": contacto.dni,
+            "tipo": contacto.tipo.value if hasattr(contacto.tipo, "value") else str(contacto.tipo) if contacto.tipo else None,
+        },
+        "totales": {
+            "facturado": str(facturado),
+            "pagado": str(pagado),
+            "pendiente": str(pendiente),
+            "devengado_no_pagado": str(devengado_no_pagado),
+            "cantidad_ops": len([i for i in items if i["estado"] != "anulada"]),
+        },
+        "ops": items,
+    }
+
+
 @router.get("/stats/resumen")
 async def resumen(
     request: Request,

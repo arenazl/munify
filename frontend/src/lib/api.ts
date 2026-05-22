@@ -2117,6 +2117,8 @@ export const ordenesPagoApi = {
     api.post(`/contaduria/ordenes-pago/${id}/anular`, { motivo }),
   resumen: () => api.get('/contaduria/ordenes-pago/stats/resumen'),
   reportes: () => api.get('/contaduria/ordenes-pago/stats/reportes'),
+  cuentaCorriente: (contactoId: number) =>
+    api.get(`/contaduria/ordenes-pago/contacto/${contactoId}/cuenta-corriente`),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

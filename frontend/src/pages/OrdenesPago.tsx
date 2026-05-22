@@ -21,6 +21,7 @@ import type { KpiSpec } from '../components/ui/KpiCard';
 import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi } from '../lib/api';
 import type { OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, Caja } from '../types';
 import { ETAPAS_LIST, getEtapaInfo } from '../lib/etapaContable';
+import { CuentaCorrienteSheet } from '../components/contaduria/CuentaCorrienteSheet';
 
 // Steps del tour de Órdenes de Pago. Cada `target` apunta a un atributo
 // `data-tour` que existe en el JSX (algunos via prop tourAnchors del ABMPage).
@@ -116,6 +117,9 @@ export default function OrdenesPago() {
 
   // Anular modal
   const [anularOP, setAnularOP] = useState<OrdenPago | null>(null);
+
+  // Sheet cuenta corriente
+  const [ctaCteId, setCtaCteId] = useState<number | null>(null);
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return <div className="p-6"><p className="text-sm" style={{ color: theme.textSecondary }}>Solo gestores.</p></div>;
@@ -308,6 +312,20 @@ export default function OrdenesPago() {
       render: (op) => {
         const Icon = op.destino_tipo === 'contacto' ? UserIcon : Building2;
         const nombre = op.destino_tipo === 'contacto' ? op.contacto_nombre : op.dependencia_nombre;
+        if (op.destino_tipo === 'contacto' && op.destino_contacto_id) {
+          return (
+            <button
+              onClick={(e) => { e.stopPropagation(); setCtaCteId(op.destino_contacto_id!); }}
+              className="inline-flex items-center gap-1.5 text-xs hover:underline"
+              title="Ver cuenta corriente del contacto"
+            >
+              <Icon className="h-3 w-3" style={{ color: theme.textSecondary }} />
+              <span className="font-medium truncate max-w-[180px]" style={{ color: theme.primary }}>
+                {nombre || '—'}
+              </span>
+            </button>
+          );
+        }
         return (
           <span className="inline-flex items-center gap-1.5 text-xs">
             <Icon className="h-3 w-3" style={{ color: theme.textSecondary }} />
@@ -803,6 +821,8 @@ export default function OrdenesPago() {
         promptLabel="Motivo de la anulación"
         promptPlaceholder="Ej: Error en el monto, beneficiario incorrecto..."
       />
+
+      <CuentaCorrienteSheet contactoId={ctaCteId} onClose={() => setCtaCteId(null)} />
 
       <MunifyTour tourKey="contaduria-op" steps={TOUR_STEPS_OP} />
     </>
