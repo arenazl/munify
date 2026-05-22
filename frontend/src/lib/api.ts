@@ -2128,6 +2128,15 @@ export const ordenesPagoApi = {
   },
 };
 
+export const retencionesApi = {
+  list: (params?: { activo?: boolean }) =>
+    api.get('/contaduria/retenciones', { params }),
+  create: (data: Record<string, unknown>) => api.post('/contaduria/retenciones', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/contaduria/retenciones/${id}`, data),
+  delete: (id: number) => api.delete(`/contaduria/retenciones/${id}`),
+};
+
 export const parajesApi = {
   list: (params?: { activo?: boolean; include_count?: boolean }) =>
     api.get('/tesoreria/parajes', { params }),

@@ -44,6 +44,20 @@ def _require_admin(user: User):
         raise HTTPException(403, "Sin permisos para operar OPs")
 
 
+def _calcular_neto(monto_bruto, retenciones) -> Decimal:
+    """Devuelve el monto neto (bruto - sum(retenciones.monto)). Si no hay
+    retenciones, neto == bruto. Acepta retenciones como lista de dicts o
+    de pydantic models."""
+    bruto = Decimal(monto_bruto or 0)
+    if not retenciones:
+        return bruto
+    total_ret = Decimal(0)
+    for r in retenciones:
+        m = r.get("monto") if isinstance(r, dict) else getattr(r, "monto", 0)
+        total_ret += Decimal(str(m or 0))
+    return max(Decimal(0), bruto - total_ret)
+
+
 async def _siguiente_numero(db: AsyncSession, municipio_id: int) -> str:
     """Genera el proximo numero correlativo del año actual para el muni.
     Formato OP-{anio}-{seq4}. Empieza en 0001 cada año.
@@ -187,6 +201,11 @@ async def create_op(
     else:
         data["destino_contacto_id"] = None
 
+    # Normalizar retenciones a lista de dicts (Pydantic devuelve dicts ya)
+    retenciones = data.get("retenciones") or []
+    data["retenciones"] = retenciones
+    data["monto_neto"] = _calcular_neto(data["monto_pesos"], retenciones)
+
     op = OrdenPago(
         municipio_id=municipio_id,
         numero=numero,
@@ -258,6 +277,9 @@ async def update_op(
 
     for k, v in data.items():
         setattr(op, k, v)
+    # Recalcular neto si cambiaron monto o retenciones
+    if "monto_pesos" in data or "retenciones" in data:
+        op.monto_neto = _calcular_neto(op.monto_pesos, op.retenciones or [])
     await db.commit()
     await db.refresh(op)
     return await _enrich(db, op)
@@ -334,7 +356,20 @@ async def pagar_op(
     fecha = payload.fecha_pago or date.today()
     forma_pago = payload.forma_pago or "transferencia"
 
-    # Crear el Gasto contado vinculado a la OP
+    # Si hay retenciones, lo que sale de caja es el NETO (monto_neto), no el
+    # bruto. El bruto queda como referencia en la OP. Si no hay retenciones,
+    # monto_neto puede ser None -> usar monto_pesos como fallback.
+    monto_salida = Decimal(op.monto_neto if op.monto_neto is not None else op.monto_pesos)
+    desc_retenciones = ""
+    if op.retenciones:
+        try:
+            total_ret = sum(Decimal(str(r.get("monto", 0))) for r in op.retenciones)
+            if total_ret > 0:
+                desc_retenciones = f" · Bruto {op.monto_pesos} - Retenciones {total_ret}"
+        except Exception:
+            pass
+
+    # Crear el Gasto contado vinculado a la OP (monto = NETO efectivamente pagado)
     gasto = Gasto(
         municipio_id=municipio_id,
         creador_id=current_user.id,
@@ -342,8 +377,8 @@ async def pagar_op(
         destino_contacto_id=op.destino_contacto_id,
         destino_dependencia_id=op.destino_dependencia_id,
         concepto=op.concepto,
-        descripcion=f"OP {op.numero}" + (f" · {op.descripcion}" if op.descripcion else ""),
-        monto_pesos=op.monto_pesos,
+        descripcion=f"OP {op.numero}" + (f" · {op.descripcion}" if op.descripcion else "") + desc_retenciones,
+        monto_pesos=monto_salida,
         fecha=fecha,
         tipo_financiacion='contado',
         forma_pago=forma_pago,
@@ -352,13 +387,13 @@ async def pagar_op(
     db.add(gasto)
     await db.flush()
     db.add(GastoCuota(
-        gasto_id=gasto.id, numero=1, monto=op.monto_pesos,
+        gasto_id=gasto.id, numero=1, monto=monto_salida,
         fecha_vencimiento=fecha, fecha_pago=fecha,
         estado=EstadoGastoCuota.PAGADA, forma_pago=forma_pago,
     ))
     db.add(TesoreriaMovimientoCaja(
         municipio_id=municipio_id, caja_id=caja_id, gasto_id=gasto.id,
-        tipo=TipoMovimientoCaja.EGRESO, monto=op.monto_pesos, fecha=fecha,
+        tipo=TipoMovimientoCaja.EGRESO, monto=monto_salida, fecha=fecha,
         concepto=f"OP {op.numero} · {op.concepto}",
     ))
 

@@ -18,8 +18,8 @@ import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
-import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi } from '../lib/api';
-import type { OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, Caja } from '../types';
+import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi, retencionesApi } from '../lib/api';
+import type { OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, Caja, ContaduriaRetencion, RetencionAplicada } from '../types';
 import { ETAPAS_LIST, getEtapaInfo } from '../lib/etapaContable';
 import { CuentaCorrienteSheet } from '../components/contaduria/CuentaCorrienteSheet';
 
@@ -82,6 +82,9 @@ export default function OrdenesPago() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [dependencias, setDependencias] = useState<DependenciaOption[]>([]);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [retencionesCat, setRetencionesCat] = useState<ContaduriaRetencion[]>([]);
+  // ids del catalogo seleccionados para la OP en edicion/creacion
+  const [retencionesSel, setRetencionesSel] = useState<Set<number>>(new Set());
   const [resumen, setResumen] = useState<Record<string, { cantidad: number; monto: string }>>({});
 
   // Filtros
@@ -133,18 +136,20 @@ export default function OrdenesPago() {
       if (etapaFiltro) params.etapa = etapaFiltro;
       if (search.trim()) params.search = search.trim();
 
-      const [opsRes, cRes, depRes, cjRes, resRes] = await Promise.all([
+      const [opsRes, cRes, depRes, cjRes, resRes, retRes] = await Promise.all([
         ordenesPagoApi.list(params),
         contactosApi.list({ activo: true, limit: 5000 }),
         dependenciasApi.getMunicipio({ activo: true }),
         cajasApi.list({ activo: true, include_saldos: true }),
         ordenesPagoApi.resumen().catch(() => ({ data: { por_estado: {} } })),
+        retencionesApi.list({ activo: true }).catch(() => ({ data: [] as ContaduriaRetencion[] })),
       ]);
       setItems(opsRes.data || []);
       setContactos(cRes.data || []);
       setDependencias(depRes.data || []);
       setCajas(cjRes.data || []);
       setResumen((resRes.data as any)?.por_estado || {});
+      setRetencionesCat(retRes.data || []);
     } catch { toast.error('Error cargando órdenes de pago'); }
     finally { setLoading(false); }
   };
@@ -191,6 +196,7 @@ export default function OrdenesPago() {
       fecha_emision: new Date().toISOString().slice(0, 10),
       fecha_vencimiento: '', nro_factura: '', factura_url: '', notas: '',
     });
+    setRetencionesSel(new Set());
     setSheetOpen(true);
   };
 
@@ -214,8 +220,27 @@ export default function OrdenesPago() {
       factura_url: op.factura_url || '',
       notas: op.notas || '',
     });
+    const ids = new Set<number>();
+    (op.retenciones || []).forEach(r => { if (r.id != null) ids.add(r.id); });
+    setRetencionesSel(ids);
     setSheetOpen(true);
   };
+
+  // Calculo en vivo del neto basado en retenciones seleccionadas
+  const retencionesAplicadas: RetencionAplicada[] = useMemo(() => {
+    const bruto = parseFloat(form.monto_pesos || '0') || 0;
+    return retencionesCat
+      .filter(r => retencionesSel.has(r.id))
+      .map(r => ({
+        id: r.id,
+        nombre: r.nombre,
+        porcentaje: parseFloat(r.porcentaje),
+        monto: Math.round((bruto * parseFloat(r.porcentaje) / 100) * 100) / 100,
+      }));
+  }, [retencionesCat, retencionesSel, form.monto_pesos]);
+
+  const totalRetenido = retencionesAplicadas.reduce((s, r) => s + r.monto, 0);
+  const netoPagar = Math.max(0, (parseFloat(form.monto_pesos || '0') || 0) - totalRetenido);
 
   const save = async () => {
     if (!form.concepto.trim()) return toast.error('Falta el concepto');
@@ -232,6 +257,7 @@ export default function OrdenesPago() {
         concepto: form.concepto.trim(),
         descripcion: form.descripcion.trim() || null,
         monto_pesos: form.monto_pesos,
+        retenciones: retencionesAplicadas,
         caja_id: form.caja_id || null,
         fecha_emision: form.fecha_emision,
         fecha_vencimiento: form.fecha_vencimiento || null,
@@ -344,11 +370,25 @@ export default function OrdenesPago() {
     },
     {
       key: 'monto', header: 'Monto',
-      render: (op) => (
-        <span className="font-bold tabular-nums" style={{ color: theme.text }}>
-          {fmtMoney(op.monto_pesos)}
-        </span>
-      ),
+      render: (op) => {
+        const hasRet = Array.isArray(op.retenciones) && op.retenciones.length > 0;
+        return (
+          <div className="text-right leading-tight">
+            <span className="font-bold tabular-nums block" style={{ color: theme.text }}>
+              {fmtMoney(op.monto_pesos)}
+            </span>
+            {hasRet && op.monto_neto && (
+              <span
+                className="text-[10px] tabular-nums"
+                style={{ color: theme.primary }}
+                title="Neto a pagar tras retenciones"
+              >
+                Neto {fmtMoney(op.monto_neto)}
+              </span>
+            )}
+          </div>
+        );
+      },
       sortValue: (op) => parseFloat(op.monto_pesos),
     },
     {
@@ -518,6 +558,11 @@ export default function OrdenesPago() {
               <p className="text-lg font-bold tabular-nums mt-1" style={{ color: theme.text }}>
                 {fmtMoney(op.monto_pesos)}
               </p>
+              {Array.isArray(op.retenciones) && op.retenciones.length > 0 && op.monto_neto && (
+                <p className="text-[10px] tabular-nums" style={{ color: theme.primary }}>
+                  Neto a pagar: {fmtMoney(op.monto_neto)} ({op.retenciones.length} retencion{op.retenciones.length === 1 ? '' : 'es'})
+                </p>
+              )}
               <p className="text-[10px]" style={{ color: theme.textSecondary }}>
                 {new Date(op.fecha_emision).toLocaleDateString('es-AR')} · {op.caja_nombre || 'sin caja'}
               </p>
@@ -603,7 +648,7 @@ export default function OrdenesPago() {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Monto *</label>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Monto bruto *</label>
               <MoneyInput
                 value={form.monto_pesos}
                 onChange={(v) => setForm(f => ({ ...f, monto_pesos: v }))}
@@ -624,6 +669,73 @@ export default function OrdenesPago() {
               />
             </div>
           </div>
+
+          {/* Retenciones aplicables */}
+          {retencionesCat.length > 0 && (
+            <div
+              className="rounded-xl p-3"
+              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+            >
+              <p className="text-[10px] uppercase font-bold mb-2 inline-flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                Retenciones aplicables al pago
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 mb-2">
+                {retencionesCat.map(r => {
+                  const checked = retencionesSel.has(r.id);
+                  const bruto = parseFloat(form.monto_pesos || '0') || 0;
+                  const monto = Math.round((bruto * parseFloat(r.porcentaje) / 100) * 100) / 100;
+                  const color = r.color || theme.primary;
+                  return (
+                    <label
+                      key={r.id}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all"
+                      style={{
+                        backgroundColor: checked ? `${color}15` : theme.card,
+                        border: `1px solid ${checked ? color : theme.border}`,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setRetencionesSel(prev => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.add(r.id); else next.delete(r.id);
+                            return next;
+                          });
+                        }}
+                        style={{ accentColor: color }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: theme.text }}>
+                          {r.nombre} <span style={{ color }}>({parseFloat(r.porcentaje)}%)</span>
+                        </p>
+                        {checked && monto > 0 && (
+                          <p className="text-[10px] tabular-nums" style={{ color: theme.textSecondary }}>
+                            -{fmtMoney(monto)}
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+              {totalRetenido > 0 && (
+                <div
+                  className="rounded-lg px-3 py-2 flex items-center justify-between gap-2"
+                  style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30` }}
+                >
+                  <div className="text-[11px]" style={{ color: theme.textSecondary }}>
+                    Bruto {fmtMoney(parseFloat(form.monto_pesos || '0'))} − Retenido {fmtMoney(totalRetenido)}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase font-bold" style={{ color: theme.textSecondary }}>Neto a pagar</p>
+                    <p className="text-base font-bold tabular-nums" style={{ color: theme.primary }}>{fmtMoney(netoPagar)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-2">
             <div>

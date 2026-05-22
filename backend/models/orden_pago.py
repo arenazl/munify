@@ -17,7 +17,7 @@ Numero correlativo: OP-{anio}-{seq4digits} por municipio. Empieza en
 import enum
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Date, Text, Numeric, Enum, ForeignKey,
-    UniqueConstraint,
+    UniqueConstraint, JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -73,7 +73,16 @@ class OrdenPago(Base):
     # ============ DATOS DE LA OP ============
     concepto = Column(String(150), nullable=False)
     descripcion = Column(Text, nullable=True)
+    # monto_pesos = BRUTO (lo que figura en la factura del proveedor).
     monto_pesos = Column(Numeric(15, 2), nullable=False)
+    # Retenciones aplicables (snapshot al crear/editar): lista de dicts con
+    # {id, nombre, porcentaje, monto}. monto = bruto * porcentaje / 100.
+    # Guardamos snapshot porque el catalogo puede cambiar despues y la OP
+    # tiene que reflejar lo que se descontó en su momento.
+    retenciones = Column(JSON, nullable=True, default=list)
+    # monto_neto = bruto - sum(retenciones). Es lo que efectivamente sale
+    # de la caja al pagar. Si no hay retenciones, neto == bruto.
+    monto_neto = Column(Numeric(15, 2), nullable=True)
 
     # Factura del proveedor que respalda esta OP. Para muni chico (SPN)
     # cada OP suele tener 1 factura. Si en el futuro un muni grande

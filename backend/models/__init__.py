@@ -201,6 +201,7 @@ from .tesoreria_extra import (
 )
 from .paraje import TesoreriaParaje
 from .orden_pago import OrdenPago, EstadoOrdenPago, EtapaContable
+from .retencion import ContaduriaRetencion
 
 __all__ += [
     "MunicipioModulo",
@@ -229,4 +230,5 @@ __all__ += [
     "OrdenPago",
     "EstadoOrdenPago",
     "EtapaContable",
+    "ContaduriaRetencion",
 ]

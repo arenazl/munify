@@ -662,6 +662,26 @@ export interface Premio {
 export type EstadoOrdenPago = 'pendiente' | 'autorizada' | 'pagada' | 'anulada';
 export type EtapaContable = 'preventivo' | 'compromiso' | 'devengado' | 'pagado';
 
+export interface RetencionAplicada {
+  id?: number | null;
+  nombre: string;
+  porcentaje: number;
+  monto: number;
+}
+
+export interface ContaduriaRetencion {
+  id: number;
+  municipio_id: number;
+  nombre: string;
+  descripcion?: string | null;
+  porcentaje: string;
+  color?: string | null;
+  activo: boolean;
+  orden: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OrdenPago {
   id: number;
   municipio_id: number;
@@ -677,6 +697,8 @@ export interface OrdenPago {
   factura_url?: string | null;
   estado: EstadoOrdenPago;
   etapa_contable: EtapaContable;
+  retenciones?: RetencionAplicada[] | null;
+  monto_neto?: string | null;
   fecha_emision: string;
   fecha_vencimiento?: string | null;
   fecha_autorizacion?: string | null;

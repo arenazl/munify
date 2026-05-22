@@ -1,11 +1,21 @@
 """Schemas Pydantic para Orden de Pago."""
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, Field, ConfigDict
 
 from models.orden_pago import EstadoOrdenPago, EtapaContable
+
+
+class RetencionAplicada(BaseModel):
+    """Snapshot de una retencion aplicada a una OP. Se guarda en el JSON
+    `retenciones` de la OP. id apunta al catalogo (contaduria_retenciones)
+    pero el nombre/porcentaje quedan congelados al momento de aplicarla."""
+    id: Optional[int] = None
+    nombre: str
+    porcentaje: float
+    monto: float
 
 
 class OrdenPagoBase(BaseModel):
@@ -16,6 +26,7 @@ class OrdenPagoBase(BaseModel):
     concepto: str = Field(..., min_length=1, max_length=150)
     descripcion: Optional[str] = None
     monto_pesos: Decimal = Field(..., gt=0)
+    retenciones: Optional[List[RetencionAplicada]] = None
 
     caja_id: Optional[int] = None
 
@@ -54,6 +65,7 @@ class OrdenPagoUpdate(BaseModel):
     concepto: Optional[str] = Field(None, min_length=1, max_length=150)
     descripcion: Optional[str] = None
     monto_pesos: Optional[Decimal] = Field(None, gt=0)
+    retenciones: Optional[List[RetencionAplicada]] = None
     caja_id: Optional[int] = None
     fecha_emision: Optional[date] = None
     fecha_vencimiento: Optional[date] = None
@@ -78,6 +90,7 @@ class OrdenPagoResponse(OrdenPagoBase):
     numero: str
     estado: EstadoOrdenPago
     etapa_contable: EtapaContable
+    monto_neto: Optional[Decimal] = None
 
     fecha_autorizacion: Optional[datetime] = None
     fecha_pago: Optional[datetime] = None
