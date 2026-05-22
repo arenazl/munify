@@ -100,8 +100,13 @@ export function KpiCard({
         </div>
       </div>
       <div
-        className="text-[28px] leading-none font-bold tabular-nums"
-        style={{ color: theme.text }}
+        className="font-bold tabular-nums leading-none truncate"
+        style={{
+          color: theme.text,
+          fontSize: 'clamp(1.05rem, 4.6vw, 1.75rem)',
+          letterSpacing: '-0.02em',
+        }}
+        title={value}
       >
         {value}
       </div>
