@@ -91,10 +91,12 @@ export function MunifyTour({
     }
   }, [tourKey, onClose]);
 
-  if (!run) return null;
   return (
     <Joyride
       steps={steps}
+      run={run}
+      continuous
+      scrollToFirstStep
       onEvent={onEvent}
       locale={{
         back: 'Atrás',
