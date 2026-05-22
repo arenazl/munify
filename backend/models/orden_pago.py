@@ -31,6 +31,25 @@ class EstadoOrdenPago(str, enum.Enum):
     ANULADA = "anulada"
 
 
+class EtapaContable(str, enum.Enum):
+    """Etapas del gasto publico segun la Ley de Administracion Financiera.
+
+    - PREVENTIVO: reserva del saldo presupuestario (la OP existe pero todavia
+      no hay compromiso firme).
+    - COMPROMISO: orden de compra/contrato firmado. Compromete el credito.
+    - DEVENGADO: bien recibido o servicio prestado (obligacion real de pago).
+    - PAGADO: salida efectiva del dinero.
+
+    Es independiente de `estado` (workflow operativo) porque una OP puede
+    estar 'autorizada' (operativamente) pero en etapa 'comprometida' o
+    'devengada' segun el momento contable.
+    """
+    PREVENTIVO = "preventivo"
+    COMPROMISO = "compromiso"
+    DEVENGADO = "devengado"
+    PAGADO = "pagado"
+
+
 class OrdenPago(Base):
     __tablename__ = "ordenes_pago"
     __table_args__ = (
@@ -92,6 +111,18 @@ class OrdenPago(Base):
         nullable=False,
         index=True,
     )
+
+    # Etapa contable (dimension independiente del estado operativo). Default
+    # PREVENTIVO al crear la OP; al autorizar pasa a COMPROMISO; al pagar a
+    # PAGADO. DEVENGADO se setea manualmente cuando la contaduria registra
+    # la recepcion del bien/servicio. Ver EtapaContable para mas detalle.
+    etapa_contable = Column(
+        Enum(EtapaContable, values_callable=lambda x: [e.value for e in x]),
+        default=EtapaContable.PREVENTIVO,
+        nullable=False,
+        index=True,
+    )
+    fecha_devengado = Column(DateTime(timezone=True), nullable=True)
 
     fecha_emision = Column(Date, nullable=False, index=True)        # cuando se crea la OP
     fecha_vencimiento = Column(Date, nullable=True)                  # cuando debe estar pagada

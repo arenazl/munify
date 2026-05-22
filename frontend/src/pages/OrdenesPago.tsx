@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   FileCheck, Clock, CheckCircle2, XCircle, Ban, Plus, Edit2, MoreVertical,
   Calendar, Wallet, Building2, User as UserIcon, FileText, Sparkles, Receipt,
-  Paperclip, Upload, ExternalLink, Loader2,
+  Paperclip, Upload, ExternalLink, Loader2, PackageCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -19,7 +19,8 @@ import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ordenesPagoApi, contactosApi, dependenciasApi, cajasApi } from '../lib/api';
-import type { OrdenPago, EstadoOrdenPago, Contacto, Caja } from '../types';
+import type { OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, Caja } from '../types';
+import { ETAPAS_LIST, getEtapaInfo } from '../lib/etapaContable';
 
 // Steps del tour de Órdenes de Pago. Cada `target` apunta a un atributo
 // `data-tour` que existe en el JSX (algunos via prop tourAnchors del ABMPage).
@@ -85,6 +86,7 @@ export default function OrdenesPago() {
   // Filtros
   const [search, setSearch] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoOrdenPago | ''>('');
+  const [etapaFiltro, setEtapaFiltro] = useState<EtapaContable | ''>('');
 
   // Sheet crear/editar
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -124,6 +126,7 @@ export default function OrdenesPago() {
     try {
       const params: any = { limit: 500 };
       if (estadoFiltro) params.estado = estadoFiltro;
+      if (etapaFiltro) params.etapa = etapaFiltro;
       if (search.trim()) params.search = search.trim();
 
       const [opsRes, cRes, depRes, cjRes, resRes] = await Promise.all([
@@ -142,7 +145,7 @@ export default function OrdenesPago() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, [estadoFiltro]);
+  useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, [estadoFiltro, etapaFiltro]);
   useEffect(() => {
     const t = setTimeout(() => fetchAll(), 350);
     return () => clearTimeout(t);
@@ -245,9 +248,17 @@ export default function OrdenesPago() {
   const handleAutorizar = async (op: OrdenPago) => {
     try {
       await ordenesPagoApi.autorizar(op.id);
-      toast.success(`OP ${op.numero} autorizada`);
+      toast.success(`OP ${op.numero} autorizada · pasa a etapa compromiso`);
       fetchAll();
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error autorizando'); }
+  };
+
+  const handleCambiarEtapa = async (op: OrdenPago, etapa: EtapaContable) => {
+    try {
+      await ordenesPagoApi.cambiarEtapa(op.id, etapa);
+      toast.success(`OP ${op.numero}: etapa actualizada a ${getEtapaInfo(etapa).label}`);
+      fetchAll();
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error cambiando etapa'); }
   };
 
   const openPagar = (op: OrdenPago) => {
@@ -335,6 +346,24 @@ export default function OrdenesPago() {
       },
       sortValue: (op) => op.estado,
     },
+    {
+      key: 'etapa', header: 'Etapa contable',
+      render: (op) => {
+        const info = getEtapaInfo(op.etapa_contable);
+        const Icon = info.icon;
+        return (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase font-bold whitespace-nowrap"
+            style={{ backgroundColor: info.bg, color: info.color, border: `1px solid ${info.color}30` }}
+            title={info.hint}
+          >
+            <Icon className="h-3 w-3" />
+            {info.label}
+          </span>
+        );
+      },
+      sortValue: (op) => getEtapaInfo(op.etapa_contable).orden,
+    },
   ];
 
   // ============ Render ============
@@ -355,6 +384,17 @@ export default function OrdenesPago() {
         isEmpty={items.length === 0}
         emptyMessage="No hay órdenes de pago. Creá una con 'Nueva OP'."
         toolbar={{
+          combos: [
+            {
+              key: 'etapa',
+              placeholder: 'Etapa contable',
+              value: etapaFiltro,
+              onChange: (v) => setEtapaFiltro(v as EtapaContable | ''),
+              options: ETAPAS_LIST.map(e => ({ value: e.key, label: e.label, color: e.color })),
+              searchable: false,
+              minWidth: 180,
+            },
+          ],
           statusPills: {
             value: estadoFiltro,
             onChange: (v) => setEstadoFiltro(v as EstadoOrdenPago | ''),
@@ -391,6 +431,13 @@ export default function OrdenesPago() {
                     />
                   </>
                 )}
+                {op.estado === 'autorizada' && op.etapa_contable !== 'devengado' && (
+                  <ABMTableAction
+                    title="Marcar devengado (bien/servicio recibido)"
+                    onClick={() => handleCambiarEtapa(op, 'devengado')}
+                    icon={<PackageCheck className="h-4 w-4" />}
+                  />
+                )}
                 {op.estado === 'autorizada' && (
                   <ABMTableAction
                     title="Pagar"
@@ -417,6 +464,8 @@ export default function OrdenesPago() {
         {items.map(op => {
           const meta = ESTADO_META[op.estado];
           const Icon = meta.Icon;
+          const etapa = getEtapaInfo(op.etapa_contable);
+          const EtapaIcon = etapa.icon;
           return (
             <div
               key={op.id}
@@ -424,15 +473,25 @@ export default function OrdenesPago() {
               style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
               onClick={() => openEdit(op)}
             >
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                 <span className="font-mono font-semibold text-xs" style={{ color: theme.primary }}>{op.numero}</span>
-                <span
-                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
-                  style={{ backgroundColor: meta.bg, color: meta.color }}
-                >
-                  <Icon className="h-3 w-3" />
-                  {meta.label}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                    style={{ backgroundColor: etapa.bg, color: etapa.color, border: `1px solid ${etapa.color}30` }}
+                    title={etapa.hint}
+                  >
+                    <EtapaIcon className="h-3 w-3" />
+                    {etapa.label}
+                  </span>
+                  <span
+                    className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1"
+                    style={{ backgroundColor: meta.bg, color: meta.color }}
+                  >
+                    <Icon className="h-3 w-3" />
+                    {meta.label}
+                  </span>
+                </div>
               </div>
               <p className="font-semibold text-sm truncate" style={{ color: theme.text }}>{op.concepto}</p>
               <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>

@@ -5,7 +5,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, ConfigDict
 
-from models.orden_pago import EstadoOrdenPago
+from models.orden_pago import EstadoOrdenPago, EtapaContable
 
 
 class OrdenPagoBase(BaseModel):
@@ -77,10 +77,12 @@ class OrdenPagoResponse(OrdenPagoBase):
     municipio_id: int
     numero: str
     estado: EstadoOrdenPago
+    etapa_contable: EtapaContable
 
     fecha_autorizacion: Optional[datetime] = None
     fecha_pago: Optional[datetime] = None
     fecha_anulacion: Optional[datetime] = None
+    fecha_devengado: Optional[datetime] = None
 
     creador_id: int
     autorizado_por_id: Optional[int] = None
@@ -114,3 +116,10 @@ class PagarOPRequest(BaseModel):
     caja_id: Optional[int] = None
     fecha_pago: Optional[date] = None
     forma_pago: Optional[str] = None
+
+
+class CambiarEtapaRequest(BaseModel):
+    """Body del POST /ordenes-pago/{id}/etapa para mover la etapa contable
+    manualmente (ej. marcar como devengado tras recibir el bien/servicio).
+    """
+    etapa: EtapaContable

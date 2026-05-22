@@ -660,6 +660,7 @@ export interface Premio {
 }
 
 export type EstadoOrdenPago = 'pendiente' | 'autorizada' | 'pagada' | 'anulada';
+export type EtapaContable = 'preventivo' | 'compromiso' | 'devengado' | 'pagado';
 
 export interface OrdenPago {
   id: number;
@@ -675,10 +676,12 @@ export interface OrdenPago {
   nro_factura?: string | null;
   factura_url?: string | null;
   estado: EstadoOrdenPago;
+  etapa_contable: EtapaContable;
   fecha_emision: string;
   fecha_vencimiento?: string | null;
   fecha_autorizacion?: string | null;
   fecha_pago?: string | null;
+  fecha_devengado?: string | null;
   fecha_anulacion?: string | null;
   creador_id: number;
   autorizado_por_id?: number | null;

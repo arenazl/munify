@@ -25,14 +25,14 @@ from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import (
-    OrdenPago, EstadoOrdenPago, Contacto, TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja,
+    OrdenPago, EstadoOrdenPago, EtapaContable, Contacto, TesoreriaCaja, TesoreriaMovimientoCaja, TipoMovimientoCaja,
     Gasto, GastoCuota, User, RolUsuario, Municipio,
 )
 from models.dependencia import Dependencia
 from models.gasto import EstadoGastoCuota
 from schemas.orden_pago import (
     OrdenPagoCreate, OrdenPagoUpdate, OrdenPagoResponse,
-    AnularRequest, PagarOPRequest,
+    AnularRequest, PagarOPRequest, CambiarEtapaRequest,
 )
 from services.op_pdf_generator import build_op_pdf
 
@@ -109,6 +109,7 @@ async def list_ops(
     response: Response,
     request: Request,
     estado: Optional[str] = None,
+    etapa: Optional[str] = None,
     search: Optional[str] = Query(None, description="Busca en concepto/numero/descripcion"),
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
@@ -124,6 +125,8 @@ async def list_ops(
     q = select(OrdenPago).where(OrdenPago.municipio_id == municipio_id)
     if estado:
         q = q.where(OrdenPago.estado == estado)
+    if etapa:
+        q = q.where(OrdenPago.etapa_contable == etapa)
     if contacto_id:
         q = q.where(OrdenPago.destino_contacto_id == contacto_id)
     if search and search.strip():
@@ -189,6 +192,7 @@ async def create_op(
         numero=numero,
         creador_id=current_user.id,
         estado=EstadoOrdenPago.PENDIENTE,
+        etapa_contable=EtapaContable.PREVENTIVO,
         **data,
     )
     db.add(op)
@@ -284,6 +288,10 @@ async def autorizar_op(
     op.estado = EstadoOrdenPago.AUTORIZADA
     op.fecha_autorizacion = datetime.utcnow()
     op.autorizado_por_id = current_user.id
+    # Avance contable: autorizar = compromiso del credito (firma del contrato/OC).
+    # Solo subimos si todavia esta en preventivo (no piso un devengado manual).
+    if op.etapa_contable == EtapaContable.PREVENTIVO:
+        op.etapa_contable = EtapaContable.COMPROMISO
     await db.commit()
     await db.refresh(op)
     return await _enrich(db, op)
@@ -359,7 +367,48 @@ async def pagar_op(
     op.gasto_id = gasto.id
     if not op.caja_id:
         op.caja_id = caja_id
+    # Pagar siempre cierra la cadena contable.
+    op.etapa_contable = EtapaContable.PAGADO
 
+    await db.commit()
+    await db.refresh(op)
+    return await _enrich(db, op)
+
+
+@router.post("/{op_id}/etapa", response_model=OrdenPagoResponse)
+async def cambiar_etapa(
+    op_id: int,
+    payload: CambiarEtapaRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cambia la etapa contable de una OP manualmente.
+
+    Casos tipicos:
+    - Marcar como DEVENGADO cuando se recibe el bien o servicio (entre
+      autorizar y pagar).
+    - Corregir un avance prematuro hacia atras (ej. devolver COMPROMISO a
+      PREVENTIVO si se cancela el contrato).
+
+    No toca el `estado` (workflow operativo).
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+    op = (await db.execute(
+        select(OrdenPago).where(OrdenPago.id == op_id, OrdenPago.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not op:
+        raise HTTPException(404, "OP no encontrada")
+    if op.estado == EstadoOrdenPago.ANULADA:
+        raise HTTPException(409, "OP anulada: la etapa contable queda congelada")
+    # PAGADO se setea automaticamente al pagar; no se admite manual.
+    if payload.etapa == EtapaContable.PAGADO and op.estado != EstadoOrdenPago.PAGADA:
+        raise HTTPException(409, "La etapa PAGADO se asigna solo al ejecutar el pago de la OP")
+
+    op.etapa_contable = payload.etapa
+    if payload.etapa == EtapaContable.DEVENGADO and op.fecha_devengado is None:
+        op.fecha_devengado = datetime.utcnow()
     await db.commit()
     await db.refresh(op)
     return await _enrich(db, op)

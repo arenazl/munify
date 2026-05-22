@@ -2097,6 +2097,7 @@ export const premiosApi = {
 export const ordenesPagoApi = {
   list: (params?: {
     estado?: string;
+    etapa?: string;
     search?: string;
     desde?: string;
     hasta?: string;
@@ -2110,6 +2111,8 @@ export const ordenesPagoApi = {
   autorizar: (id: number) => api.post(`/contaduria/ordenes-pago/${id}/autorizar`),
   pagar: (id: number, data: { caja_id?: number; fecha_pago?: string; forma_pago?: string }) =>
     api.post(`/contaduria/ordenes-pago/${id}/pagar`, data),
+  cambiarEtapa: (id: number, etapa: string) =>
+    api.post(`/contaduria/ordenes-pago/${id}/etapa`, { etapa }),
   anular: (id: number, motivo: string) =>
     api.post(`/contaduria/ordenes-pago/${id}/anular`, { motivo }),
   resumen: () => api.get('/contaduria/ordenes-pago/stats/resumen'),
