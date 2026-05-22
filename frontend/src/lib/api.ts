@@ -2119,6 +2119,11 @@ export const ordenesPagoApi = {
   reportes: () => api.get('/contaduria/ordenes-pago/stats/reportes'),
   cuentaCorriente: (contactoId: number) =>
     api.get(`/contaduria/ordenes-pago/contacto/${contactoId}/cuenta-corriente`),
+  exportTransparencia: (params: { formato: 'json' | 'csv'; desde?: string; hasta?: string; solo_pagadas?: boolean }) =>
+    api.get('/contaduria/ordenes-pago/transparencia/export', {
+      params,
+      responseType: 'blob',
+    }),
   uploadFactura: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

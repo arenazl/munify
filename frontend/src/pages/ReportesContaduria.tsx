@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { BarChart3, AlertTriangle, Calendar, TrendingUp, Loader2 } from 'lucide-react';
+import { BarChart3, AlertTriangle, Calendar, TrendingUp, Loader2, Download, Globe } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
@@ -17,6 +18,27 @@ const TOUR_STEPS = [
 ];
 import { StatusPill } from '../components/ui/StatusPill';
 import { ordenesPagoApi } from '../lib/api';
+
+async function descargarTransparencia(formato: 'json' | 'csv') {
+  try {
+    const res = await ordenesPagoApi.exportTransparencia({ formato, solo_pagadas: true });
+    const blob = new Blob([res.data], {
+      type: formato === 'csv' ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const fechaHoy = new Date().toISOString().slice(0, 10);
+    a.download = `transparencia_ejecucion_gasto_${fechaHoy}.${formato}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Exportado ${formato.toUpperCase()}`);
+  } catch (e: any) {
+    toast.error(e?.response?.data?.detail || 'Error exportando');
+  }
+}
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -66,6 +88,50 @@ export default function ReportesContaduria() {
       emptyMessage=""
     >
       <div className="col-span-full space-y-4" data-tour="rep-cont">
+        {/* Portal de Transparencia: export JSON/CSV */}
+        <div
+          className="rounded-xl p-4 flex items-start gap-3"
+          style={{
+            background: `linear-gradient(135deg, ${theme.primary}10 0%, ${theme.card} 60%, ${theme.card} 100%)`,
+            border: `1px solid ${theme.primary}30`,
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: `${theme.primary}20`, color: theme.primary }}
+          >
+            <Globe className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-sm" style={{ color: theme.text }}>
+              Portal de Transparencia
+            </h3>
+            <p className="text-[11px] leading-relaxed" style={{ color: theme.textSecondary }}>
+              Descargá la ejecución del gasto (solo OPs pagadas) en formato abierto para publicar en la web del muni.
+              Incluye beneficiario, concepto, monto bruto/neto, retenciones, fecha de pago e imputación contable.
+              Sin IDs internos, sin datos sensibles.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+            <button
+              onClick={() => descargarTransparencia('json')}
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: theme.primary, color: '#fff' }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              JSON
+            </button>
+            <button
+              onClick={() => descargarTransparencia('csv')}
+              className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
+              style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </button>
+          </div>
+        </div>
+
         {/* Vencidas */}
         <Section
           title="OPs vencidas"

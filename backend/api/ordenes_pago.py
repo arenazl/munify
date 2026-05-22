@@ -706,6 +706,142 @@ async def cuenta_corriente_contacto(
     }
 
 
+@router.get("/transparencia/export")
+async def export_transparencia(
+    request: Request,
+    formato: str = Query("json", pattern="^(json|csv)$"),
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    solo_pagadas: bool = Query(True, description="Por defecto solo OPs pagadas (info que el muni puede publicar)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Exporta la ejecucion del gasto en formato abierto (JSON o CSV) para
+    publicar en el Portal de Transparencia del muni.
+
+    Estructura abierta: sin IDs internos de usuarios, sin emails, sin datos
+    sensibles. Solo el dato que el ciudadano puede ver.
+
+    Default: solo OPs pagadas (las pendientes/autorizadas no se publican
+    porque pueden cambiar). Si solo_pagadas=false se incluyen todas las no
+    anuladas.
+    """
+    _require_admin(current_user)
+    municipio_id = get_effective_municipio_id(request, current_user)
+
+    q = select(OrdenPago).where(OrdenPago.municipio_id == municipio_id)
+    if solo_pagadas:
+        q = q.where(OrdenPago.estado == EstadoOrdenPago.PAGADA)
+    else:
+        q = q.where(OrdenPago.estado != EstadoOrdenPago.ANULADA)
+    if desde:
+        q = q.where(OrdenPago.fecha_emision >= desde)
+    if hasta:
+        q = q.where(OrdenPago.fecha_emision <= hasta)
+    q = q.order_by(OrdenPago.fecha_emision.desc(), OrdenPago.id.desc())
+
+    ops = (await db.execute(q)).scalars().all()
+
+    # Enriquecer con nombres en una sola pasada
+    contacto_ids = {op.destino_contacto_id for op in ops if op.destino_contacto_id}
+    dep_ids = {op.destino_dependencia_id for op in ops if op.destino_dependencia_id}
+    contactos_map = {}
+    deps_map = {}
+    if contacto_ids:
+        contactos_rows = (await db.execute(
+            select(Contacto).where(Contacto.id.in_(contacto_ids))
+        )).scalars().all()
+        contactos_map = {c.id: f"{c.nombre} {c.apellido or ''}".strip() for c in contactos_rows}
+    if dep_ids:
+        from models import MunicipioDependencia
+        deps_rows = (await db.execute(
+            select(MunicipioDependencia)
+            .options(selectinload(MunicipioDependencia.dependencia))
+            .where(MunicipioDependencia.id.in_(dep_ids))
+        )).scalars().all()
+        deps_map = {d.id: (d.dependencia.nombre if d.dependencia else "") for d in deps_rows}
+
+    rows = []
+    for op in ops:
+        beneficiario = (
+            contactos_map.get(op.destino_contacto_id, "")
+            if op.destino_tipo == "contacto"
+            else deps_map.get(op.destino_dependencia_id, "")
+        )
+        rows.append({
+            "numero_op": op.numero,
+            "fecha_emision": op.fecha_emision.isoformat() if op.fecha_emision else None,
+            "fecha_pago": op.fecha_pago.isoformat() if op.fecha_pago else None,
+            "beneficiario": beneficiario,
+            "tipo_beneficiario": op.destino_tipo,
+            "concepto": op.concepto,
+            "descripcion": op.descripcion or "",
+            "monto_bruto": str(op.monto_pesos),
+            "monto_neto_pagado": str(op.monto_neto if op.monto_neto is not None else op.monto_pesos),
+            "retenciones": op.retenciones or [],
+            "tipo_pago": op.tipo_pago or "",
+            "nro_factura": op.nro_factura or "",
+            "imputacion_codigo": op.codigo_imputacion or "",
+            "imputacion_descripcion": op.imputacion_descripcion or "",
+            "estado": op.estado.value if hasattr(op.estado, "value") else str(op.estado),
+            "etapa_contable": op.etapa_contable.value if hasattr(op.etapa_contable, "value") else str(op.etapa_contable),
+        })
+
+    fecha_export = datetime.utcnow().isoformat()
+    suffix = f"_{desde.isoformat()}_a_{hasta.isoformat()}" if (desde and hasta) else ""
+    filename = f"transparencia_op_muni{municipio_id}{suffix}"
+
+    if formato == "csv":
+        # CSV plano: una fila por OP. Las retenciones se serializan compactas.
+        import csv
+        import io
+        buf = io.StringIO()
+        if rows:
+            cols = [k for k in rows[0].keys() if k != "retenciones"]
+            cols.append("retenciones_total")
+            cols.append("retenciones_detalle")
+            writer = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
+            writer.writeheader()
+            for r in rows:
+                rets = r.get("retenciones") or []
+                total_ret = sum(Decimal(str(x.get("monto", 0))) for x in rets) if rets else Decimal(0)
+                detalle = " | ".join(f"{x.get('nombre')} {x.get('porcentaje')}% = {x.get('monto')}" for x in rets)
+                writer.writerow({**{k: r[k] for k in r if k != "retenciones"},
+                                 "retenciones_total": str(total_ret),
+                                 "retenciones_detalle": detalle})
+        else:
+            buf.write("Sin datos para el filtro aplicado.\n")
+        content = buf.getvalue()
+        return FastAPIResponse(
+            content=content,
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{filename}.csv"'},
+        )
+
+    # JSON default
+    import json
+    payload = {
+        "metadata": {
+            "municipio_id": municipio_id,
+            "exportado_en": fecha_export,
+            "filtros": {
+                "desde": desde.isoformat() if desde else None,
+                "hasta": hasta.isoformat() if hasta else None,
+                "solo_pagadas": solo_pagadas,
+            },
+            "cantidad": len(rows),
+            "formato_version": "1.0",
+            "nota": "Datos de la ejecucion del gasto publicados por el municipio. Formato abierto (Iniciativa Portal de Transparencia).",
+        },
+        "ops": rows,
+    }
+    return FastAPIResponse(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.json"'},
+    )
+
+
 @router.get("/stats/resumen")
 async def resumen(
     request: Request,
