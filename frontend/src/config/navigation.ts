@@ -2,7 +2,7 @@ import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers,
-  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Gift,
+  CalendarClock, Users, MapPin, TrendingUp, PiggyBank,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -261,14 +261,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
       categoria: 'Sueldos',
       description: 'Personal del muni con sueldo asignado'
-    },
-    {
-      name: 'Premios',
-      href: '/gestion/configuracion/tesoreria?tab=premios',
-      icon: Gift,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Sueldos',
-      description: 'Catálogo de plus aplicables a sueldos'
     },
     {
       name: 'Reportes',
