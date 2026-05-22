@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Joyride, STATUS } from 'react-joyride';
 import type { EventData, Step } from 'react-joyride';
 import { useTheme } from '../../contexts/ThemeContext';
+import { MunifyTourTooltip } from './MunifyTourTooltip';
 
 /**
  * Tour interactivo tipo onboarding (overlay con highlight + tooltip).
@@ -106,13 +107,15 @@ export function MunifyTour({
         skip: 'Saltar tutorial',
         open: 'Abrir',
       }}
+      tooltipComponent={MunifyTourTooltip}
       options={{
         zIndex: 10000,
         primaryColor: theme.primary,
         backgroundColor: theme.card,
         textColor: theme.text,
         arrowColor: theme.card,
-        overlayColor: 'rgba(0, 0, 0, 0.6)',
+        overlayColor: 'rgba(8, 12, 24, 0.72)',
+        spotlightRadius: 12,
       }}
     />
   );
