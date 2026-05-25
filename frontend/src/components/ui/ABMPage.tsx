@@ -523,8 +523,15 @@ export function ABMPage({
     );
   };
 
-  // Si se pasa `toolbar`, sobreescribe a `headerActions` y `secondaryFilters`.
-  const effectiveHeaderActions = toolbar ? renderToolbarActions() : headerActions;
+  // Si se pasa `toolbar` Y `headerActions`, se renderizan AMBOS (acciones
+  // del toolbar primero, despues los headerActions extra). Antes el toolbar
+  // sobreescribia headerActions y las paginas que pasaban ambos perdian
+  // botones (ej: TesoreriaContactos pierde el boton 'Unificar duplicados').
+  const effectiveHeaderActions = toolbar
+    ? (headerActions
+        ? <>{renderToolbarActions()}{headerActions}</>
+        : renderToolbarActions())
+    : headerActions;
   const effectiveSecondaryFilters = toolbar ? renderToolbarFilters() : secondaryFilters;
 
   return (
