@@ -56,6 +56,10 @@ class ContactoBase(BaseModel):
     alias_pago: Optional[str] = Field(None, max_length=60)
     tipo: TipoContactoStr = "beneficiario"
     subtipo: Optional[str] = Field(None, max_length=50)
+    # FK al catalogo per-muni de tipos de empleado. Sincronizado con `subtipo`
+    # (que es el nombre congelado), pero esta FK es la fuente de verdad
+    # para el dropdown editable.
+    tipo_empleado_id: Optional[int] = None
     notas: Optional[str] = None
 
 
@@ -76,6 +80,7 @@ class ContactoUpdate(BaseModel):
     alias_pago: Optional[str] = Field(None, max_length=60)
     tipo: Optional[TipoContactoStr] = None
     subtipo: Optional[str] = Field(None, max_length=50)
+    tipo_empleado_id: Optional[int] = None
     notas: Optional[str] = None
     activo: Optional[bool] = None
 

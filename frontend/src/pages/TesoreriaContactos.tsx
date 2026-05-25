@@ -499,7 +499,21 @@ export default function TesoreriaContactos() {
                 key: 'tipo',
                 header: 'Tipo',
                 render: (c) => (
-                  <StatusPill label={TIPO_LABELS[c.tipo]} color={TIPO_COLORS[c.tipo] || '#71717a'} size="xs" />
+                  <div className="inline-flex items-center gap-1 flex-wrap">
+                    <StatusPill label={TIPO_LABELS[c.tipo]} color={TIPO_COLORS[c.tipo] || '#71717a'} size="xs" />
+                    {c.tipo === 'empleado' && c.subtipo && (
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap"
+                        style={{
+                          backgroundColor: `${theme.primary}15`,
+                          color: theme.primary,
+                          border: `1px solid ${theme.primary}30`,
+                        }}
+                      >
+                        {c.subtipo}
+                      </span>
+                    )}
+                  </div>
                 ),
               },
               {
@@ -550,12 +564,26 @@ export default function TesoreriaContactos() {
                 <p className="font-semibold truncate" style={{ color: theme.text }}>
                   {c.nombre} {c.apellido || ''}
                 </p>
-                <span
-                  className="inline-block mt-1 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
-                  style={{ backgroundColor: `${TIPO_COLORS[c.tipo]}20`, color: TIPO_COLORS[c.tipo] }}
-                >
-                  {TIPO_LABELS[c.tipo]}
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                  <span
+                    className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded"
+                    style={{ backgroundColor: `${TIPO_COLORS[c.tipo]}20`, color: TIPO_COLORS[c.tipo] }}
+                  >
+                    {TIPO_LABELS[c.tipo]}
+                  </span>
+                  {c.tipo === 'empleado' && c.subtipo && (
+                    <span
+                      className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: `${theme.primary}15`,
+                        color: theme.primary,
+                        border: `1px solid ${theme.primary}30`,
+                      }}
+                    >
+                      {c.subtipo}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="inline-flex items-center gap-1">
                 <button
