@@ -129,6 +129,13 @@ Reglas:
 
 **How to apply:** Ante cualquier ABMPage nuevo o existente, jamás pasar `searchMaxWidth`. Si encontrás `searchMaxWidth={N}` en código existente, borralo en el mismo cambio.
 
+### 9.bis. ABMPage acepta `toolbar` Y `headerActions` juntos — NO silenciar uno
+Hoy `ABMPage` compone ambas props si vienen juntas: primero las acciones del `toolbar` (chips/combos/toggles), después los botones extra del `headerActions` (ej: "Unificar duplicados" en `TesoreriaContactos`).
+
+**Why:** Antes el código hacía `effectiveHeaderActions = toolbar ? renderToolbarActions() : headerActions` — o sea, si la página pasaba ambos, **se perdían silenciosamente los botones de headerActions**. Bug real: el botón "Unificar duplicados" estuvo invisible en prod durante varias semanas en 4 páginas (TesoreriaContactos, OrdenesPago, SueldosEmpleados, Tesoreria) sin que nadie se diera cuenta hasta que un user lo reportó.
+
+**How to apply:** Cualquier customización futura de `ABMPage` (cambio de layout del header, refactor de cómo se renderizan acciones) tiene que **probar el caso compuesto** (`toolbar` + `headerActions` pasados al mismo tiempo). Si necesitás cambiar la composición, escribilo en el comentario de la línea y dejá al menos una página de testing que pase ambos (TesoreriaContactos es buena referencia). Nunca volver al patrón "una sobreescribe a la otra" — si querés mutua exclusión, andá por error explícito (`throw`), no por silencio.
+
 ### 10. Sidebar: items de UNA SOLA palabra
 Los `name` de items del sidebar (`frontend/src/config/navigation.ts`) **siempre tienen que ser una sola palabra**. Si la función natural se nombra con dos ("Mis Reclamos", "Categorías Trámite", "Órdenes de Pago"), se reduce a la palabra que **abarque** la función completa ("Reclamos", "Trámites", "Órdenes").
 
