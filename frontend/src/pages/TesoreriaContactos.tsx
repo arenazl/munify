@@ -141,6 +141,14 @@ export default function TesoreriaContactos() {
       setForm({ nombre: '', apellido: '', tipo: 'beneficiario' });
       setUbicacionModo('direccion');
     }
+    // Refresh tipos de empleado y parajes al abrir, asi un tipo recien creado
+    // en otra pestania aparece sin tener que recargar toda la pagina.
+    tiposEmpleadoApi.list({ activo: true })
+      .then(r => setTiposEmpleado(r.data || []))
+      .catch(() => { /* ok, mantengo lo que tenia */ });
+    parajesApi.list({ activo: true, include_count: false })
+      .then(r => setParajes(r.data || []))
+      .catch(() => { /* ok */ });
     setSheetOpen(true);
   };
 
