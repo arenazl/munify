@@ -64,6 +64,10 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
   // Por grupo: { keepId, tipoFinal }
   const [keepByGroup, setKeepByGroup] = useState<Record<string, number>>({});
   const [tipoByGroup, setTipoByGroup] = useState<Record<string, TipoContacto | ''>>({});
+  // Overrides por grupo y campo: cuando hay conflicto (ej. dos teléfonos
+  // distintos) el user elige cuál se queda. Default = el del ganador.
+  // Forma: overridesByGroup[groupKey][field] = valor elegido.
+  const [overridesByGroup, setOverridesByGroup] = useState<Record<string, Record<string, string>>>({});
 
   // Cartel de confirmacion
   const [confirmGroupKey, setConfirmGroupKey] = useState<string | null>(null);
@@ -75,7 +79,7 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    contactosApi.duplicados(0.9)
+    contactosApi.duplicados(0.8)
       .then(res => {
         const data = res.data as Grupo[];
         setGrupos(data || []);
@@ -90,6 +94,7 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
         });
         setKeepByGroup(initialKeep);
         setTipoByGroup(initialTipo);
+        setOverridesByGroup({});
         setSkipped(new Set());
       })
       .catch(() => {
@@ -126,12 +131,25 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
     const mergeIds = grupoEnConfirm.contactos.filter(c => c.id !== keepId).map(c => c.id);
     const tipoFinal = tipoByGroup[key] || undefined;
 
+    // Overrides solo de campos en conflicto donde el user eligio un valor
+    // distinto al que el ganador YA tiene (sino backend hace lo mismo).
+    const overrides: Record<string, string> = {};
+    const groupOverrides = overridesByGroup[key] || {};
+    const ganador = grupoEnConfirm.contactos.find(c => c.id === keepId);
+    for (const [field, valor] of Object.entries(groupOverrides)) {
+      const valGanador = ganador ? (ganador as unknown as Record<string, unknown>)[field] : '';
+      if (valor !== valGanador) {
+        overrides[field] = valor;
+      }
+    }
+
     setMerging(true);
     try {
       const res = await contactosApi.merge({
         keep_id: keepId,
         merge_ids: mergeIds,
         tipo_final: tipoFinal,
+        overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
       });
       const { gastos_reapuntados, pagos_prog_reapuntados, merged_count } = res.data as {
         gastos_reapuntados: number;
@@ -152,6 +170,68 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
     } finally {
       setMerging(false);
     }
+  };
+
+  // ============ Helpers: detectar conflictos campo-por-campo ============
+
+  // Campos que se intentan fusionar. Si en el grupo hay >= 2 valores distintos
+  // no vacios para un mismo campo, es CONFLICTO y el user elige.
+  // Si hay 1 solo valor, se auto-completa (queda automatico).
+  const CONFLICT_FIELDS: { key: keyof ContactoDuplicado; label: string }[] = [
+    { key: 'telefono', label: 'Teléfono' },
+    { key: 'email', label: 'Email' },
+    { key: 'direccion', label: 'Dirección' },
+    { key: 'alias_pago', label: 'Alias de pago' },
+    { key: 'dni', label: 'DNI' },
+    { key: 'subtipo', label: 'Subtipo' },
+  ];
+
+  // Devuelve los campos del grupo que tienen mas de un valor distinto.
+  // Para cada uno: las opciones unicas + el ID del contacto que aporta cada valor.
+  const getConflictsForGroup = (g: Grupo) => {
+    const out: { field: string; label: string; opciones: { valor: string; deContactoId: number }[] }[] = [];
+    for (const f of CONFLICT_FIELDS) {
+      const seen = new Map<string, number>(); // valor -> contactoId (primer aporte)
+      for (const c of g.contactos) {
+        const raw = (c as unknown as Record<string, unknown>)[f.key as string];
+        const v = typeof raw === 'string' ? raw.trim() : raw == null ? '' : String(raw).trim();
+        if (v && !seen.has(v)) seen.set(v, c.id);
+      }
+      if (seen.size >= 2) {
+        out.push({
+          field: f.key as string,
+          label: f.label,
+          opciones: Array.from(seen.entries()).map(([valor, deContactoId]) => ({ valor, deContactoId })),
+        });
+      }
+    }
+    return out;
+  };
+
+  // Resuelve el valor "actual" para un campo: override del user, sino el del ganador,
+  // sino el primero de los otros que lo tenga.
+  const resolveCurrentValue = (g: Grupo, keepId: number, field: string): string => {
+    const key = groupKey(g);
+    const override = overridesByGroup[key]?.[field];
+    if (override !== undefined) return override;
+    const ganador = g.contactos.find(c => c.id === keepId);
+    const ganadorVal = ganador ? (ganador as unknown as Record<string, unknown>)[field] : null;
+    if (typeof ganadorVal === 'string' && ganadorVal.trim()) return ganadorVal;
+    // Auto-merge: si no, el primer otro contacto que tenga valor
+    for (const c of g.contactos) {
+      if (c.id === keepId) continue;
+      const v = (c as unknown as Record<string, unknown>)[field];
+      if (typeof v === 'string' && v.trim()) return v;
+    }
+    return '';
+  };
+
+  const setOverride = (g: Grupo, field: string, valor: string) => {
+    const k = groupKey(g);
+    setOverridesByGroup(prev => ({
+      ...prev,
+      [k]: { ...(prev[k] || {}), [field]: valor },
+    }));
   };
 
   // ============ Preview del impacto (para el cartel) ============
@@ -274,9 +354,10 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
             className="p-3 rounded-xl text-sm"
             style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30`, color: theme.text }}
           >
-            Detectamos contactos con nombres parecidos (similitud ≥ 90%, ignorando tildes y mayúsculas).
-            Por cada grupo, elegí cuál mantener y los demás se fusionan en ese. Los gastos y pagos programados
-            se reapuntan automáticamente al ganador.
+            Detectamos contactos con nombres parecidos (similitud ≥ 80%, ignorando tildes y mayúsculas).
+            Por cada grupo, elegí cuál mantener; los demás se fusionan en ese. Si hay datos en conflicto
+            (ej. dos teléfonos), abajo elegís con cuál te quedás. Los datos únicos (que solo uno tiene)
+            pasan automáticamente al ganador. Los gastos y pagos programados se reapuntan.
           </div>
 
           {loading ? (
@@ -334,6 +415,63 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
                         )
                       )}
                     </div>
+
+                    {/* Resolver conflictos campo-por-campo. Solo se muestra
+                        si al menos un campo tiene >= 2 valores distintos.
+                        Los datos unicos (que solo uno tiene) NO aparecen
+                        aca — se autocompletan en el merge. */}
+                    {(() => {
+                      const conflicts = getConflictsForGroup(g);
+                      if (conflicts.length === 0) return null;
+                      return (
+                        <div
+                          className="rounded-lg p-3 mb-3 space-y-2"
+                          style={{ backgroundColor: theme.card, border: `1px dashed #f59e0b60` }}
+                        >
+                          <p className="text-[10px] uppercase font-bold flex items-center gap-1.5" style={{ color: '#f59e0b' }}>
+                            <GitMerge className="h-3 w-3" />
+                            Resolver conflictos · datos que difieren entre los contactos
+                          </p>
+                          <div className="space-y-2">
+                            {conflicts.map(conf => {
+                              const current = resolveCurrentValue(g, keepId, conf.field);
+                              return (
+                                <div key={conf.field} className="grid grid-cols-[110px_1fr] gap-2 items-start">
+                                  <span className="text-xs font-semibold pt-1" style={{ color: theme.textSecondary }}>
+                                    {conf.label}:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {conf.opciones.map(op => {
+                                      const isSel = current === op.valor;
+                                      const aporta = g.contactos.find(c => c.id === op.deContactoId);
+                                      const aportaLabel = aporta ? `${aporta.nombre} ${aporta.apellido || ''}`.trim() : '';
+                                      return (
+                                        <button
+                                          key={op.valor}
+                                          type="button"
+                                          onClick={() => setOverride(g, conf.field, op.valor)}
+                                          className="px-2.5 py-1 rounded-md text-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                          style={{
+                                            backgroundColor: isSel ? `${theme.primary}20` : theme.backgroundSecondary,
+                                            color: isSel ? theme.primary : theme.text,
+                                            border: `1.5px solid ${isSel ? theme.primary : theme.border}`,
+                                          }}
+                                          title={`Aporta: ${aportaLabel}`}
+                                        >
+                                          {isSel && <CheckCircle2 className="h-3 w-3 inline mr-1" />}
+                                          {op.valor}
+                                          <span className="opacity-60 ml-1.5">· {aportaLabel}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Tipo final opcional */}
                     <div className="flex items-center gap-2 mb-3">

@@ -189,7 +189,7 @@ class DuplicadoGrupo(BaseModel):
 @router.get("/duplicados", response_model=List[DuplicadoGrupo])
 async def detectar_duplicados(
     request: Request,
-    threshold: float = Query(0.9, ge=0.5, le=1.0),
+    threshold: float = Query(0.8, ge=0.5, le=1.0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
