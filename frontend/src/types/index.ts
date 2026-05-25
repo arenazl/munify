@@ -771,8 +771,25 @@ export interface PagoProgramado {
   ultimo_pago?: string | null;
   notas?: string | null;
   activo: boolean;
+  premios_default?: number[] | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PagoEjecutadoHistorial {
+  id: number;
+  fecha: string;
+  monto_pesos: string;
+  concepto: string;
+  descripcion?: string | null;
+  forma_pago: string;
+  contacto_id?: number | null;
+  contacto_nombre?: string | null;
+  caja_id?: number | null;
+  caja_nombre?: string | null;
+  caja_color?: string | null;
+  pago_programado_id?: number | null;
+  pp_frecuencia?: string | null;
 }
 
 export interface CotizacionUSD {

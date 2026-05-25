@@ -215,6 +215,15 @@ async def ejecutar_pago(
     items_premios = payload.premios_aplicados or [
         type('I', (), {'premio_id': pid, 'monto': None})() for pid in payload.premio_ids
     ]
+    # Si el operador NO mando nada y el pago_programado tiene premios_default
+    # cargados (el caso normal: se setean al editar la liquidacion y al pagar
+    # vienen pre-aplicados), tomamos esos. Si quiere overrideerlos, el frontend
+    # manda una lista (incluso vacia explicita seria un override a "ninguno").
+    if not items_premios and pp.premios_default:
+        items_premios = [
+            type('I', (), {'premio_id': int(pid), 'monto': None})()
+            for pid in pp.premios_default
+        ]
     if items_premios:
         ids_a_cargar = [it.premio_id for it in items_premios]
         premios = list((await db.execute(
@@ -262,6 +271,7 @@ async def ejecutar_pago(
         tipo_financiacion='contado',
         forma_pago=pp.forma_pago,
         caja_id=pp.caja_id,
+        pago_programado_id=pp.id,
     )
     db.add(gasto)
     await db.flush()
@@ -296,6 +306,86 @@ async def ejecutar_pago(
         premios_aplicados=premios_aplicados,
         proximo_pago=pp.proximo_pago.isoformat() if pp.activo else None,
     )
+
+
+@router.get("/historial")
+async def historial_pagos(
+    request: Request,
+    desde: Optional[date] = None,
+    hasta: Optional[date] = None,
+    contacto_id: Optional[int] = None,
+    caja_id: Optional[int] = None,
+    pago_programado_id: Optional[int] = None,
+    limit: int = Query(200, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Historial de pagos ejecutados a partir de una liquidacion (pago programado).
+
+    Devuelve los Gastos creados por POST /agenda/{id}/ejecutar, enriquecidos
+    con nombre de contacto, caja y concepto del pago programado original.
+
+    Default: ultimos 90 dias si no se pasa desde.
+    """
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+    if not desde:
+        desde = date.today() - timedelta(days=90)
+
+    from models import Gasto, Contacto, TesoreriaCaja, TesoreriaPagoProgramado
+    q = select(Gasto).where(
+        Gasto.municipio_id == muni_id,
+        Gasto.pago_programado_id.is_not(None),
+        Gasto.fecha >= desde,
+        Gasto.activo.is_(True),
+    )
+    if hasta:
+        q = q.where(Gasto.fecha <= hasta)
+    if contacto_id:
+        q = q.where(Gasto.destino_contacto_id == contacto_id)
+    if caja_id:
+        q = q.where(Gasto.caja_id == caja_id)
+    if pago_programado_id:
+        q = q.where(Gasto.pago_programado_id == pago_programado_id)
+    q = q.order_by(Gasto.fecha.desc(), Gasto.id.desc()).limit(limit)
+
+    gastos = list((await db.execute(q)).scalars().all())
+
+    # Enriquecer con nombres
+    contacto_ids = {g.destino_contacto_id for g in gastos if g.destino_contacto_id}
+    caja_ids = {g.caja_id for g in gastos if g.caja_id}
+    pp_ids = {g.pago_programado_id for g in gastos if g.pago_programado_id}
+    contactos_map = {}
+    cajas_map = {}
+    pp_map = {}
+    if contacto_ids:
+        rows = (await db.execute(select(Contacto).where(Contacto.id.in_(contacto_ids)))).scalars().all()
+        contactos_map = {c.id: f"{c.nombre} {c.apellido or ''}".strip() for c in rows}
+    if caja_ids:
+        rows = (await db.execute(select(TesoreriaCaja).where(TesoreriaCaja.id.in_(caja_ids)))).scalars().all()
+        cajas_map = {c.id: {"nombre": c.nombre, "color": c.color} for c in rows}
+    if pp_ids:
+        rows = (await db.execute(select(TesoreriaPagoProgramado).where(TesoreriaPagoProgramado.id.in_(pp_ids)))).scalars().all()
+        pp_map = {p.id: {"concepto": p.concepto, "frecuencia": p.frecuencia.value if hasattr(p.frecuencia, "value") else str(p.frecuencia)} for p in rows}
+
+    return [
+        {
+            "id": g.id,
+            "fecha": g.fecha.isoformat(),
+            "monto_pesos": str(g.monto_pesos),
+            "concepto": g.concepto,
+            "descripcion": g.descripcion,
+            "forma_pago": g.forma_pago.value if hasattr(g.forma_pago, "value") else str(g.forma_pago),
+            "contacto_id": g.destino_contacto_id,
+            "contacto_nombre": contactos_map.get(g.destino_contacto_id),
+            "caja_id": g.caja_id,
+            "caja_nombre": cajas_map.get(g.caja_id, {}).get("nombre") if g.caja_id else None,
+            "caja_color": cajas_map.get(g.caja_id, {}).get("color") if g.caja_id else None,
+            "pago_programado_id": g.pago_programado_id,
+            "pp_frecuencia": pp_map.get(g.pago_programado_id, {}).get("frecuencia"),
+        }
+        for g in gastos
+    ]
 
 
 @router.get("/reportes")

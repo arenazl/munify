@@ -217,6 +217,10 @@ class PagoProgramadoBase(BaseModel):
     fecha_inicio: date
     fecha_fin: Optional[date] = None
     notas: Optional[str] = None
+    # Premios sugeridos: ids de TesoreriaPremio que se aplican por defecto
+    # cuando se ejecuta el pago. El operador puede destildar en el modal de
+    # pagar si el empleado no se gano el premio este mes.
+    premios_default: Optional[List[int]] = None
 
 
 class PagoProgramadoCreate(PagoProgramadoBase):
@@ -237,6 +241,7 @@ class PagoProgramadoUpdate(BaseModel):
     proximo_pago: Optional[date] = None
     notas: Optional[str] = None
     activo: Optional[bool] = None
+    premios_default: Optional[List[int]] = None
 
 
 class PagoProgramadoResponse(PagoProgramadoBase):

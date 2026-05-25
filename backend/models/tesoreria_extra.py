@@ -11,7 +11,7 @@ para no tocar los modelos viejos.
 """
 import enum
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Date, Text, Numeric, Enum, ForeignKey,
+    Column, Integer, String, Boolean, DateTime, Date, Text, Numeric, Enum, ForeignKey, JSON,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -183,6 +183,12 @@ class TesoreriaPagoProgramado(Base):
 
     notas = Column(Text, nullable=True)
     activo = Column(Boolean, default=True, nullable=False)
+
+    # Premios que se aplican por defecto a esta liquidacion. Lista de IDs de
+    # TesoreriaPremio. Al pagar, vienen pre-checked en el modal — el
+    # operador puede destildar uno si ese mes el empleado no lo gano (ej.
+    # falto, no hizo trabajo extra, etc).
+    premios_default = Column(JSON, nullable=True, default=list)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

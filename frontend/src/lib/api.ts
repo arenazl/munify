@@ -2078,6 +2078,14 @@ export const agendaPagosApi = {
     notas?: string;
   }) => api.post(`/tesoreria/agenda/${id}/ejecutar`, data),
   reportes: () => api.get('/tesoreria/agenda/reportes'),
+  historial: (params?: {
+    desde?: string;
+    hasta?: string;
+    contacto_id?: number;
+    caja_id?: number;
+    pago_programado_id?: number;
+    limit?: number;
+  }) => api.get('/tesoreria/agenda/historial', { params }),
 };
 
 /** Catalogo de premios (plus variables) por municipio. Se cargan desde

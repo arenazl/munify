@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, Float, Numeric, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, Float, Numeric, Enum, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
@@ -169,6 +169,16 @@ class Gasto(Base):
     # feature; el wizard nuevo la pide obligatoria.
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True)
     caja = relationship("TesoreriaCaja", foreign_keys=[caja_id])
+
+    # Si el Gasto fue generado por la ejecucion de un pago programado
+    # (liquidacion recurrente), guardamos la referencia. Permite listar el
+    # historial de pagos hechos a partir de una liquidacion.
+    pago_programado_id = Column(
+        Integer,
+        ForeignKey("tesoreria_pagos_programados.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # ============ AUDITORIA ============
     activo = Column(Boolean, default=True, nullable=False)

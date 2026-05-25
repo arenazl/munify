@@ -37,7 +37,7 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { CalendarView } from '../components/ui/CalendarView';
 import { agendaPagosApi, contactosApi, cajasApi, premiosApi } from '../lib/api';
-import type { PagoProgramado, Contacto, Caja, FrecuenciaPago, Premio } from '../types';
+import type { PagoProgramado, Contacto, Caja, FrecuenciaPago, Premio, PagoEjecutadoHistorial } from '../types';
 
 const FRECUENCIA_LABELS: Record<FrecuenciaPago, string> = {
   semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual',
@@ -77,7 +77,9 @@ export default function TesoreriaAgenda() {
   const [contactoFiltro, setContactoFiltro] = useState<string>('');
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
   const [frecuenciaFiltro, setFrecuenciaFiltro] = useState<FrecuenciaPago | ''>('');
-  const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos'>('todos');
+  const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos' | 'realizados'>('todos');
+  const [historial, setHistorial] = useState<PagoEjecutadoHistorial[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<PagoProgramado | null>(null);
@@ -100,6 +102,7 @@ export default function TesoreriaAgenda() {
     contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
     monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual' as FrecuenciaPago,
     dia_del_mes: 5, fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
+    premios_default: [] as number[],
   });
   const [saving, setSaving] = useState(false);
 
@@ -187,6 +190,7 @@ export default function TesoreriaAgenda() {
         monto_pesos: String(p.monto_pesos), forma_pago: p.forma_pago,
         frecuencia: p.frecuencia, dia_del_mes: p.dia_del_mes,
         fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin || '',
+        premios_default: (p.premios_default as number[] | null) || [],
       });
     } else {
       setEditing(null);
@@ -194,6 +198,7 @@ export default function TesoreriaAgenda() {
         contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
         monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual',
         dia_del_mes: 5, fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
+        premios_default: [],
       });
     }
     setSheetOpen(true);
@@ -212,6 +217,7 @@ export default function TesoreriaAgenda() {
         monto_pesos: parseFloat(form.monto_pesos), forma_pago: form.forma_pago,
         frecuencia: form.frecuencia, dia_del_mes: form.dia_del_mes,
         fecha_inicio: form.fecha_inicio, fecha_fin: form.fecha_fin || null,
+        premios_default: form.premios_default,
       };
       if (editing) await agendaPagosApi.update(editing.id, payload);
       else await agendaPagosApi.create(payload);
@@ -226,7 +232,13 @@ export default function TesoreriaAgenda() {
     setEjecutarPago(p);
     setEjecutarMonto(p.monto_pesos);
     setEjecutarFecha(new Date().toISOString().slice(0, 10));
-    setEjecutarPremiosSel(new Map());
+    // Pre-fill: si la liquidacion tiene premios_default, vienen tildados.
+    // El operador puede destildar uno si ese mes no se gano (no afecta al
+    // pago programado para los meses siguientes).
+    const defaults = (p.premios_default as number[] | null) || [];
+    const initial = new Map<number, string>();
+    defaults.forEach(pid => initial.set(pid, ''));
+    setEjecutarPremiosSel(initial);
     setEjecutarNotas('');
   };
 
@@ -322,7 +334,18 @@ export default function TesoreriaAgenda() {
     { value: 'vencidos', label: `Vencidos (${stats.vencidos})`, color: '#ef4444' },
     { value: 'urgentes', label: `Próx. 7d (${stats.pendientes7})`, color: '#f59e0b' },
     { value: 'mes', label: 'Próx. 30d', color: '#3b82f6' },
+    { value: 'realizados', label: `Realizados${historial.length > 0 ? ` (${historial.length})` : ''}`, color: '#10b981' },
   ];
+
+  // Fetch historial cuando se elige "Realizados" (lazy, no en cada render)
+  useEffect(() => {
+    if (estadoFiltro !== 'realizados') return;
+    setLoadingHistorial(true);
+    agendaPagosApi.historial({ limit: 500 })
+      .then(r => setHistorial(r.data || []))
+      .catch(() => toast.error('Error cargando historial'))
+      .finally(() => setLoadingHistorial(false));
+  }, [estadoFiltro]);
 
   const secondaryFilters = (
     <div className="flex flex-wrap items-center gap-2 agenda-filters-row">
@@ -531,6 +554,69 @@ export default function TesoreriaAgenda() {
 
 
   // ==================== Vista CARDS (children) ====================
+  // ==================== Vista HISTORIAL (pagos ya realizados) ====================
+  // Solo activa cuando estadoFiltro === 'realizados'. Lista los Gastos
+  // generados por la ejecucion de pagos programados, ordenados por fecha desc.
+  const historialView = (
+    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+      <div
+        className="px-4 py-3 flex items-center justify-between"
+        style={{ backgroundColor: theme.backgroundSecondary, borderBottom: `1px solid ${theme.border}` }}
+      >
+        <span className="text-sm font-bold inline-flex items-center gap-2" style={{ color: theme.text }}>
+          <CheckCircle2 className="h-4 w-4" style={{ color: '#10b981' }} />
+          Pagos realizados (últimos 90 días)
+        </span>
+        <span className="text-xs" style={{ color: theme.textSecondary }}>
+          {historial.length} {historial.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(historial.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0))}
+        </span>
+      </div>
+      {loadingHistorial ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+        </div>
+      ) : historial.length === 0 ? (
+        <div className="text-center py-10 text-sm" style={{ color: theme.textSecondary }}>
+          Todavía no hay pagos ejecutados desde una liquidación.
+        </div>
+      ) : (
+        <div className="max-h-[600px] overflow-y-auto">
+          {historial.map((h, i) => {
+            const fecha = new Date(h.fecha);
+            const fechaFmt = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' });
+            return (
+              <div
+                key={h.id}
+                className="px-4 py-2.5 flex items-center gap-3"
+                style={{ borderTop: i > 0 ? `1px solid ${theme.border}` : undefined }}
+              >
+                <span
+                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md whitespace-nowrap flex-shrink-0"
+                  style={{ backgroundColor: '#10b98120', color: '#10b981', border: '1px solid #10b98140' }}
+                >
+                  {fechaFmt}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
+                    {h.contacto_nombre || '—'}
+                  </p>
+                  <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                    {h.concepto}
+                    {h.caja_nombre && ` · ${h.caja_nombre}`}
+                    {h.pp_frecuencia && ` · ${h.pp_frecuencia}`}
+                  </p>
+                </div>
+                <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>
+                  {fmtMoney(h.monto_pesos)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+
   const cardsView = paginatedFiltered.map(p => {
     const dias = diasDesdeHoy(p.proximo_pago);
     const urgente = dias <= 3;
@@ -600,13 +686,15 @@ export default function TesoreriaAgenda() {
           onPageChange: setPage,
           onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
         }}
-        loading={loading}
-        isEmpty={filtered.length === 0}
-        emptyMessage="No hay pagos con esos filtros."
+        loading={loading || (estadoFiltro === 'realizados' && loadingHistorial)}
+        isEmpty={estadoFiltro === 'realizados' ? historial.length === 0 : filtered.length === 0}
+        emptyMessage={estadoFiltro === 'realizados'
+          ? 'Todavía no hay pagos ejecutados desde una liquidación.'
+          : 'No hay pagos con esos filtros.'}
         defaultViewMode="table"
         viewStorageKey="agenda_view"
-        tableView={tableView}
-        guidedView={guidedView}
+        tableView={estadoFiltro === 'realizados' ? historialView : tableView}
+        guidedView={estadoFiltro === 'realizados' ? historialView : guidedView}
         sheetOpen={sheetOpen}
         sheetTitle={editing ? `Editar pago · ${editing.contacto_nombre}` : 'Nuevo pago programado'}
         sheetContent={
@@ -668,12 +756,68 @@ export default function TesoreriaAgenda() {
                 className="w-full px-3 py-2 rounded-lg text-sm"
                 style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
             </div>
+
+            {/* Premios que aplican por DEFAULT a esta liquidacion. En cada
+                pago se pueden destildar si el empleado no los gano ese mes. */}
+            {premios.length > 0 && (
+              <div
+                className="rounded-xl p-3"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <p className="text-[10px] uppercase font-bold mb-2 inline-flex items-center gap-1" style={{ color: theme.textSecondary }}>
+                  <Gift className="h-3 w-3" />
+                  Premios que aplican por defecto
+                </p>
+                <p className="text-[10px] mb-2 leading-relaxed" style={{ color: theme.textSecondary }}>
+                  Los que tildes acá vienen pre-aplicados cuando ejecutes el pago. Si un mes el empleado no se los gana,
+                  los podés destildar en el modal de "Pagar" sin afectar los meses siguientes.
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {premios.map(pr => {
+                    const checked = form.premios_default.includes(pr.id);
+                    const color = pr.color || theme.primary;
+                    return (
+                      <label
+                        key={pr.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all"
+                        style={{
+                          backgroundColor: checked ? `${color}15` : theme.card,
+                          border: `1px solid ${checked ? color : theme.border}`,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setForm(f => ({
+                              ...f,
+                              premios_default: e.target.checked
+                                ? [...f.premios_default, pr.id]
+                                : f.premios_default.filter(id => id !== pr.id),
+                            }));
+                          }}
+                          style={{ accentColor: color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: theme.text }}>
+                            {pr.nombre}
+                          </p>
+                          <p className="text-[10px] tabular-nums" style={{ color }}>
+                            +{fmtMoney(pr.monto)}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         }
         sheetFooter={<ABMSheetFooter onCancel={() => setSheetOpen(false)} onSave={save} saving={saving} />}
         onSheetClose={() => setSheetOpen(false)}
       >
-        {cardsView}
+        {estadoFiltro === 'realizados' ? <div className="col-span-full">{historialView}</div> : cardsView}
       </ABMPage>
 
       {/* Sheet "Ejecutar pago" — reemplaza al confirm() nativo. */}
