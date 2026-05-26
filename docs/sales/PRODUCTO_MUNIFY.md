@@ -267,7 +267,7 @@ Si el municipio contrata **los 3 módulos juntos** (Reclamos + Trámites + Tesor
 - **Landing:** https://munify.com.ar
 - **App:** https://app.munify.com.ar
 - **Demo:** https://app.munify.com.ar/demo
-- **WhatsApp ventas:** +54 9 11 6022 3474
+- **WhatsApp ventas:** +54 9 11 6052 6449
 - **Email:** hola@munify.com.ar / ventas@gestionmunicipal.com
 
 **Páginas específicas por módulo:**

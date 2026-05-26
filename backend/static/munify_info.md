@@ -10,7 +10,7 @@ El sistema se divide en DOS PRODUCTOS:
 
 ## Contacto
 
-- **WhatsApp**: +54 9 11 6022-3474
+- **WhatsApp**: +54 9 11 6052-6449
 - **Email**: ventas@gestionmunicipal.com
 - **Web**: www.gestionmunicipal.com
 
@@ -221,7 +221,7 @@ Sí, el sistema de gamificación te da puntos y badges por tu participación act
 ## Solicitar Demo
 
 Para agendar una videollamada de 30 minutos donde mostramos la plataforma funcionando:
-- **WhatsApp**: +54 9 11 6022-3474
+- **WhatsApp**: +54 9 11 6052-6449
 - **Email**: ventas@gestionmunicipal.com
 
 Sin compromiso, sin costos ocultos. Período de prueba de 3 meses incluido.
