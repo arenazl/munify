@@ -19,3 +19,12 @@ venv
 htmlcov
 .mypy_cache
 tests
+Procfile
+runtime.txt
+README.md
+Dockerfile
+.dockerignore
+.idea
+.vscode
+*.swp
+.DS_Store

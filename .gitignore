@@ -85,3 +85,6 @@ landing
 scripts/gsc-credentials.json
 *-credentials.json
 *.gcp.json
+
+# Cloud Run env file (no secrets but no need to track)
+backend/env.yaml

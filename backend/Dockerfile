@@ -1,30 +1,28 @@
-# Backend Dockerfile
+# Backend Dockerfile - Cloud Run + Heroku compatible
 FROM python:3.11-slim
 
-# Variables de entorno
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias del sistema
-RUN apt-get update && apt-get install -y \
-    gcc \
-    default-libmysqlclient-dev \
-    pkg-config \
+# Dependencias del sistema (mysqlclient + ssl + ffi)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc default-libmysqlclient-dev pkg-config \
+    libssl-dev libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements e instalar dependencias
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Copiar código
 COPY . .
 
-# Puerto (configurable via ENV)
-ENV PORT=8000
-EXPOSE ${PORT}
+# Cloud Run inyecta PORT=8080 por default. Heroku tambien usa $PORT.
+ENV PORT=8080
+EXPOSE 8080
 
-# Comando de inicio (usa variable de entorno PORT)
-CMD uvicorn main:app --host 0.0.0.0 --port ${PORT}
+# gunicorn con worker uvicorn (mismo patron que Heroku Procfile).
+# 2 workers caben en 512Mi; --timeout 120 para uploads grandes/LLM.
+CMD exec gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT} --timeout 120

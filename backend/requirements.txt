@@ -2,6 +2,11 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 sqlalchemy[asyncio]==2.0.23
 aiomysql==0.2.0
+# Pin PyMySQL 1.0.3: 1.1.x cambio el default de ping(reconnect=True),
+# SQLAlchemy 2.0.23 introspect detecta el cambio y llama ping() sin args,
+# pero aiomysql 0.2.0 lo requiere obligatorio. Cuando aiomysql >=0.2.1
+# salga (o bumpeemos SQLAlchemy >=2.0.35) se puede quitar este pin.
+PyMySQL==1.0.3
 cryptography==41.0.7
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
