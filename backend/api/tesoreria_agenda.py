@@ -142,8 +142,29 @@ async def update_pago(
     )).scalar_one_or_none()
     if not pp:
         raise HTTPException(404, "No encontrado")
-    for k, v in payload.model_dump(exclude_unset=True).items():
+
+    data = payload.model_dump(exclude_unset=True)
+    # Detectar si cambian campos que afectan al proximo_pago. Solo recalculamos
+    # cuando la liquidacion todavia NO se ejecuto (ultimo_pago IS NULL). Si ya
+    # hubo pagos previos respetamos la secuencia que el sistema vino llevando
+    # (sino podria saltarse meses pagados).
+    campos_recalculo = {"fecha_inicio", "frecuencia", "dia_del_mes"}
+    recalcular = (pp.ultimo_pago is None) and bool(campos_recalculo & data.keys())
+
+    for k, v in data.items():
+        # No permitimos pisar proximo_pago manualmente; lo derivamos abajo
+        if k == "proximo_pago" and recalcular:
+            continue
         setattr(pp, k, v)
+
+    if recalcular:
+        proximo = pp.fecha_inicio
+        last_day = monthrange(proximo.year, proximo.month)[1]
+        proximo = date(proximo.year, proximo.month, min(pp.dia_del_mes, last_day))
+        if proximo < pp.fecha_inicio:
+            proximo = _calcular_proximo_pago(proximo, pp.frecuencia, pp.dia_del_mes)
+        pp.proximo_pago = proximo
+
     await db.commit()
     await db.refresh(pp)
     return await _enrich(db, pp)

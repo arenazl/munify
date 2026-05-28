@@ -53,8 +53,15 @@ const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 function diasDesdeHoy(fecha: string): number {
+  // Parsear la fecha como LOCAL (YYYY-MM-DD), no UTC. Si usamos new Date(string)
+  // y el string viene como "2026-06-01", JS lo interpreta como UTC midnight y
+  // en zonas tipo AR (-03) el dia local termina siendo 31/05, sesgando el calculo.
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const d = new Date(fecha); d.setHours(0, 0, 0, 0);
+  const m = (fecha || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const d = m
+    ? new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10))
+    : new Date(fecha);
+  d.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - hoy.getTime()) / 86400000);
 }
 
