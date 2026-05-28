@@ -224,7 +224,8 @@ export default function TesoreriaAgenda() {
         monto_pesos: parseFloat(form.monto_pesos), forma_pago: form.forma_pago,
         frecuencia: form.frecuencia, dia_del_mes: form.dia_del_mes,
         fecha_inicio: form.fecha_inicio, fecha_fin: form.fecha_fin || null,
-        premios_default: form.premios_default,
+        // Premios se manejan como liquidaciones aparte; no van junto al sueldo.
+        premios_default: [],
       };
       if (editing) await agendaPagosApi.update(editing.id, payload);
       else await agendaPagosApi.create(payload);
@@ -239,13 +240,9 @@ export default function TesoreriaAgenda() {
     setEjecutarPago(p);
     setEjecutarMonto(p.monto_pesos);
     setEjecutarFecha(new Date().toISOString().slice(0, 10));
-    // Pre-fill: si la liquidacion tiene premios_default, vienen tildados.
-    // El operador puede destildar uno si ese mes no se gano (no afecta al
-    // pago programado para los meses siguientes).
-    const defaults = (p.premios_default as number[] | null) || [];
-    const initial = new Map<number, string>();
-    defaults.forEach(pid => initial.set(pid, ''));
-    setEjecutarPremiosSel(initial);
+    // Premios se manejan como liquidaciones aparte (presentismo semanal,
+    // incentivo mitad de mes). Ya no vienen pre-tildados acá.
+    setEjecutarPremiosSel(new Map());
     setEjecutarNotas('');
   };
 
@@ -764,61 +761,9 @@ export default function TesoreriaAgenda() {
                 style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
             </div>
 
-            {/* Premios que aplican por DEFAULT a esta liquidacion. En cada
-                pago se pueden destildar si el empleado no los gano ese mes. */}
-            {premios.length > 0 && (
-              <div
-                className="rounded-xl p-3"
-                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
-              >
-                <p className="text-[10px] uppercase font-bold mb-2 inline-flex items-center gap-1" style={{ color: theme.textSecondary }}>
-                  <Gift className="h-3 w-3" />
-                  Premios que aplican por defecto
-                </p>
-                <p className="text-[10px] mb-2 leading-relaxed" style={{ color: theme.textSecondary }}>
-                  Los que tildes acá vienen pre-aplicados cuando ejecutes el pago. Si un mes el empleado no se los gana,
-                  los podés destildar en el modal de "Pagar" sin afectar los meses siguientes.
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {premios.map(pr => {
-                    const checked = form.premios_default.includes(pr.id);
-                    const color = pr.color || theme.primary;
-                    return (
-                      <label
-                        key={pr.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all"
-                        style={{
-                          backgroundColor: checked ? `${color}15` : theme.card,
-                          border: `1px solid ${checked ? color : theme.border}`,
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            setForm(f => ({
-                              ...f,
-                              premios_default: e.target.checked
-                                ? [...f.premios_default, pr.id]
-                                : f.premios_default.filter(id => id !== pr.id),
-                            }));
-                          }}
-                          style={{ accentColor: color }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate" style={{ color: theme.text }}>
-                            {pr.nombre}
-                          </p>
-                          <p className="text-[10px] tabular-nums" style={{ color }}>
-                            +{fmtMoney(pr.monto)}
-                          </p>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Premios se manejan como pagos programados independientes
+                (presentismo semanal, incentivo mitad de mes). Ya no se suman
+                acá a la liquidacion mensual del sueldo. */}
           </div>
         }
         sheetFooter={<ABMSheetFooter onCancel={() => setSheetOpen(false)} onSave={save} saving={saving} />}
@@ -886,99 +831,9 @@ export default function TesoreriaAgenda() {
               <DatePicker value={ejecutarFecha} onChange={setEjecutarFecha} />
             </div>
 
-            {/* Premios (catalogo global) */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold inline-flex items-center gap-1.5" style={{ color: theme.text }}>
-                  <Gift className="h-3.5 w-3.5" />
-                  Premios / plus que aplican este mes
-                </label>
-                {premios.length === 0 && (
-                  <span className="text-[10px]" style={{ color: theme.textSecondary }}>
-                    Cargá premios desde Configuración → Tesorería
-                  </span>
-                )}
-              </div>
-              {premios.length === 0 ? (
-                <p className="text-xs italic" style={{ color: theme.textSecondary }}>
-                  Sin premios configurados.
-                </p>
-              ) : (
-                <div className="space-y-1.5">
-                  {premios.map(pr => {
-                    const sel = ejecutarPremiosSel.has(pr.id);
-                    const override = ejecutarPremiosSel.get(pr.id) || '';
-                    const color = pr.color || theme.primary;
-                    const toggle = () => {
-                      const next = new Map(ejecutarPremiosSel);
-                      if (sel) next.delete(pr.id);
-                      else next.set(pr.id, ''); // arranca sin override -> usa el del catalogo
-                      setEjecutarPremiosSel(next);
-                    };
-                    const setOverride = (v: string) => {
-                      const next = new Map(ejecutarPremiosSel);
-                      next.set(pr.id, v);
-                      setEjecutarPremiosSel(next);
-                    };
-                    return (
-                      <div
-                        key={pr.id}
-                        className="w-full flex items-center gap-3 p-2.5 rounded-lg transition-all"
-                        style={{
-                          backgroundColor: sel ? `${color}15` : theme.backgroundSecondary,
-                          border: `2px solid ${sel ? color : 'transparent'}`,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={toggle}
-                          className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-all hover:scale-110"
-                          style={{
-                            backgroundColor: sel ? color : 'transparent',
-                            border: `2px solid ${sel ? color : theme.border}`,
-                          }}
-                        >
-                          {sel && <CheckCircle2 className="h-3 w-3 text-white" />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={toggle}
-                          className="flex-1 min-w-0 text-left"
-                        >
-                          <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                            {pr.nombre}
-                          </p>
-                          {pr.descripcion && (
-                            <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                              {pr.descripcion}
-                            </p>
-                          )}
-                        </button>
-                        {sel ? (
-                          <div className="flex-shrink-0 w-32">
-                            <MoneyInput
-                              value={override}
-                              onChange={setOverride}
-                              placeholder={pr.monto || '0'}
-                              className="w-full px-2 py-1.5 rounded-md text-sm font-bold tabular-nums text-right"
-                              style={{
-                                backgroundColor: theme.card,
-                                border: `1px solid ${color}40`,
-                                color: color,
-                              }}
-                            />
-                          </div>
-                        ) : (
-                          <span className="text-sm font-bold tabular-nums flex-shrink-0 w-32 text-right" style={{ color }}>
-                            + {fmtMoney(pr.monto)}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Premios se manejan como liquidaciones aparte (presentismo
+                semanal, incentivo mitad de mes). Ya no se eligen acá al
+                pagar el sueldo. */}
 
             {/* Notas */}
             <div>
