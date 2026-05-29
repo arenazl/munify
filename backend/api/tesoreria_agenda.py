@@ -54,6 +54,30 @@ def _calcular_proximo_pago(actual: date, frecuencia: FrecuenciaPago, dia_del_mes
     return date(year, month, min(dia_del_mes, last_day))
 
 
+def _proximo_dia_semana(desde: date, dia_semana: int) -> date:
+    """Devuelve el proximo dia_semana >= desde. 0=lunes..6=domingo."""
+    actual_dow = desde.weekday()
+    delta = (dia_semana - actual_dow) % 7
+    return desde + timedelta(days=delta)
+
+
+def _calcular_fecha_inicio_premio(hoy: date, frecuencia: FrecuenciaPago, dia_semana, dia_del_mes) -> date:
+    """Calcula la fecha del proximo pago para un premio recien creado.
+
+    Semanal: proximo dia_semana >= hoy (ej. viernes que viene).
+    Mensual/etc: dia_del_mes en el mes actual si todavia no paso, sino mes siguiente.
+    """
+    if frecuencia == FrecuenciaPago.SEMANAL:
+        return _proximo_dia_semana(hoy, dia_semana if dia_semana is not None else 4)
+    # Mensual/quincenal/etc → usar dia_del_mes
+    dia = dia_del_mes if dia_del_mes else 1
+    last_day = monthrange(hoy.year, hoy.month)[1]
+    candidato = date(hoy.year, hoy.month, min(dia, last_day))
+    if candidato >= hoy:
+        return candidato
+    return _calcular_proximo_pago(candidato, frecuencia, dia)
+
+
 async def _enrich(db: AsyncSession, pp: TesoreriaPagoProgramado) -> PagoProgramadoResponse:
     resp = PagoProgramadoResponse.model_validate(pp)
     # Cargar nombres de contacto y caja
@@ -120,9 +144,129 @@ async def create_pago(
         **payload.model_dump(),
     )
     db.add(pp)
+    await db.flush()
+
+    # Auto-crear pagos programados de PREMIOS para este contacto si es un
+    # sueldo "principal" (heuristica: no es ya un premio). Los premios del
+    # catalogo se replican como pagos programados separados con su propia
+    # frecuencia/dia (presentismo viernes, incentivo dia 15).
+    es_premio_replicado = (pp.notas or "").startswith("[auto-premio]")
+    if not es_premio_replicado:
+        await _auto_crear_premios_para_contacto(db, muni_id, pp.contacto_id, pp.caja_id)
+
     await db.commit()
     await db.refresh(pp)
     return await _enrich(db, pp)
+
+
+async def _auto_crear_premios_para_contacto(
+    db: AsyncSession, muni_id: int, contacto_id: int, caja_id: Optional[int]
+) -> int:
+    """Crea un pago programado por cada premio activo del catalogo para el
+    contacto dado. Si ya existe un pago programado con `notas` que empieza
+    con [auto-premio][premio_id=X], no se duplica.
+
+    Devuelve la cantidad creada.
+    """
+    premios = list((await db.execute(
+        select(TesoreriaPremio).where(
+            TesoreriaPremio.municipio_id == muni_id,
+            TesoreriaPremio.activo.is_(True),
+        )
+    )).scalars().all())
+    if not premios:
+        return 0
+
+    # Existentes para este contacto (notas matcheando [auto-premio][premio_id=X])
+    existentes = list((await db.execute(
+        select(TesoreriaPagoProgramado).where(
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.contacto_id == contacto_id,
+            TesoreriaPagoProgramado.activo.is_(True),
+        )
+    )).scalars().all())
+    ya_creados = set()
+    for pp_ex in existentes:
+        notas = pp_ex.notas or ""
+        if notas.startswith("[auto-premio]"):
+            # extraer premio_id del marker [auto-premio][premio_id=N]
+            import re
+            m = re.search(r"\[premio_id=(\d+)\]", notas)
+            if m:
+                ya_creados.add(int(m.group(1)))
+
+    hoy = date.today()
+    creados = 0
+    for pr in premios:
+        if pr.id in ya_creados:
+            continue
+        # Defaults por si el premio no tiene dia configurado
+        dia_semana = pr.dia_semana
+        dia_del_mes = pr.dia_del_mes or 1
+        if pr.frecuencia == FrecuenciaPago.SEMANAL and dia_semana is None:
+            dia_semana = 4  # viernes default
+        fecha_ini = _calcular_fecha_inicio_premio(hoy, pr.frecuencia, dia_semana, dia_del_mes)
+        marker = f"[auto-premio][premio_id={pr.id}] Generado automaticamente desde catalogo de premios"
+        nuevo = TesoreriaPagoProgramado(
+            municipio_id=muni_id,
+            contacto_id=contacto_id,
+            caja_id=caja_id,
+            concepto=pr.nombre,
+            descripcion=pr.descripcion or None,
+            monto_pesos=pr.monto,
+            forma_pago="transferencia",
+            frecuencia=pr.frecuencia,
+            dia_del_mes=dia_del_mes if pr.frecuencia != FrecuenciaPago.SEMANAL else 1,
+            dia_semana=dia_semana if pr.frecuencia == FrecuenciaPago.SEMANAL else None,
+            fecha_inicio=fecha_ini,
+            proximo_pago=fecha_ini,
+            notas=marker,
+            activo=True,
+        )
+        db.add(nuevo)
+        creados += 1
+    return creados
+
+
+@router.post("/regenerar-premios")
+async def regenerar_premios(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Backfill retroactivo: para cada contacto que YA tiene un pago programado
+    de sueldo cargado, generar los pagos programados de cada premio activo del
+    catalogo que aun no tenga. Util cuando se carga un premio nuevo despues
+    de tener empleados creados.
+    """
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+
+    # Contactos que ya tienen al menos un pago programado de sueldo
+    # (lo identificamos como pago activo no marcado como auto-premio)
+    rows = (await db.execute(
+        select(TesoreriaPagoProgramado).where(
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.activo.is_(True),
+        )
+    )).scalars().all()
+    # Map contacto_id -> caja_id de su primer sueldo (no auto-premio)
+    contacto_caja: dict[int, Optional[int]] = {}
+    for pp in rows:
+        if (pp.notas or "").startswith("[auto-premio]"):
+            continue
+        if pp.contacto_id not in contacto_caja:
+            contacto_caja[pp.contacto_id] = pp.caja_id
+
+    total_creados = 0
+    for contacto_id, caja_id in contacto_caja.items():
+        total_creados += await _auto_crear_premios_para_contacto(db, muni_id, contacto_id, caja_id)
+    await db.commit()
+    return {
+        "ok": True,
+        "contactos_afectados": len(contacto_caja),
+        "pagos_premios_creados": total_creados,
+    }
 
 
 @router.put("/{pp_id}", response_model=PagoProgramadoResponse)

@@ -13,7 +13,7 @@ import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { Sheet } from '../components/ui/Sheet';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { PolygonDrawer } from '../components/tesoreria/PolygonDrawer';
-import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesApi, premiosApi, retencionesApi } from '../lib/api';
+import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesApi, premiosApi, retencionesApi, agendaPagosApi } from '../lib/api';
 import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje, Premio, ContaduriaRetencion } from '../types';
 import TesoreriaProyectos from './TesoreriaProyectos';
 
@@ -1156,16 +1156,29 @@ function ParajesTab() {
 // ============================================================
 // Tab: Premios (plus variables aplicables a pagos programados)
 // ============================================================
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const FREC_PREMIO_LABELS: Record<string, string> = {
+  semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual',
+  bimestral: 'Bimestral', trimestral: 'Trimestral', anual: 'Anual',
+};
+
 function PremiosTab() {
   const { theme } = useTheme();
   const [items, setItems] = useState<Premio[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<Premio | null>(null);
-  const [form, setForm] = useState<{ nombre: string; monto: string; descripcion: string; color: string }>({
+  const [form, setForm] = useState<{
+    nombre: string; monto: string; descripcion: string; color: string;
+    frecuencia: 'semanal'|'quincenal'|'mensual'|'bimestral'|'trimestral'|'anual';
+    dia_semana: number | null;
+    dia_del_mes: number | null;
+  }>({
     nombre: '', monto: '', descripcion: '', color: '#10b981',
+    frecuencia: 'mensual', dia_semana: null, dia_del_mes: 15,
   });
   const [saving, setSaving] = useState(false);
+  const [regenerando, setRegenerando] = useState(false);
 
   const fetch = async () => {
     setLoading(true);
@@ -1184,6 +1197,9 @@ function PremiosTab() {
       monto: p?.monto || '',
       descripcion: p?.descripcion || '',
       color: p?.color || '#10b981',
+      frecuencia: (p?.frecuencia as any) || 'mensual',
+      dia_semana: p?.dia_semana ?? (p ? null : 4),
+      dia_del_mes: p?.dia_del_mes ?? (p ? null : 15),
     });
     setSheetOpen(true);
   };
@@ -1192,13 +1208,22 @@ function PremiosTab() {
     if (!form.nombre.trim()) return toast.error('Nombre requerido');
     const monto = parseFloat(form.monto || '0');
     if (!monto || monto <= 0) return toast.error('Monto inválido');
+    if (form.frecuencia === 'semanal' && form.dia_semana === null) {
+      return toast.error('Elegí el día de la semana');
+    }
+    if (form.frecuencia !== 'semanal' && !form.dia_del_mes) {
+      return toast.error('Elegí el día del mes');
+    }
     setSaving(true);
     try {
-      const data = {
+      const data: Record<string, unknown> = {
         nombre: form.nombre.trim(),
         monto: form.monto,
         descripcion: form.descripcion.trim() || null,
         color: form.color || null,
+        frecuencia: form.frecuencia,
+        dia_semana: form.frecuencia === 'semanal' ? form.dia_semana : null,
+        dia_del_mes: form.frecuencia !== 'semanal' ? form.dia_del_mes : null,
       };
       if (editing) await premiosApi.update(editing.id, data);
       else await premiosApi.create(data);
@@ -1207,6 +1232,16 @@ function PremiosTab() {
       fetch();
     } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error guardando'); }
     finally { setSaving(false); }
+  };
+
+  const regenerar = async () => {
+    if (!confirm('¿Generar los pagos programados de premios para todos los empleados con sueldo cargado?')) return;
+    setRegenerando(true);
+    try {
+      const res = await agendaPagosApi.regenerarPremios();
+      toast.success(`${res.data.pagos_premios_creados} pagos creados en ${res.data.contactos_afectados} empleados`);
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error regenerando'); }
+    finally { setRegenerando(false); }
   };
 
   const remove = async (p: Premio) => {
@@ -1226,9 +1261,21 @@ function PremiosTab() {
             Plus / bonificaciones variables que se aplican al ejecutar pagos programados (presentismo, trabajo extra, etc.).
           </p>
         </div>
-        <PrimaryButton onClick={() => openSheet(null)} size="sm" icon={<Plus className="h-4 w-4" />}>
-          Nuevo
-        </PrimaryButton>
+        <div className="inline-flex items-center gap-2">
+          <button
+            onClick={regenerar}
+            disabled={regenerando || items.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+            style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+            title="Generar las liquidaciones de premios para todos los empleados con sueldo cargado"
+          >
+            {regenerando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Regenerar para empleados
+          </button>
+          <PrimaryButton onClick={() => openSheet(null)} size="sm" icon={<Plus className="h-4 w-4" />}>
+            Nuevo
+          </PrimaryButton>
+        </div>
       </div>
 
       {loading ? (
@@ -1259,6 +1306,11 @@ function PremiosTab() {
                   <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{p.nombre}</p>
                   <p className="text-base font-bold tabular-nums" style={{ color }}>
                     + ${parseFloat(p.monto).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                    {FREC_PREMIO_LABELS[p.frecuencia] || p.frecuencia}
+                    {p.frecuencia === 'semanal' && p.dia_semana != null && ` · ${DIAS_SEMANA[p.dia_semana]}`}
+                    {p.frecuencia !== 'semanal' && p.dia_del_mes != null && ` · día ${p.dia_del_mes}`}
                   </p>
                   {p.descripcion && (
                     <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>{p.descripcion}</p>
@@ -1341,6 +1393,45 @@ function PremiosTab() {
               style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
             />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Frecuencia de pago *</label>
+              <ModernSelect
+                value={form.frecuencia}
+                onChange={(v) => setForm(f => ({ ...f, frecuencia: v as any }))}
+                options={Object.entries(FREC_PREMIO_LABELS).map(([k, v]) => ({ value: k, label: v }))}
+                placeholder="Frecuencia"
+              />
+            </div>
+            <div>
+              {form.frecuencia === 'semanal' ? (
+                <>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día de la semana *</label>
+                  <ModernSelect
+                    value={form.dia_semana != null ? String(form.dia_semana) : ''}
+                    onChange={(v) => setForm(f => ({ ...f, dia_semana: v === '' ? null : Number(v) }))}
+                    options={DIAS_SEMANA.map((d, i) => ({ value: String(i), label: d }))}
+                    placeholder="Día"
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día del mes *</label>
+                  <input
+                    type="number" min={1} max={28}
+                    value={form.dia_del_mes || ''}
+                    onChange={(e) => setForm(f => ({ ...f, dia_del_mes: e.target.value ? Number(e.target.value) : null }))}
+                    className="w-full px-3 py-2 rounded-lg text-sm tabular-nums"
+                    style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] leading-relaxed -mt-1" style={{ color: theme.textSecondary }}>
+            Cada premio se cobra <b>aparte del sueldo mensual</b>. Por ejemplo: presentismo todos los viernes, incentivo el día 15.
+            Cuando un empleado tiene su liquidación cargada, este premio se le agrega automáticamente como pago programado.
+          </p>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Color</label>
             <input

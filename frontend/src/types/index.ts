@@ -655,6 +655,9 @@ export interface Premio {
   icono?: string | null;
   orden: number;
   activo: boolean;
+  frecuencia: FrecuenciaPago;
+  dia_semana?: number | null;
+  dia_del_mes?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -765,6 +768,7 @@ export interface PagoProgramado {
   forma_pago: string;
   frecuencia: FrecuenciaPago;
   dia_del_mes: number;
+  dia_semana?: number | null;
   fecha_inicio: string;
   fecha_fin?: string | null;
   proximo_pago: string;

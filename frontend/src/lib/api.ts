@@ -2086,6 +2086,13 @@ export const agendaPagosApi = {
     pago_programado_id?: number;
     limit?: number;
   }) => api.get('/tesoreria/agenda/historial', { params }),
+  /** Backfill: para cada empleado con sueldo cargado, crea los pagos
+   * programados de cada premio del catalogo que aun no tenga (con frecuencia
+   * propia: presentismo semanal, incentivo mensual). */
+  regenerarPremios: () =>
+    api.post<{ ok: boolean; contactos_afectados: number; pagos_premios_creados: number }>(
+      '/tesoreria/agenda/regenerar-premios'
+    ),
 };
 
 /** Catalogo de premios (plus variables) por municipio. Se cargan desde

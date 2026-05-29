@@ -21,6 +21,12 @@ class PremioBase(BaseModel):
     color: Optional[str] = None
     icono: Optional[str] = None
     orden: int = 0
+    # Frecuencia propia (semanal=presentismo, mensual=incentivo)
+    frecuencia: FrecuenciaPago = FrecuenciaPago.MENSUAL
+    # Cuando frecuencia=semanal: 0=lunes..6=domingo
+    dia_semana: Optional[int] = Field(None, ge=0, le=6)
+    # Cuando frecuencia es mensual/quincenal/etc: 1..28
+    dia_del_mes: Optional[int] = Field(None, ge=1, le=28)
 
 
 class PremioCreate(PremioBase):
@@ -35,10 +41,13 @@ class PremioUpdate(BaseModel):
     icono: Optional[str] = None
     orden: Optional[int] = None
     activo: Optional[bool] = None
+    frecuencia: Optional[FrecuenciaPago] = None
+    dia_semana: Optional[int] = Field(None, ge=0, le=6)
+    dia_del_mes: Optional[int] = Field(None, ge=1, le=28)
 
 
 class PremioResponse(PremioBase):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
     id: int
     municipio_id: int
     activo: bool
@@ -214,12 +223,13 @@ class PagoProgramadoBase(BaseModel):
     forma_pago: str = "transferencia"
     frecuencia: FrecuenciaPago = FrecuenciaPago.MENSUAL
     dia_del_mes: int = Field(1, ge=1, le=28)
+    # Solo cuando frecuencia=semanal. 0=lunes..6=domingo.
+    dia_semana: Optional[int] = Field(None, ge=0, le=6)
     fecha_inicio: date
     fecha_fin: Optional[date] = None
     notas: Optional[str] = None
-    # Premios sugeridos: ids de TesoreriaPremio que se aplican por defecto
-    # cuando se ejecuta el pago. El operador puede destildar en el modal de
-    # pagar si el empleado no se gano el premio este mes.
+    # DEPRECATED: los premios ahora son liquidaciones independientes.
+    # Se mantiene para no romper compat hacia atras.
     premios_default: Optional[List[int]] = None
 
 
@@ -236,6 +246,7 @@ class PagoProgramadoUpdate(BaseModel):
     forma_pago: Optional[str] = None
     frecuencia: Optional[FrecuenciaPago] = None
     dia_del_mes: Optional[int] = Field(None, ge=1, le=28)
+    dia_semana: Optional[int] = Field(None, ge=0, le=6)
     fecha_inicio: Optional[date] = None
     fecha_fin: Optional[date] = None
     proximo_pago: Optional[date] = None

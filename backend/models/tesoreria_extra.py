@@ -38,26 +38,50 @@ class TesoreriaTipoEmpleado(Base):
         return f"<TipoEmpleado {self.id} {self.nombre}>"
 
 
+class FrecuenciaPago(str, enum.Enum):
+    SEMANAL = "semanal"
+    QUINCENAL = "quincenal"
+    MENSUAL = "mensual"
+    BIMESTRAL = "bimestral"
+    TRIMESTRAL = "trimestral"
+    ANUAL = "anual"
+
+
 class TesoreriaPremio(Base):
-    """Catalogo global de premios/plus variables que se pueden sumar a un
-    pago programado al momento de ejecutarlo. El monto del pago programado
-    es el monto BASE; cuando se ejecuta el pago, el operador puede marcar
-    cuales de estos premios se cumplieron este mes y el sistema los suma.
+    """Catalogo global de premios/plus que cada empleado cobra como
+    liquidacion APARTE del sueldo (no se suman al sueldo mensual).
+
+    Cada premio define:
+      - frecuencia propia (presentismo: semanal; incentivo: mensual)
+      - dia_semana (0-6, lunes-domingo) cuando frecuencia=semanal
+      - dia_del_mes (1-28) cuando es mensual o derivada
+
+    Cuando un empleado tiene cargada su liquidacion mensual de sueldo, el
+    sistema auto-genera un TesoreriaPagoProgramado por cada premio activo
+    del catalogo, con sus propias fechas.
 
     Ejemplos:
-      - "Presentismo" + $50.000
-      - "Trabajo extra fin de semana" + $30.000
-      - "Bonus por puntualidad" + $15.000
+      - "Presentismo": semanal, viernes, $25.000
+      - "Trabajo extra": mensual, dia 15, $150.000
 
-    Multi-tenant via municipio_id. Cuando un premio se elimina, los
-    pagos historicos que lo aplicaron NO se ven afectados (la suma ya
-    quedo en el monto_pesos del Gasto). Por eso el "delete" es soft."""
+    Multi-tenant via municipio_id. Soft-delete preserva historico."""
     __tablename__ = "tesoreria_premios"
 
     id = Column(Integer, primary_key=True, index=True)
     municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
     nombre = Column(String(100), nullable=False, index=True)
     monto = Column(Numeric(15, 2), nullable=False, default=0)
+    # Cuando se paga este premio (independiente del sueldo)
+    frecuencia = Column(
+        Enum(FrecuenciaPago, values_callable=lambda x: [e.value for e in x]),
+        default=FrecuenciaPago.MENSUAL,
+        nullable=False,
+    )
+    # Solo cuando frecuencia=semanal. 0=lunes..6=domingo.
+    dia_semana = Column(Integer, nullable=True)
+    # Cuando frecuencia es mensual/quincenal/etc. 1..28 para evitar problemas
+    # de febrero. NULL si frecuencia=semanal.
+    dia_del_mes = Column(Integer, nullable=True)
     descripcion = Column(Text, nullable=True)
     color = Column(String(20), nullable=True)
     icono = Column(String(60), nullable=True)
@@ -142,15 +166,6 @@ class TesoreriaMovimientoCaja(Base):
         return f"<MovimientoCaja {self.id} caja={self.caja_id} {self.tipo.value} ${self.monto}>"
 
 
-class FrecuenciaPago(str, enum.Enum):
-    SEMANAL = "semanal"
-    QUINCENAL = "quincenal"
-    MENSUAL = "mensual"
-    BIMESTRAL = "bimestral"
-    TRIMESTRAL = "trimestral"
-    ANUAL = "anual"
-
-
 class TesoreriaPagoProgramado(Base):
     """Agenda de pago recurrente a un contacto.
 
@@ -176,6 +191,9 @@ class TesoreriaPagoProgramado(Base):
         nullable=False,
     )
     dia_del_mes = Column(Integer, default=1, nullable=False)  # 1-28 (evita problemas de feb)
+    # Solo cuando frecuencia=semanal. 0=lunes..6=domingo. Permite que el
+    # presentismo se pague todos los viernes, por ejemplo.
+    dia_semana = Column(Integer, nullable=True)
     fecha_inicio = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=True)
     proximo_pago = Column(Date, nullable=False, index=True)
