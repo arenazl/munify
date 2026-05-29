@@ -1940,7 +1940,7 @@ export const contactosApi = {
   update: (id: number, data: Record<string, unknown>) =>
     api.put(`/tesoreria/contactos/${id}`, data),
   delete: (id: number) => api.delete(`/tesoreria/contactos/${id}`),
-  duplicados: (threshold = 0.8) =>
+  duplicados: (threshold = 0.65) =>
     api.get('/tesoreria/contactos/duplicados', { params: { threshold } }),
   merge: (data: {
     keep_id: number;

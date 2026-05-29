@@ -68,6 +68,11 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
   // distintos) el user elige cuál se queda. Default = el del ganador.
   // Forma: overridesByGroup[groupKey][field] = valor elegido.
   const [overridesByGroup, setOverridesByGroup] = useState<Record<string, Record<string, string>>>({});
+  // Por grupo: set de IDs de contactos TILDADOS para entrar a la unificación.
+  // La red de detección es amplia (puede traer falsos positivos como un
+  // apellido compartido); el cliente destilda los que no corresponden y
+  // esos quedan aparte, sin fusionarse.
+  const [includedByGroup, setIncludedByGroup] = useState<Record<string, Set<number>>>({});
 
   // Cartel de confirmacion
   const [confirmGroupKey, setConfirmGroupKey] = useState<string | null>(null);
@@ -75,11 +80,44 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
 
   const groupKey = (g: Grupo) => g.contactos.map(c => c.id).sort().join('-');
 
+  // Contactos TILDADOS del grupo (los que se van a fusionar). Si todavía no
+  // hay set inicializado, se asume que todos están incluidos.
+  const getIncluded = (g: Grupo): ContactoDuplicado[] => {
+    const set = includedByGroup[groupKey(g)];
+    if (!set) return g.contactos;
+    return g.contactos.filter(c => set.has(c.id));
+  };
+
+  const isIncluded = (g: Grupo, id: number): boolean => {
+    const set = includedByGroup[groupKey(g)];
+    return set ? set.has(id) : true;
+  };
+
+  // Ganador efectivo: el elegido si sigue tildado, sino el primer tildado.
+  // Así, si el cliente destilda al ganador, no queda un estado inválido.
+  const effectiveKeepId = (g: Grupo): number | undefined => {
+    const included = getIncluded(g);
+    if (included.length === 0) return undefined;
+    const stored = keepByGroup[groupKey(g)];
+    if (stored != null && included.some(c => c.id === stored)) return stored;
+    return included[0].id;
+  };
+
+  const toggleInclude = (g: Grupo, id: number) => {
+    const key = groupKey(g);
+    setIncludedByGroup(prev => {
+      const cur = new Set(prev[key] ?? g.contactos.map(c => c.id));
+      if (cur.has(id)) cur.delete(id);
+      else cur.add(id);
+      return { ...prev, [key]: cur };
+    });
+  };
+
   // ============ Fetch al abrir ============
   useEffect(() => {
     if (!open) return;
     setLoading(true);
-    contactosApi.duplicados(0.8)
+    contactosApi.duplicados(0.65)
       .then(res => {
         const data = res.data as Grupo[];
         setGrupos(data || []);
@@ -87,14 +125,18 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
         // actividad desc) queda como ganador.
         const initialKeep: Record<string, number> = {};
         const initialTipo: Record<string, TipoContacto | ''> = {};
+        const initialIncluded: Record<string, Set<number>> = {};
         (data || []).forEach(g => {
           const k = groupKey(g);
           initialKeep[k] = g.contactos[0].id;
           initialTipo[k] = '';
+          // Por default todos vienen tildados (incluidos en la unificación).
+          initialIncluded[k] = new Set(g.contactos.map(c => c.id));
         });
         setKeepByGroup(initialKeep);
         setTipoByGroup(initialTipo);
         setOverridesByGroup({});
+        setIncludedByGroup(initialIncluded);
         setSkipped(new Set());
       })
       .catch(() => {
@@ -127,8 +169,10 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
   const handleConfirmMerge = async () => {
     if (!grupoEnConfirm) return;
     const key = groupKey(grupoEnConfirm);
-    const keepId = keepByGroup[key];
-    const mergeIds = grupoEnConfirm.contactos.filter(c => c.id !== keepId).map(c => c.id);
+    const incluidos = getIncluded(grupoEnConfirm);
+    const keepId = effectiveKeepId(grupoEnConfirm);
+    if (keepId == null) return;
+    const mergeIds = incluidos.filter(c => c.id !== keepId).map(c => c.id);
     const tipoFinal = tipoByGroup[key] || undefined;
 
     // Overrides solo de campos en conflicto donde el user eligio un valor
@@ -190,9 +234,10 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
   // Para cada uno: las opciones unicas + el ID del contacto que aporta cada valor.
   const getConflictsForGroup = (g: Grupo) => {
     const out: { field: string; label: string; opciones: { valor: string; deContactoId: number }[] }[] = [];
+    const incluidos = getIncluded(g);
     for (const f of CONFLICT_FIELDS) {
       const seen = new Map<string, number>(); // valor -> contactoId (primer aporte)
-      for (const c of g.contactos) {
+      for (const c of incluidos) {
         const raw = (c as unknown as Record<string, unknown>)[f.key as string];
         const v = typeof raw === 'string' ? raw.trim() : raw == null ? '' : String(raw).trim();
         if (v && !seen.has(v)) seen.set(v, c.id);
@@ -210,15 +255,15 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
 
   // Resuelve el valor "actual" para un campo: override del user, sino el del ganador,
   // sino el primero de los otros que lo tenga.
-  const resolveCurrentValue = (g: Grupo, keepId: number, field: string): string => {
+  const resolveCurrentValue = (g: Grupo, keepId: number | undefined, field: string): string => {
     const key = groupKey(g);
     const override = overridesByGroup[key]?.[field];
     if (override !== undefined) return override;
     const ganador = g.contactos.find(c => c.id === keepId);
     const ganadorVal = ganador ? (ganador as unknown as Record<string, unknown>)[field] : null;
     if (typeof ganadorVal === 'string' && ganadorVal.trim()) return ganadorVal;
-    // Auto-merge: si no, el primer otro contacto que tenga valor
-    for (const c of g.contactos) {
+    // Auto-merge: si no, el primer otro contacto TILDADO que tenga valor
+    for (const c of getIncluded(g)) {
       if (c.id === keepId) continue;
       const v = (c as unknown as Record<string, unknown>)[field];
       if (typeof v === 'string' && v.trim()) return v;
@@ -237,15 +282,16 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
   // ============ Preview del impacto (para el cartel) ============
   const previewImpacto = useMemo(() => {
     if (!grupoEnConfirm) return null;
-    const key = groupKey(grupoEnConfirm);
-    const keepId = keepByGroup[key];
-    const merged = grupoEnConfirm.contactos.filter(c => c.id !== keepId);
-    const ganador = grupoEnConfirm.contactos.find(c => c.id === keepId)!;
+    const incluidos = getIncluded(grupoEnConfirm);
+    const keepId = effectiveKeepId(grupoEnConfirm);
+    if (keepId == null) return null;
+    const merged = incluidos.filter(c => c.id !== keepId);
+    const ganador = incluidos.find(c => c.id === keepId)!;
     const gastosMovidos = merged.reduce((acc, c) => acc + c.cantidad_gastos, 0);
     const totalMovido = merged.reduce((acc, c) => acc + parseFloat(c.total_gastado || '0'), 0);
     const pagosProgMovidos = merged.reduce((acc, c) => acc + c.cantidad_pagos_prog, 0);
     return { ganador, merged, gastosMovidos, totalMovido, pagosProgMovidos };
-  }, [grupoEnConfirm, keepByGroup]);
+  }, [grupoEnConfirm, keepByGroup, includedByGroup]);
 
   // ============ Render helpers ============
   const tipoOptions = (Object.keys(TIPO_LABELS) as TipoContacto[]).map(t => ({
@@ -254,29 +300,51 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
     color: TIPO_COLORS[t],
   }));
 
-  const renderContactoRow = (c: ContactoDuplicado, isKeep: boolean, onSelect: () => void) => {
+  const renderContactoRow = (
+    c: ContactoDuplicado,
+    isKeep: boolean,
+    included: boolean,
+    onSelect: () => void,
+    onToggleInclude: () => void,
+  ) => {
     const total = parseFloat(c.total_gastado || '0');
     const tipoColor = TIPO_COLORS[c.tipo] || theme.primary;
+    const highlight = included && isKeep;
     return (
       <div
         key={c.id}
-        onClick={onSelect}
+        onClick={included ? onSelect : onToggleInclude}
         className="rounded-xl p-3 cursor-pointer transition-all hover:scale-[1.005]"
         style={{
-          backgroundColor: isKeep ? `${theme.primary}10` : theme.card,
-          border: `2px solid ${isKeep ? theme.primary : theme.border}`,
+          backgroundColor: highlight ? `${theme.primary}10` : theme.card,
+          border: `2px solid ${highlight ? theme.primary : theme.border}`,
+          opacity: included ? 1 : 0.55,
         }}
       >
         <div className="flex items-start gap-3">
-          {/* Radio */}
+          {/* Checkbox: incluir en la unificación */}
+          <div
+            onClick={(e) => { e.stopPropagation(); onToggleInclude(); }}
+            className="w-5 h-5 rounded-md flex-shrink-0 mt-0.5 flex items-center justify-center transition-all"
+            style={{
+              border: `2px solid ${included ? theme.primary : theme.border}`,
+              backgroundColor: included ? theme.primary : 'transparent',
+            }}
+            title={included ? 'Incluido — clic para sacarlo de la unificación' : 'Excluido — clic para incluirlo'}
+          >
+            {included && <CheckCircle2 className="h-3.5 w-3.5 text-white" />}
+          </div>
+
+          {/* Radio: marcar como ganador (solo si está incluido) */}
           <div
             className="w-5 h-5 rounded-full flex-shrink-0 mt-0.5 flex items-center justify-center"
             style={{
-              border: `2px solid ${isKeep ? theme.primary : theme.border}`,
-              backgroundColor: isKeep ? theme.primary : 'transparent',
+              border: `2px solid ${highlight ? theme.primary : theme.border}`,
+              backgroundColor: highlight ? theme.primary : 'transparent',
             }}
+            title={included ? 'Marcar como el que se mantiene' : ''}
           >
-            {isKeep && <div className="w-2 h-2 rounded-full bg-white" />}
+            {highlight && <div className="w-2 h-2 rounded-full bg-white" />}
           </div>
 
           {/* Datos */}
@@ -291,13 +359,21 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
               >
                 {TIPO_LABELS[c.tipo]}
               </span>
-              {isKeep && (
+              {highlight && (
                 <span
                   className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded inline-flex items-center gap-1"
                   style={{ backgroundColor: theme.primary, color: '#fff' }}
                 >
                   <CheckCircle2 className="h-2.5 w-2.5" />
                   Mantener
+                </span>
+              )}
+              {!included && (
+                <span
+                  className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: `${theme.textSecondary}20`, color: theme.textSecondary }}
+                >
+                  Queda aparte
                 </span>
               )}
             </div>
@@ -354,10 +430,12 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
             className="p-3 rounded-xl text-sm"
             style={{ backgroundColor: `${theme.primary}10`, border: `1px solid ${theme.primary}30`, color: theme.text }}
           >
-            Detectamos contactos con nombres parecidos (similitud ≥ 80%, ignorando tildes y mayúsculas).
-            Por cada grupo, elegí cuál mantener; los demás se fusionan en ese. Si hay datos en conflicto
-            (ej. dos teléfonos), abajo elegís con cuál te quedás. Los datos únicos (que solo uno tiene)
-            pasan automáticamente al ganador. Los gastos y pagos programados se reapuntan.
+            Te proponemos grupos de contactos con nombres parecidos (ignorando tildes y mayúsculas).
+            Son <b>candidatos</b>: por cada grupo, <b>destildá</b> los que no correspondan (quedan aparte,
+            sin tocar) y dejá tildados solo los que son la misma persona. Después elegí cuál mantener;
+            los demás se fusionan en ese. Si hay datos en conflicto (ej. dos teléfonos), abajo elegís con
+            cuál te quedás. Los datos únicos pasan automáticamente al ganador. Los gastos y pagos
+            programados se reapuntan.
           </div>
 
           {loading ? (
@@ -383,9 +461,10 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
               </p>
               {visibles.map(g => {
                 const key = groupKey(g);
-                const keepId = keepByGroup[key];
+                const keepId = effectiveKeepId(g);
                 const tipoFinal = tipoByGroup[key] || '';
                 const scorePct = Math.round(g.score * 100);
+                const incluidosCount = getIncluded(g).length;
                 return (
                   <div
                     key={key}
@@ -404,14 +483,18 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
                         {scorePct === 100 ? 'Coincidencia exacta' : `Similitud ${scorePct}%`}
                       </span>
                       <span className="text-xs" style={{ color: theme.textSecondary }}>
-                        {g.contactos.length} contactos
+                        {incluidosCount} de {g.contactos.length} se van a unificar
                       </span>
                     </div>
 
                     <div className="space-y-2 mb-3">
                       {g.contactos.map(c =>
-                        renderContactoRow(c, c.id === keepId, () =>
-                          setKeepByGroup(prev => ({ ...prev, [key]: c.id }))
+                        renderContactoRow(
+                          c,
+                          c.id === keepId,
+                          isIncluded(g, c.id),
+                          () => setKeepByGroup(prev => ({ ...prev, [key]: c.id })),
+                          () => toggleInclude(g, c.id),
                         )
                       )}
                     </div>
@@ -505,9 +588,14 @@ export function UnificarContactosModal({ open, onClose, onMerged }: Props) {
                         <SkipForward className="h-3.5 w-3.5" />
                         Saltar (no son duplicados)
                       </button>
-                      <PrimaryButton onClick={() => handleAskConfirm(g)} size="sm">
+                      <PrimaryButton
+                        onClick={() => handleAskConfirm(g)}
+                        size="sm"
+                        disabled={incluidosCount < 2}
+                        title={incluidosCount < 2 ? 'Tildá al menos 2 contactos para unificar' : ''}
+                      >
                         <GitMerge className="h-3.5 w-3.5" />
-                        Unificar este grupo
+                        Unificar {incluidosCount > 0 ? `(${incluidosCount})` : ''}
                         <ChevronRight className="h-3.5 w-3.5" />
                       </PrimaryButton>
                     </div>
