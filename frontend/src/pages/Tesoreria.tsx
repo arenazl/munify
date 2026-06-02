@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
+import PageHint from '../components/ui/PageHint';
 import { CrearGastoWizard } from '../components/tesoreria/CrearGastoWizard';
 import { PeriodNavigator, type PeriodModo } from '../components/ui/PeriodNavigator';
 import { DateRangePicker, type DateRange } from '../components/ui/DateRangePicker';
@@ -1148,6 +1149,9 @@ export default function Tesoreria() {
   return (
     <>
       <div className="pt-3">
+        {/* Hint wizard de onboarding completo del modulo financiero (8 pasos).
+            Se cierra una vez visto (persiste en localStorage). */}
+        <PageHint pageId="gestion-financiera-onboarding" />
         <TesoreriaHint titulo="Movimientos de Tesorería" storageKey="home">
           Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
           préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o

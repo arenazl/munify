@@ -86,6 +86,71 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
   },
 
   // ========================================================================
+  // GESTIÓN FINANCIERA — wizard del flujo completo Contaduría/Tesorería/Sueldos
+  // (montado en la home de Tesorería, que es donde más cae el cliente nuevo)
+  // ========================================================================
+  'gestion-financiera-onboarding': {
+    title: 'Gestión financiera del muni',
+    accent: 'emerald',
+    steps: [
+      {
+        title: 'Cómo se conecta todo',
+        description:
+          'El módulo financiero tiene 4 secciones que trabajan en cadena: Configuración (catálogo) → Contaduría (OPs formales) → Tesorería (cajas, conciliación) → Sueldos (liquidaciones recurrentes). Te llevo de a una.',
+        icon: 'Sparkles',
+      },
+      {
+        title: '1) Configuración → Tesorería (el catálogo)',
+        description:
+          'Primero cargás lo "estable": cajas/fondos (Coparticipación, Tesoro propio), conceptos de gasto, tipos de empleado, premios (con su frecuencia: presentismo semanal, incentivo mensual) y retenciones impositivas (Tasa Muni, Ganancias, IIBB, SUSS). De acá se alimenta todo lo demás.',
+        icon: 'ClipboardList',
+        cta: { label: 'Ir a Configuración', href: '/gestion/configuracion/tesoreria' },
+      },
+      {
+        title: '2) Contaduría → Órdenes de Pago',
+        description:
+          'Acá nace cada pago formal: cargás beneficiario + concepto + monto + factura, marcás retenciones, autorizás. Al pagar la OP, automáticamente se crea el gasto en Tesorería y se descuenta la caja elegida. Todo con audit log.',
+        icon: 'FileText',
+        cta: { label: 'Ir a Órdenes de Pago', href: '/gestion/contaduria/ordenes-pago' },
+      },
+      {
+        title: '3) Tesorería → Movimientos y Cajas',
+        description:
+          'Acá ves TODO el gasto del muni (sea originado en una OP o en una liquidación). Es la fuente de verdad. En Cajas ves los saldos en vivo de cada fondo: cada gasto descuenta de la caja que elegiste.',
+        icon: 'TrendingUp',
+        cta: { label: 'Ir a Cajas', href: '/gestion/tesoreria/cajas' },
+      },
+      {
+        title: '4) Tesorería → Conciliación bancaria',
+        description:
+          'Cuando llega el extracto del banco lo subís en CSV y el sistema auto-matchea contra tus movimientos por (monto + tipo + fecha ±N días). Los que no matchean los conciliás manualmente. Cierra el ciclo: lo que sale de caja = lo que sale del banco.',
+        icon: 'Lightbulb',
+        cta: { label: 'Ir a Conciliación', href: '/gestion/tesoreria/conciliacion' },
+      },
+      {
+        title: '5) Sueldos → Liquidaciones recurrentes',
+        description:
+          'Cada empleado tiene su sueldo mensual + premios independientes: presentismo se paga todos los VIERNES, incentivo el DÍA 15. Cada uno con su propio botón Pagar. Si un viernes el empleado no se ganó el presentismo, simplemente no se le ejecuta.',
+        icon: 'Users',
+        cta: { label: 'Ir a Liquidaciones', href: '/gestion/tesoreria/agenda' },
+      },
+      {
+        title: '6) Reportes y Portal de Transparencia',
+        description:
+          'Cada módulo tiene su pantalla de Reportes (vencidos, top beneficiarios, masa salarial, evolución mensual). En Contaduría → Reportes hay un botón "Portal de Transparencia" que exporta JSON/CSV abierto para publicar en la web del muni.',
+        icon: 'TrendingUp',
+        cta: { label: 'Reportes Contaduría', href: '/gestion/contaduria/reportes' },
+      },
+      {
+        title: '¡Listo! El flujo en una imagen',
+        description:
+          'Catálogo → OP → Pago (gasto + caja) → Conciliación bancaria. En paralelo: Empleado → Liquidaciones (sueldo + premios) → Pago. Todo queda registrado con auditoría, exportable y conciliable.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  // ========================================================================
   // HINTS SIMPLES POR PANTALLA
   // ========================================================================
   'reclamos-list': {

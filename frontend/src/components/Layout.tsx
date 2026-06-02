@@ -7,8 +7,6 @@ import { useTheme, ThemeVariant } from '../contexts/ThemeContext';
 import { getNavigation, isMobileDevice } from '../config/navigation';
 import { fontPresets } from '../config/fontPresets';
 import { MunifyLogo } from './ui/MunifyLogo';
-import { MunifyTour } from './ui/MunifyTour';
-import { TourButton } from './ui/TourButton';
 import { useVecinoBadges } from '../hooks/useVecinoBadges';
 import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
@@ -403,7 +401,6 @@ export default function Layout() {
 
         {/* Header del Sidebar: Logo + Municipio */}
         <div
-          data-tour="munify-logo-header"
           className="relative z-10 px-3 py-4 border-b"
           style={{ borderColor: `${theme.sidebarTextSecondary}20` }}
         >
@@ -657,7 +654,6 @@ export default function Layout() {
                 )}
               <Link
                 to={item.href}
-                data-tour={`nav:${item.href}`}
                 className="flex items-center py-2.5 rounded-lg text-xs font-medium active:scale-[0.98] group relative overflow-hidden"
                 style={{
                   backgroundColor: isActive ? theme.primary : 'transparent',
@@ -809,9 +805,6 @@ export default function Layout() {
             >
               <Palette className="h-5 w-5" strokeWidth={2.5} />
             </button>
-            <span data-tour="munify-help-button">
-              <TourButton tourKey="onboarding-sidebar-v1" title="Volver a ver el tutorial del menú" />
-            </span>
             <NotificacionesDropdown />
           </div>
         </header>
@@ -1158,9 +1151,6 @@ export default function Layout() {
                   document.body
                 )}
               </div>
-
-              {/* Boton tutorial menu (tour onboarding-sidebar-v1) */}
-              <TourButton tourKey="onboarding-sidebar-v1" title="Volver a ver el tutorial del menú" />
 
               {/* Notificaciones */}
               <NotificacionesDropdown />
@@ -2182,75 +2172,6 @@ export default function Layout() {
       {/* Bottom-sheet de activacion de notificaciones — auto-trigger al login
           + listener para post-creacion de reclamos/tramites. */}
       <NotificationActivationSheet />
-
-      {/* Tour de onboarding del menu lateral. Arranca automatico la primera
-          vez (localStorage flag). Para relanzar manualmente: boton "?" en el
-          header (TourButton). */}
-      <MunifyTour
-        tourKey="onboarding-sidebar-v1"
-        steps={[
-          {
-            target: '[data-tour="munify-logo-header"]',
-            content: 'Munify es la herramienta de gestion integral del muni: pagos, sueldos, contaduria y tesoreria, todo conectado. Te llevo por las 4 secciones del menu de la izquierda en 1 minuto.',
-            title: 'Bienvenido a Munify',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/contaduria/ordenes-pago"]',
-            content: 'Aca nace cada pago formal del muni. Cargas concepto + factura + retenciones, autorizas, y al pagar el sistema crea el gasto en Tesoreria y descuenta automaticamente la caja elegida. Todo queda con auditoria.',
-            title: 'Contaduria · Ordenes de Pago',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/contaduria/reportes"]',
-            content: 'OPs vencidas (rojo) y proximas a vencer (amarillo), top beneficiarios del mes y boton de export JSON/CSV para Portal de Transparencia (datos abiertos para la web del muni).',
-            title: 'Contaduria · Reportes',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/tesoreria"]',
-            content: 'Aca ves TODO el gasto del muni, sea originado en una OP (Contaduria) o en una liquidacion de sueldo. Es la fuente de verdad de lo que efectivamente salio: monto, fecha, caja, contacto.',
-            title: 'Tesoreria · Movimientos',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/tesoreria/cajas"]',
-            content: 'Saldos en vivo de cada fondo (Coparticipacion, Tesoro propio, FOFINDE, etc). Cada gasto descuenta de la caja que elegiste. Aca arrancas cargando saldo inicial de cada caja.',
-            title: 'Tesoreria · Cajas / Fondos',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/tesoreria/conciliacion"]',
-            content: 'Cuando llega el extracto del banco lo subis en CSV y el sistema matchea solo: si tu movimiento de caja coincide en monto + fecha (+/- N dias), se marca como conciliado. Los que no matchean los conciliar a mano.',
-            title: 'Tesoreria · Conciliacion bancaria',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/tesoreria/contactos"]',
-            content: 'Padron de contactos del muni: proveedores, empleados, beneficiarios, contratistas. Es el padron compartido por todos los modulos. Cada empleado puede tener su tipo (corralon, planta, jornalizado, etc).',
-            title: 'Tesoreria · Contactos',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/tesoreria/agenda"]',
-            content: 'Pagos recurrentes de cada empleado: sueldo mensual + presentismo SEMANAL (viernes) + incentivo MENSUAL (dia 15). Cada uno con su propio boton Pagar segun corresponda. Si el empleado no se gano el premio, simplemente no se paga ese.',
-            title: 'Sueldos · Liquidaciones',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="nav:/gestion/configuracion/tesoreria"]',
-            content: 'Catalogo del muni: cajas/fondos, conceptos de gasto, tipos de empleado, premios (con su frecuencia y dia), retenciones impositivas (Tasa Muni, Ganancias, IIBB, SUSS), parajes y proyectos. De aca se alimenta todo lo demas.',
-            title: 'Configuracion del modulo',
-            placement: 'right' as const,
-          },
-          {
-            target: '[data-tour="munify-help-button"]',
-            content: 'Listo. Cualquier momento podes volver a ver este recorrido apretando este boton "?". Ademas cada pantalla tiene su propio tutorial puntual con su boton "?" arriba a la derecha.',
-            title: 'Para volver a verlo',
-            placement: 'bottom' as const,
-          },
-        ]}
-      />
     </div>
   );
 }
