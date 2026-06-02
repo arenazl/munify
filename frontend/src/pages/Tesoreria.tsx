@@ -1149,9 +1149,7 @@ export default function Tesoreria() {
   return (
     <>
       <div className="pt-3">
-        {/* Hint wizard de onboarding completo del modulo financiero (8 pasos).
-            Se cierra una vez visto (persiste en localStorage). */}
-        <PageHint pageId="gestion-financiera-onboarding" />
+        <PageHint pageId="tesoreria-movimientos" />
         <TesoreriaHint titulo="Movimientos de Tesorería" storageKey="home">
           Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
           préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o

@@ -3,6 +3,7 @@ import { BarChart3, Users, Briefcase, Calendar, Repeat, Loader2 } from 'lucide-r
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 import { agendaPagosApi } from '../lib/api';
@@ -59,6 +60,7 @@ export default function ReportesSueldos() {
 
   return (
     <>
+      <PageHint pageId="sueldos-reportes" />
     <ABMPage
       title="Reportes de Sueldos"
       icon={<BarChart3 className="h-5 w-5" />}

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
@@ -104,6 +105,7 @@ export default function TesoreriaCajas() {
 
   return (
     <>
+      <PageHint pageId="tesoreria-cajas" />
     <ABMPage
       title="Cajas y Saldos"
       icon={<PiggyBank className="h-5 w-5" />}

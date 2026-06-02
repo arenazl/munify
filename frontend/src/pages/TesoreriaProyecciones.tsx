@@ -14,6 +14,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PeriodNavigator } from '../components/ui/PeriodNavigator';
 import { MunifyTour } from '../components/ui/MunifyTour';
@@ -315,6 +316,7 @@ export default function TesoreriaResumen() {
 
   return (
     <>
+      <PageHint pageId="tesoreria-proyeccion" />
       <TesoreriaHint titulo="Resumen" storageKey="resumen">
         Mirá gasto por <b>mes</b> o <b>año</b> con las flechas ← →. Aplicá los filtros de arriba
         para ver cuánto se gastó en cada rubro/contacto/dependencia. En modo "Año" cada mes se expande.

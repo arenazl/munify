@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
+import PageHint from '../components/ui/PageHint';
 
 const TOUR_STEPS = [
   {
@@ -76,6 +77,7 @@ export default function ReportesContaduria() {
 
   return (
     <>
+    <PageHint pageId="contaduria-reportes" />
     <ABMPage
       title="Reportes de Contaduría"
       icon={<BarChart3 className="h-5 w-5" />}

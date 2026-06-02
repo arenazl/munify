@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PrimaryButton } from '../components/ui/PrimaryButton';
 import { cajasApi, conciliacionApi } from '../lib/api';
@@ -106,6 +107,8 @@ export default function TesoreriaConciliacion() {
   const cajaOptions = cajas.map(c => ({ value: String(c.id), label: c.nombre, color: c.color || undefined }));
 
   return (
+    <>
+    <PageHint pageId="tesoreria-conciliacion" />
     <ABMPage
       title="Conciliación Bancaria"
       icon={<Banknote className="h-5 w-5" />}
@@ -319,5 +322,6 @@ export default function TesoreriaConciliacion() {
         </div>
       </div>
     </ABMPage>
+    </>
   );
 }

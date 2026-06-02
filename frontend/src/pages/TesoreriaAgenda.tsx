@@ -8,6 +8,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 
@@ -660,6 +661,7 @@ export default function TesoreriaAgenda() {
 
   return (
     <>
+      <PageHint pageId="sueldos-liquidaciones" />
       <TesoreriaHint titulo="Liquidaciones de sueldo" storageKey="agenda">
         Programá pagos <b>recurrentes</b> (sueldos, honorarios, alquileres). El sistema te
         recuerda cuándo toca pagar y con un click crea el gasto + descuenta la caja correspondiente.

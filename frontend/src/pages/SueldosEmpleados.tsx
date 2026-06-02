@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
@@ -121,6 +122,7 @@ export default function SueldosEmpleados() {
 
   return (
     <>
+      <PageHint pageId="sueldos-empleados" />
     <ABMPage
       title="Empleados"
       icon={<Users className="h-5 w-5" />}

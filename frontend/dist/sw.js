@@ -4,7 +4,7 @@
 // Esto garantiza que el browser detecte un sw.js byte-diferente en cada
 // deploy y dispare el flujo de "Nueva version disponible" del ServiceWorkerUpdater.
 const SW_VERSION = '2.4.0';
-const SW_BUILD = '1780417812862-jiyi';
+const SW_BUILD = '1780418759631-slaa';
 const CACHE_NAME = `app-cache-v${SW_VERSION}-${SW_BUILD}`;
 
 // Handler de mensajes desde la app. Permite que el componente

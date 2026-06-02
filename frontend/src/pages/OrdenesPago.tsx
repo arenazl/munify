@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, type ABMTableColumn } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { StatusPill } from '../components/ui/StatusPill';
 import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
@@ -422,6 +423,7 @@ export default function OrdenesPago() {
   // ============ Render ============
   return (
     <>
+      <PageHint pageId="contaduria-ordenes" />
       <ABMPage
         title="Órdenes de Pago"
         icon={<FileCheck className="h-5 w-5" />}

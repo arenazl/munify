@@ -86,8 +86,434 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
   },
 
   // ========================================================================
-  // GESTIÓN FINANCIERA — wizard del flujo completo Contaduría/Tesorería/Sueldos
-  // (montado en la home de Tesorería, que es donde más cae el cliente nuevo)
+  // MÓDULO FINANCIERO — un hint por pantalla, 5 steps con lenguaje claro
+  // pensado para el intendente (no técnico).
+  // Cubre los 14 items del sidebar del módulo.
+  // ========================================================================
+  'contaduria-ordenes': {
+    title: 'Órdenes de Pago',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Qué es una Orden de Pago?',
+        description: 'Es el documento formal con el que el muni autoriza un pago. Antes de que la plata salga de la caja, alguien tiene que firmar la OP. Acá la creás, la autorizás y la pagás. Queda todo registrado con audit.',
+        icon: 'FileText',
+      },
+      {
+        title: 'Cómo se crea una',
+        description: 'Apretás "Nueva OP", ponés a quién le pagás (proveedor o secretaría), el concepto y el monto. Si tenés la factura del proveedor, la adjuntás (PDF o foto). Elegís la caja de dónde saldrá la plata.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Retenciones impositivas',
+        description: 'Si el muni retiene impuestos al pagar (Tasa Muni, Ganancias, IIBB, SUSS), tildás cuáles aplican. El sistema calcula el monto neto que efectivamente sale de caja, y el bruto queda registrado para el Tribunal de Cuentas.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Etapas contables del gasto',
+        description: 'Cada OP pasa por 4 etapas: Preventivo (reserva el presupuesto) → Compromiso (firmás el contrato/orden) → Devengado (recibiste el bien/servicio) → Pagado. Esto es lo que pide el Tribunal de Cuentas.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Al pagar, ¿qué pasa?',
+        description: 'Cuando apretás "Pagar" en una OP autorizada, automáticamente: 1) se crea el gasto en Tesorería, 2) se descuenta la caja, 3) la OP queda en estado "Pagada". Una sola acción, todo conectado.',
+        icon: 'Rocket',
+        cta: { label: 'Ver Movimientos en Tesorería', href: '/gestion/tesoreria' },
+      },
+    ],
+  },
+
+  'contaduria-reportes': {
+    title: 'Reportes de Contaduría',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Para qué sirve esta pantalla?',
+        description: 'Es el tablero de control de las OPs. De un vistazo ves qué pagos están vencidos, qué se viene en los próximos días y dónde está concentrado el gasto del muni este mes.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'OPs vencidas (rojo)',
+        description: 'Son las que tenían fecha de vencimiento y todavía no se pagaron. Es lo primero que mirás cada mañana: si hay rojo, hay un problema con un proveedor que no le pagamos a tiempo.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Próximas a vencer (amarillo)',
+        description: 'Las que vencen en los próximos 7 días. Para que el tesorero anticipe la disponibilidad de fondos y no se nos pase ninguna.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Top beneficiarios del mes',
+        description: 'A quiénes se les pagó más plata este mes. Sirve para detectar si estamos muy concentrados en un solo proveedor o si hay un gasto que se disparó.',
+        icon: 'Users',
+      },
+      {
+        title: 'Portal de Transparencia',
+        description: 'Botón "JSON/CSV" arriba: bajás todos los pagos hechos en formato abierto para publicarlos en la web del muni. Es lo que pide la Ley de Acceso a la Información Pública.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'tesoreria-movimientos': {
+    title: 'Movimientos de Tesorería',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Qué ves acá?',
+        description: 'Todo el dinero que efectivamente sale del muni. Cada gasto del muni aparece acá, sea originado en una OP de Contaduría o en una liquidación de sueldo. Es la "fuente de verdad" del dinero gastado.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Cargar un gasto suelto',
+        description: 'Si necesitás registrar un gasto que no vino por OP (un pago en efectivo, una compra menor), apretás "Nuevo Gasto" y lo cargás directo. Elegís de qué caja sale.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Filtros y búsqueda',
+        description: 'Buscás por concepto, por contacto o por descripción. También filtrás por mes, por dependencia, por caja, por forma de pago. Para encontrar cualquier gasto rápido.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Cada gasto descuenta una caja',
+        description: 'Cuando se carga un gasto con caja asignada, automáticamente se descuenta del saldo de esa caja. Así el saldo de Coparticipación, Tesoro propio, etc. siempre está actualizado.',
+        icon: 'TrendingUp',
+        cta: { label: 'Ver saldos de cajas', href: '/gestion/tesoreria/cajas' },
+      },
+      {
+        title: 'Curación con IA (Bartolo)',
+        description: 'Si importás gastos viejos (Excel, Mercurio Pago) hay una pantalla aparte donde la IA clasifica los gastos dudosos y vos los corregís. Mantiene tu histórico limpio.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'tesoreria-cajas': {
+    title: 'Cajas / Fondos',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Qué son las cajas?',
+        description: 'Son las "billeteras" del muni: Tesoro propio, Coparticipación provincial, FOFINDE, FODEMEP, fondos afectados a una obra, etc. Cada caja tiene su saldo en vivo.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Saldo inicial',
+        description: 'Al crear una caja le ponés el saldo con el que arranca. Después cada gasto y cada ingreso modifican ese saldo automáticamente. No hay que llevar planilla aparte.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Ingresos y egresos',
+        description: 'Cargás ingresos a la caja (Coparticipación que llega, transferencias recibidas, recaudación). Cada gasto registrado en Movimientos o cada OP pagada descuenta automáticamente.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Fondos con afectación específica',
+        description: 'Si un fondo está afectado a una obra puntual (FONDO ESCUELA, FONDO VIVIENDA), creás una caja específica para que la plata no se mezcle con los recursos corrientes.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Conciliación bancaria',
+        description: 'Cuando llega el extracto del banco, lo subís en Conciliación y el sistema cruza los movimientos automáticamente. Cierra el ciclo: lo que sale de caja en el sistema = lo que sale del banco.',
+        icon: 'Rocket',
+        cta: { label: 'Ir a Conciliación', href: '/gestion/tesoreria/conciliacion' },
+      },
+    ],
+  },
+
+  'tesoreria-conciliacion': {
+    title: 'Conciliación Bancaria',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Qué es conciliar?',
+        description: 'Es chequear que lo que registramos en el sistema coincida con lo que registró el banco en el extracto. Si vos cargaste un pago de $50.000 y el banco lo cobró por $50.000, esa fila está "conciliada".',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Subís el extracto del banco',
+        description: 'Bajás el extracto desde el home-banking en formato CSV (Excel exportado) y lo subís acá. Elegís a qué caja corresponde (Tesoro propio, Coparticipación, etc.).',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Match automático',
+        description: 'El sistema busca cada línea del extracto contra los movimientos de la caja: si coinciden el monto + el tipo (ingreso/egreso) + la fecha (±N días que vos elegís), se marca como conciliado solo.',
+        icon: 'Rocket',
+      },
+      {
+        title: 'Lo que no matchea',
+        description: 'Lo que el sistema no pudo matchear queda abajo. Lo conciliás manualmente apretando el botón verde. Si algo en el extracto no figura en tus movimientos, es señal de que falta cargarlo.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: '¿Por qué es importante?',
+        description: 'Conciliar todos los meses te asegura que no hay errores, robos ni faltantes. Y es lo primero que pide el Tribunal de Cuentas: "Mostrame el extracto bancario contra el libro caja".',
+        icon: 'TrendingUp',
+      },
+    ],
+  },
+
+  'tesoreria-proyeccion': {
+    title: 'Proyección / Resumen',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Para qué sirve?',
+        description: 'Es la vista resumen del gasto del muni: cuánto gastamos cada mes, en qué se nos fue la plata, qué proveedor cobra más. Para tomar decisiones a mediano plazo.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Modo mes vs modo año',
+        description: 'Con las flechas ← → navegás entre meses (o entre años si estás en modo año). En modo año cada mes se puede expandir para ver el detalle adentro.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Filtros poderosos',
+        description: 'Filtrás por dependencia (Secretaría de Obras, Salud, etc.), por contacto, por tipo de concepto, por forma de pago, por caja. Combinás filtros para responder preguntas concretas.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Total destacado',
+        description: 'Arriba siempre ves el total acumulado del período + filtros aplicados. Útil para preguntas tipo: "¿cuánto gastamos en sueldos de personal contratado este año?".',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Cuándo usarla',
+        description: 'Antes de aprobar un gasto grande, conviene mirar acá: ¿venimos cumpliendo presupuesto? ¿hay rubros que se dispararon? Es el "panel de control" del intendente.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'tesoreria-ubicacion': {
+    title: 'Mapa de Tesorería',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Qué muestra el mapa?',
+        description: 'La ubicación geográfica de tus contactos (proveedores, empleados, beneficiarios) y de cada gasto del muni. Sirve para entender la distribución territorial.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Contactos del muni',
+        description: 'Ves dónde viven tus empleados, dónde están los proveedores que más le pagás, qué barrios concentran subsidios. Cada chinche es un contacto activo.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Por paraje / zona',
+        description: 'Si cargaste contactos por paraje (Santa Rita, Los Álamos, etc.), podés ver el resumen agrupado por zona: cuánto se gastó en cada paraje en el período elegido.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Filtros temporales',
+        description: 'Elegís el mes/año para ver dónde se gastó la plata. Útil para comparar: "¿el mes pasado vs este mes, gastamos más en el centro o en los parajes?".',
+        icon: 'TrendingUp',
+      },
+      {
+        title: '¿Cuándo es útil?',
+        description: 'Cuando querés explicarle al Concejo Deliberante o a un vecino dónde se invierte la plata del muni. Una imagen del mapa con los gastos del mes vale más que mil planillas.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'tesoreria-contactos': {
+    title: 'Contactos',
+    accent: 'emerald',
+    steps: [
+      {
+        title: 'El padrón compartido del muni',
+        description: 'Acá viven todos los contactos del muni: empleados, proveedores, beneficiarios de subsidios, contratistas. Un solo lugar para no duplicar datos.',
+        icon: 'Users',
+      },
+      {
+        title: 'Tipos de contacto',
+        description: 'Cada contacto tiene un tipo: Empleado, Beneficiario, Proveedor, Contratista. Si es Empleado, además podés clasificarlo (corralón, personal de planta, jornalizado, etc.) para los reportes.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Cuenta corriente del proveedor',
+        description: 'Si hacés clic en un proveedor ves su cuenta corriente: todas las OPs emitidas a su nombre, lo que se le pagó, lo que está pendiente. Total del año, retenciones aplicadas, todo.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Ubicación y datos',
+        description: 'Cargás la dirección con autocompletar (o un paraje si vive en el campo), DNI/CUIT, teléfono, alias bancario para transferencias, y el sistema sabe cómo pagarle.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Unificar duplicados',
+        description: 'Si por error cargaste dos veces al mismo contacto (con nombre apenas distinto), hay un botón "Unificar" que fusiona los dos en uno sin perder el histórico de pagos.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'tesoreria-reportes': {
+    title: 'Reportes de Tesorería',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Para qué sirve?',
+        description: 'Es el panel ejecutivo de Tesorería: en qué se nos va la plata, qué cajas se mueven más, cómo viene la evolución mes a mes. La info que un intendente mira con su mate por la mañana.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Egresos por caja',
+        description: 'Cuánto salió de cada caja este mes y qué porcentaje del total representa. Útil para ver si estamos balanceando el uso de los fondos (no usar todo de una sola caja).',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Top conceptos del mes',
+        description: 'Los conceptos de gasto que se llevaron más plata: sueldos, combustible, obras, gastos de movilidad, etc. Para identificar rápido dónde se concentra el gasto.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Top dependencias',
+        description: 'Qué secretarías recibieron más asignación de gasto este mes. Compara consumo entre áreas y detecta desbalances.',
+        icon: 'Users',
+      },
+      {
+        title: 'Evolución mensual',
+        description: 'Gráfico de barras con los últimos 6 meses de gasto total. De un vistazo ves si veníamos creciendo, si se aplastó o si tuvimos un pico anómalo.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'sueldos-liquidaciones': {
+    title: 'Liquidaciones',
+    accent: 'emerald',
+    steps: [
+      {
+        title: '¿Qué son las liquidaciones?',
+        description: 'Son los pagos recurrentes a empleados: sueldos mensuales, presentismo semanal, incentivos. Cada uno se programa una vez y el sistema te avisa cuándo toca pagarlo.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Sueldo + premios separados',
+        description: 'Cada empleado tiene su sueldo mensual + el presentismo (semanal, todos los viernes) + el incentivo (mensual, día 15). Tres pagos distintos, cada uno con su propio botón "Pagar".',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Auto-generación',
+        description: 'Cuando cargás el sueldo de un empleado nuevo, automáticamente se le crean los pagos de cada premio activo del catálogo. No hay que cargar 3 cosas por empleado, con cargar el sueldo basta.',
+        icon: 'Rocket',
+      },
+      {
+        title: 'Si el empleado no se ganó el premio',
+        description: 'No le apretás "Pagar" a ese premio ese mes. No afecta al sueldo ni a los próximos. Por ejemplo: si faltó un viernes, ese presentismo no se paga, pero los demás viernes sí.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Filtro Realizados',
+        description: 'En el chip "Realizados" arriba ves todos los pagos ya ejecutados de los últimos 90 días. Útil para responder "¿ya le pagué a Juan este mes?".',
+        icon: 'TrendingUp',
+        cta: { label: 'Configurar premios', href: '/gestion/configuracion/tesoreria?tab=premios' },
+      },
+    ],
+  },
+
+  'sueldos-empleados': {
+    title: 'Empleados',
+    accent: 'emerald',
+    steps: [
+      {
+        title: 'El padrón de personal',
+        description: 'Acá ves todos los empleados del muni que cobran sueldo. Cada empleado es un contacto tipo "empleado" con sub-clasificación (planta, contratado, corralón, etc.).',
+        icon: 'Users',
+      },
+      {
+        title: 'KPIs arriba',
+        description: 'Cantidad de empleados activos, cuántos ya tienen liquidación cargada, y masa salarial total (suma de sueldos base sin premios). Te da la foto del personal del muni.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Estado de cada empleado',
+        description: 'Cada fila te muestra si el empleado ya tiene la liquidación cargada (verde) o no (gris). Si está gris, falta cargarle el sueldo y los premios automáticos no se le aplicarán.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Filtrar por tipo',
+        description: 'En el combo "Tipos" filtrás por sub-clasificación: ver solo Personal de planta, solo Jornalizados, solo Corralón. Útil para reportes específicos.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Para cargar uno nuevo',
+        description: 'Si entra un empleado nuevo al muni: primero lo creás como Contacto (tipo=Empleado, con DNI y datos) y después le cargás la liquidación de sueldo en la sección Liquidaciones.',
+        icon: 'Rocket',
+        cta: { label: 'Ir a Contactos', href: '/gestion/tesoreria/contactos' },
+      },
+    ],
+  },
+
+  'sueldos-reportes': {
+    title: 'Reportes de Sueldos',
+    accent: 'emerald',
+    steps: [
+      {
+        title: 'El panel de personal',
+        description: 'Es la foto financiera del personal del muni: cuánto pesa la masa salarial, qué empleados cobran más, distribución por tipo de pago.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Masa salarial',
+        description: 'El total mensual que pagás en sueldos. Si crece mes a mes, hay que prestar atención. Es uno de los gastos más grandes del muni.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Top sueldos',
+        description: 'Ranking de los empleados con los sueldos más altos. Útil para revisión presupuestaria: ¿corresponde a sus cargos? ¿hay desbalance?.',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Distribución por frecuencia',
+        description: 'Cuántas liquidaciones son mensuales vs quincenales vs semanales. Mostrás cómo se compone el pago de sueldos.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Próximos pagos',
+        description: 'Lista cronológica de los próximos 30 días de pagos a personal. Útil para planificación de tesorería y para saber qué viene la semana próxima.',
+        icon: 'Rocket',
+      },
+    ],
+  },
+
+  'configuracion-tesoreria': {
+    title: 'Configuración de Tesorería',
+    accent: 'emerald',
+    steps: [
+      {
+        title: 'El catálogo del módulo',
+        description: 'Acá cargás todo lo "estable" del muni: cajas, conceptos, tipos de empleado, premios, retenciones, parajes, proyectos. Se hace una sola vez y de acá se alimenta TODO lo demás.',
+        icon: 'Sparkles',
+      },
+      {
+        title: 'Conceptos y tipos de empleado',
+        description: 'Conceptos = de qué tipo es un gasto (Sueldo, Combustible, Obra, etc.). Tipos de empleado = sub-clasificación de empleados (corralón, planta, jornalizado).',
+        icon: 'ClipboardList',
+      },
+      {
+        title: 'Cajas / Fondos',
+        description: 'Acá creás las "billeteras" del muni: Tesoro propio, Coparticipación, FOFINDE, etc. Con su saldo inicial y color. Después cada gasto descuenta de la que corresponda.',
+        icon: 'TrendingUp',
+      },
+      {
+        title: 'Premios (semanal/mensual)',
+        description: 'Cargás Presentismo (frecuencia semanal, día viernes) e Incentivo (frecuencia mensual, día 15). El monto es fijo. Después se aplican automáticamente a cada empleado con sueldo cargado.',
+        icon: 'Lightbulb',
+      },
+      {
+        title: 'Retenciones impositivas',
+        description: 'Tasa Muni, Ganancias, IIBB, SUSS, etc. Cada una con su porcentaje. Al crear una OP marcás cuáles aplican y el sistema calcula el neto a pagar al proveedor.',
+        icon: 'Rocket',
+        cta: { label: 'Ir a Órdenes de Pago', href: '/gestion/contaduria/ordenes-pago' },
+      },
+    ],
+  },
+
+  // ========================================================================
+  // Wizard del flujo completo (kept para compat si lo necesitamos en Dashboard)
   // ========================================================================
   'gestion-financiera-onboarding': {
     title: 'Gestión financiera del muni',

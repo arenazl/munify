@@ -3,6 +3,7 @@ import { BarChart3, PiggyBank, Tag, Building2, TrendingUp, Loader2 } from 'lucid
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage } from '../components/ui/ABMPage';
+import PageHint from '../components/ui/PageHint';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 
@@ -54,6 +55,7 @@ export default function ReportesTesoreria() {
 
   return (
     <>
+      <PageHint pageId="tesoreria-reportes" />
     <ABMPage
       title="Reportes de Tesorería"
       icon={<BarChart3 className="h-5 w-5" />}
