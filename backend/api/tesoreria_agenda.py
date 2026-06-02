@@ -79,8 +79,8 @@ def _calcular_fecha_inicio_premio(hoy: date, frecuencia: FrecuenciaPago, dia_sem
 
 
 async def _enrich(db: AsyncSession, pp: TesoreriaPagoProgramado) -> PagoProgramadoResponse:
+    """Enrich de UN solo PagoProgramado. Para listas usar _enrich_bulk (evita N+1)."""
     resp = PagoProgramadoResponse.model_validate(pp)
-    # Cargar nombres de contacto y caja
     c = (await db.execute(select(Contacto).where(Contacto.id == pp.contacto_id))).scalar_one_or_none()
     if c:
         resp.contacto_nombre = f"{c.nombre} {c.apellido or ''}".strip()
@@ -89,6 +89,39 @@ async def _enrich(db: AsyncSession, pp: TesoreriaPagoProgramado) -> PagoPrograma
         if caja:
             resp.caja_nombre = caja.nombre
     return resp
+
+
+async def _enrich_bulk(
+    db: AsyncSession, pagos: list[TesoreriaPagoProgramado]
+) -> list[PagoProgramadoResponse]:
+    """Enrich de varios pagos programados en 2 queries fijas (no N+1)."""
+    if not pagos:
+        return []
+    contacto_ids = {p.contacto_id for p in pagos if p.contacto_id}
+    caja_ids = {p.caja_id for p in pagos if p.caja_id}
+
+    contactos_map: dict[int, str] = {}
+    if contacto_ids:
+        rows = (await db.execute(
+            select(Contacto.id, Contacto.nombre, Contacto.apellido).where(Contacto.id.in_(contacto_ids))
+        )).all()
+        contactos_map = {cid: f"{nom} {ape or ''}".strip() for cid, nom, ape in rows}
+
+    cajas_map: dict[int, str] = {}
+    if caja_ids:
+        rows = (await db.execute(
+            select(TesoreriaCaja.id, TesoreriaCaja.nombre).where(TesoreriaCaja.id.in_(caja_ids))
+        )).all()
+        cajas_map = {cid: nom for cid, nom in rows}
+
+    out: list[PagoProgramadoResponse] = []
+    for p in pagos:
+        resp = PagoProgramadoResponse.model_validate(p)
+        resp.contacto_nombre = contactos_map.get(p.contacto_id)
+        if p.caja_id:
+            resp.caja_nombre = cajas_map.get(p.caja_id)
+        out.append(resp)
+    return out
 
 
 @router.get("", response_model=List[PagoProgramadoResponse])
@@ -111,8 +144,8 @@ async def list_pagos(
         limite = date.today() + timedelta(days=proximos_dias)
         q = q.where(TesoreriaPagoProgramado.proximo_pago <= limite)
     q = q.order_by(TesoreriaPagoProgramado.proximo_pago.asc())
-    pagos = (await db.execute(q)).scalars().all()
-    return [await _enrich(db, p) for p in pagos]
+    pagos = list((await db.execute(q)).scalars().all())
+    return await _enrich_bulk(db, pagos)
 
 
 @router.post("", response_model=PagoProgramadoResponse, status_code=201)

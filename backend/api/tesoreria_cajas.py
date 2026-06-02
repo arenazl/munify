@@ -25,7 +25,11 @@ def _require_admin(user: User):
 
 
 async def _enrich_caja_response(db: AsyncSession, caja: TesoreriaCaja) -> CajaResponse:
-    """Carga totales de ingresos/egresos y calcula saldo actual."""
+    """Carga totales de ingresos/egresos y calcula saldo actual.
+
+    NOTA: Para listas grandes usar `_build_caja_responses_bulk` que hace una sola
+    query agregada en vez de N+1.
+    """
     rows = (await db.execute(
         select(TesoreriaMovimientoCaja.tipo, func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0))
         .where(TesoreriaMovimientoCaja.caja_id == caja.id)
@@ -47,6 +51,44 @@ async def _enrich_caja_response(db: AsyncSession, caja: TesoreriaCaja) -> CajaRe
     return resp
 
 
+async def _build_caja_responses_bulk(
+    db: AsyncSession, cajas: list[TesoreriaCaja]
+) -> list[CajaResponse]:
+    """Calcula saldos de TODAS las cajas en 1 query (no N+1).
+
+    Antes: por cada caja, un GROUP BY tipo → N+1.
+    Ahora: 1 GROUP BY (caja_id, tipo) que devuelve todos los totales de una.
+    """
+    if not cajas:
+        return []
+    caja_ids = [c.id for c in cajas]
+    rows = (await db.execute(
+        select(
+            TesoreriaMovimientoCaja.caja_id,
+            TesoreriaMovimientoCaja.tipo,
+            func.coalesce(func.sum(TesoreriaMovimientoCaja.monto), 0),
+        )
+        .where(TesoreriaMovimientoCaja.caja_id.in_(caja_ids))
+        .group_by(TesoreriaMovimientoCaja.caja_id, TesoreriaMovimientoCaja.tipo)
+    )).all()
+    # totales[caja_id] = {'ingreso': Decimal, 'egreso': Decimal}
+    totales: dict[int, dict[str, Decimal]] = {}
+    for cid, tipo, total in rows:
+        tipo_val = tipo.value if hasattr(tipo, 'value') else tipo
+        totales.setdefault(cid, {})[tipo_val] = Decimal(total)
+    out: list[CajaResponse] = []
+    for caja in cajas:
+        t = totales.get(caja.id, {})
+        ingresos = t.get('ingreso', Decimal(0))
+        egresos = t.get('egreso', Decimal(0))
+        resp = CajaResponse.model_validate(caja)
+        resp.total_ingresos = ingresos
+        resp.total_egresos = egresos
+        resp.saldo_actual = Decimal(caja.saldo_inicial or 0) + ingresos - egresos
+        out.append(resp)
+    return out
+
+
 @router.get("", response_model=List[CajaResponse])
 async def list_cajas(
     request: Request,
@@ -61,9 +103,9 @@ async def list_cajas(
     if activo is not None:
         q = q.where(TesoreriaCaja.activo == activo)
     q = q.order_by(TesoreriaCaja.orden, TesoreriaCaja.nombre)
-    cajas = (await db.execute(q)).scalars().all()
+    cajas = list((await db.execute(q)).scalars().all())
     if include_saldos:
-        return [await _enrich_caja_response(db, c) for c in cajas]
+        return await _build_caja_responses_bulk(db, cajas)
     return [CajaResponse.model_validate(c) for c in cajas]
 
 
