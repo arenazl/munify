@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Upload, MapPin, Phone, Mail, Users, Edit2, Trash2, Loader2, GitMerge, FileText } from 'lucide-react';
 import { CuentaCorrienteSheet } from '../components/contaduria/CuentaCorrienteSheet';
 import { UnificarContactosModal } from '../components/tesoreria/UnificarContactosModal';
+import { UnificarManualModal } from '../components/tesoreria/UnificarManualModal';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -67,6 +68,7 @@ export default function TesoreriaContactos() {
 
   // Modal de unificacion de duplicados
   const [unificarOpen, setUnificarOpen] = useState(false);
+  const [unificarManualOpen, setUnificarManualOpen] = useState(false);
 
   if (user && user.rol !== 'admin' && user.rol !== 'supervisor') {
     return <p className="p-6 text-sm">Sin permisos.</p>;
@@ -293,6 +295,19 @@ export default function TesoreriaContactos() {
   const headerActions = (
     <div className="inline-flex items-center gap-2">
     <TourButton tourKey="tesoreria-contactos" title="Ver tutorial de Contactos" />
+    <button
+      onClick={() => setUnificarManualOpen(true)}
+      className="inline-flex items-center gap-2 px-3 h-[34px] rounded-lg text-[12px] font-semibold transition-all hover:scale-105 active:scale-95"
+      style={{
+        backgroundColor: `${theme.primary}15`,
+        color: theme.primary,
+        border: `1px solid ${theme.primary}40`,
+      }}
+      title="Elegir 2 contactos a mano y unificarlos (cuando el detector automático no los encuentra)"
+    >
+      <GitMerge className="h-4 w-4" />
+      Unificar 2 a mano
+    </button>
     <button
       data-tour="ctc-unificar"
       onClick={() => setUnificarOpen(true)}
@@ -606,6 +621,12 @@ export default function TesoreriaContactos() {
           </ABMCard>
         ))}
       </ABMPage>
+
+      <UnificarManualModal
+        open={unificarManualOpen}
+        onClose={() => setUnificarManualOpen(false)}
+        onMerged={() => fetch()}
+      />
 
       <UnificarContactosModal
         open={unificarOpen}
