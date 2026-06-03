@@ -13,7 +13,7 @@
  * Backend: reutiliza el mismo endpoint POST /tesoreria/contactos/merge.
  */
 import { useEffect, useState, useMemo } from 'react';
-import { GitMerge, Loader2, ArrowDown, X, Search } from 'lucide-react';
+import { GitMerge, Loader2, ArrowDown, X, Search, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet } from '../ui/Sheet';
 import { ModernSelect } from '../ui/ModernSelect';
@@ -39,27 +39,35 @@ export function UnificarManualModal({ open, onClose, onMerged }: Props) {
   const [merging, setMerging] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Ids elegidos por el usuario en los 2 combos
+  // El usuario elige hasta 4 contactos:
+  // - keepId: el GANADOR (mantiene su tipo y sus datos)
+  // - mergeIds: 1, 2 o 3 contactos que se absorben en el ganador
   const [keepId, setKeepId] = useState<number | null>(null);
-  const [mergeId, setMergeId] = useState<number | null>(null);
+  const [mergeIds, setMergeIds] = useState<(number | null)[]>([null]);
 
   // Carga los contactos activos al abrir
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     setKeepId(null);
-    setMergeId(null);
+    setMergeIds([null]);
     contactosApi.list({ activo: true, limit: 5000 })
       .then(r => setContactos(r.data || []))
       .catch(() => toast.error('Error cargando contactos'))
       .finally(() => setLoading(false));
   }, [open]);
 
-  // Opciones del combo: solo contactos distintos al otro lado (evita unir A=A).
-  // Y mostramos el TIPO al lado del nombre para que el user no se confunda.
-  const opcionesPara = (excluirId: number | null) => {
+  const idsTomados = useMemo(
+    () => [keepId, ...mergeIds].filter((id): id is number => id != null),
+    [keepId, mergeIds]
+  );
+
+  // Opciones del combo: excluye TODOS los ya elegidos en cualquier otro combo
+  // (no permite duplicados ni ganador = absorbido).
+  const opcionesPara = (idActual: number | null) => {
+    const excluidos = new Set(idsTomados.filter(id => id !== idActual));
     return contactos
-      .filter(c => c.id !== excluirId)
+      .filter(c => !excluidos.has(c.id))
       .map(c => {
         const tipo = c.tipo as TipoContacto;
         const label = `${c.nombre}${c.apellido ? ' ' + c.apellido : ''}` +
@@ -73,21 +81,34 @@ export function UnificarManualModal({ open, onClose, onMerged }: Props) {
       });
   };
 
-  const opcionesKeep = useMemo(() => opcionesPara(mergeId), [contactos, mergeId]);
-  const opcionesMerge = useMemo(() => opcionesPara(keepId), [contactos, keepId]);
-
   const keep = contactos.find(c => c.id === keepId) || null;
-  const merge = contactos.find(c => c.id === mergeId) || null;
+  const merges = mergeIds
+    .map(id => (id != null ? contactos.find(c => c.id === id) : null))
+    .filter((c): c is Contacto => c != null);
 
-  const canUnificar = keepId !== null && mergeId !== null && keepId !== mergeId;
+  const idsAbsorber = mergeIds.filter((id): id is number => id != null);
+  // Hay que tener ganador + al menos 1 absorbido
+  const canUnificar = keepId !== null && idsAbsorber.length > 0;
+
+  const setMergeAt = (idx: number, value: number | null) => {
+    setMergeIds(prev => prev.map((v, i) => (i === idx ? value : v)));
+  };
+  const addMerge = () => {
+    if (mergeIds.length >= 3) return; // max 3 absorbidos = 4 total
+    setMergeIds(prev => [...prev, null]);
+  };
+  const removeMerge = (idx: number) => {
+    setMergeIds(prev => (prev.length === 1 ? [null] : prev.filter((_, i) => i !== idx)));
+  };
 
   const handleUnificar = async () => {
-    if (!canUnificar || !keep || !merge) return;
+    if (!canUnificar || !keep) return;
     setMerging(true);
     try {
       const res = await contactosApi.merge({
         keep_id: keep.id,
-        merge_ids: [merge.id],
+        merge_ids: idsAbsorber,
+        // Ganador mantiene su tipo. El parametro es por compat con el merge automatico.
         tipo_final: keep.tipo as string,
       });
       const data = res.data as {
@@ -96,7 +117,7 @@ export function UnificarManualModal({ open, onClose, onMerged }: Props) {
         merged_count: number;
       };
       toast.success(
-        `Se unificaron 2 contactos en ${keep.nombre}. ` +
+        `Se unificaron ${idsAbsorber.length + 1} contactos en ${keep.nombre}. ` +
         `${data.gastos_reapuntados} gastos y ${data.pagos_prog_reapuntados} pagos programados reapuntados.`
       );
       setConfirmOpen(false);
@@ -199,15 +220,16 @@ export function UnificarManualModal({ open, onClose, onMerged }: Props) {
               </p>
             </div>
 
-            {/* Buscador "Contacto ganador" */}
+            {/* Ganador */}
             <div>
               <label className="block text-xs font-semibold mb-1.5 inline-flex items-center gap-1.5" style={{ color: theme.text }}>
-                <Search className="h-3.5 w-3.5" /> Contacto que se MANTIENE (ganador)
+                <Search className="h-3.5 w-3.5" />
+                1) Contacto GANADOR (mantiene tipo + datos)
               </label>
               <ModernSelect
                 value={keepId != null ? String(keepId) : ''}
                 onChange={(v) => setKeepId(v ? Number(v) : null)}
-                options={opcionesKeep}
+                options={opcionesPara(keepId)}
                 placeholder="Buscar contacto por nombre, DNI, tipo..."
                 searchable
               />
@@ -224,19 +246,63 @@ export function UnificarManualModal({ open, onClose, onMerged }: Props) {
               </div>
             </div>
 
-            {/* Buscador "Contacto que se absorbe" */}
+            {/* Hasta 3 contactos que se absorben */}
             <div>
               <label className="block text-xs font-semibold mb-1.5 inline-flex items-center gap-1.5" style={{ color: theme.text }}>
-                <Search className="h-3.5 w-3.5" /> Contacto que se ABSORBE (se borra)
+                <Search className="h-3.5 w-3.5" />
+                2) Contactos a ABSORBER (hasta 3, se borran)
               </label>
-              <ModernSelect
-                value={mergeId != null ? String(mergeId) : ''}
-                onChange={(v) => setMergeId(v ? Number(v) : null)}
-                options={opcionesMerge}
-                placeholder="Buscar el otro contacto..."
-                searchable
-              />
-              {merge && <div className="mt-2">{renderCard('Se absorbe en el ganador', merge, false)}</div>}
+              <div className="space-y-3">
+                {mergeIds.map((mid, idx) => {
+                  const m = mid != null ? contactos.find(c => c.id === mid) : null;
+                  return (
+                    <div key={idx}>
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <ModernSelect
+                            value={mid != null ? String(mid) : ''}
+                            onChange={(v) => setMergeAt(idx, v ? Number(v) : null)}
+                            options={opcionesPara(mid)}
+                            placeholder={idx === 0 ? 'Buscar el otro contacto...' : 'Buscar otro más (opcional)...'}
+                            searchable
+                          />
+                        </div>
+                        {(mergeIds.length > 1 || mid != null) && (
+                          <button
+                            type="button"
+                            onClick={() => removeMerge(idx)}
+                            className="p-2 rounded-lg transition-all hover:scale-110"
+                            style={{
+                              backgroundColor: '#ef444415',
+                              color: '#ef4444',
+                              border: '1px solid #ef444440',
+                            }}
+                            title="Sacar este contacto"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                      {m && <div className="mt-2">{renderCard('Se absorbe', m, false)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+              {mergeIds.length < 3 && (
+                <button
+                  type="button"
+                  onClick={addMerge}
+                  className="mt-3 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-[1.01]"
+                  style={{
+                    backgroundColor: `${theme.primary}10`,
+                    color: theme.primary,
+                    border: `1px dashed ${theme.primary}50`,
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar otro contacto a absorber (max 3)
+                </button>
+              )}
             </div>
 
             {/* CTA */}
@@ -265,8 +331,13 @@ export function UnificarManualModal({ open, onClose, onMerged }: Props) {
         onClose={() => setConfirmOpen(false)}
         title="¿Confirmar unificación?"
         message={
-          keep && merge
-            ? `Se va a fusionar "${merge.nombre} ${merge.apellido || ''}" dentro de "${keep.nombre} ${keep.apellido || ''}". Todos los gastos y pagos programados del segundo se reapuntarán al primero. Esta acción no se puede deshacer.`
+          keep && merges.length > 0
+            ? `Se van a fusionar ${merges.length} contacto${merges.length === 1 ? '' : 's'} ` +
+              `(${merges.map(m => `"${m.nombre} ${m.apellido || ''}"`.trim()).join(', ')}) ` +
+              `dentro de "${keep.nombre} ${keep.apellido || ''}". ` +
+              `El ganador mantiene su tipo y todos sus datos. ` +
+              `Los gastos y pagos programados de los absorbidos se reapuntarán al ganador. ` +
+              `Esta acción no se puede deshacer.`
             : ''
         }
         confirmText={merging ? 'Unificando...' : 'Sí, unificar'}
