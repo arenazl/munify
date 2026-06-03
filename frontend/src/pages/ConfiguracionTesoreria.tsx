@@ -83,7 +83,10 @@ export default function ConfiguracionTesoreria() {
           { id: 'tipos-empleado', label: 'Tipos de empleado', icon: <Users className="h-4 w-4" /> },
           { id: 'cajas', label: 'Cajas / Fondos', icon: <PiggyBank className="h-4 w-4" /> },
           { id: 'conceptos-liq', label: 'Conceptos liq.', icon: <CalendarClock className="h-4 w-4" /> },
-          { id: 'premios', label: 'Premios', icon: <Gift className="h-4 w-4" /> },
+          // Premios deprecado: ahora todo se modela como Concepto. Se oculta
+          // el tab pero el componente PremiosTab + la tabla quedan en codigo
+          // por si se necesita reactivar a futuro.
+          // { id: 'premios', label: 'Premios', icon: <Gift className="h-4 w-4" /> },
           { id: 'retenciones', label: 'Retenciones', icon: <Percent className="h-4 w-4" /> },
           { id: 'parajes', label: 'Parajes', icon: <MapPin className="h-4 w-4" /> },
           { id: 'proyectos', label: 'Proyectos', icon: <Briefcase className="h-4 w-4" /> },

@@ -179,13 +179,11 @@ async def create_pago(
     db.add(pp)
     await db.flush()
 
-    # Auto-crear pagos programados de PREMIOS para este contacto si es un
-    # sueldo "principal" (heuristica: no es ya un premio). Los premios del
-    # catalogo se replican como pagos programados separados con su propia
-    # frecuencia/dia (presentismo viernes, incentivo dia 15).
-    es_premio_replicado = (pp.notas or "").startswith("[auto-premio]")
-    if not es_premio_replicado:
-        await _auto_crear_premios_para_contacto(db, muni_id, pp.contacto_id, pp.caja_id)
+    # NOTA: la auto-generacion de "premios" (presentismo, incentivo) fue
+    # deprecada. Ahora todo es un pago programado de CONCEPTO; el muni carga
+    # cada uno individualmente. El metodo _auto_crear_premios_para_contacto
+    # queda definido por compat con el endpoint /regenerar-premios pero ya
+    # no se invoca al crear pagos.
 
     await db.commit()
     await db.refresh(pp)
