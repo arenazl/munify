@@ -168,15 +168,25 @@ export function GastoDetalleSheet({
   const [pagandoCuotaId, setPagandoCuotaId] = useState<number | null>(null);
   const [togglingEstado, setTogglingEstado] = useState(false);
 
-  // Toggle estado concretado <-> pendiente
+  // Toggle estado: ciclo concretado -> al_dia -> pendiente -> concretado.
+  // El caso mas comun (al_dia -> concretado) se cubre asi en un click.
   const handleToggleEstado = async () => {
     if (!gasto) return;
     const actual = (gasto as any).estado_pago || 'concretado';
-    const next = actual === 'concretado' ? 'pendiente' : 'concretado';
+    const next = actual === 'concretado'
+      ? 'al_dia'
+      : actual === 'al_dia'
+        ? 'pendiente'
+        : 'concretado';
+    const labels: Record<string, string> = {
+      concretado: 'Concretado',
+      al_dia: 'Al día',
+      pendiente: 'Pendiente',
+    };
     setTogglingEstado(true);
     try {
       await gastosApi.update(gasto.id, { estado_pago: next } as any);
-      toast.success(next === 'concretado' ? 'Marcado como concretado' : 'Marcado como pendiente');
+      toast.success(`Marcado como ${labels[next]}`);
       onUpdated?.();
     } catch {
       toast.error('Error actualizando estado');

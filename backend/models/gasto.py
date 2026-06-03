@@ -43,13 +43,16 @@ class EstadoGastoCuota(str, enum.Enum):
 
 
 class EstadoPagoGasto(str, enum.Enum):
-    """Tag manual del gasto: concretado (caja descontada) o pendiente (no).
+    """Tag manual del gasto.
 
-    Default 'concretado' (comportamiento historico: cargar un gasto era
-    siempre algo ya pagado). 'pendiente' permite cargar un gasto futuro
-    o pendiente de pago sin que descuente la caja todavia.
+    - CONCRETADO: el pago ya se hizo. Descuenta caja.
+    - AL_DIA: registrado hoy, todavia no confirmado/cobrado. NO descuenta
+      caja. El operador despues lo cambia a concretado (o lo que quiera)
+      cuando se ejecute realmente.
+    - PENDIENTE: pago futuro o por hacer. NO descuenta caja.
     """
     CONCRETADO = "concretado"
+    AL_DIA = "al_dia"
     PENDIENTE = "pendiente"
 
 

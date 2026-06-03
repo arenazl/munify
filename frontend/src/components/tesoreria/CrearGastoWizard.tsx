@@ -77,7 +77,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [tipoFinanciacion, setTipoFinanciacion] = useState<TipoFinanciacion>('contado');
   const [formaPago, setFormaPago] = useState<FormaPago>('transferencia');
-  const [estadoPago, setEstadoPago] = useState<'concretado' | 'pendiente'>('concretado');
+  const [estadoPago, setEstadoPago] = useState<'concretado' | 'al_dia' | 'pendiente'>('concretado');
   const [cuotasTotal, setCuotasTotal] = useState<number>(12);
   const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrencia>('mensual');
   const [fechaFinRec, setFechaFinRec] = useState<string>('');
@@ -742,30 +742,36 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         options={FORMAS_PAGO.map(f => ({ value: f.value, label: f.label }))}
       />
 
-      {/* Estado del pago: concretado (default) o pendiente */}
+      {/* Estado del pago: concretado | al_dia | pendiente */}
       <div>
         <label className="block text-xs font-semibold mb-1.5" style={{ color: theme.text }}>Estado</label>
-        <div className="grid grid-cols-2 gap-2">
-          {(['concretado', 'pendiente'] as const).map(s => (
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            { value: 'concretado', label: 'Concretado', color: '#10b981' },
+            { value: 'al_dia',     label: 'Al día',     color: '#3b82f6' },
+            { value: 'pendiente',  label: 'Pendiente',  color: '#f59e0b' },
+          ] as const).map(opt => (
             <button
-              key={s}
+              key={opt.value}
               type="button"
-              onClick={() => setEstadoPago(s)}
-              className="px-3 py-2 rounded-xl text-xs font-bold capitalize transition-all"
+              onClick={() => setEstadoPago(opt.value)}
+              className="px-3 py-2 rounded-xl text-xs font-bold transition-all"
               style={{
-                backgroundColor: estadoPago === s ? (s === 'concretado' ? '#10b981' : '#f59e0b') : theme.backgroundSecondary,
-                color: estadoPago === s ? '#fff' : theme.text,
-                border: `2px solid ${estadoPago === s ? (s === 'concretado' ? '#10b981' : '#f59e0b') : 'transparent'}`,
+                backgroundColor: estadoPago === opt.value ? opt.color : theme.backgroundSecondary,
+                color: estadoPago === opt.value ? '#fff' : theme.text,
+                border: `2px solid ${estadoPago === opt.value ? opt.color : 'transparent'}`,
               }}
             >
-              {s}
+              {opt.label}
             </button>
           ))}
         </div>
         <p className="text-[11px] mt-1.5" style={{ color: theme.textSecondary }}>
           {estadoPago === 'concretado'
             ? 'El pago ya se hizo. Descuenta caja.'
-            : 'Pago futuro o por hacer. No descuenta caja todavía.'}
+            : estadoPago === 'al_dia'
+              ? 'Pago de hoy registrado. No descuenta caja todavía — después lo cambiás a "Concretado" cuando se confirme.'
+              : 'Pago futuro o por hacer. No descuenta caja todavía.'}
         </p>
       </div>
 
