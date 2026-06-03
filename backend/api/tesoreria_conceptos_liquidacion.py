@@ -9,13 +9,13 @@ afectados (el campo `concepto` del pago programado guarda el string).
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
-from models import TesoreriaConceptoLiquidacion, User, RolUsuario
+from models import TesoreriaConceptoLiquidacion, TesoreriaPagoProgramado, User, RolUsuario
 from schemas.concepto_liquidacion import (
     ConceptoLiquidacionCreate, ConceptoLiquidacionUpdate, ConceptoLiquidacionResponse,
 )
@@ -83,8 +83,20 @@ async def update_concepto(
     )).scalar_one_or_none()
     if not c:
         raise HTTPException(404, "Concepto no encontrado")
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    nombre_viejo = c.nombre
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
         setattr(c, k, v)
+    # Si cambió el nombre, cascadear a todos los pagos programados del muni
+    if "nombre" in data and data["nombre"] != nombre_viejo:
+        await db.execute(
+            update(TesoreriaPagoProgramado)
+            .where(
+                TesoreriaPagoProgramado.municipio_id == muni_id,
+                TesoreriaPagoProgramado.concepto == nombre_viejo,
+            )
+            .values(concepto=data["nombre"])
+        )
     await db.commit()
     await db.refresh(c)
     return c
