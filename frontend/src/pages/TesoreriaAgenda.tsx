@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CalendarClock, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Loader2, Calendar,
-  Home, Briefcase, Wallet, Sparkles, Gift,
+  Home, Briefcase, Wallet, Sparkles, Gift, SkipForward,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -37,8 +37,8 @@ import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { CalendarView } from '../components/ui/CalendarView';
-import { agendaPagosApi, contactosApi, cajasApi, premiosApi } from '../lib/api';
-import type { PagoProgramado, Contacto, Caja, FrecuenciaPago, Premio, PagoEjecutadoHistorial } from '../types';
+import { agendaPagosApi, contactosApi, cajasApi, premiosApi, conceptosLiquidacionApi } from '../lib/api';
+import type { PagoProgramado, Contacto, Caja, FrecuenciaPago, Premio, PagoEjecutadoHistorial, ConceptoLiquidacion } from '../types';
 
 const FRECUENCIA_LABELS: Record<FrecuenciaPago, string> = {
   semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual',
@@ -53,15 +53,23 @@ const FRECUENCIA_COLORS: Record<FrecuenciaPago, string> = {
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
-function diasDesdeHoy(fecha: string): number {
-  // Parsear la fecha como LOCAL (YYYY-MM-DD), no UTC. Si usamos new Date(string)
-  // y el string viene como "2026-06-01", JS lo interpreta como UTC midnight y
-  // en zonas tipo AR (-03) el dia local termina siendo 31/05, sesgando el calculo.
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+// Parsea un YYYY-MM-DD como fecha LOCAL (NO UTC). Evita el clasico bug:
+// new Date("2026-06-01") es UTC midnight -> en AR (-03) se ve como 31/05.
+function parseLocalDate(fecha: string | null | undefined): Date {
   const m = (fecha || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
-  const d = m
+  return m
     ? new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10))
-    : new Date(fecha);
+    : new Date(fecha || '');
+}
+
+function fmtFecha(fecha: string | null | undefined): string {
+  if (!fecha) return '';
+  return parseLocalDate(fecha).toLocaleDateString('es-AR');
+}
+
+function diasDesdeHoy(fecha: string): number {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const d = parseLocalDate(fecha);
   d.setHours(0, 0, 0, 0);
   return Math.round((d.getTime() - hoy.getTime()) / 86400000);
 }
@@ -96,6 +104,7 @@ export default function TesoreriaAgenda() {
   // Permite al user ajustar el monto del mes (varia por persona/mes) y
   // marcar premios del catalogo que se aplican (presentismo, etc.).
   const [premios, setPremios] = useState<Premio[]>([]);
+  const [conceptosLiq, setConceptosLiq] = useState<ConceptoLiquidacion[]>([]);
   const [ejecutarPago, setEjecutarPago] = useState<PagoProgramado | null>(null);
   const [ejecutarMonto, setEjecutarMonto] = useState<string>('');
   const [ejecutarFecha, setEjecutarFecha] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -121,16 +130,18 @@ export default function TesoreriaAgenda() {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [p, c, cj, pr] = await Promise.all([
+      const [p, c, cj, pr, cl] = await Promise.all([
         agendaPagosApi.list({ activo: true }),
         contactosApi.list({ activo: true, limit: 5000 }),
         cajasApi.list({ activo: true, include_saldos: true }),
         premiosApi.list({ activo: true }).catch(() => ({ data: [] as Premio[] })),
+        conceptosLiquidacionApi.list({ activo: true }).catch(() => ({ data: [] as ConceptoLiquidacion[] })),
       ]);
       setPagos(p.data || []);
       setContactos(c.data || []);
       setCajas(cj.data || []);
       setPremios(pr.data || []);
+      setConceptosLiq(cl.data || []);
     } catch { toast.error('Error cargando agenda'); } finally { setLoading(false); }
   };
   useEffect(() => { fetchAll(); }, []);
@@ -237,12 +248,29 @@ export default function TesoreriaAgenda() {
 
   // Abre el Sheet para ejecutar. NO ejecuta directo — el user puede
   // ajustar monto del mes y aplicar premios antes de confirmar.
+  const [omitingId, setOmitingId] = useState<number | null>(null);
+  const handleOmitir = async (p: PagoProgramado) => {
+    if (!confirm(`¿Omitir el pago de "${p.contacto_nombre}" del ${fmtFecha(p.proximo_pago)}? Se avanza al siguiente período sin descontar caja.`)) return;
+    setOmitingId(p.id);
+    try {
+      const res = await agendaPagosApi.omitir(p.id);
+      const next = res.data.proximo_pago
+        ? fmtFecha(res.data.proximo_pago)
+        : 'fin de la liquidación';
+      toast.success(`Pago omitido. Próximo: ${next}`);
+      fetchAll();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || 'Error omitiendo');
+    } finally { setOmitingId(null); }
+  };
+
   const handleEjecutar = (p: PagoProgramado) => {
     setEjecutarPago(p);
     setEjecutarMonto(p.monto_pesos);
-    setEjecutarFecha(new Date().toISOString().slice(0, 10));
-    // Premios se manejan como liquidaciones aparte (presentismo semanal,
-    // incentivo mitad de mes). Ya no vienen pre-tildados acá.
+    // Fecha de impacto = fecha programada (proximo_pago), no la del clic.
+    // Si el pago estaba programado para el 4 y se confirma el 1, en
+    // historial figura como del dia 4.
+    setEjecutarFecha((p.proximo_pago || '').slice(0, 10) || new Date().toISOString().slice(0, 10));
     setEjecutarPremiosSel(new Map());
     setEjecutarNotas('');
   };
@@ -435,7 +463,7 @@ export default function TesoreriaAgenda() {
             return (
               <div className="flex flex-col">
                 <span className="font-medium whitespace-nowrap" style={{ color: theme.text }}>
-                  {new Date(p.proximo_pago).toLocaleDateString('es-AR')}
+                  {fmtFecha(p.proximo_pago)}
                 </span>
                 <span className="text-[10px] font-semibold"
                   style={{ color: urgente ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
@@ -514,6 +542,11 @@ export default function TesoreriaAgenda() {
           >
             Pagar
           </PrimaryButton>
+          <ABMTableAction
+            title="Omitir este período (avanza al siguiente sin descontar caja)"
+            onClick={() => handleOmitir(p)}
+            icon={omitingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
+          />
           <ABMTableAction title="Editar" onClick={() => openSheet(p)} variant="primary" icon={<Edit2 className="h-4 w-4" />} />
           <ABMTableAction title="Eliminar" onClick={() => handleDelete(p)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
         </>
@@ -539,12 +572,12 @@ export default function TesoreriaAgenda() {
       renderDetailRow={(p) => (
         <div className="flex items-center gap-2 p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
           <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${FRECUENCIA_COLORS[p.frecuencia]}20` }}>
-            <span className="text-xs font-bold" style={{ color: FRECUENCIA_COLORS[p.frecuencia] }}>{new Date(p.proximo_pago).getDate()}</span>
+            <span className="text-xs font-bold" style={{ color: FRECUENCIA_COLORS[p.frecuencia] }}>{parseLocalDate(p.proximo_pago).getDate()}</span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{p.contacto_nombre}</p>
             <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-              {p.concepto} · {new Date(p.proximo_pago).toLocaleDateString('es-AR')}
+              {p.concepto} · {fmtFecha(p.proximo_pago)}
             </p>
           </div>
           <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</span>
@@ -640,7 +673,7 @@ export default function TesoreriaAgenda() {
         </div>
         <p className="text-xl font-bold tabular-nums mb-2" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</p>
         <div className="flex items-center justify-between text-xs mb-3" style={{ color: theme.textSecondary }}>
-          <span>{new Date(p.proximo_pago).toLocaleDateString('es-AR')}</span>
+          <span>{fmtFecha(p.proximo_pago)}</span>
           <span className="font-semibold" style={{ color: urgente ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
             {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
           </span>
@@ -651,6 +684,11 @@ export default function TesoreriaAgenda() {
             style={{ backgroundColor: '#10b981', opacity: executingId === p.id ? 0.5 : 1 }}>
             {executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
             Pagar
+          </button>
+          <button onClick={() => handleOmitir(p)} disabled={omitingId === p.id}
+            title="Omitir este período (avanza al siguiente sin descontar caja)"
+            className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: '#f59e0b' }}>
+            {omitingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
           </button>
           <button onClick={() => openSheet(p)} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: theme.primary }}><Edit2 className="h-4 w-4" /></button>
           <button onClick={() => handleDelete(p)} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: '#ef4444' }}><Trash2 className="h-4 w-4" /></button>
@@ -713,9 +751,24 @@ export default function TesoreriaAgenda() {
             </div>
             <div>
               <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Concepto *</label>
-              <input value={form.concepto} onChange={(e) => setForm(f => ({ ...f, concepto: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              {conceptosLiq.length > 0 ? (
+                <ModernSelect
+                  value={form.concepto}
+                  onChange={(v) => setForm(f => ({ ...f, concepto: v }))}
+                  options={conceptosLiq.map(c => ({
+                    value: c.nombre,
+                    label: c.nombre,
+                    color: c.color || undefined,
+                  }))}
+                  placeholder="Elegí un concepto..."
+                  searchable
+                />
+              ) : (
+                <input value={form.concepto} onChange={(e) => setForm(f => ({ ...f, concepto: e.target.value }))}
+                  placeholder="Cargá conceptos en Configuración → Tesorería → Conceptos liq."
+                  className="w-full px-3 py-2 rounded-lg text-sm"
+                  style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

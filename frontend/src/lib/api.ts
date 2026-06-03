@@ -2093,6 +2093,22 @@ export const agendaPagosApi = {
     api.post<{ ok: boolean; contactos_afectados: number; pagos_premios_creados: number }>(
       '/tesoreria/agenda/regenerar-premios'
     ),
+  omitir: (id: number) =>
+    api.post<{ ok: boolean; omitido: string; proximo_pago: string | null; activo: boolean }>(
+      `/tesoreria/agenda/${id}/omitir`
+    ),
+};
+
+/** Catalogo de conceptos para pagos programados (Sueldo, Presentismo,
+ *  Profesional, etc.). Se gestiona desde Configuracion Tesoreria. */
+export const conceptosLiquidacionApi = {
+  list: (params?: { activo?: boolean }) =>
+    api.get('/tesoreria/conceptos-liquidacion', { params }),
+  create: (data: Record<string, unknown>) =>
+    api.post('/tesoreria/conceptos-liquidacion', data),
+  update: (id: number, data: Record<string, unknown>) =>
+    api.put(`/tesoreria/conceptos-liquidacion/${id}`, data),
+  delete: (id: number) => api.delete(`/tesoreria/conceptos-liquidacion/${id}`),
 };
 
 /** Catalogo de premios (plus variables) por municipio. Se cargan desde

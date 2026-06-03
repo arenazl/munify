@@ -399,7 +399,11 @@ async def ejecutar_pago(
     if not pp:
         raise HTTPException(404, "No encontrado")
 
-    fecha = payload.fecha_pago or date.today()
+    # Fecha de IMPACTO contable = fecha del programado (proximo_pago),
+    # NO el dia en que el operador apreta "Pagar". Asi en historial figura
+    # con la fecha planificada (ej. el dia 4 aunque se haya pagado el 1).
+    # El frontend puede pasar override si justificadamente quiere otra.
+    fecha = payload.fecha_pago or pp.proximo_pago or date.today()
     monto_base = Decimal(str(payload.monto_base)) if payload.monto_base is not None else Decimal(str(pp.monto_pesos))
 
     # Validar y cargar premios (deben ser del mismo muni, activos al momento
@@ -504,6 +508,46 @@ async def ejecutar_pago(
         premios_aplicados=premios_aplicados,
         proximo_pago=pp.proximo_pago.isoformat() if pp.activo else None,
     )
+
+
+@router.post("/{pp_id}/omitir")
+async def omitir_pago(
+    pp_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Omite el pago de este periodo: NO crea gasto, NO descuenta caja,
+    pero avanza proximo_pago al siguiente periodo segun la frecuencia.
+
+    Util cuando un pago programado no aplica en este periodo puntual
+    (ej. el empleado no se gano el premio, hubo licencia, etc.) pero
+    debe volver a recordarse al periodo siguiente.
+    """
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+    pp = (await db.execute(
+        select(TesoreriaPagoProgramado).where(
+            TesoreriaPagoProgramado.id == pp_id,
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+        )
+    )).scalar_one_or_none()
+    if not pp:
+        raise HTTPException(404, "No encontrado")
+    if not pp.activo:
+        raise HTTPException(409, "Pago programado inactivo")
+
+    omitido = pp.proximo_pago
+    pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
+    if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
+        pp.activo = False
+    await db.commit()
+    return {
+        "ok": True,
+        "omitido": omitido.isoformat() if omitido else None,
+        "proximo_pago": pp.proximo_pago.isoformat() if pp.activo else None,
+        "activo": pp.activo,
+    }
 
 
 @router.get("/historial")

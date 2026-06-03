@@ -59,6 +59,7 @@ from .tesoreria_cajas import router as tesoreria_cajas_router
 from .tesoreria_agenda import router as tesoreria_agenda_router
 from .tesoreria_premios import router as tesoreria_premios_router
 from .tesoreria_conciliacion import router as tesoreria_conciliacion_router
+from .tesoreria_conceptos_liquidacion import router as tesoreria_conceptos_liquidacion_router
 from .ordenes_pago import router as ordenes_pago_router
 from .contaduria_retenciones import router as contaduria_retenciones_router
 from .tesoreria_parajes import router as tesoreria_parajes_router
@@ -126,6 +127,7 @@ api_router.include_router(tesoreria_cajas_router, prefix="/tesoreria/cajas", tag
 api_router.include_router(tesoreria_agenda_router, prefix="/tesoreria/agenda", tags=["Tesoreria - Agenda Pagos"])
 api_router.include_router(tesoreria_premios_router, prefix="/tesoreria/premios", tags=["Tesoreria - Premios"])
 api_router.include_router(tesoreria_conciliacion_router, prefix="/tesoreria/conciliacion", tags=["Tesoreria - Conciliacion Bancaria"])
+api_router.include_router(tesoreria_conceptos_liquidacion_router, prefix="/tesoreria/conceptos-liquidacion", tags=["Tesoreria - Conceptos Liquidacion"])
 # Contaduria
 api_router.include_router(ordenes_pago_router, prefix="/contaduria/ordenes-pago", tags=["Contaduria - Ordenes de Pago"])
 api_router.include_router(contaduria_retenciones_router, prefix="/contaduria/retenciones", tags=["Contaduria - Retenciones"])

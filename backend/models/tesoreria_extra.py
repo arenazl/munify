@@ -47,6 +47,34 @@ class FrecuenciaPago(str, enum.Enum):
     ANUAL = "anual"
 
 
+class TesoreriaConceptoLiquidacion(Base):
+    """Catalogo de conceptos para pagos programados (liquidaciones).
+
+    Antes el campo `concepto` del pago programado era texto libre y los
+    clientes terminaban cargando typos y variantes ("Auxliar provincial
+    escolar" vs "Auxiliar provincial escolar", etc). Ahora el campo se
+    elige desde este catalogo, gestionado per-muni en Configuracion.
+
+    Ejemplos: Sueldo mensual, Presentismo, Incentivo, Trabajo extra,
+    Profesional, Concejo deliberante, Turismo y Cultura, etc.
+    """
+    __tablename__ = "tesoreria_conceptos_liquidacion"
+
+    id = Column(Integer, primary_key=True, index=True)
+    municipio_id = Column(Integer, ForeignKey("municipios.id"), nullable=False, index=True)
+    nombre = Column(String(100), nullable=False, index=True)
+    descripcion = Column(Text, nullable=True)
+    color = Column(String(20), nullable=True)
+    icono = Column(String(60), nullable=True)
+    orden = Column(Integer, default=0, nullable=False)
+    activo = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    def __repr__(self):
+        return f"<ConceptoLiquidacion {self.id} {self.nombre}>"
+
+
 class TesoreriaPremio(Base):
     """Catalogo global de premios/plus que cada empleado cobra como
     liquidacion APARTE del sueldo (no se suman al sueldo mensual).

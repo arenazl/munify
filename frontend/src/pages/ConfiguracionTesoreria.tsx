@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Wallet, Tag, FileText, Briefcase, Plus, Edit2, Trash2, Loader2, ArrowLeft,
-  Users, PiggyBank, TrendingUp, TrendingDown, MapPin, Gift, Percent,
+  Users, PiggyBank, TrendingUp, TrendingDown, MapPin, Gift, Percent, CalendarClock,
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,12 +13,12 @@ import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { Sheet } from '../components/ui/Sheet';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { PolygonDrawer } from '../components/tesoreria/PolygonDrawer';
-import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesApi, premiosApi, retencionesApi, agendaPagosApi } from '../lib/api';
-import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje, Premio, ContaduriaRetencion } from '../types';
+import { tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi, parajesApi, premiosApi, retencionesApi, agendaPagosApi, conceptosLiquidacionApi } from '../lib/api';
+import type { TipoConcepto, Concepto, TipoEmpleadoCatalogo, Caja, Paraje, Premio, ContaduriaRetencion, ConceptoLiquidacion } from '../types';
 import TesoreriaProyectos from './TesoreriaProyectos';
 
 import PageHint from '../components/ui/PageHint';
-type Tab = 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos' | 'premios' | 'retenciones';
+type Tab = 'conceptos' | 'tipos-empleado' | 'cajas' | 'parajes' | 'proyectos' | 'premios' | 'retenciones' | 'conceptos-liq';
 
 export default function ConfiguracionTesoreria() {
   const { theme } = useTheme();
@@ -27,7 +27,7 @@ export default function ConfiguracionTesoreria() {
   // 'tipos' eliminado del selector (los tipos siguen existiendo en DB
   // pero ya no se gestionan desde acá — el ABM es solo de conceptos planos).
   const requested = searchParams.get('tab') as string | null;
-  const initialTab: Tab = (requested && ['conceptos','tipos-empleado','cajas','parajes','proyectos','premios','retenciones'].includes(requested))
+  const initialTab: Tab = (requested && ['conceptos','tipos-empleado','cajas','parajes','proyectos','premios','retenciones','conceptos-liq'].includes(requested))
     ? (requested as Tab)
     : 'conceptos';
   const [tab, setTabState] = useState<Tab>(initialTab);
@@ -82,6 +82,7 @@ export default function ConfiguracionTesoreria() {
           { id: 'conceptos', label: 'Conceptos', icon: <FileText className="h-4 w-4" /> },
           { id: 'tipos-empleado', label: 'Tipos de empleado', icon: <Users className="h-4 w-4" /> },
           { id: 'cajas', label: 'Cajas / Fondos', icon: <PiggyBank className="h-4 w-4" /> },
+          { id: 'conceptos-liq', label: 'Conceptos liq.', icon: <CalendarClock className="h-4 w-4" /> },
           { id: 'premios', label: 'Premios', icon: <Gift className="h-4 w-4" /> },
           { id: 'retenciones', label: 'Retenciones', icon: <Percent className="h-4 w-4" /> },
           { id: 'parajes', label: 'Parajes', icon: <MapPin className="h-4 w-4" /> },
@@ -109,6 +110,7 @@ export default function ConfiguracionTesoreria() {
       {/* Tab contents */}
       <div className="pt-2">
         {tab === 'conceptos' && <ConceptosTab />}
+        {tab === 'conceptos-liq' && <ConceptosLiqTab />}
         {tab === 'tipos-empleado' && <TiposEmpleadoTab />}
         {tab === 'cajas' && <CajasTab />}
         {tab === 'premios' && <PremiosTab />}
@@ -1662,3 +1664,183 @@ function RetencionesTab() {
   );
 }
 
+
+// ============================================================
+// Tab: Conceptos de Liquidación (combo del form de pago programado)
+// ============================================================
+function ConceptosLiqTab() {
+  const { theme } = useTheme();
+  const [items, setItems] = useState<ConceptoLiquidacion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<ConceptoLiquidacion | null>(null);
+  const [form, setForm] = useState<{ nombre: string; descripcion: string; color: string }>({
+    nombre: '', descripcion: '', color: '#3b82f6',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const fetch = async () => {
+    setLoading(true);
+    try {
+      const res = await conceptosLiquidacionApi.list({ activo: true });
+      setItems(res.data || []);
+    } catch { toast.error('Error cargando conceptos'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { fetch(); }, []);
+
+  const openSheet = (c: ConceptoLiquidacion | null) => {
+    setEditing(c);
+    setForm({
+      nombre: c?.nombre || '',
+      descripcion: c?.descripcion || '',
+      color: c?.color || '#3b82f6',
+    });
+    setSheetOpen(true);
+  };
+
+  const save = async () => {
+    if (!form.nombre.trim()) return toast.error('Nombre requerido');
+    setSaving(true);
+    try {
+      const data = {
+        nombre: form.nombre.trim(),
+        descripcion: form.descripcion.trim() || null,
+        color: form.color || null,
+      };
+      if (editing) await conceptosLiquidacionApi.update(editing.id, data);
+      else await conceptosLiquidacionApi.create(data);
+      toast.success(editing ? 'Concepto actualizado' : 'Concepto creado');
+      setSheetOpen(false);
+      fetch();
+    } catch (e: any) { toast.error(e?.response?.data?.detail || 'Error guardando'); }
+    finally { setSaving(false); }
+  };
+
+  const remove = async (c: ConceptoLiquidacion) => {
+    try { await conceptosLiquidacionApi.delete(c.id); toast.success('Concepto eliminado'); fetch(); }
+    catch { toast.error('Error eliminando'); }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-base font-bold inline-flex items-center gap-2" style={{ color: theme.text }}>
+            <CalendarClock className="h-5 w-5" style={{ color: theme.primary }} />
+            Conceptos de Liquidación
+          </h2>
+          <p className="text-xs" style={{ color: theme.textSecondary }}>
+            Opciones que aparecen en el combo "Concepto" al crear/editar un pago programado. Reemplaza el texto libre.
+            Ej: Sueldo mensual, Presentismo, Profesional, Concejo deliberante, etc.
+          </p>
+        </div>
+        <PrimaryButton onClick={() => openSheet(null)} size="sm" icon={<Plus className="h-4 w-4" />}>
+          Nuevo
+        </PrimaryButton>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+        </div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-8 text-sm" style={{ color: theme.textSecondary }}>
+          Sin conceptos configurados. Creá uno con "Nuevo".
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {items.map(c => {
+            const color = c.color || theme.primary;
+            return (
+              <div
+                key={c.id}
+                className="rounded-xl p-3 flex items-center gap-3"
+                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+              >
+                <div
+                  className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: `${color}20`, color }}
+                >
+                  <CalendarClock className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{c.nombre}</p>
+                  {c.descripcion && (
+                    <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>{c.descripcion}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={() => openSheet(c)} className="p-1.5 rounded-md hover:opacity-70"
+                    style={{ color: theme.textSecondary }} title="Editar">
+                    <Edit2 className="h-3.5 w-3.5" />
+                  </button>
+                  <button onClick={() => remove(c)} className="p-1.5 rounded-md hover:opacity-70"
+                    style={{ color: '#ef4444' }} title="Eliminar">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title={editing ? 'Editar concepto' : 'Nuevo concepto'}
+        description='Aparecerá en el combo Concepto del form de Pago Programado'
+        stickyFooter={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setSheetOpen(false)}
+              className="px-4 py-2 rounded-lg text-sm transition-all hover:scale-105 active:scale-95"
+              style={{ border: `1px solid ${theme.border}`, color: theme.text }}
+            >
+              Cancelar
+            </button>
+            <PrimaryButton onClick={save} disabled={saving} icon={saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : undefined}>
+              {saving ? 'Guardando...' : 'Guardar'}
+            </PrimaryButton>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Nombre *</label>
+            <input
+              type="text"
+              value={form.nombre}
+              onChange={(e) => setForm(f => ({ ...f, nombre: e.target.value }))}
+              placeholder="Ej: Profesional, Concejo deliberante, Sueldo mensual..."
+              className="w-full px-3 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
+            <input
+              type="text"
+              value={form.descripcion}
+              onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))}
+              placeholder="Opcional"
+              className="w-full px-3 py-2 rounded-lg text-sm"
+              style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Color</label>
+            <input
+              type="color"
+              value={form.color}
+              onChange={(e) => setForm(f => ({ ...f, color: e.target.value }))}
+              className="h-9 w-20 rounded-lg cursor-pointer"
+              style={{ border: `1px solid ${theme.border}` }}
+            />
+          </div>
+        </div>
+      </Sheet>
+    </div>
+  );
+}
