@@ -68,6 +68,14 @@ class TesoreriaConceptoLiquidacion(Base):
     icono = Column(String(60), nullable=True)
     orden = Column(Integer, default=0, nullable=False)
     activo = Column(Boolean, default=True, nullable=False)
+    # Valores sugeridos que se precargan al elegir este concepto en un pago nuevo.
+    # El usuario puede pisar cualquiera de los tres al crear/editar el pago.
+    frecuencia_default = Column(
+        Enum('semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'anual'),
+        nullable=True,
+    )
+    dia_del_mes_default = Column(Integer, nullable=True)   # 1-28
+    dia_semana_default = Column(Integer, nullable=True)    # 0=lun .. 6=dom
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

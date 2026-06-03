@@ -654,6 +654,9 @@ export interface ConceptoLiquidacion {
   icono?: string | null;
   orden: number;
   activo: boolean;
+  frecuencia_default?: string | null;
+  dia_del_mes_default?: number | null;
+  dia_semana_default?: number | null;
   created_at: string;
   updated_at: string;
 }

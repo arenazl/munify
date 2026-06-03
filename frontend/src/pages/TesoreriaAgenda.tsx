@@ -118,7 +118,8 @@ export default function TesoreriaAgenda() {
   const [form, setForm] = useState({
     contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
     monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual' as FrecuenciaPago,
-    dia_del_mes: 5, fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
+    dia_del_mes: 5, dia_semana: null as number | null,
+    fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
     premios_default: [] as number[],
   });
   const [saving, setSaving] = useState(false);
@@ -208,15 +209,17 @@ export default function TesoreriaAgenda() {
         concepto: p.concepto, descripcion: p.descripcion || '',
         monto_pesos: String(p.monto_pesos), forma_pago: p.forma_pago,
         frecuencia: p.frecuencia, dia_del_mes: p.dia_del_mes,
+        dia_semana: p.dia_semana ?? null,
         fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin || '',
         premios_default: (p.premios_default as number[] | null) || [],
       });
     } else {
       setEditing(null);
       setForm({
-        contacto_id: 0, caja_id: 0, concepto: 'Sueldo mensual', descripcion: '',
+        contacto_id: 0, caja_id: 0, concepto: '', descripcion: '',
         monto_pesos: '', forma_pago: 'transferencia', frecuencia: 'mensual',
-        dia_del_mes: 5, fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
+        dia_del_mes: 1, dia_semana: null,
+        fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin: '',
         premios_default: [],
       });
     }
@@ -235,6 +238,7 @@ export default function TesoreriaAgenda() {
         concepto: form.concepto.trim(), descripcion: form.descripcion.trim() || null,
         monto_pesos: parseFloat(form.monto_pesos), forma_pago: form.forma_pago,
         frecuencia: form.frecuencia, dia_del_mes: form.dia_del_mes,
+        dia_semana: form.frecuencia === 'semanal' ? (form.dia_semana ?? 4) : null,
         fecha_inicio: form.fecha_inicio, fecha_fin: form.fecha_fin || null,
         // Premios se manejan como liquidaciones aparte; no van junto al sueldo.
         premios_default: [],
@@ -542,13 +546,26 @@ export default function TesoreriaAgenda() {
           >
             Pagar
           </PrimaryButton>
-          <ABMTableAction
-            title="Omitir este período (avanza al siguiente sin descontar caja)"
-            onClick={() => handleOmitir(p)}
-            icon={omitingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
-          />
-          <ABMTableAction title="Editar" onClick={() => openSheet(p)} variant="primary" icon={<Edit2 className="h-4 w-4" />} />
-          <ABMTableAction title="Eliminar" onClick={() => handleDelete(p)} variant="danger" icon={<Trash2 className="h-4 w-4" />} />
+          <button
+            onClick={() => handleOmitir(p)} disabled={omitingId === p.id}
+            title="Avanza al siguiente período sin descontar caja"
+            className="px-2 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
+            {omitingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SkipForward className="h-3 w-3" />}
+            Omitir
+          </button>
+          <button
+            onClick={() => openSheet(p)}
+            className="px-2 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
+            <Edit2 className="h-3 w-3" /> Editar
+          </button>
+          <button
+            onClick={() => handleDelete(p)}
+            className="px-2 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+            <Trash2 className="h-3 w-3" /> Borrar
+          </button>
         </>
       )}
     />
@@ -584,7 +601,11 @@ export default function TesoreriaAgenda() {
           <button onClick={() => handleEjecutar(p)} className="px-2 py-1 rounded-md text-[11px] font-semibold text-white" style={{ backgroundColor: '#10b981' }}>
             Pagar
           </button>
-          <button onClick={() => openSheet(p)} className="p-1.5 rounded" style={{ color: theme.primary }}><Edit2 className="h-3.5 w-3.5" /></button>
+          <button onClick={() => openSheet(p)}
+            className="px-2 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
+            <Edit2 className="h-3 w-3" /> Editar
+          </button>
         </div>
       )}
     />
@@ -680,18 +701,28 @@ export default function TesoreriaAgenda() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => handleEjecutar(p)} disabled={executingId === p.id}
-            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white inline-flex items-center justify-center gap-1"
+            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold text-white inline-flex items-center justify-center gap-1 transition-all hover:opacity-90 active:scale-95"
             style={{ backgroundColor: '#10b981', opacity: executingId === p.id ? 0.5 : 1 }}>
             {executingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
             Pagar
           </button>
           <button onClick={() => handleOmitir(p)} disabled={omitingId === p.id}
-            title="Omitir este período (avanza al siguiente sin descontar caja)"
-            className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: '#f59e0b' }}>
-            {omitingId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <SkipForward className="h-4 w-4" />}
+            title="Avanza al siguiente período sin descontar caja"
+            className="px-2.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#f59e0b20', color: '#f59e0b' }}>
+            {omitingId === p.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <SkipForward className="h-3 w-3" />}
+            Omitir
           </button>
-          <button onClick={() => openSheet(p)} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: theme.primary }}><Edit2 className="h-4 w-4" /></button>
-          <button onClick={() => handleDelete(p)} className="p-2 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary, color: '#ef4444' }}><Trash2 className="h-4 w-4" /></button>
+          <button onClick={() => openSheet(p)}
+            className="px-2.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#3b82f620', color: '#3b82f6' }}>
+            <Edit2 className="h-3 w-3" /> Editar
+          </button>
+          <button onClick={() => handleDelete(p)}
+            className="px-2.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1 transition-all hover:opacity-80 active:scale-95"
+            style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+            <Trash2 className="h-3 w-3" /> Borrar
+          </button>
         </div>
       </div>
     );
@@ -754,7 +785,19 @@ export default function TesoreriaAgenda() {
               {conceptosLiq.length > 0 ? (
                 <ModernSelect
                   value={form.concepto}
-                  onChange={(v) => setForm(f => ({ ...f, concepto: v }))}
+                  onChange={(v) => {
+                    const def = conceptosLiq.find(c => c.nombre === v);
+                    setForm(f => ({
+                      ...f,
+                      concepto: v,
+                      // Pre-carga recomendación solo en nuevo pago; en edición no pisamos
+                      ...(!editing && def?.frecuencia_default ? {
+                        frecuencia: def.frecuencia_default as FrecuenciaPago,
+                        dia_del_mes: def.dia_del_mes_default ?? f.dia_del_mes,
+                        dia_semana: def.dia_semana_default ?? f.dia_semana,
+                      } : {}),
+                    }));
+                  }}
                   options={conceptosLiq.map(c => ({
                     value: c.nombre,
                     label: c.nombre,
@@ -792,11 +835,32 @@ export default function TesoreriaAgenda() {
                   options={FRECUENCIA_OPTS_FORM} />
               </div>
               <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día del mes</label>
-                <input type="number" min={1} max={28} value={form.dia_del_mes}
-                  onChange={(e) => setForm(f => ({ ...f, dia_del_mes: parseInt(e.target.value) || 1 }))}
-                  className="w-full px-3 py-2 rounded-lg text-sm"
-                  style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+                {form.frecuencia === 'semanal' ? (
+                  <>
+                    <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día de la semana</label>
+                    <ModernSelect
+                      value={String(form.dia_semana ?? 4)}
+                      onChange={(v) => setForm(f => ({ ...f, dia_semana: parseInt(v) }))}
+                      options={[
+                        { value: '0', label: 'Lunes' },
+                        { value: '1', label: 'Martes' },
+                        { value: '2', label: 'Miércoles' },
+                        { value: '3', label: 'Jueves' },
+                        { value: '4', label: 'Viernes' },
+                        { value: '5', label: 'Sábado' },
+                        { value: '6', label: 'Domingo' },
+                      ]}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día del mes</label>
+                    <input type="number" min={1} max={28} value={form.dia_del_mes}
+                      onChange={(e) => setForm(f => ({ ...f, dia_del_mes: parseInt(e.target.value) || 1 }))}
+                      className="w-full px-3 py-2 rounded-lg text-sm"
+                      style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }} />
+                  </>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

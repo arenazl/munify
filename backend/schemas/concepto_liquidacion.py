@@ -1,8 +1,10 @@
 """Schemas para el catalogo de conceptos de liquidacion."""
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel, Field, ConfigDict
+
+FrecuenciaEnum = Literal['semanal', 'quincenal', 'mensual', 'bimestral', 'trimestral', 'anual']
 
 
 class ConceptoLiquidacionBase(BaseModel):
@@ -11,6 +13,9 @@ class ConceptoLiquidacionBase(BaseModel):
     color: Optional[str] = Field(None, max_length=20)
     icono: Optional[str] = Field(None, max_length=60)
     orden: int = 0
+    frecuencia_default: Optional[FrecuenciaEnum] = None
+    dia_del_mes_default: Optional[int] = Field(None, ge=1, le=28)
+    dia_semana_default: Optional[int] = Field(None, ge=0, le=6)
 
 
 class ConceptoLiquidacionCreate(ConceptoLiquidacionBase):
@@ -24,6 +29,9 @@ class ConceptoLiquidacionUpdate(BaseModel):
     icono: Optional[str] = Field(None, max_length=60)
     orden: Optional[int] = None
     activo: Optional[bool] = None
+    frecuencia_default: Optional[FrecuenciaEnum] = None
+    dia_del_mes_default: Optional[int] = Field(None, ge=1, le=28)
+    dia_semana_default: Optional[int] = Field(None, ge=0, le=6)
 
 
 class ConceptoLiquidacionResponse(ConceptoLiquidacionBase):

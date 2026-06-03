@@ -1677,8 +1677,12 @@ function ConceptosLiqTab() {
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<ConceptoLiquidacion | null>(null);
-  const [form, setForm] = useState<{ nombre: string; descripcion: string; color: string }>({
+  const [form, setForm] = useState<{
+    nombre: string; descripcion: string; color: string;
+    frecuencia_default: string; dia_del_mes_default: string; dia_semana_default: string;
+  }>({
     nombre: '', descripcion: '', color: '#3b82f6',
+    frecuencia_default: 'mensual', dia_del_mes_default: '', dia_semana_default: '4',
   });
   const [saving, setSaving] = useState(false);
 
@@ -1698,6 +1702,9 @@ function ConceptosLiqTab() {
       nombre: c?.nombre || '',
       descripcion: c?.descripcion || '',
       color: c?.color || '#3b82f6',
+      frecuencia_default: c?.frecuencia_default || 'mensual',
+      dia_del_mes_default: c?.dia_del_mes_default != null ? String(c.dia_del_mes_default) : '',
+      dia_semana_default: c?.dia_semana_default != null ? String(c.dia_semana_default) : '4',
     });
     setSheetOpen(true);
   };
@@ -1706,10 +1713,14 @@ function ConceptosLiqTab() {
     if (!form.nombre.trim()) return toast.error('Nombre requerido');
     setSaving(true);
     try {
+      const esSemanal = form.frecuencia_default === 'semanal';
       const data = {
         nombre: form.nombre.trim(),
         descripcion: form.descripcion.trim() || null,
         color: form.color || null,
+        frecuencia_default: form.frecuencia_default || null,
+        dia_del_mes_default: !esSemanal && form.dia_del_mes_default ? parseInt(form.dia_del_mes_default) : null,
+        dia_semana_default: esSemanal ? parseInt(form.dia_semana_default) : null,
       };
       if (editing) await conceptosLiquidacionApi.update(editing.id, data);
       else await conceptosLiquidacionApi.create(data);
@@ -1769,7 +1780,14 @@ function ConceptosLiqTab() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{c.nombre}</p>
-                  {c.descripcion && (
+                  {c.frecuencia_default && (
+                    <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                      {c.frecuencia_default === 'semanal'
+                        ? `Semanal · ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][c.dia_semana_default ?? 4]}`
+                        : `${c.frecuencia_default.charAt(0).toUpperCase() + c.frecuencia_default.slice(1)} · día ${c.dia_del_mes_default ?? '–'}`}
+                    </p>
+                  )}
+                  {!c.frecuencia_default && c.descripcion && (
                     <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>{c.descripcion}</p>
                   )}
                 </div>
@@ -1816,10 +1834,59 @@ function ConceptosLiqTab() {
               type="text"
               value={form.nombre}
               onChange={(e) => setForm(f => ({ ...f, nombre: e.target.value }))}
-              placeholder="Ej: Profesional, Concejo deliberante, Sueldo mensual..."
+              placeholder="Ej: Profesionales, Presentismo, Incentivo..."
               className="w-full px-3 py-2 rounded-lg text-sm"
               style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Frecuencia recomendada</label>
+              <ModernSelect
+                value={form.frecuencia_default}
+                onChange={(v) => setForm(f => ({ ...f, frecuencia_default: v }))}
+                options={[
+                  { value: 'semanal', label: 'Semanal' },
+                  { value: 'quincenal', label: 'Quincenal' },
+                  { value: 'mensual', label: 'Mensual' },
+                  { value: 'bimestral', label: 'Bimestral' },
+                  { value: 'trimestral', label: 'Trimestral' },
+                  { value: 'anual', label: 'Anual' },
+                ]}
+              />
+            </div>
+            <div>
+              {form.frecuencia_default === 'semanal' ? (
+                <>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día recomendado</label>
+                  <ModernSelect
+                    value={form.dia_semana_default}
+                    onChange={(v) => setForm(f => ({ ...f, dia_semana_default: v }))}
+                    options={[
+                      { value: '0', label: 'Lunes' },
+                      { value: '1', label: 'Martes' },
+                      { value: '2', label: 'Miércoles' },
+                      { value: '3', label: 'Jueves' },
+                      { value: '4', label: 'Viernes' },
+                      { value: '5', label: 'Sábado' },
+                      { value: '6', label: 'Domingo' },
+                    ]}
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Día del mes recomendado</label>
+                  <input
+                    type="number" min={1} max={28}
+                    value={form.dia_del_mes_default}
+                    onChange={(e) => setForm(f => ({ ...f, dia_del_mes_default: e.target.value }))}
+                    placeholder="1–28"
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: theme.background, color: theme.text, border: `1px solid ${theme.border}` }}
+                  />
+                </>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
