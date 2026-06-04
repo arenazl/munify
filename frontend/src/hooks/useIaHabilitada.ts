@@ -11,7 +11,7 @@ import { iaConfigApi } from '../lib/api';
  *
  * Default: false hasta que carga (no muestra IA "por las dudas").
  */
-let cache: { habilitada: boolean; provider: string; modelo: string } | null = null;
+let cache: { habilitada: boolean; provider: string; modelo: string; tesoreria: boolean } | null = null;
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
 
@@ -20,9 +20,9 @@ async function preload() {
   loadingPromise = (async () => {
     try {
       const res = await iaConfigApi.getActual();
-      cache = { habilitada: !!res.data.habilitada, provider: res.data.provider, modelo: res.data.modelo };
+      cache = { habilitada: !!res.data.habilitada, provider: res.data.provider, modelo: res.data.modelo, tesoreria: res.data.tesoreria !== false };
     } catch {
-      cache = { habilitada: false, provider: 'gemini', modelo: '' };
+      cache = { habilitada: false, provider: 'gemini', modelo: '', tesoreria: true };
     } finally {
       loaded = true;
       loadingPromise = null;
@@ -52,4 +52,20 @@ export function useIaHabilitada(): boolean {
     return () => { mounted = false; };
   }, []);
   return habilitada;
+}
+
+/**
+ * Hook: true si la IA está habilitada Y el sub-módulo Tesorería tiene IA.
+ * Gatea los paneles operativos y el banner Bartolo de Tesorería: se pueden
+ * apagar solo en Tesorería aun con la IA general prendida.
+ */
+export function useIaTesoreria(): boolean {
+  const calc = () => (cache?.habilitada ?? false) && (cache?.tesoreria ?? true);
+  const [on, setOn] = useState<boolean>(calc());
+  useEffect(() => {
+    let mounted = true;
+    preload().then(() => { if (mounted) setOn(calc()); });
+    return () => { mounted = false; };
+  }, []);
+  return on;
 }

@@ -314,8 +314,9 @@ async def tesoreria_dashboard_ia_top(
     municipio_id = get_effective_municipio_id(request, current_user)
     if not municipio_id:
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
-    from core.ia_config import ia_habilitada
-    if not await ia_habilitada(db, municipio_id):
+    from core.ia_config import get_ia_config
+    _cfg = await get_ia_config(db, municipio_id)
+    if not (_cfg.habilitada and _cfg.tesoreria):
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
     from services.dashboard_ia import build_tesoreria_dashboard
     return await build_tesoreria_dashboard(db, municipio_id, force=force)
@@ -980,8 +981,9 @@ async def tesoreria_dashboard_ia(
     municipio_id = get_effective_municipio_id(request, current_user)
     if not municipio_id:
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
-    from core.ia_config import ia_habilitada
-    if not await ia_habilitada(db, municipio_id):
+    from core.ia_config import get_ia_config
+    _cfg = await get_ia_config(db, municipio_id)
+    if not (_cfg.habilitada and _cfg.tesoreria):
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
     from services.dashboard_ia import build_tesoreria_dashboard
     return await build_tesoreria_dashboard(db, municipio_id, force=force)

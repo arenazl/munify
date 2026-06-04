@@ -23,6 +23,10 @@ class MunicipioIaConfig(Base):
     )
     # Switch maestro de IA para este municipio.
     habilitada = Column(Boolean, default=False, nullable=False)
+    # Sub-switch: IA en el modulo Tesoreria (paneles operativos al costado +
+    # banner de curacion Bartolo). Solo aplica si `habilitada` esta en True.
+    # Permite tener IA prendida en general pero apagada en Tesoreria.
+    tesoreria = Column(Boolean, default=True, nullable=False)
     # Proveedor (hoy solo 'gemini'; se deja por extensibilidad).
     provider = Column(String(30), default="gemini", nullable=False)
     # Modelo concreto (ej: gemini-2.5-flash, gemini-1.5-flash, gemini-1.5-pro).

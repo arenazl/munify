@@ -18,10 +18,11 @@ class IaConfig:
     habilitada: bool
     provider: str
     modelo: str
+    tesoreria: bool = True
 
 
 def _default() -> IaConfig:
-    return IaConfig(habilitada=False, provider="gemini", modelo=settings.GEMINI_MODEL or "gemini-2.5-flash")
+    return IaConfig(habilitada=False, provider="gemini", modelo=settings.GEMINI_MODEL or "gemini-2.5-flash", tesoreria=True)
 
 
 async def get_ia_config(db: AsyncSession, municipio_id: Optional[int]) -> IaConfig:
@@ -36,6 +37,7 @@ async def get_ia_config(db: AsyncSession, municipio_id: Optional[int]) -> IaConf
         habilitada=bool(row.habilitada),
         provider=row.provider or "gemini",
         modelo=row.modelo or (settings.GEMINI_MODEL or "gemini-2.5-flash"),
+        tesoreria=bool(row.tesoreria),
     )
 
 

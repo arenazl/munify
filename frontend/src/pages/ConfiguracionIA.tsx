@@ -21,6 +21,7 @@ export default function ConfiguracionIA() {
   const [munis, setMunis] = useState<MuniOpt[]>([]);
   const [muniId, setMuniId] = useState<number | null>(null);
   const [habilitada, setHabilitada] = useState(false);
+  const [tesoreria, setTesoreria] = useState(true);
   const [modelo, setModelo] = useState('gemini-2.5-flash');
   const [modelos, setModelos] = useState<string[]>(['gemini-2.5-flash']);
   const [loading, setLoading] = useState(false);
@@ -40,8 +41,8 @@ export default function ConfiguracionIA() {
     if (!muniId) return;
     setLoading(true);
     iaConfigApi.adminGet(muniId)
-      .then((r) => { setHabilitada(!!r.data.habilitada); setModelo(r.data.modelo || 'gemini-2.5-flash'); })
-      .catch(() => { setHabilitada(false); setModelo('gemini-2.5-flash'); })
+      .then((r) => { setHabilitada(!!r.data.habilitada); setModelo(r.data.modelo || 'gemini-2.5-flash'); setTesoreria(r.data.tesoreria !== false); })
+      .catch(() => { setHabilitada(false); setModelo('gemini-2.5-flash'); setTesoreria(true); })
       .finally(() => setLoading(false));
   }, [muniId]);
 
@@ -49,7 +50,7 @@ export default function ConfiguracionIA() {
     if (!muniId) return;
     setSaving(true);
     try {
-      await iaConfigApi.adminPut(muniId, { habilitada, provider: 'gemini', modelo });
+      await iaConfigApi.adminPut(muniId, { habilitada, provider: 'gemini', modelo, tesoreria });
       toast.success('Configuración de IA guardada');
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -118,6 +119,27 @@ export default function ConfiguracionIA() {
             <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
               Modelo que usa este municipio para asistentes, clasificación e insights.
             </p>
+          </div>
+
+          <div className={habilitada ? '' : 'opacity-50 pointer-events-none'}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: theme.text }}>IA en Tesorería</p>
+                <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                  {tesoreria
+                    ? 'Activada: muestra los paneles operativos y el banner de curación en Tesorería.'
+                    : 'Desactivada: oculta los paneles de IA solo en Tesorería (el resto de la IA sigue).'}
+                </p>
+              </div>
+              <button
+                onClick={() => setTesoreria((v) => !v)}
+                className="relative inline-flex h-7 w-12 rounded-full transition-colors flex-shrink-0"
+                style={{ backgroundColor: tesoreria ? '#22c55e' : '#9ca3af' }}
+                title={tesoreria ? 'IA de Tesorería activada — click para desactivar' : 'IA de Tesorería desactivada — click para activar'}
+              >
+                <span className="inline-block h-6 w-6 rounded-full bg-white transition-transform" style={{ transform: tesoreria ? 'translateX(22px)' : 'translateX(2px)', marginTop: '2px' }} />
+              </button>
+            </div>
           </div>
 
           <div className="pt-1">

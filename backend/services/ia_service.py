@@ -382,7 +382,7 @@ def clasificar_local(texto: str, categorias: List[Dict]) -> List[Dict]:
     return scores[:3]
 
 
-async def clasificar_con_gemini(texto: str, categorias: List[Dict]) -> Optional[List[Dict]]:
+async def clasificar_con_gemini(texto: str, categorias: List[Dict], modelo: Optional[str] = None) -> Optional[List[Dict]]:
     """
     Clasificación usando Gemini (Google) - IA por defecto.
     Se usa cuando el matching local no es suficiente.
@@ -414,7 +414,7 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{modelo or settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}",
                 headers={
                     "Content-Type": "application/json"
                 },
@@ -512,7 +512,7 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
         return None
 
 
-async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool = True) -> Dict:
+async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool = True, modelo: Optional[str] = None) -> Dict:
     """
     Clasificación: usa IA si está habilitada, sino local.
     Prioridad de IA: Groq > Gemini > local
@@ -541,7 +541,7 @@ async def clasificar_reclamo(texto: str, categorias: List[Dict], usar_ia: bool =
 
         # Si Groq no funcionó, intentar Gemini como fallback
         if not ia_results and settings.GEMINI_API_KEY:
-            ia_results = await clasificar_con_gemini(texto, categorias)
+            ia_results = await clasificar_con_gemini(texto, categorias, modelo=modelo)
             if ia_results:
                 ia_metodo = 'gemini'
 

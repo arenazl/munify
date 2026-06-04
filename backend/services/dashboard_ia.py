@@ -41,6 +41,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from core.ia_config import get_ia_config
 
 logger = logging.getLogger(__name__)
 
@@ -78,13 +79,14 @@ def cache_invalidate(municipio_id: int, modulo: Optional[str] = None) -> None:
 # LLM caller
 # ===================================================================
 
-async def _call_gemini(prompt: str, max_tokens: int = 4000) -> Optional[str]:
+async def _call_gemini(prompt: str, max_tokens: int = 4000, modelo: Optional[str] = None) -> Optional[str]:
     if not settings.GEMINI_API_KEY:
         return None
+    model = modelo or settings.GEMINI_MODEL
     try:
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
-            f"{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+            f"{model}:generateContent?key={settings.GEMINI_API_KEY}"
         )
         async with httpx.AsyncClient(timeout=28.0) as client:
             response = await client.post(
@@ -281,7 +283,7 @@ async def build_reclamos_dashboard(db: AsyncSession, municipio_id: int, force: b
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_gemini(prompt)
+        text_resp = await _call_gemini(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]
@@ -425,7 +427,7 @@ async def build_tramites_dashboard(db: AsyncSession, municipio_id: int, force: b
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_gemini(prompt)
+        text_resp = await _call_gemini(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]
@@ -583,7 +585,7 @@ async def build_tesoreria_dashboard(db: AsyncSession, municipio_id: int, force: 
             stats_json=_safe_dumps(stats),
             items_json=_safe_dumps(items_criticos),
         )
-        text_resp = await _call_gemini(prompt)
+        text_resp = await _call_gemini(prompt, modelo=(await get_ia_config(db, municipio_id)).modelo)
         parsed = _parse_json_safely(text_resp) if text_resp else None
         if isinstance(parsed, dict):
             urgentes = parsed.get("urgentes", [])[:3]

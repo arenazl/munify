@@ -36,6 +36,7 @@ class IaConfigIn(BaseModel):
     habilitada: bool = False
     provider: str = "gemini"
     modelo: str = "gemini-2.5-flash"
+    tesoreria: bool = True
 
 
 class IaConfigOut(BaseModel):
@@ -43,6 +44,7 @@ class IaConfigOut(BaseModel):
     habilitada: bool
     provider: str
     modelo: str
+    tesoreria: bool = True
 
 
 # ============ Superadmin: config por municipio (path param) ============
@@ -59,7 +61,7 @@ async def admin_get_ia_config(
     _: User = Depends(require_super_admin),
 ):
     cfg = await get_ia_config(db, municipio_id)
-    return IaConfigOut(municipio_id=municipio_id, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo)
+    return IaConfigOut(municipio_id=municipio_id, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo, tesoreria=cfg.tesoreria)
 
 
 @router.put("/admin/ia-config/{municipio_id}", response_model=IaConfigOut)
@@ -78,9 +80,10 @@ async def admin_put_ia_config(
     row.habilitada = bool(payload.habilitada)
     row.provider = (payload.provider or "gemini").strip() or "gemini"
     row.modelo = (payload.modelo or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
+    row.tesoreria = bool(payload.tesoreria)
     await db.commit()
     await db.refresh(row)
-    return IaConfigOut(municipio_id=municipio_id, habilitada=row.habilitada, provider=row.provider, modelo=row.modelo)
+    return IaConfigOut(municipio_id=municipio_id, habilitada=row.habilitada, provider=row.provider, modelo=row.modelo, tesoreria=row.tesoreria)
 
 
 # ============ Gate del frontend: config del municipio actual ============
@@ -95,4 +98,4 @@ async def get_ia_config_actual(
     modo Global), devuelve deshabilitada — no rompe."""
     muni_id = resolve_municipio_id(request, current_user)
     cfg = await get_ia_config(db, muni_id)
-    return IaConfigOut(municipio_id=muni_id or 0, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo)
+    return IaConfigOut(municipio_id=muni_id or 0, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo, tesoreria=cfg.tesoreria)

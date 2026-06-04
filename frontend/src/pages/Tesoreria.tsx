@@ -7,7 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
-import { useIaHabilitada } from '../hooks/useIaHabilitada';
+import { useIaTesoreria } from '../hooks/useIaHabilitada';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import PageHint from '../components/ui/PageHint';
@@ -90,7 +90,7 @@ const ESTADO_FILTROS: { value: EstadoAgregado | ''; label: string }[] = [
 
 export default function Tesoreria() {
   const { theme } = useTheme();
-  const iaOn = useIaHabilitada();  // gate IA: banner Bartolo + panel operativo
+  const iaOn = useIaTesoreria();  // gate IA en Tesorería (respeta el sub-flag): banner Bartolo + panel operativo
   const { user } = useAuth();
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -1317,14 +1317,16 @@ export default function Tesoreria() {
         kpis={kpisSpec}
         groupBy={groupByConfig}
         sidePanel={
-          <DashboardIAPanel
-            data={dashboardIA}
-            loading={dashboardIALoading}
-            title="Tesorería · IA"
-            onCollapsedChange={setIaCollapsed}
-          />
+          iaOn ? (
+            <DashboardIAPanel
+              data={dashboardIA}
+              loading={dashboardIALoading}
+              title="Tesorería · IA"
+              onCollapsedChange={setIaCollapsed}
+            />
+          ) : undefined
         }
-        sidePanelWidth={iaCollapsed ? 44 : 280}
+        sidePanelWidth={iaOn && !iaCollapsed ? 280 : (iaOn ? 44 : 0)}
       >
         {/* Fallback: si por algun motivo no se usa groupBy/renderItem,
             mantenemos el render legacy. ABMPage los ignora cuando hay groupBy. */}
