@@ -25,10 +25,10 @@ router = APIRouter()
 
 # Modelos de Gemini ofrecidos en la pantalla del superadmin.
 MODELOS_GEMINI: List[str] = [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
+    "gemini-2.5-flash",       # económico + bueno (default)
+    "gemini-2.5-flash-lite",  # el más liviano/barato (light)
+    "gemini-2.5-pro",         # el mejor (más caro)
+    "gemini-2.0-flash",       # alternativa más barata
 ]
 
 
