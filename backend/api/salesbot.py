@@ -18,6 +18,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -29,6 +30,7 @@ from models import (
     RolUsuario,
 )
 from models.salesbot_config import SalesbotConfig
+from models.municipio_dependencia import MunicipioDependencia
 
 router = APIRouter()
 
@@ -174,6 +176,68 @@ async def detalle_municipio(
         "whatsapp_habilitado": cfg.habilitado if cfg else False,
         "stats": await _stats(db, m.id, detalle=True),
     }
+
+
+@router.get("/municipios/{municipio_id}/tramites")
+async def listar_tramites_muni(
+    municipio_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Tramites activos que ofrece el municipio."""
+    verify_salesbot_key(request)
+    rows = (await db.execute(
+        select(Tramite).where(
+            Tramite.municipio_id == municipio_id,
+            Tramite.activo == True,  # noqa: E712
+        ).order_by(Tramite.nombre)
+    )).scalars().all()
+    return [
+        {"id": t.id, "nombre": t.nombre, "descripcion": t.descripcion, "activo": bool(t.activo)}
+        for t in rows
+    ]
+
+
+@router.get("/municipios/{municipio_id}/categorias")
+async def listar_categorias_muni(
+    municipio_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Categorias de reclamo del municipio."""
+    verify_salesbot_key(request)
+    rows = (await db.execute(
+        select(CategoriaReclamo)
+        .where(CategoriaReclamo.municipio_id == municipio_id)
+        .order_by(CategoriaReclamo.nombre)
+    )).scalars().all()
+    return [{"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion} for c in rows]
+
+
+@router.get("/municipios/{municipio_id}/dependencias")
+async def listar_dependencias_muni(
+    municipio_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Areas/secretarias habilitadas en el municipio. Dependencia es un template
+    global (sin municipio_id); las del muni viven en el pivot MunicipioDependencia
+    con telefono/email efectivos (override local o el del template)."""
+    verify_salesbot_key(request)
+    rows = (await db.execute(
+        select(MunicipioDependencia)
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(
+            MunicipioDependencia.municipio_id == municipio_id,
+            MunicipioDependencia.activo == True,  # noqa: E712
+        )
+    )).scalars().all()
+    out = [
+        {"id": md.dependencia_id, "nombre": md.nombre, "telefono": md.telefono_efectivo, "email": md.email_efectivo}
+        for md in rows
+    ]
+    out.sort(key=lambda d: (d["nombre"] or ""))
+    return out
 
 
 # ============================================================
