@@ -35,6 +35,11 @@ interface NavigationOptions {
    * no esta en este set, se asume activo (no rompe sesiones viejas).
    */
   modulosDesactivados?: string[];
+  /**
+   * IA habilitada para el municipio actual (gate central). Si es false, los
+   * items de IA del sidebar (Análisis/Panel BI) se ocultan. Default false.
+   */
+  iaHabilitada?: boolean;
 }
 
 export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => {
@@ -66,6 +71,9 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   // Helper: un modulo esta habilitado si NO esta en la lista de
   // desactivados. Opt-out, default activo (compat con munis viejos).
   const moduloOn = (modulo: string) => !modulosDesactivados.has(modulo);
+  // Gate central de IA: los items de IA solo se muestran si el muni la tiene
+  // habilitada (default false → opt-in, no se expone por accidente).
+  const iaHabilitada = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.iaHabilitada : false;
 
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
@@ -306,7 +314,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Análisis',
       href: '/gestion/panel-bi',
       icon: LayoutDashboard,
-      show: isAdminOrSupervisor && moduloOn('panel-bi'),
+      show: isAdminOrSupervisor && moduloOn('panel-bi') && iaHabilitada,
       categoria: 'Operación',
       description: 'Consultas y análisis con IA'
     },

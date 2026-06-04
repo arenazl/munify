@@ -130,6 +130,10 @@ async def listar_municipios(
             "codigo": m.codigo,
             "logo_url": m.logo_url,
             "color_primario": m.color_primario,
+            # telefono va tambien en la LISTA: el fast-path del postback del menu
+            # interactivo (Flujo 2) lo usa como fallback cuando no hay whatsapp,
+            # sin tener que pegarle a /detalle.
+            "telefono": m.telefono,
             "whatsapp": cfg.whatsapp if cfg else None,
             "whatsapp_habilitado": cfg.habilitado if cfg else False,
             "stats": await _stats(db, m.id),

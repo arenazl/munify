@@ -567,6 +567,9 @@ async def tramites_dashboard_ia(
         raise HTTPException(status_code=403, detail="Solo admin/supervisor")
     if not current_user.municipio_id:
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
+    from core.ia_config import ia_habilitada
+    if not await ia_habilitada(db, current_user.municipio_id):
+        return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
     from services.dashboard_ia import build_tramites_dashboard
     return await build_tramites_dashboard(db, current_user.municipio_id, force=force)
 

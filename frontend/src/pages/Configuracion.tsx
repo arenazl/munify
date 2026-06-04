@@ -677,6 +677,7 @@ export default function Configuracion() {
         { id: 'audit-logs', label: 'Consola de auditoría', description: 'Logs cross-municipio con filtros por endpoint, latencia y status', icon: Activity, color: '#8b5cf6', link: '/gestion/admin/audit-logs', show: isSuperAdmin },
         { id: 'suscripciones', label: 'Suscripciones', description: 'Municipios suscriptos, plan, estado y próxima fecha de facturación', icon: Building2, color: '#22c55e', link: '/gestion/admin/suscripciones', show: isSuperAdmin },
         { id: 'sidebar-config', label: 'Config sidebar', description: 'Configurar qué items del menú ve cada municipio', icon: SlidersHorizontal, color: '#06b6d4', link: '/gestion/sidebar-config', show: isSuperAdmin },
+        { id: 'configuracion-ia', label: 'Configuración de IA', description: 'Activar/desactivar la IA y elegir el modelo de Gemini por municipio', icon: Sparkles, color: '#a855f7', link: '/gestion/configuracion-ia', show: isSuperAdmin },
       ],
     },
   ];

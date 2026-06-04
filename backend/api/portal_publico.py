@@ -692,11 +692,14 @@ async def clasificar_reclamo_endpoint(
         ]
         categorias = CATEGORIAS_DEFAULT
 
-    # Clasificar
+    # Clasificar. Si el muni tiene la IA deshabilitada, forzamos solo matching
+    # local (keywords): sigue sugiriendo categoria, sin LLM (gratis, no se rompe).
+    from core.ia_config import ia_habilitada
+    usar_ia = data.usar_ia and await ia_habilitada(db, data.municipio_id)
     resultado = await clasificar_reclamo(
         texto=data.texto,
         categorias=categorias,
-        usar_ia=data.usar_ia
+        usar_ia=usar_ia
     )
 
     return resultado

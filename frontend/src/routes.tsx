@@ -37,6 +37,7 @@ import GestionTasas from './pages/GestionTasas';
 import GestionPagos from './pages/GestionPagos';
 import Mostrador from './pages/Mostrador';
 import SidebarConfig from './pages/SidebarConfig';
+import ConfiguracionIA from './pages/ConfiguracionIA';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
 import CalificarReclamo from './pages/CalificarReclamo';
@@ -339,6 +340,11 @@ export const router = createBrowserRouter([
       {
         path: 'sidebar-config',
         element: <ProtectedRoute roles={['admin']}><SidebarConfig /></ProtectedRoute>
+      },
+      // Config de IA por muni (solo superadmin)
+      {
+        path: 'configuracion-ia',
+        element: <ProtectedRoute roles={['admin']}><ConfiguracionIA /></ProtectedRoute>
       },
       // Ajustes -> Configuración (compat: ambas rutas viejas redirigen).
       {

@@ -1220,6 +1220,17 @@ export const salesbotApi = {
     api.put<{ municipio_id: number; whatsapp: string | null; habilitado: boolean }>('/salesbot/mi-config', data),
 };
 
+// Config de IA por municipio. getActual = gate del muni actual (cualquier user);
+// los admin* son solo superadmin (prenden/apagan IA + eligen modelo por muni).
+export interface IaConfigData { municipio_id: number; habilitada: boolean; provider: string; modelo: string; }
+export const iaConfigApi = {
+  getActual: () => api.get<IaConfigData>('/ia-config/actual'),
+  adminGet: (municipioId: number) => api.get<IaConfigData>(`/admin/ia-config/${municipioId}`),
+  adminPut: (municipioId: number, data: { habilitada: boolean; provider?: string; modelo: string }) =>
+    api.put<IaConfigData>(`/admin/ia-config/${municipioId}`, data),
+  adminModelos: () => api.get<string[]>('/admin/ia-config/modelos'),
+};
+
 export const whatsappApi = {
   // Configuración
   getConfig: () => api.get('/whatsapp/config'),

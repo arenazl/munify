@@ -7,6 +7,7 @@ import {
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
+import { useIaHabilitada } from '../hooks/useIaHabilitada';
 import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import PageHint from '../components/ui/PageHint';
@@ -89,6 +90,7 @@ const ESTADO_FILTROS: { value: EstadoAgregado | ''; label: string }[] = [
 
 export default function Tesoreria() {
   const { theme } = useTheme();
+  const iaOn = useIaHabilitada();  // gate IA: banner Bartolo + panel operativo
   const { user } = useAuth();
 
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -1160,9 +1162,9 @@ export default function Tesoreria() {
         </TesoreriaHint>
       </div>
 
-      {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes.
-          Margen vertical generoso para separarlo del hint y del header. */}
-      {dudosos.count > 0 && (
+      {/* Banner curacion Bartolo — solo aparece si hay dudosos pendientes Y la
+          IA esta habilitada para el muni (la clasificacion es IA). */}
+      {iaOn && dudosos.count > 0 && (
         <Link
           to="/gestion/tesoreria/curacion-bartolo"
           className="relative block mb-4 overflow-hidden rounded-xl shadow-sm transition-all hover:-translate-y-0.5"

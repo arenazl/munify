@@ -12,7 +12,7 @@ import { PageTransition } from './ui/PageTransition';
 import { ChatWidget } from './ChatWidget';
 import { NotificacionesDropdown } from './NotificacionesDropdown';
 import { Sheet } from './ui/Sheet';
-import { usersApi, municipiosApi, navegacionApi, modulosApi, API_URL as apiUrl_ } from '../lib/api';
+import { usersApi, municipiosApi, navegacionApi, modulosApi, iaConfigApi, API_URL as apiUrl_ } from '../lib/api';
 import MunicipioSwitcher from './admin/MunicipioSwitcher';
 import NotificationSettings from './NotificationSettings';
 import { NotificationActivationSheet } from './NotificationActivationSheet';
@@ -89,6 +89,7 @@ export default function Layout() {
   // Modulos activos del municipio (feature flags)
   const [modulosActivos, setModulosActivos] = useState<string[]>([]);
   const [modulosDesactivados, setModulosDesactivados] = useState<string[]>([]);
+  const [iaHabilitada, setIaHabilitada] = useState<boolean>(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const sidebarBgInputRef = useRef<HTMLInputElement>(null);
   // Estado para el toggle de push notifications en la top bar
@@ -190,6 +191,10 @@ export default function Layout() {
         setModulosDesactivados(rows.filter(m => !m.activo).map(m => m.modulo));
       })
       .catch(() => { setModulosActivos([]); setModulosDesactivados([]); });
+    // Gate central de IA del muni actual (oculta los items de IA del sidebar).
+    iaConfigApi.getActual()
+      .then((r) => setIaHabilitada(!!r.data.habilitada))
+      .catch(() => setIaHabilitada(false));
   }, [user?.id, user?.municipio_id]);
 
   // Cargar datos del usuario cuando se abre el sheet de perfil
@@ -344,6 +349,7 @@ export default function Layout() {
     hrefsOcultos,
     modulosActivos,
     modulosDesactivados,
+    iaHabilitada,
   });
   const mobileTabs = getMobileTabs(user.rol);
 

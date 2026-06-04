@@ -4,6 +4,7 @@ import {
   MapPin, Tag, Users, FileText, Wallet, CalendarClock, type LucideIcon,
 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useIaHabilitada } from '../../hooks/useIaHabilitada';
 
 // =====================================================================
 // DashboardIAPanel — panel lateral de "análisis operativo IA".
@@ -67,6 +68,8 @@ export function DashboardIAPanel({
   onTipClick,
 }: DashboardIAPanelProps) {
   const { theme } = useTheme();
+  // Gate central: si el muni tiene la IA desactivada, el panel no se muestra.
+  const iaHabilitada = useIaHabilitada();
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
@@ -85,6 +88,9 @@ export function DashboardIAPanel({
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const toggleSection = (k: string) => setOpenSections(s => ({ ...s, [k]: s[k] === false ? true : false }));
   const isSectionOpen = (k: string) => openSections[k] !== false; // default: true
+
+  // Gate de IA: tras declarar todos los hooks (no romper rules-of-hooks).
+  if (!iaHabilitada) return null;
 
   // Colapsado: barra vertical fina
   if (collapsed) {

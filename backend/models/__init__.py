@@ -31,6 +31,7 @@ from .gamificacion import (
 )
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
 from .salesbot_config import SalesbotConfig
+from .municipio_ia_config import MunicipioIaConfig
 from .noticia import Noticia
 from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from .turno import Turno

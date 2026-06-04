@@ -1,6 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Check, Sparkles, Loader2, ArrowLeft, X, MessageCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useIaHabilitada } from '../../hooks/useIaHabilitada';
 import { PrimaryButton } from './PrimaryButton';
 import { chatApi } from '../../lib/api';
 
@@ -126,6 +127,7 @@ export function WizardForm({
   showAIButton = true,
 }: WizardFormProps) {
   const { theme } = useTheme();
+  const iaOn = useIaHabilitada();  // gate: oculta el botón de Asistente IA si el muni tiene IA off
   const [internalStep, setInternalStep] = useState(0);
   const [visitedSteps, setVisitedSteps] = useState<Set<number>>(new Set([0]));
   const [direction, setDirection] = useState<'left' | 'right'>('right');
@@ -446,7 +448,7 @@ export function WizardForm({
         )}
 
         {/* Botón IA */}
-        {showAIButton && (
+        {showAIButton && iaOn && (
           <button
             onClick={handleAskAI}
             disabled={aiLoading}
