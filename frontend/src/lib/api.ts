@@ -1211,6 +1211,15 @@ export const gamificacionApi = {
 };
 
 // WhatsApp
+// Config de derivación a SalesBot por municipio (tabla aparte de WhatsApp/Meta).
+// Solo el número al que SalesBot deriva + un switch de habilitado.
+export const salesbotApi = {
+  getMiConfig: () =>
+    api.get<{ municipio_id: number; whatsapp: string | null; habilitado: boolean }>('/salesbot/mi-config'),
+  updateMiConfig: (data: { whatsapp: string | null; habilitado: boolean }) =>
+    api.put<{ municipio_id: number; whatsapp: string | null; habilitado: boolean }>('/salesbot/mi-config', data),
+};
+
 export const whatsappApi = {
   // Configuración
   getConfig: () => api.get('/whatsapp/config'),

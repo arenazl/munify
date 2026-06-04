@@ -6,7 +6,7 @@ import {
   ClipboardList, Search, Hash
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { whatsappApi, reclamosApi } from '../lib/api';
+import { whatsappApi, salesbotApi, reclamosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Reclamo } from '../types';
 import SettingsHeader from '../components/ui/SettingsHeader';
@@ -72,7 +72,39 @@ export default function WhatsAppConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'config' | 'actions' | 'logs' | 'stats'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'salesbot' | 'actions' | 'logs' | 'stats'>('config');
+
+  // Derivación a SalesBot (tabla aparte, independiente de la integración Meta)
+  const [salesbotWhatsapp, setSalesbotWhatsapp] = useState('');
+  const [salesbotHabilitado, setSalesbotHabilitado] = useState(false);
+  const [salesbotLoading, setSalesbotLoading] = useState(false);
+  const [salesbotSaving, setSalesbotSaving] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'salesbot') return;
+    setSalesbotLoading(true);
+    salesbotApi.getMiConfig()
+      .then(r => { setSalesbotWhatsapp(r.data.whatsapp || ''); setSalesbotHabilitado(!!r.data.habilitado); })
+      .catch(() => toast.error('Error cargando config de SalesBot'))
+      .finally(() => setSalesbotLoading(false));
+  }, [activeTab]);
+
+  const handleSaveSalesbot = async () => {
+    setSalesbotSaving(true);
+    try {
+      const r = await salesbotApi.updateMiConfig({
+        whatsapp: salesbotWhatsapp.trim() || null,
+        habilitado: salesbotHabilitado,
+      });
+      setSalesbotWhatsapp(r.data.whatsapp || '');
+      setSalesbotHabilitado(!!r.data.habilitado);
+      toast.success('Config de SalesBot guardada');
+    } catch {
+      toast.error('Error guardando');
+    } finally {
+      setSalesbotSaving(false);
+    }
+  };
 
   // Config
   const [config, setConfig] = useState<WhatsAppConfigFull | null>(null);
@@ -372,6 +404,7 @@ export default function WhatsAppConfigPage() {
       >
         {[
           { id: 'config', label: 'Configuración', icon: MessageCircle },
+          { id: 'salesbot', label: 'SalesBot', icon: Send },
           { id: 'actions', label: 'Acciones', icon: Zap },
           { id: 'logs', label: 'Historial', icon: History },
           { id: 'stats', label: 'Estadísticas', icon: BarChart3 },
@@ -393,6 +426,65 @@ export default function WhatsAppConfigPage() {
       </div>
 
       {/* Tab Content */}
+      {activeTab === 'salesbot' && (
+        <div className="space-y-6">
+          <div className="rounded-xl p-5" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Send className="h-5 w-5" style={{ color: theme.primary }} />
+              <h3 className="font-medium" style={{ color: theme.text }}>Derivación a SalesBot</h3>
+            </div>
+            <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
+              SalesBot (el asistente de ventas de Munify) deriva los prospectos interesados en tu
+              municipio a este WhatsApp. Es <b>independiente</b> de la integración de WhatsApp
+              Business de arriba: con cargar el número y activarlo alcanza, no hace falta Meta.
+            </p>
+            {salesbotLoading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
+                    WhatsApp de contacto
+                  </label>
+                  <input
+                    type="tel"
+                    value={salesbotWhatsapp}
+                    onChange={(e) => setSalesbotWhatsapp(e.target.value)}
+                    placeholder="+54 9 11 1234-5678"
+                    className="w-full max-w-md px-3 py-2 rounded-lg text-sm font-mono outline-none"
+                    style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
+                  />
+                  <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                    Número al que SalesBot manda los prospectos. Formato internacional.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSalesbotHabilitado(v => !v)}
+                  className="flex items-center gap-2 text-sm font-medium"
+                  style={{ color: salesbotHabilitado ? '#25D366' : theme.textSecondary }}
+                >
+                  {salesbotHabilitado ? <ToggleRight className="h-6 w-6" /> : <ToggleLeft className="h-6 w-6" />}
+                  {salesbotHabilitado ? 'Habilitado para SalesBot' : 'Deshabilitado'}
+                </button>
+                <div className="pt-2">
+                  <button
+                    onClick={handleSaveSalesbot}
+                    disabled={salesbotSaving}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-2 transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    {salesbotSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'config' && (
         <div className="space-y-6">
           {/* ===== Numero saliente del Mostrador (modo wa.me) ===== */}

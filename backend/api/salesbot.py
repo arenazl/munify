@@ -1,0 +1,232 @@
+"""API SalesBot (Bruno) <-> Munify.
+
+Dos tipos de endpoints, dos auth distintas:
+
+  - GENERALES (los consume SalesBot, backend a backend): auth por header
+    `X-SalesBot-Key`. Listan/devuelven municipios con su WhatsApp de derivacion
+    + stats reales. NO son tenant-scoped: cruzan todos los municipios.
+
+  - ADMIN per-muni (los consume el panel del propio municipio): auth JWT.
+    Cargar/guardar la config de derivacion (numero + habilitado) del muni.
+
+El WhatsApp de derivacion sale de la tabla dedicada `salesbot_configs`, NO de
+WhatsAppConfig (que es la integracion Meta). Asi un muni puede estar en SalesBot
+sin tener Meta configurado.
+"""
+from typing import Optional, List
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.database import get_db
+from core.config import settings
+from core.security import get_current_user
+from core.tenancy import get_effective_municipio_id
+from models import (
+    Municipio, Reclamo, User, Tramite, CategoriaReclamo,
+    RolUsuario,
+)
+from models.salesbot_config import SalesbotConfig
+
+router = APIRouter()
+
+# Estados que cuentan como "resuelto": FINALIZADO es el actual, "resuelto" es
+# legacy. La columna guarda el VALUE en minuscula (values_callable en el Enum).
+ESTADOS_RESUELTO = ["finalizado", "resuelto"]
+
+
+# ============================================================
+# Auth backend-to-backend (SalesBot)
+# ============================================================
+
+def verify_salesbot_key(request: Request):
+    # El codebase lee headers desde Request (evita Header() por incompat de
+    # versiones FastAPI/Pydantic). Header: X-SalesBot-Key.
+    key = request.headers.get("X-SalesBot-Key")
+    if not settings.SALESBOT_API_KEY or key != settings.SALESBOT_API_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+async def _stats(db: AsyncSession, municipio_id: int, detalle: bool = False) -> dict:
+    """Stats reales de un municipio (counts directos sobre la BD de Munify)."""
+    total = (await db.execute(
+        select(func.count(Reclamo.id)).where(Reclamo.municipio_id == municipio_id)
+    )).scalar() or 0
+    resueltos = (await db.execute(
+        select(func.count(Reclamo.id)).where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.estado.in_(ESTADOS_RESUELTO),
+        )
+    )).scalar() or 0
+    tramites = (await db.execute(
+        select(func.count(Tramite.id)).where(
+            Tramite.municipio_id == municipio_id,
+            Tramite.activo == True,  # noqa: E712
+        )
+    )).scalar() or 0
+    vecinos = (await db.execute(
+        select(func.count(User.id)).where(
+            User.municipio_id == municipio_id,
+            User.rol == RolUsuario.VECINO,
+        )
+    )).scalar() or 0
+
+    stats = {
+        "reclamos_totales": int(total),
+        "reclamos_resueltos": int(resueltos),
+        "tramites_activos": int(tramites),
+        "vecinos": int(vecinos),
+    }
+    if detalle:
+        stats["tasa_resolucion_pct"] = round(resueltos / total * 100) if total else 0
+        cats = (await db.execute(
+            select(CategoriaReclamo.nombre)
+            .where(CategoriaReclamo.municipio_id == municipio_id)
+            .order_by(CategoriaReclamo.nombre)
+            .limit(8)
+        )).scalars().all()
+        stats["categorias_reclamo"] = list(cats)
+    return stats
+
+
+async def _salesbot_map(db: AsyncSession, municipio_ids: List[int]) -> dict:
+    """{municipio_id: SalesbotConfig} (1 query, evita N+1)."""
+    if not municipio_ids:
+        return {}
+    rows = (await db.execute(
+        select(SalesbotConfig).where(SalesbotConfig.municipio_id.in_(municipio_ids))
+    )).scalars().all()
+    return {r.municipio_id: r for r in rows}
+
+
+# ============================================================
+# Endpoints GENERALES (SalesBot, X-SalesBot-Key)
+# ============================================================
+
+@router.get("/municipios")
+async def listar_municipios(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista TODOS los municipios activos con su derivacion de WhatsApp + stats."""
+    verify_salesbot_key(request)
+    munis = (await db.execute(
+        select(Municipio).where(Municipio.activo == True).order_by(Municipio.nombre)  # noqa: E712
+    )).scalars().all()
+    sb = await _salesbot_map(db, [m.id for m in munis])
+
+    out = []
+    for m in munis:
+        cfg = sb.get(m.id)
+        out.append({
+            "id": m.id,
+            "nombre": m.nombre,
+            "codigo": m.codigo,
+            "logo_url": m.logo_url,
+            "color_primario": m.color_primario,
+            "whatsapp": cfg.whatsapp if cfg else None,
+            "whatsapp_habilitado": cfg.habilitado if cfg else False,
+            "stats": await _stats(db, m.id),
+        })
+    return out
+
+
+@router.get("/municipios/{municipio_id}/detalle")
+async def detalle_municipio(
+    municipio_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Detalle de un municipio (cuando el prospecto ya eligio uno)."""
+    verify_salesbot_key(request)
+    m = (await db.execute(
+        select(Municipio).where(
+            Municipio.id == municipio_id,
+            Municipio.activo == True,  # noqa: E712
+        )
+    )).scalar_one_or_none()
+    if not m:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    sb = await _salesbot_map(db, [m.id])
+    cfg = sb.get(m.id)
+    return {
+        "id": m.id,
+        "nombre": m.nombre,
+        "codigo": m.codigo,
+        "descripcion": m.descripcion,
+        "telefono": m.telefono,
+        "email": m.email,
+        "sitio_web": m.sitio_web,
+        "logo_url": m.logo_url,
+        "color_primario": m.color_primario,
+        "whatsapp": cfg.whatsapp if cfg else None,
+        "whatsapp_habilitado": cfg.habilitado if cfg else False,
+        "stats": await _stats(db, m.id, detalle=True),
+    }
+
+
+# ============================================================
+# Endpoints ADMIN per-muni (panel del municipio, JWT)
+# ============================================================
+
+class SalesbotConfigIn(BaseModel):
+    whatsapp: Optional[str] = None
+    habilitado: bool = False
+
+
+class SalesbotConfigOut(BaseModel):
+    municipio_id: int
+    whatsapp: Optional[str] = None
+    habilitado: bool = False
+
+
+def _require_admin(user: User):
+    if user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        raise HTTPException(403, "Sin permisos")
+
+
+@router.get("/mi-config", response_model=SalesbotConfigOut)
+async def get_mi_config(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Config de derivacion del municipio actual (para la pestaña SalesBot)."""
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+    cfg = (await db.execute(
+        select(SalesbotConfig).where(SalesbotConfig.municipio_id == muni_id)
+    )).scalar_one_or_none()
+    if not cfg:
+        return SalesbotConfigOut(municipio_id=muni_id, whatsapp=None, habilitado=False)
+    return SalesbotConfigOut(municipio_id=muni_id, whatsapp=cfg.whatsapp, habilitado=cfg.habilitado)
+
+
+@router.put("/mi-config", response_model=SalesbotConfigOut)
+async def put_mi_config(
+    payload: SalesbotConfigIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Crea o actualiza la config de derivacion del municipio actual."""
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+    cfg = (await db.execute(
+        select(SalesbotConfig).where(SalesbotConfig.municipio_id == muni_id)
+    )).scalar_one_or_none()
+    if not cfg:
+        cfg = SalesbotConfig(municipio_id=muni_id)
+        db.add(cfg)
+    cfg.whatsapp = (payload.whatsapp or "").strip() or None
+    cfg.habilitado = bool(payload.habilitado)
+    await db.commit()
+    await db.refresh(cfg)
+    return SalesbotConfigOut(municipio_id=muni_id, whatsapp=cfg.whatsapp, habilitado=cfg.habilitado)

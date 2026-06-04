@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = ""
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = "reclamos_municipales_2024"
 
+    # SalesBot (Bruno) - API key estatica backend-to-backend para /api/salesbot/*
+    SALESBOT_API_KEY: str = ""
+
     # CORS - URLs permitidas (separadas por coma en .env)
     CORS_ORIGINS: str = ""
 

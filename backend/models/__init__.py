@@ -30,6 +30,7 @@ from .gamificacion import (
     TipoAccion, TipoBadge, PUNTOS_POR_ACCION, BADGES_CONFIG
 )
 from .whatsapp_config import WhatsAppConfig, WhatsAppLog, WhatsAppProvider
+from .salesbot_config import SalesbotConfig
 from .noticia import Noticia
 from .tramite import Tramite, Solicitud, HistorialSolicitud, EstadoSolicitud
 from .turno import Turno
