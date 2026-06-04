@@ -105,6 +105,28 @@ class EjecutarPagoResponse(BaseModel):
     proximo_pago: Optional[str] = None
 
 
+class EjecutarMasivoRequest(BaseModel):
+    """Body del POST /agenda/ejecutar-masivo. Lista de IDs de pagos
+    programados a ejecutar de una. Cada uno se paga con sus valores POR
+    DEFECTO: monto del programado, fecha = su proximo_pago, sin premios."""
+    pago_ids: List[int] = []
+
+
+class EjecutarMasivoItem(BaseModel):
+    pago_id: int
+    ok: bool
+    gasto_id: Optional[int] = None
+    error: Optional[str] = None
+
+
+class EjecutarMasivoResponse(BaseModel):
+    total: int
+    exitosos: int
+    fallidos: int
+    monto_total: Decimal
+    items: List[EjecutarMasivoItem] = []
+
+
 # ============================================================
 # TipoEmpleado
 # ============================================================

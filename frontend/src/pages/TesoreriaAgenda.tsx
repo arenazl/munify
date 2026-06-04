@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   CalendarClock, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Loader2, Calendar,
-  Home, Briefcase, Wallet, Sparkles, Gift, SkipForward,
+  Home, Briefcase, Wallet, Sparkles, Gift, SkipForward, Layers,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -10,6 +10,7 @@ import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
+import { PagoMasivoModal } from '../components/tesoreria/PagoMasivoModal';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 
@@ -103,6 +104,7 @@ export default function TesoreriaAgenda() {
   const [frecuenciaFiltro, setFrecuenciaFiltro] = useState<FrecuenciaPago | ''>('');
   const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos' | 'adelantados' | 'realizados'>('todos');
+  const [masivoOpen, setMasivoOpen] = useState(false);
   const [historial, setHistorial] = useState<PagoEjecutadoHistorial[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
 
@@ -686,37 +688,58 @@ export default function TesoreriaAgenda() {
           </div>
         ) : (
           <div className="max-h-[600px] overflow-y-auto">
-            {items.map((h, i) => {
-              const fechaFmt = parseLocalDate(h.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' });
-              const dias = diasDesdeHoy(h.fecha);
-              return (
-                <div
-                  key={h.id}
-                  className="px-4 py-2.5 flex items-center gap-3"
-                  style={{ borderTop: i > 0 ? `1px solid ${theme.border}` : undefined }}
-                >
-                  <span
-                    className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md whitespace-nowrap flex-shrink-0"
-                    style={{ backgroundColor: `${acento}20`, color: acento, border: `1px solid ${acento}40` }}
-                  >
-                    {fechaFmt}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                      {h.contacto_nombre || '—'}
-                    </p>
-                    <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                      {h.concepto}
-                      {h.caja_nombre && ` · ${h.caja_nombre}`}
-                      {esAdelantado && dias > 0 && ` · impacta en ${dias}d`}
-                    </p>
+            {(() => {
+              // Agrupar por fecha (como la agenda): un encabezado por día con
+              // subtotal + filas, en vez de repetir el badge de fecha en cada fila.
+              const porFecha = new Map<string, PagoEjecutadoHistorial[]>();
+              for (const h of items) {
+                const f = (h.fecha || '').slice(0, 10);
+                if (!porFecha.has(f)) porFecha.set(f, []);
+                porFecha.get(f)!.push(h);
+              }
+              const fechas = Array.from(porFecha.keys())
+                // realizados: más reciente arriba; adelantados: más próximo arriba.
+                .sort((a, b) => (esAdelantado ? a.localeCompare(b) : b.localeCompare(a)));
+              return fechas.map((f, gi) => {
+                const grupo = porFecha.get(f)!;
+                const subtotal = grupo.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0);
+                const fechaLabel = parseLocalDate(f).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+                return (
+                  <div key={f}>
+                    <div className="px-4 py-2 flex items-center justify-between sticky top-0 z-10"
+                      style={{ backgroundColor: theme.backgroundSecondary, borderTop: gi > 0 ? `1px solid ${theme.border}` : undefined }}>
+                      <span className="text-xs font-bold capitalize inline-flex items-center gap-1.5" style={{ color: acento }}>
+                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: acento }} />
+                        {fechaLabel}
+                      </span>
+                      <span className="text-[11px]" style={{ color: theme.textSecondary }}>
+                        {grupo.length} {grupo.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(subtotal)}
+                      </span>
+                    </div>
+                    {grupo.map(h => {
+                      const dias = diasDesdeHoy(h.fecha);
+                      return (
+                        <div key={h.id} className="px-4 py-2.5 flex items-center gap-3" style={{ borderTop: `1px solid ${theme.border}` }}>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
+                              {h.contacto_nombre || '—'}
+                            </p>
+                            <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                              {h.concepto}
+                              {h.caja_nombre && ` · ${h.caja_nombre}`}
+                              {esAdelantado && dias > 0 && ` · impacta en ${dias}d`}
+                            </p>
+                          </div>
+                          <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>
+                            {fmtMoney(h.monto_pesos)}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>
-                    {fmtMoney(h.monto_pesos)}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         )}
       </div>
@@ -794,7 +817,18 @@ export default function TesoreriaAgenda() {
         buttonLabel="Nuevo Pago Programado"
         onAdd={() => openSheet()}
         tourAnchors={{ kpis: 'liq-kpis', addButton: 'liq-nueva' }}
-        headerActions={<TourButton tourKey="sueldos-liquidaciones" title="Ver tutorial de Liquidaciones" />}
+        headerActions={
+          <div className="flex items-center gap-2">
+            {!esVistaHistorial && pagos.length > 0 && (
+              <button onClick={() => setMasivoOpen(true)}
+                className="px-3 py-2 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-1.5 transition-all hover:opacity-90 active:scale-95"
+                style={{ backgroundColor: '#10b981' }}>
+                <Layers className="h-4 w-4" /> Pago masivo
+              </button>
+            )}
+            <TourButton tourKey="sueldos-liquidaciones" title="Ver tutorial de Liquidaciones" />
+          </div>
+        }
         searchPlaceholder="Buscar por concepto o contacto..."
         searchValue={search}
         onSearchChange={setSearch}
@@ -1055,6 +1089,13 @@ export default function TesoreriaAgenda() {
         cancelText="Cancelar"
         loading={omitingId === omitirPago?.id}
         icon={<SkipForward className="h-5 w-5" />}
+      />
+
+      <PagoMasivoModal
+        open={masivoOpen}
+        onClose={() => setMasivoOpen(false)}
+        pagos={filtered}
+        onDone={fetchAll}
       />
 
       <MunifyTour tourKey="sueldos-liquidaciones" steps={TOUR_STEPS_LIQ} />

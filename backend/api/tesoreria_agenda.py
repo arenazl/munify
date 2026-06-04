@@ -19,6 +19,7 @@ from models.gasto import EstadoGastoCuota
 from schemas.tesoreria_extra import (
     PagoProgramadoCreate, PagoProgramadoUpdate, PagoProgramadoResponse,
     EjecutarPagoRequest, EjecutarPagoResponse, PremioAplicado,
+    EjecutarMasivoRequest, EjecutarMasivoResponse, EjecutarMasivoItem,
 )
 
 router = APIRouter()
@@ -505,6 +506,90 @@ async def ejecutar_pago(
         monto_base=monto_base,
         premios_aplicados=premios_aplicados,
         proximo_pago=pp.proximo_pago.isoformat() if pp.activo else None,
+    )
+
+
+@router.post("/ejecutar-masivo", response_model=EjecutarMasivoResponse)
+async def ejecutar_pagos_masivo(
+    payload: EjecutarMasivoRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ejecuta varios pagos programados de una (pago masivo). Cada uno se
+    paga con sus valores POR DEFECTO: monto = monto_pesos del programado,
+    fecha de impacto = su proximo_pago, sin premios. Equivale a llamar
+    /ejecutar uno por uno con payload vacio, pero en una sola request y
+    una sola transaccion. Espeja el nucleo de ejecutar_pago (sin premios)."""
+    _require_admin(current_user)
+    muni_id = get_effective_municipio_id(request, current_user)
+
+    ids = list(dict.fromkeys(payload.pago_ids))  # dedup preservando orden
+    if not ids:
+        raise HTTPException(400, "Sin pagos para ejecutar")
+
+    pps = list((await db.execute(
+        select(TesoreriaPagoProgramado).where(
+            TesoreriaPagoProgramado.id.in_(ids),
+            TesoreriaPagoProgramado.municipio_id == muni_id,
+            TesoreriaPagoProgramado.activo.is_(True),
+        )
+    )).scalars().all())
+    pp_by_id = {p.id: p for p in pps}
+
+    items: list[EjecutarMasivoItem] = []
+    monto_total_acum = Decimal(0)
+    exitosos = 0
+    for pid in ids:
+        pp = pp_by_id.get(pid)
+        if not pp:
+            items.append(EjecutarMasivoItem(pago_id=pid, ok=False, error="No encontrado o inactivo"))
+            continue
+        fecha = pp.proximo_pago or date.today()
+        monto = Decimal(str(pp.monto_pesos))
+        gasto = Gasto(
+            municipio_id=muni_id,
+            creador_id=current_user.id,
+            destino_tipo='contacto',
+            destino_contacto_id=pp.contacto_id,
+            destino_dependencia_id=None,
+            concepto=pp.concepto,
+            descripcion=pp.descripcion or None,
+            monto_pesos=monto,
+            fecha=fecha,
+            tipo_financiacion='contado',
+            forma_pago=pp.forma_pago,
+            caja_id=pp.caja_id,
+            pago_programado_id=pp.id,
+        )
+        db.add(gasto)
+        await db.flush()
+        db.add(GastoCuota(
+            gasto_id=gasto.id, numero=1, monto=monto,
+            fecha_vencimiento=fecha, fecha_pago=fecha, estado=EstadoGastoCuota.PAGADA,
+            forma_pago=pp.forma_pago,
+        ))
+        if pp.caja_id:
+            db.add(TesoreriaMovimientoCaja(
+                municipio_id=muni_id, caja_id=pp.caja_id, gasto_id=gasto.id,
+                tipo=TipoMovimientoCaja.EGRESO, monto=monto, fecha=fecha,
+                concepto=pp.concepto,
+            ))
+        pp.ultimo_pago = fecha
+        pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
+        if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
+            pp.activo = False
+        items.append(EjecutarMasivoItem(pago_id=pid, ok=True, gasto_id=gasto.id))
+        monto_total_acum += monto
+        exitosos += 1
+
+    await db.commit()
+    return EjecutarMasivoResponse(
+        total=len(ids),
+        exitosos=exitosos,
+        fallidos=len(ids) - exitosos,
+        monto_total=monto_total_acum,
+        items=items,
     )
 
 

@@ -2097,6 +2097,14 @@ export const agendaPagosApi = {
     api.post<{ ok: boolean; omitido: string; proximo_pago: string | null; activo: boolean }>(
       `/tesoreria/agenda/${id}/omitir`
     ),
+  /** Pago masivo: ejecuta varios pagos programados de una, cada uno con sus
+   *  valores por defecto (monto del programado, fecha = su proximo_pago, sin
+   *  premios). Devuelve cuantos OK / fallidos. */
+  ejecutarMasivo: (pago_ids: number[]) =>
+    api.post<{
+      total: number; exitosos: number; fallidos: number; monto_total: string;
+      items: { pago_id: number; ok: boolean; gasto_id?: number; error?: string }[];
+    }>('/tesoreria/agenda/ejecutar-masivo', { pago_ids }),
 };
 
 /** Catalogo de conceptos para pagos programados (Sueldo, Presentismo,
