@@ -101,7 +101,8 @@ export default function TesoreriaAgenda() {
   const [contactoFiltro, setContactoFiltro] = useState<string>('');
   const [cajaFiltro, setCajaFiltro] = useState<string>('');
   const [frecuenciaFiltro, setFrecuenciaFiltro] = useState<FrecuenciaPago | ''>('');
-  const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos' | 'realizados'>('todos');
+  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
+  const [estadoFiltro, setEstadoFiltro] = useState<'todos' | 'urgentes' | 'mes' | 'vencidos' | 'adelantados' | 'realizados'>('todos');
   const [historial, setHistorial] = useState<PagoEjecutadoHistorial[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
 
@@ -162,6 +163,7 @@ export default function TesoreriaAgenda() {
       if (contactoFiltro && String(p.contacto_id) !== contactoFiltro) return false;
       if (cajaFiltro && String(p.caja_id || '') !== cajaFiltro) return false;
       if (frecuenciaFiltro && p.frecuencia !== frecuenciaFiltro) return false;
+      if (conceptoFiltro && p.concepto !== conceptoFiltro) return false;
       if (s) {
         const hay = (p.concepto || '').toLowerCase().includes(s)
           || (p.contacto_nombre || '').toLowerCase().includes(s);
@@ -173,7 +175,7 @@ export default function TesoreriaAgenda() {
       if (estadoFiltro === 'mes' && (dias < 0 || dias > 30)) return false;
       return true;
     }).sort((a, b) => a.proximo_pago.localeCompare(b.proximo_pago));
-  }, [pagos, search, contactoFiltro, cajaFiltro, frecuenciaFiltro, estadoFiltro]);
+  }, [pagos, search, contactoFiltro, cajaFiltro, frecuenciaFiltro, conceptoFiltro, estadoFiltro]);
 
   const paginatedFiltered = useMemo(() => {
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -195,6 +197,14 @@ export default function TesoreriaAgenda() {
     }
     return { pendientes7, total7, total30, vencidos };
   }, [pagos]);
+
+  // El historial trae TODOS los gastos de liquidaciones (incluye fecha futura).
+  // Se parte en dos por la fecha de impacto vs hoy:
+  //  - adelantados = ya tildados pero la fecha de impacto todavia no llego (futuro).
+  //  - realizados  = ya impactaron (fecha <= hoy).
+  // Un mismo pago pasa solo de adelantado a realizado cuando llega su fecha.
+  const adelantados = useMemo(() => historial.filter(h => diasDesdeHoy(h.fecha) > 0), [historial]);
+  const realizados = useMemo(() => historial.filter(h => diasDesdeHoy(h.fecha) <= 0), [historial]);
 
   // Mover un pago a otra fecha via drag&drop -> actualiza proximo_pago en el backend
   const handleMoverPago = async (pago: PagoProgramado, nuevaFechaISO: string) => {
@@ -375,6 +385,14 @@ export default function TesoreriaAgenda() {
     })),
   ]), []);
 
+  // Conceptos derivados de los pagos cargados (matchea siempre lo filtrable).
+  const conceptoOptions = useMemo(() => ([
+    { value: '', label: 'Conceptos' },
+    ...Array.from(new Set(pagos.map(p => p.concepto).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b))
+      .map(c => ({ value: c, label: c })),
+  ]), [pagos]);
+
   const FRECUENCIA_OPTS_FORM = FRECUENCIAS_SELECCIONABLES.map(f => ({
     value: f, label: FRECUENCIA_LABELS[f],
   }));
@@ -382,15 +400,18 @@ export default function TesoreriaAgenda() {
   // ==================== Filtros header ====================
   const ESTADO_CHIPS: { value: typeof estadoFiltro; label: string; color: string }[] = [
     { value: 'todos', label: `Todos (${pagos.length})`, color: theme.primary },
+    { value: 'urgentes', label: `Esta semana (${stats.pendientes7})`, color: '#f59e0b' },
+    { value: 'mes', label: 'Este mes', color: '#3b82f6' },
     { value: 'vencidos', label: `Vencidos (${stats.vencidos})`, color: '#ef4444' },
-    { value: 'urgentes', label: `Próx. 7d (${stats.pendientes7})`, color: '#f59e0b' },
-    { value: 'mes', label: 'Próx. 30d', color: '#3b82f6' },
-    { value: 'realizados', label: `Realizados${historial.length > 0 ? ` (${historial.length})` : ''}`, color: '#10b981' },
+    { value: 'adelantados', label: `Adelantados${adelantados.length > 0 ? ` (${adelantados.length})` : ''}`, color: '#10b981' },
+    { value: 'realizados', label: `Realizados${realizados.length > 0 ? ` (${realizados.length})` : ''}`, color: '#64748b' },
   ];
 
-  // Fetch historial cuando se elige "Realizados" (lazy, no en cada render)
+  // Fetch historial cuando se elige "Realizados" o "Adelantados" (lazy). El
+  // mismo dataset (gastos de liquidaciones, incluye fecha futura) alimenta a
+  // ambas vistas; se parte por fecha vs hoy en adelantados/realizados.
   useEffect(() => {
-    if (estadoFiltro !== 'realizados') return;
+    if (estadoFiltro !== 'realizados' && estadoFiltro !== 'adelantados') return;
     setLoadingHistorial(true);
     agendaPagosApi.historial({ limit: 500 })
       .then(r => setHistorial(r.data || []))
@@ -421,6 +442,10 @@ export default function TesoreriaAgenda() {
       <div className="min-w-[180px] flex-shrink-0 ts-fitem">
         <ModernSelect value={frecuenciaFiltro} onChange={(v) => setFrecuenciaFiltro(v as FrecuenciaPago | '')}
           options={frecuenciaOptions} placeholder="Todas las frecuencias" searchable />
+      </div>
+      <div className="min-w-[180px] flex-shrink-0 ts-fitem">
+        <ModernSelect value={conceptoFiltro} onChange={setConceptoFiltro}
+          options={conceptoOptions} placeholder="Todos los conceptos" searchable />
       </div>
       <div className="inline-flex items-center gap-1.5 ml-auto flex-shrink-0 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {ESTADO_CHIPS.map(c => (
@@ -477,14 +502,13 @@ export default function TesoreriaAgenda() {
           sortValue: (p) => p.proximo_pago,
           render: (p) => {
             const dias = diasDesdeHoy(p.proximo_pago);
-            const urgente = dias <= 3;
             return (
               <div className="flex flex-col">
                 <span className="font-medium whitespace-nowrap" style={{ color: theme.text }}>
                   {fmtFecha(p.proximo_pago)}
                 </span>
                 <span className="text-[10px] font-semibold"
-                  style={{ color: urgente ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
+                  style={{ color: dias < 0 ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
                   {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
                 </span>
               </div>
@@ -627,72 +651,85 @@ export default function TesoreriaAgenda() {
 
 
   // ==================== Vista CARDS (children) ====================
-  // ==================== Vista HISTORIAL (pagos ya realizados) ====================
-  // Solo activa cuando estadoFiltro === 'realizados'. Lista los Gastos
-  // generados por la ejecucion de pagos programados, ordenados por fecha desc.
-  const historialView = (
-    <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
-      <div
-        className="px-4 py-3 flex items-center justify-between"
-        style={{ backgroundColor: theme.backgroundSecondary, borderBottom: `1px solid ${theme.border}` }}
-      >
-        <span className="text-sm font-bold inline-flex items-center gap-2" style={{ color: theme.text }}>
-          <CheckCircle2 className="h-4 w-4" style={{ color: '#10b981' }} />
-          Pagos realizados (últimos 90 días)
-        </span>
-        <span className="text-xs" style={{ color: theme.textSecondary }}>
-          {historial.length} {historial.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(historial.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0))}
-        </span>
-      </div>
-      {loadingHistorial ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+  // ==================== Vista LISTA de gastos (Realizados / Adelantados) ====================
+  // Misma lista para los dos estados, parametrizada por `esAdelantado`:
+  //  - Realizados (esAdelantado=false): gastos ya impactados (fecha <= hoy), acento gris.
+  //  - Adelantados (esAdelantado=true): gastos tildados con fecha futura, acento verde,
+  //    muestra a cuántos días impacta. Sin botón Pagar (ya están pagados).
+  const listaHistorial = (items: PagoEjecutadoHistorial[], esAdelantado: boolean) => {
+    const acento = esAdelantado ? '#10b981' : '#64748b';
+    return (
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
+        <div
+          className="px-4 py-3 flex items-center justify-between"
+          style={{ backgroundColor: theme.backgroundSecondary, borderBottom: `1px solid ${theme.border}` }}
+        >
+          <span className="text-sm font-bold inline-flex items-center gap-2" style={{ color: theme.text }}>
+            {esAdelantado
+              ? <CalendarClock className="h-4 w-4" style={{ color: acento }} />
+              : <CheckCircle2 className="h-4 w-4" style={{ color: acento }} />}
+            {esAdelantado ? 'Pagos adelantados (impactan en su fecha programada)' : 'Pagos realizados (últimos 90 días)'}
+          </span>
+          <span className="text-xs" style={{ color: theme.textSecondary }}>
+            {items.length} {items.length === 1 ? 'pago' : 'pagos'} · {fmtMoney(items.reduce((s, h) => s + parseFloat(h.monto_pesos || '0'), 0))}
+          </span>
         </div>
-      ) : historial.length === 0 ? (
-        <div className="text-center py-10 text-sm" style={{ color: theme.textSecondary }}>
-          Todavía no hay pagos ejecutados desde una liquidación.
-        </div>
-      ) : (
-        <div className="max-h-[600px] overflow-y-auto">
-          {historial.map((h, i) => {
-            const fecha = new Date(h.fecha);
-            const fechaFmt = fecha.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' });
-            return (
-              <div
-                key={h.id}
-                className="px-4 py-2.5 flex items-center gap-3"
-                style={{ borderTop: i > 0 ? `1px solid ${theme.border}` : undefined }}
-              >
-                <span
-                  className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md whitespace-nowrap flex-shrink-0"
-                  style={{ backgroundColor: '#10b98120', color: '#10b981', border: '1px solid #10b98140' }}
+        {loadingHistorial ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="h-5 w-5 animate-spin" style={{ color: theme.primary }} />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="text-center py-10 text-sm" style={{ color: theme.textSecondary }}>
+            {esAdelantado
+              ? 'No hay pagos adelantados (tildados antes de su fecha).'
+              : 'Todavía no hay pagos ejecutados desde una liquidación.'}
+          </div>
+        ) : (
+          <div className="max-h-[600px] overflow-y-auto">
+            {items.map((h, i) => {
+              const fechaFmt = parseLocalDate(h.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' });
+              const dias = diasDesdeHoy(h.fecha);
+              return (
+                <div
+                  key={h.id}
+                  className="px-4 py-2.5 flex items-center gap-3"
+                  style={{ borderTop: i > 0 ? `1px solid ${theme.border}` : undefined }}
                 >
-                  {fechaFmt}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
-                    {h.contacto_nombre || '—'}
-                  </p>
-                  <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
-                    {h.concepto}
-                    {h.caja_nombre && ` · ${h.caja_nombre}`}
-                    {h.pp_frecuencia && ` · ${h.pp_frecuencia}`}
-                  </p>
+                  <span
+                    className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md whitespace-nowrap flex-shrink-0"
+                    style={{ backgroundColor: `${acento}20`, color: acento, border: `1px solid ${acento}40` }}
+                  >
+                    {fechaFmt}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>
+                      {h.contacto_nombre || '—'}
+                    </p>
+                    <p className="text-[11px] truncate" style={{ color: theme.textSecondary }}>
+                      {h.concepto}
+                      {h.caja_nombre && ` · ${h.caja_nombre}`}
+                      {esAdelantado && dias > 0 && ` · impacta en ${dias}d`}
+                    </p>
+                  </div>
+                  <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>
+                    {fmtMoney(h.monto_pesos)}
+                  </span>
                 </div>
-                <span className="font-bold tabular-nums text-sm flex-shrink-0" style={{ color: theme.text }}>
-                  {fmtMoney(h.monto_pesos)}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const realizadosView = listaHistorial(realizados, false);
+  const adelantadosView = listaHistorial(adelantados, true);
+  const esVistaHistorial = estadoFiltro === 'adelantados' || estadoFiltro === 'realizados';
+  const vistaHistorialActiva = estadoFiltro === 'adelantados' ? adelantadosView : realizadosView;
 
   const cardsView = paginatedFiltered.map(p => {
     const dias = diasDesdeHoy(p.proximo_pago);
-    const urgente = dias <= 3;
     return (
       <div key={p.id} className="rounded-xl p-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
         style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}>
@@ -709,7 +746,7 @@ export default function TesoreriaAgenda() {
         <p className="text-xl font-bold tabular-nums mb-2" style={{ color: theme.text }}>{fmtMoney(p.monto_pesos)}</p>
         <div className="flex items-center justify-between text-xs mb-3" style={{ color: theme.textSecondary }}>
           <span>{fmtFecha(p.proximo_pago)}</span>
-          <span className="font-semibold" style={{ color: urgente ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
+          <span className="font-semibold" style={{ color: dias < 0 ? '#ef4444' : dias <= 7 ? '#f59e0b' : theme.textSecondary }}>
             {dias < 0 ? `Vencido (${Math.abs(dias)}d)` : dias === 0 ? 'HOY' : `en ${dias}d`}
           </span>
         </div>
@@ -775,15 +812,19 @@ export default function TesoreriaAgenda() {
           onPageChange: setPage,
           onPageSizeChange: (s) => { setPageSize(s); setPage(1); },
         }}
-        loading={loading || (estadoFiltro === 'realizados' && loadingHistorial)}
-        isEmpty={estadoFiltro === 'realizados' ? historial.length === 0 : filtered.length === 0}
-        emptyMessage={estadoFiltro === 'realizados'
-          ? 'Todavía no hay pagos ejecutados desde una liquidación.'
+        loading={loading || (esVistaHistorial && loadingHistorial)}
+        isEmpty={esVistaHistorial
+          ? (estadoFiltro === 'adelantados' ? adelantados.length === 0 : realizados.length === 0)
+          : filtered.length === 0}
+        emptyMessage={esVistaHistorial
+          ? (estadoFiltro === 'adelantados'
+              ? 'No hay pagos adelantados (tildados antes de su fecha).'
+              : 'Todavía no hay pagos realizados.')
           : 'No hay pagos con esos filtros.'}
         defaultViewMode="table"
         viewStorageKey="agenda_view"
-        tableView={estadoFiltro === 'realizados' ? historialView : tableView}
-        guidedView={estadoFiltro === 'realizados' ? historialView : guidedView}
+        tableView={esVistaHistorial ? vistaHistorialActiva : tableView}
+        guidedView={esVistaHistorial ? vistaHistorialActiva : guidedView}
         sheetOpen={sheetOpen}
         sheetTitle={editing ? `Editar pago · ${editing.contacto_nombre}` : 'Nuevo pago programado'}
         sheetContent={
@@ -901,7 +942,7 @@ export default function TesoreriaAgenda() {
         sheetFooter={<ABMSheetFooter onCancel={() => setSheetOpen(false)} onSave={save} saving={saving} />}
         onSheetClose={() => setSheetOpen(false)}
       >
-        {estadoFiltro === 'realizados' ? <div className="col-span-full">{historialView}</div> : cardsView}
+        {esVistaHistorial ? <div className="col-span-full">{vistaHistorialActiva}</div> : cardsView}
       </ABMPage>
 
       {/* Sheet "Ejecutar pago" — reemplaza al confirm() nativo. */}
