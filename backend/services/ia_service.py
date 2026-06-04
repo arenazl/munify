@@ -423,6 +423,10 @@ Si el texto no describe un reclamo municipal claro, devuelve un array vacío: []
                     "generationConfig": {
                         "temperature": 0.1,
                         "maxOutputTokens": 1000,
+                        # Gemini 2.5 "piensa" por default y se come el presupuesto
+                        # de tokens, truncando el JSON. Lo desactivamos para que
+                        # toda la salida vaya a la respuesta (mismo patron que dashboard_ia).
+                        "thinkingConfig": {"thinkingBudget": 0},
                     }
                 }
             )
