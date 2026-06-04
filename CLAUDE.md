@@ -159,28 +159,55 @@ Si el user duda de un resultado o pregunta "¿esto es real?", ejecutar query/scr
 contra la fuente real (DB, API, código), no responder con hipótesis.
 
 ### 14. CLIs primero, dashboard después
-El user tiene `gh`, `heroku`, `netlify`, `git`, `npm`, `node`, `python`, `docker`
+El user tiene `gh`, `gcloud`, `netlify`, `git`, `npm`, `node`, `python`, `docker`
 autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI.
 
-### 15. Deploy
+### 15. Deploy — DÓNDE VIVE CADA COSA (fuente única, leer antes de deployar)
 
-**Pipeline canónico — usar SIEMPRE este, no inventar atajos:**
+> **HEROKU ESTÁ MUERTO. NO EXISTE MÁS PARA ESTE PROYECTO.** Nunca correr
+> `git push heroku`. Si ves un `Procfile` o el remote `heroku`, es legacy —
+> ignorarlo. Un push a Heroku NO deploya nada (el servicio está inactivo) y da
+> la falsa sensación de haber deployado. Esto ya causó un desastre real.
 
+**Arquitectura de producción:**
+
+| Capa | Dónde corre | Cómo se deploya |
+|---|---|---|
+| **Frontend** | Netlify (`app.munify.com.ar`) | `git push origin master` → Netlify auto-build |
+| **Backend** | **Google Cloud Run**, proyecto `munify-api`, región `southamerica-east1` | `gcloud builds submit` + `gcloud run deploy` (ver abajo) |
+| **DB** | MySQL en Aiven | — |
+
+- **Servicio Cloud Run:** `munify-api`. URL que usa el frontend:
+  `https://munify-api-1060106389361.southamerica-east1.run.app/api`.
+- **OJO con el `gcloud config` default:** suele estar parado en otro proyecto del
+  user (`tasar-prod`, que es OTRA app). Por eso **TODO comando de Munify lleva
+  `--project=munify-api` explícito**. Nunca confiar en el proyecto default.
+
+**Frontend (Netlify):**
 1. **Antes de pushear front**, correr `cd frontend && npm run build` **localmente**. Si falla
-   `tsc -b`, Netlify también va a fallar y la versión vieja va a quedar en prod
-   silenciosamente. **Sin excepciones.**
-2. `git push origin master` → Netlify reconstruye automáticamente vía su
-   integración nativa de GitHub (NO via GitHub Actions). El workflow `.github/workflows/cd.yml`
-   está roto/legacy — ignorarlo.
-3. `git push heroku master:main` → solo si cambió backend (Heroku necesita rama `main`).
-4. Verificar: comparar el hash del bundle en prod (`curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'`) contra el `dist/index.html` local.
+   `tsc -b`, Netlify también falla y la versión vieja queda en prod silenciosamente. **Sin excepciones.**
+2. `git push origin master` → Netlify reconstruye vía su integración nativa de GitHub
+   (NO GitHub Actions; el workflow `.github/workflows/cd.yml` está roto/legacy — ignorarlo).
+3. Verificar: `curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'` vs `dist/index.html` local.
+4. NUNCA `netlify deploy --prod --dir dist` directo (rompe trazabilidad). Solo `git push` → auto-build.
 
-**Lo que NO hacer:**
-- `netlify deploy --prod --dir dist` directo desde CLI — rompe la trazabilidad
-  (deploy sin commit asociado). El pipeline es `git push` → Netlify auto-build, punto.
-- Pushear sin haber corrido `npm run build` local.
-- Asumir que el push deployó: si el build falla en Netlify, prod queda con el bundle viejo
-  y no hay error visible salvo que mires el dashboard de Netlify.
+**Backend (Cloud Run):** el user hace ~10 deploys/día con su flujo. Claude NO deploya backend
+sin "dale" explícito (es prod, outward-facing). Cuando se autoriza, el pipeline real es (desde `backend/`):
+```
+gcloud builds submit --region=southamerica-east1 \
+  --tag=southamerica-east1-docker.pkg.dev/munify-api/munify/api:latest --project=munify-api .
+gcloud run deploy munify-api --image=southamerica-east1-docker.pkg.dev/munify-api/munify/api:latest \
+  --region=southamerica-east1 --allow-unauthenticated --port=8080 \
+  --env-vars-file=env.yaml --set-secrets=<9 secrets de Secret Manager> --project=munify-api
+```
+- Vars públicas en `backend/env.yaml`. Secretos en **Secret Manager** (`munify-api`): DATABASE_URL,
+  SECRET_KEY, GEMINI_API_KEY, GROK_API_KEY, SMTP_PASSWORD, CLOUDINARY_API_SECRET, GOOGLE_CLIENT_SECRET,
+  DIDIT_API_KEY, VAPID_PRIVATE_KEY. NUNCA pegar valores literales en código/docs.
+
+**VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero NO deploya el
+backend a Cloud Run. Para saber qué está realmente vivo, consultar el OpenAPI del servicio:
+`curl -s https://munify-api-1060106389361.southamerica-east1.run.app/openapi.json` y chequear las
+rutas/schemas. Que un commit exista en master NO significa que esté deployado en Cloud Run.
 
 **Notas:**
 - El user no testea local — cada cambio significativo va directo a prod.

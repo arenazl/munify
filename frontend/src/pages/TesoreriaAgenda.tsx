@@ -790,8 +790,12 @@ export default function TesoreriaAgenda() {
                     setForm(f => ({
                       ...f,
                       concepto: v,
-                      // Pre-carga recomendación solo en nuevo pago; en edición no pisamos
-                      ...(!editing && def?.frecuencia_default ? {
+                      // Al CAMBIAR el combo de concepto (accion del user) recargamos la
+                      // recomendacion frec/dia del nuevo concepto, tanto en alta como en
+                      // edicion. La carga inicial del pago existente la hace openSheet con
+                      // los valores GUARDADOS (no dispara este onChange), asi que abrir a
+                      // editar conserva lo elegido; recien al tocar el combo se recarga.
+                      ...(def?.frecuencia_default ? {
                         frecuencia: def.frecuencia_default as FrecuenciaPago,
                         dia_del_mes: def.dia_del_mes_default ?? f.dia_del_mes,
                         dia_semana: def.dia_semana_default ?? f.dia_semana,
