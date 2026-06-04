@@ -1846,8 +1846,9 @@ function ConceptosLiqTab() {
                 value={form.frecuencia_default}
                 onChange={(v) => setForm(f => ({ ...f, frecuencia_default: v }))}
                 options={[
+                  // "quincenal" excluido: su cálculo es "cada 14 días corridos" (no 15 y 30),
+                  // se desalinea del calendario y confunde. No se ofrece como opción.
                   { value: 'semanal', label: 'Semanal' },
-                  { value: 'quincenal', label: 'Quincenal' },
                   { value: 'mensual', label: 'Mensual' },
                   { value: 'bimestral', label: 'Bimestral' },
                   { value: 'trimestral', label: 'Trimestral' },

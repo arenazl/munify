@@ -51,6 +51,13 @@ const FRECUENCIA_COLORS: Record<FrecuenciaPago, string> = {
   bimestral: '#8b5cf6', trimestral: '#06b6d4', anual: '#10b981',
 };
 
+// Frecuencias que el usuario puede elegir al cargar/filtrar un pago. "quincenal"
+// queda EXCLUIDA: su cálculo real es "cada 14 días corridos" (no el 15 y el 30),
+// se desalinea del calendario y confunde. Se mantiene en LABELS/COLORS de arriba
+// para poder mostrar datos históricos si existieran, pero no como opción cargable.
+const FRECUENCIAS_SELECCIONABLES: FrecuenciaPago[] =
+  (Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).filter((f) => f !== 'quincenal');
+
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
@@ -363,12 +370,12 @@ export default function TesoreriaAgenda() {
 
   const frecuenciaOptions = useMemo(() => ([
     { value: '', label: 'Frecuencias' },
-    ...(Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).map(f => ({
+    ...FRECUENCIAS_SELECCIONABLES.map(f => ({
       value: f, label: FRECUENCIA_LABELS[f], color: FRECUENCIA_COLORS[f],
     })),
   ]), []);
 
-  const FRECUENCIA_OPTS_FORM = (Object.keys(FRECUENCIA_LABELS) as FrecuenciaPago[]).map(f => ({
+  const FRECUENCIA_OPTS_FORM = FRECUENCIAS_SELECCIONABLES.map(f => ({
     value: f, label: FRECUENCIA_LABELS[f],
   }));
 
@@ -874,16 +881,11 @@ export default function TesoreriaAgenda() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Fecha inicio</label>
-                <DatePicker value={form.fecha_inicio} onChange={(v) => setForm(f => ({ ...f, fecha_inicio: v }))} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Fecha fin (opcional)</label>
-                <DatePicker value={form.fecha_fin} onChange={(v) => setForm(f => ({ ...f, fecha_fin: v }))} />
-              </div>
-            </div>
+            {/* Fecha inicio / Fecha fin ocultas a propósito: la programación arranca
+                en el momento del alta (fecha_inicio = hoy, se setea solo) y vive hasta
+                que se la borra/desactiva (fecha_fin = null). El próximo cobro se calcula
+                solo con frecuencia + día. Los campos siguen en el form state y en la BD,
+                pero no se piden al usuario. */}
             <div>
               <label className="block text-xs font-semibold mb-1" style={{ color: theme.textSecondary }}>Descripción</label>
               <textarea value={form.descripcion} onChange={(e) => setForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
