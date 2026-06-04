@@ -108,7 +108,7 @@ app.add_middleware(
 
 # Audit middleware: loggea cada request /api/* a la tabla audit_logs
 # (en sesión separada y fire-and-forget — no bloquea el response).
-# También sigue imprimiendo la línea a stdout para los logs de Heroku.
+# También sigue imprimiendo la línea a stdout para los logs de Cloud Run.
 app.middleware("http")(audit_middleware)
 
 # Archivos estáticos del backend (imágenes subidas)
@@ -147,7 +147,7 @@ async def health():
 
 # ============ FRONTEND (PWA) ============
 # DESACTIVADO - Frontend servido desde Netlify
-# Heroku solo sirve la API en /api/*
+# El backend solo sirve la API en /api/*
 #
 # if frontend_path.exists():
 #     assets_path = frontend_path / "assets"

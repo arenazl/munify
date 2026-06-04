@@ -1,7 +1,7 @@
 """
 Migracion idempotente: agrega `tipo_jerarquico` a `dependencias` + indice.
 
-Pensado para correr local y en Heroku (heroku run python -m scripts.migrate_dependencia_jerarquia).
+Pensado para correr local y en Cloud Run.
 """
 import asyncio
 import sys

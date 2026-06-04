@@ -2,7 +2,7 @@
 import httpx
 import sys
 
-BASE = "https://reclamos-mun-api-aedc8e147cbe.herokuapp.com/api"
+BASE = "https://munify-api-1060106389361.southamerica-east1.run.app/api"
 DEP_USER = ("supervisor-obras-publicas@la-matanza.demo.com", "demo123")
 MUNI_ID = 78
 

@@ -143,7 +143,7 @@ async def _persist_audit(
             ))
             await audit_db.commit()
     except Exception as e:
-        # Heroku conserva stdout — esto es la red de seguridad, NO la fuente de verdad
+        # Cloud Run conserva stdout — esto es la red de seguridad, NO la fuente de verdad
         logger.error(f"audit_log write failed: {type(e).__name__}: {e}", exc_info=True)
 
 

@@ -2,7 +2,7 @@
 Audit log: registro persistente de cada request HTTP relevante para que
 el super admin pueda auditar actividad cross-municipio.
 
-Heroku tiene filesystem efímero — esto vive 100% en MySQL (Aiven) y se
+Cloud Run tiene filesystem efímero — esto vive 100% en MySQL (Aiven) y se
 escribe desde un middleware async fire-and-forget en sesión separada
 para no afectar la latencia ni la transaccionalidad del request.
 

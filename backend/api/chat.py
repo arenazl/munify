@@ -1940,7 +1940,7 @@ def parse_query_analysis(response: str) -> dict:
 import os
 
 # Paths al archivo JSON con el schema de la BD (múltiples ubicaciones)
-# 1. backend/data/ - para Heroku (deployado junto con el backend)
+# 1. backend/data/ - para el deploy (junto con el backend)
 # 2. APP_GUIDE/ - para desarrollo local (en la raíz del proyecto)
 SCHEMA_JSON_PATHS = [
     os.path.join(os.path.dirname(__file__), '..', 'data', '12_DATABASE_SCHEMA.json'),  # backend/data/

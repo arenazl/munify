@@ -1,4 +1,4 @@
-# Backend Dockerfile - Cloud Run + Heroku compatible
+# Backend Dockerfile - Google Cloud Run
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -19,10 +19,10 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-# Cloud Run inyecta PORT=8080 por default. Heroku tambien usa $PORT.
+# Cloud Run inyecta PORT=8080 por default.
 ENV PORT=8080
 EXPOSE 8080
 
-# gunicorn con worker uvicorn (mismo patron que Heroku Procfile).
-# 2 workers caben en 512Mi; --timeout 120 para uploads grandes/LLM.
+# gunicorn con worker uvicorn. 2 workers caben en 512Mi;
+# --timeout 120 para uploads grandes/LLM.
 CMD exec gunicorn main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT} --timeout 120

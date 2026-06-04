@@ -3,7 +3,7 @@ import httpx
 import sys
 from datetime import datetime
 
-BASE = "https://reclamos-mun-api-aedc8e147cbe.herokuapp.com/api"
+BASE = "https://munify-api-1060106389361.southamerica-east1.run.app/api"
 ADMIN = ("admin@la-matanza.demo.com", "demo123")
 MUNI_ID = 78
 

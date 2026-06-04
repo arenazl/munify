@@ -8,7 +8,7 @@ import json
 import sys
 from datetime import datetime
 
-BASE = "https://reclamos-mun-api-aedc8e147cbe.herokuapp.com/api"
+BASE = "https://munify-api-1060106389361.southamerica-east1.run.app/api"
 VECINO = ("vecino@chacabuco.demo.com", "demo123")
 ADMIN = ("admin@chacabuco.demo.com", "demo123")
 

@@ -24,7 +24,7 @@ from .portal_publico import router as portal_publico_router
 from .municipios import router as municipios_router
 from .imagenes import router as imagenes_router
 from .gamificacion import router as gamificacion_router
-# Temporalmente deshabilitado por error de reportlab en Heroku
+# Temporalmente deshabilitado por error de reportlab en el deploy
 # from .reportes import router as reportes_router
 from .noticias import router as noticias_router
 from .tramites import router as tramites_router
