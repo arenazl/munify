@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { TesoreriaHint } from '../components/tesoreria/TesoreriaHint';
 import { ABMPage, ABMSheetFooter, ABMTable, ABMTableAction, renderGroupDayLabel, renderGroupSubtotal } from '../components/ui/ABMPage';
 import PageHint from '../components/ui/PageHint';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { MunifyTour } from '../components/ui/MunifyTour';
 import { TourButton } from '../components/ui/TourButton';
 
@@ -253,8 +254,13 @@ export default function TesoreriaAgenda() {
   // Abre el Sheet para ejecutar. NO ejecuta directo — el user puede
   // ajustar monto del mes y aplicar premios antes de confirmar.
   const [omitingId, setOmitingId] = useState<number | null>(null);
-  const handleOmitir = async (p: PagoProgramado) => {
-    if (!confirm(`¿Omitir el pago de "${p.contacto_nombre}" del ${fmtFecha(p.proximo_pago)}? Se avanza al siguiente período sin descontar caja.`)) return;
+  const [omitirPago, setOmitirPago] = useState<PagoProgramado | null>(null);
+  // El boton Omitir solo abre el modal de confirmacion con estilo de la app
+  // (ConfirmModal), no el confirm() nativo — evita omitir por un toque accidental.
+  const handleOmitir = (p: PagoProgramado) => setOmitirPago(p);
+  const confirmarOmitir = async () => {
+    const p = omitirPago;
+    if (!p) return;
     setOmitingId(p.id);
     try {
       const res = await agendaPagosApi.omitir(p.id);
@@ -262,6 +268,7 @@ export default function TesoreriaAgenda() {
         ? fmtFecha(res.data.proximo_pago)
         : 'fin de la liquidación';
       toast.success(`Pago omitido. Próximo: ${next}`);
+      setOmitirPago(null);
       fetchAll();
     } catch (e: any) {
       toast.error(e?.response?.data?.detail || 'Error omitiendo');
@@ -991,6 +998,21 @@ export default function TesoreriaAgenda() {
           </div>
         )}
       </Sheet>
+
+      <ConfirmModal
+        isOpen={!!omitirPago}
+        onClose={() => setOmitirPago(null)}
+        onConfirm={confirmarOmitir}
+        variant="warning"
+        title="Omitir este período"
+        message={omitirPago
+          ? `¿Omitir el pago de "${omitirPago.contacto_nombre}" del ${fmtFecha(omitirPago.proximo_pago)}? Se avanza al siguiente período sin generar gasto ni descontar la caja.`
+          : ''}
+        confirmText="Omitir período"
+        cancelText="Cancelar"
+        loading={omitingId === omitirPago?.id}
+        icon={<SkipForward className="h-5 w-5" />}
+      />
 
       <MunifyTour tourKey="sueldos-liquidaciones" steps={TOUR_STEPS_LIQ} />
     </>
