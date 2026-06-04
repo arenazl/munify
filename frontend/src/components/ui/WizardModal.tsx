@@ -408,14 +408,16 @@ export function WizardModal({
             )}
           </div>
 
-          {/* Stepper - centered */}
-          <div className="wizard-stepper" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          {/* Stepper - centered. flexShrink + minWidth:0 + overflowX para que con
+              muchos pasos scrollee horizontal en vez de desbordar el header y
+              empujar la cruz de cerrar fuera de la vista. */}
+          <div className="wizard-stepper" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 1, minWidth: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
             {steps.map((step, index) => {
               const isCompleted = index < currentStep;
               const isCurrent = index === currentStep;
 
               return (
-                <div key={step.id} style={{ display: 'flex', alignItems: 'center' }}>
+                <div key={step.id} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                   <button
                     onClick={() => handleStepClick(index)}
                     disabled={index > currentStep}
