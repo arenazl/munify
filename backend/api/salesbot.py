@@ -17,7 +17,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -107,6 +107,59 @@ async def _salesbot_map(db: AsyncSession, municipio_ids: List[int]) -> dict:
     return {r.municipio_id: r for r in rows}
 
 
+async def _stats_batch(db: AsyncSession, municipio_ids: List[int]) -> dict:
+    """Stats de VARIOS municipios en pocas queries agregadas (evita el N+1 de
+    llamar _stats por municipio). Mismos filtros que _stats: los numeros son
+    identicos, solo cambia como se piden. Devuelve {muni_id: {stats}}."""
+    base = {
+        mid: {
+            "reclamos_totales": 0,
+            "reclamos_resueltos": 0,
+            "tramites_activos": 0,
+            "vecinos": 0,
+        }
+        for mid in municipio_ids
+    }
+    if not municipio_ids:
+        return base
+
+    # Reclamos: total y resueltos en una sola pasada (SUM condicional).
+    for mid, total, resueltos in (await db.execute(
+        select(
+            Reclamo.municipio_id,
+            func.count(Reclamo.id),
+            func.coalesce(
+                func.sum(case((Reclamo.estado.in_(ESTADOS_RESUELTO), 1), else_=0)), 0
+            ),
+        )
+        .where(Reclamo.municipio_id.in_(municipio_ids))
+        .group_by(Reclamo.municipio_id)
+    )).all():
+        if mid in base:
+            base[mid]["reclamos_totales"] = int(total or 0)
+            base[mid]["reclamos_resueltos"] = int(resueltos or 0)
+
+    # Tramites activos por municipio.
+    for mid, c in (await db.execute(
+        select(Tramite.municipio_id, func.count(Tramite.id))
+        .where(Tramite.municipio_id.in_(municipio_ids), Tramite.activo == True)  # noqa: E712
+        .group_by(Tramite.municipio_id)
+    )).all():
+        if mid in base:
+            base[mid]["tramites_activos"] = int(c or 0)
+
+    # Vecinos por municipio.
+    for mid, c in (await db.execute(
+        select(User.municipio_id, func.count(User.id))
+        .where(User.municipio_id.in_(municipio_ids), User.rol == RolUsuario.VECINO)
+        .group_by(User.municipio_id)
+    )).all():
+        if mid in base:
+            base[mid]["vecinos"] = int(c or 0)
+
+    return base
+
+
 # ============================================================
 # Endpoints GENERALES (SalesBot, X-SalesBot-Key)
 # ============================================================
@@ -121,7 +174,9 @@ async def listar_municipios(
     munis = (await db.execute(
         select(Municipio).where(Municipio.activo == True).order_by(Municipio.nombre)  # noqa: E712
     )).scalars().all()
-    sb = await _salesbot_map(db, [m.id for m in munis])
+    ids = [m.id for m in munis]
+    sb = await _salesbot_map(db, ids)
+    stats_map = await _stats_batch(db, ids)  # 1 pasada agregada, no N+1 por muni
 
     out = []
     for m in munis:
@@ -138,7 +193,7 @@ async def listar_municipios(
             "telefono": m.telefono,
             "whatsapp": cfg.whatsapp if cfg else None,
             "whatsapp_habilitado": cfg.habilitado if cfg else False,
-            "stats": await _stats(db, m.id),
+            "stats": stats_map[m.id],
         })
     return out
 
