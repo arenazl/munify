@@ -26,6 +26,8 @@ from models.tramite import Solicitud, Tramite
 from models.turno import Turno
 from models.municipio_dependencia import MunicipioDependencia
 
+from services.turnos_agenda import calcular_slots, reservar_turno
+
 
 router = APIRouter(prefix="/turnos-tramite", tags=["Turnos Tramite"])
 
@@ -40,6 +42,8 @@ class SlotDisponible(BaseModel):
     fecha_hora: datetime
     disponible: bool
     motivo: Optional[str] = None  # "ocupado" cuando otro lo tomo
+    cupo_total: Optional[int] = None
+    cupo_restante: Optional[int] = None
 
 
 class DisponibilidadResponse(BaseModel):
@@ -56,13 +60,15 @@ class ReservarRequest(BaseModel):
 
 class TurnoResponse(BaseModel):
     id: int
-    solicitud_id: int
+    solicitud_id: Optional[int] = None  # nullable: turnos del bot / atencion general
     municipio_dependencia_id: int
     fecha_hora: datetime
     duracion_min: int
     estado: str
     dependencia_nombre: Optional[str] = None
     notas: Optional[str] = None
+    motivo_tipo: Optional[str] = "tramite"
+    nombre_solicitante: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -120,37 +126,20 @@ async def disponibilidad(
     if not hasta:
         hasta = desde + timedelta(days=14)
 
-    # Turnos ya reservados en ese rango
-    q_ocupados = await db.execute(
-        select(Turno.fecha_hora).where(
-            Turno.municipio_dependencia_id == dep_id,
-            Turno.estado == "reservado",
-            Turno.fecha_hora >= desde,
-            Turno.fecha_hora <= hasta,
+    # Slots calculados por el servicio central: lee AgendaConfig (con fallback
+    # historico lun-vie 08:30-13:00 si la dependencia no tiene config), excluye
+    # feriados (AgendaExcepcion) y descuenta cupos. Reemplaza el hardcode anterior.
+    raw = await calcular_slots(db, dep_id, duracion, desde, hasta)
+    slots: List[SlotDisponible] = [
+        SlotDisponible(
+            fecha_hora=s["fecha_hora"],
+            disponible=s["disponible"],
+            motivo=None if s["disponible"] else "ocupado",
+            cupo_total=s["cupo_total"],
+            cupo_restante=s["cupo_restante"],
         )
-    )
-    ocupados = {row[0].replace(microsecond=0) for row in q_ocupados.all()}
-
-    # Generar slots
-    slots: List[SlotDisponible] = []
-    cursor = desde
-    while cursor <= hasta:
-        if cursor.weekday() in DIAS_HABILES:
-            slot_inicio = cursor.replace(
-                hour=HORA_INICIO.hour, minute=HORA_INICIO.minute, second=0, microsecond=0
-            )
-            slot_fin_dia = cursor.replace(
-                hour=HORA_FIN.hour, minute=HORA_FIN.minute, second=0, microsecond=0
-            )
-            while slot_inicio < slot_fin_dia:
-                ocupado = slot_inicio.replace(microsecond=0) in ocupados
-                slots.append(SlotDisponible(
-                    fecha_hora=slot_inicio,
-                    disponible=not ocupado,
-                    motivo="ocupado" if ocupado else None,
-                ))
-                slot_inicio += timedelta(minutes=duracion)
-        cursor += timedelta(days=1)
+        for s in raw
+    ]
 
     nombre_dep = dep.dependencia.nombre if dep.dependencia else "Dependencia"
     return DisponibilidadResponse(
@@ -197,34 +186,24 @@ async def reservar(
     if existente:
         return await _turno_to_response(db, existente)
 
-    # Verificar que el slot esté libre (race condition basico)
-    q_ocupado = await db.execute(
-        select(Turno).where(
-            Turno.municipio_dependencia_id == solicitud.municipio_dependencia_id,
-            Turno.fecha_hora == body.fecha_hora,
-            Turno.estado == "reservado",
-        )
-    )
-    if q_ocupado.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Ese slot fue tomado por otra persona. Elegí otro.")
-
     duracion = (
         solicitud.tramite.duracion_turno_min
         if solicitud.tramite and solicitud.tramite.duracion_turno_min
         else 30
     )
 
-    turno = Turno(
-        solicitud_id=solicitud.id,
-        municipio_dependencia_id=solicitud.municipio_dependencia_id,
+    # Reserva centralizada: valida el slot (dia/hora habil, no feriado) y
+    # serializa check-de-cupo + insert con lock por slot (mata la race condition).
+    turno = await reservar_turno(
+        db,
+        dep_id=solicitud.municipio_dependencia_id,
         municipio_id=solicitud.municipio_id,
         fecha_hora=body.fecha_hora,
-        duracion_min=duracion,
-        estado="reservado",
+        duracion=duracion,
+        motivo_tipo="tramite",
+        origen_id=solicitud.id,
+        solicitud_id=solicitud.id,
     )
-    db.add(turno)
-    await db.commit()
-    await db.refresh(turno)
     return await _turno_to_response(db, turno)
 
 
