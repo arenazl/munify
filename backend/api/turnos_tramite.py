@@ -302,6 +302,34 @@ async def mis_turnos(
     ]
 
 
+class EstadoTurnoIn(BaseModel):
+    estado: str
+    notas: Optional[str] = None
+
+
+@router.patch("/{turno_id}", response_model=TurnoResponse)
+async def marcar_estado(
+    turno_id: int,
+    body: EstadoTurnoIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Marca el estado del turno (presente=cumplido / ausente / cancelado). Staff del muni."""
+    q = await db.execute(select(Turno).where(Turno.id == turno_id))
+    turno = q.scalar_one_or_none()
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+    if current_user.rol != RolUsuario.VECINO and current_user.municipio_id != turno.municipio_id:
+        raise HTTPException(status_code=403, detail="No podes operar sobre este turno")
+    if body.estado not in ("reservado", "cumplido", "ausente", "cancelado"):
+        raise HTTPException(status_code=400, detail="Estado invalido")
+    turno.estado = body.estado
+    if body.notas is not None:
+        turno.notas = body.notas
+    await db.commit()
+    return await _turno_to_response(db, turno)
+
+
 @router.delete("/{turno_id}")
 async def cancelar(
     turno_id: int,

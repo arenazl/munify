@@ -12,6 +12,8 @@ import Dashboard from './pages/Dashboard';
 import DashboardVecino from './pages/DashboardVecino';
 import MisReclamos from './pages/MisReclamos';
 import MisTurnos from './pages/MisTurnos';
+import AgendaTurnos from './pages/AgendaTurnos';
+import ConfiguracionAgenda from './pages/ConfiguracionAgenda';
 import Reclamos from './pages/Reclamos';
 import Mapa from './pages/Mapa';
 import Tablero from './pages/Tablero';
@@ -193,6 +195,8 @@ export const router = createBrowserRouter([
       { path: 'reclamos/:id', element: <ReclamoDetalle /> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
       { path: 'mis-turnos', element: <MisTurnos /> },
+      { path: 'agenda-turnos', element: <ProtectedRoute roles={['admin', 'supervisor']}><AgendaTurnos /></ProtectedRoute> },
+      { path: 'configuracion-agenda', element: <ProtectedRoute roles={['admin', 'supervisor']}><ConfiguracionAgenda /></ProtectedRoute> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)

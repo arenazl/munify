@@ -7,6 +7,7 @@ import { ABMPage, ABMCard } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
+import ReservarTurnoSheet from '../components/turnos/ReservarTurnoSheet';
 
 interface Turno {
   id: number;
@@ -51,6 +52,7 @@ export default function MisTurnos() {
   const [selected, setSelected] = useState<Turno | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelando, setCancelando] = useState(false);
+  const [reservaOpen, setReservaOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -107,6 +109,8 @@ export default function MisTurnos() {
           loading={loading}
           isEmpty={filtrados.length === 0}
           emptyMessage="No tenés turnos reservados"
+          buttonLabel="Reservar turno"
+          onAdd={() => setReservaOpen(true)}
         >
           {filtrados.map((t, i) => (
             <ABMCard key={t.id} index={i} onClick={() => setSelected(t)}>
@@ -189,6 +193,8 @@ export default function MisTurnos() {
         variant="danger"
         loading={cancelando}
       />
+
+      <ReservarTurnoSheet open={reservaOpen} onClose={() => setReservaOpen(false)} onReservado={fetchData} />
     </>
   );
 }

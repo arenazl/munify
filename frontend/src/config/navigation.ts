@@ -453,6 +453,22 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Mi cuenta',
       description: 'Tus logros y puntos'
     },
+    {
+      name: 'Agenda',
+      href: '/gestion/agenda-turnos',
+      icon: CalendarClock,
+      show: isAdminOrSupervisor,
+      categoria: 'Operación',
+      description: 'Agenda diaria de turnos presenciales'
+    },
+    {
+      name: 'Turnos',
+      href: '/gestion/configuracion-agenda',
+      icon: CalendarDays,
+      show: isAdminOrSupervisor,
+      categoria: 'Configuración',
+      description: 'Horarios, cupos y feriados de turnos'
+    },
   ].filter(item => item.show && !hrefsOcultos.has(item.href));
 };
 

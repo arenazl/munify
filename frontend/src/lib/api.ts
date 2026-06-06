@@ -1326,6 +1326,24 @@ export const turnosApi = {
   reservar: (data: { solicitud_id: number; fecha_hora: string }) =>
     api.post('/turnos-tramite/reservar', data),
   cancelar: (turnoId: number) => api.delete(`/turnos-tramite/${turnoId}`),
+  // Agenda del dia (admin/supervisor)
+  agenda: (params: { dependencia_id?: number; fecha?: string }) =>
+    api.get('/turnos-tramite/agenda', { params }),
+  marcarEstado: (turnoId: number, estado: string, notas?: string) =>
+    api.patch(`/turnos-tramite/${turnoId}`, { estado, notas }),
+};
+
+// Configuracion de agenda por dependencia (admin)
+export const agendaApi = {
+  getConfig: (dependenciaId: number) =>
+    api.get('/agenda-config', { params: { dependencia_id: dependenciaId } }),
+  saveConfig: (dependenciaId: number, dias: Array<{ dia_semana: number; hora_inicio: string; hora_fin: string; cupo_max_por_slot: number; activo: boolean }>) =>
+    api.put(`/agenda-config/${dependenciaId}`, { dias }),
+  getExcepciones: (dependenciaId: number) =>
+    api.get('/agenda-excepciones', { params: { dependencia_id: dependenciaId } }),
+  crearExcepcion: (data: { municipio_dependencia_id: number; fecha: string; tipo: string; motivo?: string }) =>
+    api.post('/agenda-excepciones', data),
+  borrarExcepcion: (id: number) => api.delete(`/agenda-excepciones/${id}`),
 };
 
 export const tramitesApi = {
