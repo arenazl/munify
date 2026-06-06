@@ -35,7 +35,7 @@ from models.municipio_dependencia import MunicipioDependencia
 from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
 from models.turno import Turno
 
-from services.turnos_agenda import calcular_slots, reservar_turno
+from services.turnos_agenda import calcular_slots, reservar_turno, _tramos_por_dia
 
 router = APIRouter()
 
@@ -511,3 +511,49 @@ async def cancelar_turno_bot(
     turno.estado = "cancelado"
     await db.commit()
     return {"ok": True}
+
+
+_DIAS_NOMBRE = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]
+
+
+@router.get("/municipios/{municipio_id}/turnos/agenda")
+async def agenda_municipio_bot(
+    municipio_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Dependencias del municipio que atienden turnos + sus horarios configurados
+    (o el fallback historico lun-vie 08:30-13:00 si no configuraron agenda).
+    Le da al bot el panorama: municipio -> dependencias -> horarios, para ofrecer
+    turnos. Tenant-scoped por el municipio_id del path."""
+    verify_salesbot_key(request)
+    await _muni_activo(db, municipio_id)
+    deps = (await db.execute(
+        select(MunicipioDependencia)
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(
+            MunicipioDependencia.municipio_id == municipio_id,
+            MunicipioDependencia.activo == True,  # noqa: E712
+        )
+    )).scalars().all()
+
+    out = []
+    for dep in deps:
+        tramos = await _tramos_por_dia(db, dep.id)
+        horarios = []
+        for dia in sorted(tramos.keys()):
+            for hi, hf, cupo in tramos[dia]:
+                horarios.append({
+                    "dia_semana": dia,
+                    "dia": _DIAS_NOMBRE[dia] if 0 <= dia <= 6 else str(dia),
+                    "hora_inicio": hi.strftime("%H:%M"),
+                    "hora_fin": hf.strftime("%H:%M"),
+                    "cupo_max": cupo,
+                })
+        out.append({
+            "dependencia_id": dep.id,
+            "nombre": dep.dependencia.nombre if dep.dependencia else None,
+            "telefono": dep.telefono_efectivo,
+            "horarios": horarios,
+        })
+    return {"municipio_id": municipio_id, "dependencias": out}
