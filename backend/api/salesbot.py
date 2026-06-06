@@ -28,7 +28,7 @@ from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
 from models import (
     Municipio, Reclamo, User, Tramite, CategoriaReclamo,
-    RolUsuario,
+    RolUsuario, EstadoReclamo, HistorialReclamo, MunicipioDependenciaCategoria,
 )
 from models.salesbot_config import SalesbotConfig
 from models.municipio_dependencia import MunicipioDependencia
@@ -37,6 +37,9 @@ from models.turno import Turno
 from models.configuracion import Configuracion
 
 from services.turnos_agenda import calcular_slots, reservar_turno, _tramos_por_dia
+from services.ia_service import clasificar_reclamo
+from services.vecinos import resolver_o_crear_vecino
+from core.ia_config import get_ia_config
 
 router = APIRouter()
 
@@ -584,3 +587,122 @@ async def agenda_municipio_bot(
             "horarios": horarios,
         })
     return {"municipio_id": municipio_id, "dependencias": out}
+
+
+# ============================================================
+# Crear reclamo (SalesBot) — el vecino reporta por WhatsApp, Munify clasifica con IA
+# ============================================================
+
+class ReclamoBotIn(BaseModel):
+    descripcion: str
+    nombre: str
+    dni: Optional[str] = None
+    telefono: Optional[str] = None
+    direccion: Optional[str] = None
+    latitud: Optional[float] = None
+    longitud: Optional[float] = None
+
+
+@router.post("/municipios/{municipio_id}/reclamos")
+async def crear_reclamo_bot(
+    municipio_id: int,
+    payload: ReclamoBotIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea un reclamo desde el texto libre del vecino (canal WhatsApp). Munify
+    clasifica la categoria con IA (o keywords locales si la IA esta off en el
+    muni) y genera el reclamo. Tenant-scoped: el municipio sale del path. El
+    vecino se resuelve/crea como ghost (no necesita cuenta)."""
+    verify_salesbot_key(request)
+    await _muni_activo(db, municipio_id)
+
+    desc = (payload.descripcion or "").strip()
+    if len(desc) < 5:
+        raise HTTPException(400, "La descripcion del reclamo es muy corta")
+
+    cats = (await db.execute(
+        select(CategoriaReclamo).where(
+            CategoriaReclamo.municipio_id == municipio_id,
+            CategoriaReclamo.activo == True,  # noqa: E712
+        )
+    )).scalars().all()
+    if not cats:
+        raise HTTPException(400, "El municipio no tiene categorias de reclamo configuradas")
+    categorias = [{"id": c.id, "nombre": c.nombre, "descripcion": c.descripcion or ""} for c in cats]
+    cat_ids = {c.id for c in cats}
+    cat_nombre = {c.id: c.nombre for c in cats}
+
+    # Clasificacion: IA si el muni la tiene habilitada, sino keywords local (gratis).
+    cfg = await get_ia_config(db, municipio_id)
+    resultado = await clasificar_reclamo(desc, categorias, usar_ia=cfg.habilitada, modelo=cfg.modelo)
+    sugerencias = resultado.get("sugerencias") or []
+    # La IA puede devolver un id que no es del muni, o [] si el texto no es un
+    # reclamo claro -> validamos contra cat_ids y caemos a la primera categoria
+    # (el vecino reporto algo, igual lo generamos).
+    top = next((s for s in sugerencias if s.get("categoria_id") in cat_ids), None)
+    if top:
+        categoria_id = top["categoria_id"]
+        metodo = resultado.get("metodo_principal") or "ia"
+        confianza = top.get("confianza")
+    else:
+        categoria_id = sorted(cat_ids)[0]
+        metodo = "fallback"
+        confianza = 0
+
+    # Vecino ghost. resolver_o_crear_vecino exige nombre + apellido.
+    partes = (payload.nombre or "").strip().split(" ", 1)
+    nombre_v = partes[0] or "Vecino"
+    apellido_v = partes[1] if len(partes) > 1 else "(sin apellido)"
+    vecino = await resolver_o_crear_vecino(
+        db, municipio_id=municipio_id, dni=payload.dni, email=None,
+        nombre=nombre_v, apellido=apellido_v,
+        telefono=payload.telefono, direccion=payload.direccion,
+    )
+
+    # Auto-asignar dependencia segun la categoria (si el muni la mapeo).
+    dep_id = (await db.execute(
+        select(MunicipioDependenciaCategoria.municipio_dependencia_id).where(
+            MunicipioDependenciaCategoria.categoria_id == categoria_id,
+            MunicipioDependenciaCategoria.municipio_id == municipio_id,
+        ).limit(1)
+    )).scalar_one_or_none()
+
+    reclamo = Reclamo(
+        municipio_id=municipio_id,        # del path, nunca del payload
+        creador_id=vecino.id,
+        titulo=desc[:200],
+        descripcion=desc,
+        direccion=(payload.direccion or "Sin especificar")[:255],
+        latitud=payload.latitud,
+        longitud=payload.longitud,
+        categoria_id=categoria_id,
+        municipio_dependencia_id=dep_id,
+        estado=EstadoReclamo.NUEVO,
+        prioridad=3,
+    )
+    db.add(reclamo)
+    await db.flush()
+
+    db.add(HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=vecino.id,
+        estado_nuevo=EstadoReclamo.NUEVO,
+        accion="creado",
+        comentario="Reclamo creado via WhatsApp (SalesBot)",
+    ))
+    await db.commit()
+    await db.refresh(reclamo)
+
+    return {
+        "reclamo_id": reclamo.id,
+        "numero_seguimiento": f"REC-{reclamo.id:05d}",
+        "estado": reclamo.estado.value if hasattr(reclamo.estado, "value") else str(reclamo.estado),
+        "categoria": {
+            "id": categoria_id,
+            "nombre": cat_nombre.get(categoria_id),
+            "confianza": confianza,
+            "metodo": metodo,
+        },
+        "dependencia_id": dep_id,
+    }
