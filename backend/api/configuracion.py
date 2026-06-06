@@ -380,7 +380,20 @@ async def update_configuracion(
     )
     config = result.scalar_one_or_none()
     if not config:
-        raise HTTPException(status_code=404, detail="Configuración no encontrada")
+        # Upsert: si la clave no existe para este municipio, la creamos. Antes
+        # devolvia 404, lo que rompia el "guardar" la PRIMERA vez de cualquier
+        # config (p.ej. nombre_municipio en un muni que nunca la tuvo).
+        update_data = data.model_dump(exclude_unset=True)
+        update_data.pop("municipio_id", None)  # el scope lo fija el tenant, no el body
+        config = Configuracion(
+            clave=clave,
+            municipio_id=current_user.municipio_id,
+            **update_data,
+        )
+        db.add(config)
+        await db.commit()
+        await db.refresh(config)
+        return config
 
     if not config.editable:
         raise HTTPException(status_code=400, detail="Esta configuración no es editable")
