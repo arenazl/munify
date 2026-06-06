@@ -124,12 +124,18 @@ from .municipio_dependencia import MunicipioDependencia
 from .municipio_dependencia_categoria import MunicipioDependenciaCategoria
 from .municipio_dependencia_tramite import MunicipioDependenciaTramite
 
+# Agenda de turnos (configuracion de horarios + excepciones por dependencia)
+from .agenda_config import AgendaConfig
+from .agenda_excepcion import AgendaExcepcion
+
 __all__ += [
     "Dependencia",
     "TipoGestionDependencia",
     "MunicipioDependencia",
     "MunicipioDependenciaCategoria",
     "MunicipioDependenciaTramite",
+    "AgendaConfig",
+    "AgendaExcepcion",
 ]
 
 # Tasas (3er pilar: catalogo maestro cross-muni + padron por muni)

@@ -25,10 +25,27 @@ class Turno(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # --- Vinculo polimorfico (generalizacion) ---
+    # motivo_tipo: 'tramite' | 'reclamo' | 'atencion_general'
+    motivo_tipo = Column(String(20), nullable=True, index=True, default="tramite")
+    # origen_id: FUENTE UNICA del vinculo. solicitud.id si tramite, reclamo.id si
+    # reclamo, NULL si atencion_general. Para turnos de tramite se backfillea =
+    # solicitud_id en la migracion (evita la doble fuente de verdad que marco la
+    # critica de diseno). solicitud_id se conserva solo por la FK/backref existente.
+    origen_id = Column(Integer, nullable=True, index=True)
+
+    # FK historica -- ahora NULLABLE: los turnos del bot / atencion_general no
+    # tienen solicitud. Para tramite sigue apuntando a la solicitud.
     solicitud_id = Column(
         Integer, ForeignKey("solicitudes.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        nullable=True, index=True,
     )
+
+    # Datos del solicitante sin cuenta (bot WhatsApp / mostrador presencial)
+    nombre_solicitante = Column(String(120), nullable=True)
+    dni_solicitante = Column(String(20), nullable=True)
+    telefono_solicitante = Column(String(50), nullable=True)
+
     municipio_dependencia_id = Column(
         Integer, ForeignKey("municipio_dependencias.id"),
         nullable=False, index=True,
@@ -54,4 +71,5 @@ class Turno(Base):
     __table_args__ = (
         Index("idx_dep_fecha", "municipio_dependencia_id", "fecha_hora"),
         Index("idx_muni_fecha", "municipio_id", "fecha_hora"),
+        Index("idx_turno_tipo_origen", "motivo_tipo", "origen_id"),
     )
