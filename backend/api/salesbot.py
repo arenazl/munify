@@ -13,6 +13,7 @@ El WhatsApp de derivacion sale de la tabla dedicada `salesbot_configs`, NO de
 WhatsAppConfig (que es la integracion Meta). Asi un muni puede estar en SalesBot
 sin tener Meta configurado.
 """
+from datetime import datetime, timedelta
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -31,6 +32,10 @@ from models import (
 )
 from models.salesbot_config import SalesbotConfig
 from models.municipio_dependencia import MunicipioDependencia
+from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
+from models.turno import Turno
+
+from services.turnos_agenda import calcular_slots, reservar_turno
 
 router = APIRouter()
 
@@ -353,3 +358,156 @@ async def put_mi_config(
     await db.commit()
     await db.refresh(cfg)
     return SalesbotConfigOut(municipio_id=muni_id, whatsapp=cfg.whatsapp, habilitado=cfg.habilitado)
+
+
+# ============================================================
+# Turnos (SalesBot, X-SalesBot-Key) — el vecino reserva por WhatsApp
+# ============================================================
+# Tenant-scoped: el municipio_id sale SIEMPRE del path validado, nunca del payload.
+# Reserva via el servicio central (valida slot + lock anti-race). Cancelar exige
+# match del telefono del solicitante (no basta el id enumerable).
+
+class TurnoReservaBotIn(BaseModel):
+    tramite_id: int
+    fecha_hora: datetime
+    nombre: str
+    dni: Optional[str] = None
+    telefono: Optional[str] = None
+    notas: Optional[str] = None
+
+
+async def _muni_activo(db: AsyncSession, municipio_id: int) -> Municipio:
+    m = (await db.execute(
+        select(Municipio).where(Municipio.id == municipio_id, Municipio.activo == True)  # noqa: E712
+    )).scalar_one_or_none()
+    if not m:
+        raise HTTPException(404, "Municipio no encontrado")
+    return m
+
+
+async def _tramite_y_dep(db: AsyncSession, tramite_id: int, municipio_id: int):
+    """Devuelve (Tramite, municipio_dependencia_id) validando que ambos pertenezcan
+    al municipio del path (evita cruzar tenants)."""
+    tr = (await db.execute(
+        select(Tramite).where(Tramite.id == tramite_id, Tramite.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not tr:
+        raise HTTPException(404, "Tramite no encontrado en este municipio")
+    mdt = (await db.execute(
+        select(MunicipioDependenciaTramite)
+        .join(MunicipioDependencia, MunicipioDependencia.id == MunicipioDependenciaTramite.municipio_dependencia_id)
+        .where(
+            MunicipioDependenciaTramite.tramite_id == tramite_id,
+            MunicipioDependenciaTramite.activo == True,  # noqa: E712
+            MunicipioDependencia.municipio_id == municipio_id,
+        )
+    )).scalars().first()
+    if not mdt:
+        raise HTTPException(400, "El tramite no tiene dependencia asignada en este municipio")
+    return tr, mdt.municipio_dependencia_id
+
+
+@router.get("/municipios/{municipio_id}/turnos/disponibles")
+async def turnos_disponibles_bot(
+    municipio_id: int,
+    request: Request,
+    tramite_id: Optional[int] = None,
+    dependencia_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Slots disponibles para que el bot arme la lista. Primeros 20 libres."""
+    verify_salesbot_key(request)
+    await _muni_activo(db, municipio_id)
+
+    duracion = 30
+    dep_id = dependencia_id
+    nombre_tr: Optional[str] = None
+    if tramite_id:
+        tr, dep_id = await _tramite_y_dep(db, tramite_id, municipio_id)
+        duracion = tr.duracion_turno_min or 30
+        nombre_tr = tr.nombre
+    if not dep_id:
+        raise HTTPException(400, "Pasá tramite_id o dependencia_id")
+
+    dep = (await db.execute(
+        select(MunicipioDependencia)
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(MunicipioDependencia.id == dep_id, MunicipioDependencia.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not dep:
+        raise HTTPException(404, "Dependencia no encontrada en este municipio")
+
+    desde = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    hasta = desde + timedelta(days=7)
+    raw = await calcular_slots(db, dep_id, duracion, desde, hasta)
+    libres = [s for s in raw if s["disponible"]][:20]
+    return {
+        "dependencia_id": dep_id,
+        "dependencia_nombre": dep.dependencia.nombre if dep.dependencia else "Dependencia",
+        "tramite": nombre_tr,
+        "duracion_min": duracion,
+        "slots": [
+            {"fecha_hora": s["fecha_hora"], "cupo_restante": s["cupo_restante"]}
+            for s in libres
+        ],
+    }
+
+
+@router.post("/municipios/{municipio_id}/turnos/reservar")
+async def reservar_turno_bot(
+    municipio_id: int,
+    payload: TurnoReservaBotIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    verify_salesbot_key(request)
+    await _muni_activo(db, municipio_id)
+    tr, dep_id = await _tramite_y_dep(db, payload.tramite_id, municipio_id)
+    duracion = tr.duracion_turno_min or 30
+
+    turno = await reservar_turno(
+        db,
+        dep_id=dep_id,
+        municipio_id=municipio_id,  # del path validado, nunca del payload
+        fecha_hora=payload.fecha_hora,
+        duracion=duracion,
+        motivo_tipo="tramite",
+        solicitud_id=None,
+        origen_id=None,
+        nombre_solicitante=payload.nombre,
+        dni_solicitante=payload.dni,
+        telefono_solicitante=payload.telefono,
+        notas=(payload.notas or f"Turno via SalesBot - {tr.nombre}"),
+    )
+    return {
+        "turno_id": turno.id,
+        "fecha_hora": turno.fecha_hora,
+        "tramite": tr.nombre,
+        "estado": turno.estado,
+        "confirmacion": f"TRN-{turno.id:05d}",
+    }
+
+
+@router.delete("/municipios/{municipio_id}/turnos/{turno_id}")
+async def cancelar_turno_bot(
+    municipio_id: int,
+    turno_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancela exigiendo el telefono del solicitante (?telefono=...): el id solo
+    no alcanza, asi nadie cancela turnos ajenos iterando ids."""
+    verify_salesbot_key(request)
+    telefono = (request.query_params.get("telefono") or "").strip()
+    if not telefono:
+        raise HTTPException(400, "Falta ?telefono= para validar la cancelacion")
+    turno = (await db.execute(
+        select(Turno).where(Turno.id == turno_id, Turno.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not turno:
+        raise HTTPException(404, "Turno no encontrado")
+    if (turno.telefono_solicitante or "") != telefono:
+        raise HTTPException(403, "El telefono no coincide con el del turno")
+    turno.estado = "cancelado"
+    await db.commit()
+    return {"ok": True}
