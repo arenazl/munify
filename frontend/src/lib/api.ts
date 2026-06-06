@@ -1316,6 +1316,18 @@ export const whatsappApi = {
 //
 // Aliases retrocompat: getServicios/getCatalogo apuntan al nuevo /tramites
 // para que el código viejo no explote en el primer renderer.
+export const turnosApi = {
+  // Turnos del vecino logueado
+  misTurnos: () => api.get('/turnos-tramite/mis-turnos'),
+  porSolicitud: (solicitudId: number) =>
+    api.get(`/turnos-tramite/por-solicitud/${solicitudId}`),
+  disponibilidad: (params: { solicitud_id?: number; dependencia_id?: number; duracion_min?: number }) =>
+    api.get('/turnos-tramite/disponibilidad', { params }),
+  reservar: (data: { solicitud_id: number; fecha_hora: string }) =>
+    api.post('/turnos-tramite/reservar', data),
+  cancelar: (turnoId: number) => api.delete(`/turnos-tramite/${turnoId}`),
+};
+
 export const tramitesApi = {
   // ----- CRUD de Trámite (admin del municipio) -----
   getAll: (params?: { categoria_tramite_id?: number; activo?: boolean }) =>

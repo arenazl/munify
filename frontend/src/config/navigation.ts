@@ -420,6 +420,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       badgeKey: 'tramites',
     },
     {
+      name: 'Turnos',
+      href: '/gestion/mis-turnos',
+      icon: CalendarClock,
+      show: isVecino,
+      categoria: 'Mi cuenta',
+      description: 'Reservá y gestioná tus turnos presenciales',
+      badgeKey: 'turnos',
+    },
+    {
       name: 'Tasas',
       href: '/gestion/mis-tasas',
       icon: BarChart3,

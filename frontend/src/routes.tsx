@@ -11,6 +11,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import DashboardVecino from './pages/DashboardVecino';
 import MisReclamos from './pages/MisReclamos';
+import MisTurnos from './pages/MisTurnos';
 import Reclamos from './pages/Reclamos';
 import Mapa from './pages/Mapa';
 import Tablero from './pages/Tablero';
@@ -191,6 +192,7 @@ export const router = createBrowserRouter([
       { path: 'reclamos', element: <ProtectedRoute roles={['admin', 'supervisor']}><Reclamos /></ProtectedRoute> },
       { path: 'reclamos/:id', element: <ReclamoDetalle /> },
       { path: 'mis-reclamos', element: <MisReclamos /> },
+      { path: 'mis-turnos', element: <MisTurnos /> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)
