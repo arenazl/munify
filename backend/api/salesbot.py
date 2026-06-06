@@ -34,6 +34,7 @@ from models.salesbot_config import SalesbotConfig
 from models.municipio_dependencia import MunicipioDependencia
 from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
 from models.turno import Turno
+from models.configuracion import Configuracion
 
 from services.turnos_agenda import calcular_slots, reservar_turno, _tramos_por_dia
 
@@ -110,6 +111,26 @@ async def _salesbot_map(db: AsyncSession, municipio_ids: List[int]) -> dict:
         select(SalesbotConfig).where(SalesbotConfig.municipio_id.in_(municipio_ids))
     )).scalars().all()
     return {r.municipio_id: r for r in rows}
+
+
+# Claves que la pantalla Configuracion (tab General) guarda en `configuraciones`.
+_MUNI_CONFIG_KEYS = (
+    "direccion_municipio", "telefono_contacto",
+    "latitud_municipio", "longitud_municipio", "nombre_municipio",
+)
+
+
+async def _config_muni(db: AsyncSession, municipio_id: int) -> dict:
+    """Datos del municipio cargados en la pantalla Configuracion (tabla
+    `configuraciones`, key-value). Es donde el admin del muni carga
+    direccion/telefono/lat/long. Devuelve {clave: valor} (solo no vacios)."""
+    rows = (await db.execute(
+        select(Configuracion.clave, Configuracion.valor).where(
+            Configuracion.municipio_id == municipio_id,
+            Configuracion.clave.in_(_MUNI_CONFIG_KEYS),
+        )
+    )).all()
+    return {clave: valor for clave, valor in rows if valor}
 
 
 async def _stats_batch(db: AsyncSession, municipio_ids: List[int]) -> dict:
@@ -222,14 +243,20 @@ async def detalle_municipio(
 
     sb = await _salesbot_map(db, [m.id])
     cfg = sb.get(m.id)
+    cm = await _config_muni(db, m.id)  # datos cargados en la pantalla Configuracion
     return {
         "id": m.id,
         "nombre": m.nombre,
         "codigo": m.codigo,
         "descripcion": m.descripcion,
-        "telefono": m.telefono,
+        # direccion/telefono/lat/long: primero lo cargado en Configuracion,
+        # fallback a las columnas de `municipios`.
+        "direccion": cm.get("direccion_municipio"),
+        "telefono": cm.get("telefono_contacto") or m.telefono,
         "email": m.email,
         "sitio_web": m.sitio_web,
+        "latitud": cm.get("latitud_municipio") or (str(m.latitud) if m.latitud is not None else None),
+        "longitud": cm.get("longitud_municipio") or (str(m.longitud) if m.longitud is not None else None),
         "logo_url": m.logo_url,
         "color_primario": m.color_primario,
         "whatsapp": cfg.whatsapp if cfg else None,
