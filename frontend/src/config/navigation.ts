@@ -358,6 +358,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Configuración',
       description: 'Configuración del sistema'
     },
+    {
+      name: 'Turnos',
+      href: '/gestion/configuracion-agenda',
+      icon: CalendarDays,
+      show: isAdminOrSupervisor,
+      categoria: 'Configuración',
+      description: 'Horarios, cupos y feriados de turnos'
+    },
     // === Solo SUPERADMIN ===
     {
       name: 'Municipios',
@@ -460,14 +468,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor,
       categoria: 'Operación',
       description: 'Agenda diaria de turnos presenciales'
-    },
-    {
-      name: 'Turnos',
-      href: '/gestion/configuracion-agenda',
-      icon: CalendarDays,
-      show: isAdminOrSupervisor,
-      categoria: 'Configuración',
-      description: 'Horarios, cupos y feriados de turnos'
     },
   ].filter(item => item.show && !hrefsOcultos.has(item.href));
 };
