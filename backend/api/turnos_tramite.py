@@ -264,6 +264,44 @@ async def agenda(
     ]
 
 
+@router.get("/mis-turnos", response_model=List[TurnoResponse])
+async def mis_turnos(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Turnos del vecino logueado (los reservados desde la app, via sus solicitudes).
+    Los turnos hechos por el bot (solicitud_id NULL) se reconciliaran por dni/telefono
+    en una iteracion posterior (hueco de identidad documentado en la spec)."""
+    sub = select(Solicitud.id).where(Solicitud.solicitante_id == current_user.id)
+    q = await db.execute(
+        select(Turno)
+        .options(
+            selectinload(Turno.municipio_dependencia).selectinload(MunicipioDependencia.dependencia)
+        )
+        .where(Turno.solicitud_id.in_(sub))
+        .order_by(Turno.fecha_hora.desc())
+    )
+    return [
+        TurnoResponse(
+            id=t.id,
+            solicitud_id=t.solicitud_id,
+            municipio_dependencia_id=t.municipio_dependencia_id,
+            fecha_hora=t.fecha_hora,
+            duracion_min=t.duracion_min,
+            estado=t.estado,
+            dependencia_nombre=(
+                t.municipio_dependencia.dependencia.nombre
+                if t.municipio_dependencia and t.municipio_dependencia.dependencia
+                else None
+            ),
+            notas=t.notas,
+            motivo_tipo=t.motivo_tipo,
+            nombre_solicitante=t.nombre_solicitante,
+        )
+        for t in q.scalars().all()
+    ]
+
+
 @router.delete("/{turno_id}")
 async def cancelar(
     turno_id: int,
