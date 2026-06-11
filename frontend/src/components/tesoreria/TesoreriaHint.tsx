@@ -1,7 +1,7 @@
 import { Lightbulb, X } from 'lucide-react';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getHintUserKey } from '../../utils/hintScope';
+import { getHintScopeKey } from '../../utils/hintScope';
 
 interface Props {
   /** Titulo del banner */
@@ -25,9 +25,11 @@ interface Props {
  */
 export function TesoreriaHint({ titulo, children, storageKey }: Props) {
   const { theme } = useTheme();
-  // Key del dismiss scopeada por usuario: si lo cierra, no le vuelve a aparecer
-  // a ese perfil; otro usuario lo ve de nuevo.
-  const dismissKey = storageKey ? `tesoreria_hint_${storageKey}_${getHintUserKey()}` : null;
+  // Key del dismiss scopeada por usuario + municipio: si ese perfil lo cierra en
+  // ese muni, no le vuelve a aparecer ahi; otro usuario (o el super-admin en otro
+  // muni) lo ve de nuevo. scope es estado para reaccionar al cambio de muni.
+  const [scope, setScope] = useState(getHintScopeKey);
+  const dismissKey = storageKey ? `tesoreria_hint_${storageKey}_${scope}` : null;
   const [hidden, setHidden] = useState(() => {
     if (!dismissKey) return false;
     try {
@@ -36,6 +38,19 @@ export function TesoreriaHint({ titulo, children, storageKey }: Props) {
       return false;
     }
   });
+
+  // El super-admin cambia de municipio con el switcher → recalcular scope.
+  useEffect(() => {
+    const onMuniChanged = () => setScope(getHintScopeKey());
+    window.addEventListener('municipio-changed', onMuniChanged);
+    return () => window.removeEventListener('municipio-changed', onMuniChanged);
+  }, []);
+
+  // Al cambiar el scope (otro muni/usuario), re-evaluar si esta cerrado.
+  useEffect(() => {
+    if (!dismissKey) { setHidden(false); return; }
+    try { setHidden(localStorage.getItem(dismissKey) === '1'); } catch { setHidden(false); }
+  }, [dismissKey]);
 
   if (hidden) return null;
 

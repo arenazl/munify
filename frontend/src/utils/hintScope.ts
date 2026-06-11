@@ -19,3 +19,20 @@ export function getHintUserKey(): string {
     return 'anon';
   }
 }
+
+/**
+ * Scope combinado USUARIO + MUNICIPIO para el dismiss de los hints.
+ *
+ * Si un perfil cierra el hint en un municipio, no le vuelve a aparecer ahi.
+ * El super-admin que recorre municipios con el switcher lo ve fresco en cada
+ * uno (combinacion usuario+muni distinta), pero no le reaparece donde ya lo
+ * cerro. Para el cliente real (un municipio, usuario fijo) se comporta igual
+ * que el scope por usuario: lo cierra una vez y listo.
+ */
+export function getHintScopeKey(): string {
+  let muni = 'default';
+  if (typeof window !== 'undefined') {
+    try { muni = localStorage.getItem('municipio_codigo') || 'default'; } catch { /* ignore */ }
+  }
+  return `${getHintUserKey()}_${muni}`;
+}

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { PAGE_HINTS, type HintStep } from '../../config/pageHints';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getHintUserKey } from '../../utils/hintScope';
+import { getHintScopeKey } from '../../utils/hintScope';
 
 // Mapa de íconos disponibles para los steps (por nombre)
 const ICON_MAP: Record<string, typeof Sparkles> = {
@@ -111,11 +111,12 @@ interface PageHintProps {
 export default function PageHint({ pageId }: PageHintProps) {
   const { theme } = useTheme();
   const hint = PAGE_HINTS[pageId];
-  // Scopeamos el dismiss al USUARIO logueado (no al navegador ni al municipio):
-  // si un usuario cierra el hint, no le vuelve a aparecer a el. Otro perfil que
-  // entre (incluso en el mismo navegador) lo ve de nuevo.
-  const userKey = getHintUserKey();
-  const storageKey = `hint_dismissed_${pageId}_${userKey}`;
+  // Scopeamos el dismiss a USUARIO + MUNICIPIO: si ese perfil cierra el hint en
+  // ese municipio, no le vuelve a aparecer ahi. El super-admin que recorre
+  // municipios (switcher) lo ve fresco en cada uno, pero no le reaparece donde
+  // ya lo cerro. scopeKey es estado para reaccionar en vivo al cambio de muni.
+  const [scopeKey, setScopeKey] = useState(getHintScopeKey);
+  const storageKey = `hint_dismissed_${pageId}_${scopeKey}`;
   const isWizard = !!hint?.steps?.length;
   // Mantenemos ACCENT_STYLES para compat pero ya no se usa en el render —
   // los colores ahora salen del theme activo para respetar la paleta elegida.
@@ -131,6 +132,14 @@ export default function PageHint({ pageId }: PageHintProps) {
     setDismissed(localStorage.getItem(storageKey) === 'true');
     setStepIdx(0);
   }, [storageKey]);
+
+  // El super-admin cambia de municipio con el switcher → recalcular el scope
+  // (usuario+muni) para evaluar el dismiss del muni nuevo.
+  useEffect(() => {
+    const onMuniChanged = () => setScopeKey(getHintScopeKey());
+    window.addEventListener('municipio-changed', onMuniChanged);
+    return () => window.removeEventListener('municipio-changed', onMuniChanged);
+  }, []);
 
   const steps = hint?.steps ?? [];
   const currentStep: HintStep | undefined = steps[stepIdx];
