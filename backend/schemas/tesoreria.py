@@ -169,6 +169,8 @@ class GastoBase(BaseModel):
     # Caja de la que sale el pago. Nullable para compat con gastos viejos;
     # el wizard la pide obligatoria desde el frontend.
     caja_id: Optional[int] = None
+    # Tarjeta de credito usada (solo si forma_pago == 'tarjeta'). Solo etiqueta.
+    tarjeta_credito_id: Optional[int] = None
 
 
 class GastoCreate(GastoBase):
@@ -213,6 +215,7 @@ class GastoUpdate(BaseModel):
 
     # Caja del pago
     caja_id: Optional[int] = None
+    tarjeta_credito_id: Optional[int] = None
 
     # Otros
     activo: Optional[bool] = None

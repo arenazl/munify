@@ -436,7 +436,7 @@ export default function TesoreriaContactos() {
     <>
       <PageHint pageId="tesoreria-contactos" />
       <TesoreriaHint titulo="Agenda de Contactos" storageKey="contactos">
-        Acá guardás a las personas con las que hacés movimientos. Cada uno
+        Acá guardás a las personas con las que hacés pagos. Cada uno
         puede tener su <b>alias de transferencia</b> y <b>ubicación en el mapa</b>.
         Podés cargarlos a mano o importar el Excel del intendente.
       </TesoreriaHint>

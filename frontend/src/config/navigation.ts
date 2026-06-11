@@ -207,7 +207,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'OPs vencidas, próximas, top beneficiarios'
     },
     {
-      name: 'Movimientos',
+      name: 'Pagos',
       href: '/gestion/tesoreria',
       icon: Receipt,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),

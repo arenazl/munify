@@ -9,7 +9,7 @@ import { DireccionAutocomplete } from '../ui/DireccionAutocomplete';
 import { MoneyInput } from '../ui/MoneyInput';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
-  contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi, proyectosApi, cajasApi,
+  contactosApi, dependenciasApi, gastosApi, cotizacionApi, tesoreriaCatalogoApi, proyectosApi, cajasApi, tarjetasApi,
 } from '../../lib/api';
 import type {
   Contacto, ConceptosCatalogo, CotizacionUSD, TipoFinanciacion,
@@ -66,6 +66,8 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [cotizacion, setCotizacion] = useState<CotizacionUSD | null>(null);
   const [cajas, setCajas] = useState<Caja[]>([]);
+  const [tarjetas, setTarjetas] = useState<Array<{ id: number; denominacion: string; marca: string; ultimos_4: string | null }>>([]);
+  const [tarjetaId, setTarjetaId] = useState<number | null>(null);
 
   // Form state
   const [concepto, setConcepto] = useState('');
@@ -135,17 +137,19 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     if (!open) return;
     (async () => {
       try {
-        const [cRes, depRes, projRes, usdRes, cajasRes] = await Promise.all([
+        const [cRes, depRes, projRes, usdRes, cajasRes, tarjetasRes] = await Promise.all([
           tesoreriaCatalogoApi.conceptos(),
           dependenciasApi.getMunicipio({ activo: true }),
           proyectosApi.list({ activo: true, include_resumen: false, limit: 5000 }).catch(() => ({ data: [] as Proyecto[] })),
           cotizacionApi.usd().catch(() => null),
           cajasApi.list({ activo: true, include_saldos: true }).catch(() => ({ data: [] as Caja[] })),
+          tarjetasApi.list().catch(() => ({ data: [] })),
         ]);
         setConceptos(cRes.data);
         setDependencias(depRes.data || []);
         setProyectos(projRes.data || []);
         setCajas(cajasRes.data || []);
+        setTarjetas((tarjetasRes.data as Array<{ id: number; denominacion: string; marca: string; ultimos_4: string | null }>) || []);
         if (usdRes?.data?.valor_sugerido) {
           setCotizacion(usdRes.data);
           setCotizacionUsd(String(usdRes.data.valor_sugerido));
@@ -224,6 +228,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         fecha,
         tipo_financiacion: tipoFinanciacion,
         forma_pago: formaPago,
+        tarjeta_credito_id: formaPago === 'tarjeta' ? tarjetaId : null,
         estado_pago: estadoPago,
         cuotas_total: tipoFinanciacion === 'cuotas' || tipoFinanciacion === 'prestamo' ? cuotasTotal : null,
         frecuencia: tipoFinanciacion === 'recurrente' ? frecuencia : null,
@@ -741,6 +746,17 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
         onChange={(v) => setFormaPago(v as FormaPago)}
         options={FORMAS_PAGO.map(f => ({ value: f.value, label: f.label }))}
       />
+
+      {formaPago === 'tarjeta' && (
+        <ModernSelect
+          label="Tarjeta de crédito"
+          value={tarjetaId ? String(tarjetaId) : ''}
+          onChange={(v) => setTarjetaId(v ? parseInt(v, 10) : null)}
+          options={tarjetas.map(t => ({ value: String(t.id), label: `${t.denominacion} (${t.marca} ····${t.ultimos_4 || ''})` }))}
+          placeholder="Elegí una tarjeta..."
+          searchable
+        />
+      )}
 
       {/* Estado del pago: concretado | al_dia | pendiente */}
       <div>

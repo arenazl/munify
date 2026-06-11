@@ -670,7 +670,7 @@ export default function Tesoreria() {
   const ghostClass = "inline-flex items-center gap-2 h-[34px] px-3 rounded-lg text-[12px] font-semibold transition-all hover:scale-105 hover:-translate-y-0.5 active:scale-95";
   const headerActions = (
     <>
-      <TourButton tourKey="tesoreria-movimientos" title="Ver tutorial de Movimientos" />
+      <TourButton tourKey="tesoreria-movimientos" title="Ver tutorial de Pagos" />
       <Link to="/gestion/tesoreria/agenda" className={ghostClass} style={ghostStyle}>
         <CalendarClock className="h-3.5 w-3.5" /> Pagos
       </Link>
@@ -969,7 +969,7 @@ export default function Tesoreria() {
       value: `$${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
       icon: Wallet,
       color: theme.primary,
-      footnote: `${totales.cantidad} ${totales.cantidad === 1 ? 'movimiento' : 'movimientos'}`,
+      footnote: `${totales.cantidad} ${totales.cantidad === 1 ? 'pago' : 'pagos'}`,
       highlighted: true,
     },
     ...kpisData.map<KpiSpec>((k) => ({
@@ -977,7 +977,7 @@ export default function Tesoreria() {
       value: `$${k.total.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`,
       icon: iconByTipo(k.nombre),
       color: k.color,
-      footnote: `${(totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0).toFixed(1)}% · ${k.count} mov.`,
+      footnote: `${(totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0).toFixed(1)}% · ${k.count} pag.`,
       pct: totales.totalPesos > 0 ? (k.total / totales.totalPesos) * 100 : 0,
     })),
   ].slice(0, 4);
@@ -1128,7 +1128,7 @@ export default function Tesoreria() {
           <div>
             <div className="font-bold" style={{ color: theme.text }}>{label}</div>
             <div className="text-[11px]" style={{ color: theme.textSecondary }}>
-              {items.length} {items.length === 1 ? 'movimiento' : 'movimientos'}
+              {items.length} {items.length === 1 ? 'pago' : 'pagos'}
             </div>
           </div>
         </div>
@@ -1152,7 +1152,7 @@ export default function Tesoreria() {
     <>
       <div className="pt-3">
         <PageHint pageId="tesoreria-movimientos" />
-        <TesoreriaHint titulo="Movimientos de Tesorería" storageKey="home">
+        <TesoreriaHint titulo="Pagos de Tesorería" storageKey="home">
           Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
           préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o
           a un <b>Contacto</b>. Total este mes:{' '}
@@ -1200,7 +1200,7 @@ export default function Tesoreria() {
       )}
 
       <ABMPage
-        title="Movimientos"
+        title="Pagos"
         icon={<Wallet className="h-5 w-5" />}
         buttonLabel="Nuevo Gasto"
         onAdd={() => setWizardOpen(true)}

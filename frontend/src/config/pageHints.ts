@@ -118,7 +118,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
         title: 'Al pagar, ¿qué pasa?',
         description: 'Cuando apretás "Pagar" en una OP autorizada, automáticamente: 1) se crea el gasto en Tesorería, 2) se descuenta la caja, 3) la OP queda en estado "Pagada". Una sola acción, todo conectado.',
         icon: 'Rocket',
-        cta: { label: 'Ver Movimientos en Tesorería', href: '/gestion/tesoreria' },
+        cta: { label: 'Ver Pagos en Tesorería', href: '/gestion/tesoreria' },
       },
     ],
   },
@@ -156,7 +156,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
   },
 
   'tesoreria-movimientos': {
-    title: 'Movimientos de Tesorería',
+    title: 'Pagos de Tesorería',
     accent: 'emerald',
     steps: [
       {
@@ -204,7 +204,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
       },
       {
         title: 'Ingresos y egresos',
-        description: 'Cargás ingresos a la caja (Coparticipación que llega, transferencias recibidas, recaudación). Cada gasto registrado en Movimientos o cada OP pagada descuenta automáticamente.',
+        description: 'Cargás ingresos a la caja (Coparticipación que llega, transferencias recibidas, recaudación). Cada gasto registrado en Pagos o cada OP pagada descuenta automáticamente.',
         icon: 'TrendingUp',
       },
       {

@@ -402,6 +402,18 @@ async def create_gasto(
         if not caja:
             raise HTTPException(status_code=422, detail="caja_id invalido para este municipio")
 
+    # Validar tarjeta_credito_id si viene (forma_pago='tarjeta')
+    if payload.tarjeta_credito_id is not None:
+        from models import TarjetaCredito
+        tj = (await db.execute(
+            select(TarjetaCredito).where(
+                TarjetaCredito.id == payload.tarjeta_credito_id,
+                TarjetaCredito.municipio_id == municipio_id,
+            )
+        )).scalar_one_or_none()
+        if not tj:
+            raise HTTPException(status_code=422, detail="tarjeta_credito_id invalido para este municipio")
+
     # Calcular monto_usd si hay cotizacion
     monto_usd = None
     if payload.cotizacion_usd and payload.cotizacion_usd > 0:

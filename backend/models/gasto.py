@@ -173,6 +173,14 @@ class Gasto(Base):
     caja_id = Column(Integer, ForeignKey("tesoreria_cajas.id", ondelete="SET NULL"), nullable=True, index=True)
     caja = relationship("TesoreriaCaja", foreign_keys=[caja_id])
 
+    # Cuando forma_pago = "tarjeta", a que tarjeta de credito se cargo el pago.
+    # Solo etiqueta (no descuenta nada). Nullable: solo aplica al medio tarjeta.
+    tarjeta_credito_id = Column(
+        Integer, ForeignKey("tarjetas_credito.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    tarjeta_credito = relationship("TarjetaCredito", foreign_keys=[tarjeta_credito_id])
+
     # Si el Gasto fue generado por la ejecucion de un pago programado
     # (liquidacion recurrente), guardamos la referencia. Permite listar el
     # historial de pagos hechos a partir de una liquidacion.
