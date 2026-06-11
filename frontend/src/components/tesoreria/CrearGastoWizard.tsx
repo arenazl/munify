@@ -1154,7 +1154,7 @@ export function CrearGastoWizard({ open, onClose, onSuccess }: Props) {
     <WizardModal
       open={open}
       onClose={onClose}
-      title="Nuevo Gasto"
+      title="Nuevo Pago"
       steps={steps}
       currentStep={step}
       onStepChange={setStep}

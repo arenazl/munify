@@ -1202,7 +1202,7 @@ export default function Tesoreria() {
       <ABMPage
         title="Pagos"
         icon={<Wallet className="h-5 w-5" />}
-        buttonLabel="Nuevo Gasto"
+        buttonLabel="Nuevo Pago"
         onAdd={() => setWizardOpen(true)}
         searchPlaceholder="Buscar por concepto, contacto o descripción..."
         searchValue={search}

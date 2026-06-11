@@ -618,7 +618,7 @@ export default function TesoreriaMapa() {
         extraFilters={extraFilters}
         secondaryFilters={secondaryFilters}
         headerActions={headerActions}
-        buttonLabel="Nuevo Gasto"
+        buttonLabel="Nuevo Pago"
         onAdd={() => setWizardOpen(true)}
         loading={loading}
         isEmpty={contactos.length === 0}

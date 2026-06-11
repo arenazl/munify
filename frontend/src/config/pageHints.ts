@@ -166,7 +166,7 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
       },
       {
         title: 'Cargar un gasto suelto',
-        description: 'Si necesitás registrar un gasto que no vino por OP (un pago en efectivo, una compra menor), apretás "Nuevo Gasto" y lo cargás directo. Elegís de qué caja sale.',
+        description: 'Si necesitás registrar un gasto que no vino por OP (un pago en efectivo, una compra menor), apretás "Nuevo Pago" y lo cargás directo. Elegís de qué caja sale.',
         icon: 'ClipboardList',
       },
       {
