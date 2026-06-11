@@ -1,9 +1,11 @@
 // Service Worker para Push Notifications + auto-update
+// VERSION: 2.5.0 - Sin fetch handler (era net-negativo: nunca cacheaba y rompia
+//                  la carga de chunks lazy con "Failed to convert value to Response").
 // VERSION: 2.4.0 - Soporte de SKIP_WAITING via postMessage
 // BUILD_ID se reemplaza en cada build por scripts/stamp-sw.mjs.
 // Esto garantiza que el browser detecte un sw.js byte-diferente en cada
 // deploy y dispare el flujo de "Nueva version disponible" del ServiceWorkerUpdater.
-const SW_VERSION = '2.4.0';
+const SW_VERSION = '2.5.0';
 const SW_BUILD = '__BUILD_ID__';
 const CACHE_NAME = `app-cache-v${SW_VERSION}-${SW_BUILD}`;
 
@@ -115,22 +117,12 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// Fetch - No interceptar llamadas API, solo assets estáticos
-self.addEventListener('fetch', function(event) {
-  const url = new URL(event.request.url);
-
-  // NO interceptar llamadas a la API - dejar que el navegador las maneje directamente
-  // Esto evita duplicación de requests (fetch del SW + xhr original)
-  if (url.pathname.startsWith('/api') ||
-      url.hostname !== self.location.hostname ||
-      event.request.method !== 'GET') {
-    return; // No llamar event.respondWith() = dejar pasar sin interceptar
-  }
-
-  // Solo para assets estáticos locales, usar network-first
-  event.respondWith(
-    fetch(event.request).catch(function() {
-      return caches.match(event.request);
-    })
-  );
-});
+// Sin handler de 'fetch' a proposito.
+//
+// El SW no cachea nada (no hay ningun cache.put), asi que un fetch handler
+// "network-first" no aportaba offline real: solo agregaba un proxy fragil.
+// El bug: en el catch devolvia caches.match() === undefined, y
+// respondWith(undefined) lanza "TypeError: Failed to convert value to
+// 'Response'". Eso rompia la carga de chunks lazy (paginas de Reportes, etc.),
+// sobre todo tras un deploy con hashes nuevos. Sin handler, el navegador
+// resuelve todos los requests directamente (igual que ya hacia con /api).
