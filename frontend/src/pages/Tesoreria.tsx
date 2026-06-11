@@ -25,15 +25,15 @@ import { TourButton } from '../components/ui/TourButton';
 const TOUR_STEPS_TES_MOVIMIENTOS = [
   {
     target: '[data-tour="tes-mov-kpis"]',
-    content: 'KPIs en vivo de los gastos del muni: total del periodo activo, ticket promedio y desgloses.',
+    content: 'KPIs en vivo de los pagos del muni: total del periodo activo, ticket promedio y desgloses.',
     title: 'Resumen de Tesorería',
     placement: 'bottom' as const,
     disableBeacon: true,
   },
   {
     target: '[data-tour="tes-mov-nuevo"]',
-    content: 'Cargás un gasto directo desde acá: concepto, beneficiario, monto, caja, factura adjunta y proyecto opcional. Al guardar se descuenta la caja.',
-    title: 'Nuevo gasto',
+    content: 'Cargás un pago directo desde acá: concepto, beneficiario, monto, caja, factura adjunta y proyecto opcional. Al guardar se descuenta la caja.',
+    title: 'Nuevo pago',
     placement: 'bottom' as const,
   },
 ];
@@ -1004,7 +1004,7 @@ export default function Tesoreria() {
         <Sparkles className="h-4 w-4" style={{ color: theme.primary }} />
         <div className="flex-1 min-w-0">
           <div className="text-[11px] font-semibold" style={{ color: theme.textSecondary }}>
-            {bandejaIaDemo.length} gastos esperando aprobación
+            {bandejaIaDemo.length} pagos esperando aprobación
           </div>
         </div>
       </div>
@@ -1153,8 +1153,8 @@ export default function Tesoreria() {
       <div className="pt-3">
         <PageHint pageId="tesoreria-movimientos" />
         <TesoreriaHint titulo="Pagos de Tesorería" storageKey="home">
-          Acá cargás los gastos del municipio: sueldos, pagos a proveedores,
-          préstamos, subsidios. Cada gasto se asigna a una <b>Secretaría</b> o
+          Acá cargás los pagos del municipio: sueldos, pagos a proveedores,
+          préstamos, subsidios. Cada pago se asigna a una <b>Secretaría</b> o
           a un <b>Contacto</b>. Total este mes:{' '}
           <span className="font-bold" style={{ color: theme.primary }}>
             ${totalMes.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
@@ -1183,7 +1183,7 @@ export default function Tesoreria() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-base mb-1" style={{ color: theme.text }}>
-                {dudosos.count} gastos importados pendientes de revisar
+                {dudosos.count} pagos importados pendientes de revisar
               </h3>
               <div className="text-sm leading-relaxed" style={{ color: theme.textSecondary }}>
                 La IA los clasificó como "Compras/Otros varios" · Total: ${dudosos.monto.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
@@ -1212,7 +1212,7 @@ export default function Tesoreria() {
         headerActions={headerActions}
         loading={loading}
         isEmpty={filtered.length === 0}
-        emptyMessage="No hay gastos que coincidan con los filtros."
+        emptyMessage="No hay pagos que coincidan con los filtros."
         pagination={{
           page,
           pageSize,
@@ -1235,7 +1235,7 @@ export default function Tesoreria() {
                 ${totales.totalPesos.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
               </span>
               <span className="text-xs" style={{ color: theme.textSecondary }}>
-                ({totales.cantidad} {totales.cantidad === 1 ? 'gasto' : 'gastos'})
+                ({totales.cantidad} {totales.cantidad === 1 ? 'pago' : 'pagos'})
               </span>
             </div>
             {totales.totalImputado > 0 && (
@@ -1285,7 +1285,7 @@ export default function Tesoreria() {
             }}
             onItemClick={(g) => openDetalle(g)}
             mesesStorageKey="tesoreria_meses_visibles"
-            helperText="💡 Click sobre un gasto para ver el detalle. El calendario refleja los filtros activos."
+            helperText="Click sobre un pago para ver el detalle. El calendario refleja los filtros activos."
             formatMoney={(n) => `$${n.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
             renderDetailRow={(g) => {
               const dep = g.destino_dependencia_id ? dependenciasMap.get(g.destino_dependencia_id) : null;

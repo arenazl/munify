@@ -161,28 +161,28 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
     steps: [
       {
         title: '¿Qué ves acá?',
-        description: 'Todo el dinero que efectivamente sale del muni. Cada gasto del muni aparece acá, sea originado en una OP de Contaduría o en una liquidación de sueldo. Es la "fuente de verdad" del dinero gastado.',
+        description: 'Todo el dinero que efectivamente sale del muni. Cada pago del muni aparece acá, sea originado en una OP de Contaduría o en una liquidación de sueldo. Es la "fuente de verdad" del dinero gastado.',
         icon: 'Sparkles',
       },
       {
-        title: 'Cargar un gasto suelto',
-        description: 'Si necesitás registrar un gasto que no vino por OP (un pago en efectivo, una compra menor), apretás "Nuevo Pago" y lo cargás directo. Elegís de qué caja sale.',
+        title: 'Cargar un pago suelto',
+        description: 'Si necesitás registrar un pago que no vino por OP (un pago en efectivo, una compra menor), apretás "Nuevo Pago" y lo cargás directo. Elegís de qué caja sale.',
         icon: 'ClipboardList',
       },
       {
         title: 'Filtros y búsqueda',
-        description: 'Buscás por concepto, por contacto o por descripción. También filtrás por mes, por dependencia, por caja, por forma de pago. Para encontrar cualquier gasto rápido.',
+        description: 'Buscás por concepto, por contacto o por descripción. También filtrás por mes, por dependencia, por caja, por forma de pago. Para encontrar cualquier pago rápido.',
         icon: 'Lightbulb',
       },
       {
-        title: 'Cada gasto descuenta una caja',
-        description: 'Cuando se carga un gasto con caja asignada, automáticamente se descuenta del saldo de esa caja. Así el saldo de Coparticipación, Tesoro propio, etc. siempre está actualizado.',
+        title: 'Cada pago descuenta una caja',
+        description: 'Cuando se carga un pago con caja asignada, automáticamente se descuenta del saldo de esa caja. Así el saldo de Coparticipación, Tesoro propio, etc. siempre está actualizado.',
         icon: 'TrendingUp',
         cta: { label: 'Ver saldos de cajas', href: '/gestion/tesoreria/cajas' },
       },
       {
         title: 'Curación con IA (Bartolo)',
-        description: 'Si importás gastos viejos (Excel, Mercurio Pago) hay una pantalla aparte donde la IA clasifica los gastos dudosos y vos los corregís. Mantiene tu histórico limpio.',
+        description: 'Si importás pagos viejos (Excel, Mercurio Pago) hay una pantalla aparte donde la IA clasifica los pagos dudosos y vos los corregís. Mantiene tu histórico limpio.',
         icon: 'Rocket',
       },
     ],

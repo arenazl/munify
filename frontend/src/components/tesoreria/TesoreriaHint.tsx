@@ -1,6 +1,7 @@
 import { Lightbulb, X } from 'lucide-react';
 import { ReactNode, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getHintUserKey } from '../../utils/hintScope';
 
 interface Props {
   /** Titulo del banner */
@@ -24,10 +25,13 @@ interface Props {
  */
 export function TesoreriaHint({ titulo, children, storageKey }: Props) {
   const { theme } = useTheme();
+  // Key del dismiss scopeada por usuario: si lo cierra, no le vuelve a aparecer
+  // a ese perfil; otro usuario lo ve de nuevo.
+  const dismissKey = storageKey ? `tesoreria_hint_${storageKey}_${getHintUserKey()}` : null;
   const [hidden, setHidden] = useState(() => {
-    if (!storageKey) return false;
+    if (!dismissKey) return false;
     try {
-      return localStorage.getItem(`tesoreria_hint_${storageKey}`) === '1';
+      return localStorage.getItem(dismissKey) === '1';
     } catch {
       return false;
     }
@@ -36,8 +40,8 @@ export function TesoreriaHint({ titulo, children, storageKey }: Props) {
   if (hidden) return null;
 
   const dismiss = () => {
-    if (storageKey) {
-      try { localStorage.setItem(`tesoreria_hint_${storageKey}`, '1'); } catch { /* ignore */ }
+    if (dismissKey) {
+      try { localStorage.setItem(dismissKey, '1'); } catch { /* ignore */ }
     }
     setHidden(true);
   };
