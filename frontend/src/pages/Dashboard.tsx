@@ -113,6 +113,26 @@ export default function Dashboard() {
     return ((r * 299 + g * 587 + b * 114) / 1000) > 155;
   })();
   const { municipioActual, user } = useAuth();
+
+  // --- Hero header adaptativo -------------------------------------------
+  // Si el muni configuro una portada propia la respetamos (foto + overlay
+  // oscuro, texto blanco). Si no, en vez de una foto stock generica usamos un
+  // "hero de marca" derivado del theme: gradiente con theme.primary + el escudo
+  // del muni (o un icono) como watermark. Asi el banner deja de ser una isla
+  // oscura en los temas claros y respeta la identidad del municipio.
+  const tienePortada = !!municipioActual?.imagen_portada;
+  // Tema claro -> fondo de marca suave (se funde a card) => texto oscuro.
+  // Tema oscuro o con foto -> fondo oscuro/intenso => texto claro.
+  const heroFondoOscuro = tienePortada || !isLightTheme;
+  const heroBrandBg = isLightTheme
+    ? `linear-gradient(135deg, ${theme.primary}26 0%, ${theme.card} 55%, ${theme.primary}14 100%)`
+    : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`;
+  const heroTextColor = heroFondoOscuro ? '#ffffff' : theme.text;
+  const heroTextMuted = heroFondoOscuro ? 'rgba(255,255,255,0.9)' : theme.textSecondary;
+  const heroShadowStrong = heroFondoOscuro ? '0 2px 8px rgba(0,0,0,0.5)' : 'none';
+  const heroShadowSoft = heroFondoOscuro ? '0 1px 4px rgba(0,0,0,0.4)' : 'none';
+  // ----------------------------------------------------------------------
+
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tramitesStats, setTramitesStats] = useState<DashboardStats | null>(null);
@@ -568,44 +588,66 @@ export default function Dashboard() {
         </defs>
       </svg>
 
-      {/* Hero Header - Estilo Wok Express. Tema claro: opacity 0.3 para que no
-          compita visualmente con el contenido (el banner es decorativo). */}
+      {/* Hero Header adaptativo — foto propia del muni o hero de marca del theme. */}
       <div
         className="relative overflow-hidden rounded-2xl"
-        style={{ minHeight: '200px', opacity: isLightTheme ? 0.85 : 1 }}
+        style={{ minHeight: '200px' }}
       >
-        {/* Imagen de fondo - usa imagen_portada si existe, sino logo_url, sino placeholder */}
+        {/* Fondo del hero: foto propia del muni si la configuro, sino hero de
+            marca derivado del theme (sin foto stock generica). */}
         <div className="absolute inset-0">
-          <img
-            src={municipioActual?.imagen_portada || municipioActual?.logo_url || "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070"}
-            alt={municipioActual?.nombre || "Ciudad"}
-            className="w-full h-full object-cover"
-            style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
-          />
-          {/* Gradiente oscuro - solo si NO está sin filtro.
-              Antes la base se fundía a theme.backgroundSecondary, lo que en
-              temas claros (sand/arctic) dejaba el fondo casi blanco justo
-              donde se apoya el texto blanco — ilegible. Ahora el gradiente
-              permanece oscuro todo el alto del banner independiente del tema. */}
-          {!municipioActual?.tema_config?.portadaSinFiltro && (
+          {tienePortada ? (
             <>
-              <div
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(180deg,
-                    rgba(15, 23, 42, 0.65) 0%,
-                    rgba(15, 23, 42, 0.8) 50%,
-                    rgba(15, 23, 42, 0.85) 100%
-                  )`,
-                }}
+              <img
+                src={municipioActual?.imagen_portada}
+                alt={municipioActual?.nombre || "Portada"}
+                className="w-full h-full object-cover"
+                style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
               />
-              {/* Overlay adicional para mejor legibilidad */}
-              <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
+              {/* Gradiente oscuro sobre la foto para legibilidad del texto blanco. */}
+              {!municipioActual?.tema_config?.portadaSinFiltro ? (
+                <>
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background: `linear-gradient(180deg,
+                        rgba(15, 23, 42, 0.65) 0%,
+                        rgba(15, 23, 42, 0.8) 50%,
+                        rgba(15, 23, 42, 0.85) 100%
+                      )`,
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
+                </>
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+              )}
             </>
-          )}
-          {/* Cuando está sin filtro, solo un gradiente sutil para legibilidad del texto */}
-          {municipioActual?.tema_config?.portadaSinFiltro && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+          ) : (
+            <>
+              {/* Hero de marca: gradiente del theme + watermark del escudo (o icono). */}
+              <div className="absolute inset-0" style={{ background: heroBrandBg }} />
+              {municipioActual?.logo_url ? (
+                <img
+                  src={municipioActual.logo_url}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute -right-6 -bottom-8 h-52 w-52 object-contain pointer-events-none select-none"
+                  style={{ opacity: isLightTheme ? 0.1 : 0.16 }}
+                />
+              ) : (
+                <Building2
+                  aria-hidden="true"
+                  className="absolute -right-8 -bottom-10 pointer-events-none"
+                  style={{
+                    width: '13rem',
+                    height: '13rem',
+                    color: heroFondoOscuro ? '#ffffff' : theme.primary,
+                    opacity: isLightTheme ? 0.08 : 0.13,
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
 
@@ -615,7 +657,7 @@ export default function Dashboard() {
           onClick={() => setLiveMode(true)}
           className="live-btn absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
-            backgroundColor: 'rgba(239, 68, 68, 0.25)',
+            backgroundColor: heroFondoOscuro ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.92)',
             border: '2px solid rgba(239, 68, 68, 0.7)',
             color: '#ffffff',
           }}
@@ -702,22 +744,20 @@ export default function Dashboard() {
         <div className="relative z-10 p-6 flex flex-col justify-end" style={{ minHeight: '200px' }}>
           {/* Info principal */}
           <div className="mt-auto">
-            {/* El banner tiene imagen + overlay oscuro, el texto debe ser SIEMPRE
-                claro con drop-shadow — no depende del tema porque no se apoya
-                en la sidebar. En temas claros, sidebarText es oscuro y quedaba
-                invisible sobre el gradiente que se funde a backgroundSecondary. */}
-            <h1 className="text-3xl md:text-4xl mb-2 drop-shadow-lg" style={{ color: '#ffffff', textShadow: '0 2px 8px rgba(0,0,0,0.6)' }}>
+            {/* Texto adaptativo: claro sobre foto/gradiente intenso (tema oscuro),
+                oscuro sobre el hero de marca suave (tema claro). Ver heroTextColor. */}
+            <h1 className="text-3xl md:text-4xl mb-2" style={{ color: heroTextColor, textShadow: heroShadowStrong }}>
               <span className="font-light">Municipalidad de </span>
               <span className="font-bold">{municipioNombre}</span>
             </h1>
-            <p className="text-sm md:text-base mb-4" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+            <p className="text-sm md:text-base mb-4" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
               {selectedDepNombre
                 ? <>Vista de la dependencia <strong>{selectedDepNombre}</strong></>
                 : 'Vista consolidada de todas las dependencias'}
             </p>
 
             {/* Stats rápidos estilo Wok */}
-            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
               <div className="flex items-center gap-1.5">
                 <ClipboardList className="w-4 h-4" />
                 <span>{stats?.total || 0} reclamos</span>
