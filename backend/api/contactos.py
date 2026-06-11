@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
-from models import Contacto, Gasto, TesoreriaPagoProgramado, User, RolUsuario
+from models import Contacto, Gasto, TesoreriaPagoProgramado, TesoreriaTipoEmpleado, User, RolUsuario
 from models.contacto import TipoContacto
 from schemas.tesoreria import ContactoCreate, ContactoUpdate, ContactoResponse
 
@@ -41,6 +41,31 @@ def _require_admin(user: User):
     # contactos. Los supervisores de dependencia y vecinos no.
     if user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
         raise HTTPException(status_code=403, detail="Sin permisos para gestionar contactos")
+
+
+async def _sync_subtipo_empleado(db: AsyncSession, contacto: Contacto):
+    """Para empleados, `subtipo` (string) es un ESPEJO derivado del nombre del
+    tipo apuntado por `tipo_empleado_id` (FK al catalogo).
+
+    Existen dos campos que clasifican al empleado: la FK (que cuenta la pantalla
+    Tipos) y el string `subtipo` (que filtra las pantallas Empleados/Contactos).
+    Si se editan por separado se desincronizan: la pantalla Tipos muestra N y la
+    de Empleados muestra otra cosa. Para que NUNCA pase, el backend deriva
+    `subtipo` desde la FK en cada create/update. La fuente de verdad es la FK;
+    `subtipo` no se edita a mano para empleados.
+
+    Para otros tipos (ej. profesional) `subtipo` sigue siendo texto libre y no
+    se toca. Si el empleado no tiene FK, se respeta lo que venga.
+    """
+    tipo_val = contacto.tipo.value if hasattr(contacto.tipo, "value") else contacto.tipo
+    if tipo_val == "empleado" and contacto.tipo_empleado_id:
+        nombre = await db.scalar(
+            select(TesoreriaTipoEmpleado.nombre).where(
+                TesoreriaTipoEmpleado.id == contacto.tipo_empleado_id
+            )
+        )
+        if nombre:
+            contacto.subtipo = nombre
 
 
 def _build_filters_query(municipio_id, tipo, activo, search):
@@ -125,6 +150,7 @@ async def create_contacto(
     municipio_id = get_effective_municipio_id(request, current_user)
 
     contacto = Contacto(municipio_id=municipio_id, **payload.model_dump())
+    await _sync_subtipo_empleado(db, contacto)
     db.add(contacto)
     await db.commit()
     await db.refresh(contacto)
@@ -489,6 +515,7 @@ async def update_contacto(
 
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(contacto, k, v)
+    await _sync_subtipo_empleado(db, contacto)
     await db.commit()
     await db.refresh(contacto)
     return contacto
