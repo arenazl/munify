@@ -1346,6 +1346,14 @@ export const agendaApi = {
   borrarExcepcion: (id: number) => api.delete(`/agenda-excepciones/${id}`),
 };
 
+// Tarjetas de credito (Tesoreria) — ABM
+export const tarjetasApi = {
+  list: () => api.get('/tarjetas'),
+  create: (data: Record<string, unknown>) => api.post('/tarjetas', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/tarjetas/${id}`, data),
+  remove: (id: number) => api.delete(`/tarjetas/${id}`),
+};
+
 export const tramitesApi = {
   // ----- CRUD de Trámite (admin del municipio) -----
   getAll: (params?: { categoria_tramite_id?: number; activo?: boolean }) =>

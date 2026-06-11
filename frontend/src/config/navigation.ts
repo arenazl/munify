@@ -358,6 +358,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Configuración',
       description: 'Configuración del sistema'
     },
+    {
+      name: 'Tarjetas',
+      href: '/gestion/tarjetas',
+      icon: Banknote,
+      show: isAdminOrSupervisor,
+      categoria: 'Configuración',
+      description: 'Tarjetas de crédito para pagos'
+    },
     // === Solo SUPERADMIN ===
     {
       name: 'Municipios',
