@@ -39,6 +39,7 @@ from .dependencias import router as dependencias_router
 from .validacion_identidad import router as validacion_identidad_router
 from .geocoding import router as geocoding_router
 from .agenda_config import router as agenda_config_router
+from .tarjetas import router as tarjetas_router
 from .admin_audit import router as admin_audit_router
 from .tasas import router as tasas_router
 from .pagos import router as pagos_router
@@ -93,6 +94,7 @@ api_router.include_router(ia_config_router, tags=["IA Config"])  # rutas con pat
 api_router.include_router(turnos_router, prefix="/turnos", tags=["Turnos"])
 api_router.include_router(turnos_tramite_router)  # prefix definido en el router
 api_router.include_router(agenda_config_router, tags=["Agenda"])  # rutas con path completo (/agenda-config, /agenda-excepciones)
+api_router.include_router(tarjetas_router, tags=["Tarjetas"])  # ABM tarjetas de credito (/tarjetas)
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["Calificaciones"])
 api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
 api_router.include_router(emails_router, prefix="/emails", tags=["Emails"])
