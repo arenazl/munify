@@ -52,6 +52,22 @@ export default function ReelsStudio() {
         </div>
       </header>
 
+      {/* BARRA DE MÚSICA — visible apenas entrás, sin scroll */}
+      <div style={{ maxWidth: 1240, margin: '0 auto 24px', borderRadius: 16, padding: '14px 18px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BRAND.gold}33`, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 800, color: BRAND.gold, letterSpacing: '0.04em' }}>
+          <Music size={17} /> MÚSICA
+        </div>
+        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>tocá una para escuchar (suena en loop):</span>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+          {[{ id: 'pop', label: 'Pop' }, { id: 'electro', label: 'Electrónica' }, { id: 'funk', label: 'Funk' }].map((t) => (
+            <button key={t.id} onClick={() => pickTrack(t.id)} style={chip(track === t.id, BRAND.gold)}>{t.label}</button>
+          ))}
+          <button onClick={() => pickTrack(null)} style={{ ...chip(track === null, BRAND.gold), display: 'flex', alignItems: 'center', gap: 6 }}>
+            <VolumeX size={14} /> Silencio
+          </button>
+        </div>
+      </div>
+
       <div style={{ maxWidth: 1240, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 520px', gap: 32, alignItems: 'start' }}>
         {/* Selector + tips */}
         <div>
@@ -98,24 +114,6 @@ export default function ReelsStudio() {
         {/* Preview */}
         <div style={{ position: 'sticky', top: 24 }}>
           <ReelStage reel={reel} />
-
-          {/* Selector de música (preview) */}
-          <div style={{ marginTop: 16, borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, fontSize: 12, fontWeight: 700, color: BRAND.gold, letterSpacing: '0.04em' }}>
-              <Music size={14} /> MÚSICA — eleg&iacute; una para escuchar
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[{ id: 'inspirada', label: 'Inspiradora' }, { id: 'calida', label: 'Cálida' }, { id: 'energica', label: 'Enérgica' }].map((t) => {
-                const active = track === t.id;
-                return (
-                  <button key={t.id} onClick={() => pickTrack(t.id)} style={chip(active, reel.accent)}>{t.label}</button>
-                );
-              })}
-              <button onClick={() => pickTrack(null)} style={{ ...chip(track === null, reel.accent), display: 'flex', alignItems: 'center', gap: 6 }}>
-                <VolumeX size={14} /> Silencio
-              </button>
-            </div>
-          </div>
           <audio ref={audioRef} loop />
 
           <button
