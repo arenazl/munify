@@ -4,8 +4,8 @@
 // "Grabar" deja solo el lienzo sobre negro para capturar con OBS / grabador).
 // Ruta pública (herramienta interna de marketing), no toca el resto de la app.
 // ============================================================
-import { useState } from 'react';
-import { Film, Video, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Film, Video, X, Music, VolumeX } from 'lucide-react';
 import ReelStage, { reelDurationMs } from '../components/reels/ReelStage';
 import { REELS } from '../components/reels/reelScripts';
 import { BRAND, FONT_DISPLAY, FONT_SANS } from '../components/reels/reelBrand';
@@ -16,6 +16,20 @@ export default function ReelsStudio() {
   const [clean, setClean] = useState(false);
   const reel = REELS.find((r) => r.id === activeId) ?? REELS[0];
   const secs = Math.round(reelDurationMs(reel) / 1000);
+
+  // Música de preview (pistas libres en /public/reels-audio). Suena al
+  // elegirla (click = gesto que habilita el audio del navegador).
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [track, setTrack] = useState<string | null>(null);
+  const pickTrack = (id: string | null) => {
+    setTrack(id);
+    const a = audioRef.current;
+    if (!a) return;
+    if (!id) { a.pause(); return; }
+    a.src = `/reels-audio/${id}.mp3`;
+    a.currentTime = 0;
+    a.play().catch(() => {});
+  };
 
   // Modo grabación: solo el lienzo 9:16 centrado sobre negro absoluto
   if (clean) {
@@ -84,6 +98,26 @@ export default function ReelsStudio() {
         {/* Preview */}
         <div style={{ position: 'sticky', top: 24 }}>
           <ReelStage reel={reel} />
+
+          {/* Selector de música (preview) */}
+          <div style={{ marginTop: 16, borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10, fontSize: 12, fontWeight: 700, color: BRAND.gold, letterSpacing: '0.04em' }}>
+              <Music size={14} /> MÚSICA — eleg&iacute; una para escuchar
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[{ id: 'inspirada', label: 'Inspiradora' }, { id: 'calida', label: 'Cálida' }, { id: 'energica', label: 'Enérgica' }].map((t) => {
+                const active = track === t.id;
+                return (
+                  <button key={t.id} onClick={() => pickTrack(t.id)} style={chip(active, reel.accent)}>{t.label}</button>
+                );
+              })}
+              <button onClick={() => pickTrack(null)} style={{ ...chip(track === null, reel.accent), display: 'flex', alignItems: 'center', gap: 6 }}>
+                <VolumeX size={14} /> Silencio
+              </button>
+            </div>
+          </div>
+          <audio ref={audioRef} loop />
+
           <button
             onClick={() => setClean(true)}
             style={{
@@ -100,6 +134,13 @@ export default function ReelsStudio() {
     </div>
   );
 }
+
+const chip = (active: boolean, accent: string): React.CSSProperties => ({
+  cursor: 'pointer', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13, color: '#fff',
+  border: `1.5px solid ${active ? accent : 'rgba(255,255,255,0.14)'}`,
+  background: active ? `${accent}22` : 'rgba(255,255,255,0.04)',
+  transition: 'all 140ms',
+});
 
 const btnFloat: React.CSSProperties = {
   position: 'fixed', top: 20, right: 20, width: 44, height: 44, borderRadius: 12,
