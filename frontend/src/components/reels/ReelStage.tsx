@@ -130,8 +130,8 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
             @import url('${FONTS_HREF}');
             @keyframes reelRise { 0% { opacity: 0; transform: translateY(46px); } 100% { opacity: 1; transform: translateY(0); } }
             @keyframes reelPop { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
-            @keyframes reelMock { 0% { opacity: 0; transform: translateY(70px) scale(0.92) rotate(-2deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); } }
-            @keyframes reelFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-20px) rotate(-1.5deg); } }
+            @keyframes reelMock { 0% { opacity: 0; transform: translateY(70px) scale(0.92); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+            @keyframes reelFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-16px); } }
             @keyframes reelKen { 0% { transform: scale(1); } 100% { transform: scale(1.06); } }
             @keyframes reelUnderline { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
             @keyframes reelDrift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(60px,-46px) scale(1.14); } 66% { transform: translate(-48px,40px) scale(0.92); } }
