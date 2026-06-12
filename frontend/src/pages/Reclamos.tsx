@@ -12,6 +12,7 @@ import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { StatusPill } from '../components/ui/StatusPill';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
+import { useIaHabilitada } from '../hooks/useIaHabilitada';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
 import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
@@ -158,6 +159,10 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
   });
+  // IA del muni: si está apagada, no montamos el panel ni reservamos su columna
+  // (la grilla ocupa el 100% del ancho). La IA funcional —auto-asignación,
+  // clasificación— es independiente de este flag y sigue operando.
+  const iaOn = useIaHabilitada();
 
   // Vista guiada (Inbox) vs vista grilla clásica.
   // Misma lógica que GestionTramites: clasifica reclamos en secciones por
@@ -2878,7 +2883,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       render: (r: Reclamo) => {
         const catColor = r.categoria.color || DEFAULT_CATEGORY_COLOR;
         return (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ backgroundColor: catColor + '20', color: catColor }}
@@ -4385,7 +4390,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         sheetDescription=""
         onSheetClose={() => {}}
         extraFilters={undefined}
-        sidePanel={!soloMisTrabajos ? (
+        sidePanel={iaOn && !soloMisTrabajos ? (
           <DashboardIAPanel
             data={dashboardIA}
             loading={dashboardIALoading}
@@ -4400,7 +4405,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             }}
           />
         ) : undefined}
-        sidePanelWidth={iaCollapsed ? 44 : 280}
+        sidePanelWidth={iaOn && !soloMisTrabajos ? (iaCollapsed ? 44 : 280) : 0}
         stickyHeader={true}
         toolbar={{
           combos: [

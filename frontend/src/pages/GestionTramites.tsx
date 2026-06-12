@@ -45,6 +45,7 @@ import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal'
 import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
+import { useIaHabilitada } from '../hooks/useIaHabilitada';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
@@ -209,6 +210,10 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   const [iaCollapsed, setIaCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem('dashboard_ia_collapsed') !== '0'; } catch { return true; }
   });
+  // IA del muni: si está apagada, no montamos el panel ni reservamos su columna
+  // (la grilla ocupa el 100% del ancho). La IA funcional —auto-asignación,
+  // clasificación— es independiente de este flag y sigue operando.
+  const iaOn = useIaHabilitada();
 
   useEffect(() => {
     if (soloMiArea) return;
@@ -1772,7 +1777,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
           layout: 'left',
         }}
         tableView={renderTableView()}
-        sidePanel={!soloMiArea ? (
+        sidePanel={iaOn && !soloMiArea ? (
           <DashboardIAPanel
             data={dashboardIA}
             loading={dashboardIALoading}
@@ -1787,7 +1792,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
             }}
           />
         ) : undefined}
-        sidePanelWidth={iaCollapsed ? 44 : 280}
+        sidePanelWidth={iaOn && !soloMiArea ? (iaCollapsed ? 44 : 280) : 0}
         sheetOpen={false}
         sheetTitle=""
         onSheetClose={() => {}}
