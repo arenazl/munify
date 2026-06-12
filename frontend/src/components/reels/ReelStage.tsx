@@ -28,7 +28,7 @@ export interface Reel {
 }
 
 const DEFAULT_MS: Record<Scene['kind'], number> = {
-  hook: 2800, feature: 3200, stat: 3000, split: 3600, cta: 3600,
+  hook: 2600, feature: 2900, stat: 2800, split: 3200, cta: 3200,
 };
 export const sceneMs = (s: Scene) => s.ms ?? DEFAULT_MS[s.kind];
 export const reelDurationMs = (r: Reel) => r.scenes.reduce((sum, s) => sum + sceneMs(s), 0);
@@ -115,18 +115,26 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
           @import url('${FONTS_HREF}');
           @keyframes reelIn { 0% { opacity: 0; transform: translateY(28px) scale(0.98); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
           @keyframes reelPop { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
-          @keyframes reelMock { 0% { opacity: 0; transform: translateY(40px) scale(0.92) rotate(-2deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); } }
-          @keyframes reelGlow { 0%,100% { opacity: 0.9; } 50% { opacity: 1; } }
-          @keyframes reelFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(-2deg); } }
+          @keyframes reelRise { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
+          @keyframes reelMock { 0% { opacity: 0; transform: translateY(46px) scale(0.9) rotate(-2deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); } }
+          @keyframes reelFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-14px) rotate(-1.5deg); } }
+          @keyframes reelKen { 0% { transform: scale(1); } 100% { transform: scale(1.07); } }
+          @keyframes reelUnderline { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+          @keyframes reelDrift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(34px,-26px) scale(1.14); } 66% { transform: translate(-28px,22px) scale(0.92); } }
+          @keyframes reelDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-36px,28px) scale(1.18); } }
+          @keyframes reelParticle { 0%,100% { transform: translateY(0); opacity: 0.25; } 50% { transform: translateY(-28px); opacity: 0.75; } }
+          @keyframes reelPulse { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
           .reel-in { animation: reelIn 700ms cubic-bezier(0.16,1,0.3,1) both; }
           .reel-pop { animation: reelPop 600ms cubic-bezier(0.16,1,0.3,1) both; }
-          .reel-mock { animation: reelMock 800ms cubic-bezier(0.16,1,0.3,1) both, reelFloat 5s ease-in-out 0.8s infinite; }
+          .reel-rise { animation: reelRise 640ms cubic-bezier(0.16,1,0.3,1) both; }
+          .reel-mock { animation: reelMock 820ms cubic-bezier(0.16,1,0.3,1) both, reelFloat 5s ease-in-out 0.9s infinite; }
+          .reel-ken { animation: reelKen 6s ease-in-out infinite alternate; }
         `}</style>
 
         {/* Glow de marca */}
         <div style={{ position: 'absolute', inset: 0, background: GLOW_BG }} />
-        {/* Acento del reel arriba */}
-        <div style={{ position: 'absolute', top: -120, right: -80, width: 360, height: 360, borderRadius: 999, background: `radial-gradient(circle, ${reel.accent}33, transparent 65%)`, filter: 'blur(10px)' }} />
+        {/* Fondo vivo: blobs que driftean + partículas */}
+        <AnimatedBG accent={reel.accent} />
 
         {/* Barra de progreso (segmentos por escena) */}
         <div style={{ position: 'absolute', top: 14, left: 18, right: 18, display: 'flex', gap: 5, zIndex: 5 }}>
@@ -166,6 +174,20 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
   );
 }
 
+// Fondo animado: 3 blobs que driftean + partículas flotando (da "vida")
+function AnimatedBG({ accent }: { accent: string }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', top: '-12%', right: '-14%', width: '60%', height: '34%', borderRadius: 999, background: `radial-gradient(circle, ${accent}40, transparent 68%)`, filter: 'blur(16px)', animation: 'reelDrift1 16s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-10%', left: '-16%', width: '64%', height: '36%', borderRadius: 999, background: `radial-gradient(circle, ${BRAND.azure}33, transparent 68%)`, filter: 'blur(18px)', animation: 'reelDrift2 21s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '42%', left: '28%', width: '48%', height: '28%', borderRadius: 999, background: `radial-gradient(circle, ${BRAND.gold}22, transparent 70%)`, filter: 'blur(20px)', animation: 'reelDrift1 26s ease-in-out infinite reverse' }} />
+      {Array.from({ length: 11 }).map((_, i) => (
+        <div key={i} style={{ position: 'absolute', top: `${(i * 8 + 8) % 92}%`, left: `${(i * 15 + 6) % 94}%`, width: 6, height: 6, borderRadius: 999, background: i % 3 === 0 ? accent : i % 3 === 1 ? BRAND.gold : '#fff', opacity: 0.5, boxShadow: '0 0 8px currentColor', animation: `reelParticle ${5 + (i % 4)}s ease-in-out ${i * 0.35}s infinite` }} />
+      ))}
+    </div>
+  );
+}
+
 function Ctrl({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: BRAND.ink, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -195,9 +217,14 @@ function HookScene({ s }: { s: Extract<Scene, { kind: 'hook' }> }) {
       {s.eyebrow && (
         <div className="reel-pop" style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 800, letterSpacing: '0.22em', color: BRAND.gold, textTransform: 'uppercase', marginBottom: 22, padding: '7px 15px', border: `1px solid ${BRAND.gold}55`, borderRadius: 999 }}>{s.eyebrow}</div>
       )}
-      <h1 className="reel-in" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 60, lineHeight: 1.02, letterSpacing: '-0.02em', margin: 0 }}>
-        {s.lines.map((l, i) => <span key={i} style={{ display: 'block' }}>{l}</span>)}
-        {s.accentWord && <span style={{ display: 'block', color: BRAND.gold }}>{s.accentWord}</span>}
+      <h1 style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 60, lineHeight: 1.02, letterSpacing: '-0.02em', margin: 0 }}>
+        {s.lines.map((l, i) => <span key={i} className="reel-rise" style={{ display: 'block', animationDelay: `${i * 140}ms` }}>{l}</span>)}
+        {s.accentWord && (
+          <span className="reel-rise" style={{ display: 'block', color: BRAND.gold, position: 'relative', width: 'fit-content', animationDelay: `${s.lines.length * 140}ms` }}>
+            {s.accentWord}
+            <span style={{ position: 'absolute', left: 0, bottom: 4, height: 5, width: '100%', background: BRAND.gold, borderRadius: 9, transformOrigin: 'left', animation: `reelUnderline 560ms cubic-bezier(0.16,1,0.3,1) ${s.lines.length * 140 + 280}ms both` }} />
+          </span>
+        )}
       </h1>
     </div>
   );
@@ -206,11 +233,13 @@ function HookScene({ s }: { s: Extract<Scene, { kind: 'hook' }> }) {
 function FeatureScene({ s }: { s: Extract<Scene, { kind: 'feature' }> }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, gap: 30 }}>
-      <div className="reel-mock" style={{ filter: `drop-shadow(0 20px 50px ${s.accent}40)` }}>{s.mockup}</div>
-      <div className="reel-in" style={{ textAlign: 'center', maxWidth: '92%' }}>
-        <div style={{ display: 'inline-block', fontSize: 13, fontWeight: 800, letterSpacing: '0.16em', color: s.accent, textTransform: 'uppercase', padding: '6px 14px', borderRadius: 999, background: `${s.accent}1f`, marginBottom: 16 }}>{s.chip}</div>
-        <h2 style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 40, lineHeight: 1.05, margin: '0 0 12px', letterSpacing: '-0.015em' }}>{s.title}</h2>
-        <p style={{ fontSize: 19, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45, margin: 0, fontWeight: 400 }}>{s.desc}</p>
+      <div className="reel-mock" style={{ filter: `drop-shadow(0 20px 50px ${s.accent}40)` }}>
+        <div className="reel-ken">{s.mockup}</div>
+      </div>
+      <div style={{ textAlign: 'center', maxWidth: '92%' }}>
+        <div className="reel-rise" style={{ display: 'inline-block', fontSize: 13, fontWeight: 800, letterSpacing: '0.16em', color: s.accent, textTransform: 'uppercase', padding: '6px 14px', borderRadius: 999, background: `${s.accent}1f`, marginBottom: 16, animationDelay: '220ms' }}>{s.chip}</div>
+        <h2 className="reel-rise" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 40, lineHeight: 1.05, margin: '0 0 12px', letterSpacing: '-0.015em', animationDelay: '340ms' }}>{s.title}</h2>
+        <p className="reel-rise" style={{ fontSize: 19, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45, margin: 0, fontWeight: 400, animationDelay: '460ms' }}>{s.desc}</p>
       </div>
     </div>
   );
@@ -219,8 +248,9 @@ function FeatureScene({ s }: { s: Extract<Scene, { kind: 'feature' }> }) {
 function StatScene({ s }: { s: Extract<Scene, { kind: 'stat' }> }) {
   const v = useCountUp(s.value, 1600);
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, textAlign: 'center' }}>
-      <div className="reel-pop" style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 130, lineHeight: 0.9, letterSpacing: '-0.04em', color: '#fff', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, textAlign: 'center', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '32%', width: 320, height: 320, borderRadius: 999, background: `radial-gradient(circle, ${s.accent}55, transparent 65%)`, filter: 'blur(24px)', animation: 'reelPulse 2.4s ease-in-out infinite' }} />
+      <div className="reel-pop" style={{ position: 'relative', fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 130, lineHeight: 0.9, letterSpacing: '-0.04em', color: '#fff', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
         {s.prefix && <span style={{ fontSize: 64, color: s.accent }}>{s.prefix}</span>}
         <span style={{ background: `linear-gradient(135deg,#fff,${s.accent})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: `drop-shadow(0 6px 24px ${s.accent}66)` }}>{v.toLocaleString('es-AR')}</span>
         {s.suffix && <span style={{ fontSize: 64, color: s.accent }}>{s.suffix}</span>}
