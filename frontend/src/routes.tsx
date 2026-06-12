@@ -94,6 +94,9 @@ import DemoMinimal from './pages/demos/DemoMinimal';
 import DemoBento from './pages/demos/DemoBento';
 import DemoCyberpunk from './pages/demos/DemoCyberpunk';
 
+// Estudio de reels de promoción (marketing)
+import ReelsStudio from './pages/ReelsStudio';
+
 // Mobile App para ciudadanos (rutas legacy, redirigen a /home o usan componentes específicos)
 import MobileLayout from './layouts/MobileLayout';
 import {
@@ -112,6 +115,9 @@ export const router = createBrowserRouter([
   { path: '/demos/minimal', element: <DemoMinimal /> },
   { path: '/demos/bento', element: <DemoBento /> },
   { path: '/demos/cyberpunk', element: <DemoCyberpunk /> },
+
+  // === REELS DE PROMOCIÓN (marketing) ===
+  { path: '/reels', element: <ReelsStudio /> },
 
   // === APP MOBILE PARA CIUDADANOS ===
   // /app ahora redirige a /home (página responsiva unificada)
