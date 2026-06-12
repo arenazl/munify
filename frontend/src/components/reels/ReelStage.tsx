@@ -1,20 +1,24 @@
 // ============================================================
-// Motor de reels Munify — lienzo vertical 9:16 que rota "escenas" con
-// auto-play, count-up y transiciones. Pensado para grabar a mp4
-// (Facebook/Instagram Reels). Cero librería de slides.
+// Motor de reels Munify — lienzo BASE fijo 1080x1920 (9:16) escalado.
+// Todo el contenido se diseña en coordenadas 1080x1920 y se escala con
+// transform al tamaño objetivo. Así el preview (chico) y el mp4 (1080x1920
+// nativo) se ven IDÉNTICOS y bien proporcionados, sin franjas vacías.
 //
 // Patrón heredado de DashboardLive.tsx: useCountUp + setInterval de
 // progreso + key por escena para reiniciar animaciones.
 // ============================================================
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pause, Play, RotateCcw } from 'lucide-react';
 import { BRAND, FONT_DISPLAY, FONT_SANS, GLOW_BG, FONTS_HREF } from './reelBrand';
 import { MunifyMark } from './ReelMockups';
+
+// Lienzo de export (Facebook / Instagram Reels)
+const BASE_W = 1080;
+const BASE_H = 1920;
 
 // ---- Modelo de escena ----
 export type Scene =
   | { kind: 'hook'; ms?: number; eyebrow?: string; lines: string[]; accentWord?: string }
-  | { kind: 'feature'; ms?: number; mockup: ReactNode; chip: string; title: string; desc: string; accent: string }
+  | { kind: 'feature'; ms?: number; mockup: ReactNode; chip: string; title: string; desc: string; accent: string; scale?: number }
   | { kind: 'stat'; ms?: number; value: number; prefix?: string; suffix?: string; label: string; sub?: string; accent: string }
   | { kind: 'split'; ms?: number; beforeTitle?: string; before: string[]; afterTitle?: string; after: string[]; accent: string }
   | { kind: 'cta'; ms?: number; line: string; accentWord?: string; sub?: string };
@@ -57,28 +61,25 @@ function useCountUp(target: number, durationMs = 1500): number {
 // ============================================================
 interface ReelStageProps {
   reel: Reel;
-  /** modo grabación: oculta controles y deja solo el lienzo 9:16 sobre negro */
+  /** modo grabación / captura: sin bordes redondeados ni sombra */
   clean?: boolean;
-  /** alto del lienzo en px (default: se ajusta al viewport) */
+  /** alto objetivo en px (el ancho se deriva 9:16). Default: ajustado al viewport */
   height?: number;
   loop?: boolean;
 }
 
 export default function ReelStage({ reel, clean = false, height, loop = true }: ReelStageProps) {
   const [idx, setIdx] = useState(0);
-  const [paused, setPaused] = useState(false);
   const [progress, setProgress] = useState(0);
   const [restartKey, setRestartKey] = useState(0);
 
   const scenes = reel.scenes;
   const scene = scenes[idx] ?? scenes[0];
 
-  // Reset al cambiar de reel
-  useEffect(() => { setIdx(0); setProgress(0); setPaused(false); setRestartKey((k) => k + 1); }, [reel.id]);
+  useEffect(() => { setIdx(0); setProgress(0); setRestartKey((k) => k + 1); }, [reel.id]);
 
-  // Auto-avance + progreso (un solo interval, tick 50ms)
+  // Auto-avance + progreso (tick 50ms)
   useEffect(() => {
-    if (paused) return;
     setProgress(0);
     const tickMs = 50;
     const total = sceneMs(scene) / tickMs;
@@ -96,133 +97,117 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
       }
     }, tickMs);
     return () => clearInterval(id);
-  }, [idx, paused, scenes.length, loop, scene, restartKey]);
+  }, [idx, scenes.length, loop, scene, restartKey]);
 
-  // Tamaño del lienzo: 9:16 ajustado a la altura disponible
-  const H = height ?? (typeof window !== 'undefined' ? Math.min(window.innerHeight - (clean ? 0 : 180), 880) : 760);
-  const W = H * (9 / 16);
+  // Tamaño objetivo: alto dado (o ajustado al viewport) → escala del lienzo base
+  const targetH = height ?? (typeof window !== 'undefined' ? Math.min(window.innerHeight - 210, 920) : 820);
+  const scale = targetH / BASE_H;
+  const targetW = BASE_W * scale;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: clean ? 0 : 16 }}>
+    <div style={{ display: 'flex', justifyContent: 'center' }}>
       <div
         style={{
-          position: 'relative', width: W, height: H, borderRadius: clean ? 0 : 28, overflow: 'hidden',
-          background: BRAND.ink, fontFamily: FONT_SANS,
+          position: 'relative', width: targetW, height: targetH, overflow: 'hidden',
+          borderRadius: clean ? 0 : 28, background: BRAND.ink,
           boxShadow: clean ? 'none' : '0 40px 120px -30px rgba(0,0,0,0.8)',
         }}
       >
-        <style>{`
-          @import url('${FONTS_HREF}');
-          @keyframes reelIn { 0% { opacity: 0; transform: translateY(28px) scale(0.98); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
-          @keyframes reelPop { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
-          @keyframes reelRise { 0% { opacity: 0; transform: translateY(30px); } 100% { opacity: 1; transform: translateY(0); } }
-          @keyframes reelMock { 0% { opacity: 0; transform: translateY(46px) scale(0.9) rotate(-2deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); } }
-          @keyframes reelFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-14px) rotate(-1.5deg); } }
-          @keyframes reelKen { 0% { transform: scale(1); } 100% { transform: scale(1.07); } }
-          @keyframes reelUnderline { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
-          @keyframes reelDrift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(34px,-26px) scale(1.14); } 66% { transform: translate(-28px,22px) scale(0.92); } }
-          @keyframes reelDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-36px,28px) scale(1.18); } }
-          @keyframes reelParticle { 0%,100% { transform: translateY(0); opacity: 0.25; } 50% { transform: translateY(-28px); opacity: 0.75; } }
-          @keyframes reelPulse { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
-          .reel-in { animation: reelIn 700ms cubic-bezier(0.16,1,0.3,1) both; }
-          .reel-pop { animation: reelPop 600ms cubic-bezier(0.16,1,0.3,1) both; }
-          .reel-rise { animation: reelRise 640ms cubic-bezier(0.16,1,0.3,1) both; }
-          .reel-mock { animation: reelMock 820ms cubic-bezier(0.16,1,0.3,1) both, reelFloat 5s ease-in-out 0.9s infinite; }
-          .reel-ken { animation: reelKen 6s ease-in-out infinite alternate; }
-        `}</style>
+        {/* Lienzo base 1080x1920 escalado */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: BASE_W, height: BASE_H, transform: `scale(${scale})`, transformOrigin: 'top left', fontFamily: FONT_SANS }}>
+          <style>{`
+            @import url('${FONTS_HREF}');
+            @keyframes reelRise { 0% { opacity: 0; transform: translateY(46px); } 100% { opacity: 1; transform: translateY(0); } }
+            @keyframes reelPop { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+            @keyframes reelMock { 0% { opacity: 0; transform: translateY(70px) scale(0.92) rotate(-2deg); } 100% { opacity: 1; transform: translateY(0) scale(1) rotate(-3deg); } }
+            @keyframes reelFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-20px) rotate(-1.5deg); } }
+            @keyframes reelKen { 0% { transform: scale(1); } 100% { transform: scale(1.06); } }
+            @keyframes reelUnderline { 0% { transform: scaleX(0); } 100% { transform: scaleX(1); } }
+            @keyframes reelDrift1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(60px,-46px) scale(1.14); } 66% { transform: translate(-48px,40px) scale(0.92); } }
+            @keyframes reelDrift2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-64px,50px) scale(1.18); } }
+            @keyframes reelParticle { 0%,100% { transform: translateY(0); opacity: 0.25; } 50% { transform: translateY(-50px); opacity: 0.75; } }
+            @keyframes reelPulse { 0%,100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+            .reel-rise { animation: reelRise 680ms cubic-bezier(0.16,1,0.3,1) both; }
+            .reel-pop { animation: reelPop 620ms cubic-bezier(0.16,1,0.3,1) both; }
+            .reel-mock { animation: reelMock 840ms cubic-bezier(0.16,1,0.3,1) both, reelFloat 5s ease-in-out 0.9s infinite; }
+            .reel-ken { animation: reelKen 6s ease-in-out infinite alternate; }
+          `}</style>
 
-        {/* Glow de marca */}
-        <div style={{ position: 'absolute', inset: 0, background: GLOW_BG }} />
-        {/* Fondo vivo: blobs que driftean + partículas */}
-        <AnimatedBG accent={reel.accent} />
+          {/* Glow de marca + fondo vivo */}
+          <div style={{ position: 'absolute', inset: 0, background: GLOW_BG }} />
+          <AnimatedBG accent={reel.accent} />
 
-        {/* Barra de progreso (segmentos por escena) */}
-        <div style={{ position: 'absolute', top: 14, left: 18, right: 18, display: 'flex', gap: 5, zIndex: 5 }}>
-          {scenes.map((_, i) => (
-            <div key={i} style={{ flex: 1, height: 3.5, borderRadius: 99, background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', borderRadius: 99, background: '#fff', width: i < idx ? '100%' : i === idx ? `${progress}%` : '0%', transition: i === idx ? 'width 60ms linear' : 'none' }} />
-            </div>
-          ))}
-        </div>
+          {/* Progreso por escena */}
+          <div style={{ position: 'absolute', top: 30, left: 44, right: 44, display: 'flex', gap: 8, zIndex: 5 }}>
+            {scenes.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 6, borderRadius: 99, background: 'rgba(255,255,255,0.18)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 99, background: '#fff', width: i < idx ? '100%' : i === idx ? `${progress}%` : '0%', transition: i === idx ? 'width 60ms linear' : 'none' }} />
+              </div>
+            ))}
+          </div>
 
-        {/* Logo */}
-        <div style={{ position: 'absolute', top: 34, left: 26, display: 'flex', alignItems: 'center', gap: 9, zIndex: 5 }}>
-          <MunifyMark size={24} />
-          <span style={{ fontFamily: FONT_DISPLAY, fontStyle: 'normal', fontWeight: 600, fontSize: 21, color: '#fff', letterSpacing: '-0.01em' }}>Munify</span>
-        </div>
+          {/* Logo */}
+          <div style={{ position: 'absolute', top: 58, left: 48, display: 'flex', alignItems: 'center', gap: 14, zIndex: 5 }}>
+            <MunifyMark size={44} />
+            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 38, color: '#fff', letterSpacing: '-0.01em' }}>Munify</span>
+          </div>
 
-        {/* Escena (key → reinicia animaciones y count-up) */}
-        <div key={`${reel.id}-${idx}-${restartKey}`} style={{ position: 'absolute', inset: 0, paddingTop: 78, paddingBottom: 70 }}>
-          <SceneView scene={scene} reelAccent={reel.accent} />
-        </div>
+          {/* Escena (key → reinicia animaciones y count-up) */}
+          <div key={`${reel.id}-${idx}-${restartKey}`} style={{ position: 'absolute', inset: 0, paddingTop: 150, paddingBottom: 140 }}>
+            <SceneView scene={scene} />
+          </div>
 
-        {/* Footer marca */}
-        <div style={{ position: 'absolute', bottom: 26, left: 0, right: 0, textAlign: 'center', zIndex: 5 }}>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', fontWeight: 600, letterSpacing: '0.04em' }}>munify.com.ar</span>
+          {/* Footer marca */}
+          <div style={{ position: 'absolute', bottom: 54, left: 0, right: 0, textAlign: 'center', zIndex: 5 }}>
+            <span style={{ fontSize: 26, color: 'rgba(255,255,255,0.55)', fontWeight: 600, letterSpacing: '0.05em' }}>munify.com.ar</span>
+          </div>
         </div>
       </div>
-
-      {/* Controles (ocultos en modo grabación) */}
-      {!clean && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Ctrl onClick={() => setPaused((p) => !p)}>{paused ? <Play size={18} /> : <Pause size={18} />}</Ctrl>
-          <Ctrl onClick={() => { setIdx(0); setProgress(0); setRestartKey((k) => k + 1); }}><RotateCcw size={18} /></Ctrl>
-          <span style={{ fontSize: 13, color: '#8C948F', fontWeight: 600 }}>Escena {idx + 1}/{scenes.length}</span>
-        </div>
-      )}
     </div>
   );
 }
 
-// Fondo animado: 3 blobs que driftean + partículas flotando (da "vida")
+// Fondo animado: blobs que driftean + partículas (coords 1080x1920)
 function AnimatedBG({ accent }: { accent: string }) {
   return (
     <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <div style={{ position: 'absolute', top: '-12%', right: '-14%', width: '60%', height: '34%', borderRadius: 999, background: `radial-gradient(circle, ${accent}40, transparent 68%)`, filter: 'blur(16px)', animation: 'reelDrift1 16s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', bottom: '-10%', left: '-16%', width: '64%', height: '36%', borderRadius: 999, background: `radial-gradient(circle, ${BRAND.azure}33, transparent 68%)`, filter: 'blur(18px)', animation: 'reelDrift2 21s ease-in-out infinite' }} />
-      <div style={{ position: 'absolute', top: '42%', left: '28%', width: '48%', height: '28%', borderRadius: 999, background: `radial-gradient(circle, ${BRAND.gold}22, transparent 70%)`, filter: 'blur(20px)', animation: 'reelDrift1 26s ease-in-out infinite reverse' }} />
-      {Array.from({ length: 11 }).map((_, i) => (
-        <div key={i} style={{ position: 'absolute', top: `${(i * 8 + 8) % 92}%`, left: `${(i * 15 + 6) % 94}%`, width: 6, height: 6, borderRadius: 999, background: i % 3 === 0 ? accent : i % 3 === 1 ? BRAND.gold : '#fff', opacity: 0.5, boxShadow: '0 0 8px currentColor', animation: `reelParticle ${5 + (i % 4)}s ease-in-out ${i * 0.35}s infinite` }} />
+      <div style={{ position: 'absolute', top: '-10%', right: '-16%', width: '70%', height: '32%', borderRadius: 999, background: `radial-gradient(circle, ${accent}40, transparent 68%)`, filter: 'blur(30px)', animation: 'reelDrift1 16s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', bottom: '-8%', left: '-18%', width: '74%', height: '34%', borderRadius: 999, background: `radial-gradient(circle, ${BRAND.azure}33, transparent 68%)`, filter: 'blur(34px)', animation: 'reelDrift2 21s ease-in-out infinite' }} />
+      <div style={{ position: 'absolute', top: '44%', left: '26%', width: '56%', height: '26%', borderRadius: 999, background: `radial-gradient(circle, ${BRAND.gold}22, transparent 70%)`, filter: 'blur(40px)', animation: 'reelDrift1 26s ease-in-out infinite reverse' }} />
+      {Array.from({ length: 14 }).map((_, i) => (
+        <div key={i} style={{ position: 'absolute', top: `${(i * 7 + 6) % 92}%`, left: `${(i * 15 + 6) % 94}%`, width: 10, height: 10, borderRadius: 999, background: i % 3 === 0 ? accent : i % 3 === 1 ? BRAND.gold : '#fff', opacity: 0.5, boxShadow: '0 0 14px currentColor', animation: `reelParticle ${5 + (i % 4)}s ease-in-out ${i * 0.35}s infinite` }} />
       ))}
     </div>
   );
 }
 
-function Ctrl({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return (
-    <button onClick={onClick} style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: BRAND.ink, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-      {children}
-    </button>
-  );
-}
-
 // ============================================================
-// Renderers de escena
+// Renderers de escena (coords 1080x1920)
 // ============================================================
-function SceneView({ scene, reelAccent }: { scene: Scene; reelAccent: string }) {
+function SceneView({ scene }: { scene: Scene }) {
   switch (scene.kind) {
     case 'hook': return <HookScene s={scene} />;
     case 'feature': return <FeatureScene s={scene} />;
     case 'stat': return <StatScene s={scene} />;
     case 'split': return <SplitScene s={scene} />;
-    case 'cta': return <CtaScene s={scene} accent={reelAccent} />;
+    case 'cta': return <CtaScene s={scene} />;
   }
 }
 
-const PAD = 40;
+const PAD = 84;
 
 function HookScene({ s }: { s: Extract<Scene, { kind: 'hook' }> }) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: PAD }}>
       {s.eyebrow && (
-        <div className="reel-pop" style={{ alignSelf: 'flex-start', fontSize: 14, fontWeight: 800, letterSpacing: '0.22em', color: BRAND.gold, textTransform: 'uppercase', marginBottom: 22, padding: '7px 15px', border: `1px solid ${BRAND.gold}55`, borderRadius: 999 }}>{s.eyebrow}</div>
+        <div className="reel-pop" style={{ alignSelf: 'flex-start', fontSize: 26, fontWeight: 800, letterSpacing: '0.24em', color: BRAND.gold, textTransform: 'uppercase', marginBottom: 42, padding: '13px 28px', border: `2px solid ${BRAND.gold}55`, borderRadius: 999 }}>{s.eyebrow}</div>
       )}
-      <h1 style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 60, lineHeight: 1.02, letterSpacing: '-0.02em', margin: 0 }}>
-        {s.lines.map((l, i) => <span key={i} className="reel-rise" style={{ display: 'block', animationDelay: `${i * 140}ms` }}>{l}</span>)}
+      <h1 style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 128, lineHeight: 1.0, letterSpacing: '-0.02em', margin: 0 }}>
+        {s.lines.map((l, i) => <span key={i} className="reel-rise" style={{ display: 'block', animationDelay: `${i * 150}ms` }}>{l}</span>)}
         {s.accentWord && (
-          <span className="reel-rise" style={{ display: 'block', color: BRAND.gold, position: 'relative', width: 'fit-content', animationDelay: `${s.lines.length * 140}ms` }}>
+          <span className="reel-rise" style={{ display: 'block', color: BRAND.gold, position: 'relative', width: 'fit-content', animationDelay: `${s.lines.length * 150}ms` }}>
             {s.accentWord}
-            <span style={{ position: 'absolute', left: 0, bottom: 4, height: 5, width: '100%', background: BRAND.gold, borderRadius: 9, transformOrigin: 'left', animation: `reelUnderline 560ms cubic-bezier(0.16,1,0.3,1) ${s.lines.length * 140 + 280}ms both` }} />
+            <span style={{ position: 'absolute', left: 0, bottom: 6, height: 10, width: '100%', background: BRAND.gold, borderRadius: 9, transformOrigin: 'left', animation: `reelUnderline 580ms cubic-bezier(0.16,1,0.3,1) ${s.lines.length * 150 + 300}ms both` }} />
           </span>
         )}
       </h1>
@@ -231,32 +216,35 @@ function HookScene({ s }: { s: Extract<Scene, { kind: 'hook' }> }) {
 }
 
 function FeatureScene({ s }: { s: Extract<Scene, { kind: 'feature' }> }) {
+  const scale = s.scale ?? 2.0;
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, gap: 30 }}>
-      <div className="reel-mock" style={{ filter: `drop-shadow(0 20px 50px ${s.accent}40)` }}>
-        <div className="reel-ken">{s.mockup}</div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, gap: 108 }}>
+      <div className="reel-mock" style={{ filter: `drop-shadow(0 30px 70px ${s.accent}45)` }}>
+        <div style={{ transform: `scale(${scale})` }}>
+          <div className="reel-ken">{s.mockup}</div>
+        </div>
       </div>
-      <div style={{ textAlign: 'center', maxWidth: '92%' }}>
-        <div className="reel-rise" style={{ display: 'inline-block', fontSize: 13, fontWeight: 800, letterSpacing: '0.16em', color: s.accent, textTransform: 'uppercase', padding: '6px 14px', borderRadius: 999, background: `${s.accent}1f`, marginBottom: 16, animationDelay: '220ms' }}>{s.chip}</div>
-        <h2 className="reel-rise" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 40, lineHeight: 1.05, margin: '0 0 12px', letterSpacing: '-0.015em', animationDelay: '340ms' }}>{s.title}</h2>
-        <p className="reel-rise" style={{ fontSize: 19, color: 'rgba(255,255,255,0.72)', lineHeight: 1.45, margin: 0, fontWeight: 400, animationDelay: '460ms' }}>{s.desc}</p>
+      <div style={{ textAlign: 'center', maxWidth: 920 }}>
+        <div className="reel-rise" style={{ display: 'inline-block', fontSize: 25, fontWeight: 800, letterSpacing: '0.18em', color: s.accent, textTransform: 'uppercase', padding: '11px 26px', borderRadius: 999, background: `${s.accent}1f`, marginBottom: 28, animationDelay: '220ms' }}>{s.chip}</div>
+        <h2 className="reel-rise" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 76, lineHeight: 1.04, margin: '0 0 22px', letterSpacing: '-0.015em', animationDelay: '340ms' }}>{s.title}</h2>
+        <p className="reel-rise" style={{ fontSize: 38, color: 'rgba(255,255,255,0.74)', lineHeight: 1.4, margin: 0, fontWeight: 400, animationDelay: '460ms' }}>{s.desc}</p>
       </div>
     </div>
   );
 }
 
 function StatScene({ s }: { s: Extract<Scene, { kind: 'stat' }> }) {
-  const v = useCountUp(s.value, 1600);
+  const v = useCountUp(s.value, 1700);
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, textAlign: 'center', position: 'relative' }}>
-      <div style={{ position: 'absolute', top: '32%', width: 320, height: 320, borderRadius: 999, background: `radial-gradient(circle, ${s.accent}55, transparent 65%)`, filter: 'blur(24px)', animation: 'reelPulse 2.4s ease-in-out infinite' }} />
-      <div className="reel-pop" style={{ position: 'relative', fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 130, lineHeight: 0.9, letterSpacing: '-0.04em', color: '#fff', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
-        {s.prefix && <span style={{ fontSize: 64, color: s.accent }}>{s.prefix}</span>}
-        <span style={{ background: `linear-gradient(135deg,#fff,${s.accent})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: `drop-shadow(0 6px 24px ${s.accent}66)` }}>{v.toLocaleString('es-AR')}</span>
-        {s.suffix && <span style={{ fontSize: 64, color: s.accent }}>{s.suffix}</span>}
+      <div style={{ position: 'absolute', top: '30%', width: 620, height: 620, borderRadius: 999, background: `radial-gradient(circle, ${s.accent}55, transparent 65%)`, filter: 'blur(50px)', animation: 'reelPulse 2.4s ease-in-out infinite' }} />
+      <div className="reel-pop" style={{ position: 'relative', fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 280, lineHeight: 0.9, letterSpacing: '-0.04em', color: '#fff', display: 'flex', alignItems: 'baseline', justifyContent: 'center' }}>
+        {s.prefix && <span style={{ fontSize: 140, color: s.accent }}>{s.prefix}</span>}
+        <span style={{ background: `linear-gradient(135deg,#fff,${s.accent})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: `drop-shadow(0 10px 40px ${s.accent}66)` }}>{v.toLocaleString('es-AR')}</span>
+        {s.suffix && <span style={{ fontSize: 140, color: s.accent }}>{s.suffix}</span>}
       </div>
-      <h2 className="reel-in" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 36, lineHeight: 1.1, margin: '24px 0 8px', maxWidth: '90%', letterSpacing: '-0.015em' }}>{s.label}</h2>
-      {s.sub && <p style={{ fontSize: 18, color: 'rgba(255,255,255,0.6)', margin: 0 }}>{s.sub}</p>}
+      <h2 className="reel-rise" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 68, lineHeight: 1.1, margin: '44px 0 16px', maxWidth: 860, letterSpacing: '-0.015em' }}>{s.label}</h2>
+      {s.sub && <p style={{ fontSize: 36, color: 'rgba(255,255,255,0.6)', margin: 0 }}>{s.sub}</p>}
     </div>
   );
 }
@@ -267,14 +255,14 @@ function SplitScene({ s }: { s: Extract<Scene, { kind: 'split' }> }) {
     { title: s.afterTitle ?? 'Con Munify', items: s.after },
   ];
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: PAD, gap: 18 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: PAD, gap: 34 }}>
       {cols.map((c, i) => (
-        <div key={i} className="reel-in" style={{ animationDelay: `${i * 160}ms`, borderRadius: 20, padding: 24, background: c.bad ? 'rgba(229,72,77,0.10)' : `${s.accent}18`, border: `1px solid ${c.bad ? 'rgba(229,72,77,0.35)' : s.accent + '55'}` }}>
-          <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: c.bad ? '#E5484D' : s.accent, marginBottom: 14 }}>{c.title}</div>
+        <div key={i} className="reel-rise" style={{ animationDelay: `${i * 180}ms`, borderRadius: 34, padding: 44, background: c.bad ? 'rgba(229,72,77,0.10)' : `${s.accent}18`, border: `2px solid ${c.bad ? 'rgba(229,72,77,0.35)' : s.accent + '55'}` }}>
+          <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: c.bad ? '#E5484D' : s.accent, marginBottom: 26 }}>{c.title}</div>
           {c.items.map((it, j) => (
-            <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: j < c.items.length - 1 ? 11 : 0 }}>
-              <span style={{ fontSize: 22, lineHeight: 1, color: c.bad ? '#E5484D' : s.accent }}>{c.bad ? '✕' : '✓'}</span>
-              <span style={{ fontSize: 21, color: '#fff', fontWeight: 500 }}>{it}</span>
+            <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: j < c.items.length - 1 ? 20 : 0 }}>
+              <span style={{ fontSize: 42, lineHeight: 1, color: c.bad ? '#E5484D' : s.accent }}>{c.bad ? '✕' : '✓'}</span>
+              <span style={{ fontSize: 40, color: '#fff', fontWeight: 500 }}>{it}</span>
             </div>
           ))}
         </div>
@@ -283,15 +271,15 @@ function SplitScene({ s }: { s: Extract<Scene, { kind: 'split' }> }) {
   );
 }
 
-function CtaScene({ s, accent }: { s: Extract<Scene, { kind: 'cta' }>; accent: string }) {
+function CtaScene({ s }: { s: Extract<Scene, { kind: 'cta' }> }) {
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, textAlign: 'center', gap: 26 }}>
-      <div className="reel-pop"><MunifyMark size={84} /></div>
-      <h2 className="reel-in" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 52, lineHeight: 1.02, margin: 0, letterSpacing: '-0.02em' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, textAlign: 'center', gap: 48 }}>
+      <div className="reel-pop"><MunifyMark size={150} /></div>
+      <h2 className="reel-rise" style={{ fontFamily: FONT_DISPLAY, fontStyle: 'italic', fontWeight: 500, color: '#fff', fontSize: 96, lineHeight: 1.02, margin: 0, letterSpacing: '-0.02em' }}>
         {s.line} {s.accentWord && <span style={{ color: BRAND.gold }}>{s.accentWord}</span>}
       </h2>
       {s.sub && (
-        <div className="reel-in" style={{ animationDelay: '160ms', marginTop: 6, fontSize: 20, color: BRAND.ink, fontWeight: 700, background: BRAND.gold, padding: '14px 30px', borderRadius: 999, boxShadow: `0 16px 40px ${BRAND.gold}55` }}>{s.sub}</div>
+        <div className="reel-rise" style={{ animationDelay: '180ms', marginTop: 10, fontSize: 36, color: BRAND.ink, fontWeight: 800, background: BRAND.gold, padding: '22px 48px', borderRadius: 999, boxShadow: `0 24px 60px ${BRAND.gold}55` }}>{s.sub}</div>
       )}
     </div>
   );

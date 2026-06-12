@@ -4,8 +4,8 @@
 // "Grabar" deja solo el lienzo sobre negro para capturar con OBS / grabador).
 // Ruta pública (herramienta interna de marketing), no toca el resto de la app.
 // ============================================================
-import { useRef, useState } from 'react';
-import { Film, Video, X, Music, VolumeX } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Film, Music, VolumeX } from 'lucide-react';
 import ReelStage, { reelDurationMs } from '../components/reels/ReelStage';
 import { REELS } from '../components/reels/reelScripts';
 import { BRAND, FONT_DISPLAY, FONT_SANS } from '../components/reels/reelBrand';
@@ -13,9 +13,7 @@ import { MunifyMark } from '../components/reels/ReelMockups';
 
 export default function ReelsStudio() {
   const [activeId, setActiveId] = useState(REELS[0].id);
-  const [clean, setClean] = useState(false);
   const reel = REELS.find((r) => r.id === activeId) ?? REELS[0];
-  const secs = Math.round(reelDurationMs(reel) / 1000);
 
   // Música de preview (pistas libres en /public/reels-audio). Suena al
   // elegirla (click = gesto que habilita el audio del navegador).
@@ -31,12 +29,25 @@ export default function ReelsStudio() {
     a.play().catch(() => {});
   };
 
-  // Modo grabación: solo el lienzo 9:16 centrado sobre negro absoluto
-  if (clean) {
+  // Modo captura headless (Playwright): /reels?reel=<id>&capture=1
+  // Mantiene negro puro hasta window.__go() → el reel arranca en escena 0.
+  // Eso deja un borde negro detectable por ffmpeg blackdetect para recortar
+  // exacto. window.__reelMs informa la duración de una vuelta.
+  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const isCapture = params.get('capture') === '1';
+  const captureReel = REELS.find((r) => r.id === params.get('reel')) ?? reel;
+  const [go, setGo] = useState(false);
+  useEffect(() => {
+    if (!isCapture) return;
+    const w = window as unknown as Record<string, unknown>;
+    w.__reelMs = reelDurationMs(captureReel);
+    w.__go = () => setGo(true);
+    w.__ready = true;
+  }, [isCapture, captureReel]);
+  if (isCapture) {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-        <ReelStage reel={reel} clean height={typeof window !== 'undefined' ? window.innerHeight : 900} />
-        <button onClick={() => setClean(false)} style={btnFloat}><X size={20} /></button>
+      <div style={{ position: 'fixed', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {go && <ReelStage reel={captureReel} clean height={1920} loop={false} />}
       </div>
     );
   }
@@ -97,17 +108,15 @@ export default function ReelsStudio() {
             })}
           </div>
 
-          {/* Cómo grabar */}
+          {/* Cómo se entregan */}
           <div style={{ marginTop: 24, borderRadius: 16, padding: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontWeight: 700, fontSize: 14, color: BRAND.gold }}>
-              <Film size={16} /> Cómo pasarlo a mp4
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontWeight: 700, fontSize: 14, color: BRAND.gold }}>
+              <Film size={16} /> Cómo se entregan
             </div>
-            <ol style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.7, color: 'rgba(255,255,255,0.7)' }}>
-              <li>Apretá <b>Grabar (modo limpio)</b> → queda solo el lienzo 9:16 sobre negro.</li>
-              <li>Capturá con OBS / Xbox Game Bar (Win+G) / grabador de pantalla, recortando el rectángulo del lienzo.</li>
-              <li>El reel loopea: grabá una vuelta completa ({secs}s) y cortá.</li>
-              <li>Exportá en 1080×1920. Listo para subir.</li>
-            </ol>
+            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: 'rgba(255,255,255,0.7)' }}>
+              Acá ves el <b>preview exacto</b> de cada reel — mismo lienzo 1080×1920 que el video final.
+              Los mp4 con música los genera Claude y quedan en <b>munify/reels</b>. No hace falta grabar nada a mano.
+            </p>
           </div>
         </div>
 
@@ -115,18 +124,6 @@ export default function ReelsStudio() {
         <div style={{ position: 'sticky', top: 24 }}>
           <ReelStage reel={reel} />
           <audio ref={audioRef} loop />
-
-          <button
-            onClick={() => setClean(true)}
-            style={{
-              marginTop: 18, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              padding: '15px', borderRadius: 14, border: 'none', cursor: 'pointer',
-              background: BRAND.gold, color: BRAND.ink, fontWeight: 800, fontSize: 16,
-              boxShadow: `0 14px 40px ${BRAND.gold}44`,
-            }}
-          >
-            <Video size={20} /> Grabar (modo limpio)
-          </button>
         </div>
       </div>
     </div>
@@ -139,9 +136,3 @@ const chip = (active: boolean, accent: string): React.CSSProperties => ({
   background: active ? `${accent}22` : 'rgba(255,255,255,0.04)',
   transition: 'all 140ms',
 });
-
-const btnFloat: React.CSSProperties = {
-  position: 'fixed', top: 20, right: 20, width: 44, height: 44, borderRadius: 12,
-  border: 'none', background: 'rgba(255,255,255,0.12)', color: '#fff', cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
-};
