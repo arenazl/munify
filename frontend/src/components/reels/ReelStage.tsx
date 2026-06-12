@@ -157,14 +157,14 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
             ))}
           </div>
 
-          {/* Logo */}
-          <div style={{ position: 'absolute', top: 58, left: 48, display: 'flex', alignItems: 'center', gap: 14, zIndex: 5 }}>
-            <MunifyMark size={44} />
-            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 38, color: '#fff', letterSpacing: '-0.01em' }}>Munify</span>
+          {/* Logo — grande y centrado arriba */}
+          <div style={{ position: 'absolute', top: 78, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 5 }}>
+            <MunifyMark size={74} />
+            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 64, color: '#fff', letterSpacing: '-0.01em' }}>Munify</span>
           </div>
 
           {/* Escena (key → reinicia animaciones y count-up) */}
-          <div key={`${reel.id}-${idx}-${restartKey}`} style={{ position: 'absolute', inset: 0, paddingTop: 150, paddingBottom: 140 }}>
+          <div key={`${reel.id}-${idx}-${restartKey}`} style={{ position: 'absolute', inset: 0, paddingTop: 210, paddingBottom: 140 }}>
             <SceneView scene={scene} />
           </div>
 
