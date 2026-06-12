@@ -25,23 +25,19 @@ import type {
 export type EstadoAgregado = 'al_dia' | 'en_mora' | 'pendiente' | 'completado';
 
 export function calcEstadoAgregado(g: Gasto): EstadoAgregado {
-  // El tag manual estado_pago (concretado/pendiente) tiene prioridad sobre
-  // el calculo de cuotas. Si el gasto esta marcado como 'pendiente', el
-  // estado agregado siempre es 'pendiente' (no muestra en_mora ni al_dia).
+  // El estado que eligió el operador en el wizard (concretado/al_dia/pendiente)
+  // es la fuente de verdad: la grilla y el filtro muestran EXACTAMENTE eso, sin
+  // recalcular desde las cuotas. Mapeo de label: concretado -> 'Completado'.
   const ep = (g as any).estado_pago;
-  if (ep === 'pendiente') return 'pendiente';
+  if (ep === 'pendiente')  return 'pendiente';
+  if (ep === 'al_dia')     return 'al_dia';
+  if (ep === 'concretado') return 'completado';
 
+  // Fallback solo para gastos viejos sin estado_pago: derivar de cuotas.
   const cuotas = g.cuotas || [];
   if (cuotas.length === 0) return 'completado';
-
-  const todasPagadas = cuotas.every(c => c.estado === 'pagada');
-  if (todasPagadas) return 'completado';
-
-  // 'en_mora' eliminado del estado visible. Las cuotas vencidas se
-  // muestran como 'pendiente' (el detalle del estado por cuota sigue
-  // disponible en el side panel).
-  const algunaPagada = cuotas.some(c => c.estado === 'pagada');
-  return algunaPagada ? 'al_dia' : 'pendiente';
+  if (cuotas.every(c => c.estado === 'pagada')) return 'completado';
+  return cuotas.some(c => c.estado === 'pagada') ? 'al_dia' : 'pendiente';
 }
 
 export const ESTADO_AGREGADO_META: Record<EstadoAgregado, { label: string; color: string; bg: string }> = {
