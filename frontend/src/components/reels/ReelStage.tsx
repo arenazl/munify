@@ -157,14 +157,15 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
             ))}
           </div>
 
-          {/* Logo — grande y centrado arriba */}
-          <div style={{ position: 'absolute', top: 78, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 5 }}>
-            <MunifyMark size={74} />
-            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 64, color: '#fff', letterSpacing: '-0.01em' }}>Munify</span>
+          {/* Logo — grande y centrado arriba (doble tamaño) */}
+          <div style={{ position: 'absolute', top: 90, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 30, zIndex: 5 }}>
+            <MunifyMark size={148} />
+            <span style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 128, color: '#fff', letterSpacing: '-0.01em' }}>Munify</span>
           </div>
 
-          {/* Escena (key → reinicia animaciones y count-up) */}
-          <div key={`${reel.id}-${idx}-${restartKey}`} style={{ position: 'absolute', inset: 0, paddingTop: 210, paddingBottom: 140 }}>
+          {/* Escena (key → reinicia animaciones y count-up). Padding simétrico
+              arriba/abajo → el contenido queda centrado verticalmente. */}
+          <div key={`${reel.id}-${idx}-${restartKey}`} style={{ position: 'absolute', inset: 0, paddingTop: 300, paddingBottom: 300 }}>
             <SceneView scene={scene} />
           </div>
 
@@ -229,9 +230,11 @@ function HookScene({ s }: { s: Extract<Scene, { kind: 'hook' }> }) {
 function FeatureScene({ s }: { s: Extract<Scene, { kind: 'feature' }> }) {
   const scale = s.scale ?? 2.0;
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, gap: 108 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: PAD, gap: 96 }}>
+      {/* zoom (no transform: scale) → el mockup ocupa su tamaño REAL en el
+          layout, así el chip de abajo nunca queda tapado por el mockup. */}
       <div className="reel-mock" style={{ filter: `drop-shadow(0 30px 70px ${s.accent}45)` }}>
-        <div style={{ transform: `scale(${scale})` }}>
+        <div style={{ zoom: scale }}>
           <div className="reel-ken">{s.mockup}</div>
         </div>
       </div>
