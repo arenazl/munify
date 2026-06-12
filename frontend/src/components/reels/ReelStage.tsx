@@ -37,15 +37,26 @@ const DEFAULT_MS: Record<Scene['kind'], number> = {
 export const sceneMs = (s: Scene) => s.ms ?? DEFAULT_MS[s.kind];
 export const reelDurationMs = (r: Reel) => r.scenes.reduce((sum, s) => sum + sceneMs(s), 0);
 
+// Escala de tiempo para captura en cámara lenta (count-up + avance de escena).
+// Las animaciones CSS se enlentecen aparte vía CDP Animation.setPlaybackRate.
+// Capturar lento = más frames distintos → al acelerar en ffmpeg, 60fps fluidos.
+let TIME_SCALE = 1;
+export function setReelTimeScale(s: number) { TIME_SCALE = Math.max(1, s || 1); }
+
 // Hook: cuenta de 0 al target con ease-out (idéntico a DashboardLive)
 function useCountUp(target: number, durationMs = 1500): number {
   const [value, setValue] = useState(0);
   useEffect(() => {
     if (typeof target !== 'number' || isNaN(target)) return;
-    const start = performance.now();
+    // El inicio se toma del MISMO reloj que el `now` de RAF (no performance.now),
+    // así si CDP enlentece el reloj de animación (captura), el count-up se enlentece
+    // solo y queda en sync con las animaciones CSS. Sin esto, los relojes divergen
+    // y t se vuelve negativo → número corrupto.
+    let startTs: number | null = null;
     let raf = 0;
     const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs);
+      if (startTs === null) startTs = now;
+      const t = Math.min(1, (now - startTs) / durationMs);
       const eased = 1 - Math.pow(1 - t, 3);
       setValue(Math.round(target * eased));
       if (t < 1) raf = requestAnimationFrame(tick);
@@ -82,7 +93,7 @@ export default function ReelStage({ reel, clean = false, height, loop = true }: 
   useEffect(() => {
     setProgress(0);
     const tickMs = 50;
-    const total = sceneMs(scene) / tickMs;
+    const total = (sceneMs(scene) * TIME_SCALE) / tickMs;
     let cur = 0;
     const id = setInterval(() => {
       cur++;

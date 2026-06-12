@@ -6,7 +6,7 @@
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { Film, Music, VolumeX } from 'lucide-react';
-import ReelStage, { reelDurationMs } from '../components/reels/ReelStage';
+import ReelStage, { reelDurationMs, setReelTimeScale } from '../components/reels/ReelStage';
 import { REELS } from '../components/reels/reelScripts';
 import { BRAND, FONT_DISPLAY, FONT_SANS } from '../components/reels/reelBrand';
 import { MunifyMark } from '../components/reels/ReelMockups';
@@ -35,16 +35,19 @@ export default function ReelsStudio() {
   // exacto. window.__reelMs informa la duración de una vuelta.
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const isCapture = params.get('capture') === '1';
+  const slow = Math.max(1, Number(params.get('slow')) || 1);
   const captureReel = REELS.find((r) => r.id === params.get('reel')) ?? reel;
   const [go, setGo] = useState(false);
   useEffect(() => {
     if (!isCapture) return;
     const w = window as unknown as Record<string, unknown>;
     w.__reelMs = reelDurationMs(captureReel);
+    w.__slow = slow;
     w.__go = () => setGo(true);
     w.__ready = true;
-  }, [isCapture, captureReel]);
+  }, [isCapture, captureReel, slow]);
   if (isCapture) {
+    setReelTimeScale(slow); // antes de montar ReelStage (enlentece count-up + avance)
     return (
       <div style={{ position: 'fixed', inset: 0, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {go && <ReelStage reel={captureReel} clean height={1920} loop={false} />}
