@@ -29,6 +29,8 @@ export default function ServiceWorkerUpdater() {
 
     let updateCheckInterval: ReturnType<typeof setInterval> | null = null;
     let registration: ServiceWorkerRegistration | null = null;
+    let reloading = false;
+    const cleanups: Array<() => void> = [];
 
     const showUpdatePrompt = (worker: ServiceWorker) => {
       toast('Nueva versión disponible', {
@@ -45,6 +47,12 @@ export default function ServiceWorkerUpdater() {
       });
     };
 
+    // Rutas de marketing/herramientas (sin datos de usuario que perder):
+    // ahí auto-aplicamos la actualización sin pedir click. En el resto de la
+    // app mostramos el toast para no arrancarle la página a un user a mitad de
+    // un formulario.
+    const isMarketing = () => /^\/(reels|demos)\b/.test(window.location.pathname);
+
     const onUpdateFound = () => {
       if (!registration) return;
       const newWorker = registration.installing;
@@ -54,14 +62,22 @@ export default function ServiceWorkerUpdater() {
         // `installed` + hay un controller previo = es una actualización
         // (si no hubiera controller previo sería la primera instalación).
         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-          showUpdatePrompt(newWorker);
+          if (isMarketing()) {
+            // Activar ya → el SW (skipWaiting+claim) dispara `controllerchange`
+            // y recarga. Fallback por si no dispara.
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+            setTimeout(() => {
+              if (!reloading) { reloading = true; window.location.reload(); }
+            }, 2000);
+          } else {
+            showUpdatePrompt(newWorker);
+          }
         }
       });
     };
 
     // Cuando el nuevo SW toma el control, recargar la página para que
     // sirva el HTML/JS nuevo.
-    let reloading = false;
     const onControllerChange = () => {
       if (reloading) return;
       reloading = true;
@@ -75,12 +91,19 @@ export default function ServiceWorkerUpdater() {
         registration = reg;
         reg.addEventListener('updatefound', onUpdateFound);
 
-        // Chequear actualizaciones cada 5 minutos sin requerir recarga.
+        // Chequear actualizaciones cada 60s (antes 5 min) para que el deploy
+        // nuevo se detecte rápido.
         updateCheckInterval = setInterval(() => {
-          reg.update().catch(() => {
-            /* fallo de red, reintenta en el próximo tick */
-          });
-        }, 5 * 60 * 1000);
+          reg.update().catch(() => { /* fallo de red, reintenta */ });
+        }, 60 * 1000);
+
+        // Y chequear apenas el user vuelve a la pestaña (típico: pusheo y el
+        // user vuelve a mirar) → la actualización aparece casi al instante.
+        const onVisible = () => {
+          if (document.visibilityState === 'visible') reg.update().catch(() => {});
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        cleanups.push(() => document.removeEventListener('visibilitychange', onVisible));
       })
       .catch((err) => {
         console.error('[SW Updater] Error registrando service worker:', err);
@@ -89,6 +112,7 @@ export default function ServiceWorkerUpdater() {
     return () => {
       if (updateCheckInterval) clearInterval(updateCheckInterval);
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      cleanups.forEach((fn) => fn());
     };
   }, []);
 
