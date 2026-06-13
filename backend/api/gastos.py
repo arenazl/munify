@@ -267,7 +267,7 @@ def _generar_cuotas(gasto: Gasto) -> List[GastoCuota]:
 # ============================================================
 
 def _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependencia_id,
-                                concepto, search, desde, hasta, estado_pago):
+                                concepto, search, desde, hasta, estado_pago, caja_id=None):
     """Construye query con filtros (sin offset/limit/order_by/options).
     Reutilizable para list paginado + count."""
     query = select(Gasto).where(
@@ -298,6 +298,8 @@ def _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependen
         query = query.where(Gasto.fecha <= hasta)
     if estado_pago:
         query = query.where(Gasto.estado_pago == estado_pago)
+    if caja_id:
+        query = query.where(Gasto.caja_id == caja_id)
     return query
 
 
@@ -334,6 +336,7 @@ async def list_gastos(
     desde: Optional[date] = None,
     hasta: Optional[date] = None,
     estado_pago: Optional[str] = None,
+    caja_id: Optional[int] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
@@ -343,7 +346,7 @@ async def list_gastos(
     municipio_id = get_effective_municipio_id(request, current_user)
 
     base = _build_gastos_filter_query(municipio_id, destino_tipo, contacto_id, dependencia_id,
-                                       concepto, search, desde, hasta, estado_pago)
+                                       concepto, search, desde, hasta, estado_pago, caja_id)
 
     # Total filtrado (sin paginar) para que el frontend calcule paginas
     count_q = select(func.count()).select_from(base.subquery())

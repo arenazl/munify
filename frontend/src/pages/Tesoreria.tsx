@@ -44,10 +44,10 @@ import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { PillsOrSelect } from '../components/ui/PillsOrSelect';
 import { CalendarView } from '../components/ui/CalendarView';
-import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi } from '../lib/api';
+import { gastosApi, dependenciasApi, contactosApi, tiposConceptoApi, conceptosAbmApi, tiposEmpleadoApi, cajasApi } from '../lib/api';
 import { conceptoIcon } from '../lib/conceptoIcons';
 import { contactoIconByTipo, TIPO_CONTACTO_COLORS, TIPO_CONTACTO_LABELS } from '../lib/contactoIcons';
-import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo } from '../types';
+import type { Gasto, TipoFinanciacion, FormaPago, Contacto, TipoConcepto, Concepto, TipoContacto, TipoEmpleadoCatalogo, Caja } from '../types';
 
 const TIPO_FIN_COLORS: Record<TipoFinanciacion, string> = {
   contado: '#10b981',
@@ -102,7 +102,7 @@ export default function Tesoreria() {
   const [dependenciaFiltro, setDependenciaFiltro] = useState<string>('');
   // Filtro de tipo de concepto eliminado — listado plano de conceptos.
   const tipoConceptoFiltro = '';
-  const [conceptoFiltro, setConceptoFiltro] = useState<string>('');
+  const [cajaFiltro, setCajaFiltro] = useState<string>('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoAgregado | ''>('');
 
   // Navegador de periodos. modo: 'mes' | 'anio'. mes/anio = filtro activo.
@@ -121,6 +121,7 @@ export default function Tesoreria() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [tiposConcepto, setTiposConcepto] = useState<TipoConcepto[]>([]);
   const [conceptos, setConceptos] = useState<Concepto[]>([]);
+  const [cajas, setCajas] = useState<Caja[]>([]);
   const [tiposEmpleado, setTiposEmpleado] = useState<TipoEmpleadoCatalogo[]>([]);
   const [wizardOpen, setWizardOpen] = useState(false);
 
@@ -167,7 +168,7 @@ export default function Tesoreria() {
       const params: any = { skip: (page - 1) * pageSize, limit: pageSize };
       if (search.trim()) params.search = search.trim();
       if (dependenciaFiltro) params.dependencia_id = parseInt(dependenciaFiltro, 10);
-      if (conceptoFiltro) params.concepto = conceptoFiltro;
+      if (cajaFiltro) params.caja_id = parseInt(cajaFiltro, 10);
       if (rangoActivo) { params.desde = rangoFechas.desde; params.hasta = rangoFechas.hasta; }
       else if (!todosLosMeses && modoPeriodo === 'mes') {
         // Filtro temporal por mes: primer dia y ultimo dia
@@ -210,15 +211,18 @@ export default function Tesoreria() {
 
   const fetchCatalogoConceptos = async () => {
     try {
-      const [tiposRes, conceptosRes] = await Promise.all([
+      const [tiposRes, conceptosRes, cajasRes] = await Promise.all([
         tiposConceptoApi.list({ activo: true }),
         conceptosAbmApi.list({ activo: true }),
+        cajasApi.list({ activo: true }),
       ]);
       setTiposConcepto(tiposRes.data || []);
       setConceptos(conceptosRes.data || []);
+      setCajas((cajasRes.data as Caja[]) || []);
     } catch {
       setTiposConcepto([]);
       setConceptos([]);
+      setCajas([]);
     }
   };
 
@@ -244,7 +248,7 @@ export default function Tesoreria() {
   useEffect(() => {
     fetchGastos();
     /* eslint-disable-next-line */
-  }, [page, pageSize, dependenciaFiltro, conceptoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
+  }, [page, pageSize, dependenciaFiltro, cajaFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas.desde, rangoFechas.hasta]);
 
   // Search con debounce
   useEffect(() => {
@@ -337,8 +341,8 @@ export default function Tesoreria() {
       }
       // Tipo de concepto: matchea por NOMBRE de concepto contra los del tipo
       if (tipoConceptoFiltro && !conceptosDelTipoNombres.has(g.concepto.toLowerCase())) return false;
-      // Concepto exacto
-      if (conceptoFiltro && g.concepto.toLowerCase() !== conceptoFiltro.toLowerCase()) return false;
+      // Caja (de qué fondo sale el gasto). caja_id puede ser null (sin caja).
+      if (cajaFiltro && String(g.caja_id ?? '') !== cajaFiltro) return false;
       if (estadoFiltro && calcEstadoAgregado(g) !== estadoFiltro) return false;
       if (s) {
         const c = g.destino_contacto_id ? contactosMap.get(g.destino_contacto_id) : null;
@@ -350,7 +354,7 @@ export default function Tesoreria() {
       }
       return true;
     });
-  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, conceptoFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
+  }, [gastos, search, tipoContactoFiltro, subtipoEmpleadoFiltro, dependenciaFiltro, tipoConceptoFiltro, cajaFiltro, conceptosDelTipoNombres, estadoFiltro, mesActual, anioActual, modoPeriodo, todosLosMeses, rangoFechas, rangoActivo, contactosMap]);
 
   // Server ya paginó: `filtered` ya tiene solo la página actual con filtros
   // client-side extra aplicados encima.
@@ -535,18 +539,16 @@ export default function Tesoreria() {
   }, [tiposConcepto, ordering.tipoConceptoByNombre]);
 
   // Opciones de concepto (filtradas por tipo si hay seleccionado)
-  const conceptoOptions = useMemo(() => {
-    const items = conceptosDelTipo.map(c => {
-      const Icon = conceptoIcon(c.nombre);
-      return {
-        value: c.nombre,
-        label: c.nombre,
-        color: c.tipo_concepto_color || undefined,
-        icon: <Icon className="h-3 w-3" />,
-      };
-    });
-    return [{ value: '', label: 'Conceptos' }, ...sortByPresence(items, ordering.concepto)];
-  }, [conceptosDelTipo, ordering.concepto]);
+  // Opciones de caja (de qué fondo sale cada gasto): Coparticipación, FOFINDE,
+  // FODEMEP, Tarjeta, etc. Reemplaza al filtro de concepto en el toolbar.
+  const cajaOptions = useMemo(() => {
+    const items = cajas.map(c => ({
+      value: String(c.id),
+      label: c.nombre,
+      color: c.color || undefined,
+    }));
+    return [{ value: '', label: 'Caja' }, ...items];
+  }, [cajas]);
 
   // Navegacion de periodos (respeta modo: salta de a mes o de a año entero)
   const irAtras = () => {
@@ -631,11 +633,11 @@ export default function Tesoreria() {
         minWidth: 190,
       },
       {
-        key: 'concepto',
-        placeholder: 'Conceptos',
-        value: conceptoFiltro,
-        onChange: setConceptoFiltro,
-        options: conceptoOptions.filter(o => o.value !== ''),
+        key: 'caja',
+        placeholder: 'Caja',
+        value: cajaFiltro,
+        onChange: setCajaFiltro,
+        options: cajaOptions.filter(o => o.value !== ''),
         searchable: true,
         minWidth: 180,
       },

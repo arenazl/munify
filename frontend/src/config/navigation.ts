@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers,
+  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote,
 } from 'lucide-react';
 
@@ -390,6 +390,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isSuperAdmin,
       categoria: 'Super Admin',
       description: 'Consola de auditoría cross-municipio'
+    },
+    {
+      name: 'IA',
+      href: '/gestion/admin/configuracion-ia',
+      icon: Sparkles,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Prender/apagar IA por municipio y por módulo (Tesorería, Reclamos, Trámites)'
     },
     {
       name: 'Sidebar',
