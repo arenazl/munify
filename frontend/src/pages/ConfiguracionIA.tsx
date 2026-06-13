@@ -22,6 +22,8 @@ export default function ConfiguracionIA() {
   const [muniId, setMuniId] = useState<number | null>(null);
   const [habilitada, setHabilitada] = useState(false);
   const [tesoreria, setTesoreria] = useState(true);
+  const [reclamos, setReclamos] = useState(true);
+  const [tramites, setTramites] = useState(true);
   const [modelo, setModelo] = useState('gemini-2.5-flash');
   const [modelos, setModelos] = useState<string[]>(['gemini-2.5-flash']);
   const [loading, setLoading] = useState(false);
@@ -41,8 +43,8 @@ export default function ConfiguracionIA() {
     if (!muniId) return;
     setLoading(true);
     iaConfigApi.adminGet(muniId)
-      .then((r) => { setHabilitada(!!r.data.habilitada); setModelo(r.data.modelo || 'gemini-2.5-flash'); setTesoreria(r.data.tesoreria !== false); })
-      .catch(() => { setHabilitada(false); setModelo('gemini-2.5-flash'); setTesoreria(true); })
+      .then((r) => { setHabilitada(!!r.data.habilitada); setModelo(r.data.modelo || 'gemini-2.5-flash'); setTesoreria(r.data.tesoreria !== false); setReclamos(r.data.reclamos !== false); setTramites(r.data.tramites !== false); })
+      .catch(() => { setHabilitada(false); setModelo('gemini-2.5-flash'); setTesoreria(true); setReclamos(true); setTramites(true); })
       .finally(() => setLoading(false));
   }, [muniId]);
 
@@ -50,7 +52,7 @@ export default function ConfiguracionIA() {
     if (!muniId) return;
     setSaving(true);
     try {
-      await iaConfigApi.adminPut(muniId, { habilitada, provider: 'gemini', modelo, tesoreria });
+      await iaConfigApi.adminPut(muniId, { habilitada, provider: 'gemini', modelo, tesoreria, reclamos, tramites });
       toast.success('Configuración de IA guardada');
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -138,6 +140,48 @@ export default function ConfiguracionIA() {
                 title={tesoreria ? 'IA de Tesorería activada — click para desactivar' : 'IA de Tesorería desactivada — click para activar'}
               >
                 <span className="inline-block h-6 w-6 rounded-full bg-white transition-transform" style={{ transform: tesoreria ? 'translateX(22px)' : 'translateX(2px)', marginTop: '2px' }} />
+              </button>
+            </div>
+          </div>
+
+          <div className={habilitada ? '' : 'opacity-50 pointer-events-none'}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: theme.text }}>IA en Reclamos</p>
+                <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                  {reclamos
+                    ? 'Activada: muestra el panel operativo al costado de la grilla de Reclamos.'
+                    : 'Desactivada: oculta el panel de IA solo en Reclamos (la grilla ocupa todo el ancho).'}
+                </p>
+              </div>
+              <button
+                onClick={() => setReclamos((v) => !v)}
+                className="relative inline-flex h-7 w-12 rounded-full transition-colors flex-shrink-0"
+                style={{ backgroundColor: reclamos ? '#22c55e' : '#9ca3af' }}
+                title={reclamos ? 'IA de Reclamos activada — click para desactivar' : 'IA de Reclamos desactivada — click para activar'}
+              >
+                <span className="inline-block h-6 w-6 rounded-full bg-white transition-transform" style={{ transform: reclamos ? 'translateX(22px)' : 'translateX(2px)', marginTop: '2px' }} />
+              </button>
+            </div>
+          </div>
+
+          <div className={habilitada ? '' : 'opacity-50 pointer-events-none'}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: theme.text }}>IA en Trámites</p>
+                <p className="text-[11px]" style={{ color: theme.textSecondary }}>
+                  {tramites
+                    ? 'Activada: muestra el panel operativo al costado de la grilla de Trámites.'
+                    : 'Desactivada: oculta el panel de IA solo en Trámites (la grilla ocupa todo el ancho).'}
+                </p>
+              </div>
+              <button
+                onClick={() => setTramites((v) => !v)}
+                className="relative inline-flex h-7 w-12 rounded-full transition-colors flex-shrink-0"
+                style={{ backgroundColor: tramites ? '#22c55e' : '#9ca3af' }}
+                title={tramites ? 'IA de Trámites activada — click para desactivar' : 'IA de Trámites desactivada — click para activar'}
+              >
+                <span className="inline-block h-6 w-6 rounded-full bg-white transition-transform" style={{ transform: tramites ? 'translateX(22px)' : 'translateX(2px)', marginTop: '2px' }} />
               </button>
             </div>
           </div>

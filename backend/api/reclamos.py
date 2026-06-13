@@ -959,8 +959,9 @@ async def reclamos_dashboard_ia(
         raise HTTPException(status_code=403, detail="Solo admin/supervisor")
     if not current_user.municipio_id:
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
-    from core.ia_config import ia_habilitada
-    if not await ia_habilitada(db, current_user.municipio_id):
+    from core.ia_config import get_ia_config
+    _cfg = await get_ia_config(db, current_user.municipio_id)
+    if not (_cfg.habilitada and _cfg.reclamos):
         return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
     from services.dashboard_ia import build_reclamos_dashboard
     return await build_reclamos_dashboard(db, current_user.municipio_id, force=force)

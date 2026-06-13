@@ -37,6 +37,8 @@ class IaConfigIn(BaseModel):
     provider: str = "gemini"
     modelo: str = "gemini-2.5-flash"
     tesoreria: bool = True
+    reclamos: bool = True
+    tramites: bool = True
 
 
 class IaConfigOut(BaseModel):
@@ -45,6 +47,8 @@ class IaConfigOut(BaseModel):
     provider: str
     modelo: str
     tesoreria: bool = True
+    reclamos: bool = True
+    tramites: bool = True
 
 
 # ============ Superadmin: config por municipio (path param) ============
@@ -61,7 +65,7 @@ async def admin_get_ia_config(
     _: User = Depends(require_super_admin),
 ):
     cfg = await get_ia_config(db, municipio_id)
-    return IaConfigOut(municipio_id=municipio_id, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo, tesoreria=cfg.tesoreria)
+    return IaConfigOut(municipio_id=municipio_id, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo, tesoreria=cfg.tesoreria, reclamos=cfg.reclamos, tramites=cfg.tramites)
 
 
 @router.put("/admin/ia-config/{municipio_id}", response_model=IaConfigOut)
@@ -81,9 +85,11 @@ async def admin_put_ia_config(
     row.provider = (payload.provider or "gemini").strip() or "gemini"
     row.modelo = (payload.modelo or "gemini-2.5-flash").strip() or "gemini-2.5-flash"
     row.tesoreria = bool(payload.tesoreria)
+    row.reclamos = bool(payload.reclamos)
+    row.tramites = bool(payload.tramites)
     await db.commit()
     await db.refresh(row)
-    return IaConfigOut(municipio_id=municipio_id, habilitada=row.habilitada, provider=row.provider, modelo=row.modelo, tesoreria=row.tesoreria)
+    return IaConfigOut(municipio_id=municipio_id, habilitada=row.habilitada, provider=row.provider, modelo=row.modelo, tesoreria=row.tesoreria, reclamos=row.reclamos, tramites=row.tramites)
 
 
 # ============ Gate del frontend: config del municipio actual ============
@@ -98,4 +104,4 @@ async def get_ia_config_actual(
     modo Global), devuelve deshabilitada — no rompe."""
     muni_id = resolve_municipio_id(request, current_user)
     cfg = await get_ia_config(db, muni_id)
-    return IaConfigOut(municipio_id=muni_id or 0, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo, tesoreria=cfg.tesoreria)
+    return IaConfigOut(municipio_id=muni_id or 0, habilitada=cfg.habilitada, provider=cfg.provider, modelo=cfg.modelo, tesoreria=cfg.tesoreria, reclamos=cfg.reclamos, tramites=cfg.tramites)

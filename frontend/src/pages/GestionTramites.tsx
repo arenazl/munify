@@ -45,7 +45,7 @@ import { DocumentReviewModal } from '../components/tramites/DocumentReviewModal'
 import { ABMPage, ABMTable, FilterRowSkeleton, type ABMTableColumn } from '../components/ui/ABMPage';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
-import { useIaHabilitada } from '../hooks/useIaHabilitada';
+import { useIaTramites } from '../hooks/useIaHabilitada';
 import { StatusPill } from '../components/ui/StatusPill';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
@@ -213,7 +213,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
   // IA del muni: si está apagada, no montamos el panel ni reservamos su columna
   // (la grilla ocupa el 100% del ancho). La IA funcional —auto-asignación,
   // clasificación— es independiente de este flag y sigue operando.
-  const iaOn = useIaHabilitada();
+  const iaOn = useIaTramites();
 
   useEffect(() => {
     if (soloMiArea) return;

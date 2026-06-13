@@ -11,7 +11,7 @@ import { iaConfigApi } from '../lib/api';
  *
  * Default: false hasta que carga (no muestra IA "por las dudas").
  */
-let cache: { habilitada: boolean; provider: string; modelo: string; tesoreria: boolean } | null = null;
+let cache: { habilitada: boolean; provider: string; modelo: string; tesoreria: boolean; reclamos: boolean; tramites: boolean } | null = null;
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
 
@@ -20,9 +20,9 @@ async function preload() {
   loadingPromise = (async () => {
     try {
       const res = await iaConfigApi.getActual();
-      cache = { habilitada: !!res.data.habilitada, provider: res.data.provider, modelo: res.data.modelo, tesoreria: res.data.tesoreria !== false };
+      cache = { habilitada: !!res.data.habilitada, provider: res.data.provider, modelo: res.data.modelo, tesoreria: res.data.tesoreria !== false, reclamos: res.data.reclamos !== false, tramites: res.data.tramites !== false };
     } catch {
-      cache = { habilitada: false, provider: 'gemini', modelo: '', tesoreria: true };
+      cache = { habilitada: false, provider: 'gemini', modelo: '', tesoreria: true, reclamos: true, tramites: true };
     } finally {
       loaded = true;
       loadingPromise = null;
@@ -61,6 +61,37 @@ export function useIaHabilitada(): boolean {
  */
 export function useIaTesoreria(): boolean {
   const calc = () => (cache?.habilitada ?? false) && (cache?.tesoreria ?? true);
+  const [on, setOn] = useState<boolean>(calc());
+  useEffect(() => {
+    let mounted = true;
+    preload().then(() => { if (mounted) setOn(calc()); });
+    return () => { mounted = false; };
+  }, []);
+  return on;
+}
+
+/**
+ * Hook: true si la IA está habilitada Y el sub-flag del listado de Reclamos
+ * tiene IA. Gatea el panel operativo al costado de la grilla de Reclamos: se
+ * puede apagar solo ahí aun con la IA general prendida.
+ */
+export function useIaReclamos(): boolean {
+  const calc = () => (cache?.habilitada ?? false) && (cache?.reclamos ?? true);
+  const [on, setOn] = useState<boolean>(calc());
+  useEffect(() => {
+    let mounted = true;
+    preload().then(() => { if (mounted) setOn(calc()); });
+    return () => { mounted = false; };
+  }, []);
+  return on;
+}
+
+/**
+ * Hook: true si la IA está habilitada Y el sub-flag del listado de Trámites
+ * tiene IA. Gatea el panel operativo al costado de la grilla de Trámites.
+ */
+export function useIaTramites(): boolean {
+  const calc = () => (cache?.habilitada ?? false) && (cache?.tramites ?? true);
   const [on, setOn] = useState<boolean>(calc());
   useEffect(() => {
     let mounted = true;

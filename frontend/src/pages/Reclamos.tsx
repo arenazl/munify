@@ -12,7 +12,7 @@ import PageHint from '../components/ui/PageHint';
 import { Sheet } from '../components/ui/Sheet';
 import { StatusPill } from '../components/ui/StatusPill';
 import { DashboardIAPanel, DashboardIAData } from '../components/ui/DashboardIAPanel';
-import { useIaHabilitada } from '../hooks/useIaHabilitada';
+import { useIaReclamos } from '../hooks/useIaHabilitada';
 import { ConfirmModal, type ConfirmVariant } from '../components/ui/ConfirmModal';
 import { WizardModal } from '../components/ui/WizardModal';
 import { CrearReclamoWizard } from '../components/reclamos/CrearReclamoWizard';
@@ -162,7 +162,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   // IA del muni: si está apagada, no montamos el panel ni reservamos su columna
   // (la grilla ocupa el 100% del ancho). La IA funcional —auto-asignación,
   // clasificación— es independiente de este flag y sigue operando.
-  const iaOn = useIaHabilitada();
+  const iaOn = useIaReclamos();
 
   // Vista guiada (Inbox) vs vista grilla clásica.
   // Misma lógica que GestionTramites: clasifica reclamos en secciones por

@@ -27,6 +27,11 @@ class MunicipioIaConfig(Base):
     # banner de curacion Bartolo). Solo aplica si `habilitada` esta en True.
     # Permite tener IA prendida en general pero apagada en Tesoreria.
     tesoreria = Column(Boolean, default=True, nullable=False)
+    # Sub-switches: IA (panel operativo al costado de la grilla) en los listados
+    # de Reclamos / Trámites. Solo aplican si `habilitada` está en True. Permiten
+    # apagar el panel de un listado sin tocar el resto de la IA del municipio.
+    reclamos = Column(Boolean, default=True, nullable=False)
+    tramites = Column(Boolean, default=True, nullable=False)
     # Proveedor (hoy solo 'gemini'; se deja por extensibilidad).
     provider = Column(String(30), default="gemini", nullable=False)
     # Modelo concreto (ej: gemini-2.5-flash, gemini-1.5-flash, gemini-1.5-pro).
