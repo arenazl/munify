@@ -5,11 +5,10 @@
 // Ruta pública (herramienta interna de marketing), no toca el resto de la app.
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
-import { Film, Music, VolumeX, Mic, Sliders } from 'lucide-react';
+import { Film, Music, VolumeX, Mic } from 'lucide-react';
 import ReelStage, { reelDurationMs, setReelTimeScale } from '../components/reels/ReelStage';
 import { REELS } from '../components/reels/reelScripts';
 import { NARRATORS, REGION_LABEL, type Region } from '../components/reels/narrators';
-import { NARRATION, TTS_SERVICE_URL } from '../components/reels/narrationText';
 import { BRAND, FONT_DISPLAY, FONT_SANS } from '../components/reels/reelBrand';
 import { MunifyMark } from '../components/reels/ReelMockups';
 
@@ -87,42 +86,8 @@ export default function ReelsStudio() {
   const pickNarrator = (slug: string) => { setNarrator(slug); playNarration(activeId, slug); };
   const pickReel = (id: string) => { setActiveId(id); playNarration(id, narrator); };
 
-  // --- Tuneo de voz EN VIVO (servicio TTS): cadencia, pausa, expresión ---
-  const [speed, setSpeed] = useState(1.0);     // cadencia 0.7-1.2
-  const [pauseMs, setPauseMs] = useState(450);  // pausa entre frases
-  const [stability, setStability] = useState(0.45);
-  const [style, setStyle] = useState(0.45);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-
-  const generateLive = async () => {
-    const phrases = NARRATION[activeId] || [];
-    const voiceId = NARRATORS.find((n) => n.slug === narrator)?.voiceId;
-    if (!phrases.length || !voiceId) return;
-    setGenerating(true); setGenError(null);
-    try {
-      const segments = phrases.map((t, i) => ({ text: t, pause_ms: i < phrases.length - 1 ? pauseMs : 0 }));
-      const r = await fetch(`${TTS_SERVICE_URL}/generate`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segments, voice_id: voiceId, model_id: 'eleven_multilingual_v2', speed, stability, style }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = voiceRef.current;
-      if (a) {
-        a.src = url; a.currentTime = 0; a.volume = voiceVolRef.current;
-        const m = audioRef.current;
-        if (m && !m.paused) fadeVol(m, musicVolRef.current * DUCK, 250);
-        a.onended = () => { if (m && !m.paused) fadeVol(m, musicVolRef.current, 450); URL.revokeObjectURL(url); };
-        a.play().catch(() => {});
-      }
-    } catch (e) {
-      setGenError(e instanceof Error ? e.message : 'error');
-    } finally {
-      setGenerating(false);
-    }
-  };
+  // El tuneo de voz (cadencia/pausas/expresión + editor por texto) NO se duplica
+  // acá: se INYECTA por iframe desde la app standalone media-studio (más abajo).
 
   // Modo captura headless (Playwright): /reels?reel=<id>&capture=1
   // Mantiene negro puro hasta window.__go() → el reel arranca en escena 0.
@@ -220,23 +185,15 @@ export default function ReelsStudio() {
         })}
       </div>
 
-      {/* TUNEO DE VOZ EN VIVO — genera con el servicio TTS (cadencia/pausa/expresión) */}
-      <div style={{ maxWidth: 1320, margin: '0 auto 24px', borderRadius: 16, padding: '14px 18px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BRAND.gold}40` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 800, color: BRAND.gold, letterSpacing: '0.04em' }}>
-            <Sliders size={17} /> TUNEO DE VOZ EN VIVO
-          </span>
-          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>ajustá y dale Generar — usa el reel y la voz elegidos arriba</span>
-          <button onClick={generateLive} disabled={generating} style={{ marginLeft: 'auto', cursor: generating ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 10, border: 'none', background: generating ? 'rgba(255,255,255,0.15)' : BRAND.gold, color: generating ? '#fff' : BRAND.ink, fontWeight: 800, fontSize: 14 }}>
-            <Mic size={15} /> {generating ? 'Generando…' : 'Generar voz'}
-          </button>
-          {genError && <span style={{ fontSize: 11, color: '#ef4444' }}>error: {genError}</span>}
+      {/* ESTUDIO DE VOZ — componente INYECTADO desde media-studio (app standalone).
+          Único editor (DRY): se mantiene en media-studio y se embebe acá. */}
+      <div style={{ maxWidth: 1320, margin: '0 auto 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13, fontWeight: 800, color: BRAND.gold, letterSpacing: '0.04em' }}>
+          <Mic size={16} /> ESTUDIO DE VOZ
+          <a href="https://media-studio-arenazl.netlify.app/?tool=voz" target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>abrir en pantalla completa ↗</a>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          <TuneSlider label="Cadencia" hint="lento ← → rápido" min={0.7} max={1.2} step={0.05} value={speed} onChange={setSpeed} fmt={(v) => `${v.toFixed(2)}×`} />
-          <TuneSlider label="Pausa entre frases" hint="silencio entre líneas" min={0} max={1200} step={50} value={pauseMs} onChange={setPauseMs} fmt={(v) => `${v} ms`} />
-          <TuneSlider label="Estabilidad" hint="bajo = más expresivo/variable" min={0} max={1} step={0.05} value={stability} onChange={setStability} fmt={(v) => v.toFixed(2)} />
-          <TuneSlider label="Estilo" hint="expresividad emocional" min={0} max={1} step={0.05} value={style} onChange={setStyle} fmt={(v) => v.toFixed(2)} />
+        <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${BRAND.gold}40` }}>
+          <iframe src="https://media-studio-arenazl.netlify.app/?tool=voz&embed=1" title="Estudio de voz" style={{ width: '100%', height: 760, border: 'none', display: 'block' }} />
         </div>
       </div>
 
@@ -288,22 +245,6 @@ export default function ReelsStudio() {
           <audio ref={voiceRef} />
         </div>
       </div>
-    </div>
-  );
-}
-
-function TuneSlider({ label, hint, min, max, step, value, onChange, fmt }: {
-  label: string; hint: string; min: number; max: number; step: number;
-  value: number; onChange: (v: number) => void; fmt: (v: number) => string;
-}) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 700 }}>{label}</span>
-        <span style={{ fontSize: 12, color: BRAND.gold, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmt(value)}</span>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ accentColor: BRAND.gold, width: '100%' }} />
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{hint}</div>
     </div>
   );
 }
