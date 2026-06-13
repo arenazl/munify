@@ -25,6 +25,7 @@ export default function ReelsStudio() {
   // Música de preview (pistas libres en /public/reels-audio). Suena al
   // elegirla (click = gesto que habilita el audio del navegador).
   const audioRef = useRef<HTMLAudioElement>(null);
+  const voiceRef = useRef<HTMLAudioElement>(null);
   const [track, setTrack] = useState<string | null>(null);
   const pickTrack = (id: string | null) => {
     setTrack(id);
@@ -33,20 +34,27 @@ export default function ReelsStudio() {
     if (!id) { a.pause(); return; }
     a.src = `/reels-audio/${id}.mp3`;
     a.currentTime = 0;
+    // si ya hay una voz sonando, la música entra bajita (ducking); si no, full.
+    const v = voiceRef.current;
+    a.volume = v && !v.paused && !v.ended ? 0.22 : 1;
     a.play().catch(() => {});
   };
 
   // Probador de narradores (samples estáticos en /public/reels-audio/narrators).
-  const voiceRef = useRef<HTMLAudioElement>(null);
+  // La voz suena SOBRE la música, bajándola (ducking) mientras dura el sample —
+  // así se escucha cómo queda el reel final. No corta la música.
   const [narrator, setNarrator] = useState<string | null>(null);
   const pickNarrator = (slug: string) => {
     setNarrator(slug);
-    audioRef.current?.pause(); setTrack(null); // pausar música para escuchar la voz
     const a = voiceRef.current;
     if (!a) return;
+    const m = audioRef.current;
+    const restore = () => { if (m) m.volume = 1; };
+    if (m && !m.paused) m.volume = 0.22; // duck la música, no la corta
     a.src = `/reels-audio/narrators/${slug}.mp3`;
     a.currentTime = 0;
-    a.play().catch(() => {});
+    a.onended = restore;
+    a.play().catch(restore);
   };
 
   // Modo captura headless (Playwright): /reels?reel=<id>&capture=1
