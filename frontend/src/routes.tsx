@@ -96,6 +96,7 @@ import DemoCyberpunk from './pages/demos/DemoCyberpunk';
 
 // Estudio de reels de promoción (marketing)
 import ReelsStudio from './pages/ReelsStudio';
+import VoiceStudio from './pages/VoiceStudio';
 
 // Mobile App para ciudadanos (rutas legacy, redirigen a /home o usan componentes específicos)
 import MobileLayout from './layouts/MobileLayout';
@@ -118,6 +119,7 @@ export const router = createBrowserRouter([
 
   // === REELS DE PROMOCIÓN (marketing) ===
   { path: '/reels', element: <ReelsStudio /> },
+  { path: '/voz', element: <VoiceStudio /> },
 
   // === APP MOBILE PARA CIUDADANOS ===
   // /app ahora redirige a /home (página responsiva unificada)
