@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Film, Music, VolumeX, Mic } from 'lucide-react';
 import ReelStage, { reelDurationMs, setReelTimeScale } from '../components/reels/ReelStage';
 import { REELS } from '../components/reels/reelScripts';
-import { NARRATORS } from '../components/reels/narrators';
+import { NARRATORS, REGION_LABEL, type Region } from '../components/reels/narrators';
 import { BRAND, FONT_DISPLAY, FONT_SANS } from '../components/reels/reelBrand';
 import { MunifyMark } from '../components/reels/ReelMockups';
 
@@ -22,16 +22,32 @@ export default function ReelsStudio() {
   const [activeId, setActiveId] = useState(REELS[0].id);
   const reel = REELS.find((r) => r.id === activeId) ?? REELS[0];
 
-  // Niveles fijos (sin sliders): música presente, voz un toque más baja, con
-  // ducking suave — la música baja mientras habla la voz y vuelve al terminar.
-  const MUSIC_VOL = 1.0;   // música sola
-  const DUCK_VOL = 0.45;   // música mientras suena la voz (baja un poco, no se corta)
-  const VOICE_VOL = 0.82;  // voz
-
+  // Volúmenes controlables por sliders. Refs para que el ducking respete el
+  // nivel en vivo aunque el user mueva el slider mientras suena.
+  const DUCK = 0.5; // mientras habla la voz, la música baja a (musicVol * DUCK)
   const audioRef = useRef<HTMLAudioElement>(null);  // música (loop)
   const voiceRef = useRef<HTMLAudioElement>(null);  // narración del reel
   const [track, setTrack] = useState<string | null>(null);
   const [narrator, setNarrator] = useState<string>('lucia'); // voz por defecto
+  const [musicVol, setMusicVolState] = useState(0.8);
+  const [voiceVol, setVoiceVolState] = useState(0.92);
+  const musicVolRef = useRef(0.8);
+  const voiceVolRef = useRef(0.92);
+
+  const voicePlaying = () => {
+    const v = voiceRef.current;
+    return !!v && !v.paused && !v.ended;
+  };
+  const setMusicVol = (v: number) => {
+    musicVolRef.current = v; setMusicVolState(v);
+    const a = audioRef.current;
+    if (a) a.volume = voicePlaying() ? v * DUCK : v;
+  };
+  const setVoiceVol = (v: number) => {
+    voiceVolRef.current = v; setVoiceVolState(v);
+    const a = voiceRef.current;
+    if (a) a.volume = v;
+  };
 
   // fade suave de volumen de un <audio> (efecto ducking)
   const fadeVol = (el: HTMLAudioElement | null, to: number, ms = 300) => {
@@ -50,8 +66,7 @@ export default function ReelsStudio() {
     if (!id) { a.pause(); return; }
     a.src = `/reels-audio/${id}.mp3`;
     a.currentTime = 0;
-    const v = voiceRef.current;
-    a.volume = v && !v.paused && !v.ended ? DUCK_VOL : MUSIC_VOL; // entra duckeada si hay voz
+    a.volume = voicePlaying() ? musicVolRef.current * DUCK : musicVolRef.current;
     a.play().catch(() => {});
   };
 
@@ -61,10 +76,10 @@ export default function ReelsStudio() {
     if (!a) return;
     a.src = `/reels-audio/narration/${reelId}/${slug}.mp3`;
     a.currentTime = 0;
-    a.volume = VOICE_VOL;
+    a.volume = voiceVolRef.current;
     const m = audioRef.current;
-    if (m && !m.paused) fadeVol(m, DUCK_VOL, 250);                        // duck
-    a.onended = () => { if (m && !m.paused) fadeVol(m, MUSIC_VOL, 450); }; // restaura
+    if (m && !m.paused) fadeVol(m, musicVolRef.current * DUCK, 250);            // duck
+    a.onended = () => { if (m && !m.paused) fadeVol(m, musicVolRef.current, 450); }; // restaura
     a.play().catch(() => {});
   };
 
@@ -122,36 +137,52 @@ export default function ReelsStudio() {
             <VolumeX size={14} /> Silencio
           </button>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)', width: 56 }}>Vol música</span>
+          <input type="range" min={0} max={100} value={Math.round(musicVol * 100)} onChange={(e) => setMusicVol(Number(e.target.value) / 100)} style={{ accentColor: BRAND.gold, flex: 1, maxWidth: 360 }} />
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', width: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(musicVol * 100)}%</span>
+        </div>
       </div>
 
-      {/* NARRADORES (ElevenLabs) — tocá para escuchar el sample de cada voz */}
+      {/* NARRADORES (ElevenLabs) — agrupados por región */}
       <div style={{ maxWidth: 1240, margin: '0 auto 24px', borderRadius: 16, padding: '14px 18px', background: 'rgba(255,255,255,0.05)', border: `1px solid ${BRAND.azure}40` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 800, color: BRAND.azure, letterSpacing: '0.04em' }}>
             <Mic size={17} /> NARRADORES
           </span>
-          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>tocá una y escuchás la narración del reel elegido en esa voz (ElevenLabs)</span>
+          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>tocá una y escuchás la narración del reel elegido en esa voz</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Vol voz</span>
+            <input type="range" min={0} max={100} value={Math.round(voiceVol * 100)} onChange={(e) => setVoiceVol(Number(e.target.value) / 100)} style={{ accentColor: BRAND.azure, width: 150 }} />
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', width: 34, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(voiceVol * 100)}%</span>
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(228px, 1fr))', gap: 10, marginTop: 12 }}>
-          {NARRATORS.map((n) => {
-            const active = narrator === n.slug;
-            const ac = n.accent === 'Argentina' ? BRAND.gold : BRAND.azure;
-            return (
-              <button key={n.slug} onClick={() => pickNarrator(n.slug)} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: '11px 13px', background: active ? `${BRAND.azure}22` : 'rgba(255,255,255,0.04)', border: `1.5px solid ${active ? BRAND.azure : 'rgba(255,255,255,0.1)'}`, transition: 'all 140ms' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Mic size={13} color={active ? BRAND.azure : 'rgba(255,255,255,0.4)'} />
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{n.name}</span>
-                  {n.slug === 'lucia' && <span style={{ fontSize: 8.5, fontWeight: 800, color: BRAND.gold }}>★</span>}
-                  <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, color: ac, background: `${ac}1f`, borderRadius: 999, padding: '2px 8px' }}>{n.accent}</span>
-                </div>
-                <p style={{ margin: '6px 0 0', fontSize: 11.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.35 }}>{n.desc}</p>
-              </button>
-            );
-          })}
-        </div>
+        {(['ar', 'lat'] as Region[]).map((region) => {
+          const ac = region === 'ar' ? BRAND.gold : BRAND.azure;
+          return (
+            <div key={region} style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: ac, marginBottom: 8 }}>{REGION_LABEL[region]}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(212px, 1fr))', gap: 9 }}>
+                {NARRATORS.filter((n) => n.region === region).map((n) => {
+                  const active = narrator === n.slug;
+                  return (
+                    <button key={n.slug} onClick={() => pickNarrator(n.slug)} style={{ textAlign: 'left', cursor: 'pointer', borderRadius: 12, padding: '10px 12px', background: active ? `${ac}22` : 'rgba(255,255,255,0.04)', border: `1.5px solid ${active ? ac : 'rgba(255,255,255,0.1)'}`, transition: 'all 140ms' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <Mic size={12} color={active ? ac : 'rgba(255,255,255,0.4)'} />
+                        <span style={{ fontWeight: 700, fontSize: 13.5 }}>{n.name}</span>
+                        {n.slug === 'lucia' && <span style={{ fontSize: 8.5, fontWeight: 800, color: BRAND.gold }}>★</span>}
+                      </div>
+                      <p style={{ margin: '5px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.3 }}>{n.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div style={{ maxWidth: 1240, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 520px', gap: 32, alignItems: 'start' }}>
+      <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 640px', gap: 32, alignItems: 'start' }}>
         {/* Selector + tips */}
         <div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -192,9 +223,9 @@ export default function ReelsStudio() {
           </div>
         </div>
 
-        {/* Preview */}
-        <div style={{ position: 'sticky', top: 24 }}>
-          <ReelStage reel={reel} />
+        {/* Preview (grande) */}
+        <div style={{ position: 'sticky', top: 18 }}>
+          <ReelStage reel={reel} height={typeof window !== 'undefined' ? Math.min(window.innerHeight - 60, 1120) : 900} />
           <audio ref={audioRef} loop />
           <audio ref={voiceRef} />
         </div>
