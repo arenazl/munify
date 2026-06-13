@@ -9,7 +9,10 @@ import { Film, Music, VolumeX, Mic } from 'lucide-react';
 import ReelStage, { reelDurationMs, setReelTimeScale } from '../components/reels/ReelStage';
 import { REELS } from '../components/reels/reelScripts';
 import { NARRATORS, REGION_LABEL, type Region } from '../components/reels/narrators';
+import { NARRATION } from '../components/reels/narrationText';
 import { BRAND, FONT_DISPLAY, FONT_SANS } from '../components/reels/reelBrand';
+
+const MEDIA_STUDIO = 'https://media-studio-arenazl.netlify.app';
 import { MunifyMark } from '../components/reels/ReelMockups';
 
 const TRACKS = [
@@ -190,10 +193,12 @@ export default function ReelsStudio() {
       <div style={{ maxWidth: 1320, margin: '0 auto 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13, fontWeight: 800, color: BRAND.gold, letterSpacing: '0.04em' }}>
           <Mic size={16} /> ESTUDIO DE VOZ
-          <a href="https://media-studio-arenazl.netlify.app/?tool=voz" target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>abrir en pantalla completa ↗</a>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>· texto del reel «{reel.nombre}»</span>
+          <a href={`${MEDIA_STUDIO}/?tool=voz&text=${encodeURIComponent((NARRATION[activeId] || []).join('\n'))}`} target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>abrir en pantalla completa ↗</a>
         </div>
         <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${BRAND.gold}40` }}>
-          <iframe src="https://media-studio-arenazl.netlify.app/?tool=voz&embed=1" title="Estudio de voz" style={{ width: '100%', height: 760, border: 'none', display: 'block' }} />
+          {/* key={activeId} fuerza el remount al cambiar de reel → el editor relee ?text= y precarga la narración. */}
+          <iframe key={activeId} src={`${MEDIA_STUDIO}/?tool=voz&embed=1&text=${encodeURIComponent((NARRATION[activeId] || []).join('\n'))}`} title="Estudio de voz" style={{ width: '100%', height: 760, border: 'none', display: 'block' }} />
         </div>
       </div>
 
