@@ -22,11 +22,27 @@ export default function ReelsStudio() {
   const [activeId, setActiveId] = useState(REELS[0].id);
   const reel = REELS.find((r) => r.id === activeId) ?? REELS[0];
 
-  // Música de preview (pistas libres en /public/reels-audio). Suena al
-  // elegirla (click = gesto que habilita el audio del navegador).
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const voiceRef = useRef<HTMLAudioElement>(null);
+  // Niveles fijos (sin sliders): música presente, voz un toque más baja, con
+  // ducking suave — la música baja mientras habla la voz y vuelve al terminar.
+  const MUSIC_VOL = 1.0;   // música sola
+  const DUCK_VOL = 0.45;   // música mientras suena la voz (baja un poco, no se corta)
+  const VOICE_VOL = 0.82;  // voz
+
+  const audioRef = useRef<HTMLAudioElement>(null);  // música (loop)
+  const voiceRef = useRef<HTMLAudioElement>(null);  // narración del reel
   const [track, setTrack] = useState<string | null>(null);
+  const [narrator, setNarrator] = useState<string>('lucia'); // voz por defecto
+
+  // fade suave de volumen de un <audio> (efecto ducking)
+  const fadeVol = (el: HTMLAudioElement | null, to: number, ms = 300) => {
+    if (!el) return;
+    const from = el.volume; const steps = 12; let i = 0;
+    const id = setInterval(() => {
+      i++; el.volume = Math.max(0, Math.min(1, from + (to - from) * (i / steps)));
+      if (i >= steps) clearInterval(id);
+    }, ms / 12);
+  };
+
   const pickTrack = (id: string | null) => {
     setTrack(id);
     const a = audioRef.current;
@@ -34,28 +50,26 @@ export default function ReelsStudio() {
     if (!id) { a.pause(); return; }
     a.src = `/reels-audio/${id}.mp3`;
     a.currentTime = 0;
-    // si ya hay una voz sonando, la música entra bajita (ducking); si no, full.
     const v = voiceRef.current;
-    a.volume = v && !v.paused && !v.ended ? 0.22 : 1;
+    a.volume = v && !v.paused && !v.ended ? DUCK_VOL : MUSIC_VOL; // entra duckeada si hay voz
     a.play().catch(() => {});
   };
 
-  // Probador de narradores (samples estáticos en /public/reels-audio/narrators).
-  // La voz suena SOBRE la música, bajándola (ducking) mientras dura el sample —
-  // así se escucha cómo queda el reel final. No corta la música.
-  const [narrator, setNarrator] = useState<string | null>(null);
-  const pickNarrator = (slug: string) => {
-    setNarrator(slug);
+  // Narración del reel <reelId> en la voz <slug>, sobre la música con ducking.
+  const playNarration = (reelId: string, slug: string) => {
     const a = voiceRef.current;
     if (!a) return;
-    const m = audioRef.current;
-    const restore = () => { if (m) m.volume = 1; };
-    if (m && !m.paused) m.volume = 0.22; // duck la música, no la corta
-    a.src = `/reels-audio/narrators/${slug}.mp3`;
+    a.src = `/reels-audio/narration/${reelId}/${slug}.mp3`;
     a.currentTime = 0;
-    a.onended = restore;
-    a.play().catch(restore);
+    a.volume = VOICE_VOL;
+    const m = audioRef.current;
+    if (m && !m.paused) fadeVol(m, DUCK_VOL, 250);                        // duck
+    a.onended = () => { if (m && !m.paused) fadeVol(m, MUSIC_VOL, 450); }; // restaura
+    a.play().catch(() => {});
   };
+
+  const pickNarrator = (slug: string) => { setNarrator(slug); playNarration(activeId, slug); };
+  const pickReel = (id: string) => { setActiveId(id); playNarration(id, narrator); };
 
   // Modo captura headless (Playwright): /reels?reel=<id>&capture=1
   // Mantiene negro puro hasta window.__go() → el reel arranca en escena 0.
@@ -116,7 +130,7 @@ export default function ReelsStudio() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 800, color: BRAND.azure, letterSpacing: '0.04em' }}>
             <Mic size={17} /> NARRADORES
           </span>
-          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>voz para la locución — tocá una para escuchar el sample (ElevenLabs)</span>
+          <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.55)' }}>tocá una y escuchás la narración del reel elegido en esa voz (ElevenLabs)</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(228px, 1fr))', gap: 10, marginTop: 12 }}>
           {NARRATORS.map((n) => {
@@ -147,7 +161,7 @@ export default function ReelsStudio() {
               return (
                 <button
                   key={r.id}
-                  onClick={() => setActiveId(r.id)}
+                  onClick={() => pickReel(r.id)}
                   style={{
                     textAlign: 'left', cursor: 'pointer', borderRadius: 16, padding: '16px 18px',
                     background: active ? `${r.accent}1f` : 'rgba(255,255,255,0.04)',
