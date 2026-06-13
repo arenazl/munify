@@ -1,8 +1,11 @@
 # Reels de promoción de Munify — contexto para continuar
 
-> Doc de handoff. Estado, arquitectura, cómo regrabar, voces (ElevenLabs) y la
-> dirección de **video real con Google Veo/Flow** (con prompts listos). Pensado
-> para que otro agente (o Claude más tarde) continúe sin perder contexto.
+> **DOC VIVO — en constante evolución.** Es el **canal entre agentes**. Mantener
+> actualizado: narrativas por reel, voz elegida, estado de cada reel, clips Veo y
+> aprendizajes nuevos. Si algo cambia, se edita acá primero.
+>
+> Cubre: estado, arquitectura, cómo regrabar, voces (ElevenLabs) y la dirección de
+> **video real con Google Veo/Flow** (con prompts listos).
 
 ## 1. Qué son
 
@@ -79,12 +82,75 @@ Correr: `cd frontend && node _capture.mjs` (tarda ~6 min los 5).
   - Para generación EN VIVO (texto libre) haría falta un endpoint **backend**
     proxy con la key como secreto (Secret Manager), nunca en el front.
 
-### Narrativa propuesta (reel `tour`, ~20s) — pendiente de OK del user
-Hook: "¿Tu municipio todavía maneja todo en papel y planillas?" · Dashboard:
-"Con Munify ves toda tu gestión en vivo." · Reclamos: "El vecino reclama desde
-el celular… y vos lo resolvés." · Mapa: "Mirás dónde se concentran los
-problemas." · Trámites: "Trámites online, con identidad validada." · Tesorería:
-"Y la plata del municipio, por fin ordenada." · CTA: "Munify. Tu municipio, al día."
+## 4-bis. NARRATIVAS POR REEL (voz en off) — FUENTE DE VERDAD
+
+> **Este es el canal.** Acá curamos la locución de cada reel. Cada línea va
+> alineada a una escena del guión (`reelScripts.tsx`). `estado`: borrador →
+> aprobado por el user → grabado.
+>
+> **Dos formas de entregar la narrativa (ambas válidas, se eligen por reel):**
+> - **(a) Voz en off** sobre el reel renderizado (ElevenLabs → ffmpeg, voz
+>   adelante + música -18dB). Sanitización TTS: `Munify`→`Munifai`,
+>   `24/7`→`veinticuatro siete`, números clave deletreados.
+> - **(b) Presentador a cámara** generado con **Veo** (talking head con lip-sync):
+>   se pasa la línea como **diálogo** en el prompt de Veo y la persona la dice.
+>   Plantilla de prompt:
+>   `Medium close-up of a friendly, professional Argentine [man/woman] in their 30s speaking directly to camera in a bright modern municipal office, natural light, warm and confident tone. They say in Rioplatense Spanish: "<LÍNEA>". Photorealistic, vertical 9:16, no on-screen text.`
+>   (En este modo, la narrativa NO se sanitiza para TTS — se escribe natural.)
+
+### `tour` — Tour general · estado: **borrador**
+| Escena | Voz en off |
+|---|---|
+| Hook | ¿Tu municipio todavía maneja todo en papel y planillas? |
+| Dashboard | Con Munify ves toda tu gestión en vivo, en una sola pantalla. |
+| Reclamos | El vecino reclama desde el celular… y vos lo resolvés. |
+| Mapa de calor | Mirás en el mapa dónde se concentran los problemas. |
+| Trámites | Trámites online, con identidad validada. |
+| Tesorería | Y la plata del municipio, por fin ordenada. |
+| CTA | Munify. Tu municipio, al día. |
+
+### `vecino` — Para el vecino · estado: **borrador**
+| Escena | Voz en off |
+|---|---|
+| Hook | ¿Un bache, una luz quemada, basura sin recoger? |
+| Captura | Sacás la foto desde el celular. En treinta segundos. |
+| IA / WhatsApp | La inteligencia artificial lo clasifica y lo manda al área correcta. |
+| Seguimiento | Y lo seguís paso a paso, como un envío. |
+| Logros | Encima, sumás puntos por mejorar tu barrio. |
+| CTA | Munify. Tu ciudad te escucha. |
+
+### `intendente` — Para el intendente · estado: **borrador**
+| Escena | Voz en off |
+|---|---|
+| Hook | ¿Cómo viene tu gestión? En números, no en sensaciones. |
+| Stat 1.284 | Mil doscientos ochenta y cuatro reclamos gestionados este año. Sin un papel. |
+| Dashboard | Todo en una sola pantalla, que se actualiza sola. |
+| Stat 87% | Ochenta y siete por ciento resueltos, en tres días promedio. |
+| Mapa | Y mandás las cuadrillas donde más se necesitan. |
+| CTA | Munify. Goberná con datos. |
+
+### `tesoreria` — Tesorería · estado: **borrador**
+| Escena | Voz en off |
+|---|---|
+| Hook | ¿La plata del municipio todavía vive en planillas de Excel? |
+| Pagos | Cargás cada pago, autorizado y trazado. |
+| Cajas | Ves el saldo de cada caja al instante. |
+| Conciliación | Importás el extracto y el banco se cuadra solo. |
+| Sueldos | Y liquidás sueldos sin dolores de cabeza. |
+| CTA | Munify. Adiós, Excel. |
+
+### `ia` — Atención con IA · estado: **borrador**
+| Escena | Voz en off |
+|---|---|
+| Hook | ¿Y si tu municipio atendiera las veinticuatro horas? |
+| WhatsApp | Por WhatsApp, por donde tus vecinos ya escriben. |
+| Clasifica | La IA crea el reclamo y lo deriva al área correcta. |
+| Trámites/Turnos | Da turnos e inicia trámites, sola. |
+| Stat 0 | Cero esperas en la fila. El municipio nunca cierra. |
+| CTA | Munify. Atención sin esperas. |
+
+**Voz elegida:** _pendiente_ (el user prueba en `/reels`). Default sugerido:
+**Lucia** (es-AR, cálida, publicidad).
 
 ## 5. Dirección VIDEO REAL con Google Veo / Flow
 
