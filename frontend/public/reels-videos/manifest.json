@@ -1,0 +1,11 @@
+﻿{
+    "videos":  [
+                   {
+                       "title":  "Vecino — v1",
+                       "note":  "hook real + slides + closer chica",
+                       "id":  "vecino_v1",
+                       "reel":  "vecino",
+                       "file":  "vecino_v1.mp4"
+                   }
+               ]
+}
