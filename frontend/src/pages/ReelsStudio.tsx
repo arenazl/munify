@@ -99,31 +99,7 @@ export default function ReelsStudio() {
           <a href={`${MEDIA_STUDIO}/?tool=voz&text=${encodeURIComponent((NARRATION[activeId] || []).join('\n'))}`} target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>abrir en pantalla completa ↗</a>
         </div>
         <div style={{ borderRadius: 16, overflow: 'hidden', border: `1px solid ${BRAND.gold}40` }}>
-          <iframe ref={iframeRef} onLoad={postConfig} src={`${MEDIA_STUDIO}/?tool=voz&embed=1`} title="Estudio de voz" style={{ width: '100%', height: 820, border: 'none', display: 'block' }} />
-        </div>
-      </div>
-
-      {/* Preview del reel (canvas 1080×1920) + cómo se entrega */}
-      <div style={{ maxWidth: 1320, margin: '0 auto', display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr)', gap: 32, alignItems: 'start' }}>
-        <div style={{ position: 'sticky', top: 18 }}>
-          <ReelStage reel={reel} height={typeof window !== 'undefined' ? Math.min(window.innerHeight - 80, 900) : 820} />
-        </div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>{reel.nombre}</div>
-          <p style={{ margin: '0 0 18px', fontSize: 13.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{reel.desc}</p>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20, fontSize: 12, fontWeight: 700, color: reel.accent }}>
-            <span>{Math.round(reelDurationMs(reel) / 1000)}s</span><span>·</span><span>{reel.scenes.length} escenas</span>
-          </div>
-          <div style={{ borderRadius: 16, padding: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontWeight: 700, fontSize: 14, color: BRAND.gold }}>
-              <Film size={16} /> Cómo se entregan
-            </div>
-            <p style={{ margin: 0, fontSize: 13, lineHeight: 1.7, color: 'rgba(255,255,255,0.7)' }}>
-              Elegí el reel en el panel <b>REELS</b> del estudio de arriba: se carga su texto para tunear la voz y
-              acá ves el <b>preview exacto</b> (mismo lienzo 1080×1920 que el video final). Los mp4 con música los
-              genera Claude y quedan en <b>munify/reels</b>.
-            </p>
-          </div>
+          <iframe ref={iframeRef} onLoad={postConfig} src={`${MEDIA_STUDIO}/?tool=voz&embed=1`} title="Estudio de voz" allow="autoplay" style={{ width: '100%', height: 880, border: 'none', display: 'block' }} />
         </div>
       </div>
     </div>
