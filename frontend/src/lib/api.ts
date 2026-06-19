@@ -653,6 +653,8 @@ export const configuracionApi = {
 export const municipiosApi = {
   getAll: () => api.get('/municipios'),
   getPublic: () => api.get('/municipios/public'),
+  // Detalle público por código — usado por el acceso directo /<codigo>.
+  getPublicByCodigo: (codigo: string) => api.get(`/municipios/public/${codigo}`),
   getOne: (id: number) => api.get(`/municipios/${id}`),
   updateBranding: (id: number, formData: FormData) =>
     api.post(`/municipios/${id}/branding`, formData, {

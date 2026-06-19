@@ -63,6 +63,14 @@ class Municipio(Base):
     # Estado
     activo = Column(Boolean, default=True)
 
+    # Flag "demo de venta" vs cliente PRODUCTIVO.
+    #   True  -> aparece en la grilla pública de /demo y expone los botones de
+    #            acceso rápido (demo123) en el login.
+    #   False -> cliente real: se oculta de /demo, NO expone usuarios demo, y el
+    #            acceso es por la URL directa /<codigo> con email + contraseña.
+    # Los munis creados por el endpoint demo arrancan en True (default).
+    es_demo = Column(Boolean, default=True, nullable=False)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -116,4 +124,5 @@ class Municipio(Base):
             "logo_url": self.logo_url,
             "color_primario": self.color_primario,
             "activo": self.activo,
+            "es_demo": self.es_demo,
         }

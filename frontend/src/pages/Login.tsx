@@ -355,41 +355,48 @@ export default function Login() {
                 )}
               </button>
 
-              {/* Divider */}
-              <div className="relative flex items-center gap-3 my-6">
-                <div className="flex-1 h-px bg-white/10" />
-                <span className="text-slate-500 text-xs">ACCESO RÁPIDO (DEMO)</span>
-                <div className="flex-1 h-px bg-white/10" />
-              </div>
+              {/* Acceso rápido demo — SOLO si el muni expone usuarios demo.
+                  Clientes productivos (es_demo=False) devuelven lista vacía
+                  desde el backend, así que esta sección no se renderiza. */}
+              {demoUsers.length > 0 && (
+                <>
+                  {/* Divider */}
+                  <div className="relative flex items-center gap-3 my-6">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-slate-500 text-xs">ACCESO RÁPIDO (DEMO)</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
 
-              {/* Quick login buttons */}
-              <div className="grid grid-cols-2 gap-3">
-                {demoUsers.map((user, index) => {
-                  const config = rolConfig[user.rol] || rolConfig.vecino;
-                  const Icon = config.icon;
-                  return (
-                    <button
-                      key={`${user.rol}-${index}`}
-                      type="button"
-                      onClick={() => quickLogin(user.email, 'demo123')}
-                      disabled={loading}
-                      className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <div className="font-semibold truncate">{user.nombre_completo}</div>
-                          <div className="text-[10px] opacity-80">{config.label}</div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+                  {/* Quick login buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {demoUsers.map((user, index) => {
+                      const config = rolConfig[user.rol] || rolConfig.vecino;
+                      const Icon = config.icon;
+                      return (
+                        <button
+                          key={`${user.rol}-${index}`}
+                          type="button"
+                          onClick={() => quickLogin(user.email, 'demo123')}
+                          disabled={loading}
+                          className={`relative overflow-hidden bg-gradient-to-r ${config.color} text-white py-3 px-4 rounded-xl text-sm font-medium transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] shadow-lg`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className="h-4 w-4 flex-shrink-0" />
+                            <div className="text-left min-w-0">
+                              <div className="font-semibold truncate">{user.nombre_completo}</div>
+                              <div className="text-[10px] opacity-80">{config.label}</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-              <p className="text-xs text-slate-500 text-center mt-4">
-                Los botones de acceso rápido son solo para demostración
-              </p>
+                  <p className="text-xs text-slate-500 text-center mt-4">
+                    Los botones de acceso rápido son solo para demostración
+                  </p>
+                </>
+              )}
 
               {/* Dependencia Users Section - Two Columns */}
               {dependenciaUsers.length > 0 && (

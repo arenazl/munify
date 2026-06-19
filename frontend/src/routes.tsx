@@ -64,6 +64,7 @@ import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
 import Demo from './pages/Demo';
 import DemoReady from './pages/DemoReady';
+import MunicipioAcceso from './pages/MunicipioAcceso';
 import DependenciasConfig from './pages/DependenciasConfig';
 import AsignacionDependencias from './pages/AsignacionDependencias';
 import Municipios from './pages/Municipios';
@@ -403,6 +404,10 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // Acceso directo por código de municipio: /<codigo> -> login del muni.
+  // Va al final: las rutas estáticas de arriba tienen prioridad de match.
+  { path: '/:codigo', element: <MunicipioAcceso /> },
 
   // Catch-all: redirigir a demo si no está autenticado
   { path: '*', element: <Navigate to="/demo" replace /> },

@@ -44,6 +44,9 @@ class MunicipioPublic(BaseModel):
     # Flag de UI: si es True, los ABMs de categorías / tipos de trámite se
     # muestran como items del sidebar. Si es False, quedan sólo en Ajustes.
     abm_en_sidebar: bool = True
+    # True = demo de venta (aparece en /demo, expone accesos rápidos).
+    # False = cliente productivo (oculto de /demo, sin accesos rápidos).
+    es_demo: bool = True
 
     class Config:
         from_attributes = True
@@ -124,10 +127,14 @@ async def listar_municipios_publico(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Lista todos los municipios activos (endpoint PUBLICO).
-    Usado por la landing page para mostrar opciones.
+    Lista los municipios DEMO activos (endpoint PUBLICO).
+    Usado por la grilla de /demo. Los clientes productivos (es_demo=False) se
+    excluyen a propósito: no deben figurar en el listado público de demos.
     """
-    query = select(Municipio).where(Municipio.activo == activo)
+    query = select(Municipio).where(
+        Municipio.activo == activo,
+        Municipio.es_demo == True,
+    )
     result = await db.execute(query)
     return result.scalars().all()
 
@@ -249,6 +256,11 @@ async def obtener_usuarios_demo(
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
 
+    # Cliente productivo (cerrojo): no exponer cuentas demo. El login queda
+    # solo con email + contraseña.
+    if not municipio.es_demo:
+        return []
+
     # Buscar usuarios de prueba con tres patrones:
     # 1. @{codigo}.test.com (patrón original)
     # 2. @{codigo}.demo.com (patrón nuevo del seed)
@@ -352,6 +364,10 @@ async def obtener_usuarios_dependencias(
 
     if not municipio:
         raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Cliente productivo (cerrojo): no exponer accesos rápidos por dependencia.
+    if not municipio.es_demo:
+        return []
 
     # Buscar usuarios con municipio_dependencia_id asignado
     query = select(
