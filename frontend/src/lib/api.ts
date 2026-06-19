@@ -655,6 +655,8 @@ export const municipiosApi = {
   getPublic: () => api.get('/municipios/public'),
   // Detalle público por código — usado por el acceso directo /<codigo>.
   getPublicByCodigo: (codigo: string) => api.get(`/municipios/public/${codigo}`),
+  // Regenera la pass del admin real y le manda el correo de bienvenida (super admin).
+  enviarBienvenida: (id: number) => api.post(`/municipios/${id}/enviar-bienvenida`),
   getOne: (id: number) => api.get(`/municipios/${id}`),
   updateBranding: (id: number, formData: FormData) =>
     api.post(`/municipios/${id}/branding`, formData, {

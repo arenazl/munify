@@ -11,12 +11,14 @@ import cloudinary
 import cloudinary.uploader
 
 from core.database import get_db
-from core.security import get_current_user, require_roles
+from core.security import get_current_user, require_roles, get_password_hash
 from core.config import settings
 from models.municipio import Municipio
 from models.user import User
 from models.enums import RolUsuario
 from services.categorias_default import crear_categorias_default
+from services.email_service import email_service, EmailTemplates
+import secrets
 
 router = APIRouter()
 
@@ -1407,3 +1409,69 @@ async def generar_direcciones(
         "direcciones_creadas": resultado["direcciones_creadas"],
         "tramites_asociados": resultado["tramites_asociados"]
     }
+
+
+class EnviarBienvenidaResponse(BaseModel):
+    email_destino: str
+    enviado: bool
+
+
+@router.post("/{municipio_id}/enviar-bienvenida", response_model=EnviarBienvenidaResponse)
+async def enviar_bienvenida(
+    municipio_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN]))
+):
+    """
+    Regenera la contraseña del admin real (no demo) de un municipio y le envía
+    el correo de bienvenida con sus credenciales de acceso (URL /<codigo>,
+    usuario y contraseña). Solo super admin.
+
+    Se regenera la contraseña porque el sistema guarda únicamente el hash: es la
+    forma de garantizar que la clave del correo es válida.
+    """
+    # Solo super admin (sin municipio asignado)
+    if current_user.municipio_id is not None:
+        raise HTTPException(status_code=403, detail="Solo el super admin puede enviar credenciales")
+
+    municipio = (await db.execute(
+        select(Municipio).where(Municipio.id == municipio_id)
+    )).scalar_one_or_none()
+    if not municipio:
+        raise HTTPException(status_code=404, detail="Municipio no encontrado")
+
+    # Admin real (no demo) y activo del municipio, el más reciente
+    admin = (await db.execute(
+        select(User).where(
+            User.municipio_id == municipio_id,
+            User.rol == RolUsuario.ADMIN,
+            User.activo == True,
+            ~User.email.like("%.demo.com"),
+        ).order_by(User.id.desc()).limit(1)
+    )).scalar_one_or_none()
+    if not admin:
+        raise HTTPException(
+            status_code=400,
+            detail="El municipio no tiene un administrador real (no demo) activo",
+        )
+
+    # Contraseña nueva, legible y segura (sin caracteres ambiguos 0/O/1/l/I)
+    alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+    password = "".join(secrets.choice(alfabeto) for _ in range(12))
+    admin.password_hash = get_password_hash(password)
+    await db.commit()
+
+    url = f"https://app.munify.com.ar/{municipio.codigo}"
+    html = EmailTemplates.bienvenida_municipio(
+        nombre=admin.nombre or municipio.nombre,
+        municipio=municipio.nombre,
+        url=url,
+        email_login=admin.email,
+        password=password,
+    )
+    enviado = await email_service.send_email(
+        to_email=admin.email,
+        subject=f"Bienvenido a Munify - Acceso de {municipio.nombre}",
+        body_html=html,
+    )
+    return EnviarBienvenidaResponse(email_destino=admin.email, enviado=enviado)

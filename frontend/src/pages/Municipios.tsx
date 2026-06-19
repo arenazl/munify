@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
   Building2, Plus, Search, MapPin, Loader2, X,
-  ChevronDown, ChevronUp, Map, Briefcase
+  ChevronDown, ChevronUp, Map, Briefcase, Mail
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
+import { ConfirmModal } from '../components/ui/ConfirmModal';
 
 interface Municipio {
   id: number;
@@ -56,6 +57,10 @@ export default function Municipios() {
 
   // Generación de direcciones
   const [generatingDirecciones, setGeneratingDirecciones] = useState<number | null>(null);
+
+  // Envío de credenciales de bienvenida
+  const [toSendBienvenida, setToSendBienvenida] = useState<Municipio | null>(null);
+  const [sendingBienvenida, setSendingBienvenida] = useState(false);
 
   useEffect(() => {
     fetchMunicipios();
@@ -197,6 +202,25 @@ export default function Municipios() {
     }
   };
 
+  const handleEnviarBienvenida = async () => {
+    if (!toSendBienvenida) return;
+    setSendingBienvenida(true);
+    try {
+      const res = await municipiosApi.enviarBienvenida(toSendBienvenida.id);
+      if (res.data.enviado) {
+        toast.success(`Credenciales enviadas a ${res.data.email_destino}`, { duration: 6000 });
+      } else {
+        toast.error('No se pudo enviar el correo (revisar SMTP)');
+      }
+      setToSendBienvenida(null);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      toast.error(err.response?.data?.detail || 'Error al enviar credenciales');
+    } finally {
+      setSendingBienvenida(false);
+    }
+  };
+
   // Filtrar municipios
   const municipiosFiltrados = municipios.filter(m =>
     m.nombre.toLowerCase().includes(search.toLowerCase()) ||
@@ -301,6 +325,15 @@ export default function Municipios() {
                   </div>
 
                   <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setToSendBienvenida(municipio); }}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors"
+                      style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                      title="Regenera la contraseña del admin y le envía el correo de bienvenida"
+                    >
+                      <Mail className="h-3.5 w-3.5" />
+                      Enviar acceso
+                    </button>
                     {barrios.length > 0 && (
                       <span
                         className="px-2 py-1 rounded-full text-xs font-medium"
@@ -415,6 +448,23 @@ export default function Municipios() {
           )}
         </div>
       </div>
+
+      {/* Confirmar envío de credenciales de bienvenida */}
+      <ConfirmModal
+        isOpen={!!toSendBienvenida}
+        onClose={() => setToSendBienvenida(null)}
+        onConfirm={handleEnviarBienvenida}
+        title="Enviar credenciales de acceso"
+        message={
+          toSendBienvenida
+            ? `Se regenerará la contraseña del administrador de "${toSendBienvenida.nombre}" y se le enviará el correo de bienvenida con su dirección de acceso, usuario y contraseña. La contraseña anterior dejará de funcionar.`
+            : ''
+        }
+        confirmText="Regenerar y enviar"
+        cancelText="Cancelar"
+        variant="warning"
+        loading={sendingBienvenida}
+      />
 
       {/* Modal nuevo municipio */}
       {showModal && (
