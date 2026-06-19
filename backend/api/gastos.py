@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
+from services.factura_upload import subir_factura
 from models import (
     Gasto, GastoCuota, Contacto, MunicipioDependencia, User, RolUsuario,
     EstadoGastoCuota, Proyecto, GastoProyecto,
@@ -1016,27 +1017,12 @@ async def upload_factura_gasto(
     municipio_id = get_effective_municipio_id(request, current_user)
     if not file.content_type:
         raise HTTPException(422, "Tipo de archivo desconocido")
-    ct = file.content_type
-    is_pdf = ct == "application/pdf"
-    if is_pdf:
-        resource_type = "raw"
-    elif ct.startswith("image/"):
-        resource_type = "image"
-    else:
-        raise HTTPException(422, "Solo se permiten PDF o imagenes")
     try:
-        result = cloudinary.uploader.upload(
-            file.file,
-            folder=f"facturas-gasto/muni-{municipio_id}",
-            resource_type=resource_type,
-        )
+        return subir_factura(file, folder=f"facturas-gasto/muni-{municipio_id}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Error subiendo factura: {e}")
-    return {
-        "url": result.get("secure_url") or result.get("url"),
-        "public_id": result.get("public_id"),
-        "resource_type": resource_type,
-    }
 
 
 @router.get("/stats/reportes")
