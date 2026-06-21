@@ -144,7 +144,7 @@ api.interceptors.response.use(
     const detail = error.response?.data?.detail;
 
     if (status === 401) {
-      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register', '/app'];
+      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register', '/app', '/super'];
       const currentPath = window.location.pathname;
       const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
 

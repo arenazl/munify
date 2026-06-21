@@ -11,6 +11,7 @@ interface Municipio {
   nombre: string;
   codigo: string;
   color_primario?: string;
+  es_demo?: boolean;
 }
 
 /**
@@ -29,11 +30,14 @@ export default function MunicipioSwitcher() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Cargar lista de munis al montar
+  // Cargar lista de munis al montar. Usa el endpoint autenticado (getAll) en
+  // vez del público: el super admin ya está logueado y así trae TODOS los
+  // municipios —demos Y productivos— con el flag es_demo para separarlos. El
+  // /public filtra es_demo=True (cerrojo) y dejaba afuera a los productivos.
   useEffect(() => {
     (async () => {
       try {
-        const res = await municipiosApi.getPublic();
+        const res = await municipiosApi.getAll();
         setMunicipios(res.data);
       } catch (e) {
         console.error('Error cargando munis:', e);
@@ -86,6 +90,37 @@ export default function MunicipioSwitcher() {
 
   const current = currentMuniId ? municipios.find((m) => m.id === currentMuniId) : null;
   const label = current ? current.nombre : 'Global';
+
+  // Separar en dos grupos: demos (es_demo) y productivos. Cada uno ordenado
+  // por nombre. Un muni sin flag se considera demo (default histórico).
+  const byNombre = (a: Municipio, b: Municipio) => a.nombre.localeCompare(b.nombre);
+  const demos = municipios.filter((m) => m.es_demo !== false).sort(byNombre);
+  const productivos = municipios.filter((m) => m.es_demo === false).sort(byNombre);
+
+  const renderMuni = (m: Municipio) => (
+    <button
+      key={m.id}
+      onClick={() => handleSelectMuni(m)}
+      className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
+      style={{ color: theme.text }}
+    >
+      <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: m.color_primario || theme.textSecondary }} />
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold truncate">{m.nombre}</div>
+        <div className="text-xs font-mono" style={{ color: theme.textSecondary }}>{m.codigo}</div>
+      </div>
+      {current?.id === m.id && <Check className="h-4 w-4" style={{ color: theme.primary }} />}
+    </button>
+  );
+
+  const sectionHeader = (texto: string) => (
+    <div
+      className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider"
+      style={{ color: theme.textSecondary, backgroundColor: `${theme.primary}08` }}
+    >
+      {texto}
+    </div>
+  );
 
   const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
 
@@ -144,21 +179,20 @@ export default function MunicipioSwitcher() {
             Sin municipios
           </p>
         ) : (
-          municipios.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => handleSelectMuni(m)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-black/5"
-              style={{ color: theme.text }}
-            >
-              <Building2 className="h-4 w-4 flex-shrink-0" style={{ color: m.color_primario || theme.textSecondary }} />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold truncate">{m.nombre}</div>
-                <div className="text-xs font-mono" style={{ color: theme.textSecondary }}>{m.codigo}</div>
-              </div>
-              {current?.id === m.id && <Check className="h-4 w-4" style={{ color: theme.primary }} />}
-            </button>
-          ))
+          <>
+            {demos.length > 0 && (
+              <>
+                {sectionHeader('Demos')}
+                {demos.map(renderMuni)}
+              </>
+            )}
+            {productivos.length > 0 && (
+              <>
+                {sectionHeader('Productivos')}
+                {productivos.map(renderMuni)}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>,

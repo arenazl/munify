@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createPortal } from 'react-dom';
-import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, AlertCircle, LogIn } from 'lucide-react';
+import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, LogIn } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
@@ -51,10 +50,6 @@ export default function Landing() {
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugError, setDebugError] = useState('');
 
-  // Super Admin login modal
-  const [showSuperAdminLogin, setShowSuperAdminLogin] = useState(false);
-  const [superAdminEmail, setSuperAdminEmail] = useState('superadmin@test.com');
-  const [superAdminPassword, setSuperAdminPassword] = useState('demo123');
   const [demoUsers, setDemoUsers] = useState<Array<{
     email: string;
     nombre: string;
@@ -313,15 +308,6 @@ export default function Landing() {
                 <p className="text-[10px] sm:text-xs text-slate-400 truncate">Sistema de gestion vecinal</p>
               </div>
             </div>
-
-            {/* Botón Super Admin */}
-            <button
-              onClick={() => setShowSuperAdminLogin(true)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg sm:rounded-xl text-purple-300 hover:from-purple-500/30 hover:to-pink-500/30 hover:text-white transition-all text-xs sm:text-sm font-medium flex-shrink-0"
-            >
-              <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">Super Admin</span>
-            </button>
           </div>
         </header>
 
@@ -648,89 +634,6 @@ export default function Landing() {
           </div>
         </footer>
       </div>
-
-      {/* Modal Super Admin Login */}
-      {showSuperAdminLogin && createPortal(
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-          {/* Backdrop */}
-          <div
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
-            onClick={() => setShowSuperAdminLogin(false)}
-          />
-
-          {/* Modal */}
-          <div className="relative bg-slate-800 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
-                <Shield className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white">Super Admin</h3>
-                <p className="text-sm text-slate-400">Acceso a todos los municipios</p>
-              </div>
-              <button
-                onClick={() => setShowSuperAdminLogin(false)}
-                className="ml-auto p-2 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5 text-slate-400" />
-              </button>
-            </div>
-
-            {/* Error */}
-            {debugError && (
-              <div className="mb-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
-                {debugError}
-              </div>
-            )}
-
-            {/* Form */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={superAdminEmail}
-                  onChange={(e) => setSuperAdminEmail(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-400 mb-1">Contraseña</label>
-                <input
-                  type="password"
-                  value={superAdminPassword}
-                  onChange={(e) => setSuperAdminPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 outline-none transition-all"
-                />
-              </div>
-
-              <button
-                onClick={() => quickLogin(superAdminEmail, superAdminPassword)}
-                disabled={debugLoading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all shadow-lg shadow-purple-500/25 disabled:opacity-50"
-              >
-                {debugLoading ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    Ingresando...
-                  </>
-                ) : (
-                  <>
-                    <Shield className="h-5 w-5" />
-                    Ingresar como Super Admin
-                  </>
-                )}
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500 text-center mt-4">
-              El Super Admin puede administrar todos los municipios
-            </p>
-          </div>
-        </div>,
-        document.body
-      )}
 
       {/* Custom scrollbar styles */}
       <style>{`

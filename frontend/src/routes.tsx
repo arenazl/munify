@@ -7,6 +7,7 @@ import RootRedirect from './components/RootRedirect';
 import Landing from './pages/Landing';
 import HomePublic from './pages/HomePublic';
 import Login from './pages/Login';
+import SuperAdminLogin from './pages/SuperAdminLogin';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import DashboardVecino from './pages/DashboardVecino';
@@ -160,6 +161,8 @@ export const router = createBrowserRouter([
   { path: '/m/captura/:token/fake', element: <CapturaMovilFake /> },
   { path: '/publico', element: <Navigate to="/home" replace /> },  // Legacy: redirige a /home
   { path: '/login', element: <Login /> },
+  // Login limpio del super admin (cross-tenant). No se expone desde el landing.
+  { path: '/super', element: <SuperAdminLogin /> },
   { path: '/register', element: <Register /> },
   { path: '/register/didit-callback', element: <RegisterDiditCallback /> },
   // Checkout externo PayBridge (fuera del Layout de Munify — visualmente es
