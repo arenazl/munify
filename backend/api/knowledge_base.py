@@ -185,19 +185,49 @@ KB = {
     ],
     "screens": [
         {
-            "label": "Home del vecino (reclamos y tramites)",
+            "label": "Portal del vecino",
             "url": "https://look-guides.netlify.app/apps/munify/home.html",
-            "route": "/",
+            "route": "/app/dashboard",
         },
         {
             "label": "Nuevo reclamo con foto y mapa",
             "url": "https://look-guides.netlify.app/apps/munify/reclamo.html",
-            "route": "/reclamos/nuevo",
+            "route": "/app/reclamos/nuevo",
         },
         {
-            "label": "Panel del municipio (dashboard)",
-            "url": "https://look-guides.netlify.app/apps/munify/panel.html",
-            "route": "/panel",
+            "label": "Dashboard municipal",
+            "url": "https://look-guides.netlify.app/apps/munify/dashboard.html",
+            "route": "/gestion/dashboard",
+        },
+        {
+            "label": "Reclamos vecinales",
+            "url": "https://look-guides.netlify.app/apps/munify/reclamos.html",
+            "route": "/gestion/reclamos",
+        },
+        {
+            "label": "Tramites municipales",
+            "url": "https://look-guides.netlify.app/apps/munify/tramites.html",
+            "route": "/gestion/tramites",
+        },
+        {
+            "label": "Tesoreria",
+            "url": "https://look-guides.netlify.app/apps/munify/tesoreria.html",
+            "route": "/gestion/tesoreria/pagos",
+        },
+        {
+            "label": "Contaduria — Ordenes de pago",
+            "url": "https://look-guides.netlify.app/apps/munify/contaduria.html",
+            "route": "/gestion/contaduria/ordenes",
+        },
+        {
+            "label": "Sueldos y liquidaciones",
+            "url": "https://look-guides.netlify.app/apps/munify/sueldos.html",
+            "route": "/gestion/sueldos/liquidaciones",
+        },
+        {
+            "label": "Turnos y agenda",
+            "url": "https://look-guides.netlify.app/apps/munify/turnos.html",
+            "route": "/gestion/programacion/turnos",
         },
     ],
     "brand": {
