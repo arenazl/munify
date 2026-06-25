@@ -16,6 +16,7 @@ from .sla import router as sla_router
 from .exportar import router as exportar_router
 from .whatsapp import router as whatsapp_router
 from .salesbot import router as salesbot_router
+from .knowledge_base import router as knowledge_base_router
 from .ia_config import router as ia_config_router
 from .turnos import router as turnos_router
 from .turnos_tramite import router as turnos_tramite_router
@@ -90,6 +91,7 @@ api_router.include_router(sla_router, prefix="/sla", tags=["SLA"])
 api_router.include_router(exportar_router, prefix="/exportar", tags=["Exportar"])
 api_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["WhatsApp"])
 api_router.include_router(salesbot_router, prefix="/salesbot", tags=["SalesBot"])
+api_router.include_router(knowledge_base_router, tags=["Knowledge Base"])
 api_router.include_router(ia_config_router, tags=["IA Config"])  # rutas con path completo (/admin/ia-config, /ia-config/actual)
 api_router.include_router(turnos_router, prefix="/turnos", tags=["Turnos"])
 api_router.include_router(turnos_tramite_router)  # prefix definido en el router
