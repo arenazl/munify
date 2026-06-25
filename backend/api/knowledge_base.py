@@ -223,15 +223,16 @@ KB = {
 
 
 def _check_key(x_kb_key: str | None) -> None:
-    secret_salesbot = os.environ.get("KB_CLAVE_SALESBOT", "")
-    secret_mediastudio = os.environ.get("KB_CLAVE_MEDIASTUDIO", "")
+    secret_salesbot = os.environ.get("KB_CLAVE_SALESBOT", "").strip()
+    secret_mediastudio = os.environ.get("KB_CLAVE_MEDIASTUDIO", "").strip()
     if not secret_salesbot and not secret_mediastudio:
         raise HTTPException(status_code=503, detail="KB secrets not configured")
     if not x_kb_key:
         raise HTTPException(status_code=401, detail="missing X-KB-Key")
-    # Comparacion constant-time acumulada contra ambas claves (no cortamos al primer match)
-    match_salesbot = hmac.compare_digest(x_kb_key, secret_salesbot) if secret_salesbot else False
-    match_mediastudio = hmac.compare_digest(x_kb_key, secret_mediastudio) if secret_mediastudio else False
+    # Bytes para que compare_digest no falle con non-ASCII; strip() elimina BOM/newline del secret
+    key_bytes = x_kb_key.encode("utf-8")
+    match_salesbot = hmac.compare_digest(key_bytes, secret_salesbot.encode("utf-8")) if secret_salesbot else False
+    match_mediastudio = hmac.compare_digest(key_bytes, secret_mediastudio.encode("utf-8")) if secret_mediastudio else False
     if not (match_salesbot or match_mediastudio):
         raise HTTPException(status_code=403, detail="invalid X-KB-Key")
 
