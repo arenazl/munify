@@ -4228,7 +4228,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     );
   };
 
-  const inboxView = vistaInbox ? (
+  // Siempre devolver el InboxLayout (no depender de vistaInbox). ABMPage
+  // controla cuando mostrarlo via su viewMode. Si lo condicionamos aca,
+  // al togglear el boton guiado desaparece del toggle de ABMPage y la
+  // vista clasica queda en blanco al volver (bug del ciclo clasica->guiada->clasica).
+  const inboxView = (
     <InboxLayout
       saludoNombre={user?.nombre || ''}
       contextoLabel={user?.dependencia?.nombre || 'tu municipio'}
@@ -4316,14 +4320,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         },
       ]}
     />
-  ) : null;
-
-  // Toggle de vista (botón en headerActions)
-  const toggleVista = () => {
-    const nuevo = !vistaInbox;
-    setVistaInbox(nuevo);
-    try { localStorage.setItem('reclamos_vista_inbox', nuevo ? '1' : '0'); } catch { /* ignore */ }
-  };
+  );
 
   // KPIs arriba del ABMPage (mismo patrón que Tesorería/Trámites).
   // Lee de conteosEstados que ya carga la pagina por filtro.
@@ -4383,8 +4380,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         searchValue={search}
         onSearchChange={setSearch}
         loading={false}
-        isEmpty={filteredReclamos.length === 0}
+        isEmpty={filteredReclamos.length === 0 && !vistaInbox}
         emptyMessage={debouncedSearch ? `No se encontraron reclamos para "${debouncedSearch}"` : "No se encontraron reclamos"}
+        defaultViewMode="table"
+        viewStorageKey="reclamos_view"
+        onViewModeChange={(m) => setVistaInbox(m === 'guided')}
         sheetOpen={false}
         sheetTitle=""
         sheetDescription=""
@@ -4459,7 +4459,6 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           actions: [
             { key: 'reciente', label: 'Más recientes', icon: ArrowUpDown, active: ordenamiento === 'reciente', onClick: () => setOrdenamiento('reciente') },
             { key: 'programado', label: 'Por vencer', icon: Calendar, active: ordenamiento === 'programado', onClick: () => setOrdenamiento('programado') },
-            { key: 'vista', label: vistaInbox ? 'Vista clásica' : 'Vista guiada', icon: vistaInbox ? LayoutList : LayoutGrid, active: vistaInbox, onClick: toggleVista, title: vistaInbox ? 'Cambiar a vista clásica' : 'Cambiar a vista guiada' },
           ],
           layout: 'left',
         }}
