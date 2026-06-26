@@ -125,15 +125,14 @@ export default function Dashboard() {
   // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
   const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
   const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
-  // Overlay del banner: velo oscuro + un tinte del color del tema (la foto manda).
-  // En tema CLARO se DUPLICA la opacidad del velo porque el texto es blanco y
-  // necesita mas contraste sobre la foto clara.
-  const heroOverlayDarkA = isLightTheme ? 0.84 : 0.58;
-  const heroOverlayColorA = isLightTheme ? '66' : '33';
-  const bannerOverlay = `linear-gradient(105deg, rgba(0,0,0,${heroOverlayDarkA}) 0%, ${theme.primary}${heroOverlayColorA} 47%, transparent 86%)`;
   const tienePortada = true; // siempre hay imagen (portada propia o default)
-  // Siempre fondo con foto + gradiente oscuro => texto claro.
-  const heroFondoOscuro = true;
+  // Tema OSCURO -> banner oscuro: velo + tinte del color, la foto manda, texto blanco.
+  // Tema CLARO  -> banner claro: overlay que se funde con el fondo de la app
+  //                (no queda una isla oscura chocante) y el texto va oscuro.
+  const heroFondoOscuro = !isLightTheme;
+  const bannerOverlay = isLightTheme
+    ? `linear-gradient(105deg, ${theme.primary}29 0%, rgba(255,255,255,0.90) 48%, rgba(255,255,255,0.80) 100%)`
+    : `linear-gradient(105deg, rgba(0,0,0,0.58) 0%, ${theme.primary}33 47%, transparent 86%)`;
   const heroBrandBg = isLightTheme
     ? `linear-gradient(135deg, ${theme.primary}26 0%, ${theme.card} 55%, ${theme.primary}14 100%)`
     : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`;
