@@ -25,6 +25,7 @@ import {
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import PageHint from '../components/ui/PageHint';
 import DashboardLive from '../components/DashboardLive';
+import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { Radio } from 'lucide-react';
 
@@ -653,9 +654,11 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
         <button
           onClick={() => setLiveMode(true)}
-          className="live-btn absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
+          className="live-btn flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
             backgroundColor: heroFondoOscuro ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.92)',
             border: '2px solid rgba(239, 68, 68, 0.7)',
@@ -672,6 +675,7 @@ export default function Dashboard() {
           <Radio className="h-4 w-4 relative z-10 live-radio" />
           <span className="tracking-wider relative z-10">LIVE</span>
         </button>
+        </div>
         )}
 
         <style>{`

@@ -4,6 +4,7 @@ import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinn
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
+import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
 import { API_URL } from '../lib/api';
 
 interface Municipio {
@@ -308,6 +309,7 @@ export default function Landing() {
                 <p className="text-[10px] sm:text-xs text-slate-400 truncate">Sistema de gestion vecinal</p>
               </div>
             </div>
+            <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
           </div>
         </header>
 

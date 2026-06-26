@@ -4,6 +4,7 @@ import { Loader2, LogIn, Sparkles, ArrowRight, Trash2, Check, Search, ShieldChec
 import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
 import DemoCreationProgress from '../components/DemoCreationProgress';
+import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
 import { MunifyLogo } from '../components/ui/MunifyLogo';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 
@@ -167,6 +168,8 @@ export default function Demo() {
             <MunifyLogo size={36} variant="content" className="flex-shrink-0" />
             <span className="text-lg sm:text-xl font-bold text-slate-800 truncate">Munify</span>
           </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+          <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
           <button
             onClick={() => navigate('/login')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-slate-700 text-xs transition-colors flex-shrink-0"
@@ -175,6 +178,7 @@ export default function Demo() {
             <span className="hidden sm:inline">Ya tengo cuenta</span>
             <span className="sm:hidden">Ingresar</span>
           </button>
+          </div>
         </div>
       </header>
 
