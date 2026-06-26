@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { saveMunicipio } from '../utils/municipioStorage';
+import { API_URL } from '../lib/api';
 
 /**
  * Componente wrapper que captura el codigo de municipio del path
@@ -18,7 +19,6 @@ export default function MunicipioHome() {
       }
 
       try {
-        const API_URL = import.meta.env.VITE_API_URL;
         const res = await fetch(`${API_URL}/municipios/public`);
 
         if (res.ok) {

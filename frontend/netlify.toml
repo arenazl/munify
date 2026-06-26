@@ -4,7 +4,27 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  VITE_API_URL = "https://munify-api-1060106389361.southamerica-east1.run.app/api"
+
+# Proxy same-origin al backend (Cloud Run). El front pega a /api, /static y
+# /uploads relativos → sin URL absoluta en el bundle (sin secrets scanning) y
+# sin CORS. DEBEN ir ANTES del catch-all /* del SPA.
+[[redirects]]
+  from = "/api/*"
+  to = "https://munify-api-vmpxsxe7ra-rj.a.run.app/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/static/*"
+  to = "https://munify-api-vmpxsxe7ra-rj.a.run.app/static/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/uploads/*"
+  to = "https://munify-api-vmpxsxe7ra-rj.a.run.app/uploads/:splat"
+  status = 200
+  force = true
 
 # Redirects para SPA (React Router)
 [[redirects]]

@@ -1,26 +1,27 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 const getApiUrl = () => {
-  // Si hay URL completa configurada, usarla
+  // Si hay URL completa configurada, usarla (override explícito).
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl) {
     return envUrl;
   }
 
-  // Usar puerto configurable (default 8000)
-  const port = import.meta.env.VITE_API_PORT || '8000';
+  // Dev local (vite): apuntar al backend en localhost por puerto configurable.
   const host = window.location.hostname || 'localhost';
+  if (host === 'localhost' || host === '127.0.0.1') {
+    const port = import.meta.env.VITE_API_PORT || '8000';
+    return `http://${host}:${port}/api`;
+  }
 
-  return `http://${host}:${port}/api`;
+  // Prod: same-origin. Netlify proxea /api/* al backend (ver netlify.toml).
+  // Sin URL absoluta en el bundle → sin secrets scanning y sin CORS.
+  return '/api';
 };
 
 export const API_URL = getApiUrl();
 export const API_BASE_URL = API_URL.replace('/api', '');
 console.log('🔗 API URL:', API_URL);
-
-if (!API_URL) {
-  console.error('VITE_API_URL no está configurado en .env');
-}
 
 // ============================================
 // Sistema de Caché con TTL para datos estáticos

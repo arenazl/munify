@@ -37,6 +37,7 @@ import {
   subscribeToPush,
 } from '../lib/pushNotifications';
 import { saveMunicipio, loadMunicipio, loadMunicipioSync } from '../utils/municipioStorage';
+import { API_URL } from '../lib/api';
 
 interface Reclamo {
   id: number;
@@ -62,8 +63,6 @@ interface Estadisticas {
   por_zona?: { zona: string; cantidad: number }[];
   por_categoria?: { categoria: string; color: string; cantidad: number }[];
 }
-
-const API_URL = import.meta.env.VITE_API_URL;
 
 // Noticias de ejemplo
 const noticiasDefault = [
