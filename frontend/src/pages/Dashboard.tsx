@@ -123,6 +123,7 @@ export default function Dashboard() {
   // oscura en los temas claros y respeta la identidad del municipio.
   // Imagen de fondo del banner: la portada del muni si la cargo; si no, una
   // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
+  const [claroVariant, setClaroVariant] = useState(0);
   const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
   const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
   const tienePortada = true; // siempre hay imagen (portada propia o default)
@@ -130,8 +131,24 @@ export default function Dashboard() {
   // Tema CLARO  -> banner claro: overlay que se funde con el fondo de la app
   //                (no queda una isla oscura chocante) y el texto va oscuro.
   const heroFondoOscuro = !isLightTheme;
+  // 10 variantes del overlay para TEMA CLARO (distintas: direccion, opacity,
+  // con/sin tinte del color). El degrade va concentrado a la izquierda (texto) y
+  // se abre hacia la derecha, parecido al modo oscuro. Botonera abajo para elegir.
+  const _pc = theme.primary;
+  const bannerClaroOverlays = [
+    `linear-gradient(105deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.40) 50%, transparent 85%)`,
+    `linear-gradient(105deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0.15) 100%)`,
+    `linear-gradient(105deg, rgba(255,255,255,0.90) 0%, ${_pc}1f 50%, transparent 90%)`,
+    `linear-gradient(105deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.50) 50%, rgba(255,255,255,0.34) 100%)`,
+    `linear-gradient(105deg, ${_pc}3d 0%, rgba(255,255,255,0.62) 48%, transparent 88%)`,
+    `linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.32) 35%, transparent 70%)`,
+    `linear-gradient(0deg, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.30) 50%, transparent 85%)`,
+    `radial-gradient(125% 135% at 12% 50%, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.45) 35%, transparent 64%)`,
+    `linear-gradient(105deg, rgba(255,255,255,0.56) 0%, rgba(255,255,255,0.24) 45%, transparent 80%)`,
+    `linear-gradient(105deg, rgba(255,255,255,0.90) 0%, ${_pc}24 47%, rgba(255,255,255,0.20) 90%)`,
+  ];
   const bannerOverlay = isLightTheme
-    ? `linear-gradient(105deg, ${theme.primary}29 0%, rgba(255,255,255,0.90) 48%, rgba(255,255,255,0.80) 100%)`
+    ? bannerClaroOverlays[claroVariant]
     : `linear-gradient(105deg, rgba(0,0,0,0.58) 0%, ${theme.primary}33 47%, transparent 86%)`;
   const heroBrandBg = isLightTheme
     ? `linear-gradient(135deg, ${theme.primary}26 0%, ${theme.card} 55%, ${theme.primary}14 100%)`
@@ -673,6 +690,28 @@ export default function Dashboard() {
           <Radio className="h-4 w-4 relative z-10 live-radio" />
           <span className="tracking-wider relative z-10">LIVE</span>
         </button>
+        </div>
+        )}
+
+        {/* TEMPORAL: botonera para elegir el overlay del banner en TEMA CLARO.
+            Cuando elijas, dejamos ese fijo y se saca. */}
+        {isLightTheme && (
+        <div className="absolute bottom-3 left-4 z-20 flex items-center gap-1.5 flex-wrap" style={{ maxWidth: '70%' }}>
+          <span className="text-[10px] font-bold uppercase tracking-wider mr-1" style={{ color: heroTextColor }}>Claro</span>
+          {bannerClaroOverlays.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setClaroVariant(i)}
+              className="w-7 h-7 rounded-md text-xs font-extrabold flex items-center justify-center transition-transform hover:scale-110"
+              style={{
+                background: i === claroVariant ? theme.primary : 'rgba(0,0,0,0.10)',
+                color: i === claroVariant ? '#ffffff' : theme.text,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              {i + 1}
+            </button>
+          ))}
         </div>
         )}
 
