@@ -608,21 +608,18 @@ export default function Dashboard() {
                 className="w-full h-full object-cover"
                 style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
               />
-              {/* Gradiente oscuro sobre la foto para legibilidad del texto blanco. */}
+              {/* Overlay con el COLOR DEL TEMA y alta opacity: el banner toma el
+                  tono del muni y la foto queda como textura tenue de fondo. El
+                  texto del municipio y los botones (LIVE / Conoce Munify) van por
+                  encima (z-10), nitidos y sin overlay. */}
               {!municipioActual?.tema_config?.portadaSinFiltro ? (
-                <>
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background: `linear-gradient(180deg,
-                        rgba(15, 23, 42, 0.65) 0%,
-                        rgba(15, 23, 42, 0.8) 50%,
-                        rgba(15, 23, 42, 0.85) 100%
-                      )`,
-                    }}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-900/50 via-transparent to-slate-900/30" />
-                </>
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`,
+                    opacity: 0.86,
+                  }}
+                />
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
               )}
