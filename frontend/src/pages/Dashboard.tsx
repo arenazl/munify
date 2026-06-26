@@ -125,23 +125,12 @@ export default function Dashboard() {
   // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
   const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
   const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
-  // Variantes de overlay del banner (botonera temporal para elegir el look).
-  const _p = theme.primary; const _ph = theme.primaryHover || theme.primary; const _ACC = '#f5a623';
-  // Todas SUAVES (foto protagonista, color apenas un tinte, nunca super saturado).
-  const bannerOverlays = [
-    // 1 - Casi limpio: foto, solo un velo oscuro tenue a la izq para leer el texto
-    `linear-gradient(90deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.12) 42%, transparent 72%)`,
-    // 2 - Tinte suave del color del tema
-    `linear-gradient(90deg, ${_p}59 0%, ${_p}1f 45%, transparent 80%)`,
-    // 3 - Tinte suave naranja
-    `linear-gradient(90deg, ${_ACC}59 0%, ${_ACC}1f 45%, transparent 80%)`,
-    // 4 - Cine: oscuro abajo, foto arriba
-    `linear-gradient(0deg, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.14) 48%, transparent 82%)`,
-    // 5 - Vineta de color muy suave detras del texto
-    `radial-gradient(120% 135% at 12% 55%, ${_p}6e 0%, ${_p}21 36%, transparent 66%)`,
-    // 6 - Mix: velo oscuro + tinte de color, suave
-    `linear-gradient(105deg, rgba(0,0,0,0.5) 0%, ${_p}30 46%, transparent 86%)`,
-  ];
+  // Overlay del banner: velo oscuro + un tinte del color del tema (la foto manda).
+  // En tema CLARO se DUPLICA la opacidad del velo porque el texto es blanco y
+  // necesita mas contraste sobre la foto clara.
+  const heroOverlayDarkA = isLightTheme ? 0.84 : 0.58;
+  const heroOverlayColorA = isLightTheme ? '66' : '33';
+  const bannerOverlay = `linear-gradient(105deg, rgba(0,0,0,${heroOverlayDarkA}) 0%, ${theme.primary}${heroOverlayColorA} 47%, transparent 86%)`;
   const tienePortada = true; // siempre hay imagen (portada propia o default)
   // Siempre fondo con foto + gradiente oscuro => texto claro.
   const heroFondoOscuro = true;
@@ -196,7 +185,6 @@ export default function Dashboard() {
 
   // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
   const [liveMode, setLiveMode] = useState(false);
-  const [bannerVariant, setBannerVariant] = useState(0);
 
   // Pull-to-refresh: refreshKey fuerza re-fetch cuando el usuario tira hacia abajo
   const [refreshKey, setRefreshKey] = useState(0);
@@ -632,7 +620,7 @@ export default function Dashboard() {
                   encima (z-10), nitidos y sin overlay. */}
               <div
                 className="absolute inset-0"
-                style={{ background: bannerOverlays[bannerVariant] }}
+                style={{ background: bannerOverlay }}
               />
             </>
           ) : (
@@ -689,26 +677,6 @@ export default function Dashboard() {
         </div>
         )}
 
-        {/* TEMPORAL: botonera para elegir el overlay del banner. Cuando elijas
-            uno, dejamos ese fijo y se saca esta botonera. */}
-        <div className="absolute bottom-3 left-4 z-20 flex items-center gap-1.5">
-          <span className="text-[10px] font-bold uppercase tracking-wider mr-1" style={{ color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>Estilo</span>
-          {bannerOverlays.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setBannerVariant(i)}
-              className="w-7 h-7 rounded-md text-xs font-extrabold flex items-center justify-center transition-transform hover:scale-110"
-              style={{
-                background: i === bannerVariant ? '#ffffff' : 'rgba(255,255,255,0.22)',
-                color: i === bannerVariant ? '#111827' : '#ffffff',
-                border: '1px solid rgba(255,255,255,0.45)',
-                backdropFilter: 'blur(4px)',
-              }}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
 
         <style>{`
           .live-btn {
