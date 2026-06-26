@@ -51,7 +51,7 @@ export function Skeleton({
       <div
         className={`${getVariantStyles()} ${getAnimationClass()} ${className}`}
         style={{
-          backgroundColor: `${theme.textSecondary}15`,
+          backgroundColor: `${theme.textSecondary}2e`,
           width: width,
           height: height || (variant === 'text' ? '1em' : undefined),
         }}
@@ -69,12 +69,12 @@ export function Skeleton({
           .skeleton-wave {
             background: linear-gradient(
               90deg,
-              ${theme.textSecondary}10 0%,
-              ${theme.textSecondary}20 50%,
-              ${theme.textSecondary}10 100%
+              ${theme.textSecondary}22 0%,
+              ${theme.textSecondary}5c 50%,
+              ${theme.textSecondary}22 100%
             );
             background-size: 200% 100%;
-            animation: skeleton-wave 1.5s ease-in-out infinite;
+            animation: skeleton-wave 1.3s ease-in-out infinite;
           }
         `}</style>
       )}
