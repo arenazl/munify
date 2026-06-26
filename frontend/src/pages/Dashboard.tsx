@@ -25,7 +25,7 @@ import {
 import HeatmapWidget from '../components/ui/HeatmapWidget';
 import PageHint from '../components/ui/PageHint';
 import DashboardLive from '../components/DashboardLive';
-import PresentacionLaunchButton from '../components/PresentacionLaunchButton';
+import PresentacionLive from '../components/PresentacionLive';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { Radio } from 'lucide-react';
 
@@ -123,7 +123,7 @@ export default function Dashboard() {
   // oscura en los temas claros y respeta la identidad del municipio.
   // Imagen de fondo del banner: la portada del muni si la cargo; si no, una
   // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
-  const [claroVariant, setClaroVariant] = useState(0);
+  const [claroVariant, setClaroVariant] = useState(7); // arranca en la variante 8 (la elegida)
   const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
   const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
   const tienePortada = true; // siempre hay imagen (portada propia o default)
@@ -147,6 +147,9 @@ export default function Dashboard() {
     `linear-gradient(105deg, rgba(255,255,255,0.56) 0%, rgba(255,255,255,0.24) 45%, transparent 80%)`,
     `linear-gradient(105deg, rgba(255,255,255,0.90) 0%, ${_pc}24 47%, rgba(255,255,255,0.20) 90%)`,
   ];
+  // Opacity extra del overlay en tema claro: suaviza la variante elegida para que
+  // no quede tan fuerte (la foto se ve un poco mas). Ajustable por esta variable.
+  const claroOverlayOpacity = 0.72;
   const bannerOverlay = isLightTheme
     ? bannerClaroOverlays[claroVariant]
     : `linear-gradient(105deg, rgba(0,0,0,0.58) 0%, ${theme.primary}33 47%, transparent 86%)`;
@@ -201,6 +204,7 @@ export default function Dashboard() {
 
   // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
   const [liveMode, setLiveMode] = useState(false);
+  const [presentOpen, setPresentOpen] = useState(false);
 
   // Pull-to-refresh: refreshKey fuerza re-fetch cuando el usuario tira hacia abajo
   const [refreshKey, setRefreshKey] = useState(0);
@@ -636,7 +640,7 @@ export default function Dashboard() {
                   encima (z-10), nitidos y sin overlay. */}
               <div
                 className="absolute inset-0"
-                style={{ background: bannerOverlay }}
+                style={{ background: bannerOverlay, opacity: isLightTheme ? claroOverlayOpacity : 1 }}
               />
             </>
           ) : (
@@ -669,11 +673,27 @@ export default function Dashboard() {
 
         {/* Botón LIVE — solo para admin/supervisor (modo televisor) */}
         {(user?.rol === 'admin' || user?.rol === 'supervisor') && (
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
+        <>
+        {/* Conoce Munify — extremo IZQUIERDO, mismo estilo/brillo que LIVE (color indigo) */}
+        <button
+          onClick={() => setPresentOpen(true)}
+          className="cm-btn absolute top-4 left-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
+          style={{
+            backgroundColor: heroFondoOscuro ? 'rgba(99, 102, 241, 0.28)' : 'rgba(99, 102, 241, 0.92)',
+            border: '2px solid rgba(99, 102, 241, 0.7)',
+            color: '#ffffff',
+          }}
+          title="Recorrido guiado del producto"
+        >
+          <span className="cm-ring absolute inset-0 rounded-full pointer-events-none" />
+          <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
+          <Sparkles className="h-4 w-4 relative z-10 live-radio" />
+          <span className="tracking-wider relative z-10">Conocé Munify</span>
+        </button>
+        {/* LIVE — extremo DERECHO */}
         <button
           onClick={() => setLiveMode(true)}
-          className="live-btn flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
+          className="live-btn absolute top-4 right-4 z-20 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm backdrop-blur-md group overflow-hidden"
           style={{
             backgroundColor: heroFondoOscuro ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.92)',
             border: '2px solid rgba(239, 68, 68, 0.7)',
@@ -681,16 +701,13 @@ export default function Dashboard() {
           }}
           title="Modo televisor — slides en pantalla completa"
         >
-          {/* Anillo pulsante exterior para llamar la atención */}
           <span className="live-ring absolute inset-0 rounded-full pointer-events-none" />
-          {/* Shimmer que atraviesa el botón */}
           <span className="live-shimmer-btn absolute inset-0 rounded-full pointer-events-none" />
-
           <span className="w-2.5 h-2.5 rounded-full bg-red-500 live-dot relative z-10" />
           <Radio className="h-4 w-4 relative z-10 live-radio" />
           <span className="tracking-wider relative z-10">LIVE</span>
         </button>
-        </div>
+        </>
         )}
 
         {/* TEMPORAL: botonera para elegir el overlay del banner en TEMA CLARO.
@@ -775,8 +792,18 @@ export default function Dashboard() {
             75%      { transform: rotate(8deg); }
           }
 
+          /* Conoce Munify — mismas animaciones que LIVE, color distinto (indigo) */
+          @keyframes cmBtnBreathe {
+            0%, 100% { box-shadow: 0 4px 16px rgba(99,102,241,0.5); transform: scale(1); }
+            50%      { box-shadow: 0 6px 28px rgba(99,102,241,0.85); transform: scale(1.04); }
+          }
+          .cm-btn { animation: cmBtnBreathe 2.4s ease-in-out infinite; box-shadow: 0 4px 16px rgba(99,102,241,0.5); }
+          .cm-btn:hover { animation-play-state: paused; transform: scale(1.08); box-shadow: 0 8px 24px rgba(99,102,241,0.7); }
+          .cm-btn:active { transform: scale(0.95); }
+          .cm-ring { border: 2px solid rgba(99,102,241,0.6); animation: liveRingPulse 2s ease-out infinite; }
+
           @media (prefers-reduced-motion: reduce) {
-            .live-btn, .live-ring, .live-shimmer-btn, .live-dot, .live-radio {
+            .live-btn, .live-ring, .live-shimmer-btn, .live-dot, .live-radio, .cm-btn, .cm-ring {
               animation: none !important;
             }
           }
@@ -1652,6 +1679,7 @@ export default function Dashboard() {
         tendencias={tendencias}
         heatmapData={heatmapData}
       />
+      <PresentacionLive open={presentOpen} onClose={() => setPresentOpen(false)} />
     </div>
     </PullToRefresh>
   );
