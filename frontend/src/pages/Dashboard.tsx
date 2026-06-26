@@ -125,6 +125,16 @@ export default function Dashboard() {
   // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
   const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
   const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
+  // Variantes de overlay del banner (botonera temporal para elegir el look).
+  const _p = theme.primary; const _ph = theme.primaryHover || theme.primary; const _ACC = '#f5a623';
+  const bannerOverlays = [
+    `linear-gradient(90deg, ${_p}f2 0%, ${_p}cc 38%, ${_ph}70 72%, ${_ph}3d 100%)`,
+    `linear-gradient(110deg, ${_p}e6 0%, ${_p}b3 42%, ${_ACC}59 82%, ${_ACC}30 100%)`,
+    `linear-gradient(120deg, ${_p}d9 0%, ${_ph}80 55%, ${_ph}26 100%)`,
+    `linear-gradient(90deg, rgba(2,6,23,0.82) 0%, rgba(2,6,23,0.5) 50%, rgba(2,6,23,0.22) 100%)`,
+    `radial-gradient(130% 120% at 0% 50%, ${_p}f2 0%, ${_p}b3 32%, ${_ph}40 72%, transparent 100%)`,
+    `linear-gradient(100deg, ${_p} 0%, ${_ph}99 50%, ${_ACC}40 100%)`,
+  ];
   const tienePortada = true; // siempre hay imagen (portada propia o default)
   // Siempre fondo con foto + gradiente oscuro => texto claro.
   const heroFondoOscuro = true;
@@ -179,6 +189,7 @@ export default function Dashboard() {
 
   // Estado del modo "Live" — fullscreen TV mode con auto-rotate de slides
   const [liveMode, setLiveMode] = useState(false);
+  const [bannerVariant, setBannerVariant] = useState(0);
 
   // Pull-to-refresh: refreshKey fuerza re-fetch cuando el usuario tira hacia abajo
   const [refreshKey, setRefreshKey] = useState(0);
@@ -615,12 +626,7 @@ export default function Dashboard() {
               {!municipioActual?.tema_config?.portadaSinFiltro ? (
                 <div
                   className="absolute inset-0"
-                  style={{
-                    // Gradiente lateral del color del tema: fuerte del lado del
-                    // texto (izquierda) para que se lea, y se abre hacia la derecha
-                    // para que la foto asome (blend, no un color macizo).
-                    background: `linear-gradient(90deg, ${theme.primary}f2 0%, ${theme.primary}cc 38%, ${theme.primaryHover || theme.primary}70 72%, ${theme.primaryHover || theme.primary}3d 100%)`,
-                  }}
+                  style={{ background: bannerOverlays[bannerVariant] }}
                 />
               ) : (
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
@@ -679,6 +685,27 @@ export default function Dashboard() {
         </button>
         </div>
         )}
+
+        {/* TEMPORAL: botonera para elegir el overlay del banner. Cuando elijas
+            uno, dejamos ese fijo y se saca esta botonera. */}
+        <div className="absolute bottom-3 left-4 z-20 flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wider mr-1" style={{ color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.6)' }}>Estilo</span>
+          {bannerOverlays.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setBannerVariant(i)}
+              className="w-7 h-7 rounded-md text-xs font-extrabold flex items-center justify-center transition-transform hover:scale-110"
+              style={{
+                background: i === bannerVariant ? '#ffffff' : 'rgba(255,255,255,0.22)',
+                color: i === bannerVariant ? '#111827' : '#ffffff',
+                border: '1px solid rgba(255,255,255,0.45)',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              {i + 1}
+            </button>
+          ))}
+        </div>
 
         <style>{`
           .live-btn {
