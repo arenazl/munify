@@ -121,10 +121,13 @@ export default function Dashboard() {
   // "hero de marca" derivado del theme: gradiente con theme.primary + el escudo
   // del muni (o un icono) como watermark. Asi el banner deja de ser una isla
   // oscura en los temas claros y respeta la identidad del municipio.
-  const tienePortada = !!municipioActual?.imagen_portada;
-  // Tema claro -> fondo de marca suave (se funde a card) => texto oscuro.
-  // Tema oscuro o con foto -> fondo oscuro/intenso => texto claro.
-  const heroFondoOscuro = tienePortada || !isLightTheme;
+  // Imagen de fondo del banner: la portada del muni si la cargo; si no, una
+  // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
+  const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
+  const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
+  const tienePortada = true; // siempre hay imagen (portada propia o default)
+  // Siempre fondo con foto + gradiente oscuro => texto claro.
+  const heroFondoOscuro = true;
   const heroBrandBg = isLightTheme
     ? `linear-gradient(135deg, ${theme.primary}26 0%, ${theme.card} 55%, ${theme.primary}14 100%)`
     : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`;
@@ -600,7 +603,7 @@ export default function Dashboard() {
           {tienePortada ? (
             <>
               <img
-                src={municipioActual?.imagen_portada}
+                src={heroBgImage}
                 alt={municipioActual?.nombre || "Portada"}
                 className="w-full h-full object-cover"
                 style={{ opacity: municipioActual?.tema_config?.portadaOpacity ?? 1 }}
