@@ -818,28 +818,35 @@ export default function Layout() {
 
       {/* Main content - sin padding-top porque no hay header fijo */}
       <div className="lg:transition-[padding] lg:duration-300 main-content-area relative">
-        {/* Imagen de fondo del contenido */}
-        {contentBgImage && (
-          <>
-            <div
-              className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
-              style={{
-                backgroundImage: `url(${contentBgImage})`,
-                opacity: contentBgOpacity,
-                transition: 'opacity 0.3s ease',
-                zIndex: 0,
-              }}
-            />
-            {/* Overlay para mejorar legibilidad */}
-            <div
-              className="fixed inset-0 pointer-events-none"
-              style={{
-                background: `linear-gradient(180deg, ${theme.contentBackground}ee 0%, ${theme.contentBackground}cc 50%, ${theme.contentBackground}ee 100%)`,
-                zIndex: 0,
-              }}
-            />
-          </>
-        )}
+        {/* Imagen de fondo del contenido: la que cargó el muni/usuario; si no,
+            la imagen_portada del municipio; si nadie cargó nada, una default
+            (caso tipico de las demos). Asi siempre hay imagen de fondo. */}
+        {(() => {
+          const defaultBgImage = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
+          const effectiveBgImage = contentBgImage || municipioActual?.imagen_portada || defaultBgImage;
+          return (
+            <>
+              <div
+                className="fixed inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+                style={{
+                  backgroundImage: `url(${effectiveBgImage})`,
+                  opacity: contentBgOpacity,
+                  transition: 'opacity 0.3s ease',
+                  zIndex: 0,
+                }}
+              />
+              {/* Overlay de color con variables del tema (no hex fijos). Opacity
+                  bajo para que la imagen siga visible: primary 17% (2b) -> primaryHover 23% (3b). */}
+              <div
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                  background: `linear-gradient(135deg, ${theme.primary}2b 0%, ${theme.primaryHover}3b 100%)`,
+                  zIndex: 0,
+                }}
+              />
+            </>
+          );
+        })()}
 
         {/* Page content with transition - padding reducido en móvil */}
         <main
