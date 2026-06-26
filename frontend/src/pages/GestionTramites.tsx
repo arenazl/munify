@@ -1709,7 +1709,7 @@ export default function GestionTramites({ soloMiArea = false }: GestionTramitesP
         searchValue={searchTerm}
         onSearchChange={setSearchTerm}
         searchPlaceholder="Buscar trámites..."
-        loading={false}
+        loading={loading}
         isEmpty={filteredTramites.length === 0 && !vistaInbox}
         emptyMessage="No hay trámites"
         pagination={{
