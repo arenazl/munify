@@ -616,8 +616,10 @@ export default function Dashboard() {
                 <div
                   className="absolute inset-0"
                   style={{
-                    background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`,
-                    opacity: 0.86,
+                    // Gradiente lateral del color del tema: fuerte del lado del
+                    // texto (izquierda) para que se lea, y se abre hacia la derecha
+                    // para que la foto asome (blend, no un color macizo).
+                    background: `linear-gradient(90deg, ${theme.primary}f2 0%, ${theme.primary}cc 38%, ${theme.primaryHover || theme.primary}70 72%, ${theme.primaryHover || theme.primary}3d 100%)`,
                   }}
                 />
               ) : (
