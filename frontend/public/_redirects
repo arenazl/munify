@@ -1,1 +1,10 @@
-/* /index.html 200
+# Proxy same-origin al backend (Cloud Run). DEBEN ir antes del catch-all SPA.
+# _redirects se procesa ANTES que netlify.toml, por eso el proxy vive aca.
+# El front pega a /api, /static y /uploads relativos -> sin URL en el bundle
+# (sin secrets scanning) y sin CORS.
+/api/*      https://munify-api-vmpxsxe7ra-rj.a.run.app/api/:splat      200!
+/static/*   https://munify-api-vmpxsxe7ra-rj.a.run.app/static/:splat   200!
+/uploads/*  https://munify-api-vmpxsxe7ra-rj.a.run.app/uploads/:splat  200!
+
+# SPA fallback (React Router) - catch-all, va ultimo.
+/*          /index.html                                                200
