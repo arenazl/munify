@@ -870,6 +870,9 @@ async def get_tramites_publicos(
             "icono": t.icono or (t.categoria_tramite.icono if t.categoria_tramite else None),
             "tiempo_estimado_dias": t.tiempo_estimado_dias or 15,
             "costo": t.costo,
+            "modo_atencion": t.modo_atencion or "online",
+            "duracion_turno_min": t.duracion_turno_min or 30,
+            "requiere_kyc": bool(t.requiere_kyc),
             "documentos_requeridos": [
                 {
                     "id": d.id,

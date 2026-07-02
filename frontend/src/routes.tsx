@@ -59,6 +59,7 @@ import CapturaMovil from './pages/CapturaMovil';
 import CapturaMovilFake from './pages/CapturaMovilFake';
 import GestionCuadrillas from './pages/GestionCuadrillas';
 import OrdenesTrabajo from './pages/OrdenesTrabajo';
+import CatalogoTramites from './pages/CatalogoTramites';
 import GestionAusencias from './pages/GestionAusencias';
 import Planificacion from './pages/Planificacion';
 import PanelBI from './pages/PanelBI';
@@ -145,6 +146,8 @@ export const router = createBrowserRouter([
   // Rutas mobile fuera del layout (pantalla completa)
   { path: '/app/nuevo', element: <NuevoReclamoPage /> },
   { path: '/app/nuevo-tramite', element: <NuevoTramitePage /> },
+  // Catálogo público de trámites: requisitos + modo de atención, sin login
+  { path: '/app/tramites', element: <CatalogoTramites /> },
   { path: '/app/tramites', element: <Navigate to="/app/mis-tramites" replace /> },
   { path: '/app/tramites/nuevo', element: <Navigate to="/app/nuevo-tramite" replace /> },
   { path: '/app/mis-tramites', element: <MisTramites /> },

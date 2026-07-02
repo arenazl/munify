@@ -576,9 +576,9 @@ export default function HomePublic() {
             </div>
           </button>
 
-          {/* FIX: '/tramites' redirigía a /home (loop muerto) — va directo al wizard público */}
+          {/* Catálogo público: requisitos + modo de atención antes de iniciar/sacar turno */}
           <button
-            onClick={() => navigate('/app/nuevo-tramite')}
+            onClick={() => navigate('/app/tramites')}
             className="flex flex-col items-center justify-center gap-2 py-5 md:py-4 px-3 md:px-4 rounded-2xl font-medium transition-all active:scale-[0.98] hover:scale-[1.02]"
             style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
           >
