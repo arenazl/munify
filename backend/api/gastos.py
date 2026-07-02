@@ -647,6 +647,17 @@ async def update_gasto(
         gasto.cuotas = []
         nuevas = _generar_cuotas(gasto)
         db.add_all(nuevas)
+        # El plan de pagos se resetea (las cuotas nuevas nacen pendientes),
+        # así que los egresos de caja ya registrados por este gasto quedan
+        # huérfanos: el del contado viejo (si el tipo cambió contado→cuotas)
+        # y los de cuotas pagadas recién borradas. Sin esta limpieza, el
+        # movimiento contado viejo seguía descontando y re-pagar las cuotas
+        # nuevas duplicaba egresos. La sync de más abajo recrea el movimiento
+        # correcto si el tipo final vuelve a ser contado.
+        from sqlalchemy import delete as sa_delete
+        await db.execute(
+            sa_delete(TesoreriaMovimientoCaja).where(TesoreriaMovimientoCaja.gasto_id == gasto.id)
+        )
 
     # Si vinieron proyectos en el payload (incluso lista vacia), reasignar.
     if payload.proyectos is not None:
@@ -692,6 +703,26 @@ async def delete_gasto(
     gasto = result.scalar_one_or_none()
     if not gasto:
         raise HTTPException(status_code=404, detail="Gasto no encontrado")
+
+    # Si el gasto tiene una Orden de Pago vinculada no anulada, borrarlo
+    # dejaría una OP "pagada" apuntando a un gasto inexistente — seguiría
+    # sumando en cuenta corriente, stats y export de transparencia.
+    from models import OrdenPago, EstadoOrdenPago
+    op_vinculada = (await db.execute(
+        select(OrdenPago).where(
+            OrdenPago.gasto_id == gasto.id,
+            OrdenPago.estado != EstadoOrdenPago.ANULADA,
+        ).limit(1)
+    )).scalar_one_or_none()
+    if op_vinculada:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Este gasto tiene la orden de pago {op_vinculada.numero} vinculada. "
+                "Anulá la OP primero para mantener la contabilidad consistente."
+            ),
+        )
+
     gasto.activo = False
     # Borrar movimientos de caja asociados — el gasto eliminado ya no
     # debe seguir descontando la caja.
@@ -987,27 +1018,9 @@ async def proyecciones_cuotas_del_mes(
 
 
 
-# ===========================================
-# Dashboard IA — analisis operativo Tesoreria
-# ===========================================
-@router.get("/dashboard-ia")
-async def tesoreria_dashboard_ia(
-    request: Request,
-    force: bool = False,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _require_admin(current_user)
-    from core.tenancy import get_effective_municipio_id
-    municipio_id = get_effective_municipio_id(request, current_user)
-    if not municipio_id:
-        return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
-    from core.ia_config import get_ia_config
-    _cfg = await get_ia_config(db, municipio_id)
-    if not (_cfg.habilitada and _cfg.tesoreria):
-        return {"urgentes": [], "recomendaciones": [], "secciones": [], "generadoEn": None}
-    from services.dashboard_ia import build_tesoreria_dashboard
-    return await build_tesoreria_dashboard(db, municipio_id, force=force)
+# NOTA: acá había una segunda definición de GET /dashboard-ia idéntica a la
+# de arriba (línea ~308) — FastAPI matchea la primera, así que era código
+# muerto inalcanzable. Eliminada.
 
 
 @router.post("/upload-factura")
@@ -1187,7 +1200,7 @@ async def generar_op_desde_gasto(
     409 con el id de la OP existente.
     """
     from datetime import datetime
-    from models import OrdenPago, EstadoOrdenPago, Municipio
+    from models import OrdenPago, EstadoOrdenPago, EtapaContable, Municipio
     from api.ordenes_pago import _siguiente_numero
 
     _require_admin(current_user)
@@ -1224,6 +1237,7 @@ async def generar_op_desde_gasto(
         numero=numero,
         creador_id=current_user.id,
         estado=EstadoOrdenPago.PAGADA,                      # nace pagada (respaldo posterior)
+        etapa_contable=EtapaContable.PAGADO,                # coherente con el estado (antes quedaba en preventivo)
         destino_tipo=gasto.destino_tipo,
         destino_contacto_id=gasto.destino_contacto_id,
         destino_dependencia_id=gasto.destino_dependencia_id,
