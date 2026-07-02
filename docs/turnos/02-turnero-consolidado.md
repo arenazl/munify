@@ -84,8 +84,39 @@ paralelas), feriados. Lo que FALTA:
   abrir expediente desde el turno), reportes de demanda y ausentismo,
   sobreturnos/lista de espera si algún muni lo pide.
 
+## Identidad del turno (DEFINIDO por el dueño, 2026-07-02)
+
+Regla de negocio argentina: **los trámites exigen validación biométrica
+obligatoria** (Didit: DNI + selfie, ya integrado) — sin eso cualquiera saca
+turnos para molestar (ej. licencia de conducir) y quema slots del funcionario;
+un email no alcanza. **Reclamos siguen con fricción mínima** ("hay unos pibes
+jodiendo en la esquina" tiene que entrar sin barreras).
+
+Diseño resultante — "sin cuenta" NO significa "sin identidad", significa
+**sin registro tradicional**:
+- La identidad requerida es un **atributo del trámite en el catálogo** (pata 1).
+  Ya existe en el modelo (`requiere_kyc` + `nivel_kyc_minimo`) pero hoy gatea
+  solo la creación de Solicitud → hay que APLICARLO A LA RESERVA DEL TURNO.
+- Flujo vecino: elegir trámite → requisitos → slot → **"validá tu identidad
+  para confirmar"** → Didit (30-60 seg) → turno confirmado a nombre verificado.
+  La cuenta se crea/toma sola detrás (el registro-por-Didit ya existe, con
+  ghost accounts reclamables por DNI). Una sola fricción, no dos.
+  Si ya está verificado (nivel 2), confirma directo sin repetir biometría.
+- Beneficio para el funcionario: cada turno llega con identidad verificada →
+  check-in por DNI real, y los no-shows quedan registrados contra una persona
+  (reincidencia penalizable por DNI — anti-abuso de segundo nivel).
+- **Bot de WhatsApp**: puede reservar directo solo trámites sin exigencia
+  biométrica; para los demás hace PRE-RESERVA con hold del slot (ej. 3 horas)
+  y manda el link de Didit — el turno se confirma al validar, o se libera.
+- **Mostrador/kiosco (DEFINIDO por el dueño)**: SIN webcam en el puesto. El
+  funcionario le muestra un QR al vecino; el vecino accede al sitio desde SU
+  celular ahí mismo, se escanea (Didit en su propio teléfono) y queda
+  onboardeado usando la aplicación desde ese momento. Este flujo YA existe
+  (`captura_movil`: handoff PC→celular por QR con polling/WebSocket) — es el
+  camino canónico del kiosco; la webcam del puesto no se implementa.
+
 ## Decisiones abiertas (del dueño)
 
-1. **¿Turnero web sin cuenta?** (como el bot: nombre+DNI+teléfono). Recomendación: SÍ — es ventanilla; pedir registro mata la adopción.
-2. Confirmar el **enum de 3 modos** de atención por trámite (¿o alcanza con turno sí/no?).
-3. **¿Multi-sede real?** (una dependencia con más de una dirección de atención) — hoy no existe; si ningún muni lo pide, se difiere.
+1. Confirmar el **enum de 3 modos** de atención por trámite (¿o alcanza con turno sí/no?).
+2. **¿Multi-sede real?** (una dependencia con más de una dirección de atención) — hoy no existe; si ningún muni lo pide, se difiere.
+3. **Hold de pre-reserva del bot**: ¿cuántas horas retiene el slot esperando la validación biométrica? (propuesta: 3 hs).
