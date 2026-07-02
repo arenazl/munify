@@ -105,9 +105,13 @@ Diseño resultante — "sin cuenta" NO significa "sin identidad", significa
 - Beneficio para el funcionario: cada turno llega con identidad verificada →
   check-in por DNI real, y los no-shows quedan registrados contra una persona
   (reincidencia penalizable por DNI — anti-abuso de segundo nivel).
-- **Bot de WhatsApp**: puede reservar directo solo trámites sin exigencia
-  biométrica; para los demás hace PRE-RESERVA con hold del slot (ej. 3 horas)
-  y manda el link de Didit — el turno se confirma al validar, o se libera.
+- **Bot de WhatsApp — EN STANDBY (definido por el dueño, 2026-07-02)**: todo
+  el enganche del bot/tools queda fuera del alcance de la fase C hasta que
+  tenga una utilidad clara y esté refinado. Foco: armar bien la aplicación.
+  Los endpoints del bot existentes quedan como están (no se rompen ni se
+  extienden). Cuando se retome, el diseño previsto es: reservar directo solo
+  trámites sin exigencia biométrica; para los demás, pre-reserva con hold del
+  slot + link de Didit (se confirma al validar o se libera).
 - **Mostrador/kiosco (DEFINIDO por el dueño) — "modo híbrido para gente no
   informatizada"**: SIN webcam en el puesto. El vecino valida la biometría en
   SU celular (su elemento de confianza) vía QR que le muestra el funcionario;
@@ -123,4 +127,6 @@ Diseño resultante — "sin cuenta" NO significa "sin identidad", significa
 
 1. Confirmar el **enum de 3 modos** de atención por trámite (¿o alcanza con turno sí/no?).
 2. **¿Multi-sede real?** (una dependencia con más de una dirección de atención) — hoy no existe; si ningún muni lo pide, se difiere.
-3. **Hold de pre-reserva del bot**: ¿cuántas horas retiene el slot esperando la validación biométrica? (propuesta: 3 hs).
+
+Diferidas por standby del bot: hold de pre-reserva y verificación biométrica
+vía WhatsApp.
