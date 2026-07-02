@@ -68,11 +68,24 @@ paralelas), feriados. Lo que FALTA:
 - **Reportes**: demanda por franja/día, ausentismo por trámite/dependencia,
   turnos vs expedientes abiertos (dimensionar ventanillas con datos).
 
+## Los dos QRs (definido por el dueño, 2026-07-02)
+
+1. **QR dinámico del mostrador** (ya existía): por vecino/sesión, para la
+   validación biométrica asistida (`captura_movil`).
+2. **QR fijo de cartelería** — **HECHO** (commit `3ae5b1e`): estático,
+   imprimible (PNG 1024), se genera desde Configuración→General y apunta a
+   `/{codigo}` = acceso directo del municipio (ruta `MunicipioAcceso`,
+   validada — `app.munify.com.ar/san-pedro-norte` existe tal como el dueño
+   creía). El vecino escanea el cartel y cae en el login/registro de SU
+   municipio: reclamo anónimo, registro biométrico, trámites.
+
 ## Etapas de implementación propuestas
 
-- **C.0 (inmediato, previo a todo)**: los 4 bugs (ownership, tenant en
-  lecturas, agenda sin nombre/trámite, solapamiento de duraciones) + fix del
-  redirect-loop del portal.
+- **C.0 — HECHO (commit `3ae5b1e`)**: ownership del vecino en PATCH/DELETE,
+  tenant en /disponibilidad y /agenda (staff-only), agenda con nombre+DNI+
+  trámite (el mostrador ya no ve "Vecino" genérico), solapamiento de
+  duraciones por intervalos + lock por dependencia, fix del AttributeError
+  de supervisores en /agenda, y fix del redirect-loop del portal.
 - **C.1 (el corazón)**: modo de atención en el catálogo + ABM; `tramite_id` en
   Turno; flujo turno-directo en app y portal público; requisitos por
   adelantado (catálogo público consultable); wizard ofrece turno; mostrador
