@@ -655,6 +655,8 @@ export const configuracionApi = {
 // Municipios
 export const municipiosApi = {
   getAll: () => api.get('/municipios'),
+  // Resumen real por muni para la vista Suscripciones del superadmin
+  adminResumen: () => api.get('/municipios/admin/resumen'),
   getPublic: () => api.get('/municipios/public'),
   // Detalle público por código — usado por el acceso directo /<codigo>.
   getPublicByCodigo: (codigo: string) => api.get(`/municipios/public/${codigo}`),

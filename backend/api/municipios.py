@@ -1475,3 +1475,73 @@ async def enviar_bienvenida(
         body_html=html,
     )
     return EnviarBienvenidaResponse(email_destino=admin.email, enviado=enviado)
+
+
+# =====================================================================
+# Resumen operativo por municipio (pantalla Suscripciones del superadmin)
+# =====================================================================
+
+@router.get("/admin/resumen")
+async def resumen_municipios_admin(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN])),
+):
+    """Resumen REAL por municipio para la vista comercial del superadmin.
+
+    Reemplaza los datos demo hardcodeados que tenia la pantalla Suscripciones:
+    devuelve solo lo que existe de verdad (no hay billing todavia): tipo
+    productivo/demo, usuarios activos, volumen de reclamos, ultima actividad
+    y modulos configurados. Todo en queries batch (sin N+1).
+    """
+    if current_user.municipio_id is not None:
+        raise HTTPException(status_code=403, detail="Solo el super admin")
+
+    from sqlalchemy import func as sa_func
+    from models import Reclamo, MunicipioModulo
+
+    munis = (await db.execute(select(Municipio))).scalars().all()
+
+    # Usuarios activos por muni
+    usuarios = dict((await db.execute(
+        select(User.municipio_id, sa_func.count(User.id))
+        .where(User.activo == True, User.municipio_id.isnot(None))  # noqa: E712
+        .group_by(User.municipio_id)
+    )).all())
+
+    # Reclamos: total y ultima actividad por muni
+    reclamos = {
+        mid: (total, ultimo)
+        for mid, total, ultimo in (await db.execute(
+            select(
+                Reclamo.municipio_id,
+                sa_func.count(Reclamo.id),
+                sa_func.max(Reclamo.created_at),
+            ).group_by(Reclamo.municipio_id)
+        )).all()
+    }
+
+    # Filas de modulos por muni (el front deriva el estado efectivo con su SSoT)
+    modulos: dict = {}
+    for mid, modulo, activo in (await db.execute(
+        select(MunicipioModulo.municipio_id, MunicipioModulo.modulo, MunicipioModulo.activo)
+    )).all():
+        modulos.setdefault(mid, []).append({"modulo": modulo, "activo": bool(activo)})
+
+    return [
+        {
+            "id": m.id,
+            "nombre": m.nombre,
+            "codigo": m.codigo,
+            "activo": bool(m.activo),
+            "es_demo": bool(m.es_demo) if m.es_demo is not None else True,
+            "alta": m.created_at.isoformat() if m.created_at else None,
+            "usuarios_activos": int(usuarios.get(m.id, 0)),
+            "reclamos_total": int(reclamos.get(m.id, (0, None))[0]),
+            "ultima_actividad": (
+                reclamos[m.id][1].isoformat()
+                if m.id in reclamos and reclamos[m.id][1] else None
+            ),
+            "modulos": modulos.get(m.id, []),
+        }
+        for m in munis
+    ]

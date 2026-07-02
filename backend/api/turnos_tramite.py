@@ -14,7 +14,9 @@ from datetime import datetime, timedelta, time
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, and_
+import re
+
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -269,16 +271,47 @@ async def mis_turnos(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Turnos del vecino logueado (los reservados desde la app, via sus solicitudes).
-    Los turnos hechos por el bot (solicitud_id NULL) se reconciliaran por dni/telefono
-    en una iteracion posterior (hueco de identidad documentado en la spec)."""
+    """Turnos del vecino logueado.
+
+    Dos fuentes reconciliadas:
+      1. Turnos reservados desde la app (vía sus solicitudes).
+      2. Turnos hechos SIN cuenta (bot de WhatsApp / mostrador: solicitud_id
+         NULL) que matcheen su identidad por DNI o teléfono normalizados.
+         Cierra el hueco de identidad documentado en la spec del turnero.
+    """
     sub = select(Solicitud.id).where(Solicitud.solicitante_id == current_user.id)
+
+    # Identidad del vecino para reconciliar turnos sin cuenta
+    condiciones_identidad = []
+    dni_norm = re.sub(r"\D", "", current_user.dni or "")
+    if dni_norm:
+        condiciones_identidad.append(
+            func.regexp_replace(Turno.dni_solicitante, "[^0-9]", "") == dni_norm
+        )
+    tel_norm = re.sub(r"\D", "", current_user.telefono or "")[-10:]
+    if len(tel_norm) >= 8:
+        # Sufijo de 10 dígitos: tolera +54/054/9 y prefijos de formato
+        condiciones_identidad.append(
+            func.regexp_replace(Turno.telefono_solicitante, "[^0-9]", "").like(f"%{tel_norm}")
+        )
+
+    filtro = Turno.solicitud_id.in_(sub)
+    if condiciones_identidad:
+        filtro = or_(
+            filtro,
+            and_(
+                Turno.solicitud_id.is_(None),
+                Turno.municipio_id == current_user.municipio_id,
+                or_(*condiciones_identidad),
+            ),
+        )
+
     q = await db.execute(
         select(Turno)
         .options(
             selectinload(Turno.municipio_dependencia).selectinload(MunicipioDependencia.dependencia)
         )
-        .where(Turno.solicitud_id.in_(sub))
+        .where(filtro)
         .order_by(Turno.fecha_hora.desc())
     )
     return [
