@@ -83,27 +83,43 @@ Detalle completo de un municipio para cuando el prospecto ya eligió uno.
 
 **Auth:** `X-SalesBot-Key` header
 
-**Response:**
+**Response** (estructura real — los valores dependen de lo que el muni haya cargado;
+si no cargó nada, viene `null`):
 ```json
 {
-  "id": 3,
-  "nombre": "San Pedro Norte",
-  "descripcion": "Municipio de la sierra...",
-  "telefono": "+54 9 351 000-0000",
-  "email": "contacto@spnorte.gob.ar",
-  "sitio_web": "https://spnorte.gob.ar",
-  "whatsapp": "+54 9 351 123-4567",
-  "whatsapp_habilitado": true,
+  "id": 65,
+  "nombre": "San Pedro",
+  "codigo": "san-pedro",
+  "descripcion": null,
+  "direccion": null,
+  "telefono": null,
+  "email": null,
+  "sitio_web": null,
+  "latitud": null,
+  "longitud": null,
+  "logo_url": null,
+  "color_primario": "#0088cc",
+  "whatsapp": null,
+  "whatsapp_habilitado": false,
   "stats": {
-    "reclamos_totales": 142,
-    "reclamos_resueltos": 89,
-    "tasa_resolucion_pct": 63,
-    "tramites_activos": 23,
-    "categorias_reclamo": ["Luminaria", "Baches", "Residuos"],
-    "vecinos": 310
+    "reclamos_totales": 15,
+    "reclamos_resueltos": 5,
+    "tasa_resolucion_pct": 33,
+    "tramites_activos": 14,
+    "categorias_reclamo": ["Bacheo y calles", "Higiene urbana", "..."],
+    "vecinos": 5
   }
 }
 ```
+
+**De dónde sale cada campo (NO hay valores hardcodeados):**
+- `direccion, telefono, latitud, longitud` ← lo que el admin del muni carga en **Configuración → Datos del Municipio** (tabla `configuraciones`); fallback a columnas de `municipios`.
+- `nombre, codigo, descripcion, email, sitio_web, logo_url, color_primario` ← tabla `municipios`.
+- `whatsapp, whatsapp_habilitado` ← tabla `salesbot_configs` (pestaña SalesBot).
+- `stats` ← conteos en vivo sobre `reclamos`, `tramites`, `usuarios`, `categorias_reclamo`.
+
+> Si el muni no completó esos datos, vienen `null` — el bot NO debe inventar la
+> dirección/teléfono; si están `null`, que diga que no los tiene cargados.
 
 ---
 

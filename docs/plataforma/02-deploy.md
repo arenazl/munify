@@ -1,6 +1,6 @@
 # Deploy · Munify
 
-Pipeline canónico de deploy. **Reglas duras en [`CLAUDE.md`](../CLAUDE.md) §15** — esto es la versión expandida.
+Pipeline canónico de deploy. **Reglas duras en [`CLAUDE.md`](../../CLAUDE.md) §15** — esto es la versión expandida.
 
 > **HEROKU ESTÁ MUERTO.** No existe más para este proyecto. Nunca `git push heroku`.
 > El backend vive en **Google Cloud Run**. Si ves `Procfile` o el remote `heroku`, es legacy.

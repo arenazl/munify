@@ -1,6 +1,6 @@
 """Detector de inconsistencias de contactos/empleados/tipos del muni 80 (SPN).
 
-Genera docs/inconsistencias_contactos_muni80.md para pasarle al cliente.
+Genera docs/clientes/spn/reporte-inconsistencias-contactos.md para pasarle al cliente.
 Read-only: NO modifica nada.
 
 Reglas (calibradas con datos reales para evitar falsos positivos):
@@ -29,7 +29,10 @@ from models import Gasto  # noqa: E402
 from models.tesoreria_extra import TesoreriaTipoEmpleado  # noqa: E402
 
 MUNI = 80
-OUT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "docs", "inconsistencias_contactos_muni80.md"))
+OUT = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), "..", "..", "docs", "clientes", "spn",
+    "reporte-inconsistencias-contactos.md",
+))
 
 # Indicios de relacion laboral (para B: "tiene algun gasto de sueldo").
 LABORAL_KW = ("sueldo", "salario", "aguinaldo", "haber", "jornal", "presentismo",

@@ -1,7 +1,7 @@
 # Mapa de implementación — Munify ↔ SalesBot (lado Munify)
 
 > Contrato de lo que **Munify** expone para SalesBot. Para pasar al agente de SalesBot
-> así integra contra esto. Basado en `SPEC_MUNIFY_SALESBOT_API.md` con ajustes reales
+> así integra contra esto. Basado en `02-spec-api.md` con ajustes reales
 > (modelos verificados contra la BD de Munify).
 
 ## Resumen — 2 partes

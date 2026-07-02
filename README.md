@@ -57,11 +57,11 @@ Toda la doc viva del proyecto está en [`docs/`](docs/). Empezar por:
 - **[`docs/README.md`](docs/README.md)** — índice maestro con punteros a todo lo demás.
 - **[`BUILD_GUIDE.md`](BUILD_GUIDE.md)** *(en root)* — fuente de verdad de **cómo se construyen las cosas** (componentes, patrones de UI, reglas de ABMs). Lectura obligatoria antes de tocar código.
 - **[`CLAUDE.md`](CLAUDE.md)** *(en root)* — reglas duras del proyecto.
-- **[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)** — visión técnica, módulos, multi-tenant, modelo de datos.
-- **[`docs/DEPLOY.md`](docs/DEPLOY.md)** — pipeline canónico de deploy.
-- **[`docs/TESTING.md`](docs/TESTING.md)** — qué chequear por módulo antes de pushear.
+- **[`docs/plataforma/01-arquitectura.md`](docs/plataforma/01-arquitectura.md)** — visión técnica, módulos, multi-tenant, modelo de datos.
+- **[`docs/plataforma/02-deploy.md`](docs/plataforma/02-deploy.md)** — pipeline canónico de deploy.
+- **[`docs/plataforma/03-testing.md`](docs/plataforma/03-testing.md)** — qué chequear por módulo antes de pushear.
 
-Material histórico (planes ejecutados, refactors en pausa, logs de sesión, ideas sin implementar) vive en [`docs/legacy/`](docs/legacy/) — no es para consulta diaria.
+Material histórico: lo archivado por fecha vive en [`docs/historico/`](docs/historico/); el archivo pre-criterio (planes ejecutados, logs de sesión, ideas sin implementar) quedó congelado en [`docs/legacy/`](docs/legacy/) — ninguno es para consulta diaria.
 
 ## Licencia
 

@@ -1,6 +1,6 @@
 # Testing manual · Munify
 
-Cómo testear cambios antes de pushear y qué chequear por módulo. **No hay test suite automatizada hoy** — el testing es manual contra prod o local. Para no romper prod, hay regla dura: nunca pushear front sin correr `npm run build` local antes (ver [`DEPLOY.md`](DEPLOY.md) §14 de CLAUDE.md).
+Cómo testear cambios antes de pushear y qué chequear por módulo. **No hay test suite automatizada hoy** — el testing es manual contra prod o local. Para no romper prod, hay regla dura: nunca pushear front sin correr `npm run build` local antes (ver [`DEPLOY.md`](02-deploy.md) §14 de CLAUDE.md).
 
 ## Arrancar local
 
@@ -96,4 +96,4 @@ heroku logs --tail -a munify-backend
 
 ## Lo que NO es vivo acá
 
-El [`legacy/MANUAL_TESTING_SGM.md`](legacy/MANUAL_TESTING_SGM.md) (1280 líneas) tiene la versión vieja con URLs `reclamos-mun.netlify.app` y datos de enero. Sigue ahí por trazabilidad pero no es la referencia actual. Lo mismo con [`legacy/TESTING_CHECKLIST.md`](legacy/TESTING_CHECKLIST.md) (específico al feature "Sumarse", ya implementado).
+El [`legacy/MANUAL_TESTING_SGM.md`](../legacy/MANUAL_TESTING_SGM.md) (1280 líneas) tiene la versión vieja con URLs `reclamos-mun.netlify.app` y datos de enero. Sigue ahí por trazabilidad pero no es la referencia actual. Lo mismo con [`legacy/TESTING_CHECKLIST.md`](../legacy/TESTING_CHECKLIST.md) (específico al feature "Sumarse", ya implementado).

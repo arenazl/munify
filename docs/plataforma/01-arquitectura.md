@@ -1,6 +1,6 @@
 # Arquitectura · Munify
 
-Visión técnica del sistema **a hoy**. Para reglas de cómo construir (componentes, patrones de UI, do/don't) ver [`BUILD_GUIDE.md`](../BUILD_GUIDE.md) en root.
+Visión técnica del sistema **a hoy**. Para reglas de cómo construir (componentes, patrones de UI, do/don't) ver [`BUILD_GUIDE.md`](../../BUILD_GUIDE.md) en root.
 
 ## Qué es Munify
 
@@ -14,7 +14,7 @@ SaaS de gestión municipal **multi-tenant**: una sola instancia atiende a N muni
 
 URLs de producción:
 - App: `https://app.munify.com.ar`
-- Landing: `https://munify.com.ar` (repo separado en [`landing/`](../landing/))
+- Landing: `https://munify.com.ar` (repo separado en [`landing/`](../../../landing/))
 
 ## Stack
 
@@ -44,7 +44,7 @@ URLs de producción:
 Vecino reporta problema en vía pública (bache, luminaria, basura, etc.). Wizard de 5 pasos. La IA sugiere categoría a partir de la descripción. El supervisor asigna a empleado/cuadrilla. Estados: `nuevo → asignado → en_proceso → resuelto | rechazado`. Calificación post-resolución, notificaciones por WhatsApp/push.
 
 ### 2. Trámites municipales
-Habilitaciones, licencias, libre deuda, etc. Wizard guiado. Validación biométrica RENAPER en trámites que requieren identidad oficial. Categorías de trámite son **per-municipio** (ver [`REFACTOR_TRAMITES_PER_MUNICIPIO.md`](REFACTOR_TRAMITES_PER_MUNICIPIO.md)).
+Habilitaciones, licencias, libre deuda, etc. Wizard guiado. Validación biométrica RENAPER en trámites que requieren identidad oficial. Categorías de trámite son **per-municipio** (ver [`04-refactor-tramites-per-municipio.md`](04-refactor-tramites-per-municipio.md)).
 
 ### 3. Tesorería (NUEVO)
 Reemplaza el Excel del intendente. Cada gasto se imputa a una caja (FOFINDE, FODEMEP, Coparticipación, etc.), un proyecto y una dependencia. Soporta cuotas, recurrencia, financiación, imputación múltiple por proyecto. Importador de Excel histórico.
@@ -77,7 +77,7 @@ Definidos en `backend/models/enums.py` como `RolUsuario`:
 
 ## Modelo de datos (entidades core)
 
-Solo las principales — ver `database_schema_ai.json` para el detalle completo.
+Solo las principales — ver `database-schema-ai.json` para el detalle completo.
 
 - **`municipio`** — tenant raíz; tiene branding, módulos activos, dependencias.
 - **`usuario`** — pertenece a un municipio, tiene un rol.
@@ -119,4 +119,4 @@ Cada módulo es un router en `backend/api/<modulo>.py`. Los principales:
 
 ## Deploy
 
-Ver [`DEPLOY.md`](DEPLOY.md) — pipeline canónico (`git push` → Netlify/Heroku auto-rebuild, **nunca** `netlify deploy --prod` directo).
+Ver [`DEPLOY.md`](02-deploy.md) — pipeline canónico (`git push` → Netlify/Heroku auto-rebuild, **nunca** `netlify deploy --prod` directo).
