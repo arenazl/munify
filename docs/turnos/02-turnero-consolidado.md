@@ -101,9 +101,14 @@ paralelas), feriados. Lo que FALTA:
   (GET/PUT /tramites/{id}/dependencia) — el curado de datos de cada muni
   sigue siendo tarea del admin, pero ahora tiene la herramienta natural.
 - **C.1 CERRADO.**
-- **C.2 (ciclo de vida)**: TRN + comprobante + notificaciones de turno
-  (modelo `Notificacion` gana `turno_id`); recordatorios con Cloud Scheduler;
-  confirmación/reprogramación.
+- **C.2 — núcleo HECHO (commit `1f7656c`)**: confirmación al reservar (in-app +
+  push con código TRN), TRN visible en Mis Turnos, y recordatorios de las
+  próximas 24hs vía `POST /turnos-tramite/enviar-recordatorios` (idempotente
+  por `recordatorio_enviado_at`; auth `X-Cron-Key` vs `CRON_SECRET`).
+  **Pendiente de INFRA**: crear el job de Cloud Scheduler (comando documentado
+  en el docstring del endpoint) + setear `CRON_SECRET` en Secret Manager.
+  **Pendiente de C.2**: reprogramación, comprobante con QR, recordatorio por
+  WhatsApp (bot en standby).
 - **C.3 (gestión)**: panel de ventanilla completo (check-in por DNI/TRN,
   abrir expediente desde el turno), reportes de demanda y ausentismo,
   sobreturnos/lista de espera si algún muni lo pide.
