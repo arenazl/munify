@@ -120,8 +120,23 @@ Diseño resultante — "sin cuenta" NO significa "sin identidad", significa
   VERIFICADO que ya existe completo: `captura_movil.py` (QR + WebSocket con
   fallback polling 3s, estados esperando→en_curso→completada) → `Mostrador.tsx`
   toma control con `actuando_como={vecino}` y `kyc_modo='assisted'`, y abre
-  reclamo/trámite/tasas desde el Hub. ÚNICO GAP: el Hub del mostrador no tiene
-  el botón "Tomar turno" — se agrega en C.1 (mostrador con turnero).
+  reclamo/trámite/tasas desde el Hub.
+
+  **Dos modalidades del kiosco (definidas por el dueño):**
+  1. *Ventanilla pura (gente grande / no informatizada)* — **YA IMPLEMENTADA**:
+     el QR lleva a la página PÚBLICA `/m/captura/{token}` (sin login, sin app,
+     puro navegador): el vecino toca "Comenzar verificación", se saca la foto
+     (Didit: selfie + DNI + RENAPER), y el control pasa a la funcionaria, que
+     le hace el trámite/turno. El vecino no instala ni registra nada.
+  2. *Gancho de onboarding (opcional)* — **NO EXISTE, gap para C.1**: hoy la
+     página del celular simplemente se cierra al completar. Falta la pantalla
+     post-éxito: "Tu identidad ya quedó validada — ¿querés seguir tus trámites
+     desde el celular?" con acceso directo a la PWA (la cuenta verificada YA
+     queda creada del lado del sistema; es un magic link / establecer clave,
+     no un registro).
+
+  GAPS del mostrador para C.1: botón "Tomar turno" en el Hub + pantalla de
+  gancho post-validación (modalidad 2).
 
 ## Decisiones abiertas (del dueño)
 
