@@ -340,6 +340,7 @@ export default function Layout() {
   const navigation = getNavigation({
     userRole: user.rol,
     hasDependencia: !!user.dependencia,
+    hasEmpleado: !!user.empleado_id,
     // Superadmin = admin sin municipio_id (gestiona todos los municipios)
     isSuperAdmin: user.rol === 'admin' && !user.municipio_id,
     // Si el muni actual tiene `abm_en_sidebar=false`, los 3 items de ABMs

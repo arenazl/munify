@@ -680,6 +680,7 @@ async def crear_reclamo_bot(
         municipio_dependencia_id=dep_id,
         estado=EstadoReclamo.NUEVO,
         prioridad=3,
+        canal="whatsapp",
     )
     db.add(reclamo)
     await db.flush()

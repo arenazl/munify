@@ -214,11 +214,11 @@ export const router = createBrowserRouter([
       { path: 'configuracion-agenda', element: <ProtectedRoute roles={['admin', 'supervisor']}><ConfiguracionAgenda /></ProtectedRoute> },
       { path: 'tarjetas', element: <ProtectedRoute roles={['admin', 'supervisor']}><TarjetasCredito /></ProtectedRoute> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
-      { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
+      { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor', 'empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)
-      { path: 'mi-rendimiento', element: <ProtectedRoute roles={['supervisor']}><MiRendimiento /></ProtectedRoute> },
+      { path: 'mi-rendimiento', element: <ProtectedRoute roles={['supervisor', 'empleado']}><MiRendimiento /></ProtectedRoute> },
       // Mi Historial (auditoría de trabajos del empleado)
-      { path: 'mi-historial', element: <ProtectedRoute roles={['supervisor']}><MiHistorial /></ProtectedRoute> },
+      { path: 'mi-historial', element: <ProtectedRoute roles={['supervisor', 'empleado']}><MiHistorial /></ProtectedRoute> },
 
       // Mapa (público para usuarios autenticados)
       { path: 'mapa', element: <Mapa /> },

@@ -1096,6 +1096,7 @@ async def create_reclamo_from_whatsapp(phone: str, state: ConversationState, db:
             estado=EstadoReclamo.nuevo,
             prioridad=2,
             creador_id=user.id,
+            canal="whatsapp",
         )
 
         db.add(reclamo)

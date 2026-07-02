@@ -2,6 +2,7 @@ import { MapPin, Calendar, Clock, AlertTriangle, MessageCircle, Building2 } from
 import { useTheme } from '../../contexts/ThemeContext';
 import type { Reclamo, EstadoReclamo } from '../../types';
 import * as LucideIcons from 'lucide-react';
+import { canalLabel, canalIcon, canalColor } from '../../lib/enums/canal';
 
 // Colores sólidos para estados (compartidos entre vecino y supervisor)
 export const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
@@ -144,6 +145,20 @@ export function ReclamoCard({
               >
                 {r.categoria?.nombre || 'Sin categoría'}
               </span>
+              {/* Canal de ingreso (omnicanalidad) — sin chip si es legacy (null) */}
+              {r.canal && (() => {
+                const CanalIcon = canalIcon(r.canal);
+                return (
+                  <span
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                    style={{ backgroundColor: `${canalColor(r.canal)}15`, color: canalColor(r.canal) }}
+                    title={`Ingresó por ${canalLabel(r.canal)}`}
+                  >
+                    {CanalIcon && <CanalIcon className="h-3 w-3" />}
+                    {canalLabel(r.canal)}
+                  </span>
+                );
+              })()}
               <span className="text-xs flex items-center gap-1" style={{ color: theme.textSecondary }}>
                 <Calendar className="h-3 w-3 flex-shrink-0" />
                 <div className="flex flex-col leading-tight">

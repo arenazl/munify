@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -10,6 +10,7 @@ import csv
 
 from core.database import get_db
 from core.security import require_roles
+from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models.user import User
 from models.reclamo import Reclamo
 from models.categoria_reclamo import CategoriaReclamo as Categoria
@@ -22,6 +23,7 @@ router = APIRouter()
 
 @router.get("/reclamos/csv")
 async def exportar_reclamos_csv(
+    request: Request,
     estado: Optional[str] = None,
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
@@ -31,13 +33,15 @@ async def exportar_reclamos_csv(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Exportar reclamos a CSV"""
+    """Exportar reclamos a CSV (tenant-scoped: solo el municipio del usuario)"""
+    municipio_id = get_effective_municipio_id(request, current_user)
+
     query = select(Reclamo).options(
         selectinload(Reclamo.categoria),
         selectinload(Reclamo.zona),
         selectinload(Reclamo.creador),
-        selectinload(Reclamo.empleado_asignado)
-    )
+        selectinload(Reclamo.empleado)
+    ).where(Reclamo.municipio_id == municipio_id)
 
     # Aplicar filtros
     if estado:
@@ -127,7 +131,7 @@ async def exportar_reclamos_csv(
             r.direccion,
             f"{r.creador.nombre} {r.creador.apellido}" if r.creador else '',
             r.creador.email if r.creador else '',
-            f"{r.empleado_asignado.nombre} {r.empleado_asignado.apellido or ''}" if r.empleado_asignado else '',
+            f"{r.empleado.nombre} {r.empleado.apellido or ''}" if r.empleado else '',
             r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '',
             r.fecha_programada.strftime('%Y-%m-%d') if r.fecha_programada else '',
             r.hora_inicio.strftime('%H:%M') if r.hora_inicio else '',
@@ -154,17 +158,19 @@ async def exportar_reclamos_csv(
 
 @router.get("/estadisticas/csv")
 async def exportar_estadisticas_csv(
+    request: Request,
     dias: int = Query(30, description="Días a incluir en el reporte"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Exportar estadísticas generales a CSV"""
+    """Exportar estadísticas generales a CSV (tenant-scoped)"""
+    municipio_id = get_effective_municipio_id(request, current_user)
     fecha_desde = datetime.utcnow() - timedelta(days=dias)
 
     # Estadísticas por estado
     result = await db.execute(
         select(Reclamo.estado, func.count(Reclamo.id))
-        .where(Reclamo.created_at >= fecha_desde)
+        .where(Reclamo.municipio_id == municipio_id, Reclamo.created_at >= fecha_desde)
         .group_by(Reclamo.estado)
     )
     por_estado = {str(estado.value): count for estado, count in result.all()}
@@ -173,7 +179,7 @@ async def exportar_estadisticas_csv(
     result = await db.execute(
         select(Categoria.nombre, func.count(Reclamo.id))
         .join(Reclamo, Reclamo.categoria_id == Categoria.id)
-        .where(Reclamo.created_at >= fecha_desde)
+        .where(Reclamo.municipio_id == municipio_id, Reclamo.created_at >= fecha_desde)
         .group_by(Categoria.nombre)
     )
     por_categoria = result.all()
@@ -182,7 +188,7 @@ async def exportar_estadisticas_csv(
     result = await db.execute(
         select(Zona.nombre, func.count(Reclamo.id))
         .join(Reclamo, Reclamo.zona_id == Zona.id)
-        .where(Reclamo.created_at >= fecha_desde)
+        .where(Reclamo.municipio_id == municipio_id, Reclamo.created_at >= fecha_desde)
         .group_by(Zona.nombre)
     )
     por_zona = result.all()
@@ -196,6 +202,7 @@ async def exportar_estadisticas_csv(
     result = await db.execute(
         select(Reclamo)
         .where(
+            Reclamo.municipio_id == municipio_id,
             Reclamo.estado == EstadoReclamo.RESUELTO,
             Reclamo.fecha_resolucion.isnot(None),
             Reclamo.created_at >= fecha_desde
@@ -273,11 +280,13 @@ async def exportar_estadisticas_csv(
 
 @router.get("/empleados/csv")
 async def exportar_empleados_csv(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Exportar listado de empleados con sus métricas"""
-    # Obtener empleados con estadísticas
+    """Exportar listado de empleados con sus métricas (tenant-scoped)"""
+    municipio_id = get_effective_municipio_id(request, current_user)
+
     result = await db.execute(
         select(Empleado)
         .options(
@@ -285,7 +294,7 @@ async def exportar_empleados_csv(
             selectinload(Empleado.zona_asignada),
             selectinload(Empleado.categorias)
         )
-        .where(Empleado.activo == True)
+        .where(Empleado.activo == True, Empleado.municipio_id == municipio_id)  # noqa: E712
     )
     empleados = result.scalars().all()
 

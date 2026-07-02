@@ -44,6 +44,11 @@ class Reclamo(Base):
     creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     creador = relationship("User", back_populates="reclamos_creados", foreign_keys=[creador_id])
 
+    # Canal de ingreso (mismo vocabulario que Solicitud.canal):
+    #   "app" | "ventanilla_asistida" | "whatsapp" | "web_publica"
+    # NULL = legacy (anterior a la columna). Lo setea SIEMPRE el backend, nunca el cliente.
+    canal = Column(String(30), nullable=True, index=True)
+
     # Dependencia asignada (nuevo modelo desacoplado)
     municipio_dependencia_id = Column(Integer, ForeignKey("municipio_dependencias.id"), nullable=True, index=True)
     dependencia_asignada = relationship("MunicipioDependencia", back_populates="reclamos")

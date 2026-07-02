@@ -191,6 +191,8 @@ class ReclamoResponse(BaseModel):
     confirmado_vecino: Optional[bool] = None
     fecha_confirmacion_vecino: Optional[datetime] = None
     comentario_confirmacion_vecino: Optional[str] = None
+    # Canal de ingreso: "app" | "ventanilla_asistida" | "whatsapp" | "web_publica" | None (legacy)
+    canal: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime]
 

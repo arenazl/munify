@@ -892,6 +892,9 @@ async def seed_demo_completo(
         if muni_dep is None and _muni_deps_pool:
             muni_dep = _random_rec.choice(_muni_deps_pool)
 
+        # Mezcla de canales para que el demo muestre la omnicanalidad
+        _canal_demo = ["app", "whatsapp", "ventanilla_asistida"][len(reclamos_creados_list) % 3]
+
         reclamo = Reclamo(
             municipio_id=municipio_id,
             titulo=r_data["titulo"],
@@ -906,6 +909,7 @@ async def seed_demo_completo(
             barrio_id=barrio.id if barrio else None,
             creador_id=vecino_demo.id,
             municipio_dependencia_id=muni_dep.id if muni_dep else None,
+            canal=_canal_demo,
         )
         db.add(reclamo)
         reclamos_creados_list.append(reclamo)

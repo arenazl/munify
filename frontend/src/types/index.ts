@@ -1,4 +1,4 @@
-export type RolUsuario = 'vecino' | 'supervisor' | 'admin';
+export type RolUsuario = 'vecino' | 'empleado' | 'supervisor' | 'admin' | 'operador_ventanilla';
 export type EstadoReclamo = 'recibido' | 'en_curso' | 'finalizado' | 'pospuesto' | 'rechazado' | 'nuevo' | 'asignado' | 'en_proceso' | 'pendiente_confirmacion' | 'resuelto';
 export type MotivoRechazo = 'no_competencia' | 'duplicado' | 'info_insuficiente' | 'fuera_jurisdiccion' | 'otro';
 
@@ -147,12 +147,16 @@ export interface Documento {
   etapa?: string;
 }
 
+// Canal de ingreso de un reclamo/solicitud (null = legacy, anterior al registro de canal)
+export type CanalIngreso = 'app' | 'ventanilla_asistida' | 'whatsapp' | 'web_publica';
+
 export interface Reclamo {
   id: number;
   titulo: string;
   descripcion: string;
   estado: EstadoReclamo;
   prioridad: number;
+  canal?: CanalIngreso | null;
   direccion: string;
   latitud?: number;
   longitud?: number;
@@ -226,12 +230,22 @@ export interface Notificacion {
   created_at: string;
 }
 
+export interface DashboardTendencias {
+  ayer: number;
+  semana_pasada: number;
+  creados_30d: number;
+  creados_30d_prev: number;
+  tiempo_resolucion_30d: number | null;
+  tiempo_resolucion_30d_prev: number | null;
+}
+
 export interface DashboardStats {
   total: number;
   por_estado: Record<EstadoReclamo, number>;
   hoy: number;
   semana: number;
   tiempo_promedio_dias: number;
+  tendencias?: DashboardTendencias;
 }
 
 // =====================================================================

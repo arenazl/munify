@@ -62,6 +62,29 @@ interface TendenciaData {
 
 type VistaMetrica = 'barrios' | 'tiempos' | 'recurrentes' | 'tendencias' | 'categorias';
 
+// Trend real de una stat-card. null = sin datos suficientes para comparar (no se muestra badge).
+interface TrendInfo {
+  text: string;
+  up: boolean;
+}
+
+const trendPct = (actual: number, previo: number): TrendInfo | null =>
+  previo > 0
+    ? { text: `${actual >= previo ? '+' : ''}${Math.round(((actual - previo) / previo) * 100)}%`, up: actual >= previo }
+    : null;
+
+const trendCount = (actual: number, previo: number): TrendInfo | null => {
+  if (actual === 0 && previo === 0) return null;
+  const delta = actual - previo;
+  return { text: `${delta >= 0 ? '+' : ''}${delta}`, up: delta >= 0 };
+};
+
+const trendDias = (actual: number | null | undefined, previo: number | null | undefined): TrendInfo | null => {
+  if (actual == null || previo == null) return null;
+  const delta = Math.round((actual - previo) * 10) / 10;
+  return { text: `${delta >= 0 ? '+' : ''}${delta}d`, up: delta >= 0 };
+};
+
 interface EmpleadoDistancia {
   empleado_nombre: string;
   reclamos_resueltos: number;
@@ -465,7 +488,8 @@ export default function Dashboard() {
 
   if (!stats) return null;
 
-  // Cards de Reclamos
+  // Cards de Reclamos — trends calculados con las comparativas reales del backend
+  const tr = stats.tendencias;
   const reclamosCards = [
     {
       title: 'Total Reclamos',
@@ -473,8 +497,8 @@ export default function Dashboard() {
       icon: ClipboardList,
       iconBg: `${theme.primary}30`,
       iconColor: theme.primary,
-      trend: '+12%',
-      trendUp: true,
+      trend: tr ? trendPct(tr.creados_30d, tr.creados_30d_prev) : null,
+      trendLabel: 'vs mes ant.',
     },
     {
       title: 'Nuevos Hoy',
@@ -482,8 +506,8 @@ export default function Dashboard() {
       icon: Calendar,
       iconBg: '#f59e0b30',
       iconColor: '#f59e0b',
-      trend: '+5',
-      trendUp: true,
+      trend: tr ? trendCount(stats.hoy, tr.ayer) : null,
+      trendLabel: 'vs ayer',
     },
     {
       title: 'Esta Semana',
@@ -491,8 +515,8 @@ export default function Dashboard() {
       icon: TrendingUp,
       iconBg: '#22c55e30',
       iconColor: '#22c55e',
-      trend: '-8%',
-      trendUp: false,
+      trend: tr ? trendPct(stats.semana, tr.semana_pasada) : null,
+      trendLabel: 'vs sem. ant.',
     },
     {
       title: 'Tiempo Promedio',
@@ -500,12 +524,13 @@ export default function Dashboard() {
       icon: Clock,
       iconBg: '#8b5cf630',
       iconColor: '#8b5cf6',
-      trend: '-0.5d',
-      trendUp: false,
+      trend: tr ? trendDias(tr.tiempo_resolucion_30d, tr.tiempo_resolucion_30d_prev) : null,
+      trendLabel: 'vs mes ant.',
     },
   ];
 
   // Cards de Trámites (siempre se muestran, con 0 si no hay datos)
+  const tt = tramitesStats?.tendencias;
   const tramitesCards = [
     {
       title: 'Total Trámites',
@@ -513,8 +538,8 @@ export default function Dashboard() {
       icon: FileCheck,
       iconBg: '#06b6d430',
       iconColor: '#06b6d4',
-      trend: '+8%',
-      trendUp: true,
+      trend: tt ? trendPct(tt.creados_30d, tt.creados_30d_prev) : null,
+      trendLabel: 'vs mes ant.',
     },
     {
       title: 'Nuevos Hoy',
@@ -522,8 +547,8 @@ export default function Dashboard() {
       icon: CalendarDays,
       iconBg: '#ec489930',
       iconColor: '#ec4899',
-      trend: '+3',
-      trendUp: true,
+      trend: tt ? trendCount(tramitesStats?.hoy ?? 0, tt.ayer) : null,
+      trendLabel: 'vs ayer',
     },
     {
       title: 'Esta Semana',
@@ -531,8 +556,8 @@ export default function Dashboard() {
       icon: TrendingUp,
       iconBg: '#14b8a630',
       iconColor: '#14b8a6',
-      trend: '+5%',
-      trendUp: true,
+      trend: tt ? trendPct(tramitesStats?.semana ?? 0, tt.semana_pasada) : null,
+      trendLabel: 'vs sem. ant.',
     },
     {
       title: 'Tiempo Promedio',
@@ -540,8 +565,8 @@ export default function Dashboard() {
       icon: Clock,
       iconBg: '#a855f730',
       iconColor: '#a855f7',
-      trend: '-1d',
-      trendUp: false,
+      trend: tt ? trendDias(tt.tiempo_resolucion_30d, tt.tiempo_resolucion_30d_prev) : null,
+      trendLabel: 'vs mes ant.',
     },
   ];
 
@@ -923,18 +948,20 @@ export default function Dashboard() {
                         {card.title}
                       </p>
                       <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
-                      <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
-                        <span
-                          className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
-                          style={{
-                            backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
-                            color: card.trendUp ? '#22c55e' : '#ef4444'
-                          }}
-                        >
-                          {card.trend}
-                        </span>
-                        <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>vs mes ant.</span>
-                      </div>
+                      {card.trend && (
+                        <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
+                          <span
+                            className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: card.trend.up ? '#22c55e20' : '#ef444420',
+                              color: card.trend.up ? '#22c55e' : '#ef4444'
+                            }}
+                          >
+                            {card.trend.text}
+                          </span>
+                          <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>{card.trendLabel}</span>
+                        </div>
+                      )}
                     </div>
                     <div
                       className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
@@ -984,18 +1011,20 @@ export default function Dashboard() {
                           {card.title}
                         </p>
                         <p className="text-xl md:text-3xl font-black mt-1 md:mt-2 tracking-tight" style={{ color: theme.text }}>{card.value}</p>
-                        <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
-                          <span
-                            className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: card.trendUp ? '#22c55e20' : '#ef444420',
-                              color: card.trendUp ? '#22c55e' : '#ef4444'
-                            }}
-                          >
-                            {card.trend}
-                          </span>
-                          <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>vs mes ant.</span>
-                        </div>
+                        {card.trend && (
+                          <div className="flex items-center gap-1 md:gap-1.5 mt-1 md:mt-2">
+                            <span
+                              className="text-[10px] md:text-xs font-semibold px-1.5 md:px-2 py-0.5 rounded-full"
+                              style={{
+                                backgroundColor: card.trend.up ? '#22c55e20' : '#ef444420',
+                                color: card.trend.up ? '#22c55e' : '#ef4444'
+                              }}
+                            >
+                              {card.trend.text}
+                            </span>
+                            <span className="text-[8px] md:text-[10px] hidden md:inline" style={{ color: theme.textSecondary }}>{card.trendLabel}</span>
+                          </div>
+                        )}
                       </div>
                       <div
                         className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"

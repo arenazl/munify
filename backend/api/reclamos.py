@@ -380,6 +380,15 @@ async def get_reclamos(
     categoria_id: Optional[int] = None,
     zona_id: Optional[int] = None,
     municipio_dependencia_id: Optional[int] = None,
+    canal: Optional[str] = Query(None, description="Canal de ingreso: app | ventanilla_asistida | whatsapp | web_publica"),
+    solo_mis_tareas: bool = Query(
+        False,
+        description=(
+            "Vista de campo: solo los reclamos asignados a MÍ como empleado "
+            "(Reclamo.empleado_id == empleado vinculado al usuario actual). "
+            "Si el usuario no tiene empleado vinculado, devuelve vacío."
+        ),
+    ),
     search: Optional[str] = Query(None, description="Búsqueda en todos los campos"),
     excluir_finalizados: bool = Query(
         False,
@@ -447,6 +456,14 @@ async def get_reclamos(
         query = query.where(Reclamo.zona_id == zona_id)
     if municipio_dependencia_id:
         query = query.where(Reclamo.municipio_dependencia_id == municipio_dependencia_id)
+    if canal:
+        query = query.where(Reclamo.canal == canal)
+    if solo_mis_tareas:
+        if current_user.empleado_id:
+            query = query.where(Reclamo.empleado_id == current_user.empleado_id)
+        else:
+            # Sin empleado vinculado no hay "mis tareas": lista vacía explícita
+            query = query.where(Reclamo.id == None)  # noqa: E711
 
     # Búsqueda en todos los campos
     if search and search.strip():
@@ -1163,11 +1180,16 @@ async def create_reclamo(
         'actuando_como_user_id', 'dj_validacion_presencial',
     })
 
+    # Canal de ingreso: lo decide el backend según quién carga.
+    # Vecino desde la app → "app"; staff (mostrador/actuando_como/ghost) → "ventanilla_asistida".
+    canal_ingreso = "app" if current_user.rol == RolUsuario.VECINO else "ventanilla_asistida"
+
     reclamo = Reclamo(
         **reclamo_data,
         creador_id=creador_id,
         municipio_id=current_user.municipio_id,
-        estado=EstadoReclamo.RECIBIDO
+        estado=EstadoReclamo.RECIBIDO,
+        canal=canal_ingreso,
     )
 
     # Detectar barrio automáticamente desde la dirección

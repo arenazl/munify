@@ -8,6 +8,8 @@ import {
 interface NavigationOptions {
   userRole: string;
   hasDependencia?: boolean;
+  /** Usuario vinculado a un Empleado de campo (user.empleado_id). Habilita la vista "Trabajos". */
+  hasEmpleado?: boolean;
   /** Si el usuario admin no tiene municipio_id es superadmin (cross-municipio). */
   isSuperAdmin?: boolean;
   /**
@@ -46,6 +48,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
   // Soportar ambas firmas: getNavigation('admin') o getNavigation({ userRole: 'admin', hasDependencia: true })
   const userRole = typeof userRoleOrOptions === 'string' ? userRoleOrOptions : userRoleOrOptions.userRole;
   const hasDependencia = typeof userRoleOrOptions === 'object' ? userRoleOrOptions.hasDependencia : false;
+  const hasEmpleado = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.hasEmpleado : false;
   const isSuperAdmin = typeof userRoleOrOptions === 'object' ? !!userRoleOrOptions.isSuperAdmin : false;
   const abmEnSidebar = typeof userRoleOrOptions === 'object'
     ? (userRoleOrOptions.abmEnSidebar ?? true)
@@ -165,6 +168,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && moduloOn('mapa'),
       categoria: 'Principal',
       description: 'Ver reclamos en el mapa'
+    },
+    // === SECCIÓN CAMPO (empleados/operarios con tareas asignadas) ===
+    {
+      name: 'Trabajos',
+      href: '/gestion/mis-trabajos',
+      icon: Wrench,
+      show: userRole === 'empleado' || ((isSupervisor || isAdmin) && hasEmpleado),
+      categoria: 'Campo',
+      description: 'Mis tareas asignadas en campo'
     },
     {
       name: 'Mostrador',

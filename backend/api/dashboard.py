@@ -314,6 +314,57 @@ async def get_empleado_stats(
     }
 
 
+async def _tendencias_periodo(db: AsyncSession, model, base_filters: list, filtro_resueltos: list) -> dict:
+    """Comparativas reales para los trends de las stat-cards del dashboard.
+
+    Ventanas de igual longitud para que la comparación sea honesta:
+    - ayer (día completo) → trend de "Nuevos Hoy"
+    - semana pasada cortada al mismo día de la semana → trend de "Esta Semana"
+    - creados últimos 30 días vs los 30 previos → trend de "Total"
+    - tiempo promedio de resolución (resueltos últimos 30d vs 30d previos) → trend de "Tiempo Promedio"
+    """
+    hoy = datetime.utcnow().date()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())
+
+    async def _count(*extra):
+        return (await db.execute(
+            select(func.count(model.id)).where(*base_filters, *extra)
+        )).scalar() or 0
+
+    ayer = await _count(func.date(model.created_at) == hoy - timedelta(days=1))
+    semana_pasada = await _count(
+        func.date(model.created_at) >= inicio_semana - timedelta(days=7),
+        func.date(model.created_at) <= hoy - timedelta(days=7),
+    )
+    creados_30d = await _count(func.date(model.created_at) > hoy - timedelta(days=30))
+    creados_30d_prev = await _count(
+        func.date(model.created_at) > hoy - timedelta(days=60),
+        func.date(model.created_at) <= hoy - timedelta(days=30),
+    )
+
+    async def _avg_resolucion(desde, hasta):
+        val = (await db.execute(
+            select(func.avg(func.datediff(model.fecha_resolucion, model.created_at)))
+            .where(
+                *base_filters,
+                *filtro_resueltos,
+                model.fecha_resolucion.isnot(None),
+                func.date(model.fecha_resolucion) > desde,
+                func.date(model.fecha_resolucion) <= hasta,
+            )
+        )).scalar()
+        return round(float(val), 1) if val is not None else None
+
+    return {
+        "ayer": ayer,
+        "semana_pasada": semana_pasada,
+        "creados_30d": creados_30d,
+        "creados_30d_prev": creados_30d_prev,
+        "tiempo_resolucion_30d": await _avg_resolucion(hoy - timedelta(days=30), hoy),
+        "tiempo_resolucion_30d_prev": await _avg_resolucion(hoy - timedelta(days=60), hoy - timedelta(days=30)),
+    }
+
+
 @router.get("/stats")
 async def get_stats(
     request: Request,
@@ -376,12 +427,18 @@ async def get_stats(
     )
     tiempo_promedio = resueltos_query.scalar() or 0
 
+    tendencias = await _tendencias_periodo(
+        db, Reclamo, base_filters,
+        [Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO])],
+    )
+
     return {
         "total": total,
         "por_estado": estados,
         "hoy": hoy_count,
         "semana": semana_count,
-        "tiempo_promedio_dias": round(float(tiempo_promedio), 1)
+        "tiempo_promedio_dias": round(float(tiempo_promedio), 1),
+        "tendencias": tendencias,
     }
 
 
@@ -470,14 +527,21 @@ async def get_tramites_stats(
     )
     tiempo_promedio = resueltos_query.scalar() or 0
 
-    print(f"[tramites-stats] total={total}, hoy={hoy_count}, semana={semana_count}, estados={estados}")
+    tendencias = await _tendencias_periodo(
+        db, Solicitud, base_filters,
+        [or_(
+            Solicitud.estado == EstadoSolicitud.FINALIZADO,
+            Solicitud.estado == "FINALIZADO",  # Estado legacy en mayúsculas
+        )],
+    )
 
     return {
         "total": total,
         "por_estado": estados,
         "hoy": hoy_count,
         "semana": semana_count,
-        "tiempo_promedio_dias": round(tiempo_promedio, 1)
+        "tiempo_promedio_dias": round(tiempo_promedio, 1),
+        "tendencias": tendencias,
     }
 
 

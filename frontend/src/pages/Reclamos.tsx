@@ -22,6 +22,7 @@ import { DatePicker } from '../components/ui/DatePicker';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
+import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
@@ -150,6 +151,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null);
   const [filtroDependencia, setFiltroDependencia] = useState<number | null>(null);
+  const [filtroCanal, setFiltroCanal] = useState<string | null>(null);
   const [filterLoading, setFilterLoading] = useState<string | null>(null); // Track which filter is loading
   const [ordenamiento, setOrdenamiento] = useState<'reciente' | 'programado'>('reciente'); // Ordenar por fecha de creación o programada
 
@@ -356,6 +358,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
 
   const horaFin = calcularHoraFin(horaInicio, duracion);
   const [resolucion, setResolucion] = useState('');
+  // Foto de cierre (evidencia del trabajo terminado) — opcional al finalizar
+  const [fotoCierre, setFotoCierre] = useState<File | null>(null);
   const [tipoFinalizacion, setTipoFinalizacion] = useState<'finalizado' | 'pospuesto'>('finalizado');
   const [motivoNoFinalizado, setMotivoNoFinalizado] = useState('');
   const [motivoRechazo, setMotivoRechazo] = useState('');
@@ -526,7 +530,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     }
     fetchReclamos(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch]);
+  }, [filtroEstado, filtroCategoria, filtroDependencia, filtroCanal, debouncedSearch]);
 
   // Polling inteligente: detecta cambios en CUALQUIER reclamo visible (sin mostrar loading)
   useEffect(() => {
@@ -540,6 +544,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
         if (filtroCategoria) params.categoria_id = filtroCategoria;
         if (soloMiArea && user?.dependencia?.id) params.municipio_dependencia_id = user.dependencia.id;
         if (filtroDependencia) params.municipio_dependencia_id = filtroDependencia;
+        if (filtroCanal) params.canal = filtroCanal;
+        if (soloMisTrabajos && user?.empleado_id) params.solo_mis_tareas = 1;
         if (debouncedSearch?.trim()) params.search = debouncedSearch.trim();
 
         const res = await reclamosApi.getAll(params);
@@ -587,6 +593,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
           if (debouncedSearch?.trim()) fullParams.search = debouncedSearch.trim();
           if (soloMiArea && user?.dependencia?.id) fullParams.municipio_dependencia_id = user.dependencia.id;
           if (filtroDependencia) fullParams.municipio_dependencia_id = filtroDependencia;
+          if (filtroCanal) fullParams.canal = filtroCanal;
+          if (soloMisTrabajos && user?.empleado_id) fullParams.solo_mis_tareas = 1;
 
           const fullRes = await reclamosApi.getAll(fullParams);
           setReclamos(fullRes.data);
@@ -602,7 +610,7 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
     const pollingInterval = setInterval(checkForUpdates, 10000);
     return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroEstado, filtroCategoria, filtroDependencia, debouncedSearch, soloMiArea, user?.dependencia?.id]);
+  }, [filtroEstado, filtroCategoria, filtroDependencia, filtroCanal, debouncedSearch, soloMiArea, user?.dependencia?.id]);
 
   // Mantener actualizado el reclamo del modal abierto cuando la lista cambia
   // (después del polling). Si el reclamo seleccionado se modificó en backend,
@@ -1063,6 +1071,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       if (filtroDependencia) {
         params.municipio_dependencia_id = filtroDependencia;
       }
+      // Filtrar por canal de ingreso (omnicanalidad)
+      if (filtroCanal) {
+        params.canal = filtroCanal;
+      }
+      // Vista de campo: solo MIS tareas asignadas (empleado vinculado al user)
+      if (soloMisTrabajos && user?.empleado_id) {
+        params.solo_mis_tareas = 1;
+      }
 
       const reclamosRes = await reclamosApi.getAll(params);
       const newReclamos = reclamosRes.data;
@@ -1306,6 +1322,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setDuracion('1');
     setDisponibilidad(null);
     setComentarioAsignacion('');
+    setFotoCierre(null);
   };
 
   const handleCreate = async () => {
@@ -1672,8 +1689,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     toast.success('Reclamo finalizado');
 
     setSaving(true);
+    const evidencia = fotoCierre;
     try {
       await reclamosApi.resolver(selectedReclamo.id, { resolucion });
+      // Evidencia de cierre: foto del trabajo terminado (etapa 'resolucion')
+      if (evidencia) {
+        try {
+          await reclamosApi.upload(selectedReclamo.id, evidencia, 'resolucion');
+          toast.success('Foto de cierre adjuntada');
+        } catch {
+          toast.error('El reclamo se finalizó pero la foto de cierre no se pudo subir');
+        }
+      }
+      setFotoCierre(null);
       fetchReclamos();
     } catch (error) {
       setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
@@ -3758,6 +3786,21 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           {getCategoryIcon(selectedReclamo.categoria.nombre)}
           {selectedReclamo.categoria.nombre}
         </span>
+        {/* Canal de ingreso (omnicanalidad) */}
+        {selectedReclamo.canal && (() => {
+          const CanalIcon = canalIcon(selectedReclamo.canal);
+          const cColor = canalColor(selectedReclamo.canal);
+          return (
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+              style={{ backgroundColor: `${cColor}15`, color: cColor, border: `1px solid ${cColor}40` }}
+              title={`Ingresó por ${canalLabel(selectedReclamo.canal)}`}
+            >
+              {CanalIcon && <CanalIcon className="h-3.5 w-3.5" />}
+              {canalLabel(selectedReclamo.canal)}
+            </span>
+          );
+        })()}
         {/* Historial — con badge inline rojo si el vecino rechazó la resolución */}
         <button
           onClick={() => {
@@ -3917,6 +3960,26 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         {/* Botón Finalizado/Posponer - para estado en_proceso */}
         {canFinalizar && tipoFinalizacion === 'finalizado' && (
           <>
+            {/* Foto de cierre: evidencia del trabajo terminado (opcional) */}
+            <label
+              className="px-3 py-2.5 rounded-xl font-medium cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5"
+              style={{
+                backgroundColor: fotoCierre ? `${estadoColors.finalizado.bg}20` : theme.backgroundSecondary,
+                border: `2px dashed ${fotoCierre ? estadoColors.finalizado.bg : theme.border}`,
+                color: fotoCierre ? estadoColors.finalizado.bg : theme.textSecondary,
+              }}
+              title={fotoCierre ? `Foto de cierre: ${fotoCierre.name}` : 'Adjuntar foto del trabajo terminado (opcional)'}
+            >
+              <Camera className="h-4 w-4" />
+              {fotoCierre ? 'Foto lista' : 'Foto'}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => setFotoCierre(e.target.files?.[0] || null)}
+              />
+            </label>
             <button
               onClick={handleFinalizar}
               disabled={saving || !resolucion}
@@ -4443,6 +4506,20 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 })),
               searchable: true,
               visible: (user?.rol === 'admin' || user?.rol === 'supervisor') && !soloMiArea,
+            },
+            {
+              key: 'canal',
+              placeholder: 'Canales',
+              value: filtroCanal === null ? '' : filtroCanal,
+              onChange: (v) => {
+                setFilterLoading(v ? `canal-${v}` : 'canal-all');
+                setFiltroCanal(v || null);
+              },
+              options: CANAL_OPTIONS.map(c => ({
+                value: c.value,
+                label: c.label,
+                color: canalColors[c.value],
+              })),
             },
           ],
           statusPills: {
