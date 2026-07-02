@@ -65,8 +65,10 @@ class TramiteBase(BaseModel):
     requiere_kyc: bool = False
     nivel_kyc_minimo: Optional[int] = None
     # Turnero presencial
-    requiere_turno: bool = False
+    requiere_turno: bool = False  # DEPRECATED: usar modo_atencion
     duracion_turno_min: Optional[int] = 30
+    # 'presencial_con_turno' | 'presencial_sin_turno' | 'online'
+    modo_atencion: str = "online"
     activo: bool = True
     orden: int = 0
 
@@ -94,6 +96,7 @@ class TramiteUpdate(BaseModel):
     nivel_kyc_minimo: Optional[int] = None
     requiere_turno: Optional[bool] = None
     duracion_turno_min: Optional[int] = None
+    modo_atencion: Optional[str] = None
     activo: Optional[bool] = None
     orden: Optional[int] = None
 
@@ -112,6 +115,8 @@ class TramiteSimple(BaseModel):
     monto_cenat_referencia: Optional[float] = None
     requiere_kyc: bool = False
     nivel_kyc_minimo: Optional[int] = None
+    modo_atencion: str = "online"
+    duracion_turno_min: Optional[int] = 30
     categoria_tramite_id: Optional[int] = None
     categoria_tramite: Optional[CategoriaTramiteSimple] = None
 

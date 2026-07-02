@@ -5,8 +5,9 @@ import {
   ClipboardList, ScanLine, ShieldCheck,
   Loader2, RefreshCcw, ChevronRight, ExternalLink, Search,
   Sparkles, X, Edit3, IdCard, Smartphone, QrCode,
-  Mail, MapPin, Banknote, Clock,
+  Mail, MapPin, Banknote, Clock, CalendarClock,
 } from 'lucide-react';
+import ReservarTurnoSheet from '../components/turnos/ReservarTurnoSheet';
 import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -65,6 +66,7 @@ export default function Mostrador() {
   const [vecino, setVecino] = useState<KycDatos | null>(null);
   const [kycSessionId, setKycSessionId] = useState<string | null>(null);
   const [metricas, setMetricas] = useState<MostradorMetricas | null>(null);
+  const [turnoSheetOpen, setTurnoSheetOpen] = useState(false);
 
   const municipioId = user?.municipio_id ?? null;
 
@@ -211,7 +213,18 @@ export default function Mostrador() {
           onIrReclamo={() => irA('/gestion/crear-reclamo')}
           onIrTramite={() => irA('/gestion/crear-tramite')}
           onIrTasas={() => irA('/gestion/mis-tasas')}
+          onIrTurno={() => setTurnoSheetOpen(true)}
           onReset={reset}
+        />
+      )}
+
+      {/* Turnero desde ventanilla: la funcionaria toma el turno por el vecino */}
+      {vecino?.user_id && (
+        <ReservarTurnoSheet
+          open={turnoSheetOpen}
+          onClose={() => setTurnoSheetOpen(false)}
+          onReservado={() => setTurnoSheetOpen(false)}
+          actuandoComoUserId={vecino.user_id}
         />
       )}
     </div>
@@ -633,17 +646,18 @@ function BusquedaLibre({ onUsar, onCargarManual }: {
 // ============================================================
 // Hub — VecinoStrip + 3 GestionCards + RecentActivity
 // ============================================================
-function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onReset }: {
+function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onIrTurno, onReset }: {
   vecino: KycDatos;
   kycSessionId: string | null;
   onIrReclamo: () => void;
   onIrTramite: () => void;
   onIrTasas: () => void;
+  onIrTurno: () => void;
   onReset: () => void;
 }) {
   const { theme } = useTheme();
 
-  // Atajos de teclado: R / T / D / Esc
+  // Atajos de teclado: R / T / D / U / Esc
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -651,11 +665,12 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); onIrReclamo(); }
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); onIrTramite(); }
       if (e.key === 'd' || e.key === 'D') { e.preventDefault(); onIrTasas(); }
+      if (e.key === 'u' || e.key === 'U') { e.preventDefault(); onIrTurno(); }
       if (e.key === 'Escape') { e.preventDefault(); onReset(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onIrReclamo, onIrTramite, onIrTasas, onReset]);
+  }, [onIrReclamo, onIrTramite, onIrTasas, onIrTurno, onReset]);
 
   return (
     <div className="space-y-4">
@@ -668,12 +683,13 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
         <span className="hidden sm:flex items-center gap-2 text-[11px]" style={{ color: theme.textSecondary }}>
           <Kbd>R</Kbd> reclamo
           <Kbd>T</Kbd> trámite
+          <Kbd>U</Kbd> turno
           <Kbd>D</Kbd> tasas
           <Kbd>Esc</Kbd> cancelar
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         <GestionCard
           color="#3b82f6"
           icon={<AlertTriangle className="w-5 h-5" />}
@@ -694,6 +710,16 @@ function Hub({ vecino, kycSessionId, onIrReclamo, onIrTramite, onIrTasas, onRese
           highlighted
           ctaLabel="Iniciar trámite"
           onStart={onIrTramite}
+        />
+        <GestionCard
+          color="#f59e0b"
+          icon={<CalendarClock className="w-5 h-5" />}
+          kbd="U"
+          title="Turno"
+          subtitle="Tomar turno para un trámite presencial (el vecino se va con día y hora)"
+          contextBadge={{ tone: 'amber', text: 'Turno-first' }}
+          ctaLabel="Tomar turno"
+          onStart={onIrTurno}
         />
         <GestionCard
           color="#8b5cf6"

@@ -1331,10 +1331,14 @@ export const turnosApi = {
   misTurnos: () => api.get('/turnos-tramite/mis-turnos'),
   porSolicitud: (solicitudId: number) =>
     api.get(`/turnos-tramite/por-solicitud/${solicitudId}`),
-  disponibilidad: (params: { solicitud_id?: number; dependencia_id?: number; duracion_min?: number }) =>
+  disponibilidad: (params: { solicitud_id?: number; dependencia_id?: number; tramite_id?: number; duracion_min?: number }) =>
     api.get('/turnos-tramite/disponibilidad', { params }),
   reservar: (data: { solicitud_id: number; fecha_hora: string }) =>
     api.post('/turnos-tramite/reservar', data),
+  // Turno-first: reserva directa por trámite, sin expediente previo.
+  // 403 code=kyc_insuficiente si el trámite exige validación biométrica.
+  reservarDirecto: (data: { tramite_id: number; fecha_hora: string; actuando_como_user_id?: number }) =>
+    api.post('/turnos-tramite/reservar-directo', data),
   cancelar: (turnoId: number) => api.delete(`/turnos-tramite/${turnoId}`),
   // Agenda del dia (admin/supervisor)
   agenda: (params: { dependencia_id?: number; fecha?: string }) =>

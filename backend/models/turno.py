@@ -46,6 +46,21 @@ class Turno(Base):
     dni_solicitante = Column(String(20), nullable=True)
     telefono_solicitante = Column(String(50), nullable=True)
 
+    # Trámite del turno (turno-first): FK REAL al trámite, exista o no una
+    # solicitud. Antes el trámite del turno del bot viajaba como texto en
+    # `notas` — imposible de reportar. El expediente (solicitud_id) queda
+    # como derivado opcional que se abre en ventanilla si hace falta.
+    tramite_id = Column(
+        Integer, ForeignKey("tramites.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    # Usuario dueño del turno cuando se reservó logueado SIN solicitud
+    # (flujo turno-directo). Complementa el matching por DNI/teléfono.
+    usuario_id = Column(
+        Integer, ForeignKey("usuarios.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+
     municipio_dependencia_id = Column(
         Integer, ForeignKey("municipio_dependencias.id"),
         nullable=False, index=True,
@@ -67,6 +82,7 @@ class Turno(Base):
 
     solicitud = relationship("Solicitud", backref="turno_unico", uselist=False)
     municipio_dependencia = relationship("MunicipioDependencia")
+    tramite = relationship("Tramite", foreign_keys=[tramite_id])
 
     __table_args__ = (
         Index("idx_dep_fecha", "municipio_dependencia_id", "fecha_hora"),

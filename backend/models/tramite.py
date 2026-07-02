@@ -92,8 +92,16 @@ class Tramite(Base):
     # Turnero — si el tramite es presencial, requiere reservar un slot de
     # atencion en la dependencia. duracion_turno_min indica cuanto dura cada
     # cupo (15/30/60min) para calcular disponibilidad.
-    requiere_turno = Column(Boolean, nullable=False, default=False)
+    requiere_turno = Column(Boolean, nullable=False, default=False)  # DEPRECATED: usar modo_atencion
     duracion_turno_min = Column(Integer, nullable=True, default=30)
+
+    # MODO DE ATENCIÓN (turnero consolidado, fase C):
+    #   'presencial_con_turno' — el caso mayoritario: requisitos + turno,
+    #       el trámite se hace on-site en la dependencia
+    #   'presencial_sin_turno' — orden de llegada; solo informa requisitos
+    #   'online' — expediente digital completo (flujo histórico)
+    # Default 'online' = comportamiento previo; reemplaza a requiere_turno.
+    modo_atencion = Column(String(30), nullable=False, default="online", server_default="online")
 
     activo = Column(Boolean, default=True)
     orden = Column(Integer, default=0)

@@ -148,10 +148,28 @@ export default function CapturaMovil() {
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-50 flex items-center justify-center">
                 <CheckCircle2 className="w-8 h-8 text-green-500" />
               </div>
-              <h1 className="text-lg font-bold text-slate-900 mb-1">Sesión cerrada</h1>
+              <h1 className="text-lg font-bold text-slate-900 mb-1">Identidad validada</h1>
               <p className="text-sm text-slate-600">
-                Esta verificación ya terminó. Volvé a la PC para continuar el trámite.
+                Listo — en la ventanilla ya están continuando tu gestión.
               </p>
+              {/* Gancho de onboarding (modalidad 2 del kiosco): la cuenta
+                  verificada ya quedó creada — invitar a usar la app, opcional */}
+              <div className="mt-5 pt-4 border-t border-slate-100 text-left">
+                <p className="text-sm font-semibold text-slate-800 mb-1">
+                  ¿Querés seguir tus trámites desde el celular?
+                </p>
+                <p className="text-xs text-slate-500 mb-3">
+                  Tu identidad ya quedó validada en el sistema. Registrándote con tu
+                  mismo DNI recuperás todo lo que gestionaste hoy — turnos, trámites
+                  y reclamos — sin volver al municipio.
+                </p>
+                <a
+                  href="/bienvenido"
+                  className="block w-full text-center py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600"
+                >
+                  Usar Munify en mi celular
+                </a>
+              </div>
             </div>
           )}
 

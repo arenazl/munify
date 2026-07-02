@@ -12,6 +12,7 @@ import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import PageHint from '../components/ui/PageHint';
 import { tramitesApi, categoriasTramiteApi } from '../lib/api';
+import { ModernSelect } from '../components/ui/ModernSelect';
 import {
   DocumentosRequeridosEditor,
   type DocRequeridoDraft,
@@ -38,8 +39,17 @@ interface TramiteForm {
   monto_cenat_referencia: string;
   requiere_kyc: boolean;              // Fase 5 — tramites sensibles
   nivel_kyc_minimo: string;           // "" | "1" | "2"
+  // Turnero consolidado (fase C): cómo se atiende el trámite
+  modo_atencion: string;              // 'online' | 'presencial_con_turno' | 'presencial_sin_turno'
+  duracion_turno_min: string;         // duración del slot si lleva turno
   documentos_requeridos: DocRequeridoDraft[];
 }
+
+const MODOS_ATENCION = [
+  { value: 'presencial_con_turno', label: 'Presencial con turno', description: 'El vecino saca turno y el trámite se hace en la oficina' },
+  { value: 'presencial_sin_turno', label: 'Presencial por orden de llegada', description: 'Sin turno: solo informa los requisitos para ir' },
+  { value: 'online', label: '100% online', description: 'Expediente digital completo, sin ir al municipio' },
+];
 
 const EMPTY_FORM: TramiteForm = {
   categoria_tramite_id: null,
@@ -56,6 +66,8 @@ const EMPTY_FORM: TramiteForm = {
   monto_cenat_referencia: '',
   requiere_kyc: false,
   nivel_kyc_minimo: '',
+  modo_atencion: 'presencial_con_turno',
+  duracion_turno_min: '30',
   documentos_requeridos: [],
 };
 
@@ -134,6 +146,8 @@ export default function TramitesConfig() {
         nivel_kyc_minimo: (t as { nivel_kyc_minimo?: number }).nivel_kyc_minimo != null
           ? String((t as { nivel_kyc_minimo?: number }).nivel_kyc_minimo)
           : '',
+        modo_atencion: (t as { modo_atencion?: string }).modo_atencion || 'online',
+        duracion_turno_min: String((t as { duracion_turno_min?: number }).duracion_turno_min ?? 30),
         documentos_requeridos: (t.documentos_requeridos || []).map(d => ({
           id: d.id,
           nombre: d.nombre,
@@ -178,6 +192,8 @@ export default function TramitesConfig() {
           monto_cenat_referencia: form.monto_cenat_referencia ? parseFloat(form.monto_cenat_referencia) : undefined,
           requiere_kyc: form.requiere_kyc,
           nivel_kyc_minimo: form.nivel_kyc_minimo ? parseInt(form.nivel_kyc_minimo, 10) : undefined,
+          modo_atencion: form.modo_atencion,
+          duracion_turno_min: form.duracion_turno_min ? parseInt(form.duracion_turno_min, 10) : undefined,
         });
 
         // Sincronizar documentos requeridos
@@ -221,6 +237,10 @@ export default function TramitesConfig() {
           requiere_validacion_facial: form.requiere_validacion_facial,
           tipo_pago: form.tipo_pago || undefined,
           momento_pago: form.momento_pago || undefined,
+          requiere_kyc: form.requiere_kyc,
+          nivel_kyc_minimo: form.nivel_kyc_minimo ? parseInt(form.nivel_kyc_minimo, 10) : undefined,
+          modo_atencion: form.modo_atencion,
+          duracion_turno_min: form.duracion_turno_min ? parseInt(form.duracion_turno_min, 10) : undefined,
           documentos_requeridos: form.documentos_requeridos
             .filter(d => d.nombre.trim())
             .map(d => ({
@@ -996,6 +1016,35 @@ export default function TramitesConfig() {
           )}
 
           <div className="space-y-2">
+            {/* Modo de atención (turnero consolidado) */}
+            <div className="mb-3">
+              <label className="block text-[11px] mb-1 font-semibold uppercase" style={{ color: theme.textSecondary }}>
+                Cómo se atiende este trámite
+              </label>
+              <ModernSelect
+                value={form.modo_atencion}
+                onChange={(v) => setForm({ ...form, modo_atencion: v })}
+                options={MODOS_ATENCION}
+              />
+              {form.modo_atencion === 'presencial_con_turno' && (
+                <div className="mt-2">
+                  <label className="block text-[11px] mb-1" style={{ color: theme.textSecondary }}>
+                    Duración de cada turno (minutos)
+                  </label>
+                  <ModernSelect
+                    value={form.duracion_turno_min}
+                    onChange={(v) => setForm({ ...form, duracion_turno_min: v })}
+                    options={[
+                      { value: '15', label: '15 minutos' },
+                      { value: '30', label: '30 minutos' },
+                      { value: '45', label: '45 minutos' },
+                      { value: '60', label: '60 minutos' },
+                    ]}
+                  />
+                </div>
+              )}
+            </div>
+
             <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: theme.text }}>
               <input
                 type="checkbox"

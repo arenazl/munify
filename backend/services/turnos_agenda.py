@@ -205,6 +205,8 @@ async def reservar_turno(
     dni_solicitante: Optional[str] = None,
     telefono_solicitante: Optional[str] = None,
     notas: Optional[str] = None,
+    tramite_id: Optional[int] = None,
+    usuario_id: Optional[int] = None,
     validar: bool = True,
 ) -> Turno:
     """UNICA funcion de creacion de turnos. Valida el slot y serializa el
@@ -240,6 +242,8 @@ async def reservar_turno(
             nombre_solicitante=nombre_solicitante,
             dni_solicitante=dni_solicitante,
             telefono_solicitante=telefono_solicitante,
+            tramite_id=tramite_id,
+            usuario_id=usuario_id,
             municipio_dependencia_id=dep_id,
             municipio_id=municipio_id,
             fecha_hora=fh,

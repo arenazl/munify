@@ -27,6 +27,7 @@ from models.enums import RolUsuario
 from models.tramite import Solicitud, Tramite
 from models.turno import Turno
 from models.municipio_dependencia import MunicipioDependencia
+from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
 
 from services.turnos_agenda import calcular_slots, reservar_turno
 
@@ -79,26 +80,59 @@ class TurnoResponse(BaseModel):
         from_attributes = True
 
 
+async def _resolver_dependencia_de_tramite(
+    db: AsyncSession, tramite: Tramite
+) -> int:
+    """Primera dependencia activa que atiende el trámite (mismo criterio que
+    la auto-asignación de solicitudes). 400 claro si el muni no lo mapeó."""
+    dep_id = (await db.execute(
+        select(MunicipioDependenciaTramite.municipio_dependencia_id).where(
+            MunicipioDependenciaTramite.tramite_id == tramite.id,
+        ).limit(1)
+    )).scalar_one_or_none()
+    if not dep_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Este trámite todavía no tiene una oficina de atención asignada. "
+                   "Consultá en el municipio.",
+        )
+    return dep_id
+
+
 @router.get("/disponibilidad", response_model=DisponibilidadResponse)
 async def disponibilidad(
     solicitud_id: Optional[int] = Query(None),
     dependencia_id: Optional[int] = Query(None),
+    tramite_id: Optional[int] = Query(None),
     duracion_min: Optional[int] = Query(None),
     desde: Optional[datetime] = Query(None),
     hasta: Optional[datetime] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista slots disponibles para una solicitud o dependencia.
+    """Lista slots disponibles para una solicitud, un trámite o una dependencia.
 
-    Si `solicitud_id` viene, usa la dependencia + duracion del tramite.
-    Si `dependencia_id` viene, usa esa con duracion_min default 30.
+    - `solicitud_id`: usa la dependencia + duración del trámite del expediente.
+    - `tramite_id` (turno-directo, sin expediente): resuelve la dependencia
+      mapeada al trámite y su duración de turno.
+    - `dependencia_id`: usa esa con duracion_min default 30.
     """
-    if not solicitud_id and not dependencia_id:
-        raise HTTPException(status_code=400, detail="Pasá solicitud_id o dependencia_id")
+    if not solicitud_id and not dependencia_id and not tramite_id:
+        raise HTTPException(status_code=400, detail="Pasá solicitud_id, tramite_id o dependencia_id")
 
     dep_id: Optional[int] = dependencia_id
     duracion: int = duracion_min or 30
+
+    if tramite_id and not solicitud_id:
+        qt = await db.execute(select(Tramite).where(Tramite.id == tramite_id, Tramite.activo == True))  # noqa: E712
+        tramite = qt.scalar_one_or_none()
+        if not tramite:
+            raise HTTPException(status_code=404, detail="Trámite no encontrado")
+        if current_user.municipio_id and tramite.municipio_id != current_user.municipio_id:
+            raise HTTPException(status_code=404, detail="Trámite no encontrado")
+        dep_id = await _resolver_dependencia_de_tramite(db, tramite)
+        if tramite.duracion_turno_min:
+            duracion = tramite.duracion_turno_min
 
     if solicitud_id:
         q = await db.execute(
@@ -218,8 +252,100 @@ async def reservar(
         motivo_tipo="tramite",
         origen_id=solicitud.id,
         solicitud_id=solicitud.id,
+        tramite_id=solicitud.tramite_id,
+        usuario_id=solicitud.solicitante_id,
     )
     return await _turno_to_response(db, turno)
+
+
+class ReservarDirectoRequest(BaseModel):
+    tramite_id: int
+    fecha_hora: datetime
+    # Mostrador: staff reservando en nombre de un vecino ya identificado
+    actuando_como_user_id: Optional[int] = None
+
+
+@router.post("/reservar-directo", response_model=TurnoResponse)
+async def reservar_directo(
+    body: ReservarDirectoRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """TURNO-FIRST: reserva un turno para un trámite SIN expediente previo.
+
+    El corazón del turnero consolidado: elegir trámite → slot → confirmar.
+    El expediente (Solicitud) se abre después en ventanilla si hace falta.
+
+    Gating de identidad: si el trámite exige KYC, el titular tiene que tener
+    `nivel_verificacion` suficiente (403 code=kyc_insuficiente → el front
+    lo manda a validar con Didit y reintenta).
+    """
+    qt = await db.execute(
+        select(Tramite).where(Tramite.id == body.tramite_id, Tramite.activo == True)  # noqa: E712
+    )
+    tramite = qt.scalar_one_or_none()
+    if not tramite:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+    if current_user.municipio_id and tramite.municipio_id != current_user.municipio_id:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+    if tramite.modo_atencion == "online":
+        raise HTTPException(
+            status_code=400,
+            detail="Este trámite se hace 100% online — no lleva turno.",
+        )
+    if tramite.modo_atencion == "presencial_sin_turno":
+        raise HTTPException(
+            status_code=400,
+            detail="Este trámite se atiende por orden de llegada, sin turno.",
+        )
+
+    # Titular del turno: el vecino logueado, o el vecino impersonado por el
+    # mostrador (mismo patrón actuando_como de reclamos/solicitudes).
+    titular = current_user
+    if body.actuando_como_user_id is not None:
+        if current_user.rol == RolUsuario.VECINO:
+            raise HTTPException(status_code=403, detail="No podés reservar por otra persona")
+        qv = await db.execute(select(User).where(User.id == body.actuando_como_user_id))
+        vecino = qv.scalar_one_or_none()
+        if not vecino:
+            raise HTTPException(status_code=404, detail="Vecino no encontrado")
+        if vecino.municipio_id and vecino.municipio_id != tramite.municipio_id:
+            raise HTTPException(status_code=403, detail="El vecino no pertenece a este municipio")
+        titular = vecino
+
+    # Gating KYC del TITULAR (en mostrador, el vecino ya validó con Didit
+    # asistido y su nivel_verificacion quedó seteado)
+    if tramite.requiere_kyc:
+        nivel = getattr(titular, "nivel_verificacion", 0) or 0
+        minimo = tramite.nivel_kyc_minimo or 2
+        if nivel < minimo:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "kyc_insuficiente",
+                    "nivel_requerido": minimo,
+                    "message": "Este trámite requiere validar tu identidad para confirmar el turno.",
+                },
+            )
+
+    dep_id = await _resolver_dependencia_de_tramite(db, tramite)
+
+    turno = await reservar_turno(
+        db,
+        dep_id=dep_id,
+        municipio_id=tramite.municipio_id,
+        fecha_hora=body.fecha_hora,
+        duracion=tramite.duracion_turno_min or 30,
+        motivo_tipo="tramite",
+        tramite_id=tramite.id,
+        usuario_id=titular.id,
+        nombre_solicitante=f"{titular.nombre} {titular.apellido or ''}".strip() or None,
+        dni_solicitante=titular.dni,
+        telefono_solicitante=titular.telefono,
+    )
+    resp = await _turno_to_response(db, turno)
+    resp.tramite_nombre = tramite.nombre
+    return resp
 
 
 @router.get("/agenda", response_model=List[TurnoResponse])
@@ -346,7 +472,11 @@ async def mis_turnos(
             func.regexp_replace(Turno.telefono_solicitante, "[^0-9]", "").like(f"%{tel_norm}")
         )
 
-    filtro = Turno.solicitud_id.in_(sub)
+    filtro = or_(
+        Turno.solicitud_id.in_(sub),
+        # Turnos directos (turno-first, sin expediente) reservados logueado
+        Turno.usuario_id == current_user.id,
+    )
     if condiciones_identidad:
         filtro = or_(
             filtro,
@@ -360,7 +490,9 @@ async def mis_turnos(
     q = await db.execute(
         select(Turno)
         .options(
-            selectinload(Turno.municipio_dependencia).selectinload(MunicipioDependencia.dependencia)
+            selectinload(Turno.municipio_dependencia).selectinload(MunicipioDependencia.dependencia),
+            selectinload(Turno.tramite),
+            selectinload(Turno.solicitud).selectinload(Solicitud.tramite),
         )
         .where(filtro)
         .order_by(Turno.fecha_hora.desc())
@@ -381,6 +513,10 @@ async def mis_turnos(
             notas=t.notas,
             motivo_tipo=t.motivo_tipo,
             nombre_solicitante=t.nombre_solicitante,
+            tramite_nombre=(
+                t.tramite.nombre if t.tramite
+                else (t.solicitud.tramite.nombre if t.solicitud and t.solicitud.tramite else None)
+            ),
         )
         for t in q.scalars().all()
     ]
@@ -517,4 +653,7 @@ async def _turno_to_response(db: AsyncSession, t: Turno) -> TurnoResponse:
             dep.dependencia.nombre if dep and dep.dependencia else None
         ),
         notas=t.notas,
+        motivo_tipo=t.motivo_tipo,
+        nombre_solicitante=t.nombre_solicitante,
+        dni_solicitante=t.dni_solicitante,
     )
