@@ -270,7 +270,21 @@ async def regenerar_premios(
     de sueldo cargado, generar los pagos programados de cada premio activo del
     catalogo que aun no tenga. Util cuando se carga un premio nuevo despues
     de tener empleados creados.
+
+    DEPRECADO (Premios se modelan como conceptos/liquidaciones aparte). El
+    endpoint queda gateado con 410: una invocación accidental crearía pagos
+    programados masivos (ej. Presentismo semanal x cada empleado con sueldo)
+    en un municipio productivo. Si un muni lo necesita de verdad, se rehabilita
+    con decisión explícita.
     """
+    raise HTTPException(
+        status_code=410,
+        detail=(
+            "Deprecado: los premios se cargan como liquidaciones/conceptos "
+            "individuales. Este backfill masivo quedó deshabilitado."
+        ),
+    )
+
     _require_admin(current_user)
     muni_id = get_effective_municipio_id(request, current_user)
 

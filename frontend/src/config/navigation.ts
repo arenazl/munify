@@ -405,6 +405,14 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Municipios suscriptos, plan, estado y próxima facturación'
     },
     {
+      name: 'Módulos',
+      href: '/gestion/admin/modulos',
+      icon: Layers,
+      show: isSuperAdmin,
+      categoria: 'Super Admin',
+      description: 'Activar/desactivar módulos por municipio (feature flags)'
+    },
+    {
       name: 'Auditoría',
       href: '/gestion/admin/audit-logs',
       icon: Activity,

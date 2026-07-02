@@ -110,29 +110,38 @@ class ConsultaReclamo(BaseModel):
 
 @router.get("/estadisticas", response_model=EstadisticasPublicas)
 async def get_estadisticas_publicas(
+    municipio_id: Optional[int] = Query(None, description="Filtrar por municipio (sin él: agregado de toda la plataforma)"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtener estadísticas públicas del sistema - SIN AUTENTICACIÓN"""
+    """Obtener estadísticas públicas - SIN AUTENTICACIÓN.
+
+    Con `municipio_id` devuelve los números de ESE municipio (lo que usa el
+    widget del vecino). Sin él, el agregado global de la plataforma (landing).
+    """
+    # Filtro base opcional por tenant
+    base = [Reclamo.municipio_id == municipio_id] if municipio_id else []
+    ESTADOS_RESUELTOS = [EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]
+
     # Total de reclamos
-    result = await db.execute(select(func.count(Reclamo.id)))
+    result = await db.execute(select(func.count(Reclamo.id)).where(*base))
     total = result.scalar() or 0
 
-    # Por estado
+    # Por estado (incluye estados nuevos + legacy)
     result = await db.execute(
         select(func.count(Reclamo.id))
-        .where(Reclamo.estado == EstadoReclamo.RESUELTO)
+        .where(*base, Reclamo.estado.in_(ESTADOS_RESUELTOS))
     )
     resueltos = result.scalar() or 0
 
     result = await db.execute(
         select(func.count(Reclamo.id))
-        .where(Reclamo.estado == EstadoReclamo.EN_CURSO)
+        .where(*base, Reclamo.estado.in_([EstadoReclamo.EN_CURSO, EstadoReclamo.EN_PROCESO]))
     )
     en_curso = result.scalar() or 0
 
     result = await db.execute(
         select(func.count(Reclamo.id))
-        .where(Reclamo.estado == EstadoReclamo.NUEVO)
+        .where(*base, Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.RECIBIDO]))
     )
     nuevos = result.scalar() or 0
 
@@ -144,7 +153,8 @@ async def get_estadisticas_publicas(
     result = await db.execute(
         select(Reclamo)
         .where(
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            *base,
+            Reclamo.estado.in_(ESTADOS_RESUELTOS),
             Reclamo.fecha_resolucion >= hace_90_dias
         )
     )
@@ -161,6 +171,8 @@ async def get_estadisticas_publicas(
     # Calificación promedio
     result = await db.execute(
         select(func.avg(Calificacion.puntuacion))
+        .join(Reclamo, Reclamo.id == Calificacion.reclamo_id)
+        .where(*base)
     )
     calificacion_promedio = result.scalar() or 0
 
@@ -168,6 +180,7 @@ async def get_estadisticas_publicas(
     result = await db.execute(
         select(Categoria.nombre, func.count(Reclamo.id))
         .join(Reclamo)
+        .where(*base)
         .group_by(Categoria.id, Categoria.nombre)
         .order_by(func.count(Reclamo.id).desc())
     )
@@ -180,6 +193,7 @@ async def get_estadisticas_publicas(
     result = await db.execute(
         select(Zona.nombre, func.count(Reclamo.id))
         .join(Reclamo)
+        .where(*base)
         .group_by(Zona.id, Zona.nombre)
         .order_by(func.count(Reclamo.id).desc())
     )

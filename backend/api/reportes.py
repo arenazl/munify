@@ -65,10 +65,11 @@ async def generar_reporte_ejecutivo(
     )
     total_reclamos = result.scalar() or 0
 
-    # Resueltos
+    # Resueltos (estado nuevo FINALIZADO + legacy RESUELTO)
+    ESTADOS_RESUELTOS = [EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]
     result = await db.execute(
         select(func.count(Reclamo.id)).where(
-            and_(base_filter, Reclamo.estado == EstadoReclamo.RESUELTO)
+            and_(base_filter, Reclamo.estado.in_(ESTADOS_RESUELTOS))
         )
     )
     resueltos = result.scalar() or 0
@@ -99,11 +100,17 @@ async def generar_reporte_ejecutivo(
     reclamos_por_estado = {}
     for estado, count in result.all():
         estado_label = {
+            EstadoReclamo.RECIBIDO: "Recibido",
+            EstadoReclamo.EN_CURSO: "En Curso",
+            EstadoReclamo.FINALIZADO: "Finalizado",
+            EstadoReclamo.POSPUESTO: "Pospuesto",
+            EstadoReclamo.RECHAZADO: "Rechazado",
+            # Legacy
             EstadoReclamo.NUEVO: "Nuevo",
             EstadoReclamo.ASIGNADO: "Asignado",
-            EstadoReclamo.EN_CURSO: "En Proceso",
+            EstadoReclamo.EN_PROCESO: "En Proceso",
+            EstadoReclamo.PENDIENTE_CONFIRMACION: "Pend. Confirmación",
             EstadoReclamo.RESUELTO: "Resuelto",
-            EstadoReclamo.RECHAZADO: "Rechazado",
         }.get(estado, str(estado))
         reclamos_por_estado[estado_label] = count
 
@@ -145,14 +152,56 @@ async def generar_reporte_ejecutivo(
         )
         tendencia_mensual[mes_label] = result.scalar() or 0
 
-    # === TOP EMPLEADOS ===
-    # TODO: Migrar a dependencia cuando se implemente asignación por IA
-    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
-    top_empleados = []
+    # === TOP EMPLEADOS (resueltos por empleado asignado en el mes) ===
+    result = await db.execute(
+        select(
+            Empleado.nombre,
+            Empleado.apellido,
+            func.count(Reclamo.id).label("resueltos"),
+            func.avg(func.timestampdiff(
+                func.literal_column('HOUR'), Reclamo.created_at, Reclamo.fecha_resolucion
+            )).label("tiempo_prom"),
+            func.avg(Calificacion.puntuacion).label("calif"),
+        )
+        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
+        .outerjoin(Calificacion, Calificacion.reclamo_id == Reclamo.id)
+        .where(and_(base_filter, Reclamo.estado.in_(ESTADOS_RESUELTOS)))
+        .group_by(Empleado.id, Empleado.nombre, Empleado.apellido)
+        .order_by(func.count(Reclamo.id).desc())
+        .limit(5)
+    )
+    top_empleados = [
+        {
+            "nombre": f"{nombre} {(apellido or '')[:1]}.".strip(),
+            "resueltos": int(cant),
+            "tiempo_promedio": float(t_prom or 0),
+            "calificacion": float(calif or 0),
+        }
+        for nombre, apellido, cant, t_prom, calif in result.all()
+    ]
 
-    # === METRICAS SLA ===
-    # Por ahora un valor estimado, despues se puede calcular real
-    sla_cumplimiento = 85.0 if resueltos > 0 else 0
+    # === METRICAS SLA (real) ===
+    # % de resueltos del mes dentro del tiempo estimado de su categoría
+    # (CategoriaReclamo.tiempo_resolucion_estimado, en horas; default 48).
+    result = await db.execute(
+        select(Reclamo.created_at, Reclamo.fecha_resolucion, Categoria.tiempo_resolucion_estimado)
+        .join(Categoria, Categoria.id == Reclamo.categoria_id)
+        .where(and_(
+            base_filter,
+            Reclamo.estado.in_(ESTADOS_RESUELTOS),
+            Reclamo.fecha_resolucion.isnot(None),
+        ))
+    )
+    filas_sla = result.all()
+    if filas_sla:
+        en_tiempo = sum(
+            1 for creado, resuelto, limite_hs in filas_sla
+            if (resuelto.replace(tzinfo=None) - creado.replace(tzinfo=None)).total_seconds() / 3600
+            <= (limite_hs or 48)
+        )
+        sla_cumplimiento = round(en_tiempo / len(filas_sla) * 100, 1)
+    else:
+        sla_cumplimiento = 0
 
     # Tiempo promedio de resolucion (en horas)
     result = await db.execute(
@@ -167,12 +216,12 @@ async def generar_reporte_ejecutivo(
         ).where(
             and_(
                 base_filter,
-                Reclamo.estado == EstadoReclamo.RESUELTO,
+                Reclamo.estado.in_(ESTADOS_RESUELTOS),
                 Reclamo.fecha_resolucion.isnot(None)
             )
         )
     )
-    tiempo_promedio = result.scalar() or 48.0
+    tiempo_promedio = result.scalar() or 0
 
     # Calificacion promedio general
     result = await db.execute(
@@ -186,7 +235,8 @@ async def generar_reporte_ejecutivo(
             )
         )
     )
-    calificacion_promedio = result.scalar() or 4.0
+    # Sin calificaciones = 0 honesto (nada de defaults inventados)
+    calificacion_promedio = result.scalar() or 0
 
     # === GENERAR PDF ===
     meses_nombres = [
@@ -207,8 +257,8 @@ async def generar_reporte_ejecutivo(
         tendencia_mensual=tendencia_mensual,
         top_empleados=top_empleados,
         sla_cumplimiento=sla_cumplimiento,
-        tiempo_promedio_resolucion=float(tiempo_promedio) if tiempo_promedio else 48.0,
-        calificacion_promedio=float(calificacion_promedio) if calificacion_promedio else 4.0,
+        tiempo_promedio_resolucion=float(tiempo_promedio or 0),
+        calificacion_promedio=float(calificacion_promedio or 0),
         logo_url=municipio.logo_url,
     )
 

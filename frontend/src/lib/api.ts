@@ -128,9 +128,11 @@ api.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  // Agregar municipio seleccionado (para multi-tenant)
+  // Agregar municipio seleccionado (para multi-tenant). Si la request ya
+  // trae un X-Municipio-ID explícito (ej: pantalla Módulos del superadmin
+  // operando sobre un muni puntual), se respeta y NO se pisa.
   const municipioId = localStorage.getItem('municipio_actual_id');
-  if (municipioId) {
+  if (municipioId && !config.headers['X-Municipio-ID']) {
     config.headers['X-Municipio-ID'] = municipioId;
   }
 
@@ -1094,7 +1096,8 @@ export const exportarApi = {
 
 // Portal público (sin auth)
 export const publicoApi = {
-  getEstadisticas: () => api.get('/publico/estadisticas'),
+  getEstadisticas: (municipioId?: number) =>
+    api.get('/publico/estadisticas', { params: municipioId ? { municipio_id: municipioId } : {} }),
   getEstadisticasMunicipio: (municipioId: number) => api.get('/publico/estadisticas/municipio', { params: { municipio_id: municipioId } }),
   getTendencias: (dias?: number) => api.get('/publico/tendencias', { params: { dias } }),
   getCategorias: (municipioId?: number) => api.get('/publico/categorias', { params: { municipio_id: municipioId } }),
@@ -1357,6 +1360,21 @@ export const tarjetasApi = {
   create: (data: Record<string, unknown>) => api.post('/tarjetas', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/tarjetas/${id}`, data),
   remove: (id: number) => api.delete(`/tarjetas/${id}`),
+};
+
+// Módulos por municipio (feature flags) — el superadmin opera sobre cualquier
+// muni pasando el header X-Municipio-ID explícito (el interceptor lo respeta)
+export const modulosAdminApi = {
+  list: (municipioId: number) =>
+    api.get('/modulos/', { headers: { 'X-Municipio-ID': String(municipioId) } }),
+  upsert: (municipioId: number, modulo: string, activo: boolean) =>
+    api.put(`/modulos/${modulo}`, { activo }, { headers: { 'X-Municipio-ID': String(municipioId) } }),
+};
+
+// Reportes PDF
+export const reportesApi = {
+  ejecutivo: (mes: number, anio: number) =>
+    api.get('/reportes/ejecutivo', { params: { mes, anio }, responseType: 'blob' }),
 };
 
 // Órdenes de trabajo (campo) — N:M con reclamos

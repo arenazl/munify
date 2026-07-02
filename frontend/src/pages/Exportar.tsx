@@ -9,13 +9,15 @@ import {
   Loader2,
   Calendar,
   Filter,
-  Sparkles
+  Sparkles,
+  FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { exportarApi } from '../lib/api';
+import { exportarApi, reportesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { DateRangePicker } from '../components/ui/DateRangePicker';
+import { ModernSelect } from '../components/ui/ModernSelect';
 
 interface ExportOption {
   id: string;
@@ -25,7 +27,13 @@ interface ExportOption {
   color: string;
   hasFilters?: boolean;
   hasDays?: boolean;
+  hasMesAnio?: boolean;
 }
+
+const MESES_LABELS = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
 
 const exportOptions: ExportOption[] = [
   {
@@ -58,6 +66,14 @@ const exportOptions: ExportOption[] = [
     icon: <Clock className="h-6 w-6" />,
     color: '#f59e0b',
   },
+  {
+    id: 'ejecutivo',
+    title: 'Reporte Ejecutivo (PDF)',
+    description: 'Resumen mensual para gestión: KPIs, categorías, zonas, cumplimiento SLA y top empleados',
+    icon: <FileText className="h-6 w-6" />,
+    color: '#06b6d4',
+    hasMesAnio: true,
+  },
 ];
 
 export default function Exportar() {
@@ -74,6 +90,13 @@ export default function Exportar() {
 
   // Días para estadísticas
   const [dias, setDias] = useState(30);
+
+  // Mes/año del reporte ejecutivo — default: el mes pasado (mes cerrado)
+  const mesPasado = new Date();
+  mesPasado.setDate(1);
+  mesPasado.setMonth(mesPasado.getMonth() - 1);
+  const [mes, setMes] = useState(mesPasado.getMonth() + 1);
+  const [anio, setAnio] = useState(mesPasado.getFullYear());
 
   const downloadFile = (blob: Blob, filename: string) => {
     const url = window.URL.createObjectURL(blob);
@@ -115,6 +138,10 @@ export default function Exportar() {
           response = await exportarApi.slaCsv();
           filename = `sla_estado_${timestamp}.csv`;
           break;
+        case 'ejecutivo':
+          response = await reportesApi.ejecutivo(mes, anio);
+          filename = `reporte_ejecutivo_${anio}_${String(mes).padStart(2, '0')}.pdf`;
+          break;
         default:
           throw new Error('Opción no válida');
       }
@@ -145,7 +172,7 @@ export default function Exportar() {
           <button
             key={opt.id}
             onClick={() => {
-              if (opt.hasFilters || opt.hasDays) {
+              if (opt.hasFilters || opt.hasDays || opt.hasMesAnio) {
                 setSelectedOption(opt.id);
               } else {
                 handleExport(opt.id);
@@ -177,7 +204,7 @@ export default function Exportar() {
                 <p className="text-sm mt-1" style={{ color: theme.textSecondary }}>
                   {opt.description}
                 </p>
-                {(opt.hasFilters || opt.hasDays) && (
+                {(opt.hasFilters || opt.hasDays || opt.hasMesAnio) && (
                   <div
                     className="mt-2 flex items-center gap-1.5 text-xs"
                     style={{ color: opt.color }}
@@ -228,23 +255,19 @@ export default function Exportar() {
                   >
                     Estado
                   </label>
-                  <select
+                  <ModernSelect
                     value={filters.estado}
-                    onChange={(e) => setFilters({ ...filters, estado: e.target.value })}
-                    className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      border: `1px solid ${theme.border}`,
-                      color: theme.text,
-                    }}
-                  >
-                    <option value="">Todos los estados</option>
-                    <option value="nuevo">Nuevo</option>
-                    <option value="asignado">Asignado</option>
-                    <option value="en_progreso">En Progreso</option>
-                    <option value="resuelto">Resuelto</option>
-                    <option value="rechazado">Rechazado</option>
-                  </select>
+                    onChange={(v) => setFilters({ ...filters, estado: v })}
+                    placeholder="Todos los estados"
+                    options={[
+                      { value: '', label: 'Todos los estados' },
+                      { value: 'recibido', label: 'Recibido' },
+                      { value: 'en_curso', label: 'En Curso' },
+                      { value: 'finalizado', label: 'Finalizado' },
+                      { value: 'pospuesto', label: 'Pospuesto' },
+                      { value: 'rechazado', label: 'Rechazado' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label
@@ -293,6 +316,35 @@ export default function Exportar() {
             </div>
           )}
 
+          {/* Mes/Año para el Reporte Ejecutivo */}
+          {option.hasMesAnio && (
+            <div className="grid grid-cols-2 gap-4 max-w-md">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                  Mes
+                </label>
+                <ModernSelect
+                  value={String(mes)}
+                  onChange={(v) => setMes(Number(v))}
+                  options={MESES_LABELS.map((m, i) => ({ value: String(i + 1), label: m }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: theme.textSecondary }}>
+                  Año
+                </label>
+                <ModernSelect
+                  value={String(anio)}
+                  onChange={(v) => setAnio(Number(v))}
+                  options={Array.from({ length: 3 }, (_, i) => {
+                    const a = new Date().getFullYear() - i;
+                    return { value: String(a), label: String(a) };
+                  })}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
           <div className="flex gap-3 mt-5 pt-4" style={{ borderTop: `1px solid ${theme.border}` }}>
             <button
@@ -323,7 +375,7 @@ export default function Exportar() {
               ) : (
                 <>
                   <Download className="h-4 w-4" />
-                  Descargar CSV
+                  {option.hasMesAnio ? 'Descargar PDF' : 'Descargar CSV'}
                 </>
               )}
             </button>

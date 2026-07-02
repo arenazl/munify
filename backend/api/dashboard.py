@@ -298,19 +298,35 @@ async def get_mis_stats(
 @router.get("/empleado-stats")
 async def get_empleado_stats(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["empleado"]))
+    current_user: User = Depends(require_roles(["empleado", "supervisor", "admin"]))
 ):
-    """Estadisticas para empleados - trabajo asignado
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
-    """
-    # Por ahora retorna 0s ya que no hay empleado_id en reclamos
-    # Se migrará a dependencia_id cuando se implemente IA
+    """Estadísticas del empleado de campo: SUS reclamos asignados
+    (Reclamo.empleado_id == empleado vinculado al usuario)."""
+    if not current_user.empleado_id:
+        return {"asignados_hoy": 0, "en_curso": 0, "completados_hoy": 0, "pendientes": 0}
+
+    hoy = datetime.utcnow().date()
+    base = [
+        Reclamo.empleado_id == current_user.empleado_id,
+        Reclamo.municipio_id == current_user.municipio_id,
+    ]
+
+    async def _count(*extra):
+        return (await db.execute(
+            select(func.count(Reclamo.id)).where(*base, *extra)
+        )).scalar() or 0
+
+    cerrados = [EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO,
+                EstadoReclamo.RECHAZADO]
     return {
-        "asignados_hoy": 0,
-        "en_curso": 0,
-        "completados_hoy": 0,
-        "pendientes": 0,
-        "mensaje": "Pendiente migración a dependencias"
+        "asignados_hoy": await _count(Reclamo.fecha_programada == hoy),
+        "en_curso": await _count(Reclamo.estado.in_(
+            [EstadoReclamo.EN_CURSO, EstadoReclamo.EN_PROCESO])),
+        "completados_hoy": await _count(
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
+            func.date(Reclamo.fecha_resolucion) == hoy,
+        ),
+        "pendientes": await _count(Reclamo.estado.notin_(cerrados)),
     }
 
 

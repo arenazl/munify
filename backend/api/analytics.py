@@ -372,13 +372,45 @@ async def get_rendimiento_empleados(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
+    """Rendimiento de empleados por semana: reclamos resueltos por cada
+    empleado asignado (Reclamo.empleado_id) en las últimas N semanas.
+    Devuelve el shape que consume el Dashboard:
+      {semanas: [{semana: 'Sem dd/mm', '<Nombre A.>': n, ...}], empleados: [...]}
     """
-    Rendimiento de empleados por semana.
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
-    """
-    # Por ahora retorna datos vacíos ya que no hay empleado_id en reclamos
-    return {
-        "semanas": [],
-        "empleados": [],
-        "mensaje": "Pendiente migración a dependencias"
-    }
+    municipio_id = get_effective_municipio_id(request, current_user)
+    hoy = datetime.utcnow().date()
+    inicio = hoy - timedelta(days=hoy.weekday(), weeks=semanas - 1)  # lunes de la 1ra semana
+
+    rows = (await db.execute(
+        select(Reclamo.fecha_resolucion, Empleado.nombre, Empleado.apellido)
+        .join(Empleado, Empleado.id == Reclamo.empleado_id)
+        .where(
+            Reclamo.municipio_id == municipio_id,
+            Reclamo.empleado_id.isnot(None),
+            Reclamo.estado.in_([EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO]),
+            Reclamo.fecha_resolucion.isnot(None),
+            func.date(Reclamo.fecha_resolucion) >= inicio,
+        )
+    )).all()
+
+    # Eje X estable: las N semanas aunque estén vacías
+    lunes = [inicio + timedelta(weeks=i) for i in range(semanas)]
+    labels = {l: f"Sem {l.strftime('%d/%m')}" for l in lunes}
+    conteos: dict = {l: {} for l in lunes}
+    empleados: set = set()
+
+    for fecha_res, nombre, apellido in rows:
+        f = fecha_res.date() if hasattr(fecha_res, "date") else fecha_res
+        semana_lunes = f - timedelta(days=f.weekday())
+        if semana_lunes not in conteos:
+            continue
+        etiqueta = f"{nombre} {(apellido or '')[:1]}.".strip()
+        empleados.add(etiqueta)
+        conteos[semana_lunes][etiqueta] = conteos[semana_lunes].get(etiqueta, 0) + 1
+
+    empleados_orden = sorted(empleados)
+    semanas_out = [
+        {"semana": labels[l], **{e: conteos[l].get(e, 0) for e in empleados_orden}}
+        for l in lunes
+    ]
+    return {"semanas": semanas_out, "empleados": empleados_orden}

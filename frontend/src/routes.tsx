@@ -42,6 +42,7 @@ import GestionTasas from './pages/GestionTasas';
 import GestionPagos from './pages/GestionPagos';
 import Mostrador from './pages/Mostrador';
 import SidebarConfig from './pages/SidebarConfig';
+import ModulosMunicipio from './pages/admin/ModulosMunicipio';
 import ConfiguracionIA from './pages/ConfiguracionIA';
 import PayBridgeCheckout from './pages/PayBridgeCheckout';
 import GestionTramites from './pages/GestionTramites';
@@ -310,6 +311,10 @@ export const router = createBrowserRouter([
       {
         path: 'admin/suscripciones',
         element: <ProtectedRoute roles={['admin']}><Suscripciones /></ProtectedRoute>
+      },
+      {
+        path: 'admin/modulos',
+        element: <ProtectedRoute roles={['admin']}><ModulosMunicipio /></ProtectedRoute>
       },
       {
         path: 'consola',

@@ -226,7 +226,9 @@ export default function DashboardVecino() {
         reclamosApi.getMisReclamos(),
         configuracionApi.getPublica('municipio').catch(() => ({ data: {} })),
         configuracionApi.getDashboardConfig('vecino').catch(() => ({ data: { config: null } })),
-        publicoApi.getEstadisticas().catch(() => ({ data: null })),
+        // Estadísticas del municipio del vecino (sin municipio_id mezclaba
+        // los números de TODOS los municipios en el widget "Tu Municipio")
+        publicoApi.getEstadisticas(user?.municipio_id).catch(() => ({ data: null })),
         vecinoApi.recomendaciones().catch(() => ({ data: [] })),
       ]);
 
