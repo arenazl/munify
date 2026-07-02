@@ -34,6 +34,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Ver qué hizo el refactor per-municipio de trámites | [`plataforma/04-refactor-tramites-per-municipio.md`](plataforma/04-refactor-tramites-per-municipio.md) |
 | Replicar el Modo Live (slides animados del dashboard) | [`plataforma/05-modo-live.md`](plataforma/05-modo-live.md) |
 | La spec vigente de SalesBot (endpoints vivos) | [`salesbot/01-spec-final.md`](salesbot/01-spec-final.md) |
+| El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Pitch / argumentario de ventas para intendentes | [`sales/01-producto-munify.md`](sales/01-producto-munify.md) |
 | Prompt del agente de ventas (Bruno) | [`sales/02-sales-agent-prompt.md`](sales/02-sales-agent-prompt.md) |
 | Brochure comercial PDF | [`marketing/Munify_Brochure.pdf`](marketing/Munify_Brochure.pdf) |
