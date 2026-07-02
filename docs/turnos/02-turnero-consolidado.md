@@ -93,9 +93,14 @@ paralelas), feriados. Lo que FALTA:
   ReservarTurnoSheet turno-first con "qué tenés que llevar" por adelantado;
   card "Tomar turno" en el Hub del mostrador (atajo U); gancho de onboarding
   post-validación en CapturaMovil.
-  **Pendiente de C.1**: catálogo público consultable sin login; que el wizard
-  de solicitud ofrezca turno al terminar; curado del mapeo trámite→dependencia
-  en los munis (dato: ~65% sin mapear — sin eso reservar da 400).
+  **Restos de C.1 — HECHOS (commits `2f19495` + `62b6a87`)**: catálogo público
+  `/app/tramites` (requisitos + modo de atención sin login, el botón Trámites
+  del home entra por acá); el wizard ofrece "Sacar turno" al crear una
+  solicitud de trámite presencial (deep-link al Sheet); y el mapeo
+  trámite→oficina se asigna desde el propio ABM del trámite
+  (GET/PUT /tramites/{id}/dependencia) — el curado de datos de cada muni
+  sigue siendo tarea del admin, pero ahora tiene la herramienta natural.
+- **C.1 CERRADO.**
 - **C.2 (ciclo de vida)**: TRN + comprobante + notificaciones de turno
   (modelo `Notificacion` gana `turno_id`); recordatorios con Cloud Scheduler;
   confirmación/reprogramación.
