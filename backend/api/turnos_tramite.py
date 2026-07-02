@@ -12,7 +12,7 @@ Disponibilidad calculada dinamicamente — sin tabla de slots:
 """
 from datetime import datetime, timedelta, time
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 import re
 
