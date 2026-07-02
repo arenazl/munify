@@ -1,14 +1,25 @@
 """Curación automática de los gastos [BARTOLO-DUDOSO] de SPN (muni 80).
 
-REGLAS (solo señal fuerte — lo ambiguo NO se toca):
-  1. HERENCIA: si el mismo contacto tiene >=3 gastos NO dudosos con concepto
-     específico y >=70% en el mismo concepto, el dudoso hereda ese concepto.
-  2. CONCEJAL: contacto tipo 'concejal' -> 'Legislativo' (dieta/gastos del
-     Concejo; pagos chicos periódicos).
-  3. MEDIOS: Estación FM / Teleocho (radio y TV con pauta mensual) -> 'Publicidad'.
-  4. PUNTUALES: 'carpa' (Juan Capel) -> 'Contratacion de eventos y actividades
-     culturales' (mismo criterio que usó Bartolo en gastos análogos);
-     'elecciones legislativas' -> 'Legislativo'.
+V2 — "un punto más que conservador" (pedido del user 2026-07-02: es histórico,
+sin caja ni movimientos; confía en el criterio). Lo verdaderamente ambiguo
+sigue sin tocarse.
+
+REGLAS (en orden de prioridad):
+  1. HERENCIA: el contacto tiene >=2 gastos NO dudosos específicos y >=60%
+     en el mismo concepto -> hereda ese concepto.
+  2. CONCEJAL: contacto tipo 'concejal' -> 'Legislativo' (dieta/gastos Concejo).
+  3. EMPLEADO tipo "Prensa" -> 'Prensa' (los 4 de prensa cobran pauta periódica).
+  4. EMPLEADO (no prensa) con >=6 pagos periódicos dudosos -> 'Pago de sueldos
+     y jornales' (jornalizado recurrente).
+  5. PROFESIONAL -> 'Pago de honorarios profesionales'.
+  6. BENEFICIARIO con >=2 pagos -> 'Aporte a subsidios y ayudas sociales'.
+  7. RUBRO/KEYWORD en descripción o nombre del comercio:
+     radio/fm/tele/canal/imprenta/gráfica -> Publicidad; ferretería/corralón ->
+     Compra de materiales de obra; combustible/nafta/gasoil/YPF/Shell ->
+     Compra de combustible; carpa/sonido/escenario/animación -> Eventos;
+     desmalezamiento/trabajo máquina -> Obra pública; electricidad ->
+     Reparación de edificios; licencias de conducir -> Servicios profesionales;
+     elecciones -> Legislativo.
 
 QUÉ TOCA: SOLO gastos.concepto y gastos.observaciones (cambia el tag
 [BARTOLO-DUDOSO] por [BARTOLO-AUTO] con trazabilidad). NO toca montos, fechas,
@@ -60,12 +71,20 @@ async def main(aplicar: bool):
             SELECT g.id, g.concepto, g.descripcion, g.observaciones,
                    g.destino_contacto_id AS cid,
                    CONCAT(c.nombre, ' ', COALESCE(c.apellido,'')) AS contacto,
-                   c.tipo AS contacto_tipo
+                   c.tipo AS contacto_tipo,
+                   te.nombre AS tipo_empleado
             FROM gastos g
             LEFT JOIN contactos c ON c.id = g.destino_contacto_id
+            LEFT JOIN tesoreria_tipos_empleado te ON te.id = c.tipo_empleado_id
             WHERE g.municipio_id = :m AND g.activo = 1
               AND g.observaciones LIKE '%[BARTOLO-DUDOSO]%'
         """), {"m": MUNI})).mappings().all()
+
+        # Cuántos pagos dudosos tiene cada contacto (para la regla de recurrencia)
+        recurrencia = defaultdict(int)
+        for g in dudosos:
+            if g["cid"]:
+                recurrencia[g["cid"]] += 1
 
         # Regla 1: herencia por contacto
         hist = (await db.execute(text("""
@@ -85,23 +104,43 @@ async def main(aplicar: bool):
             lst.sort(key=lambda x: -x[1])
             total = sum(n for _, n in lst)
             top_c, top_n = lst[0]
-            if total >= 3 and top_n / total >= 0.7:
+            if total >= 2 and top_n / total >= 0.6:
                 herencia[cid] = (ALIAS_CONCEPTO.get(top_c, top_c), f"herencia {top_n}/{total}")
+
+        KW = [
+            (("estación fm", "estacion fm", "teleocho", "radio ", "canal ", " fm", "imprenta", "gráfica", "grafica", "impacto color", "señal"), "Publicidad", "regla medios/gráfica"),
+            (("ferreter", "corralón", "corralon"), "Compra de materiales de obra", "regla rubro ferretería/corralón"),
+            (("combustible", "nafta", "gasoil", "ypf", "shell "), "Compra de combustible", "regla combustible"),
+            (("carpa", "sonido", "escenario", "animación", "animacion", "show "), "Contratacion de eventos y actividades culturales", "regla eventos"),
+            (("desmalezamiento", "trabajo máquina", "trabajo maquina", "motoniveladora"), "Obra publica / construccion", "regla obra/viales"),
+            (("electricidad", "electricista"), "Reparacion de edificios e instalaciones", "regla electricidad"),
+            (("licencias de conducir",), "Contratacion de servicios profesionales", "regla licencias (proveedor sistema)"),
+            (("elecciones",), "Legislativo", "regla elecciones"),
+        ]
 
         plan = []
         for g in dudosos:
             desc = (g["descripcion"] or "").strip().lower()
+            cont = (g["contacto"] or "").lower()
+            texto = f"{desc} {cont}"
             nuevo = motivo = None
             if g["cid"] in herencia:
                 nuevo, motivo = herencia[g["cid"]]
             elif g["contacto_tipo"] == "concejal":
                 nuevo, motivo = "Legislativo", "regla concejal (dieta/gastos Concejo)"
-            elif desc in ("estación fm", "estacion fm", "teleocho") or "teleocho" in (g["contacto"] or "").lower():
-                nuevo, motivo = "Publicidad", "regla medios (pauta radio/TV)"
-            elif desc == "carpa":
-                nuevo, motivo = "Contratacion de eventos y actividades culturales", "regla carpa (criterio Bartolo)"
-            elif "elecciones legislativas" in desc:
-                nuevo, motivo = "Legislativo", "regla elecciones"
+            elif g["contacto_tipo"] == "empleado" and _norm(g["tipo_empleado"] or "") == "prensa":
+                nuevo, motivo = "Prensa", "regla empleado tipo Prensa"
+            elif g["contacto_tipo"] == "empleado" and recurrencia.get(g["cid"], 0) >= 6:
+                nuevo, motivo = "Pago de sueldos y jornales", f"regla empleado recurrente ({recurrencia[g['cid']]} pagos)"
+            elif g["contacto_tipo"] == "profesional":
+                nuevo, motivo = "Pago de honorarios profesionales", "regla profesional"
+            elif g["contacto_tipo"] == "beneficiario" and recurrencia.get(g["cid"], 0) >= 2:
+                nuevo, motivo = "Aporte a subsidios y ayudas sociales", "regla beneficiario recurrente"
+            else:
+                for kws, concepto_kw, motivo_kw in KW:
+                    if any(k in texto for k in kws):
+                        nuevo, motivo = concepto_kw, motivo_kw
+                        break
             if not nuevo:
                 continue
             canonico = catalogo.get(_norm(nuevo))
