@@ -77,6 +77,9 @@ class Turno(Base):
     estado = Column(String(20), nullable=False, default="reservado")
     notas = Column(String(500), nullable=True)
 
+    # Recordatorio 24h enviado (idempotencia del cron de recordatorios)
+    recordatorio_enviado_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

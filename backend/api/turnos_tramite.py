@@ -30,6 +30,7 @@ from models.municipio_dependencia import MunicipioDependencia
 from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
 
 from services.turnos_agenda import calcular_slots, reservar_turno
+from services.turnos_notif import notificar_turno_reservado, enviar_recordatorios, codigo_trn
 
 
 router = APIRouter(prefix="/turnos-tramite", tags=["Turnos Tramite"])
@@ -75,6 +76,8 @@ class TurnoResponse(BaseModel):
     # Para la agenda del mostrador (check-in): quién viene y a qué
     dni_solicitante: Optional[str] = None
     tramite_nombre: Optional[str] = None
+    # Código de comprobante (mismo formato que usa el bot)
+    codigo: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -255,6 +258,10 @@ async def reservar(
         tramite_id=solicitud.tramite_id,
         usuario_id=solicitud.solicitante_id,
     )
+    await notificar_turno_reservado(
+        db, turno,
+        tramite_nombre=solicitud.tramite.nombre if solicitud.tramite else None,
+    )
     return await _turno_to_response(db, turno)
 
 
@@ -343,9 +350,34 @@ async def reservar_directo(
         dni_solicitante=titular.dni,
         telefono_solicitante=titular.telefono,
     )
+    await notificar_turno_reservado(db, turno, tramite_nombre=tramite.nombre)
+
     resp = await _turno_to_response(db, turno)
     resp.tramite_nombre = tramite.nombre
     return resp
+
+
+@router.post("/enviar-recordatorios")
+async def enviar_recordatorios_turnos(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Endpoint INTERNO para el cron (Cloud Scheduler): manda el recordatorio
+    de los turnos de las próximas 24hs que aún no lo recibieron. Idempotente.
+
+    Auth: header X-Cron-Key contra settings.CRON_SECRET (vacío = deshabilitado).
+    Job sugerido (una vez, desde infra):
+      gcloud scheduler jobs create http munify-recordatorios-turnos \\
+        --schedule="0 * * * *" --uri="https://<backend>/api/turnos-tramite/enviar-recordatorios" \\
+        --http-method=POST --headers="X-Cron-Key=<CRON_SECRET>" \\
+        --location=southamerica-east1 --project=munify-api
+    """
+    from core.config import settings
+    if not settings.CRON_SECRET:
+        raise HTTPException(status_code=503, detail="CRON_SECRET no configurado")
+    if request.headers.get("X-Cron-Key") != settings.CRON_SECRET:
+        raise HTTPException(status_code=403, detail="Clave inválida")
+    return await enviar_recordatorios(db)
 
 
 @router.get("/agenda", response_model=List[TurnoResponse])
@@ -656,4 +688,5 @@ async def _turno_to_response(db: AsyncSession, t: Turno) -> TurnoResponse:
         motivo_tipo=t.motivo_tipo,
         nombre_solicitante=t.nombre_solicitante,
         dni_solicitante=t.dni_solicitante,
+        codigo=codigo_trn(t.id),
     )

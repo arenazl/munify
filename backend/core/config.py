@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     # SalesBot (Bruno) - API key estatica backend-to-backend para /api/salesbot/*
     SALESBOT_API_KEY: str = ""
 
+    # Clave del cron externo (Cloud Scheduler) para endpoints internos
+    # como el de recordatorios de turnos. Vacia = endpoint deshabilitado (503).
+    CRON_SECRET: str = ""
+
     # CORS - URLs permitidas (separadas por coma en .env)
     CORS_ORIGINS: str = ""
 

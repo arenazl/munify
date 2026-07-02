@@ -152,7 +152,7 @@ export default function MisTurnos() {
       <Sheet
         open={!!selected}
         onClose={() => setSelected(null)}
-        title={selected ? `Turno #${selected.id}` : ''}
+        title={selected ? `Turno TRN-${String(selected.id).padStart(5, '0')}` : ''}
         stickyFooter={
           selected && selected.estado === 'reservado' ? (
             <button
