@@ -12,6 +12,7 @@ import { configuracionApi, municipiosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsHeader from '../components/ui/SettingsHeader';
+import { QRCarteleria } from '../components/ui/QRCarteleria';
 import { ModulosToggle } from '../components/tesoreria/ModulosToggle';
 import NotificationPreferences from '../components/NotificationPreferences';
 
@@ -721,6 +722,9 @@ export default function Configuracion() {
         <div className="space-y-6">
       {/* Modulos activables — solo super admin */}
       {isSuperAdmin && <ModulosToggle />}
+
+      {/* QR fijo de cartelería: acceso directo al muni (/{codigo}) */}
+      <QRCarteleria />
 
       {/* Sección Datos del Municipio */}
       <div

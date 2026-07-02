@@ -78,19 +78,33 @@ async def _excepciones(
 
 async def _ocupados(
     db: AsyncSession, dep_id: int, desde: datetime, hasta: datetime
-) -> Dict[datetime, int]:
-    """Cuenta turnos reservados por slot exacto (para descontar del cupo)."""
+) -> List[tuple]:
+    """Intervalos [inicio, fin) de los turnos reservados del rango.
+
+    Se devuelven INTERVALOS (no conteo por slot exacto) porque dos trámites
+    con duraciones distintas generan grillas desalineadas: un turno de 30' a
+    las 09:00 tiene que bloquear también el slot 08:45-09:45 de otro trámite.
+    El margen hacia atrás atrapa turnos largos que arrancaron antes del rango.
+    """
+    margen = timedelta(hours=6)
     rows = (await db.execute(
-        select(Turno.fecha_hora, func.count(Turno.id))
+        select(Turno.fecha_hora, Turno.duracion_min)
         .where(
             Turno.municipio_dependencia_id == dep_id,
             Turno.estado == "reservado",
-            Turno.fecha_hora >= desde,
+            Turno.fecha_hora >= desde - margen,
             Turno.fecha_hora <= hasta,
         )
-        .group_by(Turno.fecha_hora)
     )).all()
-    return {fh.replace(microsecond=0): int(c) for fh, c in rows}
+    return [
+        (fh.replace(microsecond=0), fh.replace(microsecond=0) + timedelta(minutes=dur or 30))
+        for fh, dur in rows
+    ]
+
+
+def _solapados(intervalos: List[tuple], ini: datetime, fin: datetime) -> int:
+    """Cuántos intervalos reservados se superponen con [ini, fin)."""
+    return sum(1 for i_ini, i_fin in intervalos if i_ini < fin and i_fin > ini)
 
 
 def _tramos_del_dia(
@@ -129,7 +143,8 @@ async def calcular_slots(
             fin = dia.replace(hour=hf.hour, minute=hf.minute)
             while ini + timedelta(minutes=duracion) <= fin:
                 if ini >= desde:
-                    tomados = ocupados.get(ini.replace(microsecond=0), 0)
+                    slot_ini = ini.replace(microsecond=0)
+                    tomados = _solapados(ocupados, slot_ini, slot_ini + timedelta(minutes=duracion))
                     restante = max(0, cupo - tomados)
                     slots.append({
                         "fecha_hora": ini,
@@ -200,18 +215,20 @@ async def reservar_turno(
         await validar_slot(db, dep_id, fecha_hora, duracion)
 
     fh = fecha_hora.replace(microsecond=0)
-    lock_name = f"turno:{dep_id}:{fh.isoformat()}"
+    # Lock por DEPENDENCIA (no por slot exacto): con duraciones distintas dos
+    # slots desalineados pueden solaparse, y locks por slot no se verían entre
+    # sí. Serializar por dependencia es seguro y el volumen lo banca de sobra.
+    lock_name = f"turno:{dep_id}"
     got = (await db.execute(text("SELECT GET_LOCK(:n, 10)"), {"n": lock_name})).scalar()
     if got != 1:
         raise HTTPException(503, "No se pudo reservar (lock ocupado). Reintenta.")
     try:
-        tomados = (await db.execute(
-            select(func.count(Turno.id)).where(
-                Turno.municipio_dependencia_id == dep_id,
-                Turno.fecha_hora == fh,
-                Turno.estado == "reservado",
-            )
-        )).scalar() or 0
+        # Ocupación por SOLAPAMIENTO de intervalos (mismo criterio que
+        # calcular_slots): un turno de otra grilla que pisa parcialmente
+        # este rango también descuenta cupo.
+        fin_nuevo = fh + timedelta(minutes=duracion)
+        intervalos = await _ocupados(db, dep_id, fh, fin_nuevo)
+        tomados = _solapados(intervalos, fh, fin_nuevo)
         cupo = await _cupo_del_slot(db, dep_id, fh)
         if tomados >= cupo:
             raise HTTPException(409, "Ese horario se completo. Eligi otro.")

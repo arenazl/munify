@@ -71,6 +71,9 @@ class TurnoResponse(BaseModel):
     notas: Optional[str] = None
     motivo_tipo: Optional[str] = "tramite"
     nombre_solicitante: Optional[str] = None
+    # Para la agenda del mostrador (check-in): quién viene y a qué
+    dni_solicitante: Optional[str] = None
+    tramite_nombre: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -106,6 +109,13 @@ async def disponibilidad(
         solicitud = q.scalar_one_or_none()
         if not solicitud:
             raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        # Tenant/ownership: el vecino solo ve disponibilidad de SUS solicitudes;
+        # el staff, solo de solicitudes de su municipio.
+        if current_user.rol == RolUsuario.VECINO:
+            if solicitud.solicitante_id != current_user.id:
+                raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+        elif current_user.municipio_id and solicitud.municipio_id != current_user.municipio_id:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada")
         if not solicitud.municipio_dependencia_id:
             raise HTTPException(status_code=400, detail="La solicitud no tiene dependencia asignada")
         dep_id = solicitud.municipio_dependencia_id
@@ -120,6 +130,9 @@ async def disponibilidad(
     )
     dep = qd.scalar_one_or_none()
     if not dep:
+        raise HTTPException(status_code=404, detail="Dependencia no encontrada")
+    # Tenant: la dependencia tiene que ser del municipio del usuario
+    if current_user.municipio_id and dep.municipio_id != current_user.municipio_id:
         raise HTTPException(status_code=404, detail="Dependencia no encontrada")
 
     # Rango: por default proximos 14 dias desde manana
@@ -217,11 +230,26 @@ async def agenda(
     current_user: User = Depends(get_current_user),
 ):
     """Devuelve los turnos del día para una dependencia. Si no se pasa
-    dependencia_id, usa la del supervisor logueado."""
-    if not dependencia_id and current_user.dependencia_id:
-        dependencia_id = current_user.dependencia_id
+    dependencia_id, usa la del supervisor logueado. Solo staff (la agenda
+    lleva nombre y DNI de los vecinos — un vecino no puede leerla)."""
+    if current_user.rol == RolUsuario.VECINO:
+        raise HTTPException(status_code=403, detail="Solo staff del municipio")
+    # FIX: el atributo real del User es municipio_dependencia_id
+    # (dependencia_id no existía — 500 para supervisores de dependencia)
+    if not dependencia_id and current_user.municipio_dependencia_id:
+        dependencia_id = current_user.municipio_dependencia_id
     if not dependencia_id:
         raise HTTPException(status_code=400, detail="Falta dependencia_id")
+
+    # Tenant: la dependencia tiene que ser del municipio del staff
+    dep_ok = (await db.execute(
+        select(MunicipioDependencia.id).where(
+            MunicipioDependencia.id == dependencia_id,
+            MunicipioDependencia.municipio_id == current_user.municipio_id,
+        )
+    )).scalar_one_or_none() if current_user.municipio_id else dependencia_id
+    if not dep_ok:
+        raise HTTPException(status_code=404, detail="Dependencia no encontrada")
 
     if fecha:
         try:
@@ -247,6 +275,22 @@ async def agenda(
         .order_by(Turno.fecha_hora.asc())
     )
     turnos = q.scalars().all()
+
+    def _nombre(t: Turno) -> Optional[str]:
+        # Turnos sin cuenta (bot/mostrador) traen el nombre propio; los de la
+        # app lo heredan del snapshot de la solicitud. Antes esto no se
+        # serializaba y el mostrador veía "Vecino" genérico en toda la agenda.
+        if t.nombre_solicitante:
+            return t.nombre_solicitante
+        if t.solicitud and t.solicitud.nombre_solicitante:
+            return f"{t.solicitud.nombre_solicitante} {t.solicitud.apellido_solicitante or ''}".strip()
+        return None
+
+    def _dni(t: Turno) -> Optional[str]:
+        if t.dni_solicitante:
+            return t.dni_solicitante
+        return t.solicitud.dni_solicitante if t.solicitud else None
+
     return [
         TurnoResponse(
             id=t.id,
@@ -261,6 +305,13 @@ async def agenda(
                 else None
             ),
             notas=t.notas,
+            motivo_tipo=t.motivo_tipo,
+            nombre_solicitante=_nombre(t),
+            dni_solicitante=_dni(t),
+            tramite_nombre=(
+                t.solicitud.tramite.nombre
+                if t.solicitud and t.solicitud.tramite else None
+            ),
         )
         for t in turnos
     ]
@@ -340,6 +391,23 @@ class EstadoTurnoIn(BaseModel):
     notas: Optional[str] = None
 
 
+async def _es_turno_del_vecino(db: AsyncSession, turno: Turno, user: User) -> bool:
+    """Ownership del vecino: turnos de SUS solicitudes, o turnos sin cuenta
+    (bot/mostrador) que matcheen su DNI/teléfono normalizados."""
+    if turno.solicitud_id:
+        solicitante = (await db.execute(
+            select(Solicitud.solicitante_id).where(Solicitud.id == turno.solicitud_id)
+        )).scalar_one_or_none()
+        return solicitante == user.id
+    dni_user = re.sub(r"\D", "", user.dni or "")
+    dni_turno = re.sub(r"\D", "", turno.dni_solicitante or "")
+    if dni_user and dni_user == dni_turno:
+        return True
+    tel_user = re.sub(r"\D", "", user.telefono or "")[-10:]
+    tel_turno = re.sub(r"\D", "", turno.telefono_solicitante or "")
+    return len(tel_user) >= 8 and tel_turno.endswith(tel_user)
+
+
 @router.patch("/{turno_id}", response_model=TurnoResponse)
 async def marcar_estado(
     turno_id: int,
@@ -347,12 +415,20 @@ async def marcar_estado(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Marca el estado del turno (presente=cumplido / ausente / cancelado). Staff del muni."""
+    """Marca el estado del turno. Staff del muni: cualquier estado (presente=
+    cumplido / ausente / cancelado). Vecino: SOLO cancelar y SOLO sus turnos
+    (antes no se validaba ownership — cualquier vecino podía tocar turnos
+    ajenos iterando ids)."""
     q = await db.execute(select(Turno).where(Turno.id == turno_id))
     turno = q.scalar_one_or_none()
     if not turno:
         raise HTTPException(status_code=404, detail="Turno no encontrado")
-    if current_user.rol != RolUsuario.VECINO and current_user.municipio_id != turno.municipio_id:
+    if current_user.rol == RolUsuario.VECINO:
+        if not await _es_turno_del_vecino(db, turno, current_user):
+            raise HTTPException(status_code=404, detail="Turno no encontrado")
+        if body.estado != "cancelado":
+            raise HTTPException(status_code=403, detail="Solo podés cancelar tu turno")
+    elif current_user.municipio_id != turno.municipio_id:
         raise HTTPException(status_code=403, detail="No podes operar sobre este turno")
     if body.estado not in ("reservado", "cumplido", "ausente", "cancelado"):
         raise HTTPException(status_code=400, detail="Estado invalido")
@@ -373,7 +449,11 @@ async def cancelar(
     turno = q.scalar_one_or_none()
     if not turno:
         raise HTTPException(status_code=404, detail="Turno no encontrado")
-    if current_user.rol != RolUsuario.VECINO and current_user.municipio_id != turno.municipio_id:
+    if current_user.rol == RolUsuario.VECINO:
+        # Ownership: antes cualquier vecino podía cancelar turnos ajenos
+        if not await _es_turno_del_vecino(db, turno, current_user):
+            raise HTTPException(status_code=404, detail="Turno no encontrado")
+    elif current_user.municipio_id != turno.municipio_id:
         raise HTTPException(status_code=403, detail="No podes cancelar este turno")
     turno.estado = "cancelado"
     await db.commit()

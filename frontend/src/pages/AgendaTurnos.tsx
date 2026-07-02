@@ -18,6 +18,8 @@ interface TurnoAgenda {
   duracion_min: number;
   dependencia_nombre: string | null;
   nombre_solicitante: string | null;
+  dni_solicitante: string | null;
+  tramite_nombre: string | null;
   notas: string | null;
 }
 
@@ -135,7 +137,17 @@ export default function AgendaTurnos() {
                 <div className="flex items-center gap-1.5" style={{ color: theme.text }}>
                   <User className="h-3.5 w-3.5 shrink-0" style={{ color: theme.textSecondary }} />
                   <span className="font-medium truncate">{t.nombre_solicitante || 'Vecino'}</span>
+                  {t.dni_solicitante && (
+                    <span className="text-xs shrink-0" style={{ color: theme.textSecondary }}>
+                      DNI {t.dni_solicitante}
+                    </span>
+                  )}
                 </div>
+                {t.tramite_nombre && (
+                  <div className="text-xs truncate mt-0.5" style={{ color: theme.textSecondary }}>
+                    {t.tramite_nombre}
+                  </div>
+                )}
                 <span
                   className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-xs font-medium"
                   style={{ backgroundColor: (ESTADO_COLOR[t.estado] || theme.primary) + '22', color: ESTADO_COLOR[t.estado] || theme.primary }}
