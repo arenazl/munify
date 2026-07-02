@@ -1347,6 +1347,9 @@ export const turnosApi = {
   // Agenda del dia (admin/supervisor)
   agenda: (params: { dependencia_id?: number; fecha?: string }) =>
     api.get('/turnos-tramite/agenda', { params }),
+  // Reportes del turnero: demanda por trámite/franja/día + ausentismo
+  stats: (params?: { dependencia_id?: number; dias?: number }) =>
+    api.get('/turnos-tramite/stats', { params }),
   marcarEstado: (turnoId: number, estado: string, notas?: string) =>
     api.patch(`/turnos-tramite/${turnoId}`, { estado, notas }),
 };

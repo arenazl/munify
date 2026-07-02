@@ -78,6 +78,9 @@ class TurnoResponse(BaseModel):
     tramite_nombre: Optional[str] = None
     # Código de comprobante (mismo formato que usa el bot)
     codigo: Optional[str] = None
+    # Para "abrir expediente desde el turno" (C.3): titular y trámite
+    usuario_id: Optional[int] = None
+    tramite_id: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -424,6 +427,7 @@ async def agenda(
         .options(
             selectinload(Turno.municipio_dependencia).selectinload(MunicipioDependencia.dependencia),
             selectinload(Turno.solicitud).selectinload(Solicitud.tramite),
+            selectinload(Turno.tramite),
         )
         .where(
             Turno.municipio_dependencia_id == dependencia_id,
@@ -467,12 +471,88 @@ async def agenda(
             nombre_solicitante=_nombre(t),
             dni_solicitante=_dni(t),
             tramite_nombre=(
-                t.solicitud.tramite.nombre
-                if t.solicitud and t.solicitud.tramite else None
+                t.tramite.nombre if t.tramite
+                else (t.solicitud.tramite.nombre if t.solicitud and t.solicitud.tramite else None)
             ),
+            codigo=codigo_trn(t.id),
+            usuario_id=t.usuario_id or (t.solicitud.solicitante_id if t.solicitud else None),
+            tramite_id=t.tramite_id or (t.solicitud.tramite_id if t.solicitud else None),
         )
         for t in turnos
     ]
+
+
+@router.get("/stats")
+async def stats_turnero(
+    dependencia_id: Optional[int] = Query(None, description="Filtrar por dependencia"),
+    dias: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reportes del turnero (C.3): demanda y ausentismo para dimensionar
+    ventanillas. Solo staff, tenant-scoped."""
+    if current_user.rol == RolUsuario.VECINO:
+        raise HTTPException(status_code=403, detail="Solo staff del municipio")
+
+    from sqlalchemy import func as sa_func
+
+    desde = datetime.now() - timedelta(days=dias)
+    base = [Turno.fecha_hora >= desde]
+    if current_user.municipio_id:
+        base.append(Turno.municipio_id == current_user.municipio_id)
+    if dependencia_id:
+        base.append(Turno.municipio_dependencia_id == dependencia_id)
+
+    # Por estado
+    por_estado = dict((await db.execute(
+        select(Turno.estado, sa_func.count(Turno.id)).where(*base).group_by(Turno.estado)
+    )).all())
+    cumplidos = int(por_estado.get("cumplido", 0))
+    ausentes = int(por_estado.get("ausente", 0))
+    atendibles = cumplidos + ausentes
+    ausentismo_pct = round(ausentes / atendibles * 100, 1) if atendibles else 0.0
+
+    # Demanda por trámite (top 8)
+    por_tramite = [
+        {"tramite": nombre, "cantidad": int(n)}
+        for nombre, n in (await db.execute(
+            select(Tramite.nombre, sa_func.count(Turno.id))
+            .join(Tramite, Tramite.id == Turno.tramite_id)
+            .where(*base)
+            .group_by(Tramite.nombre)
+            .order_by(sa_func.count(Turno.id).desc())
+            .limit(8)
+        )).all()
+    ]
+
+    # Demanda por franja horaria y por día de semana (para dimensionar ventanillas)
+    por_hora = [
+        {"hora": int(h), "cantidad": int(n)}
+        for h, n in (await db.execute(
+            select(sa_func.hour(Turno.fecha_hora), sa_func.count(Turno.id))
+            .where(*base).group_by(sa_func.hour(Turno.fecha_hora))
+            .order_by(sa_func.hour(Turno.fecha_hora))
+        )).all()
+    ]
+    dias_semana = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    por_dia_semana = [
+        {"dia": dias_semana[int(d) - 2] if int(d) >= 2 else "domingo", "cantidad": int(n)}
+        for d, n in (await db.execute(
+            # MySQL DAYOFWEEK: 1=domingo..7=sábado
+            select(sa_func.dayofweek(Turno.fecha_hora), sa_func.count(Turno.id))
+            .where(*base).group_by(sa_func.dayofweek(Turno.fecha_hora))
+        )).all()
+    ]
+
+    return {
+        "dias": dias,
+        "total": int(sum(por_estado.values())),
+        "por_estado": {k: int(v) for k, v in por_estado.items()},
+        "ausentismo_pct": ausentismo_pct,
+        "por_tramite": por_tramite,
+        "por_hora": por_hora,
+        "por_dia_semana": por_dia_semana,
+    }
 
 
 @router.get("/mis-turnos", response_model=List[TurnoResponse])
