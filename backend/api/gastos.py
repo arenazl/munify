@@ -728,6 +728,11 @@ async def pagar_cuota(
     if not cuota:
         raise HTTPException(status_code=404, detail="Cuota no encontrada")
 
+    # Idempotencia: un doble click / retry de red NO puede pagar dos veces
+    # la misma cuota (cada pago duplicado creaba un egreso de caja extra).
+    if cuota.estado == EstadoGastoCuota.PAGADA:
+        raise HTTPException(status_code=409, detail="Esta cuota ya está pagada")
+
     cuota.estado = EstadoGastoCuota.PAGADA
     cuota.fecha_pago = payload.fecha_pago or date.today()
     if payload.forma_pago:

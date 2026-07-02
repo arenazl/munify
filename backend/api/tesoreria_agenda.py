@@ -4,7 +4,7 @@ from calendar import monthrange
 from decimal import Decimal
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -403,6 +403,29 @@ async def ejecutar_pago(
     # con la fecha planificada (ej. el dia 4 aunque se haya pagado el 1).
     # El frontend puede pasar override si justificadamente quiere otra.
     fecha = payload.fecha_pago or pp.proximo_pago or date.today()
+
+    # Anti doble-ejecución (retry de red / doble click / dos tabs): claim
+    # atómico del período. El UPDATE condicional solo pasa si nadie pagó ya
+    # esta fecha; la request concurrente espera el row-lock de InnoDB y al
+    # ver rowcount=0 recibe 409 en lugar de duplicar gasto + egreso de caja.
+    claim = await db.execute(
+        update(TesoreriaPagoProgramado)
+        .where(
+            TesoreriaPagoProgramado.id == pp.id,
+            or_(
+                TesoreriaPagoProgramado.ultimo_pago.is_(None),
+                TesoreriaPagoProgramado.ultimo_pago < fecha,
+            ),
+        )
+        .values(ultimo_pago=fecha)
+    )
+    if claim.rowcount == 0:
+        raise HTTPException(
+            409,
+            f"Este período ya fue pagado (último pago: {pp.ultimo_pago}). "
+            "Si es un pago extra del mismo día, usá una fecha de pago posterior.",
+        )
+
     monto_base = Decimal(str(payload.monto_base)) if payload.monto_base is not None else Decimal(str(pp.monto_pesos))
 
     # Validar y cargar premios (deben ser del mismo muni, activos al momento
@@ -413,18 +436,25 @@ async def ejecutar_pago(
     monto_premios = Decimal(0)
     # Soporte para los 2 formatos: nuevo (premios_aplicados con override)
     # y viejo (premio_ids). Si vienen ambos, gana premios_aplicados.
-    items_premios = payload.premios_aplicados or [
-        type('I', (), {'premio_id': pid, 'monto': None})() for pid in payload.premio_ids
-    ]
-    # Si el operador NO mando nada y el pago_programado tiene premios_default
-    # cargados (el caso normal: se setean al editar la liquidacion y al pagar
-    # vienen pre-aplicados), tomamos esos. Si quiere overrideerlos, el frontend
-    # manda una lista (incluso vacia explicita seria un override a "ninguno").
-    if not items_premios and pp.premios_default:
+    #
+    # DISTINCIÓN CRÍTICA None vs []: una lista vacía explícita es un override
+    # a "ningún premio" (es lo que manda SIEMPRE la UI actual). El fallback a
+    # pp.premios_default corre SOLO si el campo no vino (clientes viejos).
+    # Antes `[] or ...` era falsy y aplicaba premios_default silenciosos:
+    # el operador confirmaba $286.000 en pantalla y la caja debitaba $311.000.
+    if payload.premios_aplicados is not None:
+        items_premios = list(payload.premios_aplicados)
+    elif payload.premio_ids:
+        items_premios = [
+            type('I', (), {'premio_id': pid, 'monto': None})() for pid in payload.premio_ids
+        ]
+    elif pp.premios_default:
         items_premios = [
             type('I', (), {'premio_id': int(pid), 'monto': None})()
             for pid in pp.premios_default
         ]
+    else:
+        items_premios = []
     if items_premios:
         ids_a_cargar = [it.premio_id for it in items_premios]
         premios = list((await db.execute(
@@ -491,8 +521,7 @@ async def ejecutar_pago(
             concepto=pp.concepto,
         ))
 
-    # Avanzar proximo_pago
-    pp.ultimo_pago = fecha
+    # Avanzar proximo_pago (ultimo_pago ya quedó claimeado arriba)
     pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
     if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
         pp.activo = False
@@ -546,6 +575,26 @@ async def ejecutar_pagos_masivo(
             items.append(EjecutarMasivoItem(pago_id=pid, ok=False, error="No encontrado o inactivo"))
             continue
         fecha = pp.proximo_pago or date.today()
+
+        # Mismo claim atómico anti doble-ejecución que en /ejecutar
+        claim = await db.execute(
+            update(TesoreriaPagoProgramado)
+            .where(
+                TesoreriaPagoProgramado.id == pp.id,
+                or_(
+                    TesoreriaPagoProgramado.ultimo_pago.is_(None),
+                    TesoreriaPagoProgramado.ultimo_pago < fecha,
+                ),
+            )
+            .values(ultimo_pago=fecha)
+        )
+        if claim.rowcount == 0:
+            items.append(EjecutarMasivoItem(
+                pago_id=pid, ok=False,
+                error=f"Período ya pagado (último pago: {pp.ultimo_pago})",
+            ))
+            continue
+
         monto = Decimal(str(pp.monto_pesos))
         gasto = Gasto(
             municipio_id=muni_id,
@@ -575,7 +624,7 @@ async def ejecutar_pagos_masivo(
                 tipo=TipoMovimientoCaja.EGRESO, monto=monto, fecha=fecha,
                 concepto=pp.concepto,
             ))
-        pp.ultimo_pago = fecha
+        # ultimo_pago ya quedó claimeado arriba
         pp.proximo_pago = _calcular_proximo_pago(pp.proximo_pago, pp.frecuencia, pp.dia_del_mes)
         if pp.fecha_fin and pp.proximo_pago > pp.fecha_fin:
             pp.activo = False

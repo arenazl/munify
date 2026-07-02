@@ -92,7 +92,10 @@ class EjecutarPagoRequest(BaseModel):
     fecha_pago: Optional[date] = None
     monto_base: Optional[Decimal] = Field(None, gt=0)
     premio_ids: List[int] = []  # deprecated, usar premios_aplicados
-    premios_aplicados: List[PremioAplicadoInput] = []
+    # None = cliente viejo que no manda el campo (fallback a premios_default).
+    # [] = override explícito a "ningún premio" (la UI actual siempre manda esto).
+    # La distinción None/[] es la que evita aplicar premios_default silenciosos.
+    premios_aplicados: Optional[List[PremioAplicadoInput]] = None
     notas: Optional[str] = None
 
 

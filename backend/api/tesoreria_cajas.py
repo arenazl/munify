@@ -246,6 +246,16 @@ async def delete_movimiento(
     )).scalar_one_or_none()
     if not mov:
         raise HTTPException(404, "Movimiento no encontrado")
+    # Los movimientos generados por un gasto NO se borran sueltos: dejan el
+    # gasto concretado sin descontar caja (desync silencioso) y, peor, si el
+    # gasto se edita después la sincronización lo recrea "solo". El camino
+    # correcto es editar/eliminar el gasto, que gestiona sus movimientos.
+    if mov.gasto_id is not None:
+        raise HTTPException(
+            400,
+            "Este movimiento pertenece a un gasto. Editá o eliminá el gasto "
+            "para que la caja quede consistente.",
+        )
     await db.delete(mov)
     await db.commit()
     return {"ok": True, "id": mov_id}
