@@ -11,7 +11,7 @@ import { WizardModal, type WizardStep } from '../components/ui/WizardModal';
 import { DynamicIcon } from '../components/ui/DynamicIcon';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import PageHint from '../components/ui/PageHint';
-import { tramitesApi, categoriasTramiteApi } from '../lib/api';
+import { tramitesApi, categoriasTramiteApi, turnosApi, dependenciasApi } from '../lib/api';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import {
   DocumentosRequeridosEditor,
@@ -42,6 +42,7 @@ interface TramiteForm {
   // Turnero consolidado (fase C): cómo se atiende el trámite
   modo_atencion: string;              // 'online' | 'presencial_con_turno' | 'presencial_sin_turno'
   duracion_turno_min: string;         // duración del slot si lleva turno
+  dependencia_id: string;             // oficina que lo atiende ('' = sin mapear)
   documentos_requeridos: DocRequeridoDraft[];
 }
 
@@ -68,6 +69,7 @@ const EMPTY_FORM: TramiteForm = {
   nivel_kyc_minimo: '',
   modo_atencion: 'presencial_con_turno',
   duracion_turno_min: '30',
+  dependencia_id: '',
   documentos_requeridos: [],
 };
 
@@ -90,6 +92,21 @@ export default function TramitesConfig() {
   // Form y guardado compartidos entre alta y edición
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<TramiteForm>(EMPTY_FORM);
+
+  // Oficinas del muni para el mapeo trámite→dependencia (turnero)
+  const [dependencias, setDependencias] = useState<{ id: number; nombre?: string; dependencia?: { nombre?: string } }[]>([]);
+  useEffect(() => {
+    dependenciasApi.getMunicipio({ activo: true })
+      .then(res => setDependencias(res.data || []))
+      .catch(() => setDependencias([]));
+  }, []);
+  const opcionesDependencia = useMemo(() => ([
+    { value: '', label: 'Sin oficina asignada (el turnero no puede reservar)' },
+    ...dependencias.map(d => ({
+      value: String(d.id),
+      label: d.dependencia?.nombre || d.nombre || `Oficina ${d.id}`,
+    })),
+  ]), [dependencias]);
 
   const cargar = async () => {
     setLoading(true);
@@ -129,6 +146,10 @@ export default function TramitesConfig() {
     try {
       const res = await tramitesApi.getOne(tramite.id);
       const t = res.data as Tramite;
+      // Oficina que atiende este trámite (mapeo del turnero)
+      const depActual = await turnosApi.getDependenciaTramite(tramite.id)
+        .then(r => (r.data as { municipio_dependencia_id?: number | null })?.municipio_dependencia_id ?? null)
+        .catch(() => null);
       setForm({
         categoria_tramite_id: t.categoria_tramite_id,
         nombre: t.nombre,
@@ -148,6 +169,7 @@ export default function TramitesConfig() {
           : '',
         modo_atencion: (t as { modo_atencion?: string }).modo_atencion || 'online',
         duracion_turno_min: String((t as { duracion_turno_min?: number }).duracion_turno_min ?? 30),
+        dependencia_id: depActual != null ? String(depActual) : '',
         documentos_requeridos: (t.documentos_requeridos || []).map(d => ({
           id: d.id,
           nombre: d.nombre,
@@ -223,10 +245,16 @@ export default function TramitesConfig() {
             });
           }
         }
+        // Mapeo trámite→oficina (el turnero lo necesita para saber la agenda)
+        await turnosApi.setDependenciaTramite(
+          editing.id,
+          form.dependencia_id ? Number(form.dependencia_id) : null,
+        ).catch(() => toast.error('El trámite se guardó pero no se pudo asignar la oficina'));
+
         toast.success('Trámite actualizado');
         setEditSheetOpen(false);
       } else {
-        await tramitesApi.create({
+        const creado = await tramitesApi.create({
           categoria_tramite_id: form.categoria_tramite_id,
           nombre: form.nombre.trim(),
           descripcion: form.descripcion.trim() || undefined,
@@ -250,6 +278,12 @@ export default function TramitesConfig() {
               orden: d.orden,
             })),
         });
+        // Mapeo trámite→oficina del recién creado
+        const nuevoId = (creado.data as { id?: number })?.id;
+        if (nuevoId && form.dependencia_id) {
+          await turnosApi.setDependenciaTramite(nuevoId, Number(form.dependencia_id))
+            .catch(() => toast.error('El trámite se creó pero no se pudo asignar la oficina'));
+        }
         toast.success('Trámite creado');
         setWizardOpen(false);
       }
@@ -1040,6 +1074,19 @@ export default function TramitesConfig() {
                       { value: '45', label: '45 minutos' },
                       { value: '60', label: '60 minutos' },
                     ]}
+                  />
+                </div>
+              )}
+              {form.modo_atencion !== 'online' && (
+                <div className="mt-2">
+                  <label className="block text-[11px] mb-1" style={{ color: theme.textSecondary }}>
+                    Oficina que lo atiende
+                  </label>
+                  <ModernSelect
+                    value={form.dependencia_id}
+                    onChange={(v) => setForm({ ...form, dependencia_id: v })}
+                    options={opcionesDependencia}
+                    searchable
                   />
                 </div>
               )}

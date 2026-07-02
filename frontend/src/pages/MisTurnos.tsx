@@ -54,8 +54,20 @@ export default function MisTurnos() {
   const [cancelando, setCancelando] = useState(false);
   const [reservaOpen, setReservaOpen] = useState(false);
 
+  // Deep-link del wizard: /gestion/mis-turnos?reservar_solicitud=N abre el
+  // sheet con esa solicitud preseleccionada (turno-first tras crear trámite)
+  const [solicitudInicial, setSolicitudInicial] = useState<number | undefined>(undefined);
+
   useEffect(() => {
     fetchData();
+    const params = new URLSearchParams(window.location.search);
+    const rid = params.get('reservar_solicitud');
+    if (rid) {
+      setSolicitudInicial(Number(rid));
+      setReservaOpen(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -194,7 +206,12 @@ export default function MisTurnos() {
         loading={cancelando}
       />
 
-      <ReservarTurnoSheet open={reservaOpen} onClose={() => setReservaOpen(false)} onReservado={fetchData} />
+      <ReservarTurnoSheet
+        open={reservaOpen}
+        onClose={() => { setReservaOpen(false); setSolicitudInicial(undefined); }}
+        onReservado={fetchData}
+        solicitudInicial={solicitudInicial}
+      />
     </>
   );
 }

@@ -1339,6 +1339,10 @@ export const turnosApi = {
   // 403 code=kyc_insuficiente si el trámite exige validación biométrica.
   reservarDirecto: (data: { tramite_id: number; fecha_hora: string; actuando_como_user_id?: number }) =>
     api.post('/turnos-tramite/reservar-directo', data),
+  // Oficina que atiende el trámite (mapeo del turnero, se edita desde el ABM)
+  getDependenciaTramite: (tramiteId: number) => api.get(`/tramites/${tramiteId}/dependencia`),
+  setDependenciaTramite: (tramiteId: number, municipioDependenciaId: number | null) =>
+    api.put(`/tramites/${tramiteId}/dependencia`, { municipio_dependencia_id: municipioDependenciaId }),
   cancelar: (turnoId: number) => api.delete(`/turnos-tramite/${turnoId}`),
   // Agenda del dia (admin/supervisor)
   agenda: (params: { dependencia_id?: number; fecha?: string }) =>

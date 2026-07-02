@@ -2134,3 +2134,104 @@ async def cenat_status(
         adjunto_nombre=doc.nombre_original if doc else None,
         adjunto_subido_at=doc.created_at.isoformat() if (doc and doc.created_at) else None,
     )
+
+
+# =====================================================================
+# Oficina que atiende el trámite (mapeo trámite→dependencia, turnero C.1)
+# =====================================================================
+
+class AsignarDependenciaTramiteIn(BaseModel):
+    # None = desasignar (el trámite queda sin oficina hasta nueva asignación)
+    municipio_dependencia_id: Optional[int] = None
+
+
+@router.get("/{tramite_id}/dependencia")
+async def dependencia_del_tramite(
+    tramite_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """Devuelve la oficina (municipio_dependencia) que atiende este trámite,
+    o null si el muni todavía no lo mapeó."""
+    from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
+    from models.municipio_dependencia import MunicipioDependencia
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+    tramite = (await db.execute(
+        select(Tramite).where(Tramite.id == tramite_id, Tramite.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not tramite:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+
+    fila = (await db.execute(
+        select(MunicipioDependencia)
+        .join(
+            MunicipioDependenciaTramite,
+            MunicipioDependenciaTramite.municipio_dependencia_id == MunicipioDependencia.id,
+        )
+        .options(selectinload(MunicipioDependencia.dependencia))
+        .where(
+            MunicipioDependenciaTramite.tramite_id == tramite_id,
+            MunicipioDependenciaTramite.activo == True,  # noqa: E712
+        )
+        .limit(1)
+    )).scalar_one_or_none()
+    if not fila:
+        return {"municipio_dependencia_id": None, "nombre": None}
+    return {
+        "municipio_dependencia_id": fila.id,
+        "nombre": fila.dependencia.nombre if fila.dependencia else None,
+    }
+
+
+@router.put("/{tramite_id}/dependencia")
+async def asignar_dependencia_tramite(
+    tramite_id: int,
+    data: AsignarDependenciaTramiteIn,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles([RolUsuario.ADMIN, RolUsuario.SUPERVISOR])),
+):
+    """Asigna (o desasigna) la oficina que atiende ESTE trámite.
+
+    Complementa la pantalla de Asignaciones (que trabaja desde la dependencia
+    reemplazando todo su set): acá el admin lo hace desde el ABM del trámite,
+    que es el flujo natural al crear uno nuevo. Sin este mapeo, el turnero
+    no sabe a qué agenda mandar y la reserva rebota.
+    """
+    from sqlalchemy import delete as sa_delete
+    from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
+    from models.municipio_dependencia import MunicipioDependencia
+
+    municipio_id = get_effective_municipio_id(request, current_user)
+    tramite = (await db.execute(
+        select(Tramite).where(Tramite.id == tramite_id, Tramite.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    if not tramite:
+        raise HTTPException(status_code=404, detail="Trámite no encontrado")
+
+    if data.municipio_dependencia_id is not None:
+        dep = (await db.execute(
+            select(MunicipioDependencia).where(
+                MunicipioDependencia.id == data.municipio_dependencia_id,
+                MunicipioDependencia.municipio_id == municipio_id,
+            )
+        )).scalar_one_or_none()
+        if not dep:
+            raise HTTPException(status_code=400, detail="Dependencia inválida para este municipio")
+
+    # Reemplazar el mapeo de ESTE trámite (no toca los demás trámites de la dependencia)
+    await db.execute(
+        sa_delete(MunicipioDependenciaTramite).where(
+            MunicipioDependenciaTramite.tramite_id == tramite_id
+        )
+    )
+    if data.municipio_dependencia_id is not None:
+        db.add(MunicipioDependenciaTramite(
+            municipio_dependencia_id=data.municipio_dependencia_id,
+            tramite_id=tramite_id,
+            activo=True,
+        ))
+    await db.commit()
+    return {"ok": True, "municipio_dependencia_id": data.municipio_dependencia_id}

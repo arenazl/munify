@@ -51,6 +51,8 @@ interface Props {
   onReservado: () => void;
   /** Mostrador: staff reservando en nombre de un vecino ya identificado */
   actuandoComoUserId?: number;
+  /** Deep-link: abrir con una solicitud ya elegida (wizard → "Sacar turno") */
+  solicitudInicial?: number;
 }
 
 function diaLabel(iso: string): string {
@@ -67,7 +69,7 @@ function nombreSolicitud(s: SolicitudLite): string {
 
 type Modo = 'tramite' | 'solicitud';
 
-export default function ReservarTurnoSheet({ open, onClose, onReservado, actuandoComoUserId }: Props) {
+export default function ReservarTurnoSheet({ open, onClose, onReservado, actuandoComoUserId, solicitudInicial }: Props) {
   const { theme } = useTheme();
   const [modo, setModo] = useState<Modo>('tramite');
 
@@ -88,9 +90,14 @@ export default function ReservarTurnoSheet({ open, onClose, onReservado, actuand
 
   useEffect(() => {
     if (!open) return;
-    setModo('tramite');
+    if (solicitudInicial) {
+      setModo('solicitud');
+      setSolId(String(solicitudInicial));
+    } else {
+      setModo('tramite');
+      setSolId('');
+    }
     setTramiteId('');
-    setSolId('');
     setSlots([]);
     setSlotSel('');
     setRequisitos([]);

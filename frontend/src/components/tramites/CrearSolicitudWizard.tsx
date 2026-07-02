@@ -409,9 +409,22 @@ export function CrearSolicitudWizard({ open, onClose, onSuccess, tramiteInicial 
         });
         return;
       }
-      toast.success(`Solicitud ${res.data.numero_tramite} creada. Cargá los documentos desde el detalle.`, {
-        duration: 6000,
-      });
+      // Turno-first: si el trámite es presencial con turno, el paso natural
+      // siguiente es sacar el turno — se lo ofrecemos en el mismo toast.
+      const llevaTurno = (tramiteSeleccionado as { modo_atencion?: string } | null)?.modo_atencion === 'presencial_con_turno';
+      if (llevaTurno) {
+        toast.success(`Solicitud ${res.data.numero_tramite} creada. Este trámite se hace con turno.`, {
+          duration: 10000,
+          action: {
+            label: 'Sacar turno',
+            onClick: () => { window.location.href = `/gestion/mis-turnos?reservar_solicitud=${res.data.id}`; },
+          },
+        });
+      } else {
+        toast.success(`Solicitud ${res.data.numero_tramite} creada. Cargá los documentos desde el detalle.`, {
+          duration: 6000,
+        });
+      }
       onSuccess?.(res.data);
       onClose();
       // Bottom-sheet de notificaciones (solo entra una vez total).
