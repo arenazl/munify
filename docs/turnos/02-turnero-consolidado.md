@@ -86,10 +86,16 @@ paralelas), feriados. Lo que FALTA:
   trámite (el mostrador ya no ve "Vecino" genérico), solapamiento de
   duraciones por intervalos + lock por dependencia, fix del AttributeError
   de supervisores en /agenda, y fix del redirect-loop del portal.
-- **C.1 (el corazón)**: modo de atención en el catálogo + ABM; `tramite_id` en
-  Turno; flujo turno-directo en app y portal público; requisitos por
-  adelantado (catálogo público consultable); wizard ofrece turno; mostrador
-  con turnero (kiosco); curado del mapeo trámite→dependencia en los munis.
+- **C.1 — HECHO en su núcleo (commit `2f503c6`)**: modo de atención en catálogo
+  + ABM (ModernSelect 3 modos + duración); `Turno.tramite_id` y `Turno.usuario_id`
+  (migración ejecutada); `POST /reservar-directo` con gating KYC (403
+  kyc_insuficiente) y `actuando_como`; `/disponibilidad?tramite_id`;
+  ReservarTurnoSheet turno-first con "qué tenés que llevar" por adelantado;
+  card "Tomar turno" en el Hub del mostrador (atajo U); gancho de onboarding
+  post-validación en CapturaMovil.
+  **Pendiente de C.1**: catálogo público consultable sin login; que el wizard
+  de solicitud ofrezca turno al terminar; curado del mapeo trámite→dependencia
+  en los munis (dato: ~65% sin mapear — sin eso reservar da 400).
 - **C.2 (ciclo de vida)**: TRN + comprobante + notificaciones de turno
   (modelo `Notificacion` gana `turno_id`); recordatorios con Cloud Scheduler;
   confirmación/reprogramación.
