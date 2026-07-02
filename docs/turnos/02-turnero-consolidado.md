@@ -109,9 +109,16 @@ paralelas), feriados. Lo que FALTA:
   en el docstring del endpoint) + setear `CRON_SECRET` en Secret Manager.
   **Pendiente de C.2**: reprogramación, comprobante con QR, recordatorio por
   WhatsApp (bot en standby).
-- **C.3 (gestión)**: panel de ventanilla completo (check-in por DNI/TRN,
-  abrir expediente desde el turno), reportes de demanda y ausentismo,
-  sobreturnos/lista de espera si algún muni lo pide.
+- **C.3 — HECHO (commit `d5201f0`)**: check-in en la agenda por nombre/DNI/
+  código TRN; "Abrir expediente" desde el turno (levanta el wizard pre-cargado
+  actuando por el vecino — cierra turno→atención→expediente); KPIs de 30 días
+  (cumplidos, ausentes, % ausentismo) y `GET /turnos-tramite/stats` (demanda
+  por trámite/franja/día para dimensionar ventanillas).
+  Diferidos hasta que un muni los pida: sobreturnos / lista de espera.
+
+**CRONOGRAMA C.0→C.3: COMPLETO (2026-07-03).** Queda: job de Cloud Scheduler
+(pedido a infra con OK explícito del dueño, ver CANAL_AGENTES MSG-20260703-0030-01)
+y el curado de datos por muni (mapeos + modo_atencion de cada trámite real).
 
 ## Identidad del turno (DEFINIDO por el dueño, 2026-07-02)
 
