@@ -108,12 +108,16 @@ Diseño resultante — "sin cuenta" NO significa "sin identidad", significa
 - **Bot de WhatsApp**: puede reservar directo solo trámites sin exigencia
   biométrica; para los demás hace PRE-RESERVA con hold del slot (ej. 3 horas)
   y manda el link de Didit — el turno se confirma al validar, o se libera.
-- **Mostrador/kiosco (DEFINIDO por el dueño)**: SIN webcam en el puesto. El
-  funcionario le muestra un QR al vecino; el vecino accede al sitio desde SU
-  celular ahí mismo, se escanea (Didit en su propio teléfono) y queda
-  onboardeado usando la aplicación desde ese momento. Este flujo YA existe
-  (`captura_movil`: handoff PC→celular por QR con polling/WebSocket) — es el
-  camino canónico del kiosco; la webcam del puesto no se implementa.
+- **Mostrador/kiosco (DEFINIDO por el dueño) — "modo híbrido para gente no
+  informatizada"**: SIN webcam en el puesto. El vecino valida la biometría en
+  SU celular (su elemento de confianza) vía QR que le muestra el funcionario;
+  al completar, el control se TRANSFIERE a la ventanilla por WebSocket y la
+  funcionaria le levanta el trámite / le toma el turno actuando por él.
+  VERIFICADO que ya existe completo: `captura_movil.py` (QR + WebSocket con
+  fallback polling 3s, estados esperando→en_curso→completada) → `Mostrador.tsx`
+  toma control con `actuando_como={vecino}` y `kyc_modo='assisted'`, y abre
+  reclamo/trámite/tasas desde el Hub. ÚNICO GAP: el Hub del mostrador no tiene
+  el botón "Tomar turno" — se agrega en C.1 (mostrador con turnero).
 
 ## Decisiones abiertas (del dueño)
 
