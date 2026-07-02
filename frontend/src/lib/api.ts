@@ -1359,6 +1359,21 @@ export const tarjetasApi = {
   remove: (id: number) => api.delete(`/tarjetas/${id}`),
 };
 
+// Órdenes de trabajo (campo) — N:M con reclamos
+export const ordenesTrabajoApi = {
+  list: (params?: Record<string, string | number | boolean>) =>
+    api.get('/ordenes-trabajo', { params }),
+  get: (id: number) => api.get(`/ordenes-trabajo/${id}`),
+  porReclamo: (reclamoId: number) => api.get(`/ordenes-trabajo/reclamo/${reclamoId}`),
+  create: (data: Record<string, unknown>) => api.post('/ordenes-trabajo', data),
+  update: (id: number, data: Record<string, unknown>) => api.put(`/ordenes-trabajo/${id}`, data),
+  asignar: (id: number, data: Record<string, unknown>) => api.post(`/ordenes-trabajo/${id}/asignar`, data),
+  iniciar: (id: number) => api.post(`/ordenes-trabajo/${id}/iniciar`),
+  completar: (id: number, data: { notas_cierre: string; horas_reales?: number }) =>
+    api.post(`/ordenes-trabajo/${id}/completar`, data),
+  cancelar: (id: number, motivo: string) => api.post(`/ordenes-trabajo/${id}/cancelar`, { motivo }),
+};
+
 export const tramitesApi = {
   // ----- CRUD de Trámite (admin del municipio) -----
   getAll: (params?: { categoria_tramite_id?: number; activo?: boolean }) =>

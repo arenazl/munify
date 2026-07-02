@@ -23,7 +23,8 @@ from .notificacion import Notificacion
 from .sla import SLAConfig, SLAViolacion
 from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
-from .enums import EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana
+from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+from .enums import EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana, EstadoOrdenTrabajo
 from .gamificacion import (
     PuntosUsuario, HistorialPuntos, BadgeUsuario,
     LeaderboardMensual, RecompensaDisponible, RecompensaCanjeada,
@@ -79,6 +80,10 @@ __all__ = [
     "EstadoReclamo",
     "RolUsuario",
     "MotivoRechazo",
+    # Órdenes de trabajo (campo)
+    "OrdenTrabajo",
+    "OrdenTrabajoReclamo",
+    "EstadoOrdenTrabajo",
     # Gamificación
     "PuntosUsuario",
     "HistorialPuntos",

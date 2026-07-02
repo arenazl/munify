@@ -150,6 +150,49 @@ export interface Documento {
 // Canal de ingreso de un reclamo/solicitud (null = legacy, anterior al registro de canal)
 export type CanalIngreso = 'app' | 'ventanilla_asistida' | 'whatsapp' | 'web_publica';
 
+// =====================================================================
+// ÓRDENES DE TRABAJO (unidad formal de trabajo de campo, N:M con reclamos)
+// =====================================================================
+
+export type EstadoOrdenTrabajo = 'pendiente' | 'asignada' | 'en_curso' | 'completada' | 'cancelada';
+
+export interface OTMaterial {
+  descripcion: string;
+  cantidad: number;
+  unidad?: string | null;
+}
+
+export interface OTReclamoMini {
+  id: number;
+  titulo: string;
+  estado: string;
+  direccion?: string | null;
+}
+
+export interface OrdenTrabajo {
+  id: number;
+  numero: string;
+  estado: EstadoOrdenTrabajo;
+  titulo: string;
+  descripcion?: string | null;
+  cuadrilla_id?: number | null;
+  cuadrilla_nombre?: string | null;
+  empleado_id?: number | null;
+  empleado_nombre?: string | null;
+  fecha_programada?: string | null;
+  hora_inicio?: string | null;
+  hora_fin?: string | null;
+  materiales?: OTMaterial[] | null;
+  horas_estimadas?: number | null;
+  horas_reales?: number | null;
+  notas_cierre?: string | null;
+  motivo_cancelacion?: string | null;
+  fecha_inicio_real?: string | null;
+  fecha_completada?: string | null;
+  created_at?: string;
+  reclamos: OTReclamoMini[];
+}
+
 export interface Reclamo {
   id: number;
   titulo: string;

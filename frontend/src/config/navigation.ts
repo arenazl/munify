@@ -1,8 +1,8 @@
 import {
   Home, ClipboardList, Map,
-  Wrench, Clock, Trophy, FileCheck, BarChart3, Plus, History, CalendarDays, LayoutDashboard, Settings, Building2,
-  FolderTree, FileText, Activity, Zap, Receipt, Wallet, ScanLine, Layers, Sparkles,
-  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote,
+  Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
+  FolderTree, FileText, Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
+  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote, Hammer,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -177,6 +177,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: userRole === 'empleado' || ((isSupervisor || isAdmin) && hasEmpleado),
       categoria: 'Campo',
       description: 'Mis tareas asignadas en campo'
+    },
+    {
+      name: 'Órdenes',
+      href: '/gestion/ordenes-trabajo',
+      icon: Hammer,
+      // Opt-in por municipio (como tesorería): sin fila en municipio_modulos = oculto
+      show: (isAdminOrSupervisor || userRole === 'empleado') && modulosActivos.has('ordenes_trabajo'),
+      categoria: 'Campo',
+      description: 'Órdenes de trabajo de cuadrillas'
     },
     {
       name: 'Mostrador',
@@ -543,6 +552,9 @@ export const getDefaultRoute = (role: string, hasDependencia?: boolean, isSuperA
     case 'admin':
     case 'supervisor':
       return '/gestion';
+    case 'empleado':
+      // Operario de campo: directo a sus tareas asignadas
+      return '/gestion/mis-trabajos';
     case 'vecino':
       return '/gestion/mi-panel';
     default:

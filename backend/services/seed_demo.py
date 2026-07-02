@@ -1027,6 +1027,13 @@ async def seed_demo_completo(
             solicitudes_creadas += 1
     await db.flush()
 
+    # Activar el módulo de órdenes de trabajo (opt-in) en los munis demo,
+    # así la demo muestra el circuito de campo completo. El seed corre una
+    # sola vez por muni nuevo, no hace falta chequear duplicados.
+    from models.municipio_modulo import MunicipioModulo
+    db.add(MunicipioModulo(municipio_id=municipio_id, modulo='ordenes_trabajo', activo=True))
+    await db.flush()
+
     return {
         "dependencias": len(muni_deps),
         "tramites": len(tramites_creados),

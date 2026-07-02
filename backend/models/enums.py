@@ -30,6 +30,15 @@ class MotivoRechazo(str, enum.Enum):
     OTRO = "otro"
 
 
+class EstadoOrdenTrabajo(str, enum.Enum):
+    """Ciclo de vida de una orden de trabajo (OT) de campo."""
+    PENDIENTE = "pendiente"      # Creada, sin cuadrilla/empleado asignado
+    ASIGNADA = "asignada"        # Con cuadrilla y/o empleado responsable
+    EN_CURSO = "en_curso"        # Trabajo iniciado en campo
+    COMPLETADA = "completada"    # Trabajo terminado (no cierra los reclamos)
+    CANCELADA = "cancelada"
+
+
 class TipoAusencia(str, enum.Enum):
     VACACIONES = "vacaciones"
     LICENCIA_MEDICA = "licencia_medica"
