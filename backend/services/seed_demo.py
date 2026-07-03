@@ -490,6 +490,16 @@ RECLAMOS_DEMO = [
 # Funciones helper de seed
 # ============================================================
 
+def _slug_palabra(texto: str) -> str:
+    """Primera palabra significativa de un texto, sin acentos y en minúscula.
+    Usado para derivar slugs de email (ej: "Alumbrado público" → "alumbrado")
+    sin hardcodear un mapeo nombre→slug por fuera de los datos."""
+    import unicodedata
+    limpio = unicodedata.normalize("NFD", texto)
+    limpio = "".join(c for c in limpio if unicodedata.category(c) != "Mn")
+    return limpio.lower().split()[0]
+
+
 async def _seed_zonas(
     db: AsyncSession,
     municipio_id: int,
@@ -1093,24 +1103,28 @@ async def seed_demo_completo(
 
     # Usuarios con rol EMPLEADO — sin esto no hay con qué entrar como el
     # operario de campo (ve "Mis Trabajos" y, si el módulo está activo, sus
-    # Órdenes de Trabajo). Vinculados a los 2 empleados que ya tienen
-    # reclamos/OTs asignados en la semilla curada (Bacheo y Alumbrado).
+    # Órdenes de Trabajo). Genérico y agnóstico: uno por cada empleado
+    # "operario" de EMPLEADOS_DEMO (los "administrativo" no hacen campo), con
+    # slug derivado de su categoría — nada hardcodeado a nombres puntuales,
+    # así escala igual en cualquier demo nueva que se genere.
     empleados_login: list[User] = []
-    for idx, slug in ((0, "bacheo"), (1, "alumbrado")):
-        if idx < len(empleados):
-            emp_user = User(
-                email=f"empleado-{slug}@{codigo}.demo.com",
-                nombre=EMPLEADOS_DEMO[idx][0],
-                apellido=EMPLEADOS_DEMO[idx][1],
-                password_hash=hash_demo,
-                rol=RolUsuario.EMPLEADO,
-                municipio_id=municipio_id,
-                empleado_id=empleados[idx].id,
-                activo=True,
-                cuenta_verificada=True,
-            )
-            db.add(emp_user)
-            empleados_login.append(emp_user)
+    for idx, (nombre, apellido, _tel, tipo, _esp, cat_nombre, _zona) in enumerate(EMPLEADOS_DEMO):
+        if tipo != "operario" or idx >= len(empleados):
+            continue
+        slug = _slug_palabra(cat_nombre) if cat_nombre else f"campo-{idx + 1}"
+        emp_user = User(
+            email=f"empleado-{slug}@{codigo}.demo.com",
+            nombre=nombre,
+            apellido=apellido,
+            password_hash=hash_demo,
+            rol=RolUsuario.EMPLEADO,
+            municipio_id=municipio_id,
+            empleado_id=empleados[idx].id,
+            activo=True,
+            cuenta_verificada=True,
+        )
+        db.add(emp_user)
+        empleados_login.append(emp_user)
     await db.flush()
 
     # ------------------------------------------------------------------
