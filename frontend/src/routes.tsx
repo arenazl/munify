@@ -68,6 +68,7 @@ import ConsolaGlobal from './pages/admin/ConsolaGlobal';
 import Suscripciones from './pages/admin/Suscripciones';
 import Demo from './pages/Demo';
 import DemoReady from './pages/DemoReady';
+import PresentacionMunify from './pages/PresentacionMunify';
 import MunicipioAcceso from './pages/MunicipioAcceso';
 import DependenciasConfig from './pages/DependenciasConfig';
 import AsignacionDependencias from './pages/AsignacionDependencias';
@@ -157,6 +158,8 @@ export const router = createBrowserRouter([
   // === RUTAS PÚBLICAS ===
   { path: '/demo', element: <Demo /> },
   { path: '/demo/listo', element: <DemoReady /> },
+  // Presentación comercial en modo kiosko (para proyectar frente a un cliente)
+  { path: '/presentacion', element: <PresentacionMunify /> },
   { path: '/bienvenido', element: <Landing /> },
   { path: '/home', element: <HomePublic /> },
   { path: '/m/:codigo', element: <MunicipioHome /> },  // URL corta para PWA: /m/chacabuco
