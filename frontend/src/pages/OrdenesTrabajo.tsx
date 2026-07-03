@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes } from 'lucide-react';
+import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,10 +9,12 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
-import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi } from '../lib/api';
+import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi, otTiposTrabajoApi } from '../lib/api';
 import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels } from '../lib/enums/ordenTrabajo';
 import { naturalezaColors, naturalezaIcons } from '../lib/enums/inventario';
-import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario } from '../types';
+import { prioridadLabels, prioridadColor, prioridadIcons, PRIORIDAD_OPTIONS } from '../lib/enums/prioridadOT';
+import { imprimirOrdenTrabajo } from '../lib/printOrdenTrabajo';
+import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario, OTTipoTrabajo, PrioridadOT } from '../types';
 
 // Recurso de inventario en el form de la OT (activo reservado o consumible planeado).
 type RecursoForm = {
@@ -33,6 +35,8 @@ interface CuadrillaMini {
 type FormState = {
   titulo: string;
   descripcion: string;
+  prioridad: PrioridadOT;
+  tipo_trabajo_id: string;
   cuadrilla_id: string;
   empleado_id: string;
   fecha_programada: string;
@@ -43,7 +47,8 @@ type FormState = {
 };
 
 const FORM_VACIO: FormState = {
-  titulo: '', descripcion: '', cuadrilla_id: '', empleado_id: '',
+  titulo: '', descripcion: '', prioridad: 'media', tipo_trabajo_id: '',
+  cuadrilla_id: '', empleado_id: '',
   fecha_programada: '', horas_estimadas: '', materiales: [], recursos: [], reclamo_ids: [],
 };
 
@@ -74,10 +79,12 @@ export default function OrdenesTrabajo() {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [reclamosActivos, setReclamosActivos] = useState<Reclamo[]>([]);
   const [itemsDisponibles, setItemsDisponibles] = useState<InventarioItem[]>([]);
+  const [tiposTrabajo, setTiposTrabajo] = useState<OTTipoTrabajo[]>([]);
   // Nuevo material (form inline)
   const [nuevoMaterial, setNuevoMaterial] = useState('');
 
   const esGestor = user?.rol === 'admin' || user?.rol === 'supervisor';
+  const muniNombre = (user as { municipio_nombre?: string } | null)?.municipio_nombre || 'Municipalidad';
 
   const fetchOrdenes = useCallback(async () => {
     setLoading(true);
@@ -129,6 +136,11 @@ export default function OrdenesTrabajo() {
         const iRes = await inventarioApi.listItems({ solo_disponibles: true, limit: 300 });
         setItemsDisponibles(iRes.data || []);
       } catch { /* inventario no activo: sin recursos */ }
+      // Tipos de trabajo (para el selector del formato)
+      try {
+        const tRes = await otTiposTrabajoApi.list({ activo: true });
+        setTiposTrabajo(tRes.data || []);
+      } catch { /* sin tipos: el selector queda vacío */ }
     })();
   }, [esGestor]);
 
@@ -160,6 +172,8 @@ export default function OrdenesTrabajo() {
     setForm({
       titulo: ot.titulo,
       descripcion: ot.descripcion || '',
+      prioridad: ot.prioridad || 'media',
+      tipo_trabajo_id: ot.tipo_trabajo_id ? String(ot.tipo_trabajo_id) : '',
       cuadrilla_id: ot.cuadrilla_id ? String(ot.cuadrilla_id) : '',
       empleado_id: ot.empleado_id ? String(ot.empleado_id) : '',
       fecha_programada: ot.fecha_programada || '',
@@ -182,6 +196,8 @@ export default function OrdenesTrabajo() {
   const buildPayload = () => ({
     titulo: form.titulo.trim(),
     descripcion: form.descripcion.trim() || null,
+    prioridad: form.prioridad,
+    tipo_trabajo_id: form.tipo_trabajo_id ? Number(form.tipo_trabajo_id) : null,
     cuadrilla_id: form.cuadrilla_id ? Number(form.cuadrilla_id) : null,
     empleado_id: form.empleado_id ? Number(form.empleado_id) : null,
     fecha_programada: form.fecha_programada || null,
@@ -269,6 +285,11 @@ export default function OrdenesTrabajo() {
     ...empleados.map(e => ({ value: String(e.id), label: `${e.nombre} ${e.apellido || ''}`.trim() })),
   ]), [empleados]);
 
+  const tipoTrabajoOptions: SelectOption[] = useMemo(() => ([
+    { value: '', label: 'Sin clasificar' },
+    ...tiposTrabajo.map(t => ({ value: String(t.id), label: t.nombre })),
+  ]), [tiposTrabajo]);
+
   const reclamoOptions: SelectOption[] = useMemo(() =>
     reclamosActivos
       .filter(r => !form.reclamo_ids.includes(r.id))
@@ -349,6 +370,21 @@ export default function OrdenesTrabajo() {
           {!ot.cuadrilla_nombre && !ot.empleado_nombre && '—'}
         </div>
       ),
+    },
+    {
+      key: 'prioridad',
+      header: 'Prioridad',
+      sortValue: (ot: OrdenTrabajo) => ot.prioridad || '',
+      render: (ot: OrdenTrabajo) => {
+        const color = prioridadColor(ot.prioridad);
+        const PIcon = prioridadIcons[ot.prioridad as PrioridadOT];
+        return (
+          <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full w-fit" style={{ backgroundColor: `${color}20`, color }}>
+            {PIcon && <PIcon className="h-3 w-3" />}
+            {prioridadLabels[ot.prioridad as PrioridadOT] || ot.prioridad}
+          </span>
+        );
+      },
     },
     {
       key: 'reclamos',
@@ -438,15 +474,32 @@ export default function OrdenesTrabajo() {
               className="rounded-2xl p-5 cursor-pointer transition-all hover:scale-[1.01]"
               style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, borderLeft: `4px solid ${color}` }}
             >
-              <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start justify-between mb-3 gap-2">
                 <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary }}>
                   {ot.numero}
                 </span>
-                <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${color}20`, color }}>
-                  <EstadoIcon className="h-3 w-3" />
-                  {otEstadoLabel(ot.estado)}
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  {(() => {
+                    const pColor = prioridadColor(ot.prioridad);
+                    const PIcon = prioridadIcons[ot.prioridad as PrioridadOT];
+                    return (
+                      <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${pColor}20`, color: pColor }}>
+                        {PIcon && <PIcon className="h-3 w-3" />}
+                        {prioridadLabels[ot.prioridad as PrioridadOT] || ot.prioridad}
+                      </span>
+                    );
+                  })()}
+                  <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${color}20`, color }}>
+                    <EstadoIcon className="h-3 w-3" />
+                    {otEstadoLabel(ot.estado)}
+                  </span>
+                </div>
               </div>
+              {ot.tipo_trabajo_nombre && (
+                <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full mb-1.5" style={{ backgroundColor: `${ot.tipo_trabajo_color || theme.primary}15`, color: ot.tipo_trabajo_color || theme.primary }}>
+                  {ot.tipo_trabajo_nombre}
+                </span>
+              )}
               <h3 className="font-bold mb-1 line-clamp-2" style={{ color: theme.text }}>{ot.titulo}</h3>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs" style={{ color: theme.textSecondary }}>
                 {ot.cuadrilla_nombre && (
@@ -475,8 +528,18 @@ export default function OrdenesTrabajo() {
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
         title={selected ? `${selected.numero} · ${otEstadoLabel(selected.estado)}` : 'Nueva orden de trabajo'}
-        stickyFooter={esGestor || (selected && esEditable) ? (
+        stickyFooter={(selected || esGestor) ? (
           <div className="flex items-center gap-2">
+            {selected && (
+              <button
+                onClick={() => imprimirOrdenTrabajo(selected, muniNombre)}
+                className="px-3 py-2.5 rounded-lg font-medium flex items-center gap-1.5"
+                style={{ color: theme.text, border: `1px solid ${theme.border}` }}
+                title="Imprimir / guardar como PDF"
+              >
+                <Printer className="h-4 w-4" /> Imprimir
+              </button>
+            )}
             {selected && esEditable && esGestor && (
               <button
                 onClick={() => setConfirmCancelar(true)}
@@ -549,6 +612,28 @@ export default function OrdenesTrabajo() {
               className="w-full px-3 py-2 rounded-lg resize-none"
               style={inputStyle}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Prioridad</p>
+              <ModernSelect
+                value={form.prioridad}
+                onChange={(v) => setForm({ ...form, prioridad: v as PrioridadOT })}
+                options={PRIORIDAD_OPTIONS}
+                disabled={!esGestor || !esEditable}
+              />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Tipo de trabajo</p>
+              <ModernSelect
+                value={form.tipo_trabajo_id}
+                onChange={(v) => setForm({ ...form, tipo_trabajo_id: v })}
+                options={tipoTrabajoOptions}
+                disabled={!esGestor || !esEditable}
+                searchable
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

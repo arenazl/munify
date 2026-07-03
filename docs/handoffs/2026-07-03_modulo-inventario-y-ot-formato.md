@@ -1,8 +1,32 @@
 # Handoff · Módulo Inventario + cruce con Órdenes de Trabajo
 
 **Fecha:** 2026-07-03
-**Estado:** Fase 1 (inventario base) + Fase 2 (cruce OT) COMPLETAS y pusheadas.
-Fase 3 (formato/PDF de OT) y Fase 4 (generalizar seed a todos los munis) PENDIENTES.
+**Estado:** Fases 1-4 COMPLETAS y pusheadas. Inventario base + cruce OT +
+formato/PDF de OT + generalizado a todos los munis.
+
+> **Guía canónica del módulo (para arrancar en frío):**
+> [`../campo/01-inventario-y-ordenes-trabajo.md`](../campo/01-inventario-y-ordenes-trabajo.md).
+> Este handoff es el registro de la sesión; la guía es la referencia viva.
+
+## Fase 3 (formato de OT) + Fase 4 (generalizar) — resumen
+
+- **Prioridad** (`PrioridadOT`: baja/media/alta/urgente) + **tipo de trabajo**
+  (catálogo configurable `ot_tipos_trabajo`, template de 10 tipos) en la OT.
+- **Planilla imprimible / PDF**: `frontend/src/lib/printOrdenTrabajo.ts` (ventana
+  nueva HTML A4 + `window.print()`), botón "Imprimir" en el Sheet de OT.
+- Config nueva: `pages/OTTiposTrabajoConfig.tsx` (ruta `/gestion/tipos-trabajo`,
+  link en Configuración). API `/ot-tipos-trabajo`.
+- Migración `scripts/migrate_add_ot_formato.py` (ejecutada): tabla tipos +
+  columnas `prioridad`/`tipo_trabajo_id`.
+- **Fase 4**: `scripts/generalizar_modulo_campo.py --activar` corrido → template
+  de categorías (sin ítems demo) + tipos + flag `inventario` en TODOS los munis
+  (130 categorías + 270 tipos creados). Incluye SPN productivo (aditivo, reversible).
+- **Bug corregido** de Fase 2: `actualizar_orden` no excluía `recursos` del
+  `model_dump`, lo que pisaría la relationship. Ahora `exclude` lo incluye.
+
+---
+
+## Fases 1-2 (contexto original)
 
 ## Qué se hizo
 

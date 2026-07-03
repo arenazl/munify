@@ -48,6 +48,11 @@ export const PAGE_HINTS: Record<string, PageHintConfig> = {
     description: 'Definí las categorías y su naturaleza: activo (se reserva/libera) o consumible (se descuenta). Después cargás los ítems desde Inventario.',
     accent: 'blue',
   },
+  'ot-tipos-trabajo-config': {
+    title: 'Tipos de trabajo',
+    description: 'Clasificá las órdenes de trabajo (poda, bacheo, alumbrado...). Se elige al crear la OT y aparece en la planilla imprimible.',
+    accent: 'violet',
+  },
   // ========================================================================
   // DASHBOARD — mini tutorial del sistema completo (wizard)
   // ========================================================================

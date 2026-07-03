@@ -1307,6 +1307,10 @@ async def seed_demo_completo(
     from services.inventario_seed import seed_inventario
     inv_res = await seed_inventario(db, municipio_id, incluir_demo=True)
 
+    # Tipos de trabajo (template configurable, para el formato de la OT).
+    from services.ot_tipos_seed import seed_tipos_trabajo
+    await seed_tipos_trabajo(db, municipio_id)
+
     # Activar los módulos opt-in en los munis demo, así la demo muestra el
     # circuito completo (campo + inventario + sueldos + contaduría). El seed
     # corre una sola vez por muni nuevo, no hace falta chequear duplicados.

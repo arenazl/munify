@@ -1,11 +1,11 @@
 from sqlalchemy import (
-    Column, Integer, String, DateTime, Date, Time, Text, Float, Enum,
+    Column, Integer, String, Boolean, DateTime, Date, Time, Text, Float, Enum,
     ForeignKey, JSON, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
-from .enums import EstadoOrdenTrabajo
+from .enums import EstadoOrdenTrabajo, PrioridadOT
 
 
 class OrdenTrabajo(Base):
@@ -46,6 +46,17 @@ class OrdenTrabajo(Base):
     # Qué hay que hacer
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
+
+    # Formato / clasificación (Fase 3)
+    prioridad = Column(
+        Enum(PrioridadOT, values_callable=lambda x: [e.value for e in x]),
+        default=PrioridadOT.MEDIA, nullable=False, index=True,
+    )
+    # Tipo de trabajo del catálogo configurable por muni (Poda, Bacheo, ...)
+    tipo_trabajo_id = Column(
+        Integer, ForeignKey("ot_tipos_trabajo.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    tipo_trabajo = relationship("OrdenTrabajoTipo")
 
     # Quién lo hace: cuadrilla y/o empleado responsable individual
     cuadrilla_id = Column(Integer, ForeignKey("cuadrillas.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -90,6 +101,30 @@ class OrdenTrabajo(Base):
         cascade="all, delete-orphan",
         overlaps="orden",
     )
+
+
+class OrdenTrabajoTipo(Base):
+    """Tipo de trabajo por municipio (catálogo configurable — template).
+
+    Clasifica la OT en la planilla (Poda, Bacheo, Alumbrado, ...). Se siembra
+    un set genérico que el municipio customiza, mismo criterio que las
+    categorías de reclamo / inventario.
+    """
+    __tablename__ = "ot_tipos_trabajo"
+    __table_args__ = (
+        UniqueConstraint("municipio_id", "nombre", name="uq_ot_tipo_muni_nombre"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    municipio_id = Column(Integer, ForeignKey("municipios.id", ondelete="CASCADE"), nullable=False, index=True)
+    nombre = Column(String(100), nullable=False)
+    icono = Column(String(50), nullable=True)
+    color = Column(String(20), nullable=True)
+    activo = Column(Boolean, default=True, nullable=False)
+    orden = Column(Integer, default=0)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class OrdenTrabajoReclamo(Base):

@@ -21,7 +21,7 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
-    OrdenTrabajo, OrdenTrabajoReclamo, EstadoOrdenTrabajo,
+    OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo, EstadoOrdenTrabajo, PrioridadOT,
     Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
@@ -65,6 +65,8 @@ class RecursoResponse(BaseModel):
 class OTCreate(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
+    prioridad: PrioridadOT = PrioridadOT.MEDIA
+    tipo_trabajo_id: Optional[int] = None
     reclamo_ids: List[int] = []
     cuadrilla_id: Optional[int] = None
     empleado_id: Optional[int] = None
@@ -79,6 +81,8 @@ class OTCreate(BaseModel):
 class OTUpdate(BaseModel):
     titulo: Optional[str] = None
     descripcion: Optional[str] = None
+    prioridad: Optional[PrioridadOT] = None
+    tipo_trabajo_id: Optional[int] = None
     reclamo_ids: Optional[List[int]] = None  # None = no tocar vínculos
     cuadrilla_id: Optional[int] = None
     empleado_id: Optional[int] = None
@@ -121,6 +125,11 @@ class OTResponse(BaseModel):
     id: int
     numero: str
     estado: EstadoOrdenTrabajo
+    prioridad: PrioridadOT = PrioridadOT.MEDIA
+    tipo_trabajo_id: Optional[int] = None
+    tipo_trabajo_nombre: Optional[str] = None
+    tipo_trabajo_color: Optional[str] = None
+    tipo_trabajo_icono: Optional[str] = None
     titulo: str
     descripcion: Optional[str] = None
     cuadrilla_id: Optional[int] = None
@@ -174,6 +183,7 @@ def _query_base():
     return select(OrdenTrabajo).options(
         selectinload(OrdenTrabajo.cuadrilla),
         selectinload(OrdenTrabajo.empleado),
+        selectinload(OrdenTrabajo.tipo_trabajo),
         selectinload(OrdenTrabajo.reclamos_vinculados).selectinload(OrdenTrabajoReclamo.reclamo),
         selectinload(OrdenTrabajo.recursos).selectinload(OrdenTrabajoRecurso.item),
     )
@@ -185,6 +195,10 @@ def _to_response(ot: OrdenTrabajo) -> OTResponse:
         resp.cuadrilla_nombre = f"{ot.cuadrilla.nombre} {ot.cuadrilla.apellido or ''}".strip()
     if ot.empleado:
         resp.empleado_nombre = f"{ot.empleado.nombre} {ot.empleado.apellido or ''}".strip()
+    if ot.tipo_trabajo:
+        resp.tipo_trabajo_nombre = ot.tipo_trabajo.nombre
+        resp.tipo_trabajo_color = ot.tipo_trabajo.color
+        resp.tipo_trabajo_icono = ot.tipo_trabajo.icono
     resp.reclamos = [
         ReclamoMini(
             id=link.reclamo.id,
@@ -235,6 +249,17 @@ async def _validar_recursos(db: AsyncSession, municipio_id: int,
         ))).scalar_one_or_none()
         if not ok:
             raise HTTPException(status_code=400, detail="Empleado inválido para este municipio")
+
+
+async def _validar_tipo_trabajo(db: AsyncSession, municipio_id: int, tipo_trabajo_id: Optional[int]):
+    """El tipo de trabajo debe pertenecer al mismo municipio (anti cross-tenant)."""
+    if not tipo_trabajo_id:
+        return
+    ok = (await db.execute(select(OrdenTrabajoTipo.id).where(
+        OrdenTrabajoTipo.id == tipo_trabajo_id, OrdenTrabajoTipo.municipio_id == municipio_id,
+    ))).scalar_one_or_none()
+    if not ok:
+        raise HTTPException(status_code=400, detail="Tipo de trabajo inválido para este municipio")
 
 
 async def _vincular_reclamos(db: AsyncSession, ot: OrdenTrabajo, reclamo_ids: List[int],
@@ -495,6 +520,7 @@ async def crear_orden(
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
+    await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
 
     numero = await _siguiente_numero(db, municipio_id)
     estado = (
@@ -509,6 +535,8 @@ async def crear_orden(
         estado=estado,
         titulo=data.titulo,
         descripcion=data.descripcion,
+        prioridad=data.prioridad,
+        tipo_trabajo_id=data.tipo_trabajo_id,
         cuadrilla_id=data.cuadrilla_id,
         empleado_id=data.empleado_id,
         fecha_programada=data.fecha_programada,
@@ -550,8 +578,12 @@ async def actualizar_orden(
         raise HTTPException(status_code=400, detail="No se puede editar una OT completada o cancelada")
 
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
+    if "tipo_trabajo_id" in data.model_dump(exclude_unset=True):
+        await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
 
-    campos = data.model_dump(exclude_unset=True, exclude={"reclamo_ids", "materiales"})
+    # prioridad/tipo_trabajo_id son escalares → se setean acá directo.
+    # reclamo_ids/materiales/recursos se manejan aparte (no son columnas simples).
+    campos = data.model_dump(exclude_unset=True, exclude={"reclamo_ids", "materiales", "recursos"})
     for k, v in campos.items():
         setattr(ot, k, v)
     if data.materiales is not None:

@@ -169,10 +169,26 @@ export interface OTReclamoMini {
   direccion?: string | null;
 }
 
+export type PrioridadOT = 'baja' | 'media' | 'alta' | 'urgente';
+
+export interface OTTipoTrabajo {
+  id: number;
+  nombre: string;
+  icono?: string | null;
+  color?: string | null;
+  activo: boolean;
+  orden: number;
+}
+
 export interface OrdenTrabajo {
   id: number;
   numero: string;
   estado: EstadoOrdenTrabajo;
+  prioridad: PrioridadOT;
+  tipo_trabajo_id?: number | null;
+  tipo_trabajo_nombre?: string | null;
+  tipo_trabajo_color?: string | null;
+  tipo_trabajo_icono?: string | null;
   titulo: string;
   descripcion?: string | null;
   cuadrilla_id?: number | null;

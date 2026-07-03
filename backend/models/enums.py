@@ -39,6 +39,14 @@ class EstadoOrdenTrabajo(str, enum.Enum):
     CANCELADA = "cancelada"
 
 
+class PrioridadOT(str, enum.Enum):
+    """Prioridad de una orden de trabajo (para la planilla / el formato)."""
+    BAJA = "baja"
+    MEDIA = "media"
+    ALTA = "alta"
+    URGENTE = "urgente"
+
+
 class NaturalezaInventario(str, enum.Enum):
     """Dos naturalezas de inventario, con mecánicas opuestas.
 
