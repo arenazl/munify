@@ -424,6 +424,31 @@ async def obtener_usuarios_dependencias(
 
 # ============ Endpoints PROTEGIDOS (requieren autenticacion) ============
 
+@router.get("/argentina")
+async def buscar_municipios_argentina(
+    q: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    """Autocomplete PÚBLICO del catálogo oficial de municipios argentinos
+    (tabla municipios_argentina, dataset georef de datos.gob.ar, 2.082
+    municipios con centroide). Devuelve top 10 por nombre; la provincia
+    desambigua homónimos (hay 6 'San Martín' en el país)."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return []
+    rows = (await db.execute(text("""
+        SELECT id, nombre, provincia, lat, lng FROM municipios_argentina
+        WHERE nombre LIKE :patt
+        ORDER BY (nombre LIKE :prefijo) DESC, CHAR_LENGTH(nombre), nombre
+        LIMIT 10
+    """), {"patt": f"%{q}%", "prefijo": f"{q}%"})).fetchall()
+    return [
+        {"id": r[0], "nombre": r[1], "provincia": r[2],
+         "lat": float(r[3]), "lng": float(r[4])}
+        for r in rows
+    ]
+
+
 @router.get("", response_model=List[MunicipioDetalle])
 async def listar_municipios(
     skip: int = 0,
@@ -476,8 +501,16 @@ class MunicipioCreateResponse(MunicipioDetalle):
 
 
 class MunicipioDemoCreate(BaseModel):
-    """Input mínimo para crear un municipio de demo desde la landing pública."""
+    """Input mínimo para crear un municipio de demo desde la landing pública.
+
+    lat/lng/provincia vienen del autocomplete oficial (tabla
+    municipios_argentina, dataset georef). Si vienen, se usan directo y se
+    saltea el geocoding por Nominatim (más rápido y sin ambigüedad de
+    homónimos: hay 6 "San Martín" en el país)."""
     nombre: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    provincia: Optional[str] = None
 
 
 class MunicipioDemoResponse(BaseModel):
@@ -546,32 +579,34 @@ async def crear_municipio_demo(
         suffix += 1
         codigo = f"{base_codigo}-{suffix}"
 
-    # 1. Geocodificar el nombre del muni con Nominatim (OpenStreetMap).
-    # Best-effort: si falla o no encuentra, usa fallback de CABA centro.
-    # Esto permite que los reclamos demo y el mapa del muni caigan en
-    # la ubicación real del municipio en Argentina.
+    # 1. Coordenadas del municipio. Si el autocomplete oficial ya las trajo
+    # (tabla municipios_argentina), se usan directo. Si no, fallback al
+    # geocoding por Nominatim (best-effort, default CABA).
     lat, lng = -34.603722, -58.381592  # default CABA
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=5.0) as hc:
-            r = await hc.get(
-                "https://nominatim.openstreetmap.org/search",
-                params={
-                    "q": f"{nombre_limpio}, Argentina",
-                    "format": "json",
-                    "limit": 1,
-                    "countrycodes": "ar",
-                },
-                headers={"User-Agent": "Munify/1.0 (demo creator)"},
-            )
-            if r.status_code == 200:
-                data = r.json()
-                if data:
-                    lat = float(data[0]["lat"])
-                    lng = float(data[0]["lon"])
-    except Exception:
-        # Silenciamos el error — el fallback de CABA ya está asignado
-        pass
+    if data.lat is not None and data.lng is not None:
+        lat, lng = data.lat, data.lng
+    else:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as hc:
+                r = await hc.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={
+                        "q": f"{nombre_limpio}, Argentina",
+                        "format": "json",
+                        "limit": 1,
+                        "countrycodes": "ar",
+                    },
+                    headers={"User-Agent": "Munify/1.0 (demo creator)"},
+                )
+                if r.status_code == 200:
+                    geo = r.json()
+                    if geo:
+                        lat = float(geo[0]["lat"])
+                        lng = float(geo[0]["lon"])
+        except Exception:
+            # Silenciamos el error — el fallback de CABA ya está asignado
+            pass
 
     # 2. Crear fila del municipio con coords (reales o fallback)
     municipio = Municipio(

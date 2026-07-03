@@ -19,6 +19,7 @@ import {
   AlertTriangle, Clock, Camera, QrCode, Wallet,
 } from 'lucide-react';
 import { MunifyMark } from '../components/ui/MunifyMark';
+import { MockupWhatsApp, MockupSeguimiento, MockupLogros } from '../components/reels/ReelMockups';
 
 const SLIDE_DURATION_MS = 14000;
 // Paleta OFICIAL de marca (tokens de reelBrand.ts, sampleados del banner
@@ -858,6 +859,29 @@ function CierreSlide({ isMobile }: { isMobile: boolean }) {
   );
 }
 
+function EngagementSlide({ isMobile }: { isMobile: boolean }) {
+  const piezas = [
+    { Mock: MockupWhatsApp, t: 'Bot de WhatsApp', d: 'Reclamos y consultas desde el chat, sin instalar nada.', c: VERDE },
+    { Mock: MockupSeguimiento, t: 'Seguimiento en vivo', d: 'El vecino ve el estado de su reclamo paso a paso.', c: VIOLETA },
+    { Mock: MockupLogros, t: 'Gamificación', d: 'Logros y reconocimiento para los vecinos más activos.', c: AMBAR },
+  ];
+  return (
+    <div style={{ maxWidth: 1100, width: '100%' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? 14 : 22, alignItems: 'start' }}>
+        {piezas.map((p, i) => (
+          <div key={i} className="pres-pop" style={{ textAlign: 'center', animationDelay: `${i * 220}ms` }}>
+            <div className="pres-float" style={{ display: 'flex', justifyContent: 'center', marginBottom: 14, animationDelay: `${i * 500}ms`, filter: `drop-shadow(0 14px 34px ${p.c}30)`, transform: isMobile ? 'scale(0.85)' : undefined }}>
+              <p.Mock />
+            </div>
+            <div className="pres-display" style={{ fontSize: isMobile ? 16 : 19, fontWeight: 800, color: '#fff', marginBottom: 5 }}>{p.t}</div>
+            <div style={{ fontSize: isMobile ? 12 : 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.5, maxWidth: 280, margin: '0 auto' }}>{p.d}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CircuitoReclamoSlide({ isMobile }: { isMobile: boolean }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
@@ -1014,6 +1038,7 @@ function useSlides(paraMuni: string | null): Slide[] {
     { key: 'problema', title: 'El problema', subtitle: 'Lo que hoy le pasa a cualquier municipio', icon: AlertTriangle, color: AMBAR, Component: ProblemaSlide },
     { key: 'que-es', title: 'Qué es Munify', subtitle: 'Una plataforma, tres caras', icon: Layers, color: VERDE, Component: QueEsSlide },
     { key: 'omnicanal', title: 'El vínculo con el vecino', subtitle: 'Omnicanalidad real', icon: MessageCircle, color: AZUL, Component: OmnicanalSlide },
+    { key: 'engagement', title: 'El vínculo con el vecino', subtitle: 'WhatsApp, seguimiento en vivo y logros', icon: Bell, color: VERDE, Component: EngagementSlide },
     { key: 'rec-vecino', title: 'Reclamos', subtitle: 'La experiencia del vecino', icon: ClipboardList, color: AZUL, Component: ReclamoVecinoSlide },
     { key: 'rec-gestion', title: 'Reclamos', subtitle: 'La gestión puertas adentro', icon: Building2, color: VERDE, Component: ReclamoGestionSlide },
     { key: 'circuito-rec', title: 'Reclamos', subtitle: 'El circuito de punta a punta', icon: CheckCircle2, color: VERDE, Component: CircuitoReclamoSlide },

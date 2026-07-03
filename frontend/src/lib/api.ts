@@ -690,13 +690,19 @@ export const municipiosApi = {
   // Endpoint público para crear municipio de demo desde la landing comercial.
   // Arma todo el seed mínimo (categorías + dep General + 2 users demo) y
   // devuelve la URL de redirección a la landing del muni nuevo.
-  crearDemo: (nombre: string) =>
+  crearDemo: (nombre: string, geo?: { lat: number; lng: number; provincia?: string }) =>
     api.post<{
       id: number;
       nombre: string;
       codigo: string;
       redirect_path: string;
-    }>('/municipios/crear-demo', { nombre }),
+    }>('/municipios/crear-demo', { nombre, ...(geo || {}) }),
+  // Autocomplete del catálogo OFICIAL de municipios argentinos (tabla local
+  // municipios_argentina, cargada una vez desde georef — sin API externa en runtime).
+  buscarArgentina: (q: string) =>
+    api.get<Array<{ id: string; nombre: string; provincia: string; lat: number; lng: number }>>(
+      '/municipios/argentina', { params: { q } },
+    ),
   eliminarDemo: (codigo: string) => api.delete(`/municipios/demo/${codigo}`),
   update: (id: number, data: object) => api.put(`/municipios/${id}`, data),
   delete: (id: number) => api.delete(`/municipios/${id}`),

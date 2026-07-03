@@ -16,6 +16,15 @@ interface Municipio {
   logo_url?: string;
 }
 
+// Municipio del catálogo OFICIAL (tabla local municipios_argentina, georef).
+interface MuniArg {
+  id: string;
+  nombre: string;
+  provincia: string;
+  lat: number;
+  lng: number;
+}
+
 const PLACEHOLDER_CITIES = ['Pergamino', 'San Pedro', 'Salta', 'Tandil', 'Rosario', 'Bariloche'];
 const MAX_NAME = 40;
 const MIN_NAME = 3;
@@ -33,6 +42,30 @@ export default function Demo() {
   const [toDelete, setToDelete] = useState<Municipio | null>(null);
   const [search, setSearch] = useState('');
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  // Autocomplete del catálogo oficial: solo se puede crear una demo con un
+  // municipio REAL elegido de la lista (basta de "Pepito Pepito").
+  const [sugerencias, setSugerencias] = useState<MuniArg[]>([]);
+  const [muniSel, setMuniSel] = useState<MuniArg | null>(null);
+  const [showSug, setShowSug] = useState(false);
+
+  // Buscar en el catálogo con debounce mientras tipea (y sin selección hecha)
+  useEffect(() => {
+    const q = nuevoNombre.trim();
+    if (muniSel && `${muniSel.nombre}` === q) { setSugerencias([]); return; }
+    if (q.length < 2) { setSugerencias([]); setShowSug(false); return; }
+    const id = setTimeout(() => {
+      municipiosApi.buscarArgentina(q)
+        .then((r) => { setSugerencias(r.data || []); setShowSug(true); })
+        .catch(() => setSugerencias([]));
+    }, 220);
+    return () => clearTimeout(id);
+  }, [nuevoNombre, muniSel]);
+
+  const elegirMuni = (m: MuniArg) => {
+    setMuniSel(m);
+    setNuevoNombre(m.nombre.slice(0, MAX_NAME));
+    setShowSug(false);
+  };
 
   useEffect(() => {
     clearMunicipio();
@@ -94,11 +127,17 @@ export default function Demo() {
       setError(`El nombre debe tener al menos ${MIN_NAME} caracteres`);
       return;
     }
+    if (!muniSel || muniSel.nombre !== nombre) {
+      setError('Elegí tu municipio de la lista (catálogo oficial de Argentina)');
+      return;
+    }
     setCreando(true);
     setCreandoDone(false);
     setError('');
     try {
-      const res = await municipiosApi.crearDemo(nombre);
+      const res = await municipiosApi.crearDemo(nombre, {
+        lat: muniSel.lat, lng: muniSel.lng, provincia: muniSel.provincia,
+      });
       const muni = res.data;
       saveMunicipioToStorage({
         id: muni.id,
@@ -118,7 +157,9 @@ export default function Demo() {
   };
 
   const trimmed = nuevoNombre.trim();
-  const nameValid = trimmed.length >= MIN_NAME && trimmed.length <= MAX_NAME;
+  // Válido = municipio REAL seleccionado del catálogo (no texto libre)
+  const nameValid = trimmed.length >= MIN_NAME && trimmed.length <= MAX_NAME
+    && !!muniSel && muniSel.nombre === trimmed;
 
   const filteredMunicipios = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -207,10 +248,18 @@ export default function Demo() {
                 <input
                   type="text"
                   value={nuevoNombre}
-                  onChange={(e) => setNuevoNombre(e.target.value.slice(0, MAX_NAME))}
+                  onChange={(e) => {
+                    const v = e.target.value.slice(0, MAX_NAME);
+                    setNuevoNombre(v);
+                    if (muniSel && muniSel.nombre !== v.trim()) setMuniSel(null);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !creando && nameValid) handleCrearDemo();
+                    if (e.key === 'Enter' && !nameValid && sugerencias.length > 0) elegirMuni(sugerencias[0]);
+                    if (e.key === 'Escape') setShowSug(false);
                   }}
+                  onFocus={() => { if (sugerencias.length > 0 && !muniSel) setShowSug(true); }}
+                  onBlur={() => setTimeout(() => setShowSug(false), 180)}
                   placeholder={`Ej: ${PLACEHOLDER_CITIES[placeholderIdx]}...`}
                   disabled={creando}
                   maxLength={MAX_NAME}
@@ -231,9 +280,24 @@ export default function Demo() {
                           : 'text-slate-400'
                     }`}
                   >
-                    {trimmed.length}/{MAX_NAME}
+                    {nameValid && muniSel ? muniSel.provincia : `${trimmed.length}/${MAX_NAME}`}
                   </span>
                 </div>
+                {/* Dropdown del catálogo oficial (tabla local, dataset georef) */}
+                {showSug && sugerencias.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl border border-slate-200 shadow-xl z-20 overflow-hidden">
+                    {sugerencias.map((m) => (
+                      <button
+                        key={m.id}
+                        onMouseDown={(e) => { e.preventDefault(); elegirMuni(m); }}
+                        className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blue-50 transition-colors"
+                      >
+                        <span className="text-sm font-medium text-slate-800">{m.nombre}</span>
+                        <span className="text-xs text-slate-400">{m.provincia}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 onClick={handleCrearDemo}
