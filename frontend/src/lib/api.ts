@@ -147,7 +147,10 @@ api.interceptors.response.use(
     const detail = error.response?.data?.detail;
 
     if (status === 401) {
-      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register', '/app', '/super'];
+      // Páginas PÚBLICAS: un 401 de fondo jamás debe expulsar al login.
+      // Bug real: /demo echaba al usuario a /bienvenido por un 401 transitorio
+      // del autocomplete mientras el backend deployaba (2026-07-03).
+      const publicPaths = ['/nuevo-reclamo', '/publico', '/bienvenido', '/register', '/app', '/super', '/demo', '/presentacion', '/m/'];
       const currentPath = window.location.pathname;
       const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
 
