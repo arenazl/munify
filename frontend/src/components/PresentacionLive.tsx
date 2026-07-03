@@ -32,7 +32,9 @@ import {
 } from './reels/ReelMockups';
 
 const SLIDE_DURATION_MS = 11000;
-const BG = '#0b0f1a';
+const BG = '#0E1830';  // ink navy de marca
+const NAVY = '#103070'; // M exterior del logo
+const FONT_DISPLAY = "'Fraunces', Georgia, 'Times New Roman', serif";
 
 // ---- hooks ----
 function useIsMobile(breakpoint = 760): boolean {
@@ -93,7 +95,7 @@ function makeModuleSlide(opts: {
         maxWidth: 1240, width: '100%', margin: '0 auto',
       }}>
         {/* Mockup */}
-        <div style={{
+        <div className="presl-float" style={{
           padding: isMobile ? 16 : 30, borderRadius: 20,
           background: `radial-gradient(circle at 100% 0%, ${accent}18, transparent 60%), rgba(255,255,255,0.03)`,
           border: `1px solid ${accent}33`,
@@ -111,28 +113,29 @@ function makeModuleSlide(opts: {
         </div>
         {/* Texto */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
-          <Chip accent={accent}>Pantalla en produccion</Chip>
-          <div>
+          <div className="presl-pop"><Chip accent={accent}>Pantalla en produccion</Chip></div>
+          <div className="presl-rise" style={{ animationDelay: '150ms' }}>
             <div style={{ ...UPPER, fontSize: 12, marginBottom: 5 }}>Resuelve</div>
-            <div style={{ fontSize: isMobile ? 24 : 32, fontWeight: 800, color: '#fff', lineHeight: 1.15, fontStyle: 'italic' }}>
+            <div style={{ fontSize: isMobile ? 24 : 32, fontWeight: 800, color: '#fff', lineHeight: 1.15, fontStyle: 'italic', fontFamily: FONT_DISPLAY }}>
               “{q}”
             </div>
           </div>
-          <div>
+          <div className="presl-rise" style={{ animationDelay: '350ms' }}>
             <div style={{ ...UPPER, fontSize: 12, marginBottom: 6 }}>Que hace</div>
             <p style={{ fontSize: isMobile ? 14 : 16, color: 'rgba(255,255,255,0.85)', lineHeight: 1.55, margin: 0 }}>{use}</p>
           </div>
           {bullets && bullets.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {bullets.map((b) => (
-                <span key={b} style={{
+              {bullets.map((b, _bi) => (
+                <span key={b} className="presl-pop" style={{
+                  animationDelay: `${550 + _bi * 150}ms`,
                   fontSize: 12.5, color: 'rgba(255,255,255,0.82)', background: 'rgba(255,255,255,0.05)',
                   border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '5px 10px',
                 }}>{b}</span>
               ))}
             </div>
           )}
-          <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="presl-rise" style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', animationDelay: '800ms' }}>
             <div style={{ ...UPPER, fontSize: 9.5, letterSpacing: '0.18em', marginBottom: 4 }}>Ejemplo real</div>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5, margin: 0, fontStyle: 'italic' }}>{example}</p>
           </div>
@@ -145,18 +148,18 @@ function makeModuleSlide(opts: {
 // ============================================================
 // Slides "especiales" (no-modulo)
 // ============================================================
-function HeroSlide({ isMobile, accent, accent2 }: SlideCtx) {
+function HeroSlide({ isMobile, accent }: SlideCtx) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 18 : 26, maxWidth: 900, margin: '0 auto' }}>
       <div style={{
         width: isMobile ? 92 : 128, height: isMobile ? 92 : 128, borderRadius: 28,
-        background: `linear-gradient(135deg, ${accent}, ${accent2})`,
+        background: NAVY,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         boxShadow: `0 22px 60px -16px ${accent}88`,
       }}>
-        <MunifyMark size={isMobile ? 52 : 72} mono="#ffffff" />
+        <MunifyMark size={isMobile ? 52 : 72} />
       </div>
-      <h1 style={{ fontSize: isMobile ? 40 : 'clamp(56px, 8vw, 96px)', fontWeight: 900, color: '#fff', lineHeight: 1.02, margin: 0, letterSpacing: '-0.02em' }}>
+      <h1 style={{ fontSize: isMobile ? 40 : 'clamp(56px, 8vw, 96px)', fontWeight: 900, color: '#fff', lineHeight: 1.02, margin: 0, letterSpacing: '-0.01em', fontFamily: FONT_DISPLAY }}>
         Una sola plataforma<br />para <span style={{ color: accent }}>todo el municipio</span>
       </h1>
       <p style={{ fontSize: isMobile ? 16 : 21, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, margin: 0, maxWidth: 720 }}>
@@ -247,13 +250,13 @@ function VentajasSlide({ isMobile, accent, accent2 }: SlideCtx) {
   );
 }
 
-function CierreSlide({ isMobile, accent, accent2 }: SlideCtx) {
+function CierreSlide({ isMobile, accent }: SlideCtx) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 18 : 28, maxWidth: 820, margin: '0 auto' }}>
-      <div style={{ width: isMobile ? 80 : 104, height: isMobile ? 80 : 104, borderRadius: 24, background: `linear-gradient(135deg, ${accent}, ${accent2})`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 22px 60px -16px ${accent}88` }}>
-        <MunifyMark size={isMobile ? 46 : 60} mono="#ffffff" />
+      <div style={{ width: isMobile ? 80 : 104, height: isMobile ? 80 : 104, borderRadius: 24, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 22px 60px -16px ${accent}88` }}>
+        <MunifyMark size={isMobile ? 46 : 60} />
       </div>
-      <h2 style={{ fontSize: isMobile ? 34 : 'clamp(44px, 6vw, 72px)', fontWeight: 900, color: '#fff', lineHeight: 1.05, margin: 0 }}>
+      <h2 style={{ fontSize: isMobile ? 34 : 'clamp(44px, 6vw, 72px)', fontWeight: 900, color: '#fff', lineHeight: 1.05, margin: 0, fontFamily: FONT_DISPLAY }}>
         Tu municipio, <span style={{ color: accent }}>en una sola app</span>
       </h2>
       <p style={{ fontSize: isMobile ? 16 : 20, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5, margin: 0 }}>
@@ -405,12 +408,22 @@ export default function PresentacionLive({ open, onClose }: { open: boolean; onC
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  const accent = theme.primary || '#f5a623';
-  const accent2 = theme.primaryHover || '#e08a12';
+  // Acentos de MARCA Munify (azul del logo), no del theme del muni:
+  // el recorrido vende Munify, y la marca es el logo + su azul.
+  void theme;
+  const accent = '#5B9BFF';
+  const accent2 = '#4070C0';
 
-  // reset al abrir
+  // reset al abrir + tipografia de marca on-demand
   useEffect(() => {
     if (open) { setCurrent(0); setProgress(0); setPaused(false); }
+    if (open && !document.getElementById('font-fraunces')) {
+      const link = document.createElement('link');
+      link.id = 'font-fraunces';
+      link.rel = 'stylesheet';
+      link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&display=swap';
+      document.head.appendChild(link);
+    }
   }, [open]);
 
   // auto-avance + barra de progreso
@@ -459,8 +472,8 @@ export default function PresentacionLive({ open, onClose }: { open: boolean; onC
 
       {/* header */}
       <header style={{ position: 'relative', zIndex: 10, display: 'flex', alignItems: 'center', gap: 12, padding: isMobile ? '12px 16px' : '16px 28px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <MunifyMark size={26} mono="#fff" />
-        <span style={{ fontWeight: 800, fontSize: 16 }}>Munify</span>
+        <MunifyMark size={26} />
+        <span style={{ fontWeight: 700, fontSize: 16, fontFamily: FONT_DISPLAY }}>Munify</span>
         <span style={{ marginLeft: 6, fontSize: 12, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>Recorrido del producto</span>
         <span style={{ marginLeft: 'auto', fontSize: 12.5, color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>{current + 1} / {slides.length}</span>
         <button onClick={onClose} aria-label="Cerrar" style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)' }}>
@@ -473,7 +486,7 @@ export default function PresentacionLive({ open, onClose }: { open: boolean; onC
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: isMobile ? 14 : 22, flexShrink: 0 }}>
           <span style={{ width: isMobile ? 40 : 48, height: isMobile ? 40 : 48, borderRadius: 14, background: `linear-gradient(135deg, ${slide.color}, ${slide.color}99)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: `0 8px 24px ${slide.color}55` }}>{slide.icon}</span>
           <div>
-            <h2 style={{ fontSize: isMobile ? 20 : 28, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.1 }}>{slide.title}</h2>
+            <h2 style={{ fontSize: isMobile ? 20 : 28, fontWeight: 900, color: '#fff', margin: 0, lineHeight: 1.1, fontFamily: FONT_DISPLAY }}>{slide.title}</h2>
             {slide.subtitle && <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.5)', margin: 0 }}>{slide.subtitle}</p>}
           </div>
         </div>
@@ -500,6 +513,12 @@ export default function PresentacionLive({ open, onClose }: { open: boolean; onC
       <style>{`
         @keyframes presSlideIn { from { opacity: 0; transform: translateX(36px); } to { opacity: 1; transform: translateX(0); } }
         .pres-slide-anim { animation: presSlideIn 600ms cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes preslRise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+        .presl-rise { animation: preslRise 640ms cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes preslPop { from { opacity: 0; transform: translateY(12px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .presl-pop { animation: preslPop 520ms cubic-bezier(0.16,1,0.3,1) both; }
+        @keyframes preslFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+        .presl-float { animation: preslFloat 5.5s ease-in-out infinite; }
         @keyframes presBlob { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,-30px) scale(1.15); } }
         .pres-bg-blob { position: absolute; top: -10%; left: -5%; width: 50vw; height: 50vw; filter: blur(80px); opacity: 0.5; pointer-events: none; animation: presBlob 14s ease-in-out infinite; z-index: 0; }
         .pres-bg-blob-2 { top: auto; bottom: -15%; left: auto; right: -5%; animation-duration: 18s; animation-direction: reverse; }

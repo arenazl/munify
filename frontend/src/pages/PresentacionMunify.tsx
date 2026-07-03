@@ -18,15 +18,22 @@ import {
   Pause, Play, X, Fingerprint, Bell, CheckCircle2, Layers, MessageCircle,
   AlertTriangle, Clock, Camera, QrCode, Wallet,
 } from 'lucide-react';
+import { MunifyMark } from '../components/ui/MunifyMark';
 
 const SLIDE_DURATION_MS = 14000;
-const AZUL = '#38bdf8';
-const AZUL_MARCA = '#0088cc';
-const VERDE = '#22c55e';
-const VIOLETA = '#8b5cf6';
-const AMBAR = '#f59e0b';
+// Paleta OFICIAL de marca (tokens de reelBrand.ts, sampleados del banner
+// oficial — no inventar colores):
+const AZUL = '#5B9BFF';        // azul trámites de marca (acento brillante)
+const AZUL_MARCA = '#4070C0';  // azure del logo
+const NAVY = '#103070';        // M exterior del logo
+const INK = '#0E1830';         // fondo navy de marca
+const VERDE = '#1FC591';       // verde reclamos de marca
+const VIOLETA = '#A78BFA';     // violeta turnos de marca
+const AMBAR = '#C8A24E';       // dorado de marca
 const ROSA = '#f472b6';
-const CIAN = '#06b6d4';
+const CIAN = '#34D399';        // teal IA de marca
+// Tipografías de marca (mismas que los reels / banner oficial)
+const FONT_DISPLAY = "'Fraunces', Georgia, 'Times New Roman', serif";
 
 // ============================================================
 // Hooks (patrón del template — no tocar)
@@ -296,6 +303,177 @@ function MockupTesoreria() {
   );
 }
 
+function MockupMapaCalor() {
+  const pins = [
+    { x: 62, y: 40, c: '#EF4444' }, { x: 118, y: 72, c: AMBAR }, { x: 180, y: 52, c: '#EF4444' },
+    { x: 92, y: 108, c: VERDE }, { x: 208, y: 96, c: AMBAR }, { x: 150, y: 30, c: VERDE },
+  ];
+  return (
+    <div style={{ width: 290, padding: 14, background: '#0d1424', borderRadius: 14, border: '1px solid #223050' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Mapa de calor · Reclamos</div>
+        <div style={{ fontSize: 8, color: '#5b6b8c' }}>últimos 30 días</div>
+      </div>
+      <div style={{ position: 'relative', height: 140, borderRadius: 10, background: '#101a30', overflow: 'hidden', marginBottom: 8 }}>
+        <svg viewBox="0 0 260 140" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+          {[28, 62, 96, 124].map((y, i) => <line key={i} x1="0" y1={y} x2="260" y2={y} stroke="rgba(255,255,255,0.07)" strokeWidth="3" />)}
+          {[52, 118, 186, 232].map((x, i) => <line key={`v${i}`} x1={x} y1="0" x2={x} y2="140" stroke="rgba(255,255,255,0.07)" strokeWidth="3" />)}
+          <line x1="0" y1="130" x2="260" y2="8" stroke="rgba(255,255,255,0.05)" strokeWidth="5" />
+        </svg>
+        <div className="pres-heat" style={{ position: 'absolute', left: 34, top: 14, width: 90, height: 90, borderRadius: '50%', background: 'radial-gradient(circle, rgba(239,68,68,0.5), transparent 65%)' }} />
+        <div className="pres-heat" style={{ position: 'absolute', left: 150, top: 40, width: 110, height: 110, borderRadius: '50%', background: `radial-gradient(circle, ${AMBAR}55, transparent 65%)`, animationDelay: '900ms' }} />
+        <div className="pres-heat" style={{ position: 'absolute', left: 60, top: 76, width: 70, height: 70, borderRadius: '50%', background: `radial-gradient(circle, ${VERDE}40, transparent 65%)`, animationDelay: '1700ms' }} />
+        {pins.map((p, i) => (
+          <div key={i} className="pres-cascade" style={{ position: 'absolute', left: p.x, top: p.y, animationDelay: `${300 + i * 220}ms` }}>
+            <span className="pres-ping-wrap"><MapPin size={13} color={p.c} /><span className="pres-ping" style={{ background: p.c }} /></span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+        {[['Crítico', '#EF4444'], ['Medio', AMBAR], ['Bajo', VERDE]].map(([l, c], i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 99, background: c as string }} />
+            <span style={{ fontSize: 8, color: '#9fb0cc' }}>{l as string}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MockupPanel() {
+  const kpis: Array<[string, string, string]> = [
+    ['HOY', '14', AZUL], ['EN CURSO', '38', AMBAR], ['RESUELTOS', '127', VERDE], ['SLA RIESGO', '3', '#EF4444'],
+  ];
+  return (
+    <div style={{ width: 300, padding: 14, background: '#0d1424', borderRadius: 14, border: '1px solid #223050' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>Dashboard · Panel de control</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="pres-dot-live" style={{ width: 5, height: 5, borderRadius: 99, background: VERDE, display: 'inline-block' }} />
+          <div style={{ fontSize: 8, color: '#5b6b8c' }}>en vivo</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 9 }}>
+        {kpis.map(([l, v, c], i) => (
+          <div key={i} className="pres-cascade" style={{ padding: '7px 5px', background: `linear-gradient(160deg, ${c}18, #111b30)`, border: `1px solid ${c}40`, borderRadius: 8, textAlign: 'center', animationDelay: `${200 + i * 180}ms` }}>
+            <div style={{ fontSize: 5.5, color: '#5b6b8c', fontWeight: 700, letterSpacing: '0.06em' }}>{l}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: c }}>{v}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 52, padding: '0 4px', marginBottom: 8 }}>
+        {[68, 44, 82, 30, 56, 72, 38, 62].map((h, i) => (
+          <div key={i} className="pres-bar-rise" style={{ flex: 1, height: `${h}%`, borderRadius: '4px 4px 0 0', background: `linear-gradient(180deg, ${AZUL}, ${AZUL_MARCA})`, animationDelay: `${400 + i * 110}ms` }} />
+        ))}
+      </div>
+      <div className="pres-cascade" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px', background: `${CIAN}10`, border: `1px solid ${CIAN}30`, borderRadius: 8, animationDelay: '1400ms' }}>
+        <span className="pres-badge-glow" style={{ display: 'inline-flex' }}><Bell size={10} color={CIAN} /></span>
+        <div style={{ fontSize: 8, color: '#9fb0cc' }}>"¿Cuántos reclamos de alumbrado este mes?" — Análisis con IA</div>
+      </div>
+    </div>
+  );
+}
+
+function MockupTesoreriaFondo() {
+  return (
+    <div style={{ width: 290, padding: 14, background: '#0d1424', borderRadius: 14, border: '1px solid #223050' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 9 }}>Liquidaciones · Julio</div>
+      {([
+        ['Sueldos del personal (42)', '$ 31,4M', '100ms'],
+        ['Premio presentismo', '+ $ 1,2M', '350ms'],
+        ['Alquiler corralón (recurrente)', '$ 850.000', '600ms'],
+      ] as Array<[string, string, string]>).map(([n, v, d], i) => (
+        <div key={i} className="pres-cascade" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 9px', background: '#111b30', borderRadius: 8, marginBottom: 5, animationDelay: d }}>
+          <div style={{ fontSize: 8.5, color: '#c7d2e8' }}>{n}</div>
+          <div style={{ fontSize: 8.5, fontWeight: 800, color: i === 1 ? VERDE : '#fff' }}>{v}</div>
+        </div>
+      ))}
+      <div className="pres-cascade" style={{ display: 'flex', gap: 5, margin: '8px 0', animationDelay: '850ms' }}>
+        <div style={{ flex: 1, padding: '6px 8px', background: `${VERDE}10`, border: `1px solid ${VERDE}30`, borderRadius: 8, textAlign: 'center' }}>
+          <div style={{ fontSize: 6.5, color: '#5b6b8c', fontWeight: 700 }}>CONCILIADO</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: VERDE }}>96%</div>
+        </div>
+        <div style={{ flex: 1, padding: '6px 8px', background: `${AMBAR}10`, border: `1px solid ${AMBAR}30`, borderRadius: 8, textAlign: 'center' }}>
+          <div style={{ fontSize: 6.5, color: '#5b6b8c', fontWeight: 700 }}>PRÓX. PAGOS</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: AMBAR }}>7 días</div>
+        </div>
+      </div>
+      <div className="pres-cascade" style={{ position: 'relative', height: 54, borderRadius: 9, background: '#101a30', overflow: 'hidden', animationDelay: '1100ms' }}>
+        <div className="pres-heat" style={{ position: 'absolute', left: 30, top: -14, width: 70, height: 70, borderRadius: '50%', background: `radial-gradient(circle, ${AMBAR}45, transparent 65%)` }} />
+        <div className="pres-heat" style={{ position: 'absolute', right: 40, top: 0, width: 60, height: 60, borderRadius: '50%', background: `radial-gradient(circle, ${VIOLETA}40, transparent 65%)`, animationDelay: '800ms' }} />
+        {[{ x: 52, y: 16 }, { x: 130, y: 26 }, { x: 208, y: 12 }].map((p, i) => (
+          <MapPin key={i} size={11} color={AMBAR} style={{ position: 'absolute', left: p.x, top: p.y }} />
+        ))}
+        <div style={{ position: 'absolute', bottom: 4, width: '100%', textAlign: 'center', fontSize: 7.5, color: '#5b6b8c' }}>
+          Gastos y contactos georreferenciados en el mapa
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MockupCircuitoReclamo() {
+  const pasos: Array<[string, string, string, string]> = [
+    ['Recibido por App', 'REC-01234 · con foto y ubicación', AZUL, '300ms'],
+    ['Derivado a Obras Públicas', 'SLA de 72 hs corriendo', VIOLETA, '1100ms'],
+    ['Orden de trabajo asignada', 'OT-0007 · Cuadrilla Bacheo', AMBAR, '1900ms'],
+    ['Resuelto por la cuadrilla', 'Con foto del trabajo terminado', VERDE, '2700ms'],
+    ['El vecino confirmó', 'El cierre lo valida el vecino', VERDE, '3500ms'],
+  ];
+  return (
+    <div style={{ width: 280, padding: 14, background: '#0d1424', borderRadius: 14, border: '1px solid #223050' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 10 }}>Expediente REC-01234</div>
+      <div style={{ position: 'relative' }}>
+        <div style={{ position: 'absolute', left: 8, top: 6, bottom: 6, width: 2, background: 'rgba(255,255,255,0.09)', borderRadius: 99 }} />
+        {pasos.map(([t, d, c, delay], i) => (
+          <div key={i} className="pres-step" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < pasos.length - 1 ? 10 : 0, position: 'relative', animationDelay: delay }}>
+            <span style={{ width: 18, height: 18, minWidth: 18, borderRadius: 99, background: `${c}22`, border: `2px solid ${c}`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+              <CheckCircle2 size={10} color={c} />
+            </span>
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#fff' }}>{t}</div>
+              <div style={{ fontSize: 7.5, color: '#5b6b8c' }}>{d}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MockupCircuitoTramite() {
+  return (
+    <div style={{ width: 280, padding: 14, background: '#0d1424', borderRadius: 14, border: '1px solid #223050' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>SOL-2026-00312</div>
+        <span className="pres-badge-glow" style={{ fontSize: 7.5, fontWeight: 700, color: AZUL, background: `${AZUL}1c`, padding: '2px 8px', borderRadius: 99 }}>EN CURSO</span>
+      </div>
+      <div style={{ fontSize: 9.5, color: '#c7d2e8', marginBottom: 9 }}>Habilitación comercial — Panadería La Espiga</div>
+      <div style={{ fontSize: 7, color: '#5b6b8c', fontWeight: 700, letterSpacing: '0.1em', marginBottom: 5 }}>DOCUMENTACIÓN</div>
+      {([
+        ['DNI del titular', true, '200ms'],
+        ['Plano del local', true, '500ms'],
+        ['Constancia AFIP', true, '2200ms'],
+      ] as Array<[string, boolean, string]>).map(([doc, ok, d], i) => (
+        <div key={i} className="pres-step" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', background: '#111b30', borderRadius: 7, marginBottom: 4, animationDelay: d }}>
+          <CheckCircle2 size={10} color={ok ? VERDE : '#5b6b8c'} />
+          <div style={{ flex: 1, fontSize: 8.5, color: '#c7d2e8' }}>{doc}</div>
+          <FileCheck size={9} color="#5b6b8c" />
+        </div>
+      ))}
+      <div className="pres-cascade" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px', background: `${CIAN}10`, border: `1px solid ${CIAN}30`, borderRadius: 8, margin: '8px 0 5px', animationDelay: '2800ms' }}>
+        <CalendarClock size={10} color={CIAN} />
+        <div style={{ fontSize: 8, color: '#9fb0cc' }}>Turno reservado · Habilitaciones · jueves 10:30</div>
+      </div>
+      <div className="pres-cascade" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 9px', background: `${VERDE}10`, border: `1px solid ${VERDE}30`, borderRadius: 8, animationDelay: '3300ms' }}>
+        <span className="pres-badge-glow" style={{ display: 'inline-flex' }}><Bell size={10} color={VERDE} /></span>
+        <div style={{ fontSize: 8, color: '#9fb0cc' }}>El vecino recibe una notificación en cada avance</div>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 // Slides
 // ============================================================
@@ -303,9 +481,13 @@ function MockupTesoreria() {
 function HeroSlide({ isMobile }: { isMobile: boolean }) {
   return (
     <div style={{ textAlign: 'center', maxWidth: 980 }}>
+      <div className="pres-float" style={{ display: 'flex', justifyContent: 'center', marginBottom: isMobile ? 16 : 24, filter: `drop-shadow(0 12px 40px ${AZUL_MARCA}70)` }}>
+        <MunifyMark size={isMobile ? 72 : 116} />
+      </div>
       <div className="pres-hero-title" style={{
         fontSize: isMobile ? 'clamp(52px, 15vw, 84px)' : 'clamp(84px, 10vw, 132px)',
-        fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1,
+        fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1,
+        fontFamily: FONT_DISPLAY,
       }}>
         Munify
       </div>
@@ -346,7 +528,7 @@ function makeParaMuniSlide(nombreMuni: string) {
         <div className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>
           Preparado para
         </div>
-        <div className="pres-hero-title" style={{ fontSize: isMobile ? 'clamp(38px, 11vw, 58px)' : 'clamp(56px, 7vw, 88px)', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.05, marginBottom: 20 }}>
+        <div className="pres-hero-title" style={{ fontSize: isMobile ? 'clamp(38px, 11vw, 58px)' : 'clamp(56px, 7vw, 88px)', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.05, marginBottom: 20, fontFamily: FONT_DISPLAY }}>
           {nombreMuni}
         </div>
         <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15.5, color: 'rgba(255,255,255,0.7)', maxWidth: 640, margin: '0 auto 24px', lineHeight: 1.6, animationDelay: '300ms' }}>
@@ -434,7 +616,7 @@ function OmnicanalSlide({ isMobile }: { isMobile: boolean }) {
             </div>
           ))}
         </div>
-        <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, marginBottom: 12, animationDelay: '400ms' }}>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, marginBottom: 12, animationDelay: '400ms' }}>
           Entre por donde entre, cae al mismo lugar.
         </div>
         <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6, animationDelay: '600ms' }}>
@@ -464,7 +646,7 @@ function ReclamoVecinoSlide({ isMobile }: { isMobile: boolean }) {
       </MockupFrame>
       <div>
         <Chip color={AZUL}>La cara del vecino</Chip>
-        <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
           Un reclamo en 30 segundos, con seguimiento de principio a fin.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -491,7 +673,7 @@ function ReclamoGestionSlide({ isMobile }: { isMobile: boolean }) {
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.1fr 1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
       <div>
         <Chip color={VERDE}>La cocina interna</Chip>
-        <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
           Del otro lado del mostrador, orden.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
@@ -518,7 +700,7 @@ function OrdenesTrabajoSlide({ isMobile }: { isMobile: boolean }) {
       </MockupFrame>
       <div>
         <Chip color={AMBAR}>Trabajo de campo</Chip>
-        <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 27, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 27, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
           El reclamo es la cara del vecino. La orden de trabajo es la tarea de la cuadrilla.
         </div>
         <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
@@ -543,7 +725,7 @@ function IdentidadSlide({ isMobile }: { isMobile: boolean }) {
       <MockupFrame color={VERDE} scale={1.3} scaleMobile={0.92} isMobile={isMobile} minHeight={260}>
         <MockupMostradorQR />
       </MockupFrame>
-      <div className="pres-rise" style={{ fontSize: isMobile ? 19 : 26, fontWeight: 800, color: '#fff', lineHeight: 1.3, margin: '18px 0 10px', animationDelay: '300ms' }}>
+      <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 19 : 26, fontWeight: 800, color: '#fff', lineHeight: 1.3, margin: '18px 0 10px', animationDelay: '300ms' }}>
         Identidad real, validada contra <span style={{ color: AZUL }}>RENAPER</span> — sin instalar nada.
       </div>
       <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.68)', lineHeight: 1.6, maxWidth: 780, margin: '0 auto', animationDelay: '500ms' }}>
@@ -565,7 +747,7 @@ function TurneroSlide({ isMobile }: { isMobile: boolean }) {
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
       <div>
         <Chip color={CIAN}>Trámites y turnos</Chip>
-        <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
           El vecino elige el trámite; el sistema le da el turno.
         </div>
         <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
@@ -595,7 +777,7 @@ function TesoreriaSlide({ isMobile }: { isMobile: boolean }) {
       </MockupFrame>
       <div>
         <Chip color={VIOLETA}>Finanzas</Chip>
-        <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
           Las cuentas del municipio, claras.
         </div>
         <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
@@ -633,7 +815,7 @@ function ModularSlide({ isMobile }: { isMobile: boolean }) {
   ];
   return (
     <div style={{ maxWidth: 1000, width: '100%', textAlign: 'center' }}>
-      <div className="pres-rise" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', marginBottom: 20 }}>
+      <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', marginBottom: 20 }}>
         Cada municipio prende lo que necesita.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr)', gap: 12, marginBottom: 26 }}>
@@ -657,7 +839,10 @@ function ModularSlide({ isMobile }: { isMobile: boolean }) {
 function CierreSlide({ isMobile }: { isMobile: boolean }) {
   return (
     <div style={{ textAlign: 'center', maxWidth: 900 }}>
-      <div className="pres-rise" style={{ fontSize: isMobile ? 24 : 40, fontWeight: 900, color: '#fff', lineHeight: 1.2, marginBottom: 16 }}>
+      <div className="pres-float" style={{ display: 'flex', justifyContent: 'center', marginBottom: 20, filter: `drop-shadow(0 12px 36px ${AZUL_MARCA}70)` }}>
+        <MunifyMark size={isMobile ? 54 : 78} />
+      </div>
+      <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 24 : 40, fontWeight: 900, color: '#fff', lineHeight: 1.2, marginBottom: 16, fontFamily: FONT_DISPLAY }}>
         Un municipio moderno <span className="pres-glow-text" style={{ color: AZUL }}>se nota</span> —
         en la calle y en el celular del vecino.
       </div>
@@ -666,8 +851,142 @@ function CierreSlide({ isMobile }: { isMobile: boolean }) {
         y crecemos por configuración, sin proyectos eternos. La demo está viva: la recorremos juntos.
       </p>
       <div className="pres-pop pres-btn-pulse" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, padding: '12px 28px', borderRadius: 14, background: AZUL_MARCA, boxShadow: `0 18px 44px -12px ${AZUL_MARCA}90`, animationDelay: '650ms' }}>
-        <Building2 size={18} color="#fff" />
+        <MunifyMark size={18} />
         <span style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>app.munify.com.ar</span>
+      </div>
+    </div>
+  );
+}
+
+function CircuitoReclamoSlide({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
+      <MockupFrame color={VERDE} scale={1.35} isMobile={isMobile}>
+        <MockupCircuitoReclamo />
+      </MockupFrame>
+      <div>
+        <Chip color={VERDE}>El circuito completo</Chip>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 27, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+          Cada reclamo es un expediente que se recorre solo.
+        </div>
+        <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
+          Entra por cualquier canal, la dependencia correcta lo recibe con el SLA corriendo,
+          la cuadrilla sale con su orden de trabajo, y al resolverse el vecino recibe la foto
+          del trabajo terminado. El detalle que cambia todo: <strong style={{ color: VERDE }}>el
+          cierre lo confirma el vecino</strong>, no el municipio — eso construye confianza.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['Historial completo', 'SLA visible', 'Foto del antes y después', 'Cierre validado'].map((t, i) => (
+            <span key={i} className="pres-pop" style={{ fontSize: 11, fontWeight: 700, color: VERDE, background: `${VERDE}1a`, padding: '4px 12px', borderRadius: 99, animationDelay: `${600 + i * 140}ms` }}>{t}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MapaCalorSlide({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
+      <div>
+        <Chip color={'#EF4444'}>El territorio</Chip>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+          El mapa dice dónde duele el distrito.
+        </div>
+        <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
+          Cada reclamo cae georreferenciado en el mapa. La capa de calor muestra dónde se
+          concentran los problemas — por categoría, por barrio, por zona — y convierte miles
+          de reclamos sueltos en una decisión: a qué cuadra mandar la próxima cuadrilla.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['Capa de calor', 'Filtro por categoría', 'Zonas y barrios', 'Evolución en el tiempo'].map((t, i) => (
+            <span key={i} className="pres-pop" style={{ fontSize: 11, fontWeight: 700, color: '#EF4444', background: '#EF44441a', padding: '4px 12px', borderRadius: 99, animationDelay: `${600 + i * 140}ms` }}>{t}</span>
+          ))}
+        </div>
+      </div>
+      <MockupFrame color={'#EF4444'} scale={1.4} isMobile={isMobile}>
+        <MockupMapaCalor />
+      </MockupFrame>
+    </div>
+  );
+}
+
+function CircuitoTramiteSlide({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
+      <MockupFrame color={CIAN} scale={1.35} isMobile={isMobile}>
+        <MockupCircuitoTramite />
+      </MockupFrame>
+      <div>
+        <Chip color={CIAN}>El expediente digital</Chip>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 27, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+          Del formulario en papel al expediente que avisa solo.
+        </div>
+        <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
+          Cada trámite del catálogo dice qué documentación hace falta ANTES de empezar — se
+          acabó el "le falta un papel, vuelva mañana". El vecino adjunta los documentos desde
+          el celular, sigue los estados con su historial, y si el trámite es presencial, el
+          turno ya viene incluido en el mismo expediente.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['Requisitos claros', 'Documentos digitales', 'Historial de estados', 'Turno integrado'].map((t, i) => (
+            <span key={i} className="pres-pop" style={{ fontSize: 11, fontWeight: 700, color: CIAN, background: `${CIAN}1a`, padding: '4px 12px', borderRadius: 99, animationDelay: `${600 + i * 140}ms` }}>{t}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PanelSlide({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
+      <div>
+        <Chip color={AZUL}>Tablero de control</Chip>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 28, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+          La foto del municipio, en vivo.
+        </div>
+        <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
+          El intendente y cada secretario abren el panel y ven el pulso del día: cuántos
+          reclamos entraron, cuántos están en riesgo de vencer, cómo viene cada área. Con
+          tablero kanban para la operación, planificación semanal del personal, y consultas
+          en lenguaje natural con IA — preguntás como le preguntarías a una persona.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['KPIs del día', 'Tablero kanban', 'Planificación semanal', 'Consultas con IA'].map((t, i) => (
+            <span key={i} className="pres-pop" style={{ fontSize: 11, fontWeight: 700, color: AZUL, background: `${AZUL}1a`, padding: '4px 12px', borderRadius: 99, animationDelay: `${600 + i * 140}ms` }}>{t}</span>
+          ))}
+        </div>
+      </div>
+      <MockupFrame color={AZUL} scale={1.42} isMobile={isMobile}>
+        <MockupPanel />
+      </MockupFrame>
+    </div>
+  );
+}
+
+function TesoreriaFondoSlide({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1.1fr', gap: isMobile ? 18 : 40, alignItems: 'center', maxWidth: 1100, width: '100%' }}>
+      <MockupFrame color={AMBAR} scale={1.38} isMobile={isMobile}>
+        <MockupTesoreriaFondo />
+      </MockupFrame>
+      <div>
+        <Chip color={AMBAR}>Tesorería a fondo</Chip>
+        <div className="pres-rise pres-display" style={{ fontSize: isMobile ? 20 : 27, fontWeight: 800, color: '#fff', lineHeight: 1.25, margin: '14px 0', animationDelay: '200ms' }}>
+          Sueldos, pagos recurrentes y cada peso en el mapa.
+        </div>
+        <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 12, animationDelay: '400ms' }}>
+          Las liquidaciones se ejecutan en un click con premios configurables (presentismo,
+          tareas extra). Los pagos recurrentes avisan antes de vencer. El extracto del banco
+          se importa y se concilia contra los movimientos de caja. Y los gastos quedan
+          georreferenciados: el mapa muestra dónde se invierte cada peso del municipio.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['Liquidación 1-click', 'Premios configurables', 'Conciliación bancaria', 'Gasto en el mapa'].map((t, i) => (
+            <span key={i} className="pres-pop" style={{ fontSize: 11, fontWeight: 700, color: AMBAR, background: `${AMBAR}1a`, padding: '4px 12px', borderRadius: 99, animationDelay: `${600 + i * 140}ms` }}>{t}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -697,10 +1016,15 @@ function useSlides(paraMuni: string | null): Slide[] {
     { key: 'omnicanal', title: 'El vínculo con el vecino', subtitle: 'Omnicanalidad real', icon: MessageCircle, color: AZUL, Component: OmnicanalSlide },
     { key: 'rec-vecino', title: 'Reclamos', subtitle: 'La experiencia del vecino', icon: ClipboardList, color: AZUL, Component: ReclamoVecinoSlide },
     { key: 'rec-gestion', title: 'Reclamos', subtitle: 'La gestión puertas adentro', icon: Building2, color: VERDE, Component: ReclamoGestionSlide },
+    { key: 'circuito-rec', title: 'Reclamos', subtitle: 'El circuito de punta a punta', icon: CheckCircle2, color: VERDE, Component: CircuitoReclamoSlide },
+    { key: 'mapa-calor', title: 'El territorio', subtitle: 'Mapa de calor del distrito', icon: MapPin, color: '#EF4444', Component: MapaCalorSlide },
     { key: 'ot', title: 'Órdenes de trabajo', subtitle: 'La cuadrilla con trazabilidad', icon: Hammer, color: AMBAR, Component: OrdenesTrabajoSlide },
     { key: 'identidad', title: 'Identidad digital', subtitle: 'Biometría + RENAPER en la ventanilla', icon: Fingerprint, color: VERDE, Component: IdentidadSlide },
     { key: 'turnero', title: 'Trámites y turnos', subtitle: 'La agenda de cada oficina', icon: CalendarClock, color: CIAN, Component: TurneroSlide },
+    { key: 'circuito-tram', title: 'Trámites', subtitle: 'El expediente digital completo', icon: FileCheck, color: CIAN, Component: CircuitoTramiteSlide },
+    { key: 'panel', title: 'Panel de control', subtitle: 'KPIs, kanban, planificación e IA', icon: Layers, color: AZUL, Component: PanelSlide },
     { key: 'tesoreria', title: 'Tesorería', subtitle: 'En producción en un municipio real', icon: PiggyBank, color: VIOLETA, Component: TesoreriaSlide },
+    { key: 'tesoreria-fondo', title: 'Tesorería', subtitle: 'Sueldos, conciliación y el gasto en el mapa', icon: Wallet, color: AMBAR, Component: TesoreriaFondoSlide },
     { key: 'modular', title: 'A medida', subtitle: 'Módulos activables por municipio', icon: Layers, color: AZUL, Component: ModularSlide },
     { key: 'cierre', title: 'Munify', subtitle: 'Próximo paso: la demo en vivo', icon: Building2, color: AZUL, Component: CierreSlide },
   ], [paraMuni]);
@@ -716,6 +1040,16 @@ export default function PresentacionMunify() {
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const [now, setNow] = useState(new Date());
+
+  // Fraunces (display de marca) — se carga on-demand, no pesa en la app
+  useEffect(() => {
+    if (document.getElementById('font-fraunces')) return;
+    const link = document.createElement('link');
+    link.id = 'font-fraunces';
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700;9..144,900&display=swap';
+    document.head.appendChild(link);
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -753,12 +1087,12 @@ export default function PresentacionMunify() {
   const slide = slides[currentSlide];
 
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', background: '#070d1a', color: '#fff', overflow: 'hidden' }}>
-      {/* fondo vivo: orbes flotantes + grid sutil */}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', background: INK, color: '#fff', overflow: 'hidden' }}>
+      {/* fondo vivo: orbes flotantes + grid sutil (navy/azure de marca) */}
       <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <div className="pres-orb" style={{ position: 'absolute', top: '-12%', right: '-6%', width: 520, height: 520, borderRadius: '50%', background: `radial-gradient(circle, ${AZUL_MARCA}30, transparent 65%)`, filter: 'blur(10px)' }} />
-        <div className="pres-orb" style={{ position: 'absolute', bottom: '-18%', left: '-8%', width: 620, height: 620, borderRadius: '50%', background: `radial-gradient(circle, ${AZUL}1e, transparent 65%)`, filter: 'blur(12px)', animationDelay: '4s' }} />
-        <div className="pres-orb" style={{ position: 'absolute', top: '30%', left: '42%', width: 380, height: 380, borderRadius: '50%', background: `radial-gradient(circle, ${VIOLETA}14, transparent 65%)`, filter: 'blur(14px)', animationDelay: '8s' }} />
+        <div className="pres-orb" style={{ position: 'absolute', top: '-12%', right: '-6%', width: 520, height: 520, borderRadius: '50%', background: `radial-gradient(circle, ${AZUL_MARCA}38, transparent 65%)`, filter: 'blur(10px)' }} />
+        <div className="pres-orb" style={{ position: 'absolute', bottom: '-18%', left: '-8%', width: 620, height: 620, borderRadius: '50%', background: `radial-gradient(circle, ${NAVY}55, transparent 65%)`, filter: 'blur(12px)', animationDelay: '4s' }} />
+        <div className="pres-orb" style={{ position: 'absolute', top: '30%', left: '42%', width: 380, height: 380, borderRadius: '50%', background: `radial-gradient(circle, ${AMBAR}16, transparent 65%)`, filter: 'blur(14px)', animationDelay: '8s' }} />
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)', backgroundSize: '56px 56px', maskImage: 'radial-gradient(ellipse at center, #000 30%, transparent 75%)' }} />
       </div>
 
@@ -770,10 +1104,10 @@ export default function PresentacionMunify() {
       {/* header */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '12px 16px' : '16px 32px', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="pres-logo-glow" style={{ width: 30, height: 30, borderRadius: 9, background: AZUL_MARCA, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Building2 size={17} color="#fff" />
+          <div className="pres-logo-glow" style={{ width: 34, height: 34, borderRadius: 10, background: NAVY, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <MunifyMark size={19} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '0.02em' }}>MUNIFY</span>
+          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: '0.01em', fontFamily: FONT_DISPLAY }}>Munify</span>
           {!isMobile && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.14em', textTransform: 'uppercase', marginLeft: 8 }}>Presentación</span>}
         </div>
         {!isMobile && (
@@ -819,6 +1153,7 @@ export default function PresentacionMunify() {
       </footer>
 
       <style>{`
+        .pres-display { font-family: 'Fraunces', Georgia, 'Times New Roman', serif; letter-spacing: -0.01em; }
         @keyframes presIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
         .pres-anim-in { animation: presIn 560ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
@@ -886,8 +1221,14 @@ export default function PresentacionMunify() {
         @keyframes presLogoGlow { 0%, 100% { box-shadow: 0 0 14px 0 rgba(0,136,204,0.55); } 50% { box-shadow: 0 0 26px 4px rgba(56,189,248,0.5); } }
         .pres-logo-glow { animation: presLogoGlow 3.4s ease-in-out infinite; }
 
-        @keyframes presGlowText { 0%, 100% { text-shadow: 0 0 22px rgba(56,189,248,0.45); } 50% { text-shadow: 0 0 44px rgba(56,189,248,0.85); } }
+        @keyframes presGlowText { 0%, 100% { text-shadow: 0 0 22px rgba(91,155,255,0.45); } 50% { text-shadow: 0 0 44px rgba(91,155,255,0.85); } }
         .pres-glow-text { animation: presGlowText 2.6s ease-in-out infinite; }
+
+        @keyframes presHeat { 0%, 100% { opacity: 0.55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.14); } }
+        .pres-heat { animation: presHeat 3.6s ease-in-out infinite; }
+
+        @keyframes presBarRise { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+        .pres-bar-rise { animation: presBarRise 900ms cubic-bezier(0.16, 1, 0.3, 1) both; transform-origin: bottom; }
       `}</style>
     </div>,
     document.body,

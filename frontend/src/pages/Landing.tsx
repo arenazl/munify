@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, LogIn } from 'lucide-react';
+import { MunifyMark } from '../components/ui/MunifyMark';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import { useMunicipioFromUrl, buildMunicipioUrl, isDevelopment } from '../hooks/useSubdomain';
@@ -301,12 +302,13 @@ export default function Landing() {
         <header className="px-3 sm:px-6 py-4 sm:py-6">
           <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 flex-shrink-0">
-                <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              {/* Logo OFICIAL de Munify sobre navy de marca — nunca un icono generico */}
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0" style={{ background: '#103070', boxShadow: '0 10px 25px -5px rgba(64,112,192,0.45)' }}>
+                <MunifyMark size={22} />
               </div>
               <div className="min-w-0">
-                <h1 className="font-bold text-white text-base sm:text-xl truncate">Reclamos Municipales</h1>
-                <p className="text-[10px] sm:text-xs text-slate-400 truncate">Sistema de gestion vecinal</p>
+                <h1 className="font-bold text-white text-base sm:text-xl truncate">Munify</h1>
+                <p className="text-[10px] sm:text-xs text-slate-400 truncate">Gestión municipal integral</p>
               </div>
             </div>
             <PresentacionLaunchButton label="Conocé Munify" style={{ padding: '7px 14px', fontSize: 13 }} />
