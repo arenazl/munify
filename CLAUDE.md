@@ -174,11 +174,14 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 | Capa | Dónde corre | Cómo se deploya |
 |---|---|---|
 | **Frontend** | Netlify (`app.munify.com.ar`) | `git push origin master` → Netlify auto-build |
-| **Backend** | **Google Cloud Run**, proyecto `munify-api`, región `southamerica-east1` | `gcloud builds submit` + `gcloud run deploy` (ver abajo) |
+| **Backend** | **Google Cloud Run**, proyecto `munify-api`, región **`us-east4`** (única — ver nota abajo) | `git push origin master` → CD gestionado por Infra |
 | **DB** | MySQL en Aiven | — |
 
-- **Servicio Cloud Run:** `munify-api`. URL que usa el frontend:
-  `https://munify-api-1060106389361.southamerica-east1.run.app/api`.
+- **Servicio Cloud Run:** `munify-api`, región `us-east4`. URL que usa el frontend:
+  `https://munify-api-1060106389361.us-east4.run.app/api`.
+- **Región única: `us-east4`.** No existe más `southamerica-east1` (era la región vieja,
+  Brasil/São Paulo — quedó zombie y se dio de baja). Cualquier referencia a
+  `southamerica-east1` en código/docs/URLs es legacy: ignorarla o corregirla.
 - **OJO con el `gcloud config` default:** suele estar parado en otro proyecto del
   user (`tasar-prod`, que es OTRA app). Por eso **TODO comando de Munify lleva
   `--project=munify-api` explícito**. Nunca confiar en el proyecto default.
@@ -191,23 +194,24 @@ autenticados localmente. Antes de pedirle clicks o credenciales, intentar la CLI
 3. Verificar: `curl -s https://app.munify.com.ar/ | grep -oE 'index-\w+\.js'` vs `dist/index.html` local.
 4. NUNCA `netlify deploy --prod --dir dist` directo (rompe trazabilidad). Solo `git push` → auto-build.
 
-**Backend (Cloud Run):** el user hace ~10 deploys/día con su flujo. Claude NO deploya backend
-sin "dale" explícito (es prod, outward-facing). Cuando se autoriza, el pipeline real es (desde `backend/`):
-```
-gcloud builds submit --region=southamerica-east1 \
-  --tag=southamerica-east1-docker.pkg.dev/munify-api/munify/api:latest --project=munify-api .
-gcloud run deploy munify-api --image=southamerica-east1-docker.pkg.dev/munify-api/munify/api:latest \
-  --region=southamerica-east1 --allow-unauthenticated --port=8080 \
-  --env-vars-file=env.yaml --set-secrets=<9 secrets de Secret Manager> --project=munify-api
-```
-- Vars públicas en `backend/env.yaml`. Secretos en **Secret Manager** (`munify-api`): DATABASE_URL,
-  SECRET_KEY, GEMINI_API_KEY, GROK_API_KEY, SMTP_PASSWORD, CLOUDINARY_API_SECRET, GOOGLE_CLIENT_SECRET,
-  DIDIT_API_KEY, VAPID_PRIVATE_KEY. NUNCA pegar valores literales en código/docs.
+**Backend (Cloud Run):** **Claude NO deploya — el CD lo gestiona Infra.** El flujo de Claude
+termina en el push: **desarrollar → commit + push `origin master` → listo**. Nunca correr
+`gcloud builds submit`, `gcloud run deploy` ni `gcloud run services update` manualmente para
+Munify — eso es responsabilidad exclusiva del proyecto de Infraestructura. **NO se levantan
+servers locales NUNCA** — se trabaja directo sobre los ambientes deployados (ver §"No usar
+localhost"). Si necesitás verificar que un cambio ya está live, esperá el deploy de Infra y
+recién ahí testeá contra el ambiente real — no asumas que está deployado apenas se pushea.
+**Prohibido preguntar** "¿lo commiteo?" o "¿lo pusheo?": eso sí es responsabilidad de Claude por
+defecto. Lo que NUNCA hay que preguntar (ni hacer) es "¿lo deployo?" — la respuesta siempre es que
+no, eso lo dispara Infra.
 
-**VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero NO deploya el
-backend a Cloud Run. Para saber qué está realmente vivo, consultar el OpenAPI del servicio:
-`curl -s https://munify-api-1060106389361.southamerica-east1.run.app/openapi.json` y chequear las
-rutas/schemas. Que un commit exista en master NO significa que esté deployado en Cloud Run.
+**VERIFICAR LIVE, no asumir desde commits:** un push a `origin master` versiona pero el deploy a
+Cloud Run lo dispara Infra por su cuenta (puede no ser instantáneo). Para saber qué está
+realmente vivo, consultar el OpenAPI del servicio:
+`curl -s https://munify-api-1060106389361.us-east4.run.app/openapi.json` y chequear las
+rutas/schemas, o `gcloud run revisions list --service=munify-api --region=us-east4
+--project=munify-api` para ver la última revisión y su fecha. Que un commit exista en master NO
+significa que ya esté deployado en Cloud Run.
 
 **Notas:**
 - El user no testea local — cada cambio significativo va directo a prod.

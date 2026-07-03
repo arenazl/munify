@@ -28,7 +28,7 @@ from models import (
     TipoContacto, DestinoGasto, TipoFinanciacion, FormaPago, EstadoGastoCuota,
     TesoreriaTipoConcepto, TesoreriaConcepto, TesoreriaTipoEmpleado,
     TesoreriaCaja, TesoreriaParaje, Proyecto, EstadoProyecto,
-    TesoreriaPagoProgramado, FrecuenciaPago,
+    TesoreriaPagoProgramado, FrecuenciaPago, TesoreriaConceptoLiquidacion,
 )
 
 
@@ -199,6 +199,22 @@ PARAJES_DEMO = [
 ]
 
 
+# Catálogo básico de conceptos de liquidación (Pagos Programados). Antes el
+# campo era texto libre; ahora los pagos programados demo referencian un
+# nombre que también existe acá, mostrando el autocomplete poblado.
+# (nombre, frecuencia_default, dia_del_mes_default)
+CONCEPTOS_LIQUIDACION_DEMO = [
+    ("Sueldo Básico", "mensual", 5),
+    ("Presentismo", "mensual", 5),
+    ("Antigüedad", "mensual", 5),
+    ("Bono por Zona", "mensual", 5),
+    ("Horas Extra", "mensual", 10),
+    ("Descuento Jubilatorio", "mensual", 5),
+    ("Obra Social", "mensual", 5),
+    ("Aporte Sindical", "mensual", 5),
+]
+
+
 CONTACTOS_DEMO = [
     # 5 empleados de muni
     ("Juan", "Perez", TipoContacto.EMPLEADO, "Personal de planta"),
@@ -229,6 +245,37 @@ CONTACTOS_DEMO = [
 ]
 
 
+async def _geocodificar_contacto_demo(muni_lat: float, muni_lon: float, seed: int):
+    """Geocodifica una dirección REAL cercana al centro del municipio vía
+    Nominatim (mismo patrón que el vecino demo en seed_demo.py — jamás
+    coordenadas inventadas). Devuelve (direccion, lat, lon) o (None, None,
+    None) si Nominatim no responde o no encuentra calle."""
+    import httpx
+    dlat = (((seed >> 3) % 2000) - 1000) / 100000.0  # offset ~1km
+    dlon = (((seed >> 7) % 2000) - 1000) / 100000.0
+    lat, lon = muni_lat + dlat, muni_lon + dlon
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as hc:
+            r = await hc.get(
+                "https://nominatim.openstreetmap.org/reverse",
+                params={"lat": lat, "lon": lon, "format": "json", "zoom": 18, "addressdetails": 1},
+                headers={"User-Agent": "Munify/1.0 (demo seed)"},
+            )
+            if r.status_code == 200:
+                data = r.json()
+                addr = data.get("address", {}) if isinstance(data, dict) else {}
+                road = addr.get("road") or addr.get("pedestrian") or addr.get("street")
+                if road:
+                    num = 100 + ((seed >> 11) % 4900)
+                    loc = (addr.get("suburb") or addr.get("city_district")
+                           or addr.get("city") or addr.get("town") or addr.get("village") or "")
+                    direccion = f"{road} {num}" + (f", {loc}" if loc else "")
+                    return direccion, lat, lon
+    except Exception:
+        pass
+    return None, None, None
+
+
 def _poligono_circular(cx: float, cy: float, radio_km: float, vertices: int = 8, offset: float = 0) -> list[list[float]]:
     coords = []
     for i in range(vertices):
@@ -254,6 +301,7 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
 
     counts = {
         "tipos_concepto": 0, "conceptos": 0, "tipos_empleado": 0,
+        "conceptos_liquidacion": 0,
         "cajas": 0, "parajes": 0, "contactos": 0, "gastos": 0,
         "proyectos": 0, "pagos_programados": 0,
     }
@@ -302,6 +350,19 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
             ))
             counts["tipos_empleado"] += 1
 
+    # 3.bis Conceptos de liquidación (catálogo de Pagos Programados)
+    has_conceptos_liq = (await db.execute(
+        select(TesoreriaConceptoLiquidacion).where(TesoreriaConceptoLiquidacion.municipio_id == municipio_id).limit(1)
+    )).scalar_one_or_none()
+    if not has_conceptos_liq:
+        for orden, (nombre, frecuencia, dia_mes) in enumerate(CONCEPTOS_LIQUIDACION_DEMO):
+            db.add(TesoreriaConceptoLiquidacion(
+                municipio_id=municipio_id, nombre=nombre,
+                frecuencia_default=frecuencia, dia_del_mes_default=dia_mes,
+                orden=orden, activo=True,
+            ))
+            counts["conceptos_liquidacion"] += 1
+
     # 4. Cajas
     has_cajas = (await db.execute(
         select(TesoreriaCaja).where(TesoreriaCaja.municipio_id == municipio_id).limit(1)
@@ -348,12 +409,26 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
         select(Contacto).where(Contacto.municipio_id == municipio_id).limit(1)
     )).scalar_one_or_none()
     if not has_contactos:
-        for nombre, apellido, tipo, subtipo in CONTACTOS_DEMO:
+        # Un par de contactos (2 empleados + 1 beneficiario) quedan
+        # geolocalizados con una dirección REAL del municipio (Nominatim),
+        # nunca coordenadas inventadas. El resto queda sin domicilio, como
+        # ya lo estaba.
+        _GEOLOCALIZAR_IDX = {0, 1, 15}  # Juan Perez, Maria Gomez, Club Atletico
+        for idx, (nombre, apellido, tipo, subtipo) in enumerate(CONTACTOS_DEMO):
+            direccion = lat = lon = None
+            if idx in _GEOLOCALIZAR_IDX:
+                direccion, lat, lon = await _geocodificar_contacto_demo(
+                    muni_lat, muni_lon, municipio_id * 1000 + idx,
+                )
+            notas = "[DEMO] Contacto generado para la demo"
+            if direccion:
+                notas += " — geolocalizado"
             c = Contacto(
                 municipio_id=municipio_id, nombre=nombre, apellido=apellido,
                 tipo=tipo, subtipo=subtipo,
+                direccion=direccion, latitud=lat, longitud=lon,
                 alias_pago=f"{nombre.upper()}.{(apellido or 'SPN').split()[0].upper()}",
-                notas="[DEMO] Contacto generado para la demo",
+                notas=notas,
                 activo=True,
             )
             db.add(c)
@@ -438,7 +513,11 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
     )).scalar_one_or_none()
     if not has_pp and contactos_creados:
         empleados = [c for c in contactos_creados if c.tipo == TipoContacto.EMPLEADO][:2]
-        for emp in empleados:
+        # Conceptos reales del catálogo recién sembrado (no texto libre) —
+        # variedad: uno paga el sueldo básico, el otro un plus de presentismo.
+        _conceptos_pp = [("Sueldo Básico", 500_000), ("Presentismo", 45_000)]
+        for idx, emp in enumerate(empleados):
+            concepto_nombre, monto = _conceptos_pp[idx % len(_conceptos_pp)]
             hoy = date.today()
             inicio = date(hoy.year, hoy.month, 1)
             proximo_mes = hoy.month + 1 if hoy.month < 12 else 1
@@ -446,9 +525,9 @@ async def seed_tesoreria_demo(db: AsyncSession, municipio_id: int, admin_user_id
             db.add(TesoreriaPagoProgramado(
                 municipio_id=municipio_id, contacto_id=emp.id,
                 caja_id=caja_tesoro_id,
-                concepto="Sueldo mensual",
+                concepto=concepto_nombre,
                 descripcion="[DEMO] Pago programado de prueba",
-                monto_pesos=Decimal(500_000),
+                monto_pesos=Decimal(monto),
                 forma_pago="transferencia",
                 frecuencia=FrecuenciaPago.MENSUAL,
                 dia_del_mes=5,

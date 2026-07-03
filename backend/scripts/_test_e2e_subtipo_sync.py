@@ -13,7 +13,7 @@ import requests
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-BASE = "https://munify-api-1060106389361.southamerica-east1.run.app"
+BASE = "https://munify-api-1060106389361.us-east4.run.app"
 EMAIL = "admin@san-pedro-norte.demo.com"
 PWD = "demo123"
 TIPO_CREATE = (1, "En blanco")    # (id, nombre esperado)

@@ -628,24 +628,17 @@ async def crear_municipio_demo(
     await crear_categorias_default(db, municipio.id)
     await db.flush()
 
-    # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud
+    # 3. Seed completo: dependencias, trámites, usuarios, reclamos, solicitud.
+    # Es LA semilla única y coherente — categorías, trámites y reclamos ya
+    # nacen mapeados a su dependencia correcta (ver seed_demo.py). Ya no se
+    # corre un seed extra de 10+10 al azar (scripts/seed_10_demos.py): rompía
+    # la coherencia dependencia↔categoría con asignaciones random.
     seed_info = await seed_demo_completo(db, municipio.id, codigo)
 
     await db.commit()
 
-    # 4. Seed extra (best-effort): 10 reclamos + 10 trámites con datos coherentes.
-    # Va separado del commit principal: si falla, la demo queda creada igual.
-    try:
-        from scripts.seed_10_demos import seed_municipio
-        await seed_municipio(db, municipio.id, municipio.nombre)
-        await db.commit()
-    except Exception as e:
-        print(f"[CREAR DEMO] Seed extra 10+10 fallo (best-effort): {e}")
-        await db.rollback()
-
-    # 4.bis Turnero (best-effort): cura el modo de atención de TODOS los
-    # trámites (los del paso 4 nacen 'online'), mapea oficinas y carga
-    # turnos de ejemplo (futuros + pasados) para agenda y estadísticas.
+    # 4. Turnero (best-effort): agenda, horarios y turnos de ejemplo sobre
+    # los trámites ya creados en el paso 3.
     try:
         from services.seed_demo import seed_turnero_demo
         turnero_counts = await seed_turnero_demo(db, municipio.id)

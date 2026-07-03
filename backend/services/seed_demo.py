@@ -10,7 +10,7 @@ categorías que ya siembra `crear_categorias_default()`.
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, text
+from sqlalchemy import select, text
 
 from core.security import get_password_hash
 from models.user import User
@@ -38,29 +38,51 @@ from models.sla import SLAConfig
 # ============================================================
 # Mapeo dependencia → categorías de reclamo (por nombre)
 # ============================================================
+# Cubre las 10 categorías default sin huérfanos: TODA categoría tiene una
+# dependencia responsable, aunque esa dependencia no sea una de las
+# "activas" (con supervisor + contenido demo — ver DEPENDENCIAS_ACTIVAS).
 DEPENDENCIA_CATEGORIAS_MAP = {
-    "OBRAS_PUBLICAS": ["Bacheo y calles"],
     "SERVICIOS_PUBLICOS": [
         "Alumbrado público",
         "Recolección de residuos",
         "Arbolado y espacios verdes",
         "Agua y cloacas",
-    ],
-    "TRANSITO_VIAL": ["Tránsito y señalización"],
-    "GENERAL": [
         "Higiene urbana",
-        "Plagas y control",
-        "Animales sueltos",
-        "Ruidos y convivencia",
     ],
+    "OBRAS_PUBLICAS": ["Bacheo y calles"],
+    "TRANSITO_VIAL": ["Tránsito y señalización"],
+    "ZOONOSIS": ["Plagas y control", "Animales sueltos"],
+    "SEGURIDAD": ["Ruidos y convivencia"],
 }
 
+# Catálogo completo: las 12 dependencias/secretarías se habilitan siempre
+# para que el municipio demo tenga el organigrama real y completo.
 DEPENDENCIAS_CODIGOS = [
+    "ATENCION_VECINO",
     "OBRAS_PUBLICAS",
     "SERVICIOS_PUBLICOS",
     "TRANSITO_VIAL",
+    "SEGURIDAD",
+    "ZOONOSIS",
+    "CATASTRO",
+    "RENTAS",
     "HABILITACIONES",
-    "GENERAL",
+    "OBRAS_PARTICULARES",
+    "BROMATOLOGIA",
+    "DESARROLLO_SOCIAL",
+]
+
+# Subconjunto curado: solo estas dependencias reciben supervisor + reclamos +
+# trámites de ejemplo. Las 6 restantes del catálogo quedan habilitadas (se ven
+# en el organigrama) pero sin bandeja cargada — evita abrumar la demo con
+# actividad en las 12 a la vez, priorizando calidad sobre cantidad.
+DEPENDENCIAS_ACTIVAS = [
+    "SERVICIOS_PUBLICOS",   # estrella: alumbrado público + servicios urbanos
+    "OBRAS_PUBLICAS",
+    "TRANSITO_VIAL",
+    "ZOONOSIS",
+    "HABILITACIONES",
+    "RENTAS",
 ]
 
 TRAMITES_DEMO = [
@@ -86,6 +108,22 @@ TRAMITES_DEMO = [
         ],
     },
     {
+        "nombre": "Renovación de licencia de conducir",
+        "descripcion": "Renovación de la licencia de conducir vigente, sin cambio de categoría.",
+        "categoria_tramite_nombre": "Tránsito y Transporte",
+        "dep_codigo": "TRANSITO_VIAL",
+        "tiempo_estimado_dias": 5,
+        "costo": 6000.0,
+        "tipo_pago": "adhesion_debito",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_con_turno",
+        "duracion_turno_min": 20,
+        "documentos": [
+            ("DNI (frente y dorso)", "Copia digitalizada del documento nacional de identidad", True),
+            ("Licencia anterior", "Licencia de conducir a renovar", True),
+        ],
+    },
+    {
         "nombre": "Habilitación comercial",
         "descripcion": "Habilitación para apertura de un nuevo comercio o actividad comercial.",
         "categoria_tramite_nombre": "Habilitaciones Comerciales",
@@ -100,6 +138,20 @@ TRAMITES_DEMO = [
             ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
             ("Plano del local", "Plano aprobado por profesional matriculado", True),
             ("Constancia de inscripción AFIP", "Constancia de CUIT actualizada", True),
+        ],
+    },
+    {
+        "nombre": "Renovación de habilitación comercial",
+        "descripcion": "Renovación anual de la habilitación comercial vigente.",
+        "categoria_tramite_nombre": "Habilitaciones Comerciales",
+        "dep_codigo": "HABILITACIONES",
+        "tiempo_estimado_dias": 10,
+        "costo": 6000.0,
+        "tipo_pago": "adhesion_debito",
+        "momento_pago": "inicio",
+        "modo_atencion": "presencial_sin_turno",
+        "documentos": [
+            ("Habilitación anterior", "Constancia de la habilitación a renovar", True),
         ],
     },
     {
@@ -121,7 +173,7 @@ TRAMITES_DEMO = [
         "nombre": "Certificado de libre deuda municipal",
         "descripcion": "Certificado que acredita la inexistencia de deudas con el municipio.",
         "categoria_tramite_nombre": "Tasas y Tributos",
-        "dep_codigo": "GENERAL",
+        "dep_codigo": "RENTAS",
         "tiempo_estimado_dias": 5,
         "costo": 2000.0,
         "tipo_pago": "rapipago",
@@ -130,6 +182,21 @@ TRAMITES_DEMO = [
         "documentos": [
             ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
             ("Última boleta de tasa municipal", "Boleta del último período abonado", False),
+        ],
+    },
+    {
+        "nombre": "Plan de pago de tasas",
+        "descripcion": "Refinanciación de deuda de tasas municipales en cuotas.",
+        "categoria_tramite_nombre": "Tasas y Tributos",
+        "dep_codigo": "RENTAS",
+        "tiempo_estimado_dias": 3,
+        "costo": 0.0,
+        "tipo_pago": None,
+        "momento_pago": None,
+        "modo_atencion": "presencial_sin_turno",
+        "documentos": [
+            ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
+            ("Último resumen de deuda", "Detalle de las boletas adeudadas", False),
         ],
     },
 ]
@@ -204,24 +271,14 @@ SLA_CONFIGS_DEMO = [
 # ============================================================
 # Reclamos demo (enriquecidos con coords + zona + barrio)
 # ============================================================
+# Curados a propósito: 3-4 por cada una de las 4 dependencias "activas" que
+# manejan reclamos (Servicios Públicos, Obras Públicas, Tránsito, Zoonosis).
+# Servicios Públicos incluye 3 de alumbrado público a propósito — es el
+# reclamo insignia que más se muestra en las demos.
 # (titulo, descripcion, categoria_nombre, estado, direccion,
 #  dep_codigo, zona_nombre, barrio_nombre, lat_offset, lng_offset, historial)
 RECLAMOS_DEMO = [
-    {
-        "titulo": "Bache peligroso en Av. San Martín",
-        "descripcion": "Hay un bache de gran tamaño en Av. San Martín al 800 que representa un riesgo para los vehículos y peatones.",
-        "categoria_nombre": "Bacheo y calles",
-        "estado": EstadoReclamo.RECIBIDO,
-        "direccion": "Av. San Martín 800",
-        "dependencia_codigo": "OBRAS_PUBLICAS",
-        "zona_nombre": "Sur",
-        "barrio_nombre": "San Martín",
-        "lat_offset": 0.015,
-        "lng_offset": -0.010,
-        "historial": [
-            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
-        ],
-    },
+    # --- Servicios Públicos (4 — alumbrado x3 + residuos x1) ---
     {
         "titulo": "Luminaria quemada en Plaza Central",
         "descripcion": "La luminaria de la esquina noroeste de la plaza central lleva una semana sin funcionar. La zona queda muy oscura de noche.",
@@ -236,6 +293,36 @@ RECLAMOS_DEMO = [
         "historial": [
             {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
             {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Asignado a Carlos Gómez (Cuadrilla Alumbrado). Se envió cuadrilla de mantenimiento."},
+        ],
+    },
+    {
+        "titulo": "Falta de alumbrado en Villa Norte",
+        "descripcion": "Toda la cuadra de Villa Norte está sin luz desde hace varios días, los vecinos piden recorrida urgente.",
+        "categoria_nombre": "Alumbrado público",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "Calle Güemes al 400, Villa Norte",
+        "dependencia_codigo": "SERVICIOS_PUBLICOS",
+        "zona_nombre": "Norte",
+        "barrio_nombre": "Villa Norte",
+        "lat_offset": -0.018,
+        "lng_offset": 0.003,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Poste de luz caído tras la tormenta",
+        "descripcion": "Un poste de alumbrado quedó caído sobre la vereda después de la tormenta de anoche. Riesgo para los peatones.",
+        "categoria_nombre": "Alumbrado público",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "Sarmiento y Los Álamos",
+        "dependencia_codigo": "SERVICIOS_PUBLICOS",
+        "zona_nombre": "Oeste",
+        "barrio_nombre": "Los Álamos",
+        "lat_offset": -0.014,
+        "lng_offset": -0.017,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
         ],
     },
     {
@@ -255,6 +342,54 @@ RECLAMOS_DEMO = [
             {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.EN_CURSO, "estado_nuevo": EstadoReclamo.FINALIZADO, "comentario": "Recolección normalizada en la zona"},
         ],
     },
+    # --- Obras Públicas (3) ---
+    {
+        "titulo": "Bache peligroso en Av. San Martín",
+        "descripcion": "Hay un bache de gran tamaño en Av. San Martín al 800 que representa un riesgo para los vehículos y peatones.",
+        "categoria_nombre": "Bacheo y calles",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "Av. San Martín 800",
+        "dependencia_codigo": "OBRAS_PUBLICAS",
+        "zona_nombre": "Sur",
+        "barrio_nombre": "San Martín",
+        "lat_offset": 0.015,
+        "lng_offset": -0.010,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Vereda hundida por raíces",
+        "descripcion": "Las raíces de un árbol levantaron las baldosas de la vereda, varios vecinos ya tropezaron.",
+        "categoria_nombre": "Bacheo y calles",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "Güemes al 250",
+        "dependencia_codigo": "OBRAS_PUBLICAS",
+        "zona_nombre": "Este",
+        "barrio_nombre": "Güemes",
+        "lat_offset": 0.007,
+        "lng_offset": -0.011,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Zanja sin señalizar tras arreglo de cañería",
+        "descripcion": "Quedó una zanja abierta después de un arreglo de agua y no tiene ningún vallado ni cinta de precaución.",
+        "categoria_nombre": "Bacheo y calles",
+        "estado": EstadoReclamo.EN_CURSO,
+        "direccion": "Rivadavia y Belgrano",
+        "dependencia_codigo": "OBRAS_PUBLICAS",
+        "zona_nombre": "Periferia",
+        "barrio_nombre": "Las Lomas",
+        "lat_offset": 0.021,
+        "lng_offset": 0.012,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Cuadrilla de bacheo asignada para vallar y reparar."},
+        ],
+    },
+    # --- Tránsito y Vialidad (3) ---
     {
         "titulo": "Semáforo intermitente en Rivadavia y Sarmiento",
         "descripcion": "El semáforo de la intersección Rivadavia y Sarmiento está en modo intermitente desde ayer a la tarde.",
@@ -268,6 +403,84 @@ RECLAMOS_DEMO = [
         "lng_offset": 0.018,
         "historial": [
             {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Falta de señalización en cruce escolar",
+        "descripcion": "El cruce peatonal frente a la escuela no tiene demarcación horizontal ni cartel de reductor de velocidad.",
+        "categoria_nombre": "Tránsito y señalización",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "La Estación y Belgrano",
+        "dependencia_codigo": "TRANSITO_VIAL",
+        "zona_nombre": "Centro",
+        "barrio_nombre": "La Estación",
+        "lat_offset": 0.004,
+        "lng_offset": -0.004,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Cartel de PARE caído en Belgrano y Mitre",
+        "descripcion": "El cartel de PARE de la esquina está tirado en el pasto desde el fin de semana, la esquina quedó sin señalización.",
+        "categoria_nombre": "Tránsito y señalización",
+        "estado": EstadoReclamo.EN_CURSO,
+        "direccion": "Belgrano y Mitre",
+        "dependencia_codigo": "TRANSITO_VIAL",
+        "zona_nombre": "Norte",
+        "barrio_nombre": "Belgrano",
+        "lat_offset": -0.011,
+        "lng_offset": 0.006,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Cuadrilla de señalización notificada para reposición."},
+        ],
+    },
+    # --- Zoonosis (3) ---
+    {
+        "titulo": "Perros sueltos en Plaza Central",
+        "descripcion": "Una jauría de perros sueltos anda por la plaza central, ya hubo un intento de mordedura a un chico.",
+        "categoria_nombre": "Animales sueltos",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "Plaza Central",
+        "dependencia_codigo": "ZOONOSIS",
+        "zona_nombre": "Centro",
+        "barrio_nombre": "Centro",
+        "lat_offset": 0.001,
+        "lng_offset": 0.002,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Enjambre de avispas en plaza del barrio",
+        "descripcion": "Hay un panal de avispas en un árbol de la plaza del barrio, varios vecinos ya fueron picados.",
+        "categoria_nombre": "Plagas y control",
+        "estado": EstadoReclamo.RECIBIDO,
+        "direccion": "Plaza de Los Álamos",
+        "dependencia_codigo": "ZOONOSIS",
+        "zona_nombre": "Oeste",
+        "barrio_nombre": "Los Álamos",
+        "lat_offset": -0.013,
+        "lng_offset": -0.014,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+        ],
+    },
+    {
+        "titulo": "Perro atropellado necesita atención veterinaria",
+        "descripcion": "Un perro sin dueño aparente fue atropellado y está herido sobre la vereda, necesita asistencia urgente.",
+        "categoria_nombre": "Animales sueltos",
+        "estado": EstadoReclamo.EN_CURSO,
+        "direccion": "Parque Municipal",
+        "dependencia_codigo": "ZOONOSIS",
+        "zona_nombre": "Sur",
+        "barrio_nombre": "Parque",
+        "lat_offset": 0.011,
+        "lng_offset": 0.009,
+        "historial": [
+            {"accion": "Reclamo creado", "estado_nuevo": EstadoReclamo.RECIBIDO},
+            {"accion": "Cambio de estado", "estado_anterior": EstadoReclamo.RECIBIDO, "estado_nuevo": EstadoReclamo.EN_CURSO, "comentario": "Se coordinó traslado con la veterinaria municipal."},
         ],
     },
 ]
@@ -617,9 +830,15 @@ async def seed_demo_completo(
     )
     db.add(admin_demo)
 
-    # Un supervisor por cada dependencia habilitada
+    # Un supervisor solo para las dependencias "activas" (las que tienen
+    # contenido demo real) — el resto del catálogo queda habilitado pero sin
+    # usuario propio, para no abrumar la demo con logins que no llevan a
+    # ninguna bandeja cargada.
     supervisores_demo: list[User] = []
-    for dep_codigo, muni_dep in muni_deps.items():
+    for dep_codigo in DEPENDENCIAS_ACTIVAS:
+        muni_dep = muni_deps.get(dep_codigo)
+        if not muni_dep:
+            continue
         # Nombre legible desde el código (ej: OBRAS_PUBLICAS → Obras Públicas)
         # Buscamos la Dependencia global para obtener el nombre bonito
         dep_obj = await db.get(Dependencia, muni_dep.dependencia_id)
@@ -1058,8 +1277,9 @@ async def seed_demo_completo(
 
     return {
         "dependencias": len(muni_deps),
+        "dependencias_activas": len(supervisores_demo),
         "tramites": len(tramites_creados),
-        "usuarios": 3,
+        "usuarios": 2 + len(supervisores_demo),  # admin + vecino + 1 supervisor por dep activa
         "zonas": len(zonas),
         "barrios": len(barrios),
         "empleados": len(empleados),
@@ -1395,71 +1615,10 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
             counts["turnos"] += 1
         await db.flush()
 
-    # ------------------------------------------------------------------
-    # Balanceo: NINGUNA dependencia con acceso queda con 0 reclamos (la
-    # landing muestra "N reclamos asignados" por área — un 0 mata la demo).
-    # Toda dep con <2 reclamos recibe 2 propios con título afín a su área.
-    # ------------------------------------------------------------------
-    _TITULOS_DEP = [
-        (("habilitacion", "comercio"), [
-            ("Comercio sin habilitación a la vista", "El local de la esquina no exhibe la habilitación municipal."),
-            ("Venta ambulante sin permiso", "Puestos sin permiso sobre la vereda comercial."),
-        ]),
-        (("transito", "vial", "seguridad"), [
-            ("Semáforo fuera de servicio", "El semáforo del cruce principal está apagado desde ayer."),
-            ("Estacionamiento sobre la senda peatonal", "Autos tapan la senda todos los mediodías."),
-        ]),
-        (("obra", "infraestructura"), [
-            ("Vereda levantada por raíces", "Baldosas levantadas, peligro de caídas."),
-            ("Zanja sin señalizar", "Quedó abierta después de un arreglo y no tiene vallado."),
-        ]),
-        (("servicio", "ambiente", "espacio"), [
-            ("Contenedor desbordado", "Hace tres días que no se vacía el contenedor."),
-            ("Luminaria intermitente", "El foco de la cuadra prende y apaga toda la noche."),
-        ]),
-    ]
-    _GENERICOS = [
-        ("Pedido de poda de árbol inclinado", "El árbol quedó inclinado tras la tormenta."),
-        ("Ruidos molestos en horario nocturno", "Música alta todos los fines de semana."),
-    ]
-    cats_muni = (await db.execute(
-        select(CategoriaReclamo).where(CategoriaReclamo.municipio_id == municipio_id)
-    )).scalars().all()
-    muni_row = await db.get(Municipio, municipio_id)
-    base_lat = muni_row.latitud if muni_row and muni_row.latitud else -34.603722
-    base_lng = muni_row.longitud if muni_row and muni_row.longitud else -58.381592
-    counts["reclamos_balance"] = 0
-    if vecino and cats_muni:
-        for d_idx, dep in enumerate(deps):
-            n_rec = (await db.execute(
-                select(func.count()).select_from(Reclamo).where(
-                    Reclamo.municipio_dependencia_id == dep.id)
-            )).scalar() or 0
-            if n_rec >= 2:
-                continue
-            dep_obj = await db.get(Dependencia, dep.dependencia_id)
-            dep_nom = _norm(dep_obj.nombre if dep_obj else "")
-            titulos = _GENERICOS
-            for kws, tits in _TITULOS_DEP:
-                if any(k in dep_nom for k in kws):
-                    titulos = tits
-                    break
-            for j, (tit, desc) in enumerate(titulos[: 2 - n_rec]):
-                db.add(Reclamo(
-                    municipio_id=municipio_id,
-                    titulo=tit,
-                    descripcion=desc,
-                    estado="recibido" if j == 0 else "en_curso",
-                    prioridad=3,
-                    direccion="Zona céntrica (demo)",
-                    latitud=base_lat + ((d_idx * 7 + j * 3) - 10) / 1000.0,
-                    longitud=base_lng + ((d_idx * 5 - j * 4) - 8) / 1000.0,
-                    categoria_id=cats_muni[(d_idx + j) % len(cats_muni)].id,
-                    creador_id=vecino.id,
-                    municipio_dependencia_id=dep.id,
-                    canal=["app", "ventanilla_asistida", "whatsapp", "web_publica"][(d_idx + j) % 4],
-                ))
-                counts["reclamos_balance"] += 1
-        await db.flush()
-
+    # NOTA: antes había un "balanceo" acá que le inyectaba 2 reclamos
+    # sintéticos a CUALQUIER dependencia con <2 reclamos — incluidas las 6
+    # dependencias habilitadas pero sin contenido demo (ver
+    # DEPENDENCIAS_ACTIVAS en seed_demo.py). Eso llenaba de ruido el
+    # organigrama y contradice la curación: solo las dependencias activas
+    # deben mostrar actividad, el resto queda deliberadamente vacío.
     return counts

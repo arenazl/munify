@@ -373,7 +373,7 @@ async def enviar_recordatorios_turnos(
       gcloud scheduler jobs create http munify-recordatorios-turnos \\
         --schedule="0 * * * *" --uri="https://<backend>/api/turnos-tramite/enviar-recordatorios" \\
         --http-method=POST --headers="X-Cron-Key=<CRON_SECRET>" \\
-        --location=southamerica-east1 --project=munify-api
+        --location=us-east4 --project=munify-api
     """
     from core.config import settings
     if not settings.CRON_SECRET:

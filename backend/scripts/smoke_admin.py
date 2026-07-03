@@ -3,7 +3,7 @@ import httpx
 import sys
 from datetime import datetime
 
-BASE = "https://munify-api-1060106389361.southamerica-east1.run.app/api"
+BASE = "https://munify-api-1060106389361.us-east4.run.app/api"
 ADMIN = ("admin@la-matanza.demo.com", "demo123")
 MUNI_ID = 78
 
