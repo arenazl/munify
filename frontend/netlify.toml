@@ -10,19 +10,19 @@
 # sin CORS. DEBEN ir ANTES del catch-all /* del SPA.
 [[redirects]]
   from = "/api/*"
-  to = "https://munify-api-vmpxsxe7ra-rj.a.run.app/api/:splat"
+  to = "https://munify-api-1060106389361.us-east4.run.app/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/static/*"
-  to = "https://munify-api-vmpxsxe7ra-rj.a.run.app/static/:splat"
+  to = "https://munify-api-1060106389361.us-east4.run.app/static/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/uploads/*"
-  to = "https://munify-api-vmpxsxe7ra-rj.a.run.app/uploads/:splat"
+  to = "https://munify-api-1060106389361.us-east4.run.app/uploads/:splat"
   status = 200
   force = true
 
