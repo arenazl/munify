@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, LogIn } from 'lucide-react';
+import { Search, Building2, ChevronRight, Loader2, Shield, Clock, Users, MapPinned, ArrowLeft, User, LogIn, Wrench } from 'lucide-react';
 import { MunifyMark } from '../components/ui/MunifyMark';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
@@ -256,6 +256,7 @@ export default function Landing() {
   const rolConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
     admin: { icon: Shield, color: 'from-red-500 to-rose-600', label: 'Administrador' },
     supervisor: { icon: Users, color: 'from-orange-500 to-amber-600', label: 'Supervisor' },
+    empleado: { icon: Wrench, color: 'from-emerald-500 to-teal-600', label: 'Empleado' },
     vecino: { icon: User, color: 'from-blue-500 to-indigo-600', label: 'Vecino' },
   };
 

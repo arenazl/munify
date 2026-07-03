@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
-import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck } from 'lucide-react';
+import { Building2, Mail, Lock, Loader2, ArrowLeft, Shield, Users, User, AlertCircle, FileCheck, Wrench } from 'lucide-react';
 import { validationSchemas } from '../lib/validations';
 import { API_URL } from '../lib/api';
 
@@ -132,6 +132,7 @@ export default function Login() {
   const rolConfig: Record<string, { icon: typeof Shield; color: string; label: string }> = {
     admin: { icon: Shield, color: 'from-red-500 to-rose-600', label: 'Administrador' },
     supervisor: { icon: Users, color: 'from-orange-500 to-amber-600', label: 'Supervisor' },
+    empleado: { icon: Wrench, color: 'from-emerald-500 to-teal-600', label: 'Empleado' },
     vecino: { icon: User, color: 'from-blue-500 to-indigo-600', label: 'Vecino' },
   };
 

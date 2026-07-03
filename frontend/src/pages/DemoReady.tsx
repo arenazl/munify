@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, Shield, User, Sparkles, ArrowLeft, Building2 } from 'lucide-react';
+import { Loader2, Shield, User, Sparkles, ArrowLeft, Building2, Wrench } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDefaultRouteForUser } from '../config/navigation';
 import api from '../lib/api';
@@ -73,6 +73,7 @@ export default function DemoReady() {
 
   const adminUser = users.find((u) => u.rol === 'admin');
   const supervisorUsers = users.filter((u) => u.rol === 'supervisor');
+  const empleadoUsers = users.filter((u) => u.rol === 'empleado');
   const vecinoUser = users.find((u) => u.rol === 'vecino');
 
   const handleQuickLoginByEmail = async (email: string | undefined) => {
@@ -234,6 +235,41 @@ export default function DemoReady() {
                               {sup.dependencia_nombre || sup.apellido || 'Dependencia'}
                             </p>
                             <p className="text-[9px] text-amber-100/70 font-mono truncate">{sup.email}</p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empleados de campo (circuito de mis-trabajos / órdenes de trabajo) */}
+              {empleadoUsers.length > 0 && (
+                <div className="mt-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Wrench className="h-4 w-4 text-emerald-400" />
+                    <span className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                      Empleados de campo
+                    </span>
+                    <span className="text-xs text-slate-500">({empleadoUsers.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {empleadoUsers.map((emp) => (
+                      <button
+                        key={emp.email}
+                        onClick={() => handleQuickLoginByEmail(emp.email)}
+                        disabled={quickLoading}
+                        className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-emerald-500/90 to-teal-600/90 p-3 text-left transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 shadow-lg hover:shadow-xl"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                            <Wrench className="h-4 w-4 text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-white truncate">
+                              {emp.nombre_completo}
+                            </p>
+                            <p className="text-[9px] text-emerald-100/70 font-mono truncate">{emp.email}</p>
                           </div>
                         </div>
                       </button>

@@ -280,13 +280,15 @@ async def obtener_usuarios_demo(
             User.email.like(email_pattern3),
         ),
         User.activo == True,
-        # Roles demo: admin, vecino, y supervisores (uno por dependencia).
-        # El prefijo `supervisor-` matchea `supervisor-obras-publicas@...`
-        # además del `supervisor@` legacy.
+        # Roles demo: admin, vecino, supervisores (uno por dependencia) y
+        # empleados de campo (uno por área operativa). El prefijo `supervisor-`
+        # matchea `supervisor-obras-publicas@...` además del `supervisor@`
+        # legacy; `empleado-` matchea `empleado-bacheo@...`.
         or_(
             User.email.like("admin@%"),
             User.email.like("supervisor@%"),
             User.email.like("supervisor-%"),
+            User.email.like("empleado-%"),
             User.email.like("vecino@%"),
         ),
     )
