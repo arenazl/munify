@@ -154,20 +154,37 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Gestionar todos los reclamos'
     },
     {
-      name: 'Trámites',
-      href: '/gestion/tramites',
-      icon: FileCheck,
-      show: isAdminOrSupervisor && moduloOn('tramites'),
-      categoria: 'Principal',
-      description: 'Gestionar trámites'
-    },
-    {
       name: 'Mapa',
       href: '/gestion/mapa',
       icon: Map,
       show: isAdminOrSupervisor && moduloOn('mapa'),
       categoria: 'Principal',
       description: 'Ver reclamos en el mapa'
+    },
+    // === SECCIÓN TRÁMITES (la unidad trámite → turno → agenda, consolidación 2026-07) ===
+    {
+      name: 'Trámites',
+      href: '/gestion/tramites',
+      icon: FileCheck,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Trámites',
+      description: 'Gestionar trámites'
+    },
+    {
+      name: 'Agenda',
+      href: '/gestion/agenda-turnos',
+      icon: CalendarClock,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Trámites',
+      description: 'Agenda diaria de turnos presenciales'
+    },
+    {
+      name: 'Horarios',
+      href: '/gestion/configuracion-agenda',
+      icon: CalendarDays,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Trámites',
+      description: 'Horarios, cupos y feriados de la agenda de turnos'
     },
     // === SECCIÓN CAMPO (empleados/operarios con tareas asignadas) ===
     {
@@ -212,23 +229,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Histórico transaccional para contaduría'
     },
     {
-      name: 'Órdenes',
-      href: '/gestion/contaduria/ordenes-pago',
-      icon: FileCheck,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Contaduría',
-      description: 'Autorización formal de pagos'
-    },
-    {
-      name: 'Reportes',
-      href: '/gestion/contaduria/reportes',
-      icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
-      categoria: 'Contaduría',
-      description: 'OPs vencidas, próximas, top beneficiarios'
-    },
-    {
-      name: 'Pagos',
+      name: 'Gastos',
       href: '/gestion/tesoreria',
       icon: Receipt,
       show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
@@ -284,10 +285,21 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       description: 'Egresos por caja, top conceptos, evolución'
     },
     {
+      // Tarjetas de crédito con las que se pagan gastos — vive con Tesorería,
+      // no en Configuración general (movido en la reorg de módulos 2026-07).
+      name: 'Tarjetas',
+      href: '/gestion/tarjetas',
+      icon: Banknote,
+      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      categoria: 'Tesorería',
+      description: 'Tarjetas de crédito para pagos'
+    },
+    // === SUELDOS (flag propio desde la reorg 2026-07; antes cluster 'tesoreria') ===
+    {
       name: 'Liquidaciones',
       href: '/gestion/tesoreria/agenda',
       icon: CalendarClock,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
       categoria: 'Sueldos',
       description: 'Pago de sueldos y recurrentes con premios'
     },
@@ -295,7 +307,7 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Empleados',
       href: '/gestion/sueldos/empleados',
       icon: Users,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
       categoria: 'Sueldos',
       description: 'Personal del muni con sueldo asignado'
     },
@@ -303,9 +315,26 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       name: 'Reportes',
       href: '/gestion/sueldos/reportes',
       icon: BarChart3,
-      show: isAdminOrSupervisor && modulosActivos.has('tesoreria'),
+      show: isAdminOrSupervisor && modulosActivos.has('sueldos'),
       categoria: 'Sueldos',
       description: 'Masa salarial, top sueldos, próximos pagos'
+    },
+    // === CONTADURÍA (flag propio desde la reorg 2026-07; apagado por default) ===
+    {
+      name: 'Órdenes',
+      href: '/gestion/contaduria/ordenes-pago',
+      icon: FileCheck,
+      show: isAdminOrSupervisor && modulosActivos.has('contaduria'),
+      categoria: 'Contaduría',
+      description: 'Autorización formal de pagos'
+    },
+    {
+      name: 'Reportes',
+      href: '/gestion/contaduria/reportes',
+      icon: BarChart3,
+      show: isAdminOrSupervisor && modulosActivos.has('contaduria'),
+      categoria: 'Contaduría',
+      description: 'OPs vencidas, próximas, top beneficiarios'
     },
     {
       name: 'Tablero',
@@ -378,14 +407,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor,
       categoria: 'Configuración',
       description: 'Configuración del sistema'
-    },
-    {
-      name: 'Tarjetas',
-      href: '/gestion/tarjetas',
-      icon: Banknote,
-      show: isAdminOrSupervisor,
-      categoria: 'Configuración',
-      description: 'Tarjetas de crédito para pagos'
     },
     // === Solo SUPERADMIN ===
     {
@@ -497,22 +518,6 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isVecino,
       categoria: 'Mi cuenta',
       description: 'Tus logros y puntos'
-    },
-    {
-      name: 'Agenda',
-      href: '/gestion/agenda-turnos',
-      icon: CalendarClock,
-      show: isAdminOrSupervisor,
-      categoria: 'Programación',
-      description: 'Agenda diaria de turnos presenciales'
-    },
-    {
-      name: 'Turnos',
-      href: '/gestion/configuracion-agenda',
-      icon: CalendarDays,
-      show: isAdminOrSupervisor,
-      categoria: 'Programación',
-      description: 'Horarios, cupos y feriados de turnos'
     },
   ].filter(item => item.show && !hrefsOcultos.has(item.href));
 };

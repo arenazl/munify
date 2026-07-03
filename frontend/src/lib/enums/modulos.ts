@@ -1,6 +1,7 @@
 import {
   Home, ClipboardList, FileCheck, Map, ScanLine, Receipt, Wallet,
   LayoutDashboard, CalendarClock, Activity, Sparkles, PiggyBank, Hammer,
+  FileSignature, Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -31,7 +32,9 @@ export const MODULOS: ModuloDef[] = [
   { key: 'planificacion', label: 'Planificación', descripcion: 'Agenda semanal de trabajos', icon: CalendarClock, optIn: false },
   { key: 'sla', label: 'SLA', descripcion: 'Tiempos máximos y alertas de vencimiento', icon: Activity, optIn: false },
   { key: 'panel-bi', label: 'Análisis', descripcion: 'Panel BI con consultas en lenguaje natural (requiere IA)', icon: Sparkles, optIn: false },
-  { key: 'tesoreria', label: 'Tesorería', descripcion: 'Gastos, cajas, liquidaciones, órdenes de pago (cluster completo)', icon: PiggyBank, optIn: true },
+  { key: 'tesoreria', label: 'Tesorería', descripcion: 'Gastos, cajas, contactos, conciliación y reportes financieros', icon: PiggyBank, optIn: true },
+  { key: 'sueldos', label: 'Sueldos', descripcion: 'Liquidaciones, empleados con sueldo y pagos recurrentes', icon: Users, optIn: true },
+  { key: 'contaduria', label: 'Contaduría', descripcion: 'Órdenes de pago con autorización formal y sus reportes', icon: FileSignature, optIn: true },
   { key: 'ordenes_trabajo', label: 'Órdenes de trabajo', descripcion: 'OTs de campo con cuadrillas y materiales', icon: Hammer, optIn: true },
 ];
 
