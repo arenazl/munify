@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState, memo } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Building2, Smartphone, Globe, ScanLine, ClipboardList, FileCheck,
   CalendarClock, Hammer, PiggyBank, MapPin, Users, ChevronLeft, ChevronRight,
@@ -330,6 +330,46 @@ function HeroSlide({ isMobile }: { isMobile: boolean }) {
   );
 }
 
+/** Slide personalizado al cliente: /presentacion?para=San%20Martín lo activa.
+ *  No es halago — es "escuchamos lo que necesitan": aterriza la presentación
+ *  en los dolores que el propio municipio planteó. */
+function makeParaMuniSlide(nombreMuni: string) {
+  return function ParaMuniSlide({ isMobile }: { isMobile: boolean }) {
+    const necesidades = [
+      { icon: ClipboardList, c: AZUL, t: 'Reclamos punta a punta', d: 'Del vecino que reporta al cierre confirmado, sin papeles en el medio.' },
+      { icon: Hammer, c: AMBAR, t: 'Órdenes de trabajo', d: 'Las cuadrillas con tareas formales: qué, quién, con qué y cuánto llevó.' },
+      { icon: MessageCircle, c: VERDE, t: 'Todos los canales', d: 'App, ventanilla, web o teléfono — un solo expediente para el municipio.' },
+      { icon: MapPin, c: ROSA, t: 'El trabajo en la calle', d: 'Mapa de calor, SLA y estadísticas para saber qué pasa en el territorio.' },
+    ];
+    return (
+      <div style={{ maxWidth: 1000, width: '100%', textAlign: 'center' }}>
+        <div className="pres-rise" style={{ fontSize: isMobile ? 13 : 15, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 10 }}>
+          Preparado para
+        </div>
+        <div className="pres-hero-title" style={{ fontSize: isMobile ? 'clamp(38px, 11vw, 58px)' : 'clamp(56px, 7vw, 88px)', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.05, marginBottom: 20 }}>
+          {nombreMuni}
+        </div>
+        <p className="pres-rise" style={{ fontSize: isMobile ? 13 : 15.5, color: 'rgba(255,255,255,0.7)', maxWidth: 640, margin: '0 auto 24px', lineHeight: 1.6, animationDelay: '300ms' }}>
+          Escuchamos lo que están buscando. Esta presentación recorre exactamente eso:
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14, textAlign: 'left' }}>
+          {necesidades.map((n, i) => (
+            <Card key={i} color={n.c} className="pres-pop" style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: 18, animationDelay: `${450 + i * 180}ms` }}>
+              <div style={{ minWidth: 40, height: 40, borderRadius: 12, background: `${n.c}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <n.icon size={19} color={n.c} />
+              </div>
+              <div>
+                <div style={{ fontSize: isMobile ? 14.5 : 16, fontWeight: 800, color: '#fff', marginBottom: 3 }}>{n.t}</div>
+                <div style={{ fontSize: isMobile ? 12 : 13, color: 'rgba(255,255,255,0.62)', lineHeight: 1.5 }}>{n.d}</div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+}
+
 function ProblemaSlide({ isMobile }: { isMobile: boolean }) {
   const items = [
     { icon: Clock, color: AMBAR, t: 'La cola como único canal', d: 'Para todo hay que ir, esperar y volver. El horario del municipio manda sobre el del vecino.' },
@@ -644,9 +684,14 @@ const SlideContentMemo = memo(function SlideContentMemo({ SlideComponent, isMobi
   return <>{<SlideComponent isMobile={isMobile} />}</>;
 });
 
-function useSlides(): Slide[] {
+function useSlides(paraMuni: string | null): Slide[] {
   return useMemo<Slide[]>(() => [
     { key: 'hero', title: 'Munify', subtitle: 'Gestión municipal integral', icon: Building2, color: AZUL, Component: HeroSlide },
+    // Slide dedicado al cliente (solo si la URL trae ?para=<Municipio>)
+    ...(paraMuni ? [{
+      key: 'para-muni', title: paraMuni, subtitle: 'Lo que escuchamos que necesitan',
+      icon: Building2, color: AZUL, Component: makeParaMuniSlide(paraMuni),
+    } satisfies Slide] : []),
     { key: 'problema', title: 'El problema', subtitle: 'Lo que hoy le pasa a cualquier municipio', icon: AlertTriangle, color: AMBAR, Component: ProblemaSlide },
     { key: 'que-es', title: 'Qué es Munify', subtitle: 'Una plataforma, tres caras', icon: Layers, color: VERDE, Component: QueEsSlide },
     { key: 'omnicanal', title: 'El vínculo con el vecino', subtitle: 'Omnicanalidad real', icon: MessageCircle, color: AZUL, Component: OmnicanalSlide },
@@ -658,13 +703,15 @@ function useSlides(): Slide[] {
     { key: 'tesoreria', title: 'Tesorería', subtitle: 'En producción en un municipio real', icon: PiggyBank, color: VIOLETA, Component: TesoreriaSlide },
     { key: 'modular', title: 'A medida', subtitle: 'Módulos activables por municipio', icon: Layers, color: AZUL, Component: ModularSlide },
     { key: 'cierre', title: 'Munify', subtitle: 'Próximo paso: la demo en vivo', icon: Building2, color: AZUL, Component: CierreSlide },
-  ], []);
+  ], [paraMuni]);
 }
 
 export default function PresentacionMunify() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const slides = useSlides();
+  const [searchParams] = useSearchParams();
+  const paraMuni = searchParams.get('para');
+  const slides = useSlides(paraMuni);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
