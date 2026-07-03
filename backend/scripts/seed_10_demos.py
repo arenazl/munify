@@ -170,18 +170,20 @@ async def seed_municipio(db, muni_id: int, muni_nombre: str):
                 municipio_id, titulo, descripcion, direccion,
                 latitud, longitud, estado, prioridad,
                 categoria_id, creador_id, municipio_dependencia_id,
-                barrio_id, zona_id,
+                barrio_id, zona_id, canal,
                 fecha_recibido, fecha_resolucion, resolucion,
                 created_at, updated_at
             ) VALUES (
                 :mid, :titulo, :descripcion, :direccion,
                 :lat, :lon, :estado, :prioridad,
                 :cat_id, :creador_id, :muni_dep_id,
-                :barrio_id, :zona_id,
+                :barrio_id, :zona_id, :canal,
                 :fecha_recibido, :fecha_resolucion, :resolucion,
                 :created_at, :created_at
             )
         """), {
+            # Canal rotativo — la demo muestra la omnicanalidad en la bandeja
+            "canal": ["app", "whatsapp", "ventanilla_asistida", "web_publica"][i % 4],
             "mid": muni_id,
             "titulo": titulo[:200],
             "descripcion": descripcion,

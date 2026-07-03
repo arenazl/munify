@@ -73,6 +73,12 @@ TRAMITES_DEMO = [
         "costo": 8500.0,
         "tipo_pago": "boton_pago",
         "momento_pago": "inicio",
+        # Turnero: el trámite insignia del flujo turno-first — presencial,
+        # con biometría obligatoria (la regla de identidad de la casa).
+        "modo_atencion": "presencial_con_turno",
+        "duracion_turno_min": 45,
+        "requiere_kyc": True,
+        "nivel_kyc_minimo": 2,
         "documentos": [
             ("DNI (frente y dorso)", "Copia digitalizada del documento nacional de identidad", True),
             ("Certificado médico psicofísico", "Emitido por centro habilitado, vigencia 30 días", True),
@@ -88,6 +94,8 @@ TRAMITES_DEMO = [
         "costo": 15000.0,
         "tipo_pago": "adhesion_debito",
         "momento_pago": "inicio",
+        "modo_atencion": "presencial_con_turno",
+        "duracion_turno_min": 30,
         "documentos": [
             ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
             ("Plano del local", "Plano aprobado por profesional matriculado", True),
@@ -103,6 +111,7 @@ TRAMITES_DEMO = [
         "costo": 5000.0,
         "tipo_pago": "boton_pago",
         "momento_pago": "inicio",
+        "modo_atencion": "presencial_sin_turno",
         "documentos": [
             ("DNI del propietario", "Copia digitalizada del documento nacional de identidad", True),
             ("Plano de obra", "Croquis o plano firmado por profesional", True),
@@ -117,6 +126,7 @@ TRAMITES_DEMO = [
         "costo": 2000.0,
         "tipo_pago": "rapipago",
         "momento_pago": "fin",
+        "modo_atencion": "online",
         "documentos": [
             ("DNI del titular", "Copia digitalizada del documento nacional de identidad", True),
             ("Última boleta de tasa municipal", "Boleta del último período abonado", False),
@@ -559,6 +569,10 @@ async def seed_demo_completo(
             costo=t_data["costo"],
             tipo_pago=t_data.get("tipo_pago"),
             momento_pago=t_data.get("momento_pago"),
+            modo_atencion=t_data.get("modo_atencion", "online"),
+            duracion_turno_min=t_data.get("duracion_turno_min", 30),
+            requiere_kyc=t_data.get("requiere_kyc", False),
+            nivel_kyc_minimo=t_data.get("nivel_kyc_minimo"),
             activo=True,
             orden=i,
             documentos_requeridos=docs,
@@ -1027,11 +1041,19 @@ async def seed_demo_completo(
             solicitudes_creadas += 1
     await db.flush()
 
-    # Activar el módulo de órdenes de trabajo (opt-in) en los munis demo,
-    # así la demo muestra el circuito de campo completo. El seed corre una
+    # ------------------------------------------------------------------
+    # 10. Órdenes de trabajo (el circuito de campo formal sobre los reclamos)
+    # ------------------------------------------------------------------
+    ots_creadas = await _seed_ordenes_trabajo(
+        db, municipio_id, reclamos_creados_list, cuadrillas, empleados, admin_demo.id,
+    )
+
+    # Activar los módulos opt-in en los munis demo, así la demo muestra el
+    # circuito completo (campo + sueldos + contaduría). El seed corre una
     # sola vez por muni nuevo, no hace falta chequear duplicados.
     from models.municipio_modulo import MunicipioModulo
-    db.add(MunicipioModulo(municipio_id=municipio_id, modulo='ordenes_trabajo', activo=True))
+    for _mod in ('ordenes_trabajo', 'sueldos', 'contaduria'):
+        db.add(MunicipioModulo(municipio_id=municipio_id, modulo=_mod, activo=True))
     await db.flush()
 
     return {
@@ -1045,4 +1067,238 @@ async def seed_demo_completo(
         "sla_configs": sla_count,
         "reclamos": reclamos_creados,
         "solicitudes": solicitudes_creadas,
+        "ordenes_trabajo": ots_creadas,
     }
+
+
+# ============================================================
+# Órdenes de trabajo demo (circuito de campo formal)
+# ============================================================
+
+async def _seed_ordenes_trabajo(
+    db: AsyncSession,
+    municipio_id: int,
+    reclamos: list,
+    cuadrillas: list,
+    empleados: list,
+    creador_id: int,
+) -> int:
+    """10 OTs en estados variados, vinculadas a los reclamos demo.
+
+    Cubre los casos que se muestran en demo: OT pendiente sin asignar,
+    asignada a cuadrilla, en curso, completada (con horas reales y notas)
+    y cancelada. Incluye 1 reclamo con 2 OTs (poda + bacheo del mismo
+    evento), 1 OT que agrupa 2 reclamos, y 2 preventivas sin reclamo.
+    """
+    from datetime import date, time as _time, timedelta
+    from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+    from models.enums import EstadoOrdenTrabajo
+
+    hoy = date.today()
+    ahora = datetime.utcnow()
+
+    def _c(i):
+        return cuadrillas[i % len(cuadrillas)].id if cuadrillas else None
+
+    def _e(i):
+        return empleados[i % len(empleados)].id if empleados else None
+
+    def _r(i):
+        return reclamos[i % len(reclamos)] if reclamos else None
+
+    # (titulo, estado, cuadrilla_idx|None, empleado_idx|None, dias_prog,
+    #  materiales, h_est, h_real, notas_cierre, reclamo_idxs)
+    OTS = [
+        ("Bacheo de la calzada", EstadoOrdenTrabajo.PENDIENTE, None, None, 3,
+         [{"descripcion": "Asfalto en frío", "cantidad": 6, "unidad": "bolsas"}], 4.0, None, None, [0]),
+        ("Reposición de luminaria", EstadoOrdenTrabajo.PENDIENTE, None, None, 2,
+         [{"descripcion": "Lámpara LED 150W", "cantidad": 1, "unidad": "u"}], 2.0, None, None, [1]),
+        ("Retiro de residuos acumulados", EstadoOrdenTrabajo.ASIGNADA, 0, 2, 1,
+         None, 3.0, None, None, [2]),
+        ("Recambio de semáforo", EstadoOrdenTrabajo.ASIGNADA, 1, 4, 2,
+         [{"descripcion": "Controlador semafórico", "cantidad": 1, "unidad": "u"}], 6.0, None, None, [3]),
+        ("Poda correctiva de arbolado", EstadoOrdenTrabajo.EN_CURSO, 2, 3, 0,
+         [{"descripcion": "Combustible motosierra", "cantidad": 10, "unidad": "l"}], 5.0, None, None, [0]),
+        ("Limpieza integral del sector", EstadoOrdenTrabajo.EN_CURSO, 0, 2, 0,
+         None, 4.0, None, None, [1, 2]),
+        ("Nivelación y compactado", EstadoOrdenTrabajo.EN_CURSO, 0, 0, 0,
+         [{"descripcion": "Tosca", "cantidad": 2, "unidad": "m3"}], 8.0, None, None, [3]),
+        ("Reparación de vereda hundida", EstadoOrdenTrabajo.COMPLETADA, 0, 0, -2,
+         [{"descripcion": "Cemento", "cantidad": 4, "unidad": "bolsas"}], 6.0, 5.0,
+         "Trabajo terminado sin observaciones. Se repuso la baldosa faltante.", [0]),
+        ("Mantenimiento preventivo de luminarias", EstadoOrdenTrabajo.COMPLETADA, 1, 1, -5,
+         [{"descripcion": "Lámpara LED 150W", "cantidad": 4, "unidad": "u"}], 4.0, 3.5,
+         "Recorrida completa del corredor. 4 luminarias recambiadas.", []),
+        ("Desmalezado de banquinas", EstadoOrdenTrabajo.CANCELADA, 2, None, -1,
+         None, 6.0, None, None, []),
+    ]
+
+    creadas = 0
+    for i, (titulo, estado, c_idx, e_idx, dias, mat, h_est, h_real, notas, r_idxs) in enumerate(OTS):
+        ot = OrdenTrabajo(
+            municipio_id=municipio_id,
+            numero=f"OT-{hoy.year}-{i + 1:04d}",
+            estado=estado,
+            titulo=titulo,
+            descripcion=f"{titulo} — generada como ejemplo del circuito de campo.",
+            cuadrilla_id=_c(c_idx) if c_idx is not None else None,
+            empleado_id=_e(e_idx) if e_idx is not None else None,
+            fecha_programada=hoy + timedelta(days=dias),
+            hora_inicio=_time(8, 0),
+            hora_fin=_time(12, 0),
+            materiales=mat,
+            horas_estimadas=h_est,
+            horas_reales=h_real,
+            notas_cierre=notas,
+            motivo_cancelacion="Se resolvió por administración antes de salir a campo."
+            if estado == EstadoOrdenTrabajo.CANCELADA else None,
+            fecha_inicio_real=ahora - timedelta(hours=3)
+            if estado in (EstadoOrdenTrabajo.EN_CURSO, EstadoOrdenTrabajo.COMPLETADA) else None,
+            fecha_completada=ahora - timedelta(days=abs(dias))
+            if estado == EstadoOrdenTrabajo.COMPLETADA else None,
+            creador_id=creador_id,
+        )
+        db.add(ot)
+        await db.flush()
+        for r_idx in r_idxs:
+            rec = _r(r_idx)
+            if rec is not None:
+                db.add(OrdenTrabajoReclamo(orden_trabajo_id=ot.id, reclamo_id=rec.id))
+        creadas += 1
+    await db.flush()
+    return creadas
+
+
+# ============================================================
+# Turnero demo — se corre al FINAL del pipeline de crear-demo
+# (después de seed_10_demos, que agrega trámites sin modo de atención)
+# ============================================================
+
+_MODOS_ONLINE_KW = ("libre deuda", "certificado", "constancia", "boleta")
+_MODOS_SIN_TURNO_KW = ("denuncia", "reclamo")
+_MODOS_KYC_KW = ("licencia", "conducir")
+
+
+async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
+    """Deja el turnero demoable: cura el modo de atención de TODOS los
+    trámites del muni (los de seed_10_demos nacen 'online'), asegura que
+    cada trámite presencial tenga oficina mapeada, y carga turnos de
+    ejemplo (futuros reservados + pasados cumplidos/ausentes para que las
+    estadísticas de la agenda muestren datos)."""
+    import unicodedata
+    from datetime import date, timedelta
+    from models.municipio_dependencia_tramite import MunicipioDependenciaTramite
+    from models.turno import Turno
+
+    def _norm(s: str) -> str:
+        s = unicodedata.normalize("NFD", (s or "").lower())
+        return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
+    tramites = (await db.execute(
+        select(Tramite).where(Tramite.municipio_id == municipio_id, Tramite.activo == True)  # noqa: E712
+    )).scalars().all()
+    deps = (await db.execute(
+        select(MunicipioDependencia).where(MunicipioDependencia.municipio_id == municipio_id)
+    )).scalars().all()
+    vecino = (await db.execute(
+        select(User).where(User.municipio_id == municipio_id, User.rol == RolUsuario.VECINO).limit(1)
+    )).scalars().first()
+
+    mapeados = set((await db.execute(
+        select(MunicipioDependenciaTramite.tramite_id)
+        .join(MunicipioDependencia,
+              MunicipioDependencia.id == MunicipioDependenciaTramite.municipio_dependencia_id)
+        .where(MunicipioDependencia.municipio_id == municipio_id)
+    )).scalars().all())
+
+    counts = {"con_turno": 0, "online": 0, "sin_turno": 0, "mapeados": 0, "turnos": 0}
+    dep_i = 0
+    con_turno: list[Tramite] = []
+    for t in tramites:
+        nom = _norm(t.nombre)
+        if any(k in nom for k in _MODOS_KYC_KW):
+            t.modo_atencion = "presencial_con_turno"
+            t.duracion_turno_min = 45
+            t.requiere_kyc = True
+            t.nivel_kyc_minimo = 2
+            counts["con_turno"] += 1
+        elif any(k in nom for k in _MODOS_ONLINE_KW):
+            t.modo_atencion = "online"
+            counts["online"] += 1
+        elif any(k in nom for k in _MODOS_SIN_TURNO_KW):
+            t.modo_atencion = "presencial_sin_turno"
+            counts["sin_turno"] += 1
+        else:
+            t.modo_atencion = "presencial_con_turno"
+            t.duracion_turno_min = t.duracion_turno_min or 30
+            counts["con_turno"] += 1
+        if t.modo_atencion != "online":
+            if t.id not in mapeados and deps:
+                db.add(MunicipioDependenciaTramite(
+                    municipio_dependencia_id=deps[dep_i % len(deps)].id,
+                    tramite_id=t.id, activo=True,
+                ))
+                dep_i += 1
+                counts["mapeados"] += 1
+            if t.modo_atencion == "presencial_con_turno":
+                con_turno.append(t)
+    await db.flush()
+
+    # Turnos de ejemplo sobre los trámites con turno (si hay vecino demo).
+    # Futuros: próximos días hábiles a la mañana. Pasados: última semana con
+    # estados variados para que los KPIs de la agenda no arranquen en cero.
+    if vecino and con_turno and deps:
+        dep_de = {}
+        for fila in (await db.execute(
+            select(MunicipioDependenciaTramite).join(
+                MunicipioDependencia,
+                MunicipioDependencia.id == MunicipioDependenciaTramite.municipio_dependencia_id)
+            .where(MunicipioDependencia.municipio_id == municipio_id)
+        )).scalars().all():
+            dep_de[fila.tramite_id] = fila.municipio_dependencia_id
+
+        def _dia_habil(base: date, delta: int) -> date:
+            d = base + timedelta(days=delta)
+            while d.weekday() >= 5:
+                d += timedelta(days=1 if delta >= 0 else -1)
+            return d
+
+        hoy = date.today()
+        nombre_vec = f"{vecino.nombre} {vecino.apellido or ''}".strip()
+        # (delta_dias, hora, minuto, estado, recordatorio)
+        TURNOS = [
+            (1, 9, 0, "reservado", False),
+            (2, 9, 30, "reservado", False),
+            (3, 10, 0, "reservado", False),
+            (4, 10, 30, "reservado", False),
+            (-2, 9, 0, "cumplido", True),
+            (-3, 9, 30, "cumplido", True),
+            (-4, 10, 0, "cumplido", True),
+            (-5, 11, 0, "ausente", True),
+            (-6, 11, 30, "cancelado", False),
+        ]
+        for j, (delta, hh, mm, estado, recordado) in enumerate(TURNOS):
+            t = con_turno[j % len(con_turno)]
+            dep_id = dep_de.get(t.id)
+            if not dep_id:
+                continue
+            fh = datetime.combine(_dia_habil(hoy, delta), datetime.min.time()).replace(hour=hh, minute=mm)
+            db.add(Turno(
+                motivo_tipo="tramite",
+                tramite_id=t.id,
+                usuario_id=vecino.id,
+                municipio_dependencia_id=dep_id,
+                municipio_id=municipio_id,
+                fecha_hora=fh,
+                duracion_min=t.duracion_turno_min or 30,
+                estado=estado,
+                nombre_solicitante=nombre_vec or None,
+                dni_solicitante=vecino.dni,
+                telefono_solicitante=vecino.telefono,
+                recordatorio_enviado_at=datetime.utcnow() - timedelta(days=abs(delta))
+                if recordado else None,
+            ))
+            counts["turnos"] += 1
+        await db.flush()
+
+    return counts

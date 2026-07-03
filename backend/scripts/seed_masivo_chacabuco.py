@@ -488,14 +488,19 @@ CATEGORIA_DATA = {
         ]
     },
     "Otros Reclamos": {
+        # Titulos CONCRETOS aunque la categoria sea "otros" — los genericos
+        # ("Situacion irregular", "Problema a resolver") arruinaban las demos.
         "titulos": [
-            "Problema no categorizado", "Consulta general al municipio", "Situacion irregular",
-            "Reclamo multiple", "Inconveniente en la zona", "Solicitud especial",
-            "Tema a evaluar", "Problema a resolver", "Situacion a mejorar",
-            "Pedido de informacion", "Denuncia anonima", "Situacion urgente",
-            "Problema recurrente", "Queja general", "Sugerencia de mejora",
-            "Pedido especial", "Consulta sobre tramite", "Reclamo complejo",
-            "Tema administrativo", "Pedido de reunion"
+            "Vereda rota frente a la escuela", "Auto abandonado hace meses en la cuadra",
+            "Pastizal crecido en terreno baldio", "Cables colgando a baja altura",
+            "Fuga de agua en la vereda", "Olor a gas en la esquina",
+            "Alcantarilla tapada se inunda la esquina", "Grafitis en el frente de la biblioteca",
+            "Juegos de la plaza rotos", "Refugio de colectivo vandalizado",
+            "Escombros abandonados en la via publica", "Cesto de basura arrancado",
+            "Persiana del centro de salud rota", "Banco de plaza roto",
+            "Arbol caido tras la tormenta", "Poste de madera por caerse",
+            "Charco permanente por perdida de agua", "Rampa de discapacitados obstruida",
+            "Cartel publicitario suelto peligroso", "Reja del canal abierta"
         ],
         "descripciones": [
             "Tengo un problema que no se en que categoria entra, necesito orientacion.",

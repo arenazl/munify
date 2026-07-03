@@ -608,6 +608,18 @@ async def crear_municipio_demo(
         print(f"[CREAR DEMO] Seed extra 10+10 fallo (best-effort): {e}")
         await db.rollback()
 
+    # 4.bis Turnero (best-effort): cura el modo de atención de TODOS los
+    # trámites (los del paso 4 nacen 'online'), mapea oficinas y carga
+    # turnos de ejemplo (futuros + pasados) para agenda y estadísticas.
+    try:
+        from services.seed_demo import seed_turnero_demo
+        turnero_counts = await seed_turnero_demo(db, municipio.id)
+        print(f"[CREAR DEMO] Turnero seed: {turnero_counts}")
+        await db.commit()
+    except Exception as e:
+        print(f"[CREAR DEMO] Seed de turnero fallo (best-effort): {e}")
+        await db.rollback()
+
     # 5. Seed de tasas (best-effort): partidas + deudas ficticias para el demo
     # del Boton de Pago GIRE. Requiere seed_tipos_tasa.py ya corrido (global).
     try:
@@ -826,6 +838,15 @@ async def eliminar_municipio_demo(
         "DELETE ec FROM empleado_capacitaciones ec JOIN empleados e ON ec.empleado_id = e.id WHERE e.municipio_id = :mid",
         # Intermedia de cuadrillas
         "DELETE cc FROM cuadrilla_categorias cc JOIN cuadrillas c ON cc.cuadrilla_id = c.id WHERE c.municipio_id = :mid",
+        # Ordenes de trabajo (pivot N:M con reclamos)
+        "DELETE otr FROM orden_trabajo_reclamos otr JOIN ordenes_trabajo ot ON otr.orden_trabajo_id = ot.id WHERE ot.municipio_id = :mid",
+        # Mapeo tramite → dependencia (cuelga de municipio_dependencias)
+        "DELETE mdt FROM municipio_dependencia_tramites mdt JOIN municipio_dependencias md ON mdt.municipio_dependencia_id = md.id WHERE md.municipio_id = :mid",
+        # Tasas: deudas/pagos cuelgan de partidas
+        "DELETE d FROM tasas_deudas d JOIN tasas_partidas p ON d.partida_id = p.id WHERE p.municipio_id = :mid",
+        "DELETE tp FROM tasas_pagos tp JOIN tasas_partidas p ON tp.partida_id = p.id WHERE p.municipio_id = :mid",
+        # Tesoreria: cuotas cuelgan de gastos
+        "DELETE gc FROM gastos_cuotas gc JOIN gastos g ON gc.gasto_id = g.id WHERE g.municipio_id = :mid",
     ]:
         try:
             await db.execute(text(join_sql), {"mid": muni_id})
@@ -843,6 +864,16 @@ async def eliminar_municipio_demo(
         "email_validations",
         # Nuevos (seed demo completo)
         "cuadrillas", "empleados", "sla_config",
+        # Turnero + campo (2026-07)
+        "turnos", "ordenes_trabajo", "municipio_modulos",
+        # Tasas demo
+        "tasas_partidas",
+        # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)
+        "tesoreria_movimientos_caja", "tesoreria_pagos_programados",
+        "tesoreria_premios", "tesoreria_cajas", "tesoreria_parajes",
+        "tesoreria_conceptos", "tesoreria_tipos_concepto", "tesoreria_tipos_empleado",
+        "gasto_proyectos", "gastos", "contactos", "ordenes_pago",
+        "salesbot_configs", "configuraciones",
     ]
     for t in tables_with_muni:
         try:
