@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, LogIn, Sparkles, ArrowRight, Trash2, Check, Search, ShieldCheck, CreditCard } from 'lucide-react';
+import { Loader2, LogIn, Sparkles, ArrowRight, Trash2, Check, Search, ShieldCheck, CreditCard, MapPin } from 'lucide-react';
 import { municipiosApi } from '../lib/api';
 import { clearMunicipio } from '../utils/municipioStorage';
 import DemoCreationProgress from '../components/DemoCreationProgress';
@@ -47,16 +47,20 @@ export default function Demo() {
   const [sugerencias, setSugerencias] = useState<MuniArg[]>([]);
   const [muniSel, setMuniSel] = useState<MuniArg | null>(null);
   const [showSug, setShowSug] = useState(false);
+  const [hlIdx, setHlIdx] = useState(0);
+  const [buscando, setBuscando] = useState(false);
 
   // Buscar en el catálogo con debounce mientras tipea (y sin selección hecha)
   useEffect(() => {
     const q = nuevoNombre.trim();
     if (muniSel && `${muniSel.nombre}` === q) { setSugerencias([]); return; }
     if (q.length < 2) { setSugerencias([]); setShowSug(false); return; }
+    setBuscando(true);
     const id = setTimeout(() => {
       municipiosApi.buscarArgentina(q)
-        .then((r) => { setSugerencias(r.data || []); setShowSug(true); })
-        .catch(() => setSugerencias([]));
+        .then((r) => { setSugerencias(r.data || []); setShowSug(true); setHlIdx(0); })
+        .catch(() => setSugerencias([]))
+        .finally(() => setBuscando(false));
     }, 220);
     return () => clearTimeout(id);
   }, [nuevoNombre, muniSel]);
@@ -65,6 +69,19 @@ export default function Demo() {
     setMuniSel(m);
     setNuevoNombre(m.nombre.slice(0, MAX_NAME));
     setShowSug(false);
+  };
+
+  // Resalta la parte del nombre que matchea lo tipeado
+  const resaltar = (nombre: string, q: string) => {
+    const i = nombre.toLowerCase().indexOf(q.toLowerCase());
+    if (i < 0) return <>{nombre}</>;
+    return (
+      <>
+        {nombre.slice(0, i)}
+        <span className="font-bold text-blue-600">{nombre.slice(i, i + q.length)}</span>
+        {nombre.slice(i + q.length)}
+      </>
+    );
   };
 
   useEffect(() => {
@@ -255,9 +272,13 @@ export default function Demo() {
                     if (muniSel && muniSel.nombre !== v.trim()) setMuniSel(null);
                   }}
                   onKeyDown={(e) => {
+                    if (showSug && sugerencias.length > 0) {
+                      if (e.key === 'ArrowDown') { e.preventDefault(); setHlIdx((i) => (i + 1) % sugerencias.length); return; }
+                      if (e.key === 'ArrowUp') { e.preventDefault(); setHlIdx((i) => (i - 1 + sugerencias.length) % sugerencias.length); return; }
+                      if (e.key === 'Enter') { e.preventDefault(); elegirMuni(sugerencias[hlIdx] || sugerencias[0]); return; }
+                      if (e.key === 'Escape') { setShowSug(false); return; }
+                    }
                     if (e.key === 'Enter' && !creando && nameValid) handleCrearDemo();
-                    if (e.key === 'Enter' && !nameValid && sugerencias.length > 0) elegirMuni(sugerencias[0]);
-                    if (e.key === 'Escape') setShowSug(false);
                   }}
                   onFocus={() => { if (sugerencias.length > 0 && !muniSel) setShowSug(true); }}
                   onBlur={() => setTimeout(() => setShowSug(false), 180)}
@@ -284,17 +305,37 @@ export default function Demo() {
                     {nameValid && muniSel ? muniSel.provincia : `${trimmed.length}/${MAX_NAME}`}
                   </span>
                 </div>
-                {/* Dropdown del catálogo oficial (tabla local, dataset georef) */}
+                {/* Dropdown del catálogo oficial (tabla local, dataset georef).
+                    Teclado: flechas navegan, Enter elige, Esc cierra. */}
                 {showSug && sugerencias.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl border border-slate-200 shadow-xl z-30 max-h-64 overflow-y-auto">
-                    {sugerencias.map((m) => (
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-xl rounded-xl border border-slate-200/80 shadow-[0_18px_50px_-12px_rgba(15,23,42,0.25)] z-30 max-h-72 overflow-y-auto overscroll-contain">
+                    <div className="px-4 pt-2.5 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="h-3 w-3" />
+                      Catálogo oficial de municipios
+                      {buscando && <Loader2 className="h-3 w-3 animate-spin ml-auto" />}
+                    </div>
+                    {sugerencias.map((m, i) => (
                       <button
                         key={m.id}
                         onMouseDown={(e) => { e.preventDefault(); elegirMuni(m); }}
-                        className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-blue-50 transition-colors"
+                        onMouseEnter={() => setHlIdx(i)}
+                        ref={(el) => { if (i === hlIdx && el) el.scrollIntoView({ block: 'nearest' }); }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                          i === hlIdx ? 'bg-blue-50' : 'bg-transparent'
+                        }`}
                       >
-                        <span className="text-sm font-medium text-slate-800">{m.nombre}</span>
-                        <span className="text-xs text-slate-400">{m.provincia}</span>
+                        <span className={`flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition-colors ${
+                          i === hlIdx ? 'bg-gradient-to-br from-blue-500 to-cyan-500' : 'bg-slate-100'
+                        }`}>
+                          <MapPin className={`h-4 w-4 ${i === hlIdx ? 'text-white' : 'text-slate-400'}`} />
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-slate-800 truncate">
+                            {resaltar(m.nombre, trimmed)}
+                          </span>
+                          <span className="block text-[11px] text-slate-400">{m.provincia}</span>
+                        </span>
+                        {i === hlIdx && <ArrowRight className="h-4 w-4 text-blue-500 shrink-0" />}
                       </button>
                     ))}
                   </div>
