@@ -181,3 +181,30 @@ Diseño resultante — "sin cuenta" NO significa "sin identidad", significa
 
 Diferidas por standby del bot: hold de pre-reserva y verificación biométrica
 vía WhatsApp.
+
+## Verificación live (2026-07-02, post-deploy)
+
+Smoke test integral del flujo turno-first contra producción (muni demo 120,
+San Martín) — **todo verde**:
+
+| Paso | Resultado |
+|---|---|
+| Catálogo público con `modo_atencion` | 12 trámites: 9 con turno, 3 online, 1 con KYC (licencia) |
+| Disponibilidad por `tramite_id` (resuelve oficina mapeada) | 90 slots libres, dependencia resuelta |
+| `reservar-directo` (vecino logueado) | Turno TRN-00003 creado |
+| Ocupación por solapamiento | El slot desapareció de disponibilidad |
+| `mis-turnos` | Incluye el turno nuevo |
+| Gating biométrico (vecino nivel 0 → trámite con KYC) | 403 `kyc_insuficiente` correcto; con nivel 2 pasa |
+| Cancelación por el vecino | OK (turnos de prueba limpiados, cero huérfanos) |
+| `stats` staff (ausentismo, por trámite/hora/día) | OK |
+
+**Incidente durante el rollout**: el deploy de C.2 tiró el backend (503, ~30
+min) por un `import Request` faltante en `turnos_tramite.py` — el chequeo de
+sintaxis (`ast.parse`) no lo atrapa porque es un `NameError` en import-time de
+FastAPI. Hotfix `6d53b67`. **Lección incorporada al checklist**: correr
+`pyflakes` sobre todo archivo backend tocado antes de pushear.
+
+Curado demo ejecutado (`backend/scripts/_curar_turnero_demo_sm.py`): modos de
+atención + duraciones + KYC en licencia + mapeo de oficinas para los 12
+trámites de San Martín. La demo del flujo completo (catálogo → turno →
+check-in → expediente) queda operativa.
