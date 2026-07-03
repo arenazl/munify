@@ -478,7 +478,9 @@ export default function Demo() {
                           setToDelete(municipio);
                         }}
                         disabled={isEliminando}
-                        className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/0 hover:bg-red-50 text-slate-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                        // SIEMPRE visible (antes solo en hover: inaccesible en mobile).
+                        // Las demos se administran desde esta UI pública a propósito.
+                        className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/70 hover:bg-red-50 text-slate-400 hover:text-red-600 border border-slate-200/60 hover:border-red-200 transition-all disabled:opacity-50"
                         title={`Eliminar demo ${municipio.nombre}`}
                         aria-label={`Eliminar demo ${municipio.nombre}`}
                       >
