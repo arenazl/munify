@@ -563,7 +563,7 @@ export function ABMPage({
         <div
           className={`px-5 py-3 relative overflow-hidden ${effectiveSecondaryFilters ? 'rounded-t-xl' : 'rounded-xl'}`}
           style={{
-            backgroundColor: theme.card,
+            background: theme.cardAccentBg || theme.card,
             border: `1px solid ${theme.border}20`,
             borderBottom: effectiveSecondaryFilters ? 'none' : `1px solid ${theme.border}20`,
           }}
@@ -763,7 +763,7 @@ export function ABMPage({
           <div
             className="rounded-b-xl p-2.5 abm-secondary-filters-wrap"
             style={{
-              backgroundColor: theme.card,
+              background: theme.cardAccentBg || theme.card,
               border: `1px solid ${theme.border}20`,
               borderTop: 'none',
             }}
@@ -954,7 +954,7 @@ export function ABMPage({
       ) : (
         <div
           className="text-center py-16 rounded-xl flex flex-col items-center gap-4"
-          style={{ backgroundColor: theme.card, color: theme.textSecondary }}
+          style={{ background: theme.cardAccentBg || theme.card, color: theme.textSecondary }}
         >
           <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: theme.backgroundSecondary }}>
             <Search className="h-8 w-8" style={{ color: theme.textSecondary }} />
@@ -1012,7 +1012,7 @@ export function ABMCard({ children, onClick, index = 0 }: ABMCardProps) {
         abm-card-hover
       `}
       style={{
-        backgroundColor: theme.card,
+        background: theme.cardAccentBg || theme.card,
         border: `1px solid ${theme.border}`,
         color: theme.text,
         animationDelay: `${index * 50}ms`,
@@ -1206,7 +1206,7 @@ export function ABMSheetFooter({ onCancel, onSave, saving = false, saveLabel = '
       <button
         onClick={onCancel}
         className="px-5 py-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-        style={{ border: `1px solid ${theme.border}`, color: theme.text }}
+        style={{ background: theme.cardAccentBg, border: `1px solid ${theme.border}`, color: theme.text }}
       >
         Cancelar
       </button>
@@ -1424,7 +1424,7 @@ export function ABMCollapsible({ title, icon, children, defaultOpen = false, var
           ${isOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}
         `}
       >
-        <div className="px-3 py-2.5" style={{ backgroundColor: theme.card }}>
+        <div className="px-3 py-2.5" style={{ background: theme.cardAccentBg || theme.card }}>
           {children}
         </div>
       </div>
@@ -1737,7 +1737,7 @@ export function ABMTable<T>({
   return (
     <div
       className="rounded-xl overflow-hidden animate-fade-in-up"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      style={{ background: theme.cardAccentBg || theme.card, border: `1px solid ${theme.border}` }}
     >
       <div className="overflow-x-auto">
         <table className="w-full">
@@ -2352,7 +2352,7 @@ function PaginationFooter({ pagination, loading }: PaginationFooterProps) {
   return (
     <div
       className="flex items-center gap-3 flex-wrap rounded-xl px-5 py-3 mt-3"
-      style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}` }}
+      style={{ background: theme.cardAccentBg || theme.card, border: `1px solid ${theme.border}` }}
     >
       <span className="text-[12px] font-medium flex-1 min-w-[140px]" style={{ color: theme.textSecondary }}>
         {loading ? (

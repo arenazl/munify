@@ -107,7 +107,7 @@ export function Sheet({ open, onClose, title, description, children, footer, sti
           maxWidth: '32rem', // max-w-lg
           display: 'flex',
           flexDirection: 'column',
-          backgroundColor: theme.card,
+          background: theme.cardAccentBg || theme.card,
           transform: isVisible
             ? 'translateX(0) scale(1)'
             : 'translateX(100%) scale(0.95)',

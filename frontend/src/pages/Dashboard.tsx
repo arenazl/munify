@@ -146,7 +146,7 @@ export default function Dashboard() {
   // oscura en los temas claros y respeta la identidad del municipio.
   // Imagen de fondo del banner: la portada del muni si la cargo; si no, una
   // imagen default. Asi el banner nunca queda sin foto (caso demos / munis nuevos).
-  const [claroVariant, setClaroVariant] = useState(7); // arranca en la variante 8 (la elegida)
+  const claroVariant = 7; // variante 8 (elegida 2026-07-03) — fija, botonera de prueba sacada
   const DEFAULT_HERO = 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?q=80&w=2070';
   const heroBgImage = municipioActual?.imagen_portada || DEFAULT_HERO;
   const tienePortada = true; // siempre hay imagen (portada propia o default)
@@ -181,8 +181,11 @@ export default function Dashboard() {
     : `linear-gradient(135deg, ${theme.primary} 0%, ${theme.primaryHover || theme.primary} 100%)`;
   const heroTextColor = heroFondoOscuro ? '#ffffff' : theme.text;
   const heroTextMuted = heroFondoOscuro ? 'rgba(255,255,255,0.9)' : theme.textSecondary;
-  const heroShadowStrong = heroFondoOscuro ? '0 2px 8px rgba(0,0,0,0.5)' : 'none';
-  const heroShadowSoft = heroFondoOscuro ? '0 1px 4px rgba(0,0,0,0.4)' : 'none';
+  // Tema claro: el overlay radial (variante 8) se abre bastante hacia abajo/derecha,
+  // asi que el texto (anclado abajo, justify-end) puede quedar sin proteccion sobre
+  // la foto. Un halo blanco sutil en el shadow compensa sin oscurecer el texto.
+  const heroShadowStrong = heroFondoOscuro ? '0 2px 8px rgba(0,0,0,0.5)' : '0 1px 12px rgba(255,255,255,0.9), 0 1px 2px rgba(255,255,255,0.9)';
+  const heroShadowSoft = heroFondoOscuro ? '0 1px 4px rgba(0,0,0,0.4)' : '0 1px 10px rgba(255,255,255,0.85), 0 1px 2px rgba(255,255,255,0.85)';
   // ----------------------------------------------------------------------
 
   const navigate = useNavigate();
@@ -735,27 +738,9 @@ export default function Dashboard() {
         </>
         )}
 
-        {/* TEMPORAL: botonera para elegir el overlay del banner en TEMA CLARO.
-            Cuando elijas, dejamos ese fijo y se saca. */}
-        {isLightTheme && (
-        <div className="absolute bottom-3 left-4 z-20 flex items-center gap-1.5 flex-wrap" style={{ maxWidth: '70%' }}>
-          <span className="text-[10px] font-bold uppercase tracking-wider mr-1" style={{ color: heroTextColor }}>Claro</span>
-          {bannerClaroOverlays.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setClaroVariant(i)}
-              className="w-7 h-7 rounded-md text-xs font-extrabold flex items-center justify-center transition-transform hover:scale-110"
-              style={{
-                background: i === claroVariant ? theme.primary : 'rgba(0,0,0,0.10)',
-                color: i === claroVariant ? '#ffffff' : theme.text,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
-        )}
+        {/* Botonera de prueba de overlays (variante 8 elegida el 2026-07-03) —
+            sacada de la UI. El array bannerClaroOverlays queda por si se
+            quiere retomar la comparación más adelante. */}
 
 
         <style>{`
@@ -844,14 +829,14 @@ export default function Dashboard() {
               <span className="font-light">Municipalidad de </span>
               <span className="font-bold">{municipioNombre}</span>
             </h1>
-            <p className="text-sm md:text-base mb-4" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
+            <p className="text-sm md:text-base mb-4 font-medium" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
               {selectedDepNombre
                 ? <>Vista de la dependencia <strong>{selectedDepNombre}</strong></>
                 : 'Vista consolidada de todas las dependencias'}
             </p>
 
             {/* Stats rápidos estilo Wok */}
-            <div className="flex flex-wrap items-center gap-4 text-sm" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
+            <div className="flex flex-wrap items-center gap-4 text-sm font-medium" style={{ color: heroTextMuted, textShadow: heroShadowSoft }}>
               <div className="flex items-center gap-1.5">
                 <ClipboardList className="w-4 h-4" />
                 <span>{stats?.total || 0} reclamos</span>

@@ -50,6 +50,12 @@ export interface ThemeColors {
 
   // Bordes
   border: string;
+
+  /** Fondo con un lavado MUY sutil del acento (gradiente), para contenedores
+   *  "agrupación" (header de ABMPage, tabla, cards, Sheet). Opcional — si no
+   *  está definido, los componentes caen a `card` (flat, comportamiento
+   *  histórico). En evaluación 2026-07-03 solo para niebla/marfil/perla. */
+  cardAccentBg?: string;
 }
 
 // Funciones auxiliares de color
@@ -182,6 +188,22 @@ function genCuratedVariants(
   };
 }
 
+// Lavado sutil del acento sobre el card — diagonal, se disuelve rápido para
+// no competir con el contenido. EXPERIMENTO 2026-07-03: solo se aplica a
+// niebla/marfil/perla vía `withAccentWash` (no toca generateColors ni el
+// resto de los temas, que siguen con `card` flat).
+const accentWash = (card: string, primary: string): string =>
+  `linear-gradient(160deg, ${mixColors(card, primary, 0.07)} 0%, ${card} 60%)`;
+
+function withAccentWash(variants: ThemePreset['variants']): ThemePreset['variants'] {
+  const tint = (c: ThemeColors): ThemeColors => ({ ...c, cardAccentBg: accentWash(c.card, c.primary) });
+  return {
+    clasico: tint(variants.clasico),
+    vintage: tint(variants.vintage),
+    vibrante: tint(variants.vibrante),
+  };
+}
+
 // ============================================================
 // COLECCION CURADA — 9 temas oficiales (3 light suaves + 3 azul SaaS + 3 dark VS Code)
 // El resto de los temas (Midnight, Forest, Sunset, etc.) estan `archived: true`:
@@ -199,8 +221,8 @@ export const themePresets: ThemePreset[] = [
     name: 'Niebla',
     family: 'light',
     palette: ['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'],
-    variants: genCuratedVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'], 0, 3,
-      ['#e7ebf3', '#475569', '#1e293b']),
+    variants: withAccentWash(genCuratedVariants(['#f4f6fa', '#e7ebf3', '#1e293b', '#4f46e5'], 0, 3,
+      ['#e7ebf3', '#475569', '#1e293b'])),
   },
 
   // 2. Marfil — beige calido, acento verde olivo. Editorial/civic.
@@ -209,8 +231,8 @@ export const themePresets: ThemePreset[] = [
     name: 'Marfil',
     family: 'light',
     palette: ['#faf8f3', '#efece4', '#1f2937', '#65a30d'],
-    variants: genCuratedVariants(['#faf8f3', '#efece4', '#1f2937', '#65a30d'], 0, 3,
-      ['#efece4', '#57534e', '#292524']),
+    variants: withAccentWash(genCuratedVariants(['#faf8f3', '#efece4', '#1f2937', '#65a30d'], 0, 3,
+      ['#efece4', '#57534e', '#292524'])),
   },
 
   // 3. Perla — gris perlado limpio, acento azul acero. Escandinavo.
@@ -219,8 +241,8 @@ export const themePresets: ThemePreset[] = [
     name: 'Perla',
     family: 'light',
     palette: ['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'],
-    variants: genCuratedVariants(['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'], 0, 3,
-      ['#e2e8f0', '#475569', '#0f172a']),
+    variants: withAccentWash(genCuratedVariants(['#f1f5f9', '#e2e8f0', '#0f172a', '#0369a1'], 0, 3,
+      ['#e2e8f0', '#475569', '#0f172a'])),
   },
 
   // ---- AZUL (SaaS modernos, fondo azul-grisaceo) ----
