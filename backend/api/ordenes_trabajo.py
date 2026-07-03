@@ -252,6 +252,8 @@ async def listar_ordenes(
     cuadrilla_id: Optional[int] = None,
     empleado_id: Optional[int] = None,
     reclamo_id: Optional[int] = None,
+    dependencia_id: Optional[int] = Query(None, description="Solo OTs con algún reclamo vinculado de esta dependencia"),
+    vigentes: bool = Query(False, description="Excluye OTs completadas/canceladas"),
     solo_mias: bool = Query(False, description="Solo OTs donde soy responsable o mi cuadrilla"),
     search: Optional[str] = Query(None, description="Busca en número/título"),
     skip: int = Query(0, ge=0),
@@ -282,8 +284,16 @@ async def listar_ordenes(
         query = query.where(OrdenTrabajo.cuadrilla_id == cuadrilla_id)
     if empleado_id:
         query = query.where(OrdenTrabajo.empleado_id == empleado_id)
-    if reclamo_id:
-        query = query.join(OrdenTrabajoReclamo).where(OrdenTrabajoReclamo.reclamo_id == reclamo_id)
+    if reclamo_id or dependencia_id:
+        query = query.join(OrdenTrabajoReclamo, OrdenTrabajoReclamo.orden_trabajo_id == OrdenTrabajo.id)
+        if reclamo_id:
+            query = query.where(OrdenTrabajoReclamo.reclamo_id == reclamo_id)
+        if dependencia_id:
+            query = query.join(Reclamo, Reclamo.id == OrdenTrabajoReclamo.reclamo_id).where(
+                Reclamo.municipio_dependencia_id == dependencia_id
+            )
+    if vigentes:
+        query = query.where(OrdenTrabajo.estado.notin_(ESTADOS_FINALES))
     if search and search.strip():
         s = f"%{search.strip()}%"
         from sqlalchemy import or_

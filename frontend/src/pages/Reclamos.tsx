@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList, ThumbsDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
@@ -25,7 +25,7 @@ import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../compone
 import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
-import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType } from '../types';
+import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType, OrdenTrabajo } from '../types';
 
 // Helper para generar URL de imagen local basada en el nombre de la categoría
 const getCategoryImageUrl = (nombre: string): string | null => {
@@ -283,6 +283,12 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [dependenciaSeleccionada, setDependenciaSeleccionada] = useState<string>('');
   const [empleadoSeleccionadoId, setEmpleadoSeleccionadoId] = useState<string>('');
   const [asignandoEmpleado, setAsignandoEmpleado] = useState(false);
+  // Asignación polimórfica (cuadrilla o empleado) + vínculo guiado a Orden de Trabajo
+  const [cuadrillasDisponibles, setCuadrillasDisponibles] = useState<{ id: number; nombre: string; apellido?: string | null }[]>([]);
+  const [moduloOTActivo, setModuloOTActivo] = useState(false);
+  const [otsVigentesDependencia, setOtsVigentesDependencia] = useState<OrdenTrabajo[]>([]);
+  const [otSeleccionadaId, setOtSeleccionadaId] = useState<string>('');
+  const [vinculandoOT, setVinculandoOT] = useState(false);
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
   const [descripcionInicio, setDescripcionInicio] = useState('');
   const [fechaProgramada, setFechaProgramada] = useState('');
@@ -463,6 +469,18 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       }).catch(() => {
         setDependenciasDisponibles([]);
       });
+
+      // Cuadrillas del municipio — determina si la asignación es polimórfica
+      // (cuadrilla, para munis grandes) o solo empleado individual (munis chicos).
+      empleadosGestionApi.getCuadrillasAll({ activo: true }).then((res) => {
+        setCuadrillasDisponibles(res.data || []);
+      }).catch(() => setCuadrillasDisponibles([]));
+
+      // Módulo Órdenes de Trabajo — opt-in por municipio, igual que en el sidebar.
+      modulosApi.list().then((res) => {
+        const rows = (res.data || []) as Array<{ modulo: string; activo: boolean }>;
+        setModuloOTActivo(rows.some(m => m.modulo === 'ordenes_trabajo' && m.activo));
+      }).catch(() => setModuloOTActivo(false));
     }
   }, [soloMisTrabajos]);
 
@@ -1431,6 +1449,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
   };
 
+  // OTs vigentes (pendiente/asignada/en_curso) de la dependencia del reclamo
+  // abierto — datasource del combo "Orden de trabajo" del bloque de asignación.
+  useEffect(() => {
+    setOtSeleccionadaId('');
+    if (!moduloOTActivo || !selectedReclamo?.dependencia_asignada?.id) {
+      setOtsVigentesDependencia([]);
+      return;
+    }
+    ordenesTrabajoApi.list({ dependencia_id: selectedReclamo.dependencia_asignada.id, vigentes: true })
+      .then(res => setOtsVigentesDependencia(res.data || []))
+      .catch(() => setOtsVigentesDependencia([]));
+  }, [selectedReclamo?.id, selectedReclamo?.dependencia_asignada?.id, moduloOTActivo]);
+
   const handleAsignarEmpleadoManual = async (empleadoId: string) => {
     if (!selectedReclamo) return;
     setEmpleadoSeleccionadoId(empleadoId);
@@ -1456,6 +1487,55 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       toast.error(e.response?.data?.detail || 'No se pudo asignar');
     } finally {
       setAsignandoEmpleado(false);
+    }
+  };
+
+  // --- Vínculo guiado con Órdenes de Trabajo (opt-in, módulo 'ordenes_trabajo') ---
+  // Responsable polimórfico: "cuadrilla:<id>" o "empleado:<id>". Una cuadrilla
+  // no existe como campo directo del reclamo (Reclamo solo tiene empleado_id
+  // liviano) — por eso asignar una cuadrilla SIEMPRE canaliza por una OT.
+  const handleAsignarResponsable = (valor: string) => {
+    setEmpleadoSeleccionadoId(valor);
+    setOtSeleccionadaId('');
+  };
+
+  const handleVincularOT = async (otValor: string) => {
+    if (!selectedReclamo || !empleadoSeleccionadoId) return;
+    setOtSeleccionadaId(otValor);
+    const [tipo, idStr] = empleadoSeleccionadoId.split(':');
+    const responsable = tipo === 'cuadrilla' ? { cuadrilla_id: Number(idStr) } : { empleado_id: Number(idStr) };
+
+    // Empleado + "asignación simple" (sin OT): circuito liviano de siempre.
+    if (!otValor && tipo === 'empleado') {
+      await handleAsignarEmpleadoManual(idStr);
+      return;
+    }
+    if (!otValor) return; // cuadrilla sin OT no es una opción válida (ver arriba)
+
+    setVinculandoOT(true);
+    try {
+      if (otValor === '__nueva__') {
+        const res = await ordenesTrabajoApi.create({
+          titulo: selectedReclamo.titulo,
+          descripcion: `Generada desde el reclamo #${selectedReclamo.id}`,
+          reclamo_ids: [selectedReclamo.id],
+          fecha_programada: fechaProgramada || undefined,
+          hora_inicio: horaInicio || undefined,
+          ...responsable,
+        });
+        toast.success(`Orden de trabajo ${res.data?.numero || ''} creada y vinculada`);
+      } else {
+        const ot = otsVigentesDependencia.find(o => String(o.id) === otValor);
+        const reclamoIds = Array.from(new Set([...(ot?.reclamos.map(r => r.id) || []), selectedReclamo.id]));
+        await ordenesTrabajoApi.update(Number(otValor), { reclamo_ids: reclamoIds, ...responsable });
+        toast.success(`Reclamo vinculado a la orden ${ot?.numero || otValor}`);
+      }
+      fetchReclamos();
+    } catch (err) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      toast.error(e.response?.data?.detail || 'No se pudo vincular la orden de trabajo');
+    } finally {
+      setVinculandoOT(false);
     }
   };
 
@@ -3187,7 +3267,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
-        {/* Asignar empleado — panel separado, colapsado por defecto cuando no hay candidatos */}
+        {/* Asignar responsable — polimórfico (cuadrilla o empleado) + vínculo guiado
+            a Orden de Trabajo. Una cuadrilla no tiene campo directo en Reclamo, así
+            que asignar una cuadrilla siempre canaliza por una OT; un empleado puede
+            seguir el circuito liviano de siempre (sin OT) o sumarse a una OT. */}
         {selectedReclamo.dependencia_asignada?.nombre &&
           (user?.rol === 'admin' || user?.rol === 'supervisor') &&
           ['recibido', 'en_curso', 'pospuesto'].includes(selectedReclamo.estado) && (() => {
@@ -3197,18 +3280,38 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                 e.categorias?.some(c => c.id === selectedReclamo.categoria.id)
               )
             );
-            const hayCandidatos = empleadosDependencia.length > 0;
+            const hayCuadrillas = cuadrillasDisponibles.length > 0;
+            const hayCandidatos = empleadosDependencia.length > 0 || hayCuadrillas;
+            const responsableOptions = [
+              ...cuadrillasDisponibles.map(c => ({
+                value: `cuadrilla:${c.id}`,
+                label: `${c.nombre}${c.apellido ? ` ${c.apellido}` : ''} · cuadrilla`,
+              })),
+              ...empleadosDependencia.map(emp => ({
+                value: `empleado:${emp.id}`,
+                label: `${emp.nombre} ${emp.apellido || ''}${emp.especialidad ? ` · ${emp.especialidad}` : ''}`.trim(),
+              })),
+            ];
+            const tipoResp = empleadoSeleccionadoId.split(':')[0];
+            const otOptions = [
+              ...(tipoResp === 'empleado' ? [{ value: '', label: 'Asignación simple (sin orden de trabajo)' }] : []),
+              ...otsVigentesDependencia.map(ot => ({
+                value: String(ot.id),
+                label: `${ot.numero} · ${ot.titulo} (${ot.reclamos.length} reclamo${ot.reclamos.length === 1 ? '' : 's'})`,
+              })),
+              { value: '__nueva__', label: '+ Nueva orden de trabajo' },
+            ];
             return (
               <ABMCollapsible
-                key={`empleado-${selectedReclamo.id}-${hayCandidatos ? 'o' : 'c'}`}
-                title={hayCandidatos ? 'Asignar empleado (opcional)' : 'Asignar empleado — sin candidatos'}
+                key={`resp-${selectedReclamo.id}-${hayCandidatos ? 'o' : 'c'}`}
+                title={hayCandidatos ? 'Asignar trabajo (opcional)' : 'Asignar trabajo — sin candidatos'}
                 icon={<UserPlus className="h-4 w-4" />}
                 defaultOpen={hayCandidatos}
               >
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleAutoAsignar}
-                    disabled={asignandoEmpleado || !hayCandidatos}
+                    disabled={asignandoEmpleado || empleadosDependencia.length === 0}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 flex-shrink-0"
                     style={{
                       backgroundColor: `${theme.primary}15`,
@@ -3220,31 +3323,41 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
                     <Sparkles className="h-3.5 w-3.5" />
                     {asignandoEmpleado ? 'Asignando…' : 'Auto-asignar'}
                   </button>
-                  <select
-                    value={empleadoSeleccionadoId}
-                    onChange={(e) => handleAsignarEmpleadoManual(e.target.value)}
-                    disabled={asignandoEmpleado || !hayCandidatos}
-                    className="flex-1 min-w-0 rounded-lg text-xs px-2 py-1.5 transition-colors focus:outline-none"
-                    style={{
-                      backgroundColor: theme.backgroundSecondary,
-                      color: theme.text,
-                      border: `1px solid ${theme.border}`,
-                    }}
-                  >
-                    <option value="">
-                      {hayCandidatos ? 'Seleccionar empleado…' : 'Sin empleados asignables en la dependencia'}
-                    </option>
-                    {empleadosDependencia.map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.nombre} {emp.apellido || ''}{emp.especialidad ? ` · ${emp.especialidad}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex-1 min-w-0">
+                    <ModernSelect
+                      value={empleadoSeleccionadoId}
+                      onChange={handleAsignarResponsable}
+                      options={responsableOptions}
+                      placeholder={hayCandidatos ? (hayCuadrillas ? 'Seleccionar cuadrilla o empleado…' : 'Seleccionar empleado…') : 'Sin cuadrillas ni empleados asignables'}
+                      disabled={asignandoEmpleado || !hayCandidatos}
+                      searchable
+                    />
+                  </div>
                 </div>
                 {!hayCandidatos && (
                   <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
-                    Esta dependencia no tiene empleados cargados para la categoría del reclamo. La asignación de empleado es opcional — podés avanzar sin ella.
+                    Esta dependencia no tiene cuadrillas ni empleados cargados para la categoría del reclamo. La asignación es opcional — podés avanzar sin ella.
                   </p>
+                )}
+                {moduloOTActivo && !!empleadoSeleccionadoId && (
+                  <div className="mt-3">
+                    <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>
+                      Orden de trabajo
+                    </p>
+                    <ModernSelect
+                      value={otSeleccionadaId}
+                      onChange={handleVincularOT}
+                      options={otOptions}
+                      placeholder="Elegí una orden vigente o generá una nueva…"
+                      disabled={vinculandoOT}
+                      searchable
+                    />
+                    <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                      {tipoResp === 'cuadrilla'
+                        ? 'Las cuadrillas siempre trabajan con una orden de trabajo formal.'
+                        : 'Opcional: si el municipio no usa órdenes de trabajo, dejá "Asignación simple".'}
+                    </p>
+                  </div>
                 )}
               </ABMCollapsible>
             );

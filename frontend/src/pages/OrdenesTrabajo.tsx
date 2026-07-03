@@ -4,13 +4,13 @@ import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X } fro
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ABMPage } from '../components/ui/ABMPage';
+import { ABMPage, ABMTable } from '../components/ui/ABMPage';
 import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi } from '../lib/api';
-import { otEstadoLabel, otEstadoColor, otEstadoIcons, OT_ESTADO_OPTIONS } from '../lib/enums/ordenTrabajo';
+import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels } from '../lib/enums/ordenTrabajo';
 import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado } from '../types';
 
 interface CuadrillaMini {
@@ -42,6 +42,7 @@ export default function OrdenesTrabajo() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [ordenes, setOrdenes] = useState<OrdenTrabajo[]>([]);
+  const [todasOrdenes, setTodasOrdenes] = useState<OrdenTrabajo[]>([]); // sin filtro de estado, solo para contar las píldoras
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<string>('');
@@ -82,6 +83,17 @@ export default function OrdenesTrabajo() {
   }, [filtroEstado, search]);
 
   useEffect(() => { fetchOrdenes(); }, [fetchOrdenes]);
+
+  // Conteos para las píldoras de estado — independiente del filtro activo
+  useEffect(() => {
+    ordenesTrabajoApi.list({ limit: 200 }).then(res => setTodasOrdenes(res.data || [])).catch(() => {});
+  }, [ordenes]);
+
+  const conteosEstado = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const ot of todasOrdenes) c[ot.estado] = (c[ot.estado] || 0) + 1;
+    return c;
+  }, [todasOrdenes]);
 
   // Catálogos (una vez)
   useEffect(() => {
@@ -244,6 +256,73 @@ export default function OrdenesTrabajo() {
   const esEditable = !selected || (selected.estado !== 'completada' && selected.estado !== 'cancelada');
   const inputStyle = { backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` };
 
+  const otTableColumns = [
+    {
+      key: 'numero',
+      header: 'Número',
+      sortValue: (ot: OrdenTrabajo) => ot.numero,
+      render: (ot: OrdenTrabajo) => (
+        <span className="font-mono text-xs" style={{ color: theme.textSecondary }}>{ot.numero}</span>
+      ),
+    },
+    {
+      key: 'titulo',
+      header: 'Título',
+      width: '260px',
+      sortValue: (ot: OrdenTrabajo) => ot.titulo,
+      render: (ot: OrdenTrabajo) => (
+        <span className="text-sm font-medium truncate block" style={{ color: theme.text }}>{ot.titulo}</span>
+      ),
+    },
+    {
+      key: 'responsable',
+      header: 'Responsable',
+      sortValue: (ot: OrdenTrabajo) => ot.cuadrilla_nombre || ot.empleado_nombre || '',
+      render: (ot: OrdenTrabajo) => (
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: theme.textSecondary }}>
+          {ot.cuadrilla_nombre && <><Users className="h-3.5 w-3.5" />{ot.cuadrilla_nombre}</>}
+          {ot.empleado_nombre && <><UserIcon className="h-3.5 w-3.5" />{ot.empleado_nombre}</>}
+          {!ot.cuadrilla_nombre && !ot.empleado_nombre && '—'}
+        </div>
+      ),
+    },
+    {
+      key: 'reclamos',
+      header: 'Reclamos',
+      sortValue: (ot: OrdenTrabajo) => ot.reclamos.length,
+      render: (ot: OrdenTrabajo) => (
+        <span className="flex items-center gap-1 text-xs" style={{ color: theme.textSecondary }}>
+          <ClipboardList className="h-3.5 w-3.5" />{ot.reclamos.length}
+        </span>
+      ),
+    },
+    {
+      key: 'fecha_programada',
+      header: 'Programada',
+      sortValue: (ot: OrdenTrabajo) => ot.fecha_programada || '',
+      render: (ot: OrdenTrabajo) => ot.fecha_programada ? (
+        <span className="text-xs" style={{ color: theme.textSecondary }}>
+          {new Date(`${ot.fecha_programada}T00:00:00`).toLocaleDateString('es-AR')}
+        </span>
+      ) : <span className="text-xs" style={{ color: theme.textSecondary }}>—</span>,
+    },
+    {
+      key: 'estado',
+      header: 'Estado',
+      sortValue: (ot: OrdenTrabajo) => ot.estado,
+      render: (ot: OrdenTrabajo) => {
+        const color = otEstadoColor(ot.estado);
+        const EstadoIcon = otEstadoIcons[ot.estado as EstadoOrdenTrabajo] || Hammer;
+        return (
+          <span className="flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full w-fit" style={{ backgroundColor: `${color}20`, color }}>
+            <EstadoIcon className="h-3 w-3" />
+            {otEstadoLabel(ot.estado)}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
     <>
       <ABMPage
@@ -258,20 +337,32 @@ export default function OrdenesTrabajo() {
         buttonLabel="Nueva orden"
         buttonIcon={<Plus className="h-4 w-4 mr-1.5" />}
         onAdd={esGestor ? () => abrirNueva() : undefined}
+        defaultViewMode="table"
+        viewStorageKey="ordenes_trabajo_view"
         toolbar={{
-          combos: [
-            {
-              key: 'estado',
-              placeholder: 'Estados',
-              value: filtroEstado,
-              onChange: (v: string) => setFiltroEstado(v),
-              options: OT_ESTADO_OPTIONS.map(o => ({
-                value: o.value, label: o.label, color: otEstadoColor(o.value),
-              })),
-            },
-          ],
+          statusPills: {
+            value: filtroEstado,
+            onChange: (v: string) => setFiltroEstado(v),
+            items: (Object.keys(otEstadoLabels) as EstadoOrdenTrabajo[]).map(estado => ({
+              key: estado,
+              label: otEstadoLabels[estado],
+              icon: otEstadoIcons[estado],
+              color: otEstadoColor(estado),
+              count: conteosEstado[estado] || 0,
+            })),
+          },
           layout: 'left',
         }}
+        tableView={
+          <ABMTable
+            data={ordenes}
+            columns={otTableColumns}
+            keyExtractor={(ot: OrdenTrabajo) => ot.id}
+            onRowClick={(ot: OrdenTrabajo) => abrirDetalle(ot)}
+            defaultSortKey="numero"
+            defaultSortDirection="desc"
+          />
+        }
       >
         {ordenes.map(ot => {
           const color = otEstadoColor(ot.estado);

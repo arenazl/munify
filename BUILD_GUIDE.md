@@ -29,7 +29,7 @@ SaaS municipal multi-tenant (cada municipio = un tenant aislado por
 - **Trámites** — vecinos solicitan; dependencias procesan.
 - **Tesorería** — supervisores cargan gastos / proyecciones / contactos.
 - **Dependencias** — secretarías del municipio que reciben reclamos/trámites según categoría.
-- **Multi-rol:** `vecino`, `supervisor`, `admin` (rol `empleado` está deprecado).
+- **Multi-rol:** `vecino`, `supervisor`, `admin`, `empleado` (circuito de campo: mis-trabajos, órdenes de trabajo).
 
 ---
 
@@ -702,7 +702,7 @@ Usar `Sheet` con scroll interno. Acciones en footer del `Sheet`.
 ### 8.2 Autenticación y roles
 
 - Dependency en cada endpoint: `current_user: User = Depends(get_current_user)` (de `core/security.py`).
-- Roles: `vecino`, `supervisor`, `admin`. (`empleado` está deprecado.)
+- Roles: `vecino`, `supervisor`, `admin`, `empleado` (este último solo con acceso a "Mis Trabajos" y, si el módulo está activo, "Órdenes de Trabajo" propias).
 - Chequeo inline:
   ```python
   if current_user.rol not in ("supervisor", "admin"):
