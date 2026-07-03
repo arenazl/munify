@@ -39,6 +39,32 @@ class EstadoOrdenTrabajo(str, enum.Enum):
     CANCELADA = "cancelada"
 
 
+class NaturalezaInventario(str, enum.Enum):
+    """Dos naturalezas de inventario, con mecánicas opuestas.
+
+    - ACTIVO: bien reutilizable (camioneta, retro, motosierra). No se
+      consume: una OT lo *toma* y queda ocupado hasta que se libera.
+    - CONSUMIBLE: material que se gasta (cemento, caños, pintura). Tiene
+      stock; una OT lo *descuenta* al completarse.
+    """
+    ACTIVO = "activo"
+    CONSUMIBLE = "consumible"
+
+
+class EstadoActivo(str, enum.Enum):
+    """Estado operativo de un bien de inventario (solo naturaleza ACTIVO)."""
+    DISPONIBLE = "disponible"        # Libre para asignar a una OT
+    EN_USO = "en_uso"                # Tomado por una OT vigente
+    MANTENIMIENTO = "mantenimiento"  # Fuera de servicio temporal
+    BAJA = "baja"                    # Dado de baja (no operativo)
+
+
+class TipoRecursoOT(str, enum.Enum):
+    """Cómo una OT usa un ítem de inventario."""
+    RESERVA = "reserva"   # Toma un activo (se libera al cerrar la OT)
+    CONSUMO = "consumo"   # Gasta un consumible (descuenta stock al completar)
+
+
 class TipoAusencia(str, enum.Enum):
     VACACIONES = "vacaciones"
     LICENCIA_MEDICA = "licencia_medica"

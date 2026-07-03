@@ -1415,6 +1415,26 @@ export const ordenesTrabajoApi = {
   cancelar: (id: number, motivo: string) => api.post(`/ordenes-trabajo/${id}/cancelar`, { motivo }),
 };
 
+// Inventario — categorías (template) + ítems (activos/consumibles)
+export const inventarioApi = {
+  // Categorías
+  listCategorias: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/categorias', { params }),
+  createCategoria: (data: Record<string, unknown>) =>
+    api.post('/inventario/categorias', data),
+  updateCategoria: (id: number, data: Record<string, unknown>) =>
+    api.put(`/inventario/categorias/${id}`, data),
+  deleteCategoria: (id: number) => api.delete(`/inventario/categorias/${id}`),
+  // Ítems
+  listItems: (params?: Record<string, string | number | boolean>) =>
+    api.get('/inventario/items', { params }),
+  getItem: (id: number) => api.get(`/inventario/items/${id}`),
+  createItem: (data: Record<string, unknown>) => api.post('/inventario/items', data),
+  updateItem: (id: number, data: Record<string, unknown>) =>
+    api.put(`/inventario/items/${id}`, data),
+  deleteItem: (id: number) => api.delete(`/inventario/items/${id}`),
+};
+
 export const tramitesApi = {
   // ----- CRUD de Trámite (admin del municipio) -----
   getAll: (params?: { categoria_tramite_id?: number; activo?: boolean }) =>

@@ -42,6 +42,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | OpenAPI del backend en prod (Cloud Run) | [`plataforma/openapi-prod.json`](plataforma/openapi-prod.json) |
 | Qué se le comunicó/arregló a San Pedro Norte | [`clientes/spn/`](clientes/spn/) |
 | Curación de gastos históricos SPN (estado + cómo retomar) | [`clientes/spn/02-curacion-gastos-historicos.md`](clientes/spn/02-curacion-gastos-historicos.md) |
+| Módulo Inventario + cruce con OT (estado + qué falta) | [`handoffs/2026-07-03_modulo-inventario-y-ot-formato.md`](handoffs/2026-07-03_modulo-inventario-y-ot-formato.md) |
 
 ## ¿Dónde va un doc nuevo?
 

@@ -24,7 +24,11 @@ from .sla import SLAConfig, SLAViolacion
 from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
 from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
-from .enums import EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana, EstadoOrdenTrabajo
+from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
+from .enums import (
+    EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana,
+    EstadoOrdenTrabajo, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+)
 from .gamificacion import (
     PuntosUsuario, HistorialPuntos, BadgeUsuario,
     LeaderboardMensual, RecompensaDisponible, RecompensaCanjeada,
@@ -84,6 +88,13 @@ __all__ = [
     "OrdenTrabajo",
     "OrdenTrabajoReclamo",
     "EstadoOrdenTrabajo",
+    # Inventario (activos + consumibles)
+    "InventarioCategoria",
+    "InventarioItem",
+    "OrdenTrabajoRecurso",
+    "NaturalezaInventario",
+    "EstadoActivo",
+    "TipoRecursoOT",
     # Gamificación
     "PuntosUsuario",
     "HistorialPuntos",

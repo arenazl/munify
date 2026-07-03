@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X } from 'lucide-react';
+import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,9 +9,19 @@ import { Sheet } from '../components/ui/Sheet';
 import { ConfirmModal } from '../components/ui/ConfirmModal';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
-import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi } from '../lib/api';
+import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inventarioApi } from '../lib/api';
 import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels } from '../lib/enums/ordenTrabajo';
-import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado } from '../types';
+import { naturalezaColors, naturalezaIcons } from '../lib/enums/inventario';
+import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario } from '../types';
+
+// Recurso de inventario en el form de la OT (activo reservado o consumible planeado).
+type RecursoForm = {
+  item_id: number;
+  nombre: string;
+  naturaleza: NaturalezaInventario;
+  cantidad?: number;
+  unidad?: string | null;
+};
 
 interface CuadrillaMini {
   id: number;
@@ -28,12 +38,13 @@ type FormState = {
   fecha_programada: string;
   horas_estimadas: string;
   materiales: OTMaterial[];
+  recursos: RecursoForm[];
   reclamo_ids: number[];
 };
 
 const FORM_VACIO: FormState = {
   titulo: '', descripcion: '', cuadrilla_id: '', empleado_id: '',
-  fecha_programada: '', horas_estimadas: '', materiales: [], reclamo_ids: [],
+  fecha_programada: '', horas_estimadas: '', materiales: [], recursos: [], reclamo_ids: [],
 };
 
 export default function OrdenesTrabajo() {
@@ -62,6 +73,7 @@ export default function OrdenesTrabajo() {
   const [cuadrillas, setCuadrillas] = useState<CuadrillaMini[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [reclamosActivos, setReclamosActivos] = useState<Reclamo[]>([]);
+  const [itemsDisponibles, setItemsDisponibles] = useState<InventarioItem[]>([]);
   // Nuevo material (form inline)
   const [nuevoMaterial, setNuevoMaterial] = useState('');
 
@@ -111,6 +123,12 @@ export default function OrdenesTrabajo() {
       } catch {
         // catálogos best-effort: el listado principal sigue funcionando
       }
+      // Inventario disponible (opt-in): si el módulo no está activo o no hay
+      // ítems, queda vacío y la sección "Recursos" no se muestra.
+      try {
+        const iRes = await inventarioApi.listItems({ solo_disponibles: true, limit: 300 });
+        setItemsDisponibles(iRes.data || []);
+      } catch { /* inventario no activo: sin recursos */ }
     })();
   }, [esGestor]);
 
@@ -147,6 +165,13 @@ export default function OrdenesTrabajo() {
       fecha_programada: ot.fecha_programada || '',
       horas_estimadas: ot.horas_estimadas != null ? String(ot.horas_estimadas) : '',
       materiales: ot.materiales || [],
+      recursos: (ot.recursos || []).map(r => ({
+        item_id: r.item_id,
+        nombre: r.item_nombre || `#${r.item_id}`,
+        naturaleza: (r.naturaleza || (r.tipo === 'reserva' ? 'activo' : 'consumible')) as NaturalezaInventario,
+        cantidad: r.cantidad ?? undefined,
+        unidad: r.unidad,
+      })),
       reclamo_ids: ot.reclamos.map(r => r.id),
     });
     setNotasCierre('');
@@ -162,6 +187,10 @@ export default function OrdenesTrabajo() {
     fecha_programada: form.fecha_programada || null,
     horas_estimadas: form.horas_estimadas ? Number(form.horas_estimadas) : null,
     materiales: form.materiales.length ? form.materiales : null,
+    recursos: form.recursos.map(r => ({
+      item_id: r.item_id,
+      cantidad: r.naturaleza === 'consumible' ? (r.cantidad ?? 1) : undefined,
+    })),
     reclamo_ids: form.reclamo_ids,
   });
 
@@ -252,6 +281,41 @@ export default function OrdenesTrabajo() {
     const enSelected = selected?.reclamos.find(r => r.id === id);
     return enSelected ? `#${id} · ${enSelected.titulo}` : `#${id}`;
   };
+
+  // --- Recursos de inventario ---
+  const mostrarRecursos = itemsDisponibles.length > 0 || form.recursos.length > 0;
+
+  const recursoOptions: SelectOption[] = useMemo(() =>
+    itemsDisponibles
+      .filter(it => !form.recursos.some(r => r.item_id === it.id))
+      .map(it => ({
+        value: String(it.id),
+        label: it.naturaleza === 'activo'
+          ? `${it.nombre}${it.identificador ? ` · ${it.identificador}` : ''}`
+          : `${it.nombre} · ${it.stock_actual ?? 0}${it.unidad ? ` ${it.unidad}` : ''}`,
+      })),
+  [itemsDisponibles, form.recursos]);
+
+  const agregarRecurso = (itemId: number) => {
+    const it = itemsDisponibles.find(i => i.id === itemId);
+    if (!it) return;
+    setForm(f => ({
+      ...f,
+      recursos: [...f.recursos, {
+        item_id: it.id,
+        nombre: it.nombre,
+        naturaleza: it.naturaleza,
+        cantidad: it.naturaleza === 'consumible' ? 1 : undefined,
+        unidad: it.unidad,
+      }],
+    }));
+  };
+
+  const quitarRecurso = (itemId: number) =>
+    setForm(f => ({ ...f, recursos: f.recursos.filter(r => r.item_id !== itemId) }));
+
+  const setCantidadRecurso = (itemId: number, cantidad: number) =>
+    setForm(f => ({ ...f, recursos: f.recursos.map(r => r.item_id === itemId ? { ...r, cantidad } : r) }));
 
   const esEditable = !selected || (selected.estado !== 'completada' && selected.estado !== 'cancelada');
   const inputStyle = { backgroundColor: theme.card, color: theme.text, border: `1px solid ${theme.border}` };
@@ -566,9 +630,67 @@ export default function OrdenesTrabajo() {
             )}
           </div>
 
-          {/* Materiales */}
+          {/* Recursos de inventario (activos reservados + consumibles) */}
+          {mostrarRecursos && (
+            <div>
+              <p className="text-xs font-semibold uppercase mb-1 flex items-center gap-1.5" style={{ color: theme.textSecondary }}>
+                <Boxes className="h-3.5 w-3.5" /> Recursos del inventario
+              </p>
+              {form.recursos.length > 0 && (
+                <div className="space-y-1.5 mb-2">
+                  {form.recursos.map(r => {
+                    const c = naturalezaColors[r.naturaleza] || theme.textSecondary;
+                    const NatIcon = naturalezaIcons[r.naturaleza];
+                    return (
+                      <div key={r.item_id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{ backgroundColor: theme.backgroundSecondary }}>
+                        {NatIcon && <NatIcon className="h-4 w-4 flex-shrink-0" style={{ color: c }} />}
+                        <span className="text-sm flex-1 truncate" style={{ color: theme.text }}>{r.nombre}</span>
+                        {r.naturaleza === 'consumible' && (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min={1}
+                              step="any"
+                              value={r.cantidad ?? 1}
+                              onChange={e => setCantidadRecurso(r.item_id, Number(e.target.value) || 1)}
+                              disabled={!esGestor || !esEditable}
+                              className="w-16 px-2 py-1 rounded text-sm text-right"
+                              style={inputStyle}
+                            />
+                            <span className="text-[11px] w-10" style={{ color: theme.textSecondary }}>{r.unidad || 'u'}</span>
+                          </div>
+                        )}
+                        {r.naturaleza === 'activo' && (
+                          <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${c}20`, color: c }}>reserva</span>
+                        )}
+                        {esGestor && esEditable && (
+                          <button onClick={() => quitarRecurso(r.item_id)}>
+                            <X className="h-3.5 w-3.5" style={{ color: theme.textSecondary }} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {esGestor && esEditable && recursoOptions.length > 0 && (
+                <ModernSelect
+                  value=""
+                  onChange={(v) => v && agregarRecurso(Number(v))}
+                  options={recursoOptions}
+                  placeholder="Agregar del inventario..."
+                  searchable
+                />
+              )}
+              <p className="text-[11px] mt-1" style={{ color: theme.textSecondary }}>
+                Los activos quedan tomados hasta cerrar la OT. El stock de los consumibles se descuenta al completarla.
+              </p>
+            </div>
+          )}
+
+          {/* Materiales sueltos (texto libre, para lo que no está en el catálogo) */}
           <div>
-            <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Materiales</p>
+            <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Materiales sueltos</p>
             {form.materiales.length > 0 && (
               <div className="space-y-1 mb-2">
                 {form.materiales.map((m, i) => (

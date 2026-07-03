@@ -23,6 +23,7 @@ from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
     OrdenTrabajo, OrdenTrabajoReclamo, EstadoOrdenTrabajo,
     Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
+    InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
 from models.enums import RolUsuario
 
@@ -39,6 +40,28 @@ class MaterialItem(BaseModel):
     unidad: Optional[str] = None
 
 
+class RecursoInput(BaseModel):
+    """Ítem de inventario a vincular a la OT. El tipo (reserva/consumo) se
+    deriva de la naturaleza del ítem. `cantidad` sólo aplica a consumibles."""
+    item_id: int
+    cantidad: Optional[float] = None
+
+
+class RecursoResponse(BaseModel):
+    id: int
+    item_id: int
+    item_nombre: Optional[str] = None
+    naturaleza: Optional[str] = None
+    tipo: TipoRecursoOT
+    cantidad: Optional[float] = None
+    unidad: Optional[str] = None
+    identificador: Optional[str] = None
+    aplicado: bool = False
+
+    class Config:
+        from_attributes = True
+
+
 class OTCreate(BaseModel):
     titulo: str
     descripcion: Optional[str] = None
@@ -49,6 +72,7 @@ class OTCreate(BaseModel):
     hora_inicio: Optional[time] = None
     hora_fin: Optional[time] = None
     materiales: Optional[List[MaterialItem]] = None
+    recursos: Optional[List[RecursoInput]] = None
     horas_estimadas: Optional[float] = None
 
 
@@ -62,6 +86,7 @@ class OTUpdate(BaseModel):
     hora_inicio: Optional[time] = None
     hora_fin: Optional[time] = None
     materiales: Optional[List[MaterialItem]] = None
+    recursos: Optional[List[RecursoInput]] = None  # None = no tocar recursos
     horas_estimadas: Optional[float] = None
 
 
@@ -114,6 +139,7 @@ class OTResponse(BaseModel):
     fecha_completada: Optional[datetime] = None
     created_at: Optional[datetime] = None
     reclamos: List[ReclamoMini] = []
+    recursos: List[RecursoResponse] = []
 
     class Config:
         from_attributes = True
@@ -149,6 +175,7 @@ def _query_base():
         selectinload(OrdenTrabajo.cuadrilla),
         selectinload(OrdenTrabajo.empleado),
         selectinload(OrdenTrabajo.reclamos_vinculados).selectinload(OrdenTrabajoReclamo.reclamo),
+        selectinload(OrdenTrabajo.recursos).selectinload(OrdenTrabajoRecurso.item),
     )
 
 
@@ -166,6 +193,20 @@ def _to_response(ot: OrdenTrabajo) -> OTResponse:
             direccion=link.reclamo.direccion,
         )
         for link in ot.reclamos_vinculados if link.reclamo
+    ]
+    resp.recursos = [
+        RecursoResponse(
+            id=rec.id,
+            item_id=rec.item_id,
+            item_nombre=(rec.item.nombre if rec.item else rec.item_nombre),
+            naturaleza=(rec.item.naturaleza.value if rec.item and rec.item.naturaleza else None),
+            tipo=rec.tipo,
+            cantidad=rec.cantidad,
+            unidad=(rec.item.unidad if rec.item else None),
+            identificador=(rec.item.identificador if rec.item else None),
+            aplicado=rec.aplicado,
+        )
+        for rec in ot.recursos
     ]
     return resp
 
@@ -241,6 +282,115 @@ async def _cuadrillas_del_user(db: AsyncSession, user: User) -> set:
         )
     )).scalars().all()
     return set(rows)
+
+
+# ---------------------- Recursos de inventario ----------------------
+#
+# Mecánica del cruce OT ↔ inventario:
+#   - ACTIVO (reserva): se marca `en_uso` mientras la OT esté vinculada;
+#     se libera al desvincular, completar o cancelar. Un activo sólo puede
+#     estar tomado por UNA OT a la vez.
+#   - CONSUMIBLE (consumo): se guarda la cantidad planeada; el stock se
+#     descuenta recién al COMPLETAR la OT (si se cancela, no se descuenta).
+
+async def _sincronizar_recursos(db: AsyncSession, ot: OrdenTrabajo,
+                                recursos_input: List[RecursoInput], municipio_id: int):
+    """Reemplaza los recursos de la OT por la lista dada (sync total).
+
+    Libera los activos que se quitan; reserva los activos nuevos (validando
+    disponibilidad); registra/actualiza los consumos planeados. NO descuenta
+    stock acá (eso ocurre al completar la OT)."""
+    actuales = {
+        r.item_id: r for r in (await db.execute(
+            select(OrdenTrabajoRecurso).where(OrdenTrabajoRecurso.orden_trabajo_id == ot.id)
+        )).scalars().all()
+    }
+    nuevos_ids = {r.item_id for r in recursos_input}
+
+    # 1) Quitar los que ya no están (liberar activos)
+    for item_id, rec in list(actuales.items()):
+        if item_id not in nuevos_ids:
+            if rec.tipo == TipoRecursoOT.RESERVA:
+                await _liberar_activo(db, item_id, ot.id, municipio_id)
+            await db.delete(rec)
+
+    # 2) Agregar / actualizar
+    for rin in recursos_input:
+        item = (await db.execute(select(InventarioItem).where(
+            InventarioItem.id == rin.item_id,
+            InventarioItem.municipio_id == municipio_id,
+            InventarioItem.activo == True,  # noqa: E712
+        ))).scalar_one_or_none()
+        if not item:
+            raise HTTPException(status_code=400, detail=f"Ítem de inventario {rin.item_id} inválido para este municipio")
+
+        existente = actuales.get(item.id)
+
+        if item.naturaleza == NaturalezaInventario.CONSUMIBLE:
+            cant = rin.cantidad if (rin.cantidad and rin.cantidad > 0) else 1
+            if existente:
+                existente.cantidad = cant
+                existente.item_nombre = item.nombre
+            else:
+                db.add(OrdenTrabajoRecurso(
+                    orden_trabajo_id=ot.id, item_id=item.id,
+                    tipo=TipoRecursoOT.CONSUMO, cantidad=cant, item_nombre=item.nombre,
+                ))
+        else:  # ACTIVO — reserva
+            if existente:
+                continue  # ya reservado por esta OT
+            if item.estado_activo != EstadoActivo.DISPONIBLE:
+                if item.ocupado_por_ot_id and item.ocupado_por_ot_id != ot.id:
+                    otra = (await db.execute(select(OrdenTrabajo.numero).where(
+                        OrdenTrabajo.id == item.ocupado_por_ot_id
+                    ))).scalar_one_or_none()
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"«{item.nombre}» ya está tomado por la OT {otra or item.ocupado_por_ot_id}",
+                    )
+                if item.estado_activo in (EstadoActivo.MANTENIMIENTO, EstadoActivo.BAJA):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"«{item.nombre}» no está disponible ({item.estado_activo.value})",
+                    )
+            item.estado_activo = EstadoActivo.EN_USO
+            item.ocupado_por_ot_id = ot.id
+            db.add(OrdenTrabajoRecurso(
+                orden_trabajo_id=ot.id, item_id=item.id,
+                tipo=TipoRecursoOT.RESERVA, item_nombre=item.nombre,
+            ))
+
+
+async def _liberar_activo(db: AsyncSession, item_id: int, ot_id: int, municipio_id: int):
+    """Devuelve un activo a `disponible` si lo tenía esta OT (o quedó colgado)."""
+    item = (await db.execute(select(InventarioItem).where(
+        InventarioItem.id == item_id, InventarioItem.municipio_id == municipio_id,
+    ))).scalar_one_or_none()
+    if item and item.naturaleza == NaturalezaInventario.ACTIVO:
+        if item.ocupado_por_ot_id in (ot_id, None):
+            item.estado_activo = EstadoActivo.DISPONIBLE
+            item.ocupado_por_ot_id = None
+
+
+async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int,
+                           descontar_consumos: bool):
+    """Al cerrar la OT: libera activos siempre; descuenta stock de
+    consumibles sólo si `descontar_consumos` (completar sí, cancelar no)."""
+    for rec in ot.recursos:
+        item = (await db.execute(select(InventarioItem).where(
+            InventarioItem.id == rec.item_id, InventarioItem.municipio_id == municipio_id,
+        ))).scalar_one_or_none()
+        if not item:
+            continue
+        if rec.tipo == TipoRecursoOT.RESERVA and item.naturaleza == NaturalezaInventario.ACTIVO:
+            if item.ocupado_por_ot_id in (ot.id, None):
+                item.estado_activo = EstadoActivo.DISPONIBLE
+                item.ocupado_por_ot_id = None
+        elif (rec.tipo == TipoRecursoOT.CONSUMO and descontar_consumos
+              and not rec.aplicado and rec.cantidad):
+            if item.stock_actual is not None:
+                item.stock_actual = max(0.0, (item.stock_actual or 0) - rec.cantidad)
+            rec.aplicado = True
 
 
 # ============================== Endpoints ==============================
@@ -378,6 +528,9 @@ async def crear_orden(
         comentario=f"Orden de trabajo {numero} creada: {data.titulo}",
     )
 
+    if data.recursos:
+        await _sincronizar_recursos(db, ot, data.recursos, municipio_id)
+
     await db.commit()
     ot = await _get_ot(db, ot.id, municipio_id)
     return _to_response(ot)
@@ -410,6 +563,9 @@ async def actualizar_orden(
             await db.delete(link)
         await db.flush()
         await _vincular_reclamos(db, ot, data.reclamo_ids, municipio_id)
+
+    if data.recursos is not None:
+        await _sincronizar_recursos(db, ot, data.recursos, municipio_id)
 
     # Si estaba pendiente y ahora tiene responsable, pasa a asignada
     if ot.estado == EstadoOrdenTrabajo.PENDIENTE and (ot.cuadrilla_id or ot.empleado_id):
@@ -499,6 +655,9 @@ async def completar_orden(
     ot.horas_reales = data.horas_reales
     ot.fecha_completada = datetime.utcnow()
 
+    # Libera activos y descuenta el stock de los consumibles usados.
+    await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=True)
+
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
     _historial_reclamos(
         db, reclamos, current_user.id,
@@ -526,6 +685,9 @@ async def cancelar_orden(
 
     ot.estado = EstadoOrdenTrabajo.CANCELADA
     ot.motivo_cancelacion = data.motivo
+
+    # Libera los activos reservados; NO descuenta consumibles (no se usaron).
+    await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=False)
 
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
     _historial_reclamos(

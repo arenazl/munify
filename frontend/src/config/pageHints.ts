@@ -36,6 +36,19 @@ export interface PageHintConfig {
 
 export const PAGE_HINTS: Record<string, PageHintConfig> = {
   // ========================================================================
+  // INVENTARIO
+  // ========================================================================
+  'inventario': {
+    title: 'Inventario: activos y consumibles',
+    description: 'Los activos (camioneta, herramientas) se toman y se liberan en cada orden de trabajo. Los consumibles (cemento, caños) tienen stock que se descuenta al completar la OT.',
+    accent: 'blue',
+  },
+  'inventario-categorias-config': {
+    title: 'Rubros del inventario',
+    description: 'Definí las categorías y su naturaleza: activo (se reserva/libera) o consumible (se descuenta). Después cargás los ítems desde Inventario.',
+    accent: 'blue',
+  },
+  // ========================================================================
   // DASHBOARD — mini tutorial del sistema completo (wizard)
   // ========================================================================
   'dashboard-home': {

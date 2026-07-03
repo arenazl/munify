@@ -4,7 +4,7 @@ import {
   Palette, ImageIcon, Trash2, SlidersHorizontal, Wallet, ChevronRight,
   Bell, MessageCircle, Users, Wrench, FolderTree, FileText, LayoutDashboard,
   UsersRound, CalendarOff, Landmark, Link2, Activity, FileDown, Tag,
-  Briefcase, PiggyBank, CalendarClock, Trees,
+  Briefcase, PiggyBank, CalendarClock, Trees, Boxes,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -637,6 +637,7 @@ export default function Configuracion() {
         { id: 'asignacion-dependencias', label: 'Asignación', description: 'Asignar categorías y tipos de trámite a dependencias', icon: Link2, color: '#f59e0b', link: '/gestion/asignacion-dependencias', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'categorias-reclamo', label: 'Categorías Reclamo', description: 'Tipos de reclamos del municipio: alumbrado, bacheo, etc', icon: FolderTree, color: '#8b5cf6', link: '/gestion/categorias-reclamo', show: isAdminOrSupervisor },
         { id: 'categorias-tramite', label: 'Categorías Trámite', description: 'Categorías de trámites del municipio: Obras, Comercio, etc', icon: FolderTree, color: '#10b981', link: '/gestion/categorias-tramite', show: isAdminOrSupervisor },
+        { id: 'categorias-inventario', label: 'Categorías Inventario', description: 'Rubros del inventario: vehículos, herramientas, materiales', icon: Boxes, color: '#3b82f6', link: '/gestion/categorias-inventario', show: isAdminOrSupervisor },
         { id: 'tramites-config', label: 'Tipos de Trámite', description: 'Trámites específicos del municipio (ej: Licencia de Conducir)', icon: FileText, color: '#6366f1', link: '/gestion/tramites-config', show: isAdminOrSupervisor },
         { id: 'zonas', label: 'Zonas', description: 'Barrios y áreas del municipio', icon: MapPin, color: '#06b6d4', link: '/gestion/zonas', show: isAdminOrSupervisor },
         { id: 'importar-padron', label: 'Catálogo de Tasas', description: 'Importá el padrón tributario y mapealo al catálogo Munify', icon: Landmark, color: '#0ea5e9', link: '/gestion/configuracion/importar-padron', show: isAdminOrSupervisor && !isSuperAdmin },

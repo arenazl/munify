@@ -191,6 +191,60 @@ export interface OrdenTrabajo {
   fecha_completada?: string | null;
   created_at?: string;
   reclamos: OTReclamoMini[];
+  recursos?: OTRecurso[];
+}
+
+// ============ Inventario ============
+
+export type NaturalezaInventario = 'activo' | 'consumible';
+export type EstadoActivo = 'disponible' | 'en_uso' | 'mantenimiento' | 'baja';
+export type TipoRecursoOT = 'reserva' | 'consumo';
+
+export interface InventarioCategoria {
+  id: number;
+  nombre: string;
+  descripcion?: string | null;
+  icono?: string | null;
+  color?: string | null;
+  naturaleza: NaturalezaInventario;
+  orden: number;
+  activo: boolean;
+  items_count: number;
+}
+
+export interface InventarioItem {
+  id: number;
+  categoria_id: number;
+  categoria_nombre?: string | null;
+  categoria_icono?: string | null;
+  categoria_color?: string | null;
+  nombre: string;
+  descripcion?: string | null;
+  naturaleza: NaturalezaInventario;
+  // Consumibles
+  stock_actual?: number | null;
+  stock_minimo?: number | null;
+  unidad?: string | null;
+  // Activos
+  identificador?: string | null;
+  estado_activo?: EstadoActivo | null;
+  ocupado_por_ot_id?: number | null;
+  ocupado_por_ot_numero?: string | null;
+  activo: boolean;
+  bajo_stock: boolean;
+}
+
+// Recurso de inventario vinculado a una OT
+export interface OTRecurso {
+  id: number;
+  item_id: number;
+  item_nombre?: string | null;
+  naturaleza?: NaturalezaInventario | null;
+  tipo: TipoRecursoOT;
+  cantidad?: number | null;
+  unidad?: string | null;
+  identificador?: string | null;
+  aplicado: boolean;
 }
 
 export interface Reclamo {

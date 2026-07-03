@@ -2,7 +2,7 @@ import {
   Home, ClipboardList, Map,
   Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
-  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote, Hammer,
+  CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote, Hammer, Boxes,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -203,6 +203,15 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: (isAdminOrSupervisor || userRole === 'empleado') && modulosActivos.has('ordenes_trabajo'),
       categoria: 'Campo',
       description: 'Órdenes de trabajo de cuadrillas'
+    },
+    {
+      name: 'Inventario',
+      href: '/gestion/inventario',
+      icon: Boxes,
+      // Opt-in por municipio: activos (vehículos, herramientas) + consumibles (materiales)
+      show: isAdminOrSupervisor && modulosActivos.has('inventario'),
+      categoria: 'Campo',
+      description: 'Vehículos, herramientas y materiales'
     },
     {
       name: 'Mostrador',

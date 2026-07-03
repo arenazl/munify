@@ -59,6 +59,8 @@ import CapturaMovil from './pages/CapturaMovil';
 import CapturaMovilFake from './pages/CapturaMovilFake';
 import GestionCuadrillas from './pages/GestionCuadrillas';
 import OrdenesTrabajo from './pages/OrdenesTrabajo';
+import Inventario from './pages/Inventario';
+import InventarioCategoriasConfig from './pages/InventarioCategoriasConfig';
 import CatalogoTramites from './pages/CatalogoTramites';
 import GestionAusencias from './pages/GestionAusencias';
 import Planificacion from './pages/Planificacion';
@@ -223,6 +225,8 @@ export const router = createBrowserRouter([
       { path: 'tarjetas', element: <ProtectedRoute roles={['admin', 'supervisor']}><TarjetasCredito /></ProtectedRoute> },
       // Órdenes de trabajo (unidad formal del trabajo de campo, N:M con reclamos)
       { path: 'ordenes-trabajo', element: <ProtectedRoute roles={['admin', 'supervisor', 'empleado']}><OrdenesTrabajo /></ProtectedRoute> },
+      // Inventario (activos + consumibles; se cruza con las OT)
+      { path: 'inventario', element: <ProtectedRoute roles={['admin', 'supervisor']}><Inventario /></ProtectedRoute> },
       // Mis Trabajos (para empleados - usa la misma pantalla de Reclamos filtrada)
       { path: 'mis-trabajos', element: <ProtectedRoute roles={['supervisor', 'empleado']}><Reclamos soloMisTrabajos /></ProtectedRoute> },
       // Mi Rendimiento (estadísticas del empleado)
@@ -292,6 +296,10 @@ export const router = createBrowserRouter([
       {
         path: 'categorias-tramite',
         element: <ProtectedRoute roles={['admin', 'supervisor']}><CategoriasTramiteConfig /></ProtectedRoute>
+      },
+      {
+        path: 'categorias-inventario',
+        element: <ProtectedRoute roles={['admin', 'supervisor']}><InventarioCategoriasConfig /></ProtectedRoute>
       },
       // ABM de trámites per-municipio
       {

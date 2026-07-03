@@ -82,6 +82,15 @@ class OrdenTrabajo(Base):
         "OrdenTrabajoReclamo", back_populates="orden", cascade="all, delete-orphan"
     )
 
+    # Recursos de inventario tomados/consumidos por la OT (módulo inventario,
+    # opt-in). Se define en models/inventario.py; relación por string lazy.
+    recursos = relationship(
+        "OrdenTrabajoRecurso",
+        foreign_keys="OrdenTrabajoRecurso.orden_trabajo_id",
+        cascade="all, delete-orphan",
+        overlaps="orden",
+    )
+
 
 class OrdenTrabajoReclamo(Base):
     """Pivot N:M orden de trabajo ↔ reclamo."""
