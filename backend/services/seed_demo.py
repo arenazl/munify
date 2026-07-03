@@ -1091,6 +1091,28 @@ async def seed_demo_completo(
     empleados = await _seed_empleados(db, municipio_id, cats_reclamo, zonas)
     cuadrillas = await _seed_cuadrillas(db, municipio_id, empleados, cats_reclamo, zonas)
 
+    # Usuarios con rol EMPLEADO — sin esto no hay con qué entrar como el
+    # operario de campo (ve "Mis Trabajos" y, si el módulo está activo, sus
+    # Órdenes de Trabajo). Vinculados a los 2 empleados que ya tienen
+    # reclamos/OTs asignados en la semilla curada (Bacheo y Alumbrado).
+    empleados_login: list[User] = []
+    for idx, slug in ((0, "bacheo"), (1, "alumbrado")):
+        if idx < len(empleados):
+            emp_user = User(
+                email=f"empleado-{slug}@{codigo}.demo.com",
+                nombre=EMPLEADOS_DEMO[idx][0],
+                apellido=EMPLEADOS_DEMO[idx][1],
+                password_hash=hash_demo,
+                rol=RolUsuario.EMPLEADO,
+                municipio_id=municipio_id,
+                empleado_id=empleados[idx].id,
+                activo=True,
+                cuenta_verificada=True,
+            )
+            db.add(emp_user)
+            empleados_login.append(emp_user)
+    await db.flush()
+
     # ------------------------------------------------------------------
     # 7. SLA configs
     # ------------------------------------------------------------------
@@ -1279,7 +1301,7 @@ async def seed_demo_completo(
         "dependencias": len(muni_deps),
         "dependencias_activas": len(supervisores_demo),
         "tramites": len(tramites_creados),
-        "usuarios": 2 + len(supervisores_demo),  # admin + vecino + 1 supervisor por dep activa
+        "usuarios": 2 + len(supervisores_demo) + len(empleados_login),  # admin + vecino + supervisores + logins de empleado
         "zonas": len(zonas),
         "barrios": len(barrios),
         "empleados": len(empleados),
