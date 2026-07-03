@@ -1194,12 +1194,46 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
         s = unicodedata.normalize("NFD", (s or "").lower())
         return "".join(c for c in s if unicodedata.category(c) != "Mn")
 
+    from datetime import time as _time
+    from models.agenda_config import AgendaConfig
+
     tramites = (await db.execute(
         select(Tramite).where(Tramite.municipio_id == municipio_id, Tramite.activo == True)  # noqa: E712
     )).scalars().all()
     deps = (await db.execute(
         select(MunicipioDependencia).where(MunicipioDependencia.municipio_id == municipio_id)
     )).scalars().all()
+
+    # Horarios de atención por dependencia (pantalla "Horarios" con datos
+    # reales de demo, en vez del fallback invisible). La primera dependencia
+    # muestra horario PARTIDO (mañana + tarde) — el caso que más vende.
+    ya_config = set((await db.execute(
+        select(AgendaConfig.municipio_dependencia_id).where(
+            AgendaConfig.municipio_id == municipio_id)
+    )).scalars().all())
+    configs_creadas = 0
+    for d_idx, dep in enumerate(deps):
+        if dep.id in ya_config:
+            continue
+        if d_idx == 0:
+            tramos = [(_time(8, 0), _time(12, 0), 3), (_time(14, 0), _time(17, 0), 2)]
+            dias = range(0, 5)
+        elif d_idx == len(deps) - 1:
+            tramos = [(_time(9, 0), _time(13, 0), 2)]
+            dias = range(0, 6)  # incluye sábado
+        else:
+            tramos = [(_time(8, 0), _time(13, 0), 2)]
+            dias = range(0, 5)
+        for dia in dias:
+            for hi, hf, cupo in tramos:
+                db.add(AgendaConfig(
+                    municipio_id=municipio_id,
+                    municipio_dependencia_id=dep.id,
+                    dia_semana=dia, hora_inicio=hi, hora_fin=hf,
+                    cupo_max_por_slot=cupo, activo=True,
+                ))
+                configs_creadas += 1
+    await db.flush()
     vecino = (await db.execute(
         select(User).where(User.municipio_id == municipio_id, User.rol == RolUsuario.VECINO).limit(1)
     )).scalars().first()
@@ -1211,7 +1245,8 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
         .where(MunicipioDependencia.municipio_id == municipio_id)
     )).scalars().all())
 
-    counts = {"con_turno": 0, "online": 0, "sin_turno": 0, "mapeados": 0, "turnos": 0}
+    counts = {"con_turno": 0, "online": 0, "sin_turno": 0, "mapeados": 0,
+              "turnos": 0, "agenda_configs": configs_creadas}
     dep_i = 0
     con_turno: list[Tramite] = []
     for t in tramites:
@@ -1266,7 +1301,12 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
         hoy = date.today()
         nombre_vec = f"{vecino.nombre} {vecino.apellido or ''}".strip()
         # (delta_dias, hora, minuto, estado, recordatorio)
+        # delta 0 = HOY: la Agenda del día muestra actividad apenas entran
+        # (uno ya atendido a la mañana + dos reservados para más tarde).
         TURNOS = [
+            (0, 8, 30, "cumplido", True),
+            (0, 11, 30, "reservado", True),
+            (0, 12, 0, "reservado", True),
             (1, 9, 0, "reservado", False),
             (2, 9, 30, "reservado", False),
             (3, 10, 0, "reservado", False),
@@ -1299,6 +1339,73 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
                 if recordado else None,
             ))
             counts["turnos"] += 1
+        await db.flush()
+
+    # ------------------------------------------------------------------
+    # Balanceo: NINGUNA dependencia con acceso queda con 0 reclamos (la
+    # landing muestra "N reclamos asignados" por área — un 0 mata la demo).
+    # Toda dep con <2 reclamos recibe 2 propios con título afín a su área.
+    # ------------------------------------------------------------------
+    _TITULOS_DEP = [
+        (("habilitacion", "comercio"), [
+            ("Comercio sin habilitación a la vista", "El local de la esquina no exhibe la habilitación municipal."),
+            ("Venta ambulante sin permiso", "Puestos sin permiso sobre la vereda comercial."),
+        ]),
+        (("transito", "vial", "seguridad"), [
+            ("Semáforo fuera de servicio", "El semáforo del cruce principal está apagado desde ayer."),
+            ("Estacionamiento sobre la senda peatonal", "Autos tapan la senda todos los mediodías."),
+        ]),
+        (("obra", "infraestructura"), [
+            ("Vereda levantada por raíces", "Baldosas levantadas, peligro de caídas."),
+            ("Zanja sin señalizar", "Quedó abierta después de un arreglo y no tiene vallado."),
+        ]),
+        (("servicio", "ambiente", "espacio"), [
+            ("Contenedor desbordado", "Hace tres días que no se vacía el contenedor."),
+            ("Luminaria intermitente", "El foco de la cuadra prende y apaga toda la noche."),
+        ]),
+    ]
+    _GENERICOS = [
+        ("Pedido de poda de árbol inclinado", "El árbol quedó inclinado tras la tormenta."),
+        ("Ruidos molestos en horario nocturno", "Música alta todos los fines de semana."),
+    ]
+    cats_muni = (await db.execute(
+        select(CategoriaReclamo).where(CategoriaReclamo.municipio_id == municipio_id)
+    )).scalars().all()
+    muni_row = await db.get(Municipio, municipio_id)
+    base_lat = muni_row.latitud if muni_row and muni_row.latitud else -34.603722
+    base_lng = muni_row.longitud if muni_row and muni_row.longitud else -58.381592
+    counts["reclamos_balance"] = 0
+    if vecino and cats_muni:
+        for d_idx, dep in enumerate(deps):
+            n_rec = (await db.execute(
+                select(func.count()).select_from(Reclamo).where(
+                    Reclamo.municipio_dependencia_id == dep.id)
+            )).scalar() or 0
+            if n_rec >= 2:
+                continue
+            dep_obj = await db.get(Dependencia, dep.dependencia_id)
+            dep_nom = _norm(dep_obj.nombre if dep_obj else "")
+            titulos = _GENERICOS
+            for kws, tits in _TITULOS_DEP:
+                if any(k in dep_nom for k in kws):
+                    titulos = tits
+                    break
+            for j, (tit, desc) in enumerate(titulos[: 2 - n_rec]):
+                db.add(Reclamo(
+                    municipio_id=municipio_id,
+                    titulo=tit,
+                    descripcion=desc,
+                    estado="recibido" if j == 0 else "en_curso",
+                    prioridad=3,
+                    direccion="Zona céntrica (demo)",
+                    latitud=base_lat + ((d_idx * 7 + j * 3) - 10) / 1000.0,
+                    longitud=base_lng + ((d_idx * 5 - j * 4) - 8) / 1000.0,
+                    categoria_id=cats_muni[(d_idx + j) % len(cats_muni)].id,
+                    creador_id=vecino.id,
+                    municipio_dependencia_id=dep.id,
+                    canal=["app", "ventanilla_asistida", "whatsapp", "web_publica"][(d_idx + j) % 4],
+                ))
+                counts["reclamos_balance"] += 1
         await db.flush()
 
     return counts

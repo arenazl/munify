@@ -901,6 +901,7 @@ async def eliminar_municipio_demo(
         "cuadrillas", "empleados", "sla_config",
         # Turnero + campo (2026-07)
         "turnos", "ordenes_trabajo", "municipio_modulos",
+        "agenda_configs", "agenda_excepciones",
         # Tasas demo
         "tasas_partidas",
         # Tesoreria demo (el seed la carga completa; sin esto quedaban huerfanos)
