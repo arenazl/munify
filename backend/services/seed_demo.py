@@ -1234,6 +1234,41 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
                 ))
                 configs_creadas += 1
     await db.flush()
+
+    # Feriados / aperturas especiales de ejemplo (pantalla "Horarios" nacía
+    # siempre en "Sin feriados cargados" — vacío no vende el turnero).
+    from models.agenda_excepcion import AgendaExcepcion
+    ya_excepciones = set((await db.execute(
+        select(AgendaExcepcion.municipio_dependencia_id).where(
+            AgendaExcepcion.municipio_id == municipio_id)
+    )).scalars().all())
+    excepciones_creadas = 0
+    hoy_exc = date.today()
+    if deps:
+        dep_feriado = deps[0]
+        if dep_feriado.id not in ya_excepciones:
+            db.add(AgendaExcepcion(
+                municipio_id=municipio_id,
+                municipio_dependencia_id=dep_feriado.id,
+                fecha=hoy_exc + timedelta(days=9),
+                tipo="cierre",
+                motivo="Feriado provincial",
+            ))
+            excepciones_creadas += 1
+        dep_apertura = deps[-1]
+        if dep_apertura.id not in ya_excepciones:
+            db.add(AgendaExcepcion(
+                municipio_id=municipio_id,
+                municipio_dependencia_id=dep_apertura.id,
+                fecha=hoy_exc + timedelta(days=16),
+                tipo="apertura_especial",
+                motivo="Jornada especial de atención",
+                hora_inicio_override=_time(9, 0),
+                hora_fin_override=_time(13, 0),
+            ))
+            excepciones_creadas += 1
+        await db.flush()
+
     vecino = (await db.execute(
         select(User).where(User.municipio_id == municipio_id, User.rol == RolUsuario.VECINO).limit(1)
     )).scalars().first()
@@ -1246,7 +1281,8 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
     )).scalars().all())
 
     counts = {"con_turno": 0, "online": 0, "sin_turno": 0, "mapeados": 0,
-              "turnos": 0, "agenda_configs": configs_creadas}
+              "turnos": 0, "agenda_configs": configs_creadas,
+              "excepciones": excepciones_creadas}
     dep_i = 0
     con_turno: list[Tramite] = []
     for t in tramites:
@@ -1304,18 +1340,36 @@ async def seed_turnero_demo(db: AsyncSession, municipio_id: int) -> dict:
         # delta 0 = HOY: la Agenda del día muestra actividad apenas entran
         # (uno ya atendido a la mañana + dos reservados para más tarde).
         TURNOS = [
+            # Hoy: la Agenda del día muestra actividad apenas entran
+            # (uno ya atendido a la mañana + dos reservados para más tarde).
             (0, 8, 30, "cumplido", True),
             (0, 11, 30, "reservado", True),
             (0, 12, 0, "reservado", True),
+            # Próximos días hábiles (semana actual y siguiente)
             (1, 9, 0, "reservado", False),
+            (1, 11, 0, "reservado", False),
             (2, 9, 30, "reservado", False),
+            (2, 12, 30, "reservado", False),
             (3, 10, 0, "reservado", False),
             (4, 10, 30, "reservado", False),
+            # Resto del mes hacia adelante — puebla la vista calendario
+            (6, 9, 0, "reservado", False),
+            (7, 9, 30, "reservado", False),
+            (8, 11, 0, "reservado", False),
+            (9, 10, 0, "reservado", False),
+            (10, 9, 0, "reservado", False),
+            (12, 10, 30, "reservado", False),
+            # Pasados recientes — cumplidos/ausentes/cancelado con recordatorio
             (-2, 9, 0, "cumplido", True),
             (-3, 9, 30, "cumplido", True),
             (-4, 10, 0, "cumplido", True),
             (-5, 11, 0, "ausente", True),
             (-6, 11, 30, "cancelado", False),
+            # Resto del mes hacia atrás — completa la vista calendario
+            (-8, 9, 0, "cumplido", True),
+            (-9, 10, 0, "cumplido", True),
+            (-11, 9, 30, "ausente", True),
+            (-12, 11, 0, "cumplido", True),
         ]
         for j, (delta, hh, mm, estado, recordado) in enumerate(TURNOS):
             t = con_turno[j % len(con_turno)]

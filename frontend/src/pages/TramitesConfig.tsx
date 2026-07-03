@@ -2,8 +2,9 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Pencil, Trash2, Loader2, FileText, FolderTree, Settings,
   ClipboardList, CheckCircle2, Sparkles, Clock, CreditCard,
-  ShieldCheck, ScanFace,
+  ShieldCheck, ScanFace, Calendar, Users, Globe, CalendarClock,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
 import { Sheet } from '../components/ui/Sheet';
@@ -51,6 +52,14 @@ const MODOS_ATENCION = [
   { value: 'presencial_sin_turno', label: 'Presencial por orden de llegada', description: 'Sin turno: solo informa los requisitos para ir' },
   { value: 'online', label: '100% online', description: 'Expediente digital completo, sin ir al municipio' },
 ];
+
+// Badge de "cómo se atiende" en las cards del listado — mismo lenguaje visual
+// que Agenda/Horarios para que se lea como una sola unidad (turnero consolidado).
+const MODO_ATENCION_META: Record<string, { label: string; icon: typeof Calendar; color: string }> = {
+  presencial_con_turno: { label: 'Con turno', icon: Calendar, color: '#3b82f6' },
+  presencial_sin_turno: { label: 'Sin turno', icon: Users, color: '#f59e0b' },
+  online: { label: 'Online', icon: Globe, color: '#10b981' },
+};
 
 const EMPTY_FORM: TramiteForm = {
   categoria_tramite_id: null,
@@ -499,33 +508,33 @@ export default function TramitesConfig() {
               <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
                 Método de pago
               </label>
-              <select
+              <ModernSelect
                 value={form.tipo_pago}
-                onChange={e => setForm({ ...form, tipo_pago: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
-              >
-                <option value="">— Elegí un método —</option>
-                <option value="boton_pago">Botón de Pago (tarjeta web)</option>
-                <option value="rapipago">Rapipago (cupón efectivo)</option>
-                <option value="adhesion_debito">Adhesión Débito (CBU)</option>
-                <option value="qr">QR Interoperable</option>
-              </select>
+                onChange={(v) => setForm({ ...form, tipo_pago: v })}
+                placeholder="Elegí un método"
+                options={[
+                  { value: '', label: '— Elegí un método —' },
+                  { value: 'boton_pago', label: 'Botón de Pago (tarjeta web)' },
+                  { value: 'rapipago', label: 'Rapipago (cupón efectivo)' },
+                  { value: 'adhesion_debito', label: 'Adhesión Débito (CBU)' },
+                  { value: 'qr', label: 'QR Interoperable' },
+                ]}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
                 Momento de cobro
               </label>
-              <select
+              <ModernSelect
                 value={form.momento_pago}
-                onChange={e => setForm({ ...form, momento_pago: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm"
-                style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
-              >
-                <option value="">— Elegí cuándo cobrar —</option>
-                <option value="inicio">Al inicio (antes de trabajar)</option>
-                <option value="fin">Al final (al retirar)</option>
-              </select>
+                onChange={(v) => setForm({ ...form, momento_pago: v })}
+                placeholder="Elegí cuándo cobrar"
+                options={[
+                  { value: '', label: '— Elegí cuándo cobrar —' },
+                  { value: 'inicio', label: 'Al inicio (antes de trabajar)' },
+                  { value: 'fin', label: 'Al final (al retirar)' },
+                ]}
+              />
             </div>
           </div>
           <p className="text-xs leading-relaxed" style={{ color: theme.textSecondary }}>
@@ -809,6 +818,19 @@ export default function TramitesConfig() {
                               <span>{t.documentos_requeridos.length} docs</span>
                             )}
                           </div>
+                          {/* Badge de modo de atención — turnero consolidado */}
+                          {(() => {
+                            const meta = MODO_ATENCION_META[t.modo_atencion || 'online'];
+                            const ModoIcon = meta.icon;
+                            return (
+                              <div
+                                className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium mr-2"
+                                style={{ backgroundColor: `${meta.color}15`, color: meta.color, border: `1px solid ${meta.color}40` }}
+                              >
+                                <ModoIcon className="h-3 w-3" /> {meta.label}
+                              </div>
+                            );
+                          })()}
                           {/* Badge de método de cobro — solo si tiene costo */}
                           {!!t.costo && t.costo > 0 && (() => {
                             const tp = (t as any).tipo_pago as string | null;
@@ -919,17 +941,12 @@ export default function TramitesConfig() {
             <label className="block text-sm font-medium mb-1" style={{ color: theme.text }}>
               Categoría <span className="text-red-500">*</span>
             </label>
-            <select
-              value={form.categoria_tramite_id ?? ''}
-              onChange={e => setForm({ ...form, categoria_tramite_id: Number(e.target.value) || null })}
-              className="w-full px-3 py-2 rounded-xl text-sm"
-              style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}`, color: theme.text }}
-            >
-              <option value="">Seleccionar categoría</option>
-              {categorias.map(c => (
-                <option key={c.id} value={c.id}>{c.nombre}</option>
-              ))}
-            </select>
+            <ModernSelect
+              value={form.categoria_tramite_id != null ? String(form.categoria_tramite_id) : ''}
+              onChange={(v) => setForm({ ...form, categoria_tramite_id: Number(v) || null })}
+              placeholder="Seleccionar categoría"
+              options={categorias.map(c => ({ value: String(c.id), label: c.nombre }))}
+            />
           </div>
 
           <div>
@@ -1013,33 +1030,33 @@ export default function TramitesConfig() {
                   <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
                     Método de pago
                   </label>
-                  <select
+                  <ModernSelect
                     value={form.tipo_pago}
-                    onChange={e => setForm({ ...form, tipo_pago: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
-                  >
-                    <option value="">— Elegí un método —</option>
-                    <option value="boton_pago">💳 Botón de Pago (tarjeta web)</option>
-                    <option value="rapipago">🧾 Rapipago (cupón efectivo)</option>
-                    <option value="adhesion_debito">🔁 Adhesión Débito (CBU)</option>
-                    <option value="qr">📱 QR Interoperable</option>
-                  </select>
+                    onChange={(v) => setForm({ ...form, tipo_pago: v })}
+                    placeholder="Elegí un método"
+                    options={[
+                      { value: '', label: '— Elegí un método —' },
+                      { value: 'boton_pago', label: 'Botón de Pago (tarjeta web)' },
+                      { value: 'rapipago', label: 'Rapipago (cupón efectivo)' },
+                      { value: 'adhesion_debito', label: 'Adhesión Débito (CBU)' },
+                      { value: 'qr', label: 'QR Interoperable' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1" style={{ color: theme.textSecondary }}>
                     Momento de cobro
                   </label>
-                  <select
+                  <ModernSelect
                     value={form.momento_pago}
-                    onChange={e => setForm({ ...form, momento_pago: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg text-sm"
-                    style={{ backgroundColor: theme.card, border: `1px solid ${theme.border}`, color: theme.text }}
-                  >
-                    <option value="">— Elegí cuándo cobrar —</option>
-                    <option value="inicio">Al inicio (antes de trabajar)</option>
-                    <option value="fin">Al final (al retirar)</option>
-                  </select>
+                    onChange={(v) => setForm({ ...form, momento_pago: v })}
+                    placeholder="Elegí cuándo cobrar"
+                    options={[
+                      { value: '', label: '— Elegí cuándo cobrar —' },
+                      { value: 'inicio', label: 'Al inicio (antes de trabajar)' },
+                      { value: 'fin', label: 'Al final (al retirar)' },
+                    ]}
+                  />
                 </div>
               </div>
               <p className="text-xs leading-relaxed" style={{ color: theme.textSecondary }}>
@@ -1088,6 +1105,26 @@ export default function TramitesConfig() {
                     options={opcionesDependencia}
                     searchable
                   />
+                  {form.dependencia_id && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <Link
+                        to={`/gestion/configuracion-agenda?dependencia_id=${form.dependencia_id}`}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium"
+                        style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+                      >
+                        <Clock className="h-3.5 w-3.5" /> Ver horarios
+                      </Link>
+                      {form.modo_atencion === 'presencial_con_turno' && (
+                        <Link
+                          to={`/gestion/agenda-turnos?dependencia_id=${form.dependencia_id}`}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium"
+                          style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+                        >
+                          <CalendarClock className="h-3.5 w-3.5" /> Ver agenda
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1129,15 +1166,16 @@ export default function TramitesConfig() {
                 <label className="block text-[11px] mb-1" style={{ color: theme.textSecondary }}>
                   Nivel mínimo exigido
                 </label>
-                <select
-                  value={form.nivel_kyc_minimo}
-                  onChange={e => setForm({ ...form, nivel_kyc_minimo: e.target.value })}
-                  className="px-3 py-1.5 rounded-lg text-sm outline-none"
-                  style={{ backgroundColor: theme.backgroundSecondary, color: theme.text, border: `1px solid ${theme.border}` }}
-                >
-                  <option value="1">Nivel 1 — Email verificado</option>
-                  <option value="2">Nivel 2 — DNI + selfie (biometría)</option>
-                </select>
+                <div className="max-w-xs">
+                  <ModernSelect
+                    value={form.nivel_kyc_minimo}
+                    onChange={(v) => setForm({ ...form, nivel_kyc_minimo: v })}
+                    options={[
+                      { value: '1', label: 'Nivel 1 — Email verificado' },
+                      { value: '2', label: 'Nivel 2 — DNI + selfie (biometría)' },
+                    ]}
+                  />
+                </div>
               </div>
             )}
             {form.requiere_cenat && (

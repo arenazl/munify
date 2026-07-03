@@ -1353,8 +1353,9 @@ export const turnosApi = {
   setDependenciaTramite: (tramiteId: number, municipioDependenciaId: number | null) =>
     api.put(`/tramites/${tramiteId}/dependencia`, { municipio_dependencia_id: municipioDependenciaId }),
   cancelar: (turnoId: number) => api.delete(`/turnos-tramite/${turnoId}`),
-  // Agenda del dia (admin/supervisor)
-  agenda: (params: { dependencia_id?: number; fecha?: string }) =>
+  // Agenda del dia (admin/supervisor). Con desde+hasta devuelve un rango
+  // (vista calendario) en lugar de un solo día.
+  agenda: (params: { dependencia_id?: number; fecha?: string; desde?: string; hasta?: string }) =>
     api.get('/turnos-tramite/agenda', { params }),
   // Reportes del turnero: demanda por trámite/franja/día + ausentismo
   stats: (params?: { dependencia_id?: number; dias?: number }) =>

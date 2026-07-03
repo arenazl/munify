@@ -334,8 +334,9 @@ export interface Tramite {
   // Configuración de cobro
   tipo_pago?: string;        // 'boton_pago' | 'rapipago' | 'adhesion_debito' | 'qr'
   momento_pago?: string;     // 'inicio' | 'fin'
-  // Turnero presencial
-  requiere_turno?: boolean;
+  // Turnero presencial (fase C — turnero consolidado)
+  requiere_turno?: boolean; // DEPRECATED: usar modo_atencion
+  modo_atencion?: string;   // 'online' | 'presencial_con_turno' | 'presencial_sin_turno'
   duracion_turno_min?: number;  // 15 / 30 / 60
   activo: boolean;
   orden: number;

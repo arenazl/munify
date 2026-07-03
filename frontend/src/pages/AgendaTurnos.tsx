@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Check, X, User, CalendarClock, UserX, FileText } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Check, X, User, CalendarClock, UserX, FileText, Clock } from 'lucide-react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { turnosApi, dependenciasApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -9,6 +9,7 @@ import { ABMPage, ABMCard } from '../components/ui/ABMPage';
 import type { KpiSpec } from '../components/ui/KpiCard';
 import { ModernSelect, type SelectOption } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
+import { CalendarView } from '../components/ui/CalendarView';
 
 interface DepItem {
   id: number;
@@ -56,6 +57,7 @@ export default function AgendaTurnos() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [deps, setDeps] = useState<DepItem[]>([]);
   const [depId, setDepId] = useState('');
   const [fecha, setFecha] = useState(hoyISO());
@@ -63,6 +65,9 @@ export default function AgendaTurnos() {
   const [stats, setStats] = useState<StatsTurnero | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table' | 'guided'>('cards');
+  const [turnosRango, setTurnosRango] = useState<TurnoAgenda[]>([]);
+  const [loadingRango, setLoadingRango] = useState(false);
 
   // Reportes del turnero (últimos 30 días de la dependencia elegida)
   useEffect(() => {
@@ -97,9 +102,15 @@ export default function AgendaTurnos() {
       .then((res) => {
         const list = (res.data as DepItem[]) || [];
         setDeps(list);
-        if (list.length && !depId) setDepId(String(list[0].id));
+        const desdeUrl = searchParams.get('dependencia_id');
+        if (desdeUrl && list.some((d) => String(d.id) === desdeUrl)) {
+          setDepId(desdeUrl);
+        } else if (list.length && !depId) {
+          setDepId(String(list[0].id));
+        }
       })
       .catch(() => toast.error('No se pudieron cargar las dependencias'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -115,6 +126,30 @@ export default function AgendaTurnos() {
       toast.error('No se pudo cargar la agenda');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Vista calendario: se carga sólo cuando el operador la abre (evita bajar
+  // ~3 meses de turnos si nunca sale de la vista de tarjetas del día).
+  useEffect(() => {
+    if (!depId || viewMode !== 'guided') return;
+    fetchTurnosRango();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depId, viewMode]);
+
+  const fetchTurnosRango = async () => {
+    try {
+      setLoadingRango(true);
+      const hoy = new Date();
+      const desdeD = new Date(hoy); desdeD.setDate(desdeD.getDate() - 45);
+      const hastaD = new Date(hoy); hastaD.setDate(hastaD.getDate() + 45);
+      const fmt = (d: Date) => d.toISOString().slice(0, 10);
+      const res = await turnosApi.agenda({ dependencia_id: Number(depId), desde: fmt(desdeD), hasta: fmt(hastaD) });
+      setTurnosRango((res.data as TurnoAgenda[]) || []);
+    } catch {
+      toast.error('No se pudo cargar el calendario de turnos');
+    } finally {
+      setLoadingRango(false);
     }
   };
 
@@ -156,6 +191,24 @@ export default function AgendaTurnos() {
     ];
   }, [stats]);
 
+  // Vista calendario: panorama de varias semanas (planificación de carga),
+  // complementa la vista de tarjetas (operación del día, check-in).
+  const guidedView = (
+    <CalendarView<TurnoAgenda>
+      items={turnosRango}
+      getId={(t) => t.id}
+      getDate={(t) => t.fecha_hora}
+      getLabel={(t) => `${hhmm(t.fecha_hora)} ${(t.nombre_solicitante || 'Turno').split(' ')[0]}`}
+      getColor={(t) => ESTADO_COLOR[t.estado] || theme.primary}
+      getTooltip={(t) => `${hhmm(t.fecha_hora)} · ${t.nombre_solicitante || 'Vecino'}${t.tramite_nombre ? ` · ${t.tramite_nombre}` : ''} · ${t.estado}`}
+      onItemClick={(t) => {
+        setFecha(t.fecha_hora.slice(0, 10));
+        toast.info('Cambiá a "Vista tarjetas" para gestionar ese turno');
+      }}
+      helperText={loadingRango ? 'Cargando turnos...' : 'Turnos de los últimos y próximos 45 días. Click en un turno para ubicar ese día en la vista de tarjetas.'}
+    />
+  );
+
   return (
     <ABMPage
       title="Agenda de turnos"
@@ -166,8 +219,11 @@ export default function AgendaTurnos() {
       isEmpty={filtrados.length === 0}
       emptyMessage="No hay turnos para ese día"
       kpis={kpisSpec}
+      guidedView={guidedView}
+      viewStorageKey="agenda_turnos_view"
+      onViewModeChange={setViewMode}
       extraFilters={
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <ModernSelect
             value={depId}
             onChange={setDepId}
@@ -176,6 +232,15 @@ export default function AgendaTurnos() {
             className="min-w-[180px]"
           />
           <DatePicker value={fecha} onChange={setFecha} />
+          {depId && (
+            <Link
+              to={`/gestion/configuracion-agenda?dependencia_id=${depId}`}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap"
+              style={{ backgroundColor: `${theme.primary}15`, color: theme.primary, border: `1px solid ${theme.primary}40` }}
+            >
+              <Clock className="h-3.5 w-3.5" /> Horarios de esta oficina
+            </Link>
+          )}
         </div>
       }
     >

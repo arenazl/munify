@@ -386,11 +386,15 @@ async def enviar_recordatorios_turnos(
 @router.get("/agenda", response_model=List[TurnoResponse])
 async def agenda(
     dependencia_id: Optional[int] = Query(None),
-    fecha: Optional[str] = Query(None),  # YYYY-MM-DD
+    fecha: Optional[str] = Query(None),  # YYYY-MM-DD (un solo día)
+    desde: Optional[str] = Query(None),  # YYYY-MM-DD, junto con `hasta` = rango (vista calendario)
+    hasta: Optional[str] = Query(None),  # YYYY-MM-DD, inclusive
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Devuelve los turnos del día para una dependencia. Si no se pasa
+    """Devuelve los turnos de una dependencia. Por defecto, el día (`fecha`,
+    o hoy). Si se pasan `desde`/`hasta`, devuelve ese rango completo en lugar
+    de un solo día (usado por la vista calendario). Si no se pasa
     dependencia_id, usa la del supervisor logueado. Solo staff (la agenda
     lleva nombre y DNI de los vecinos — un vecino no puede leerla)."""
     if current_user.rol == RolUsuario.VECINO:
@@ -412,15 +416,27 @@ async def agenda(
     if not dep_ok:
         raise HTTPException(status_code=404, detail="Dependencia no encontrada")
 
-    if fecha:
+    if desde or hasta:
+        if not (desde and hasta):
+            raise HTTPException(status_code=400, detail="desde y hasta van juntos")
+        try:
+            fecha_dt = datetime.strptime(desde, "%Y-%m-%d")
+            fin = datetime.strptime(hasta, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha invalido (YYYY-MM-DD)")
+        if fin <= fecha_dt:
+            raise HTTPException(status_code=400, detail="hasta debe ser posterior a desde")
+        if (fin - fecha_dt).days > 93:
+            raise HTTPException(status_code=400, detail="Rango máximo: 90 días")
+    elif fecha:
         try:
             fecha_dt = datetime.strptime(fecha, "%Y-%m-%d")
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato fecha invalido (YYYY-MM-DD)")
+        fin = fecha_dt + timedelta(days=1)
     else:
         fecha_dt = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
-    fin = fecha_dt + timedelta(days=1)
+        fin = fecha_dt + timedelta(days=1)
 
     q = await db.execute(
         select(Turno)
