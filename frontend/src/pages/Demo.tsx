@@ -251,8 +251,9 @@ export default function Demo() {
             </p>
           </div>
 
-          {/* OJO: sin overflow-hidden — recortaba el dropdown del autocomplete */}
-          <div className="mb-6 bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.12),0_2px_8px_-2px_rgba(15,23,42,0.06)] p-4 sm:p-6 relative">
+          {/* OJO: sin overflow-hidden (recortaba el dropdown) y con z-40 para
+              que el dropdown quede SOBRE la sección de municipios de abajo */}
+          <div className="mb-6 bg-white/80 backdrop-blur-xl rounded-2xl border border-white/60 shadow-[0_8px_30px_-8px_rgba(15,23,42,0.12),0_2px_8px_-2px_rgba(15,23,42,0.06)] p-4 sm:p-6 relative z-40">
             {/* Top stripe gradient — refuerza que es el CTA principal. */}
             <div className="absolute top-0 left-0 right-0 h-[3px] rounded-t-2xl bg-gradient-to-r from-blue-500 via-cyan-400 to-violet-400" />
             <div className="flex items-center gap-2 mb-3">
@@ -308,7 +309,7 @@ export default function Demo() {
                 {/* Dropdown del catálogo oficial (tabla local, dataset georef).
                     Teclado: flechas navegan, Enter elige, Esc cierra. */}
                 {showSug && sugerencias.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-xl rounded-xl border border-slate-200/80 shadow-[0_18px_50px_-12px_rgba(15,23,42,0.25)] z-30 max-h-72 overflow-y-auto overscroll-contain">
+                  <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl border border-slate-200/80 shadow-[0_18px_50px_-12px_rgba(15,23,42,0.25)] z-50 max-h-72 overflow-y-auto overscroll-contain">
                     <div className="px-4 pt-2.5 pb-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                       <ShieldCheck className="h-3 w-3" />
                       Catálogo oficial de municipios
