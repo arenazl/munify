@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Clock, AlertTriangle, FileText, User } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
 import { notificacionesApi } from '../lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -29,7 +28,6 @@ interface NotificacionesDropdownProps {
 
 export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarHoverColor, sidebarBgHover, sidebarWidth }: NotificacionesDropdownProps = {}) {
   const { theme } = useTheme();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
@@ -116,14 +114,14 @@ export function NotificacionesDropdown({ sidebarMode, sidebarTextColor, sidebarH
       return;
     }
 
-    // 2) Fallback al patrón por rol + reclamo_id / solicitud_id.
-    const isGestion = user?.rol === 'supervisor' || user?.rol === 'admin';
+    // 2) Fallback al patrón por reclamo_id / solicitud_id.
+    // El detalle vive SIEMPRE bajo /gestion (Layout + rutas protegidas por rol).
+    // Antes se usaban rutas top-level (/reclamos, /tramites) que no existen y
+    // caían en el catch-all -> /demo (página comercial).
     if (notif.reclamo_id) {
-      const basePath = isGestion ? '/gestion/reclamos' : '/reclamos';
-      navigate(`${basePath}/${notif.reclamo_id}`);
+      navigate(`/gestion/reclamos/${notif.reclamo_id}`);
     } else if (notif.solicitud_id) {
-      const basePath = isGestion ? '/gestion/tramites' : '/tramites';
-      navigate(`${basePath}/${notif.solicitud_id}`);
+      navigate(`/gestion/tramites/${notif.solicitud_id}`);
     }
   };
 

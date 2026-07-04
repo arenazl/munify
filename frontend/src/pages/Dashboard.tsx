@@ -1263,7 +1263,7 @@ export default function Dashboard() {
                           key={item.id}
                           className="p-3 rounded-lg cursor-pointer hover:scale-[1.01] transition-all"
                           style={{ backgroundColor: '#f59e0b15', border: '1px solid #f59e0b30' }}
-                          onClick={() => window.location.href = `/gestion/reclamos/${item.id}`}
+                          onClick={() => navigate(`/gestion/reclamos/${item.id}`)}
                         >
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <span className="text-xs font-medium line-clamp-1" style={{ color: theme.text }}>{item.titulo}</span>
@@ -1652,7 +1652,7 @@ export default function Dashboard() {
                         key={r.id}
                         className="p-1.5 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                         style={{ backgroundColor: `${item.color}15` }}
-                        onClick={() => window.location.href = `/reclamos/${r.id}`}
+                        onClick={() => navigate(`/gestion/reclamos/${r.id}`)}
                       >
                         <p className="text-[10px] font-medium truncate" style={{ color: theme.text }}>
                           {r.titulo}

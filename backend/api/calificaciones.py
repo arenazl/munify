@@ -235,7 +235,7 @@ async def get_calificaciones_pendientes(
         .outerjoin(Calificacion)
         .where(
             Reclamo.creador_id == current_user.id,
-            Reclamo.estado == EstadoReclamo.RESUELTO,
+            Reclamo.estado.in_((EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO)),
             Calificacion.id.is_(None)
         )
         .options(selectinload(Reclamo.categoria))
@@ -301,7 +301,8 @@ async def get_info_calificacion_publica(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.RESUELTO:
+    # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
+    if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):
         raise HTTPException(status_code=400, detail="Este reclamo aún no ha sido resuelto")
 
     # Verificar si ya fue calificado
@@ -340,7 +341,8 @@ async def crear_calificacion_publica(
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
-    if reclamo.estado != EstadoReclamo.RESUELTO:
+    # Estado activo es FINALIZADO; RESUELTO queda como compat con datos legacy
+    if reclamo.estado not in (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO):
         raise HTTPException(status_code=400, detail="Este reclamo aún no ha sido resuelto")
 
     # Verificar que no existe calificación previa

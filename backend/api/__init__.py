@@ -21,7 +21,8 @@ from .ia_config import router as ia_config_router
 from .turnos import router as turnos_router
 from .turnos_tramite import router as turnos_tramite_router
 from .calificaciones import router as calificaciones_router
-from .escalado import router as escalado_router
+# F0: escalado apagado (cross-tenant + IntegrityError). Revive o se borra en F5. Ver docs/reclamos/02.
+# from .escalado import router as escalado_router
 from .emails import router as emails_router
 from .portal_publico import router as portal_publico_router
 from .municipios import router as municipios_router
@@ -101,7 +102,8 @@ api_router.include_router(turnos_tramite_router)  # prefix definido en el router
 api_router.include_router(agenda_config_router, tags=["Agenda"])  # rutas con path completo (/agenda-config, /agenda-excepciones)
 api_router.include_router(tarjetas_router, tags=["Tarjetas"])  # ABM tarjetas de credito (/tarjetas)
 api_router.include_router(calificaciones_router, prefix="/calificaciones", tags=["Calificaciones"])
-api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
+# F0: escalado apagado (cross-tenant + IntegrityError). Revive o se borra en F5. Ver docs/reclamos/02.
+# api_router.include_router(escalado_router, prefix="/escalado", tags=["Auto-Escalado"])
 api_router.include_router(emails_router, prefix="/emails", tags=["Emails"])
 api_router.include_router(portal_publico_router, prefix="/publico", tags=["Portal Público"])
 api_router.include_router(imagenes_router, tags=["Imágenes"])

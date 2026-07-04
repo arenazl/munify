@@ -1093,7 +1093,7 @@ async def create_reclamo_from_whatsapp(phone: str, state: ConversationState, db:
             direccion=state.data["direccion"],
             latitud=state.data["latitud"],
             longitud=state.data["longitud"],
-            estado=EstadoReclamo.nuevo,
+            estado=EstadoReclamo.NUEVO,
             prioridad=2,
             creador_id=user.id,
             canal="whatsapp",

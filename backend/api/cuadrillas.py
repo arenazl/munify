@@ -116,7 +116,10 @@ async def get_cuadrilla(
             selectinload(Cuadrilla.categorias),
             selectinload(Cuadrilla.categoria_principal)
         )
-        .where(Cuadrilla.id == cuadrilla_id)
+        .where(
+            Cuadrilla.id == cuadrilla_id,
+            Cuadrilla.municipio_id == current_user.municipio_id
+        )
     )
     cuadrilla = result.scalar_one_or_none()
     if not cuadrilla:
@@ -138,7 +141,10 @@ async def create_cuadrilla(
     # Agregar categorias si se proporcionan
     if categoria_ids:
         result = await db.execute(
-            select(Categoria).where(Categoria.id.in_(categoria_ids))
+            select(Categoria).where(
+                Categoria.id.in_(categoria_ids),
+                Categoria.municipio_id == current_user.municipio_id
+            )
         )
         categorias = result.scalars().all()
         cuadrilla.categorias = list(categorias)
@@ -172,7 +178,10 @@ async def update_cuadrilla(
             selectinload(Cuadrilla.categorias),
             selectinload(Cuadrilla.categoria_principal)
         )
-        .where(Cuadrilla.id == cuadrilla_id)
+        .where(
+            Cuadrilla.id == cuadrilla_id,
+            Cuadrilla.municipio_id == current_user.municipio_id
+        )
     )
     cuadrilla = result.scalar_one_or_none()
     if not cuadrilla:
@@ -185,7 +194,10 @@ async def update_cuadrilla(
         categoria_ids = update_data.pop('categoria_ids')
         if categoria_ids is not None:
             result = await db.execute(
-                select(Categoria).where(Categoria.id.in_(categoria_ids))
+                select(Categoria).where(
+                    Categoria.id.in_(categoria_ids),
+                    Categoria.municipio_id == current_user.municipio_id
+                )
             )
             categorias = result.scalars().all()
             cuadrilla.categorias = list(categorias)
@@ -214,7 +226,10 @@ async def delete_cuadrilla(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    result = await db.execute(select(Cuadrilla).where(Cuadrilla.id == cuadrilla_id))
+    result = await db.execute(select(Cuadrilla).where(
+        Cuadrilla.id == cuadrilla_id,
+        Cuadrilla.municipio_id == current_user.municipio_id
+    ))
     cuadrilla = result.scalar_one_or_none()
     if not cuadrilla:
         raise HTTPException(status_code=404, detail="Cuadrilla no encontrada")

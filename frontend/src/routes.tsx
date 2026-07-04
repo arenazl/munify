@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import RootRedirect from './components/RootRedirect';
+import ReclamoLegacyRedirect from './components/ReclamoLegacyRedirect';
 
 // Pages
 import Landing from './pages/Landing';
@@ -438,6 +439,9 @@ export const router = createBrowserRouter([
   // Acceso directo por código de municipio: /<codigo> -> login del muni.
   // Va al final: las rutas estáticas de arriba tienen prioridad de match.
   { path: '/:codigo', element: <MunicipioAcceso /> },
+
+  // Links historicos: /reclamos/:id -> /gestion/reclamos/:id (sanea push/WhatsApp viejos)
+  { path: '/reclamos/:id', element: <ReclamoLegacyRedirect /> },
 
   // Catch-all: redirigir a demo si no está autenticado
   { path: '*', element: <Navigate to="/demo" replace /> },

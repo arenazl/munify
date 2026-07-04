@@ -119,7 +119,9 @@ def require_roles(allowed_roles: list):
 def get_municipio_id_from_header():
     """
     Obtiene el municipio_id del header X-Municipio-ID.
-    Solo admins/supervisores pueden cambiar de municipio.
+    Solo el superadmin real (sin municipio propio) puede cambiar de municipio.
+    NOTA: helper legacy sin call sites vivos; el resolver canonico es
+    core.tenancy.resolve_municipio_id.
     """
     from fastapi import Request
 
@@ -127,8 +129,9 @@ def get_municipio_id_from_header():
         request: Request,
         current_user = Depends(get_current_user)
     ) -> int:
-        # Solo admins y supervisores pueden cambiar de municipio via header
-        if current_user.rol in ['admin', 'supervisor']:
+        # Solo el superadmin real (municipio_id None) puede cambiar via header;
+        # un admin/supervisor de un muni queda atado al suyo (anti cross-tenant).
+        if current_user.municipio_id is None:
             header_municipio_id = request.headers.get('X-Municipio-ID')
             if header_municipio_id:
                 try:

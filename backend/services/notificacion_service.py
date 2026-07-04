@@ -81,7 +81,7 @@ def preparar_variables_reclamo(reclamo, usuario=None, **extras) -> Dict[str, Any
         "descripcion": descripcion_wp,
         "descripcion_corta": descripcion_corta,
         "direccion": reclamo.direccion or "No especificada",
-        "url": f"{settings.FRONTEND_URL}/reclamos/{reclamo.id}",
+        "url": f"{settings.FRONTEND_URL}/gestion/reclamos/{reclamo.id}",
     }
 
     if hasattr(reclamo, 'estado') and reclamo.estado:
@@ -366,7 +366,7 @@ class NotificacionService:
         """Genera el mensaje de reclamo resuelto con link de calificación"""
         descripcion_corta = descripcion[:150] + "..." if len(descripcion) > 150 else descripcion
         link_calificacion = NotificacionService.generar_link_calificacion(reclamo_id)
-        reclamo_url = f"{settings.FRONTEND_URL}/reclamos/{reclamo_id}"
+        reclamo_url = f"{settings.FRONTEND_URL}/gestion/reclamos/{reclamo_id}"
 
         mensaje = (
             f"*Reclamo Resuelto*\n\n"

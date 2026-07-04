@@ -30,6 +30,8 @@ from services.gamificacion_service import GamificacionService
 
 router = APIRouter()
 
+logger = logging.getLogger(__name__)
+
 
 # ===========================================
 # HELPER: NOTIFICACIONES WHATSAPP AUTOMÁTICAS
@@ -232,9 +234,8 @@ async def enviar_notificacion_push(
 
             print(f"[PUSH] Notificacion enviada: {tipo_notificacion}", flush=True)
         except Exception as e:
-            print(f"[PUSH] Error enviando: {e}", flush=True)
-            import traceback
-            traceback.print_exc()
+            logger.error("[PUSH] Error enviando notificacion push (reclamo #%s, tipo=%s): %s",
+                         reclamo_id, tipo_notificacion, e, exc_info=True)
 
 
 async def enviar_notificacion_dependencia(
@@ -372,6 +373,55 @@ def get_reclamos_query():
         selectinload(Reclamo.dependencia_asignada).selectinload(MunicipioDependencia.dependencia),
         selectinload(Reclamo.documentos)
     )
+
+
+async def _get_reclamo(db: AsyncSession, reclamo_id: int, municipio_id: int) -> Reclamo:
+    """Trae un reclamo garantizando que pertenece al municipio (anti cross-tenant).
+
+    Análogo a `_get_ot` de ordenes_trabajo.py: agrega el filtro
+    `Reclamo.municipio_id == municipio_id` y devuelve 404 si el reclamo no
+    existe o es de otro tenant. TODO endpoint operable debe resolver el
+    municipio efectivo con `get_effective_municipio_id(request, current_user)`
+    y pasarlo acá — nunca fetchear por id pelado.
+    """
+    result = await db.execute(
+        get_reclamos_query().where(
+            Reclamo.id == reclamo_id,
+            Reclamo.municipio_id == municipio_id,
+        )
+    )
+    reclamo = result.scalar_one_or_none()
+    if not reclamo:
+        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    return reclamo
+
+
+async def _empleado_puede_operar(db: AsyncSession, reclamo: Reclamo, current_user: User) -> bool:
+    """¿El empleado logueado puede operar (escritura) sobre este reclamo?
+
+    True si el reclamo está asignado directamente a su `empleado_id`, o si
+    pertenece a la cuadrilla (miembro activo) de alguna OT vinculada al reclamo.
+    """
+    empleado_id = getattr(current_user, "empleado_id", None)
+    if not empleado_id:
+        return False
+    if reclamo.empleado_id and reclamo.empleado_id == empleado_id:
+        return True
+    # Pertenencia vía cuadrilla de una OT vinculada al reclamo
+    from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+    from models.empleado_cuadrilla import EmpleadoCuadrilla
+    q = (
+        select(OrdenTrabajo.id)
+        .join(OrdenTrabajoReclamo, OrdenTrabajoReclamo.orden_trabajo_id == OrdenTrabajo.id)
+        .join(EmpleadoCuadrilla, EmpleadoCuadrilla.cuadrilla_id == OrdenTrabajo.cuadrilla_id)
+        .where(
+            OrdenTrabajoReclamo.reclamo_id == reclamo.id,
+            EmpleadoCuadrilla.empleado_id == empleado_id,
+            EmpleadoCuadrilla.activo == True,  # noqa: E712
+        )
+        .limit(1)
+    )
+    return (await db.execute(q)).scalar_one_or_none() is not None
 
 @router.get("", response_model=List[ReclamoResponse])
 async def get_reclamos(
@@ -513,6 +563,7 @@ async def get_mis_reclamos(
 @router.patch("/{reclamo_id}", response_model=ReclamoResponse)
 async def cambiar_estado_reclamo_drag(
     reclamo_id: int,
+    request: Request,
     nuevo_estado: str = Query(..., description="Nuevo estado del reclamo"),
     comentario: Optional[str] = Query(None, description="Observación del cambio de estado"),
     db: AsyncSession = Depends(get_db),
@@ -527,10 +578,8 @@ async def cambiar_estado_reclamo_drag(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Estado inválido: {nuevo_estado}")
 
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Verificar permisos de usuario de dependencia ANTES de la transicion,
     # asi no filtramos info del estado actual de un reclamo ajeno.
@@ -538,6 +587,13 @@ async def cambiar_estado_reclamo_drag(
     # con municipio_dependencia_id asignado. Admin sin dep ve todo su muni.
     if current_user.municipio_dependencia_id:
         if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
+
+    # El rol EMPLEADO solo puede operar reclamos que le pertenecen (asignación
+    # directa o cuadrilla de una OT vinculada). Evita que un operario mueva
+    # reclamos ajenos por API.
+    if current_user.rol == RolUsuario.EMPLEADO:
+        if not await _empleado_puede_operar(db, reclamo, current_user):
             raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
 
     # Validar transiciones permitidas
@@ -561,20 +617,28 @@ async def cambiar_estado_reclamo_drag(
         )
 
     estado_anterior = reclamo.estado
-    reclamo.estado = estado_enum
+
+    # El empleado no puede saltearse la confirmación del supervisor: si intenta
+    # FINALIZAR, el reclamo queda en PENDIENTE_CONFIRMACION para que un supervisor
+    # lo confirme. La transición solicitada (FINALIZADO) ya se validó arriba.
+    estado_destino = estado_enum
+    if current_user.rol == RolUsuario.EMPLEADO and estado_destino == EstadoReclamo.FINALIZADO:
+        estado_destino = EstadoReclamo.PENDIENTE_CONFIRMACION
+
+    reclamo.estado = estado_destino
 
     # Manejar fechas según el estado
-    if estado_enum in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
+    if estado_destino in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
         reclamo.fecha_resolucion = datetime.now(timezone.utc)
 
     # Generar comentario para historial
-    comentario_historial = comentario if comentario else f"Estado cambiado de {estado_anterior.value} a {estado_enum.value}"
+    comentario_historial = comentario if comentario else f"Estado cambiado de {estado_anterior.value} a {estado_destino.value}"
 
     historial = HistorialReclamo(
         reclamo_id=reclamo.id,
         usuario_id=current_user.id,
         estado_anterior=estado_anterior,
-        estado_nuevo=estado_enum,
+        estado_nuevo=estado_destino,
         accion="cambio_estado",
         comentario=comentario_historial
     )
@@ -582,15 +646,21 @@ async def cambiar_estado_reclamo_drag(
 
     await db.commit()
 
-    # Notificaciones en background (no bloquean respuesta)
-    if estado_enum in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
-        # await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_resuelto', current_user.municipio_id)
-        asyncio.create_task(enviar_notificacion_push(db, reclamo, 'reclamo_resuelto'))
+    # Notificaciones en background (no bloquean respuesta).
+    # OJO: enviar_notificacion_push toma (reclamo_id, tipo_notificacion, ...) por
+    # keyword — NO la sesión ni el objeto reclamo (usa su propia sesión).
+    if estado_destino in [EstadoReclamo.RESUELTO, EstadoReclamo.FINALIZADO]:
+        asyncio.create_task(enviar_notificacion_push(
+            reclamo_id=reclamo.id,
+            tipo_notificacion='reclamo_resuelto',
+        ))
     else:
-        # await enviar_notificacion_whatsapp(db, reclamo, 'cambio_estado', current_user.municipio_id)
-        asyncio.create_task(enviar_notificacion_push(db, reclamo, 'cambio_estado',
-                                  estado_anterior=estado_anterior.value,
-                                  estado_nuevo=estado_enum.value))
+        asyncio.create_task(enviar_notificacion_push(
+            reclamo_id=reclamo.id,
+            tipo_notificacion='cambio_estado',
+            estado_anterior=estado_anterior.value,
+            estado_nuevo=estado_destino.value,
+        ))
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -1045,13 +1115,12 @@ async def reclamos_revision_ia(
 @router.get("/{reclamo_id}", response_model=ReclamoResponse)
 async def get_reclamo(
     reclamo_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Verificar permisos
     if current_user.rol == RolUsuario.VECINO and reclamo.creador_id != current_user.id:
@@ -1059,19 +1128,43 @@ async def get_reclamo(
 
     return reclamo
 
+# Acciones internas que el vecino NO debe ver en el historial (cocina interna).
+_ACCIONES_INTERNAS_VECINO = {"devuelto", "feedback_descartado"}
+
 @router.get("/{reclamo_id}/historial", response_model=List[HistorialResponse])
 async def get_reclamo_historial(
     reclamo_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Multi-tenant + pertenencia: valida que el reclamo sea del muni efectivo.
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
+
+    # El vecino solo puede ver el historial de SUS propios reclamos.
+    es_vecino = current_user.rol == RolUsuario.VECINO
+    if es_vecino and reclamo.creador_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver este reclamo")
+
     result = await db.execute(
         select(HistorialReclamo)
         .options(selectinload(HistorialReclamo.usuario))
         .where(HistorialReclamo.reclamo_id == reclamo_id)
         .order_by(HistorialReclamo.created_at.desc())
     )
-    return result.scalars().all()
+    entradas = result.scalars().all()
+
+    # Al vecino le ocultamos la cocina interna: devoluciones al empleado,
+    # feedback descartado por el supervisor y la DJ de ventanilla asistida.
+    if es_vecino:
+        entradas = [
+            h for h in entradas
+            if (h.accion not in _ACCIONES_INTERNAS_VECINO)
+            and not (h.accion == "creado" and "Reclamo creado en ventanilla" in (h.comentario or ""))
+        ]
+
+    return entradas
 
 @router.post("", response_model=ReclamoResponse)
 async def create_reclamo(
@@ -1079,14 +1172,10 @@ async def create_reclamo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    print(f"\n{'='*80}", flush=True)
-    print(f"🆕 CREANDO NUEVO RECLAMO", flush=True)
-    print(f"{'='*80}", flush=True)
-    print(f"Usuario: {current_user.email} (ID: {current_user.id})", flush=True)
-    print(f"Título: {data.titulo}", flush=True)
-    print(f"Categoría ID: {data.categoria_id}", flush=True)
-    print(f"Municipio ID: {current_user.municipio_id}", flush=True)
-    print(f"{'='*80}\n", flush=True)
+    logger.info(
+        "Creando reclamo | usuario=%s (id=%s) titulo=%r categoria_id=%s municipio_id=%s",
+        current_user.email, current_user.id, data.titulo, data.categoria_id, current_user.municipio_id,
+    )
 
     # Validar que el usuario tenga un municipio válido
     if not current_user.municipio_id:
@@ -1258,17 +1347,17 @@ async def create_reclamo(
     db.add(historial)
 
     await db.commit()
-    print(f"✅ Reclamo #{reclamo.id} creado exitosamente en BD", flush=True)
+    logger.info("Reclamo #%s creado exitosamente en BD", reclamo.id)
 
     # Gamificación: otorgar puntos por crear reclamo
     try:
-        print(f"🎮 Procesando gamificación...", flush=True)
         puntos, badges = await GamificacionService.procesar_reclamo_creado(
             db, reclamo, current_user
         )
-        print(f"✅ Gamificación procesada: {puntos} puntos, {len(badges)} badges", flush=True)
+        logger.info("Gamificacion procesada para reclamo #%s: %s puntos, %s badges",
+                    reclamo.id, puntos, len(badges))
     except Exception as e:
-        print(f"⚠️ Error en gamificación: {e}", flush=True)
+        logger.warning("Error en gamificacion para reclamo #%s: %s", reclamo.id, e)
         # No fallar si hay error en gamificación
         pass
 
@@ -1283,7 +1372,7 @@ async def create_reclamo(
         if cat:
             categoria_nombre = cat.nombre
     except Exception as e:
-        print(f"⚠️ Error obteniendo categoría: {e}", flush=True)
+        logger.warning("Error obteniendo categoria para reclamo #%s: %s", reclamo.id, e)
 
     # Notificaciones en background (no bloquean respuesta)
     # await enviar_notificacion_whatsapp(db, reclamo, 'reclamo_recibido', current_user.municipio_id)
@@ -1314,24 +1403,21 @@ async def create_reclamo(
     ))
 
     # Recargar con relaciones
-    print(f"🔄 Recargando reclamo con relaciones...", flush=True)
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo.id))
     reclamo_final = result.scalar_one()
-    print(f"✅ Reclamo #{reclamo_final.id} listo para retornar", flush=True)
-    print(f"{'='*80}\n", flush=True)
+    logger.info("Reclamo #%s listo para retornar", reclamo_final.id)
     return reclamo_final
 
 @router.put("/{reclamo_id}", response_model=ReclamoResponse)
 async def update_reclamo(
     reclamo_id: int,
+    request: Request,
     data: ReclamoUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Solo el creador o admin/supervisor pueden editar
     if current_user.rol == RolUsuario.VECINO and reclamo.creador_id != current_user.id:
@@ -1353,6 +1439,7 @@ async def update_reclamo(
 @router.post("/{reclamo_id}/asignar", response_model=ReclamoResponse)
 async def asignar_reclamo(
     reclamo_id: int,
+    request: Request,
     data: ReclamoAsignar,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1363,10 +1450,8 @@ async def asignar_reclamo(
     - Admin/Supervisor: puede asignar a cualquier dependencia
     - Empleado: solo puede aceptar reclamos ya asignados a su propia dependencia
     """
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     if reclamo.estado not in [EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]:
         raise HTTPException(status_code=400, detail="El reclamo no puede ser asignado en su estado actual")
@@ -1510,14 +1595,13 @@ async def asignar_reclamo(
 @router.post("/{reclamo_id}/iniciar", response_model=ReclamoResponse)
 async def iniciar_reclamo(
     reclamo_id: int,
+    request: Request,
     descripcion: str = Query(..., min_length=1, description="Descripción del inicio del trabajo"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Permitir iniciar desde recibido o asignado (legacy)
     if reclamo.estado not in [EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO]:
@@ -1574,6 +1658,7 @@ async def iniciar_reclamo(
 @router.post("/{reclamo_id}/resolver", response_model=ReclamoResponse)
 async def resolver_reclamo(
     reclamo_id: int,
+    request: Request,
     data: ReclamoResolver,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"]))
@@ -1587,10 +1672,8 @@ async def resolver_reclamo(
     from services.notificacion_service import NotificacionService
     from models.empleado import Empleado
 
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     if reclamo.estado != EstadoReclamo.EN_CURSO:
         raise HTTPException(status_code=400, detail="El reclamo debe estar en proceso para resolverlo")
@@ -1599,6 +1682,12 @@ async def resolver_reclamo(
     # con municipio_dependencia_id. Bloquear si reclamo no pertenece a su dep.
     if current_user.municipio_dependencia_id:
         if reclamo.municipio_dependencia_id != current_user.municipio_dependencia_id:
+            raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
+
+    # El rol EMPLEADO solo puede resolver reclamos que le pertenecen (asignación
+    # directa o cuadrilla de una OT vinculada).
+    if current_user.rol == RolUsuario.EMPLEADO:
+        if not await _empleado_puede_operar(db, reclamo, current_user):
             raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
 
     estado_anterior = reclamo.estado
@@ -1706,6 +1795,7 @@ async def resolver_reclamo(
 @router.post("/{reclamo_id}/confirmar", response_model=ReclamoResponse)
 async def confirmar_reclamo(
     reclamo_id: int,
+    request: Request,
     comentario: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
@@ -1718,14 +1808,8 @@ async def confirmar_reclamo(
     from datetime import datetime
     from services.notificacion_service import NotificacionService
 
-    result = await db.execute(
-        select(Reclamo).options(
-            selectinload(Reclamo.creador)
-        ).where(Reclamo.id == reclamo_id)
-    )
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     if reclamo.estado != EstadoReclamo.PENDIENTE_CONFIRMACION:
         raise HTTPException(
@@ -1785,6 +1869,7 @@ async def confirmar_reclamo(
 @router.post("/{reclamo_id}/devolver", response_model=ReclamoResponse)
 async def devolver_reclamo(
     reclamo_id: int,
+    request: Request,
     motivo: str = Query(..., description="Motivo por el que se devuelve al empleado"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
@@ -1795,10 +1880,8 @@ async def devolver_reclamo(
     """
     from services.notificacion_service import NotificacionService
 
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     if reclamo.estado != EstadoReclamo.PENDIENTE_CONFIRMACION:
         raise HTTPException(
@@ -1840,14 +1923,13 @@ async def devolver_reclamo(
 @router.post("/{reclamo_id}/rechazar", response_model=ReclamoResponse)
 async def rechazar_reclamo(
     reclamo_id: int,
+    request: Request,
     data: ReclamoRechazar,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     if reclamo.estado == EstadoReclamo.RESUELTO:
         raise HTTPException(status_code=400, detail="No se puede rechazar un reclamo resuelto")
@@ -1877,6 +1959,7 @@ async def rechazar_reclamo(
 @router.post("/{reclamo_id}/comentario", response_model=HistorialResponse)
 async def agregar_comentario(
     reclamo_id: int,
+    request: Request,
     data: ReclamoComentario,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -1885,10 +1968,8 @@ async def agregar_comentario(
     from datetime import datetime
     from services.push_service import notificar_comentario_vecino_a_dependencia
 
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Verificar permisos: admin/supervisor pueden comentar en cualquiera,
     # vecinos solo en sus propios reclamos
@@ -1955,6 +2036,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 @router.post("/{reclamo_id}/upload")
 async def upload_documento(
     reclamo_id: int,
+    request: Request,
     file: UploadFile = File(...),
     etapa: str = Query("creacion"),
     db: AsyncSession = Depends(get_db),
@@ -1984,10 +2066,18 @@ async def upload_documento(
     # Volver al inicio del archivo para Cloudinary
     await file.seek(0)
 
-    result = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = result.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
+
+    # Autorización: solo el creador, staff del muni (admin/supervisor) o el
+    # empleado asignado (directo o por cuadrilla de una OT vinculada) pueden
+    # subir imágenes al reclamo. Antes cualquier autenticado podía subir a
+    # cualquier reclamo (incluso de otro tenant).
+    es_staff = current_user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR)
+    es_creador = reclamo.creador_id == current_user.id
+    if not (es_staff or es_creador):
+        if not (current_user.rol == RolUsuario.EMPLEADO and await _empleado_puede_operar(db, reclamo, current_user)):
+            raise HTTPException(status_code=403, detail="No tienes permiso para subir archivos a este reclamo")
 
     # Subir a Cloudinary con tipos permitidos
     try:
@@ -2072,9 +2162,12 @@ async def get_sugerencia_asignacion(
     from models.empleado_categoria import empleado_categoria
     import math
 
-    # Obtener el reclamo
+    # Obtener el reclamo (multi-tenant: solo del municipio del usuario)
     result = await db.execute(
-        get_reclamos_query().where(Reclamo.id == reclamo_id)
+        get_reclamos_query().where(
+            Reclamo.id == reclamo_id,
+            Reclamo.municipio_id == current_user.municipio_id,
+        )
     )
     reclamo = result.scalar_one_or_none()
     if not reclamo:
@@ -2286,7 +2379,10 @@ async def auto_asignar_reclamo(
     top = sugerencias[0]
     empleado_id = top["empleado_id"]
 
-    r = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
+    r = await db.execute(get_reclamos_query().where(
+        Reclamo.id == reclamo_id,
+        Reclamo.municipio_id == current_user.municipio_id,
+    ))
     reclamo = r.scalar_one_or_none()
     if not reclamo:
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
@@ -2313,6 +2409,7 @@ class AsignarEmpleadoRequest(BaseModel):
 @router.put("/{reclamo_id}/empleado")
 async def asignar_empleado(
     reclamo_id: int,
+    request: Request,
     data: AsignarEmpleadoRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -2328,10 +2425,8 @@ async def asignar_empleado(
     if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
         raise HTTPException(status_code=403, detail="Solo admin/supervisor puede asignar empleados")
 
-    r = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    reclamo = r.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Solo se puede asignar/editar cuando esta en RECIBIDO (o NUEVO/ASIGNADO legacy).
     # En estados posteriores hay que pasar por "Reasignar" primero.
@@ -2395,6 +2490,7 @@ class ReasignarRequest(BaseModel):
 @router.post("/{reclamo_id}/reasignar")
 async def reasignar_reclamo(
     reclamo_id: int,
+    request: Request,
     data: ReasignarRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -2410,10 +2506,8 @@ async def reasignar_reclamo(
     if not data.motivo or not data.motivo.strip():
         raise HTTPException(status_code=400, detail="El motivo es obligatorio")
 
-    r = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = r.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     # Solo tiene sentido reasignar si ya estaba en un estado posterior
     if reclamo.estado == EstadoReclamo.RECIBIDO:
@@ -2556,6 +2650,7 @@ async def confirmar_reclamo_vecino(
 @router.post("/{reclamo_id}/descartar-feedback-vecino")
 async def descartar_feedback_vecino(
     reclamo_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -2568,10 +2663,8 @@ async def descartar_feedback_vecino(
     if current_user.rol not in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
         raise HTTPException(status_code=403, detail="Solo admin/supervisor puede descartar feedback")
 
-    r = await db.execute(select(Reclamo).where(Reclamo.id == reclamo_id))
-    reclamo = r.scalar_one_or_none()
-    if not reclamo:
-        raise HTTPException(status_code=404, detail="Reclamo no encontrado")
+    municipio_id = get_effective_municipio_id(request, current_user)
+    reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
     if reclamo.confirmado_vecino is not False:
         raise HTTPException(status_code=400, detail="No hay feedback negativo del vecino para descartar")

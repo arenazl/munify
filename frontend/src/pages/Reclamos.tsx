@@ -1316,9 +1316,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     if (reclamo.estado === 'nuevo') {
       setLoadingSugerencias(true);
       try {
-        console.log('[DEBUG] Cargando sugerencias para reclamo:', reclamo.id);
         const res = await reclamosApi.getSugerenciaAsignacion(reclamo.id);
-        console.log('[DEBUG] Sugerencias recibidas:', res.data);
         setSugerencias(res.data.sugerencias || []);
       } catch (error) {
         console.error('Error cargando sugerencias:', error);
@@ -1731,20 +1729,18 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       return;
     }
 
-    // Actualización optimista: actualizar UI inmediatamente
-    const reclamoActualizado = { ...selectedReclamo, estado: 'en_curso' as const };
-    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
-    closeSheet();
-    toast.success('Reclamo en proceso');
-
     setSaving(true);
     try {
-      await reclamosApi.iniciar(selectedReclamo.id, descripcionInicio.trim());
-      // Refrescar en background para sincronizar datos completos
+      // PATCH cambiarEstado: permite rol empleado y valida la transición recibido->en_curso
+      // (el POST /iniciar era admin/supervisor-only -> 403 para el empleado).
+      await reclamosApi.cambiarEstado(selectedReclamo.id, 'en_curso', descripcionInicio.trim());
+      // Confirmado por el backend: recién ahora actualizamos UI, cerramos y avisamos.
+      const reclamoActualizado = { ...selectedReclamo, estado: 'en_curso' as const };
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
       fetchReclamos();
+      closeSheet();
+      toast.success('Reclamo en proceso');
     } catch (error) {
-      // Revertir cambio optimista si falla
-      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al poner en proceso');
       console.error('Error:', error);
     } finally {
@@ -1762,29 +1758,31 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       });
     }
 
-    // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'finalizado' as const, resolucion };
-    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
-    closeSheet();
-    toast.success('Reclamo finalizado');
-
     setSaving(true);
     const evidencia = fotoCierre;
+    // Un empleado no finaliza directo: el backend deja el reclamo en
+    // pendiente_confirmacion (queda a la espera del supervisor).
+    const esEmpleado = user?.rol === 'empleado';
     try {
       await reclamosApi.resolver(selectedReclamo.id, { resolucion });
+      // Confirmado por el backend: recién ahora actualizamos UI, cerramos y avisamos.
+      const nuevoEstado = esEmpleado ? 'pendiente_confirmacion' : 'finalizado';
+      const reclamoActualizado = { ...selectedReclamo, estado: nuevoEstado as typeof selectedReclamo.estado, resolucion };
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
       // Evidencia de cierre: foto del trabajo terminado (etapa 'resolucion')
       if (evidencia) {
         try {
           await reclamosApi.upload(selectedReclamo.id, evidencia, 'resolucion');
           toast.success('Foto de cierre adjuntada');
         } catch {
-          toast.error('El reclamo se finalizó pero la foto de cierre no se pudo subir');
+          toast.error('El trabajo se registró pero la foto de cierre no se pudo subir');
         }
       }
       setFotoCierre(null);
       fetchReclamos();
+      closeSheet();
+      toast.success(esEmpleado ? 'Enviado al supervisor para confirmar' : 'Reclamo finalizado');
     } catch (error) {
-      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al finalizar reclamo');
       console.error('Error:', error);
     } finally {
@@ -1795,21 +1793,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleRechazar = async () => {
     if (!selectedReclamo || !motivoRechazo) return;
 
-    // Actualización optimista
-    const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
-    setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
-    closeSheet();
-    toast.success('Reclamo rechazado');
-
     setSaving(true);
     try {
       await reclamosApi.rechazar(selectedReclamo.id, {
         motivo: motivoRechazo,
         descripcion: descripcionRechazo || undefined
       });
+      // Confirmado por el backend: recién ahora actualizamos UI, cerramos y avisamos.
+      const reclamoActualizado = { ...selectedReclamo, estado: 'rechazado' as const };
+      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? reclamoActualizado : r));
       fetchReclamos();
+      closeSheet();
+      toast.success('Reclamo rechazado');
     } catch (error) {
-      setReclamos(prev => prev.map(r => r.id === selectedReclamo.id ? selectedReclamo : r));
       toast.error('Error al rechazar reclamo');
       console.error('Error:', error);
     } finally {
@@ -3998,17 +3994,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             >
               {saving ? 'Recibiendo...' : 'Recibir'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: `${estadoColors.rechazado.bg}20`,
+                  border: `2px solid ${estadoColors.rechazado.bg}`,
+                  color: estadoColors.rechazado.bg
+                }}
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
@@ -4027,17 +4025,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             >
               {saving ? 'Asignando...' : selectedReclamo.dependencia_asignada ? 'Reasignar' : 'Asignar'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: `${estadoColors.rechazado.bg}20`,
+                  border: `2px solid ${estadoColors.rechazado.bg}`,
+                  color: estadoColors.rechazado.bg
+                }}
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
@@ -4056,17 +4056,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             >
               {saving ? 'Procesando...' : 'En Curso'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: `${estadoColors.rechazado.bg}20`,
+                  border: `2px solid ${estadoColors.rechazado.bg}`,
+                  color: estadoColors.rechazado.bg
+                }}
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 
@@ -4105,17 +4107,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             >
               {saving ? 'Finalizando...' : 'Finalizar'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: `${estadoColors.rechazado.bg}20`,
+                  border: `2px solid ${estadoColors.rechazado.bg}`,
+                  color: estadoColors.rechazado.bg
+                }}
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
         {canFinalizar && tipoFinalizacion === 'pospuesto' && (
@@ -4132,17 +4136,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
             >
               {saving ? 'Posponiendo...' : 'Posponer'}
             </button>
-            <button
-              onClick={() => setMotivoRechazo('otro')}
-              className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
-              style={{
-                backgroundColor: `${estadoColors.rechazado.bg}20`,
-                border: `2px solid ${estadoColors.rechazado.bg}`,
-                color: estadoColors.rechazado.bg
-              }}
-            >
-              Rechazar
-            </button>
+            {user?.rol !== 'empleado' && (
+              <button
+                onClick={() => setMotivoRechazo('otro')}
+                className="px-4 py-2.5 rounded-xl font-medium transition-all duration-200 hover:scale-105 active:scale-95"
+                style={{
+                  backgroundColor: `${estadoColors.rechazado.bg}20`,
+                  border: `2px solid ${estadoColors.rechazado.bg}`,
+                  color: estadoColors.rechazado.bg
+                }}
+              >
+                Rechazar
+              </button>
+            )}
           </>
         )}
 

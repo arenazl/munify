@@ -19,11 +19,12 @@ Ahora todo vive acá y los endpoints lo piden como dependency:
 
 Reglas de resolución:
 
-- Si el usuario es **admin o supervisor**, puede pasar `X-Municipio-ID`
-  por header para actuar sobre otro municipio distinto al suyo (típicamente
-  superadmins viendo datos de varios municipios desde el panel).
-- Si el header no viene o el rol no lo permite, cae al `municipio_id` del
-  perfil del usuario.
+- Solo el **superadmin real** (usuario sin `municipio_id` propio, ver
+  `is_super_admin`) puede pasar `X-Municipio-ID` por header para actuar
+  sobre un municipio. Un admin/supervisor de un municipio NO puede spoofear
+  el header para operar cross-tenant (era un leak de seguridad).
+- Si el header no viene o el usuario no es superadmin, cae al `municipio_id`
+  del perfil del usuario.
 - Si el usuario no tiene municipio asignado y tampoco viene header,
   el endpoint devuelve 400. Esto previene ejecutar queries sin filtro.
 
@@ -35,7 +36,6 @@ from typing import Annotated, Optional
 from fastapi import Depends, Header, HTTPException, Request, status
 
 from core.security import get_current_user, get_current_user_optional
-from models.enums import RolUsuario
 from models.user import User
 
 
@@ -73,7 +73,11 @@ def resolve_municipio_id(
     fallback natural cuando no hay tenant (ej: listar categorías por
     defecto para el portal público).
     """
-    if current_user and current_user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+    # Solo el superadmin real (sin municipio propio) puede elegir municipio
+    # via X-Municipio-ID. Un admin/supervisor de un muni NO puede spoofear el
+    # header para operar cross-tenant (era un leak: cualquier admin podía
+    # mandar X-Municipio-ID de otro muni y leer/escribir sus datos).
+    if current_user and current_user.municipio_id is None:
         from_header = _parse_header(request.headers.get("X-Municipio-ID"))
         if from_header is not None:
             return from_header
@@ -118,12 +122,12 @@ async def get_municipio_id(
     Levanta 400 si no hay forma de resolver el municipio — eso garantiza
     que ninguna query se ejecute sin filtro de tenancy.
     """
-    if current_user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+    # Solo el superadmin real (sin municipio propio) puede elegir municipio
+    # via X-Municipio-ID; un admin/supervisor de un muni queda atado al suyo.
+    if current_user.municipio_id is None:
         from_header = _parse_header(x_municipio_id)
         if from_header is not None:
             return from_header
-
-    if current_user.municipio_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Usuario sin municipio asignado. Indicá X-Municipio-ID.",
@@ -143,14 +147,15 @@ async def get_municipio_id_optional(
     """
     # Usuario logueado → misma lógica que el helper principal
     if current_user is not None:
-        if current_user.rol in (RolUsuario.ADMIN, RolUsuario.SUPERVISOR):
+        # Solo el superadmin real (sin municipio) puede elegir muni por header.
+        if current_user.municipio_id is None:
             from_header = _parse_header(x_municipio_id)
             if from_header is not None:
                 return from_header
-        if current_user.municipio_id is not None:
+        else:
             return current_user.municipio_id
 
-    # Sin user → el header es la única fuente
+    # Sin user (portal público) → el header es la única fuente
     from_header = _parse_header(x_municipio_id)
     if from_header is not None:
         return from_header

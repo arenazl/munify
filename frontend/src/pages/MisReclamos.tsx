@@ -101,8 +101,8 @@ export default function MisReclamos() {
       setLoadingHistorial(false);
     }
 
-    // Si está resuelto, verificar si ya tiene calificación
-    if (reclamo.estado === 'resuelto') {
+    // Si está resuelto/finalizado, verificar si ya tiene calificación
+    if (['resuelto', 'finalizado'].includes(reclamo.estado)) {
       setLoadingCalificacion(true);
       try {
         const res = await calificacionesApi.getReclamo(reclamo.id);
