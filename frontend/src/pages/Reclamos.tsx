@@ -23,6 +23,7 @@ import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
 import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
+import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType, OrdenTrabajo } from '../types';
@@ -339,6 +340,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [cuadrillasDisponibles, setCuadrillasDisponibles] = useState<{ id: number; nombre: string; apellido?: string | null }[]>([]);
   const [moduloOTActivo, setModuloOTActivo] = useState(false);
   const [otsVigentesDependencia, setOtsVigentesDependencia] = useState<OrdenTrabajo[]>([]);
+  // OTs que YA tienen vinculado el reclamo abierto (la VUELTA: reclamo → OT).
+  const [otsDelReclamo, setOtsDelReclamo] = useState<OrdenTrabajo[]>([]);
   const [otSeleccionadaId, setOtSeleccionadaId] = useState<string>('');
   const [vinculandoOT, setVinculandoOT] = useState(false);
   const [comentarioAsignacion, setComentarioAsignacion] = useState('');
@@ -786,6 +789,26 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
       setSearchParams({}); // Limpiar URL
     }
   }, [searchParams, categorias, setSearchParams]);
+
+  // Deep-link ?abrir=N → abre el Sheet del reclamo (la vuelta desde una OT: los
+  // chips de reclamo en OrdenesTrabajo navegan acá con ?abrir={id}).
+  useEffect(() => {
+    const abrirId = searchParams.get('abrir');
+    if (!abrirId) return;
+    const id = parseInt(abrirId, 10);
+    const enLista = reclamos.find(r => r.id === id);
+    if (enLista) {
+      openViewSheet(enLista);
+      setSearchParams({}, { replace: true });
+    } else if (reclamos.length > 0) {
+      // No está en la página actual: lo traemos puntualmente.
+      reclamosApi.getOne(id)
+        .then(res => openViewSheet(res.data))
+        .catch(() => toast.error('No se pudo abrir el reclamo'));
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, reclamos]);
 
   // Calcular distancia cuando cambian las coordenadas
   useEffect(() => {
@@ -1525,6 +1548,18 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       .then(res => setOtsVigentesDependencia(res.data || []))
       .catch(() => setOtsVigentesDependencia([]));
   }, [selectedReclamo?.id, selectedReclamo?.dependencia_asignada?.id, moduloOTActivo]);
+
+  // Órdenes de trabajo YA vinculadas al reclamo abierto (la vuelta reclamo → OT).
+  // Endpoint dedicado (porReclamo) — solo si el módulo está activo.
+  useEffect(() => {
+    if (!moduloOTActivo || !selectedReclamo?.id) {
+      setOtsDelReclamo([]);
+      return;
+    }
+    ordenesTrabajoApi.porReclamo(selectedReclamo.id)
+      .then(res => setOtsDelReclamo(res.data || []))
+      .catch(() => setOtsDelReclamo([]));
+  }, [selectedReclamo?.id, moduloOTActivo]);
 
   const handleAsignarEmpleadoManual = async (empleadoId: string) => {
     if (!selectedReclamo) return;
@@ -3424,6 +3459,45 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
               </ABMCollapsible>
             );
           })()}
+
+        {/* Órdenes de trabajo YA vinculadas (la vuelta reclamo → OT). Solo si el
+            módulo está activo y el reclamo tiene alguna OT. Read-only + link. */}
+        {moduloOTActivo && otsDelReclamo.length > 0 && (
+          <ABMInfoPanel
+            title={otsDelReclamo.length === 1 ? 'Orden de trabajo' : 'Órdenes de trabajo'}
+            icon={<Wrench className="h-4 w-4" />}
+            variant="default"
+          >
+            <div className="space-y-2">
+              {otsDelReclamo.map((ot) => {
+                const responsable = ot.cuadrilla_nombre || ot.empleado_nombre || 'Sin responsable';
+                return (
+                  <button
+                    key={ot.id}
+                    type="button"
+                    onClick={() => navigate(`/gestion/ordenes-trabajo?abrir=${ot.id}`)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors hover:opacity-80"
+                    style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+                  >
+                    <span className="font-mono text-sm font-semibold" style={{ color: theme.text }}>
+                      {ot.numero}
+                    </span>
+                    <span
+                      className="text-[11px] px-2 py-0.5 rounded-full font-medium"
+                      style={{ backgroundColor: `${otEstadoColor(ot.estado)}20`, color: otEstadoColor(ot.estado) }}
+                    >
+                      {otEstadoLabel(ot.estado)}
+                    </span>
+                    <span className="text-xs flex-1 truncate" style={{ color: theme.textSecondary }}>
+                      {responsable}
+                    </span>
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" style={{ color: theme.textSecondary }} />
+                  </button>
+                );
+              })}
+            </div>
+          </ABMInfoPanel>
+        )}
 
         {/* Tiempo estimado de resolución - Solo para aceptar reclamos nuevos */}
         {selectedReclamo.estado === 'nuevo' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (

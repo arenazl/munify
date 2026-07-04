@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Request, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from pydantic import BaseModel
@@ -510,6 +510,66 @@ async def _empleado_puede_operar(db: AsyncSession, reclamo: Reclamo, current_use
     )
     return (await db.execute(q)).scalar_one_or_none() is not None
 
+
+async def _cuadrillas_activas_empleado(db: AsyncSession, empleado_id: int) -> set:
+    """IDs de cuadrillas donde el empleado es miembro activo (mismo criterio
+    que `_cuadrillas_del_user` de ordenes_trabajo.py)."""
+    from models.empleado_cuadrilla import EmpleadoCuadrilla
+    rows = (await db.execute(
+        select(EmpleadoCuadrilla.cuadrilla_id).where(
+            EmpleadoCuadrilla.empleado_id == empleado_id,
+            EmpleadoCuadrilla.activo == True,  # noqa: E712
+        )
+    )).scalars().all()
+    return set(rows)
+
+
+async def _reclamos_del_empleado_filter(  # noqa: C901
+    db: AsyncSession,
+    empleado_id: int,
+    municipio_id: int,
+    solo_vigentes: bool = False,
+):
+    """Condición SQL (para `.where`) que matchea "los reclamos del empleado":
+    asignación directa (`Reclamo.empleado_id`) O reclamos vinculados vía OT
+    donde el empleado es responsable individual o miembro activo de la
+    cuadrilla asignada (join `orden_trabajo_reclamos`, mismo criterio de
+    "mis OTs" en ordenes_trabajo.py).
+
+    Multi-tenant: la subquery de OTs filtra por `municipio_id`; el caller debe
+    ANDear igualmente `Reclamo.municipio_id`. Con `solo_vigentes=True` excluye
+    OTs completadas/canceladas (bandeja de trabajo pendiente); en False cuenta
+    todo el histórico (para métricas / historial).
+    """
+    from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+    from models.enums import EstadoOrdenTrabajo
+
+    cuadrillas = await _cuadrillas_activas_empleado(db, empleado_id)
+    ot_cond = [OrdenTrabajo.empleado_id == empleado_id]
+    if cuadrillas:
+        ot_cond.append(OrdenTrabajo.cuadrilla_id.in_(cuadrillas))
+
+    sub = (
+        select(OrdenTrabajoReclamo.reclamo_id)
+        .join(OrdenTrabajo, OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id)
+        .where(
+            OrdenTrabajo.municipio_id == municipio_id,
+            or_(*ot_cond),
+        )
+    )
+    if solo_vigentes:
+        sub = sub.where(
+            OrdenTrabajo.estado.notin_(
+                [EstadoOrdenTrabajo.COMPLETADA, EstadoOrdenTrabajo.CANCELADA]
+            )
+        )
+
+    return or_(
+        Reclamo.empleado_id == empleado_id,
+        Reclamo.id.in_(sub),
+    )
+
+
 @router.get("", response_model=List[ReclamoResponse])
 async def get_reclamos(
     request: Request,
@@ -521,9 +581,11 @@ async def get_reclamos(
     solo_mis_tareas: bool = Query(
         False,
         description=(
-            "Vista de campo: solo los reclamos asignados a MÍ como empleado "
-            "(Reclamo.empleado_id == empleado vinculado al usuario actual). "
-            "Si el usuario no tiene empleado vinculado, devuelve vacío."
+            "Bandeja de campo unificada: los reclamos asignados a MÍ como "
+            "empleado — asignación directa (Reclamo.empleado_id) O reclamos "
+            "vinculados a OTs vigentes donde soy responsable o miembro activo "
+            "de la cuadrilla. Si el usuario no tiene empleado vinculado, "
+            "devuelve vacío."
         ),
     ),
     search: Optional[str] = Query(None, description="Búsqueda en todos los campos"),
@@ -597,7 +659,14 @@ async def get_reclamos(
         query = query.where(Reclamo.canal == canal)
     if solo_mis_tareas:
         if current_user.empleado_id:
-            query = query.where(Reclamo.empleado_id == current_user.empleado_id)
+            # Bandeja unificada: asignación directa + trabajo canalizado por OT
+            # vigente (cuadrilla o responsable). Multi-tenant: `municipio_id` ya
+            # fue resuelto arriba y la subquery de OTs lo filtra igual.
+            query = query.where(
+                await _reclamos_del_empleado_filter(
+                    db, current_user.empleado_id, municipio_id, solo_vigentes=True
+                )
+            )
         else:
             # Sin empleado vinculado no hay "mis tareas": lista vacía explícita
             query = query.where(Reclamo.id == None)  # noqa: E711
@@ -946,11 +1015,13 @@ async def buscar_reclamos_similares(
 @router.get("/mis-estadisticas")
 async def get_mis_estadisticas(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["supervisor", "admin"]))
+    current_user: User = Depends(require_roles(["supervisor", "admin", "empleado"]))
 ):
     """
-    Estadísticas de rendimiento de la dependencia del supervisor logueado.
-    Filtra Reclamos por current_user.municipio_dependencia_id.
+    Estadísticas de rendimiento del usuario logueado.
+    - Supervisor / admin: mide la dependencia (current_user.municipio_dependencia_id).
+    - Empleado (D8): mide SUS reclamos — asignación directa + los canalizados
+      por OT (histórico completo), nunca los de todo el muni.
     """
     empty = {
         "total_asignados": 0,
@@ -963,16 +1034,24 @@ async def get_mis_estadisticas(
         "ultimos_resueltos": [],
     }
 
-    # Sin dependencia asignada -> no hay nada que medir
-    if not current_user.municipio_dependencia_id:
-        return {**empty, "mensaje": "Tu usuario no tiene una dependencia asignada."}
+    # Scope según rol (multi-tenant siempre por municipio_id)
+    if current_user.rol == RolUsuario.EMPLEADO:
+        if not current_user.empleado_id:
+            return {**empty, "mensaje": "Tu usuario no tiene un legajo de empleado vinculado."}
+        base_filter = await _reclamos_del_empleado_filter(
+            db, current_user.empleado_id, current_user.municipio_id, solo_vigentes=False
+        )
+    else:
+        # Sin dependencia asignada -> no hay nada que medir
+        if not current_user.municipio_dependencia_id:
+            return {**empty, "mensaje": "Tu usuario no tiene una dependencia asignada."}
+        base_filter = Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id
+
+    if current_user.municipio_id:
+        base_filter = base_filter & (Reclamo.municipio_id == current_user.municipio_id)
 
     estados_resueltos = [EstadoReclamo.FINALIZADO.value, EstadoReclamo.RESUELTO.value]
     estados_en_curso = [EstadoReclamo.EN_CURSO.value, EstadoReclamo.EN_PROCESO.value, EstadoReclamo.ASIGNADO.value]
-
-    base_filter = Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id
-    if current_user.municipio_id:
-        base_filter = base_filter & (Reclamo.municipio_id == current_user.municipio_id)
 
     # Total + breakdown por estado en una sola query
     total_q = await db.execute(select(func.count(Reclamo.id)).where(base_filter))
@@ -1070,15 +1149,27 @@ async def get_mi_historial(
     limit: int = Query(20, le=50),
     estado: Optional[str] = Query(None, description="Filtrar por estado"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(["supervisor", "admin"]))
+    current_user: User = Depends(require_roles(["supervisor", "admin", "empleado"]))
 ):
     """
-    Historial de reclamos asignados a la dependencia del supervisor logueado.
+    Historial de reclamos del usuario logueado.
+    - Supervisor / admin: los de su dependencia (municipio_dependencia_id).
+    - Empleado (D8): SUS reclamos — asignación directa + los canalizados por OT
+      (histórico completo), nunca los de todo el muni.
     """
-    if not current_user.municipio_dependencia_id:
-        return {"data": [], "total": 0, "skip": skip, "limit": limit}
+    if current_user.rol == RolUsuario.EMPLEADO:
+        if not current_user.empleado_id:
+            return {"data": [], "total": 0, "skip": skip, "limit": limit}
+        filtros = [
+            await _reclamos_del_empleado_filter(
+                db, current_user.empleado_id, current_user.municipio_id, solo_vigentes=False
+            )
+        ]
+    else:
+        if not current_user.municipio_dependencia_id:
+            return {"data": [], "total": 0, "skip": skip, "limit": limit}
+        filtros = [Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id]
 
-    filtros = [Reclamo.municipio_dependencia_id == current_user.municipio_dependencia_id]
     if current_user.municipio_id:
         filtros.append(Reclamo.municipio_id == current_user.municipio_id)
     if estado:

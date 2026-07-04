@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Hammer, Plus, Users, User as UserIcon, Calendar, ClipboardList, X, Boxes, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,6 +13,7 @@ import { ordenesTrabajoApi, empleadosApi, empleadosGestionApi, reclamosApi, inve
 import { otEstadoLabel, otEstadoColor, otEstadoIcons, otEstadoLabels } from '../lib/enums/ordenTrabajo';
 import { naturalezaColors, naturalezaIcons } from '../lib/enums/inventario';
 import { prioridadLabels, prioridadColor, prioridadIcons, PRIORIDAD_OPTIONS } from '../lib/enums/prioridadOT';
+import { getEstadoInfo } from '../lib/estadoConfig';
 import { imprimirOrdenTrabajo } from '../lib/printOrdenTrabajo';
 import type { OrdenTrabajo, OTMaterial, EstadoOrdenTrabajo, Reclamo, Empleado, InventarioItem, NaturalezaInventario, OTTipoTrabajo, PrioridadOT } from '../types';
 
@@ -56,6 +57,7 @@ export default function OrdenesTrabajo() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [ordenes, setOrdenes] = useState<OrdenTrabajo[]>([]);
   const [todasOrdenes, setTodasOrdenes] = useState<OrdenTrabajo[]>([]); // sin filtro de estado, solo para contar las píldoras
@@ -166,6 +168,18 @@ export default function OrdenesTrabajo() {
       searchParams.delete('reclamo_id');
       setSearchParams(searchParams, { replace: true });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Deep-link ?abrir=N → abre el detalle de una OT (la vuelta desde el Sheet de Reclamos)
+  useEffect(() => {
+    const oid = searchParams.get('abrir');
+    if (!oid) return;
+    ordenesTrabajoApi.get(parseInt(oid, 10))
+      .then(res => { if (res.data) abrirDetalle(res.data); })
+      .catch(() => toast.error('No se pudo abrir la orden de trabajo'));
+    searchParams.delete('abrir');
+    setSearchParams(searchParams, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -306,6 +320,12 @@ export default function OrdenesTrabajo() {
     const enSelected = selected?.reclamos.find(r => r.id === id);
     return enSelected ? `#${id} · ${enSelected.titulo}` : `#${id}`;
   };
+
+  // Estado del reclamo vinculado (para pintar el badge en el chip). Puede venir
+  // del catálogo de activos o de los reclamos que trae la OTs seleccionada.
+  const reclamoEstado = (id: number): string | undefined =>
+    reclamosActivos.find(r => r.id === id)?.estado ||
+    selected?.reclamos.find(r => r.id === id)?.estado;
 
   // --- Recursos de inventario ---
   const mostrarRecursos = itemsDisponibles.length > 0 || form.recursos.length > 0;
@@ -692,20 +712,42 @@ export default function OrdenesTrabajo() {
             <p className="text-xs font-semibold uppercase mb-1" style={{ color: theme.textSecondary }}>Reclamos vinculados</p>
             {form.reclamo_ids.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {form.reclamo_ids.map(id => (
-                  <span
-                    key={id}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
-                    style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
-                  >
-                    {reclamoLabel(id)}
-                    {esGestor && esEditable && (
-                      <button onClick={() => setForm({ ...form, reclamo_ids: form.reclamo_ids.filter(r => r !== id) })}>
-                        <X className="h-3 w-3" />
+                {form.reclamo_ids.map(id => {
+                  const est = reclamoEstado(id);
+                  const estInfo = est ? getEstadoInfo(est) : null;
+                  return (
+                    <span
+                      key={id}
+                      className="flex items-center gap-1.5 text-xs pl-2 pr-2 py-1 rounded-lg"
+                      style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/gestion/reclamos?abrir=${id}`)}
+                        className="flex items-center gap-1.5 hover:underline"
+                        title="Ver reclamo"
+                      >
+                        <span>{reclamoLabel(id)}</span>
+                        {estInfo && (
+                          <span
+                            className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                            style={{ backgroundColor: estInfo.bg, color: estInfo.color }}
+                          >
+                            {estInfo.label}
+                          </span>
+                        )}
                       </button>
-                    )}
-                  </span>
-                ))}
+                      {esGestor && esEditable && (
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, reclamo_ids: form.reclamo_ids.filter(r => r !== id) })}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
               </div>
             )}
             {esGestor && esEditable && (

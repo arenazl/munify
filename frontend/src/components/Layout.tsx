@@ -19,8 +19,10 @@ import { NotificationActivationSheet } from './NotificationActivationSheet';
 import { subscribeToPush } from '../lib/pushNotifications';
 import { toast } from 'sonner';
 
-// Definir tabs del footer móvil según rol (siempre 5, el del medio es el principal)
-const getMobileTabs = (userRole: string) => {
+// Definir tabs del footer móvil según rol. Gestor/vecino: 5 tabs con centro de
+// acción (crear/menú). Empleado: 3-4 tabs sin centro. El render distingue cada
+// tipo por 'isCreateMenu'/'end' in tab (no por índice fijo).
+const getMobileTabs = (userRole: string, modulosActivos: string[] = []) => {
   const isAdmin = userRole === 'admin';
   const isSupervisor = userRole === 'supervisor';
   const isAdminOrSupervisor = isAdmin || isSupervisor;
@@ -34,6 +36,23 @@ const getMobileTabs = (userRole: string) => {
       { path: '/gestion/tramites', icon: FileCheck, label: 'Trámites', end: false },
       { path: '/gestion/tesoreria', icon: Wallet, label: 'Tesorería', end: false },
     ];
+  }
+
+  // Empleado de campo: footer operativo propio. Antes heredaba el del vecino
+  // (Inicio->mi-panel rebota, Reclamos->mis-reclamos del vecino, etc). Ahora:
+  // Trabajos · Órdenes (si el muni tiene el módulo) · Mapa · Logros.
+  if (userRole === 'empleado') {
+    const tabs: Array<{ path: string; icon: any; label: string; end: boolean }> = [
+      { path: '/gestion/mis-trabajos', icon: Wrench, label: 'Trabajos', end: false },
+    ];
+    if (modulosActivos.includes('ordenes_trabajo')) {
+      tabs.push({ path: '/gestion/ordenes-trabajo', icon: ClipboardList, label: 'Órdenes', end: false });
+    }
+    tabs.push(
+      { path: '/gestion/mapa', icon: Map, label: 'Mapa', end: false },
+      { path: '/gestion/logros', icon: Trophy, label: 'Logros', end: false },
+    );
+    return tabs;
   }
 
   // Vecino: "+" en el centro abre menú con Reclamo/Trámite (los dos core features).
@@ -352,7 +371,7 @@ export default function Layout() {
     modulosDesactivados,
     iaHabilitada,
   });
-  const mobileTabs = getMobileTabs(user.rol);
+  const mobileTabs = getMobileTabs(user.rol, modulosActivos);
 
   // Anchos dinámicos con medidas relativas para mejor responsividad
   // En móvil un ancho más compacto (12.5rem), en desktop respeta el estado colapsado
@@ -1315,11 +1334,28 @@ export default function Layout() {
                     items.push(
                       { label: 'Mapa', icon: Map, color: '#3b82f6', onClick: () => navigate('/gestion/mapa') },
                       { label: 'Mostrador', icon: ScanLine, color: '#8b5cf6', onClick: () => navigate('/gestion/mostrador') },
-                      { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
-                      { label: 'Contactos', icon: User, color: '#06b6d4', onClick: () => navigate('/gestion/tesoreria/contactos') },
-                      { label: 'Resumen', icon: TrendingUp, color: '#10b981', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
-                      { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
                     );
+                    // Si el muni opera órdenes de trabajo (opt-in), priorizar accesos
+                    // del universo Reclamos (Órdenes/Tablero) sobre los slots de
+                    // tesorería. Gateado SOLO por ordenes_trabajo (no inventario, que
+                    // está activo en todos los munis) para no alterar el menú de los
+                    // munis que solo usan tesorería (ej. SPN).
+                    const tieneOrdenes = modulosActivos.includes('ordenes_trabajo');
+                    if (tieneOrdenes) {
+                      items.push(
+                        { label: 'Órdenes', icon: ClipboardList, color: '#f97316', onClick: () => navigate('/gestion/ordenes-trabajo') },
+                        { label: 'Tablero', icon: TrendingUp, color: '#14b8a6', onClick: () => navigate('/gestion/tablero') },
+                        { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
+                        { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
+                      );
+                    } else {
+                      items.push(
+                        { label: 'Agenda', icon: Calendar, color: '#f59e0b', onClick: () => navigate('/gestion/tesoreria/agenda') },
+                        { label: 'Contactos', icon: User, color: '#06b6d4', onClick: () => navigate('/gestion/tesoreria/contactos') },
+                        { label: 'Resumen', icon: TrendingUp, color: '#10b981', onClick: () => navigate('/gestion/tesoreria/proyecciones') },
+                        { label: 'Config', icon: Settings, color: '#64748b', onClick: () => navigate('/gestion/configuracion') },
+                      );
+                    }
                   } else {
                     items.push(
                       { label: 'Reclamo', icon: AlertCircle, color: '#ef4444', onClick: () => navigate('/gestion/crear-reclamo') },

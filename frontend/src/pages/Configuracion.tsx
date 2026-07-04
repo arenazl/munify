@@ -632,6 +632,7 @@ export default function Configuracion() {
       id: 'catalogos',
       title: 'Catálogos',
       items: [
+        { id: 'exportar', label: 'Exportar Reclamos', description: 'Descargá informes CSV de reclamos, trámites y métricas de SLA', icon: FileDown, color: '#10b981', link: '/gestion/exportar', show: isAdminOrSupervisor },
         { id: 'municipios', label: 'Municipios', description: 'Alta, baja y modificación de municipios', icon: Landmark, color: '#ec4899', link: '/gestion/municipios', show: isSuperAdmin },
         { id: 'dependencias', label: 'Dependencias', description: 'Secretarías y direcciones que gestionan reclamos y trámites', icon: Building2, color: '#3b82f6', link: '/gestion/dependencias', show: isAdminOrSupervisor },
         { id: 'asignacion-dependencias', label: 'Asignación', description: 'Asignar categorías y tipos de trámite a dependencias', icon: Link2, color: '#f59e0b', link: '/gestion/asignacion-dependencias', show: isAdminOrSupervisor && !isSuperAdmin },
@@ -643,7 +644,6 @@ export default function Configuracion() {
         { id: 'zonas', label: 'Zonas', description: 'Barrios y áreas del municipio', icon: MapPin, color: '#06b6d4', link: '/gestion/zonas', show: isAdminOrSupervisor },
         { id: 'importar-padron', label: 'Catálogo de Tasas', description: 'Importá el padrón tributario y mapealo al catálogo Munify', icon: Landmark, color: '#0ea5e9', link: '/gestion/configuracion/importar-padron', show: isAdminOrSupervisor && !isSuperAdmin },
         { id: 'dashboard-config', label: 'Dashboards', description: 'Personalizá los dashboards por rol', icon: LayoutDashboard, color: '#8b5cf6', link: '/gestion/config-dashboard', show: isAdminOrSupervisor },
-        { id: 'exportar', label: 'Exportar', description: 'Exportar informes CSV de reclamos, trámites y métricas', icon: FileDown, color: '#10b981', link: '/gestion/exportar', show: isAdminOrSupervisor },
       ],
     },
     {

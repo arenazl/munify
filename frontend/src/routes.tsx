@@ -22,7 +22,6 @@ import Mapa from './pages/Mapa';
 import Tablero from './pages/Tablero';
 import Empleados from './pages/Empleados';
 import Usuarios from './pages/Usuarios';
-import Categorias from './pages/Categorias';
 import CategoriasReclamoConfig from './pages/CategoriasReclamoConfig';
 import CategoriasTramiteConfig from './pages/CategoriasTramiteConfig';
 import TramitesConfig from './pages/TramitesConfig';
@@ -275,8 +274,10 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute roles={['admin', 'supervisor']}><Usuarios /></ProtectedRoute>
       },
       {
+        // Legacy: la pantalla vieja de categorías (Categorias.tsx) quedó sin
+        // links. Redirige al ABM per-municipio de categorías de reclamo.
         path: 'categorias',
-        element: <ProtectedRoute roles={['admin', 'supervisor']}><Categorias /></ProtectedRoute>
+        element: <Navigate to="/gestion/categorias-reclamo" replace />
       },
       {
         path: 'zonas',

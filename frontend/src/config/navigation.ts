@@ -3,6 +3,7 @@ import {
   Wrench, Clock, Trophy, FileCheck, BarChart3, CalendarDays, LayoutDashboard, Settings, Building2,
   FolderTree, FileText, Activity, Receipt, Wallet, ScanLine, Layers, Sparkles,
   CalendarClock, Users, MapPin, TrendingUp, PiggyBank, Banknote, Hammer, Boxes,
+  UsersRound, History,
 } from 'lucide-react';
 
 interface NavigationOptions {
@@ -145,12 +146,16 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Principal',
       description: 'Resumen y métricas'
     },
+    // === UNIVERSO RECLAMOS (Reclamos + Mapa + Tablero + Planificación + SLA + Análisis) ===
+    // Reagrupación F2/D1 (variante C): las piezas del universo reclamos quedan
+    // contiguas y ANTES del bloque financiero. Antes Tablero/Planificación/SLA/
+    // Análisis vivían en la categoría 'Operación' al final; se fusionaron acá.
     {
       name: 'Reclamos',
       href: '/gestion/reclamos',
       icon: ClipboardList,
       show: isAdminOrSupervisor && moduloOn('reclamos'),
-      categoria: 'Principal',
+      categoria: 'Reclamos',
       description: 'Gestionar todos los reclamos'
     },
     {
@@ -158,33 +163,40 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       href: '/gestion/mapa',
       icon: Map,
       show: isAdminOrSupervisor && moduloOn('mapa'),
-      categoria: 'Principal',
+      categoria: 'Reclamos',
       description: 'Ver reclamos en el mapa'
     },
-    // === SECCIÓN TRÁMITES (la unidad trámite → turno → agenda, consolidación 2026-07) ===
     {
-      name: 'Trámites',
-      href: '/gestion/tramites',
-      icon: FileCheck,
-      show: isAdminOrSupervisor && moduloOn('tramites'),
-      categoria: 'Trámites',
-      description: 'Gestionar trámites'
+      name: 'Tablero',
+      href: '/gestion/tablero',
+      icon: Wrench,
+      show: isAdminOrSupervisor && moduloOn('tablero'),
+      categoria: 'Reclamos',
+      description: 'Tablero Kanban'
     },
     {
-      name: 'Agenda',
-      href: '/gestion/agenda-turnos',
-      icon: CalendarClock,
-      show: isAdminOrSupervisor && moduloOn('tramites'),
-      categoria: 'Trámites',
-      description: 'Agenda diaria de turnos presenciales'
-    },
-    {
-      name: 'Horarios',
-      href: '/gestion/configuracion-agenda',
+      name: 'Planificación',
+      href: '/gestion/planificacion',
       icon: CalendarDays,
-      show: isAdminOrSupervisor && moduloOn('tramites'),
-      categoria: 'Trámites',
-      description: 'Horarios, cupos y feriados de la agenda de turnos'
+      show: isAdminOrSupervisor && moduloOn('planificacion'),
+      categoria: 'Reclamos',
+      description: 'Calendario semanal del personal'
+    },
+    {
+      name: 'SLA',
+      href: '/gestion/sla',
+      icon: Clock,
+      show: isAdminOrSupervisor && moduloOn('sla'),
+      categoria: 'Reclamos',
+      description: 'Gestión de SLA'
+    },
+    {
+      name: 'Análisis',
+      href: '/gestion/panel-bi',
+      icon: LayoutDashboard,
+      show: isAdminOrSupervisor && moduloOn('panel-bi') && iaHabilitada,
+      categoria: 'Reclamos',
+      description: 'Consultas y análisis con IA'
     },
     // === SECCIÓN CAMPO (empleados/operarios con tareas asignadas) ===
     {
@@ -212,6 +224,69 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       show: isAdminOrSupervisor && modulosActivos.has('inventario'),
       categoria: 'Campo',
       description: 'Vehículos, herramientas y materiales'
+    },
+    {
+      // F2/T2: Empleados de campo (tabla `empleados`) — antes solo se llegaba
+      // por tile de Configuración. Gateado por el flag reclamos (son recurso del
+      // universo Reclamos): si el muni no usa reclamos, no ensucian el sidebar.
+      name: 'Personal',
+      href: '/gestion/empleados',
+      icon: Users,
+      show: isAdminOrSupervisor && moduloOn('reclamos'),
+      categoria: 'Campo',
+      description: 'Empleados de campo del municipio'
+    },
+    {
+      // F2/T2: Cuadrillas (grupos de trabajo) — a ellas se asignan reclamos/OTs.
+      name: 'Cuadrillas',
+      href: '/gestion/cuadrillas',
+      icon: UsersRound,
+      show: isAdminOrSupervisor && moduloOn('reclamos'),
+      categoria: 'Campo',
+      description: 'Grupos de trabajo y asignaciones'
+    },
+    {
+      // F2/D8: se habilita para el empleado (endpoints abiertos por otro agente).
+      name: 'Rendimiento',
+      href: '/gestion/mi-rendimiento',
+      icon: TrendingUp,
+      show: userRole === 'empleado' && moduloOn('reclamos'),
+      categoria: 'Campo',
+      description: 'Mi rendimiento y estadísticas'
+    },
+    {
+      // F2/D8: historial de tareas resueltas del propio empleado.
+      name: 'Historial',
+      href: '/gestion/mi-historial',
+      icon: History,
+      show: userRole === 'empleado' && moduloOn('reclamos'),
+      categoria: 'Campo',
+      description: 'Historial de mis tareas resueltas'
+    },
+    // === SECCIÓN TRÁMITES (la unidad trámite → turno → agenda, consolidación 2026-07) ===
+    {
+      name: 'Trámites',
+      href: '/gestion/tramites',
+      icon: FileCheck,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Trámites',
+      description: 'Gestionar trámites'
+    },
+    {
+      name: 'Agenda',
+      href: '/gestion/agenda-turnos',
+      icon: CalendarClock,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Trámites',
+      description: 'Agenda diaria de turnos presenciales'
+    },
+    {
+      name: 'Horarios',
+      href: '/gestion/configuracion-agenda',
+      icon: CalendarDays,
+      show: isAdminOrSupervisor && moduloOn('tramites'),
+      categoria: 'Trámites',
+      description: 'Horarios, cupos y feriados de la agenda de turnos'
     },
     {
       name: 'Mostrador',
@@ -345,41 +420,11 @@ export const getNavigation = (userRoleOrOptions: string | NavigationOptions) => 
       categoria: 'Contaduría',
       description: 'OPs vencidas, próximas, top beneficiarios'
     },
-    {
-      name: 'Tablero',
-      href: '/gestion/tablero',
-      icon: Wrench,
-      show: isAdminOrSupervisor && moduloOn('tablero'),
-      categoria: 'Operación',
-      description: 'Tablero Kanban'
-    },
-    {
-      name: 'Planificación',
-      href: '/gestion/planificacion',
-      icon: CalendarDays,
-      show: isAdminOrSupervisor && moduloOn('planificacion'),
-      categoria: 'Operación',
-      description: 'Calendario semanal del personal'
-    },
-    {
-      name: 'SLA',
-      href: '/gestion/sla',
-      icon: Clock,
-      show: isAdminOrSupervisor && moduloOn('sla'),
-      categoria: 'Operación',
-      description: 'Gestión de SLA'
-    },
-    {
-      name: 'Análisis',
-      href: '/gestion/panel-bi',
-      icon: LayoutDashboard,
-      show: isAdminOrSupervisor && moduloOn('panel-bi') && iaHabilitada,
-      categoria: 'Operación',
-      description: 'Consultas y análisis con IA'
-    },
     // === ABMs per-municipio (solo si el modulo correspondiente esta activo) ===
     {
-      name: 'Reclamos',
+      // F2: renombrado 'Reclamos' → 'Categorías' para desambiguar del item
+      // 'Reclamos' del universo (categoría Reclamos) y del ABM de trámites.
+      name: 'Categorías',
       href: '/gestion/categorias-reclamo',
       icon: FolderTree,
       show: isAdminOrSupervisor && abmEnSidebar && !isSuperAdmin && moduloOn('reclamos'),

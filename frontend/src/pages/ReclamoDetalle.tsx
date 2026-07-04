@@ -4,10 +4,10 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, AlertTriangle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp, Star
+  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp, Star, Wrench
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, whatsappApi, calificacionesApi } from '../lib/api';
+import { reclamosApi, whatsappApi, calificacionesApi, modulosApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
@@ -156,6 +156,8 @@ export default function ReclamoDetalle() {
   const [showComentarioModal, setShowComentarioModal] = useState(false);
   const [nuevoEstado, setNuevoEstado] = useState<EstadoReclamo | null>(null);
   const [comentarioCambioEstado, setComentarioCambioEstado] = useState('');
+  // Módulo Órdenes de Trabajo (opt-in por muni) — gatea el botón "Crear OT".
+  const [moduloOTActivo, setModuloOTActivo] = useState(false);
 
   // Función para confirmar reclamo (supervisor)
   const handleConfirmar = async () => {
@@ -331,6 +333,18 @@ export default function ReclamoDetalle() {
     fetchData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Estado del módulo Órdenes de Trabajo (opt-in). Solo interesa a gestores,
+  // que son quienes pueden generar una OT desde el reclamo.
+  useEffect(() => {
+    if (!user || !['admin', 'supervisor'].includes(user.rol)) return;
+    modulosApi.list()
+      .then((res) => {
+        const rows = (res.data || []) as Array<{ modulo: string; activo: boolean }>;
+        setModuloOTActivo(rows.some(m => m.modulo === 'ordenes_trabajo' && m.activo));
+      })
+      .catch(() => setModuloOTActivo(false));
+  }, [user]);
 
   // Combinar historial y logs de WhatsApp en un timeline unificado
   const timelineEvents = useMemo(() => {
@@ -657,6 +671,24 @@ export default function ReclamoDetalle() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Puente al módulo de campo: generar una OT desde este reclamo.
+                Gateado por el módulo 'ordenes_trabajo' (opt-in) y por rol gestor.
+                El deep-link ?reclamo_id={id} abre el sheet de creación pre-vinculado. */}
+            {moduloOTActivo && user && ['admin', 'supervisor'].includes(user.rol) && (
+              <button
+                onClick={() => navigate(`/gestion/ordenes-trabajo?reclamo_id=${reclamo.id}`)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all hover:scale-[1.01] active:scale-95"
+                style={{
+                  backgroundColor: `${theme.primary}15`,
+                  border: `1.5px solid ${theme.primary}`,
+                  color: theme.primary,
+                }}
+              >
+                <Wrench className="h-4 w-4" />
+                Crear orden de trabajo
+              </button>
             )}
 
             {/* Timeline de eventos */}
