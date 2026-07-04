@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef, useLayoutEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList, ThumbsDown } from 'lucide-react';
+import { MapPin, Calendar, Tag, UserPlus, Play, CheckCircle, XCircle, Clock, Eye, FileText, User, Users, FileCheck, FolderOpen, AlertTriangle, AlertCircle, Zap, Droplets, TreeDeciduous, Trash2, Building2, X, Camera, Sparkles, Send, Lightbulb, CheckCircle2, Car, Construction, Bug, Leaf, Signpost, Recycle, Brush, Phone, Mail, Bell, BellOff, MessageCircle, Loader2, Wrench, Timer, TrendingUp, Search, ExternalLink, ShieldCheck, TrafficCone, CloudRain, Volume2, Dog, Fence, Home, PaintBucket, Footprints, Info, ArrowUpDown, CalendarDays, PauseCircle, PlayCircle, Inbox, LayoutGrid, LayoutList, ThumbsDown, Star } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi } from '../lib/api';
+import { reclamosApi, empleadosApi, categoriasApi, zonasApi, usersApi, dashboardApi, API_URL, API_BASE_URL, chatApi, clasificacionApi, dependenciasApi, ordenesTrabajoApi, empleadosGestionApi, modulosApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ABMPage, ABMTextarea, ABMField, ABMFieldGrid, ABMInfoPanel, ABMCollapsible, ABMTable, FilterRowSkeleton } from '../components/ui/ABMPage';
@@ -38,6 +38,56 @@ const getCategoryImageUrl = (nombre: string): string | null => {
 
   return `${API_BASE_URL}/static/images/categorias/${safeName}.jpeg`;
 };
+
+// Calificación que dejó el vecino tras el cierre del reclamo (T5-F1).
+// El dato ya vive en BD; ninguna pantalla del muni lo mostraba.
+interface CalificacionVecinoData {
+  id: number;
+  puntuacion: number;
+  comentario?: string | null;
+  created_at?: string;
+}
+
+// Panel de "la voz del vecino": estrellas + comentario. Solo tokens de tema
+// (sin hex nuevo): estrella llena = primary, vacía = border.
+function CalificacionVecinoPanel({ calificacion }: { calificacion: CalificacionVecinoData }) {
+  const { theme } = useTheme();
+  return (
+    <ABMInfoPanel
+      title="Calificación del vecino"
+      icon={<Star className="h-4 w-4" />}
+      variant="success"
+    >
+      <div className="flex items-center gap-1 mb-2">
+        {[1, 2, 3, 4, 5].map((n) => {
+          const activa = n <= calificacion.puntuacion;
+          return (
+            <Star
+              key={n}
+              className="h-5 w-5"
+              style={{
+                color: activa ? theme.primary : theme.border,
+                fill: activa ? theme.primary : 'none',
+              }}
+            />
+          );
+        })}
+        <span className="text-sm font-semibold ml-1.5" style={{ color: theme.text }}>
+          {calificacion.puntuacion}/5
+        </span>
+      </div>
+      {calificacion.comentario?.trim() ? (
+        <p className="text-sm leading-relaxed" style={{ color: theme.text }}>
+          &ldquo;{calificacion.comentario}&rdquo;
+        </p>
+      ) : (
+        <p className="text-sm italic" style={{ color: theme.textSecondary }}>
+          El vecino no dejó comentario.
+        </p>
+      )}
+    </ABMInfoPanel>
+  );
+}
 
 // Función para obtener el icono del estado
 const getEstadoIcon = (estado: EstadoReclamo): React.ReactNode => {
@@ -246,6 +296,8 @@ export default function Reclamos({ soloMisTrabajos = false, soloMiArea = false }
   const [selectedReclamo, setSelectedReclamo] = useState<Reclamo | null>(null);
   const [historial, setHistorial] = useState<HistorialReclamo[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+  // Calificación del vecino para el reclamo abierto en el Sheet (T5-F1)
+  const [calificacion, setCalificacion] = useState<CalificacionVecinoData | null>(null);
 
   // Estado para el ConfirmModal reutilizable (reemplaza window.confirm/prompt)
   const [confirmModal, setConfirmModal] = useState<{
@@ -1312,6 +1364,19 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       setLoadingHistorial(false);
     }
 
+    // Si el reclamo está cerrado, traer la calificación que dejó el vecino (T5-F1).
+    // 404 = todavía no calificó → dejamos null y no mostramos el panel.
+    const estadoCierre = (reclamo.estado || '').toLowerCase();
+    setCalificacion(null);
+    if (estadoCierre === 'finalizado' || estadoCierre === 'resuelto') {
+      try {
+        const res = await calificacionesApi.getReclamo(reclamo.id);
+        setCalificacion(res.data);
+      } catch {
+        setCalificacion(null);
+      }
+    }
+
     // Si el reclamo es nuevo, cargar sugerencias de asignación
     if (reclamo.estado === 'nuevo') {
       setLoadingSugerencias(true);
@@ -1330,6 +1395,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     setSheetMode('closed');
     setSelectedReclamo(null);
     setHistorial([]);
+    setCalificacion(null);
     // Reset asignación states
     setDependenciaSeleccionada('');
     setEmpleadoSeleccionadoId('');
@@ -3467,6 +3533,9 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
+        {/* Calificación del vecino (T5-F1) — solo si el vecino ya calificó el cierre */}
+        {calificacion && <CalificacionVecinoPanel calificacion={calificacion} />}
+
         {/* Rechazo */}
         {selectedReclamo.motivo_rechazo && (
           <ABMInfoPanel
@@ -4386,6 +4455,8 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     }
     const badges: Array<{ label: string; color: string }> = [];
     const estado = (r.estado || '').toLowerCase();
+    // D2 (F1): cierre disputado por el vecino — pill textual además del icono.
+    if (r.confirmado_vecino === false) badges.push({ label: 'Disputado', color: '#ef4444' });
     if (estado === 'pospuesto') badges.push({ label: 'Pospuesto', color: '#8b5cf6' });
     const solicitanteNombre = r.es_anonimo
       ? 'Anónimo'
@@ -4513,6 +4584,10 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
     const finalizados = (c['finalizado'] || 0) + (c['resuelto'] || 0);
     const total = Object.values(c).reduce((a, b) => a + (b || 0), 0);
     const pct = (n: number) => (total > 0 ? (n / total) * 100 : 0);
+    // D2 (F1): cierres disputados por el vecino ("sigue el problema"). Viene del
+    // conteo del backend (pseudo-estado 'disputados') para contar el TOTAL real,
+    // no solo la pagina cargada en el cliente.
+    const disputados = conteosEstados['disputados'] || 0;
     return [
       {
         label: 'Total Reclamos',
@@ -4522,6 +4597,13 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         footnote: `${reclamos.length} en pantalla`,
         highlighted: true,
       },
+      ...(disputados > 0 ? [{
+        label: 'Disputados',
+        value: disputados.toLocaleString('es-AR'),
+        icon: ThumbsDown,
+        color: '#ef4444',
+        footnote: 'el vecino dice que sigue',
+      }] : []),
       {
         label: 'Recibidos',
         value: recibidos.toLocaleString('es-AR'),
@@ -4547,7 +4629,7 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
         pct: pct(finalizados),
       },
     ];
-  }, [conteosEstados, reclamos.length, theme.primary]);
+  }, [conteosEstados, reclamos, theme.primary]);
 
   return (
     <PullToRefresh onRefresh={async () => { await fetchReclamos(true); }}>

@@ -10,6 +10,7 @@ from datetime import datetime
 from core.database import get_db
 from core.security import get_current_user, require_roles
 from models import User, Reclamo
+from models.empleado import Empleado
 from models.calificacion import Calificacion
 from models.enums import EstadoReclamo
 
@@ -110,8 +111,15 @@ async def get_calificacion_reclamo(
     current_user: User = Depends(get_current_user)
 ):
     """Obtener calificación de un reclamo"""
+    # Multi-tenant: la calificación solo es visible si el reclamo pertenece al
+    # municipio del usuario (evita IDOR cross-tenant iterando reclamo_id).
     result = await db.execute(
-        select(Calificacion).where(Calificacion.reclamo_id == reclamo_id)
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Calificacion.reclamo_id == reclamo_id,
+            Reclamo.municipio_id == current_user.municipio_id,
+        )
     )
     calificacion = result.scalar_one_or_none()
 
@@ -134,17 +142,20 @@ async def get_estadisticas_calificaciones(
 
     fecha_desde = datetime.utcnow() - timedelta(days=dias)
 
-    # Query base
-    query = select(Calificacion).where(Calificacion.created_at >= fecha_desde)
+    # Query base — multi-tenant: SIEMPRE join a Reclamo y filtro por el municipio
+    # del usuario (sin esto el widget mezclaba calificaciones de TODOS los munis).
+    query = (
+        select(Calificacion)
+        .join(Reclamo, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Calificacion.created_at >= fecha_desde,
+            Reclamo.municipio_id == current_user.municipio_id,
+        )
+    )
 
     # Filtros
     if categoria_id:
-        query = query.join(Reclamo)
-        # TODO: Migrar filtro empleado_id a dependencia_id
-        # if empleado_id:
-        #     query = query.where(Reclamo.municipio_dependencia_id == dependencia_id)
-        if categoria_id:
-            query = query.where(Reclamo.categoria_id == categoria_id)
+        query = query.where(Reclamo.categoria_id == categoria_id)
 
     result = await db.execute(query)
     calificaciones = result.scalars().all()
@@ -210,11 +221,43 @@ async def get_ranking_empleados(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_roles(["admin", "supervisor"]))
 ):
-    """Obtener ranking de empleados por calificación
-    TODO: Migrar a dependencia cuando se implemente asignación por IA
+    """Obtener ranking de empleados por promedio de calificación de sus reclamos.
+
+    Usa el mismo join que el reporte ejecutivo (reportes.py): Reclamo.empleado_id
+    → Empleado, y las estrellas de Calificacion sobre esos reclamos. Multi-tenant:
+    solo empleados del municipio del usuario actual.
     """
-    # Por ahora retorna lista vacía ya que no hay empleado_id en reclamos
-    ranking = []
+    from datetime import timedelta
+
+    fecha_desde = datetime.utcnow() - timedelta(days=dias)
+
+    result = await db.execute(
+        select(
+            Empleado.id,
+            Empleado.nombre,
+            Empleado.apellido,
+            func.avg(Calificacion.puntuacion).label("promedio"),
+            func.count(Calificacion.id).label("total_calificaciones"),
+        )
+        .join(Reclamo, Reclamo.empleado_id == Empleado.id)
+        .join(Calificacion, Calificacion.reclamo_id == Reclamo.id)
+        .where(
+            Empleado.municipio_id == current_user.municipio_id,
+            Calificacion.created_at >= fecha_desde,
+        )
+        .group_by(Empleado.id, Empleado.nombre, Empleado.apellido)
+        .order_by(func.avg(Calificacion.puntuacion).desc())
+    )
+
+    ranking = [
+        {
+            "empleado_id": eid,
+            "nombre": f"{nombre} {apellido or ''}".strip(),
+            "promedio": round(float(promedio or 0), 2),
+            "total_calificaciones": int(total),
+        }
+        for eid, nombre, apellido, promedio, total in result.all()
+    ]
 
     return {
         "periodo_dias": dias,

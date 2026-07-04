@@ -15,7 +15,9 @@ from models.reclamo import Reclamo
 from models.empleado import Empleado
 from models.municipio_dependencia import MunicipioDependencia
 from models.user import User
+from models.historial import HistorialReclamo
 from models.enums import RolUsuario, EstadoReclamo
+from services.push_service import notificar_asignacion_empleado
 
 router = APIRouter()
 
@@ -441,7 +443,29 @@ async def asignar_fecha_reclamo(
         if reclamo.estado == EstadoReclamo.NUEVO:
             reclamo.estado = EstadoReclamo.ASIGNADO
 
+        # Miga en el historial (mismo criterio que la asignación directa de reclamos)
+        nombre_empleado = f"{empleado.nombre} {empleado.apellido or ''}".strip()
+        db.add(HistorialReclamo(
+            reclamo_id=reclamo.id,
+            usuario_id=current_user.id,
+            accion="asignado_empleado",
+            comentario=f"Asignado a {nombre_empleado} para el {fecha_programada} (desde planificación)",
+        ))
+
         await db.commit()
+
+        # Notificar al/los usuario(s) vinculados al empleado (push).
+        result_users = await db.execute(
+            select(User).where(
+                User.empleado_id == empleado_id,
+                User.activo == True
+            )
+        )
+        for empleado_user in result_users.scalars().all():
+            try:
+                await notificar_asignacion_empleado(db, empleado_user.id, reclamo)
+            except Exception as ex:
+                print(f"Error notificando asignación a usuario {empleado_user.id}: {ex}")
 
         return {
             "success": True,

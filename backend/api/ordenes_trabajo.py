@@ -8,7 +8,7 @@ su circuito propio (resolver → confirmar supervisor → confirmar vecino).
 Aditivo al flujo simple (Reclamo.empleado_id directo) — los munis chicos no
 necesitan OTs. Frontend gated por municipio_modulos 'ordenes_trabajo' (opt-in).
 """
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -25,7 +25,9 @@ from models import (
     Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
-from models.enums import RolUsuario
+from models.enums import RolUsuario, EstadoReclamo
+from services.notificacion_service import NotificacionService
+from services import push_service
 
 router = APIRouter()
 
@@ -105,6 +107,8 @@ class OTAsignar(BaseModel):
 class OTCompletar(BaseModel):
     notas_cierre: str
     horas_reales: Optional[float] = None
+    # D4: opt-in para finalizar también los reclamos vinculados al cerrar la OT.
+    finalizar_reclamos: bool = False
 
 
 class OTCancelar(BaseModel):
@@ -307,6 +311,69 @@ async def _cuadrillas_del_user(db: AsyncSession, user: User) -> set:
         )
     )).scalars().all()
     return set(rows)
+
+
+# ---------------------- Notificaciones (F1 · matriz canónica) -------
+#
+# El módulo OT era 100% mudo. Acá conectamos los helpers ya existentes de
+# services/notificacion_service.py (in-app + campanita, transaccional vía flush)
+# y services/push_service.py (web-push, best-effort DESPUÉS del commit).
+# Para OT la matriz sólo pide in-app+push (nunca WhatsApp): enviar_whatsapp=False.
+
+async def _empleado_user_ids(db: AsyncSession, empleado_ids) -> List[int]:
+    """User.id vinculados a un conjunto de empleado_id (para el web-push)."""
+    ids = [e for e in empleado_ids if e]
+    if not ids:
+        return []
+    rows = (await db.execute(
+        select(User.id).where(User.empleado_id.in_(ids))
+    )).scalars().all()
+    return list(rows)
+
+
+async def _destinatarios_ot(db: AsyncSession, ot: OrdenTrabajo) -> set:
+    """empleado_id destino de una OT: responsable directo + miembros activos
+    de la cuadrilla asignada (dedup por set)."""
+    ids = set()
+    if ot.empleado_id:
+        ids.add(ot.empleado_id)
+    if ot.cuadrilla_id:
+        rows = (await db.execute(select(EmpleadoCuadrilla.empleado_id).where(
+            EmpleadoCuadrilla.cuadrilla_id == ot.cuadrilla_id,
+            EmpleadoCuadrilla.activo == True,  # noqa: E712
+        ))).scalars().all()
+        ids.update(rows)
+    return ids
+
+
+async def _notificar_ot_asignada_inapp(db: AsyncSession, ot: OrdenTrabajo) -> Optional[dict]:
+    """In-app al responsable/miembros de cuadrilla de una OT recién asignada.
+    Devuelve {user_ids, titulo, mensaje} (strings ya materializados) para
+    disparar el web-push después del commit, o None si no hay destinatarios."""
+    empleado_ids = await _destinatarios_ot(db, ot)
+    if not empleado_ids:
+        return None
+    titulo = f"OT {ot.numero} asignada"
+    mensaje = f"Te asignaron la orden {ot.numero}: {ot.titulo}"
+    for emp_id in empleado_ids:
+        await NotificacionService.notificar_empleado(
+            db=db, empleado_id=emp_id, titulo=titulo, mensaje=mensaje,
+            tipo="info", enviar_whatsapp=False,
+        )
+    user_ids = await _empleado_user_ids(db, empleado_ids)
+    return {"user_ids": user_ids, "titulo": titulo, "mensaje": mensaje}
+
+
+async def _push_a_users(db: AsyncSession, user_ids, titulo: str, mensaje: str, url: str):
+    """Web-push best-effort a un conjunto de usuarios. Se llama DESPUÉS del
+    commit: send_push_to_user ya degrada solo si no hay VAPID/suscripciones."""
+    for uid in {u for u in user_ids if u}:
+        try:
+            await push_service.send_push_to_user(
+                db=db, user_id=uid, title=titulo, body=mensaje, url=url,
+            )
+        except Exception:  # noqa: BLE001 — push nunca debe romper el flujo
+            pass
 
 
 # ---------------------- Recursos de inventario ----------------------
@@ -559,7 +626,17 @@ async def crear_orden(
     if data.recursos:
         await _sincronizar_recursos(db, ot, data.recursos, municipio_id)
 
+    # Si nació ya asignada, avisar al responsable/cuadrilla (matriz: OT asignada).
+    push_asig = None
+    if estado == EstadoOrdenTrabajo.ASIGNADA:
+        push_asig = await _notificar_ot_asignada_inapp(db, ot)
+
     await db.commit()
+
+    if push_asig:
+        await _push_a_users(db, push_asig["user_ids"], push_asig["titulo"],
+                            push_asig["mensaje"], "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot.id, municipio_id)
     return _to_response(ot)
 
@@ -636,7 +713,15 @@ async def asignar_orden(
     if ot.estado == EstadoOrdenTrabajo.PENDIENTE:
         ot.estado = EstadoOrdenTrabajo.ASIGNADA
 
+    # Avisar al nuevo responsable / miembros de cuadrilla (matriz: OT asignada).
+    push_asig = await _notificar_ot_asignada_inapp(db, ot)
+
     await db.commit()
+
+    if push_asig:
+        await _push_a_users(db, push_asig["user_ids"], push_asig["titulo"],
+                            push_asig["mensaje"], "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)
 
@@ -659,7 +744,45 @@ async def iniciar_orden(
 
     ot.estado = EstadoOrdenTrabajo.EN_CURSO
     ot.fecha_inicio_real = datetime.utcnow()
+
+    numero = ot.numero
+    reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+
+    # D3: los reclamos que todavía no arrancaron pasan a EN_CURSO (con miga en
+    # historial). No tocamos reclamos ya en un estado más avanzado.
+    ESTADOS_PREVIOS = (EstadoReclamo.RECIBIDO, EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO)
+    a_curso = [r for r in reclamos if r.estado in ESTADOS_PREVIOS]
+    for r in a_curso:
+        r.estado = EstadoReclamo.EN_CURSO
+    if a_curso:
+        _historial_reclamos(
+            db, a_curso, current_user.id,
+            accion="ot_iniciada",
+            comentario=f"La orden {numero} comenzó: el reclamo pasó a en curso.",
+        )
+
+    # Avisar al vecino creador de cada reclamo vinculado ("comenzó el trabajo").
+    # In-app transaccional; el web-push se dispara tras el commit.
+    push_vecinos = []  # (creador_id, reclamo_id)
+    for r in reclamos:
+        await NotificacionService.notificar_vecino(
+            db=db, reclamo=r,
+            titulo="Comenzó el trabajo en tu reclamo",
+            mensaje=f"Un equipo municipal comenzó a trabajar en tu reclamo #{r.id} (orden {numero}).",
+            tipo="info", enviar_whatsapp=False,
+        )
+        if r.creador_id:
+            push_vecinos.append((r.creador_id, r.id))
+
     await db.commit()
+
+    for uid, rid in push_vecinos:
+        await _push_a_users(
+            db, [uid], "Comenzó el trabajo en tu reclamo",
+            f"Un equipo municipal comenzó a trabajar en tu reclamo #{rid}.",
+            f"/gestion/reclamos/{rid}",
+        )
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)
 
@@ -690,14 +813,67 @@ async def completar_orden(
     # Libera activos y descuenta el stock de los consumibles usados.
     await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=True)
 
+    numero = ot.numero
+    creador_id = ot.creador_id
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+    n_recl = len(reclamos)
+    primer_reclamo_id = reclamos[0].id if reclamos else None
+
     _historial_reclamos(
         db, reclamos, current_user.id,
         accion="ot_completada",
-        comentario=f"Orden de trabajo {ot.numero} completada: {data.notas_cierre}",
+        comentario=f"Orden de trabajo {numero} completada: {data.notas_cierre}",
     )
 
+    # D4: opt-in para finalizar también los reclamos vinculados. No tocamos los
+    # que ya estén cerrados (finalizado/resuelto/rechazado).
+    finalizados_ids = []
+    if data.finalizar_reclamos:
+        CERRADOS = (EstadoReclamo.FINALIZADO, EstadoReclamo.RESUELTO, EstadoReclamo.RECHAZADO)
+        a_finalizar = [r for r in reclamos if r.estado not in CERRADOS]
+        for r in a_finalizar:
+            r.estado = EstadoReclamo.FINALIZADO
+            r.fecha_resolucion = datetime.now(timezone.utc)
+            finalizados_ids.append(r.id)
+        if a_finalizar:
+            _historial_reclamos(
+                db, a_finalizar, current_user.id,
+                accion="ot_finalizo_reclamo",
+                comentario=f"Finalizado al completar la orden {numero}.",
+            )
+
+    # Avisar al creador de la OT + supervisores del muni ("OT lista, cerrá los N").
+    titulo = f"OT {numero} completada"
+    if finalizados_ids:
+        mensaje = f"La orden {numero} se completó y se finalizaron {len(finalizados_ids)} reclamo(s) vinculado(s)."
+    else:
+        mensaje = f"La orden {numero} está lista. Revisá y cerrá los {n_recl} reclamo(s) vinculado(s)."
+
+    notificados = await NotificacionService.notificar_supervisores(
+        db=db, municipio_id=municipio_id, titulo=titulo, mensaje=mensaje,
+        tipo="info", reclamo_id=primer_reclamo_id, enviar_whatsapp=False,
+    )
+    if creador_id and creador_id not in notificados:
+        await NotificacionService.crear_notificacion_inapp(
+            db=db, usuario_id=creador_id, titulo=titulo, mensaje=mensaje,
+            tipo="info", reclamo_id=primer_reclamo_id,
+        )
+
     await db.commit()
+
+    # Web-push best-effort (fuera de la transacción).
+    push_ids = set(notificados)
+    if creador_id:
+        push_ids.add(creador_id)
+    await _push_a_users(db, push_ids, titulo, mensaje, "/gestion/reclamos")
+
+    # Vecinos de los reclamos finalizados: in-app con link a calificar + push
+    # (reusa el helper canónico de cierre; re-fetch fresco tras el commit).
+    for rid in finalizados_ids:
+        r = (await db.execute(select(Reclamo).where(Reclamo.id == rid))).scalar_one_or_none()
+        if r:
+            await push_service.notificar_reclamo_resuelto(db, r)
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)
 
@@ -721,13 +897,27 @@ async def cancelar_orden(
     # Libera los activos reservados; NO descuenta consumibles (no se usaron).
     await _cerrar_recursos(db, ot, municipio_id, descontar_consumos=False)
 
+    numero = ot.numero
     reclamos = [link.reclamo for link in ot.reclamos_vinculados if link.reclamo]
+    primer_reclamo_id = reclamos[0].id if reclamos else None
+
     _historial_reclamos(
         db, reclamos, current_user.id,
         accion="ot_cancelada",
-        comentario=f"Orden de trabajo {ot.numero} cancelada: {data.motivo}",
+        comentario=f"Orden de trabajo {numero} cancelada: {data.motivo}",
+    )
+
+    # Avisar a supervisores del muni (matriz: OT cancelada → supervisores).
+    titulo = f"OT {numero} cancelada"
+    mensaje = f"La orden {numero} fue cancelada: {data.motivo}"
+    notificados = await NotificacionService.notificar_supervisores(
+        db=db, municipio_id=municipio_id, titulo=titulo, mensaje=mensaje,
+        tipo="warning", reclamo_id=primer_reclamo_id, enviar_whatsapp=False,
     )
 
     await db.commit()
+
+    await _push_a_users(db, notificados, titulo, mensaje, "/gestion/ordenes-trabajo")
+
     ot = await _get_ot(db, ot_id, municipio_id)
     return _to_response(ot)

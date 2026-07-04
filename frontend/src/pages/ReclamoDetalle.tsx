@@ -4,10 +4,10 @@ import {
   ArrowLeft, Clock, MapPin, User, Users, Tag, Calendar,
   CheckCircle, XCircle, AlertCircle, AlertTriangle, PlayCircle, FileText,
   MessageSquare, Sparkles, Image as ImageIcon, MessageCircle,
-  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp
+  RefreshCw, Send, ChevronDown, ClipboardList, ThumbsDown, ThumbsUp, Star
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, whatsappApi } from '../lib/api';
+import { reclamosApi, whatsappApi, calificacionesApi } from '../lib/api';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
@@ -30,6 +30,14 @@ interface TimelineEvent {
   type: 'historial' | 'whatsapp';
   created_at: string;
   data: HistorialReclamo | WhatsAppLog;
+}
+
+// Calificación que dejó el vecino tras el cierre del reclamo (T5-F1)
+interface CalificacionVecinoData {
+  id: number;
+  puntuacion: number;
+  comentario?: string | null;
+  created_at?: string;
 }
 
 const tipoMensajeLabels: Record<string, string> = {
@@ -133,6 +141,7 @@ export default function ReclamoDetalle() {
   const [reclamo, setReclamo] = useState<Reclamo | null>(null);
   const [historial, setHistorial] = useState<HistorialReclamo[]>([]);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
+  const [calificacion, setCalificacion] = useState<CalificacionVecinoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resendingId, setResendingId] = useState<number | null>(null);
@@ -277,6 +286,20 @@ export default function ReclamoDetalle() {
       ]);
       setReclamo(reclamoRes.data);
       setHistorial(historialRes.data);
+
+      // Si el reclamo está cerrado, traer la calificación del vecino (T5-F1).
+      // 404 = todavía no calificó → dejamos null y no mostramos el panel.
+      const estadoCierre = (reclamoRes.data.estado || '').toLowerCase();
+      if (estadoCierre === 'finalizado' || estadoCierre === 'resuelto') {
+        try {
+          const califRes = await calificacionesApi.getReclamo(Number(id));
+          setCalificacion(califRes.data);
+        } catch {
+          setCalificacion(null);
+        }
+      } else {
+        setCalificacion(null);
+      }
 
       // Cargar logs de WhatsApp (puede fallar si no hay permisos, ignorar)
       try {
@@ -916,6 +939,51 @@ export default function ReclamoDetalle() {
                     {reclamo.fecha_resolucion && (
                       <p className="text-sm mt-2" style={{ color: theme.textSecondary }}>
                         Resuelto el {new Date(reclamo.fecha_resolucion).toLocaleString('es-AR')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Calificación del vecino (T5-F1) — la voz del vecino del lado muni.
+                Estrella llena = primary, vacía = border (solo tokens de tema). */}
+            {calificacion && (
+              <div
+                className="p-4 rounded-xl"
+                style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }}
+              >
+                <div className="flex items-start gap-3">
+                  <Star className="h-5 w-5 mt-0.5 flex-shrink-0" style={{ color: theme.primary, fill: theme.primary }} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
+                      Calificación del vecino
+                    </p>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => {
+                        const activa = n <= calificacion.puntuacion;
+                        return (
+                          <Star
+                            key={n}
+                            className="h-5 w-5"
+                            style={{
+                              color: activa ? theme.primary : theme.border,
+                              fill: activa ? theme.primary : 'none',
+                            }}
+                          />
+                        );
+                      })}
+                      <span className="text-sm font-semibold ml-1.5" style={{ color: theme.text }}>
+                        {calificacion.puntuacion}/5
+                      </span>
+                    </div>
+                    {calificacion.comentario?.trim() ? (
+                      <p className="text-sm mt-2 leading-relaxed" style={{ color: theme.text }}>
+                        &ldquo;{calificacion.comentario}&rdquo;
+                      </p>
+                    ) : (
+                      <p className="text-sm mt-2 italic" style={{ color: theme.textSecondary }}>
+                        El vecino no dejó comentario.
                       </p>
                     )}
                   </div>

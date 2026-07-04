@@ -125,15 +125,22 @@ class NotificacionService:
         titulo: str,
         mensaje: str,
         tipo: str = "info",
-        reclamo_id: Optional[int] = None
+        reclamo_id: Optional[int] = None,
+        accion_url: Optional[str] = None
     ) -> Notificacion:
-        """Crea una notificación in-app para un usuario"""
+        """Crea una notificación in-app para un usuario.
+
+        `accion_url` (opcional) es el deep link al que lleva la campanita al
+        tocar la notificación (ej: `/calificar/{id}`). Es distinto del texto:
+        el mensaje va en texto plano y el link viaja aparte, no embebido.
+        """
         notificacion = Notificacion(
             usuario_id=usuario_id,
             titulo=titulo,
             mensaje=mensaje,
             tipo=tipo,
-            reclamo_id=reclamo_id
+            reclamo_id=reclamo_id,
+            accion_url=accion_url
         )
         db.add(notificacion)
         await db.flush()
@@ -202,12 +209,20 @@ class NotificacionService:
         mensaje: str,
         tipo: str = "info",
         tipo_whatsapp: str = "cambio_estado",
-        enviar_whatsapp: bool = True
+        enviar_whatsapp: bool = True,
+        accion_url: Optional[str] = None,
+        mensaje_whatsapp: Optional[str] = None
     ):
         """
         Notifica al creador del reclamo.
         Envía notificación in-app y opcionalmente WhatsApp.
         NO notifica a usuarios anónimos.
+
+        `mensaje` es el texto plano de la campanita (in-app). `mensaje_whatsapp`
+        (opcional) permite mandar un texto distinto por WhatsApp — típicamente el
+        armado con *markdown* y URLs (ej: generar_mensaje_resuelto). Si no se pasa,
+        WhatsApp reutiliza `mensaje`. `accion_url` es el deep link de la campanita
+        (ej: /calificar/{id}).
         """
         # Obtener el usuario creador
         result = await db.execute(
@@ -223,15 +238,19 @@ class NotificacionService:
             print(f"   Notificación omitida: usuario {user.id} es anónimo")
             return
 
-        # Notificación in-app
+        # Notificación in-app (texto plano + deep link aparte)
         await NotificacionService.crear_notificacion_inapp(
             db=db,
             usuario_id=user.id,
             titulo=titulo,
             mensaje=mensaje,
             tipo=tipo,
-            reclamo_id=reclamo.id
+            reclamo_id=reclamo.id,
+            accion_url=accion_url
         )
+
+        # Texto a enviar por WhatsApp (puede diferir del in-app)
+        mensaje_wp = mensaje_whatsapp if mensaje_whatsapp is not None else mensaje
 
         # WhatsApp si está habilitado
         if enviar_whatsapp and user.telefono:
@@ -256,7 +275,7 @@ class NotificacionService:
                             db=db,
                             municipio_id=reclamo.municipio_id,
                             telefono=user.telefono,
-                            mensaje=mensaje,
+                            mensaje=mensaje_wp,
                             usuario_id=user.id,
                             reclamo_id=reclamo.id,
                             tipo_mensaje=tipo_whatsapp
@@ -387,6 +406,19 @@ class NotificacionService:
             mensaje += f"*Ver detalle:* {reclamo_url}"
 
         return mensaje
+
+    @staticmethod
+    def generar_mensaje_resuelto_inapp(titulo_reclamo: str = "") -> str:
+        """Mensaje CORTO en texto plano para la notificación in-app (campanita)
+        de un reclamo finalizado.
+
+        A diferencia de `generar_mensaje_resuelto` (que arma texto con *markdown*
+        y URLs, pensado para WhatsApp), este NO lleva asteriscos ni links: el
+        deep link a `/calificar/{id}` viaja en `accion_url`, no embebido en el
+        texto. Así la campanita deja de mostrar markdown crudo de WhatsApp.
+        """
+        asunto = f' "{titulo_reclamo}"' if titulo_reclamo else ""
+        return f"Tu reclamo{asunto} fue finalizado. Tocá para calificar la atención recibida."
 
     @staticmethod
     def generar_mensaje_pendiente_confirmacion(

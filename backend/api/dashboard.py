@@ -676,6 +676,14 @@ async def get_conteo_estados(
         for estado, count in query.all()
     ]
 
+    # "disputados": reclamos con feedback negativo del vecino (confirmado_vecino
+    # explicito en False). Va como pseudo-estado para que el front lea el TOTAL
+    # real (no el array paginado del cliente) — D2 / code-review F1.
+    disputados_q = await db.execute(
+        select(func.count(Reclamo.id)).where(*conditions, Reclamo.confirmado_vecino.is_(False))
+    )
+    result.append({"estado": "disputados", "cantidad": disputados_q.scalar() or 0})
+
     return result
 
 @router.get("/conteo-dependencias")

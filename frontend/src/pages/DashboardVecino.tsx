@@ -9,7 +9,7 @@ import {
   Search, PlusCircle, Upload, Loader, ShieldCheck, Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { reclamosApi, configuracionApi, publicoApi, vecinoApi } from '../lib/api';
+import { reclamosApi, configuracionApi, publicoApi, vecinoApi, api } from '../lib/api';
 import type { Recomendacion } from '../lib/api';
 
 const REC_ICONS: Record<string, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -56,117 +56,44 @@ interface DashboardConfig {
   componentes: DashboardComponente[];
 }
 
-// Noticias hardcodeadas del municipio - 3 por cada slot del carrusel (4 slots x 3 = 12 noticias)
-const noticiasCarrusel = [
-  // Slot 1
-  [
-    {
-      id: 1,
-      titulo: 'Obra de pavimentación en Av. San Martín',
-      descripcion: 'Se están realizando trabajos de mejoramiento vial en toda la avenida principal.',
-      imagen: 'https://images.unsplash.com/photo-1581094288338-2314dddb7ece?w=400&h=250&fit=crop',
-      fecha: 'Hace 2 días',
-      categoria: 'Obras',
-    },
-    {
-      id: 2,
-      titulo: 'Repavimentación de calles en Barrio Norte',
-      descripcion: 'Continúan los trabajos de bacheo y repavimentación en el sector norte.',
-      imagen: 'https://images.unsplash.com/photo-1590674899484-d5640e854abe?w=400&h=250&fit=crop',
-      fecha: 'Hace 5 días',
-      categoria: 'Obras',
-    },
-    {
-      id: 3,
-      titulo: 'Nueva iluminación LED en el centro',
-      descripcion: 'Se instalaron más de 200 luminarias LED en el casco céntrico.',
-      imagen: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop',
-      fecha: 'Hace 1 semana',
-      categoria: 'Obras',
-    },
-  ],
-  // Slot 2
-  [
-    {
-      id: 4,
-      titulo: 'Festival gratuito este sábado',
-      descripcion: 'Shows en vivo, food trucks y actividades para toda la familia.',
-      imagen: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400&h=250&fit=crop',
-      fecha: 'Hace 1 día',
-      categoria: 'Eventos',
-    },
-    {
-      id: 5,
-      titulo: 'Feria de emprendedores locales',
-      descripcion: 'Más de 50 emprendedores locales expondrán sus productos.',
-      imagen: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=400&h=250&fit=crop',
-      fecha: 'Mañana',
-      categoria: 'Eventos',
-    },
-    {
-      id: 6,
-      titulo: 'Maratón solidaria por el hospital',
-      descripcion: 'Inscripciones abiertas para la carrera de 5K y 10K.',
-      imagen: 'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=400&h=250&fit=crop',
-      fecha: 'Próximo domingo',
-      categoria: 'Eventos',
-    },
-  ],
-  // Slot 3
-  [
-    {
-      id: 7,
-      titulo: 'Nuevo centro de atención al vecino',
-      descripcion: 'Ya está habilitado el nuevo CAV en el barrio San José.',
-      imagen: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=400&h=250&fit=crop',
-      fecha: 'Hoy',
-      categoria: 'Servicios',
-    },
-    {
-      id: 8,
-      titulo: 'Ampliación de horarios en oficinas',
-      descripcion: 'Ahora podés hacer trámites de 7:00 a 19:00 hs.',
-      imagen: 'https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=400&h=250&fit=crop',
-      fecha: 'Desde el lunes',
-      categoria: 'Servicios',
-    },
-    {
-      id: 9,
-      titulo: 'Nuevo sistema de turnos online',
-      descripcion: 'Sacá tu turno desde la app sin hacer filas.',
-      imagen: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=250&fit=crop',
-      fecha: 'Ya disponible',
-      categoria: 'Servicios',
-    },
-  ],
-  // Slot 4
-  [
-    {
-      id: 10,
-      titulo: 'Campaña de vacunación gratuita',
-      descripcion: 'Vacunas contra la gripe disponibles en todos los centros de salud.',
-      imagen: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=400&h=250&fit=crop',
-      fecha: 'Ayer',
-      categoria: 'Salud',
-    },
-    {
-      id: 11,
-      titulo: 'Operativo de salud en barrios',
-      descripcion: 'Controles médicos gratuitos en distintos puntos de la ciudad.',
-      imagen: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=250&fit=crop',
-      fecha: 'Esta semana',
-      categoria: 'Salud',
-    },
-    {
-      id: 12,
-      titulo: 'Charlas sobre prevención de dengue',
-      descripcion: 'Aprende a eliminar criaderos de mosquitos en tu hogar.',
-      imagen: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=250&fit=crop',
-      fecha: 'Viernes 18hs',
-      categoria: 'Salud',
-    },
-  ],
-];
+// Noticia real del municipio (GET /noticias/publico). NUNCA se muestran noticias
+// de relleno: si el muni no cargó noticias, el bloque "Novedades" se oculta.
+interface NoticiaItem {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  imagen: string | null;
+  fecha: string;
+  categoria?: string;
+}
+
+// Respuesta cruda del endpoint público de noticias
+interface NoticiaApiResponse {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  imagen_url: string | null;
+  created_at: string;
+}
+
+function mapNoticia(n: NoticiaApiResponse): NoticiaItem {
+  let fecha = '';
+  try {
+    fecha = new Date(n.created_at).toLocaleDateString('es-AR', {
+      day: 'numeric',
+      month: 'long',
+    });
+  } catch {
+    fecha = '';
+  }
+  return {
+    id: n.id,
+    titulo: n.titulo,
+    descripcion: n.descripcion,
+    imagen: n.imagen_url,
+    fecha,
+  };
+}
 
 const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
   recibido: { bg: '#cffafe', text: '#0e7490' },
@@ -215,6 +142,7 @@ export default function DashboardVecino() {
   const [estadisticasPublicas, setEstadisticasPublicas] = useState<EstadisticasPublicas | null>(null);
   const [modalEstadistica, setModalEstadistica] = useState<string | null>(null);
   const [recomendaciones, setRecomendaciones] = useState<Recomendacion[]>([]);
+  const [noticias, setNoticias] = useState<NoticiaItem[]>([]);
 
   useEffect(() => {
     fetchData();
@@ -231,6 +159,20 @@ export default function DashboardVecino() {
         publicoApi.getEstadisticas(user?.municipio_id).catch(() => ({ data: null })),
         vecinoApi.recomendaciones().catch(() => ({ data: [] })),
       ]);
+
+      // Noticias reales del municipio (público). Si el muni no cargó ninguna,
+      // el bloque de novedades queda oculto — nunca se muestran de relleno.
+      if (user?.municipio_id) {
+        try {
+          const noticiasRes = await api.get('/noticias/publico', {
+            params: { municipio_id: user.municipio_id },
+          });
+          const items = (noticiasRes.data as NoticiaApiResponse[] | null) || [];
+          setNoticias(items.map(mapNoticia));
+        } catch {
+          setNoticias([]);
+        }
+      }
 
       const reclamos = reclamosRes.data as Reclamo[];
       setMisReclamos(reclamos);
@@ -480,24 +422,23 @@ export default function DashboardVecino() {
         </div>
       )}
 
-      {/* News Feed - Grid 2x2 con carruseles */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
-            <Newspaper className="h-5 w-5" style={{ color: theme.primary }} />
-            Novedades del Municipio
-          </h2>
-          <button className="text-sm font-medium" style={{ color: theme.primary }}>
-            Ver todas
-          </button>
-        </div>
+      {/* News Feed - solo se muestra si el municipio cargó noticias reales */}
+      {noticias.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+              <Newspaper className="h-5 w-5" style={{ color: theme.primary }} />
+              Novedades del Municipio
+            </h2>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {noticiasCarrusel.map((noticias, slotIndex) => (
-            <NewsCarouselCard key={slotIndex} noticias={noticias} theme={theme} slotIndex={slotIndex} />
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {noticias.map((n, slotIndex) => (
+              <NewsCarouselCard key={n.id} noticias={[n]} theme={theme} slotIndex={slotIndex} />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Estadísticas del Municipio - Versión moderna con gráficos */}
       {estadisticasPublicas && (
@@ -1315,7 +1256,7 @@ function NewsCarouselCard({
   theme,
   slotIndex,
 }: {
-  noticias: typeof noticiasCarrusel[0];
+  noticias: NoticiaItem[];
   theme: ReturnType<typeof useTheme>['theme'];
   slotIndex: number;
 }) {
@@ -1362,11 +1303,20 @@ function NewsCarouselCard({
               className="relative h-full flex-shrink-0"
               style={{ width: `${100 / noticias.length}%` }}
             >
-              <img
-                src={n.imagen}
-                alt={n.titulo}
-                className="w-full h-full object-cover"
-              />
+              {n.imagen ? (
+                <img
+                  src={n.imagen}
+                  alt={n.titulo}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-full h-full flex items-center justify-center"
+                  style={{ background: `linear-gradient(135deg, ${theme.primary}30, ${theme.primary}10)` }}
+                >
+                  <Newspaper className="w-10 h-10" style={{ color: `${theme.primary}80` }} />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1374,19 +1324,21 @@ function NewsCarouselCard({
         {/* Gradiente oscuro en la parte inferior */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-        {/* Badge categoría - arriba izquierda */}
-        <span
-          className="absolute top-3 left-3 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md"
-          style={{
-            backgroundColor: `${categoriaColors[noticia.categoria] || theme.primary}90`,
-            color: 'white',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          {noticia.categoria}
-        </span>
+        {/* Badge categoría - arriba izquierda (solo si la noticia trae categoría) */}
+        {noticia.categoria && (
+          <span
+            className="absolute top-3 left-3 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md"
+            style={{
+              backgroundColor: `${categoriaColors[noticia.categoria] || theme.primary}90`,
+              color: 'white',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            {noticia.categoria}
+          </span>
+        )}
 
-        {/* Dots de navegación - arriba derecha */}
+        {/* Dots de navegación - arriba derecha (solo con múltiples noticias) */}
         <div className="absolute top-3 right-3 flex gap-1.5">
           {noticias.map((_, idx) => (
             <button

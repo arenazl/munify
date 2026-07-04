@@ -1410,7 +1410,7 @@ export const ordenesTrabajoApi = {
   update: (id: number, data: Record<string, unknown>) => api.put(`/ordenes-trabajo/${id}`, data),
   asignar: (id: number, data: Record<string, unknown>) => api.post(`/ordenes-trabajo/${id}/asignar`, data),
   iniciar: (id: number) => api.post(`/ordenes-trabajo/${id}/iniciar`),
-  completar: (id: number, data: { notas_cierre: string; horas_reales?: number }) =>
+  completar: (id: number, data: { notas_cierre: string; horas_reales?: number; finalizar_reclamos?: boolean }) =>
     api.post(`/ordenes-trabajo/${id}/completar`, data),
   cancelar: (id: number, motivo: string) => api.post(`/ordenes-trabajo/${id}/cancelar`, { motivo }),
 };

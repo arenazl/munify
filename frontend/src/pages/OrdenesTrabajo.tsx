@@ -71,6 +71,7 @@ export default function OrdenesTrabajo() {
   // Cierre / cancelación
   const [notasCierre, setNotasCierre] = useState('');
   const [horasReales, setHorasReales] = useState('');
+  const [finalizarReclamos, setFinalizarReclamos] = useState(false); // D4: opt-in al completar
   const [confirmCancelar, setConfirmCancelar] = useState(false);
   const [motivoCancelacion, setMotivoCancelacion] = useState('');
 
@@ -152,6 +153,7 @@ export default function OrdenesTrabajo() {
     });
     setNotasCierre('');
     setHorasReales('');
+    setFinalizarReclamos(false);
     setSheetOpen(true);
   }, []);
 
@@ -190,6 +192,7 @@ export default function OrdenesTrabajo() {
     });
     setNotasCierre('');
     setHorasReales('');
+    setFinalizarReclamos(false);
     setSheetOpen(true);
   };
 
@@ -251,6 +254,7 @@ export default function OrdenesTrabajo() {
       await ordenesTrabajoApi.completar(selected.id, {
         notas_cierre: notasCierre.trim(),
         horas_reales: horasReales ? Number(horasReales) : undefined,
+        finalizar_reclamos: finalizarReclamos,
       });
       toast.success('Orden completada');
       setSheetOpen(false);
@@ -842,8 +846,24 @@ export default function OrdenesTrabajo() {
                   Completar
                 </button>
               </div>
+              {selected.reclamos.length > 0 && (
+                <label className="flex items-center gap-2 cursor-pointer text-sm select-none" style={{ color: theme.text }}>
+                  <input
+                    type="checkbox"
+                    checked={finalizarReclamos}
+                    onChange={e => setFinalizarReclamos(e.target.checked)}
+                    className="h-4 w-4 rounded"
+                    style={{ accentColor: otEstadoColor('completada') }}
+                  />
+                  <span>
+                    Finalizar también {selected.reclamos.length === 1 ? 'el reclamo vinculado' : `los ${selected.reclamos.length} reclamos vinculados`}
+                  </span>
+                </label>
+              )}
               <p className="text-[11px]" style={{ color: theme.textSecondary }}>
-                Completar la orden no cierra los reclamos: cada reclamo mantiene su circuito de resolución y confirmación.
+                {finalizarReclamos
+                  ? 'Los reclamos vinculados quedarán finalizados y se le avisará a cada vecino para calificar.'
+                  : 'Por defecto, completar la orden no cierra los reclamos: cada reclamo mantiene su circuito de resolución y confirmación.'}
               </p>
             </div>
           )}

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays, Filter } from 'lucide-react';
-import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi } from '../lib/api';
+import { ClipboardList, Clock, TrendingUp, Sparkles, Calendar, AlertTriangle, MapPin, Building2, Route, Shield, AlertCircle, CalendarCheck, CheckCircle2, Repeat, Tags, Users, FileCheck, CalendarDays, Filter, Star } from 'lucide-react';
+import { dashboardApi, analyticsApi, reclamosApi, dependenciasApi, calificacionesApi } from '../lib/api';
 import { DashboardStats } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -124,6 +124,17 @@ interface MetricasDetalle {
   resueltos: ReclamoResumen[];
 }
 
+// Respuesta de GET /calificaciones/estadisticas (schema EstadisticasCalificaciones)
+interface CalifEstadisticas {
+  total_calificaciones: number;
+  promedio_general: number;
+  promedio_tiempo_respuesta: number;
+  promedio_calidad_trabajo: number;
+  promedio_atencion: number;
+  distribucion: Record<string, number>;
+  tags_frecuentes: { tag: string; count: number }[];
+}
+
 export default function Dashboard() {
   console.log('🚀 Dashboard v159 - TRAMITES ALWAYS SHOW');
   const { theme } = useTheme();
@@ -222,6 +233,9 @@ export default function Dashboard() {
     total_empleados: number;
   } | null>(null);
   const [metricasDetalle, setMetricasDetalle] = useState<MetricasDetalle | null>(null);
+
+  // Calificaciones del vecino (la voz del vecino, lado muni) — GET /calificaciones/estadisticas
+  const [califStats, setCalifStats] = useState<CalifEstadisticas | null>(null);
 
   // Callback para navegar al mapa cuando se hace click en una categoría del heatmap
   const handleCategoryClick = useCallback((categoryKey: string, categoryLabel: string) => {
@@ -413,6 +427,13 @@ export default function Dashboard() {
           setMetricasDetalle(metricasDetalleRes.data || null);
         } catch (error) {
           console.error('Error cargando métricas detalle:', error);
+        }
+
+        try {
+          const califRes = await calificacionesApi.getEstadisticas({ dias: 90 }).catch(() => ({ data: null }));
+          setCalifStats(califRes.data || null);
+        } catch (error) {
+          console.error('Error cargando calificaciones:', error);
         }
 
         setLoadingAnalytics(false);
@@ -1678,6 +1699,87 @@ export default function Dashboard() {
               </div>
             );
           })}
+      </div>
+
+      {/* Fila 6: La voz del vecino — promedio + distribución de calificaciones */}
+      <div
+        className="rounded-2xl p-6 backdrop-blur-sm"
+        style={{
+          backgroundColor: theme.card,
+          border: `1px solid ${theme.border}`,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.1)',
+        }}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <Star className="h-5 w-5" style={{ color: theme.primary }} />
+          <h2 className="text-lg font-semibold" style={{ color: theme.text }}>
+            La voz del vecino
+          </h2>
+        </div>
+        <p className="text-xs mb-5" style={{ color: theme.textSecondary }}>
+          Calificaciones de reclamos finalizados (últimos 90 días)
+        </p>
+
+        {!califStats || califStats.total_calificaciones === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Star className="h-8 w-8 mb-2" style={{ color: `${theme.textSecondary}60` }} />
+            <p className="text-sm" style={{ color: theme.textSecondary }}>
+              Todavía no hay calificaciones en este período.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            {/* Promedio + estrellas */}
+            <div className="flex flex-col items-center justify-center">
+              <p className="text-5xl font-black" style={{ color: theme.primary }}>
+                {califStats.promedio_general.toFixed(1)}
+              </p>
+              <div className="flex items-center gap-1 mt-2">
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const activa = n <= Math.round(califStats.promedio_general);
+                  return (
+                    <Star
+                      key={n}
+                      className="h-5 w-5"
+                      style={{ color: activa ? theme.primary : `${theme.textSecondary}50` }}
+                      fill={activa ? theme.primary : 'none'}
+                    />
+                  );
+                })}
+              </div>
+              <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
+                {califStats.total_calificaciones} {califStats.total_calificaciones === 1 ? 'calificación' : 'calificaciones'}
+              </p>
+            </div>
+
+            {/* Distribución 5 → 1 */}
+            <div className="space-y-2">
+              {[5, 4, 3, 2, 1].map((estrella) => {
+                const cantidad = califStats.distribucion[String(estrella)] || 0;
+                const pct = califStats.total_calificaciones > 0
+                  ? Math.round((cantidad / califStats.total_calificaciones) * 100)
+                  : 0;
+                return (
+                  <div key={estrella} className="flex items-center gap-2">
+                    <span className="flex items-center gap-0.5 w-8 text-xs font-medium" style={{ color: theme.textSecondary }}>
+                      {estrella}
+                      <Star className="h-3 w-3" style={{ color: theme.primary }} fill={theme.primary} />
+                    </span>
+                    <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: `${theme.textSecondary}20` }}>
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: theme.primary }}
+                      />
+                    </div>
+                    <span className="w-10 text-right text-xs" style={{ color: theme.textSecondary }}>
+                      {cantidad}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
       </>
       )}

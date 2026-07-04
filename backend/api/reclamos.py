@@ -17,7 +17,7 @@ from models.reclamo import Reclamo
 from models.historial import HistorialReclamo
 from models.documento import Documento
 from models.user import User
-from models.enums import EstadoReclamo, RolUsuario
+from models.enums import EstadoReclamo, RolUsuario, MotivoRechazo
 from models.whatsapp_config import WhatsAppConfig
 from models.municipio_dependencia_categoria import MunicipioDependenciaCategoria
 from models.municipio_dependencia import MunicipioDependencia
@@ -31,6 +31,93 @@ from services.gamificacion_service import GamificacionService
 router = APIRouter()
 
 logger = logging.getLogger(__name__)
+
+
+# Labels legibles para el motivo de rechazo (T3-F1). Resiliente: si aparece un
+# motivo nuevo en el enum, cae al .value humanizado (no rompe).
+MOTIVO_RECHAZO_LABELS = {
+    MotivoRechazo.NO_COMPETENCIA: "No es competencia del municipio",
+    MotivoRechazo.DUPLICADO: "Reclamo duplicado",
+    MotivoRechazo.INFO_INSUFICIENTE: "Información insuficiente para resolverlo",
+    MotivoRechazo.FUERA_JURISDICCION: "Fuera de la jurisdicción del municipio",
+    MotivoRechazo.OTRO: "Otro motivo",
+}
+
+
+async def _notificar_empleado_asignado(
+    db: AsyncSession,
+    reclamo: Reclamo,
+    empleado_id: int,
+    actor_user: User,
+):
+    """T2-F1: registra miga en historial ('asignado_empleado') y notifica la
+    asignación de un empleado a un reclamo, según la matriz canónica:
+      - Empleado  -> in-app + push
+      - Vecino    -> in-app ("tu reclamo tiene técnico asignado")
+    Best-effort: cualquier fallo notificando NO rompe la asignación (ya commiteada
+    por el caller). El empleado se ubica por el `User.empleado_id` vinculado.
+    """
+    from models.empleado import Empleado
+
+    emp = (
+        await db.execute(select(Empleado).where(Empleado.id == empleado_id))
+    ).scalar_one_or_none()
+    emp_nombre = (
+        f"{emp.nombre} {emp.apellido or ''}".strip() if emp else f"empleado #{empleado_id}"
+    )
+
+    # Miga en historial (hoy ningún path de asignación de empleado la dejaba)
+    db.add(HistorialReclamo(
+        reclamo_id=reclamo.id,
+        usuario_id=actor_user.id,
+        accion="asignado_empleado",
+        comentario=f"Asignado a {emp_nombre}",
+    ))
+    await db.commit()
+
+    # Usuario de sistema vinculado al empleado (puede no existir)
+    emp_user = (
+        await db.execute(select(User).where(User.empleado_id == empleado_id))
+    ).scalar_one_or_none()
+
+    if emp_user:
+        try:
+            from services.push_service import (
+                crear_notificacion_db,
+                notificar_asignacion_empleado,
+            )
+            await crear_notificacion_db(
+                db=db,
+                usuario_id=emp_user.id,
+                titulo="Nueva asignación",
+                mensaje=f"Se te asignó el reclamo #{reclamo.id}: {reclamo.titulo}",
+                tipo="info",
+                reclamo_id=reclamo.id,
+                accion_url=f"/gestion/reclamos/{reclamo.id}",
+            )
+            # Push (helper ya existente, hasta hoy dead code)
+            await notificar_asignacion_empleado(db, emp_user.id, reclamo)
+        except Exception as e:
+            logger.warning(
+                "Error notificando empleado asignado (reclamo #%s): %s", reclamo.id, e
+            )
+
+    # Vecino: aviso in-app de que hay técnico asignado (sin WhatsApp)
+    try:
+        from services.notificacion_service import NotificacionService
+        await NotificacionService.notificar_vecino(
+            db=db,
+            reclamo=reclamo,
+            titulo="Tu reclamo tiene técnico asignado",
+            mensaje=f"Asignamos a {emp_nombre} para trabajar en tu reclamo #{reclamo.id}.",
+            tipo="info",
+            enviar_whatsapp=False,
+        )
+        await db.commit()
+    except Exception as e:
+        logger.warning(
+            "Error notificando vecino de asignación (reclamo #%s): %s", reclamo.id, e
+        )
 
 
 # ===========================================
@@ -1581,7 +1668,7 @@ async def asignar_reclamo(
                         "Nuevo Reclamo Asignado",
                         f"Se asignó el reclamo #{reclamo_id_for_push} a tu dependencia.",
                         f"/reclamos/{reclamo_id_for_push}",
-                        data={"tipo": "asignacion_empleado", "reclamo_id": reclamo_id_for_push}
+                        data={"tipo": "reclamo_nuevo_supervisor", "reclamo_id": reclamo_id_for_push}
                     )
                 print(f"[PUSH] Notificaciones de asignación enviadas para reclamo #{reclamo_id_for_push}", flush=True)
         except Exception as e:
@@ -1764,24 +1851,21 @@ async def resolver_reclamo(
         except Exception as e:
             pass
 
-        # Guardar datos para notificación
+        # T4-F1: cierre siempre invita a calificar. notificar_reclamo_resuelto
+        # deja la notificación in-app (campanita) + push, ambas con accion_url
+        # = /calificar/{id}. Unifica este camino con /confirmar.
         reclamo_id_for_push = reclamo.id
-        creador_id_for_push = reclamo.creador_id
 
-        # Notificación al vecino en background con nueva sesión
         async def enviar_push_resuelto():
             from core.database import AsyncSessionLocal
-            from services.push_service import send_push_to_user
+            from services.push_service import notificar_reclamo_resuelto
             try:
                 async with AsyncSessionLocal() as new_db:
-                    await send_push_to_user(
-                        new_db,
-                        creador_id_for_push,
-                        "Reclamo Resuelto",
-                        f"Tu reclamo #{reclamo_id_for_push} ha sido resuelto. ¡Gracias por tu paciencia!",
-                        f"/gestion/reclamos/{reclamo_id_for_push}",
-                        data={"tipo": "reclamo_resuelto", "reclamo_id": reclamo_id_for_push}
-                    )
+                    r = (await new_db.execute(
+                        select(Reclamo).where(Reclamo.id == reclamo_id_for_push)
+                    )).scalar_one_or_none()
+                    if r:
+                        await notificar_reclamo_resuelto(new_db, r)
                     print(f"[PUSH] Notificación de resuelto enviada para reclamo #{reclamo_id_for_push}", flush=True)
             except Exception as e:
                 print(f"[PUSH] Error en background task resuelto: {e}", flush=True)
@@ -1806,7 +1890,6 @@ async def confirmar_reclamo(
     Cambia el estado a RESUELTO y notifica al vecino con link de calificación.
     """
     from datetime import datetime
-    from services.notificacion_service import NotificacionService
 
     municipio_id = get_effective_municipio_id(request, current_user)
     reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
@@ -1839,28 +1922,25 @@ async def confirmar_reclamo(
     except Exception as e:
         pass
 
-    # Notificar al vecino con link de calificación
-    link_calificacion = NotificacionService.generar_link_calificacion(reclamo.id)
-    user = reclamo.creador
+    # T4-F1: cierre siempre invita a calificar (in-app plano + push, ambos con
+    # accion_url = /calificar/{id}). Antes el in-app mostraba markdown de WhatsApp
+    # crudo y no había push ni link de calificación. Mismo camino que /resolver.
+    reclamo_id_for_push = reclamo.id
 
-    if user and not user.es_anonimo:
-        mensaje_resuelto = NotificacionService.generar_mensaje_resuelto(
-            nombre_usuario=user.nombre,
-            reclamo_id=reclamo.id,
-            titulo_reclamo=reclamo.titulo,
-            descripcion=reclamo.descripcion,
-            incluir_link_calificacion=True
-        )
+    async def enviar_push_confirmado():
+        from core.database import AsyncSessionLocal
+        from services.push_service import notificar_reclamo_resuelto
+        try:
+            async with AsyncSessionLocal() as new_db:
+                r = (await new_db.execute(
+                    select(Reclamo).where(Reclamo.id == reclamo_id_for_push)
+                )).scalar_one_or_none()
+                if r:
+                    await notificar_reclamo_resuelto(new_db, r)
+        except Exception as e:
+            print(f"[PUSH] Error en background task confirmado: {e}", flush=True)
 
-        await NotificacionService.notificar_vecino(
-            db=db,
-            reclamo=reclamo,
-            titulo="¡Tu reclamo fue resuelto!",
-            mensaje=mensaje_resuelto,
-            tipo="success",
-            tipo_whatsapp="reclamo_resuelto",
-            enviar_whatsapp=True
-        )
+    asyncio.create_task(enviar_push_confirmado())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -1915,6 +1995,47 @@ async def devolver_reclamo(
             reclamo_id=reclamo.id,
             enviar_whatsapp=True
         )
+    else:
+        # T6-F1 fallback: sin empleado_id (típico de reclamos resueltos por una
+        # cuadrilla/OT) nadie se enteraba. Avisar a quien marcó el trabajo como
+        # terminado (historial 'pendiente_confirmacion'); si no lo ubicamos, a
+        # los supervisores del municipio.
+        try:
+            from services.push_service import crear_notificacion_db
+            hist_pc = (await db.execute(
+                select(HistorialReclamo)
+                .where(
+                    HistorialReclamo.reclamo_id == reclamo.id,
+                    HistorialReclamo.accion == "pendiente_confirmacion",
+                )
+                .order_by(HistorialReclamo.created_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+
+            mensaje_dev = f"El reclamo #{reclamo.id} '{reclamo.titulo}' fue devuelto.\n\nMotivo: {motivo}"
+            if hist_pc and hist_pc.usuario_id:
+                await crear_notificacion_db(
+                    db=db,
+                    usuario_id=hist_pc.usuario_id,
+                    titulo="Trabajo devuelto",
+                    mensaje=mensaje_dev,
+                    tipo="warning",
+                    reclamo_id=reclamo.id,
+                    accion_url=f"/gestion/reclamos/{reclamo.id}",
+                )
+            else:
+                await NotificacionService.notificar_supervisores(
+                    db=db,
+                    municipio_id=reclamo.municipio_id,
+                    titulo="Trabajo devuelto",
+                    mensaje=mensaje_dev,
+                    tipo="warning",
+                    reclamo_id=reclamo.id,
+                    enviar_whatsapp=False,
+                )
+                await db.commit()
+        except Exception as e:
+            logger.warning("Error notificando devolución (reclamo #%s): %s", reclamo.id, e)
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -1951,6 +2072,50 @@ async def rechazar_reclamo(
     db.add(historial)
 
     await db.commit()
+
+    # T3-F1: el rechazo es el evento más sensible del ciclo y hasta hoy era el
+    # único totalmente mudo. Avisar al vecino con el motivo legible (in-app + push).
+    motivo_label = MOTIVO_RECHAZO_LABELS.get(
+        data.motivo, data.motivo.value.replace("_", " ").capitalize()
+    )
+    detalle = f" {data.descripcion.strip()}" if data.descripcion else ""
+    mensaje_rechazo = f"Tu reclamo #{reclamo.id} fue rechazado. Motivo: {motivo_label}.{detalle}"
+
+    try:
+        from services.notificacion_service import NotificacionService
+        await NotificacionService.notificar_vecino(
+            db=db,
+            reclamo=reclamo,
+            titulo="Tu reclamo fue rechazado",
+            mensaje=mensaje_rechazo,
+            tipo="error",
+            enviar_whatsapp=False,
+        )
+        await db.commit()
+    except Exception as e:
+        logger.warning("Error notificando rechazo (reclamo #%s): %s", reclamo.id, e)
+
+    # Push best-effort en background (nueva sesión, no bloquea la respuesta)
+    reclamo_id_for_push = reclamo.id
+    creador_id_for_push = reclamo.creador_id
+
+    async def _push_rechazo():
+        from core.database import AsyncSessionLocal
+        from services.push_service import send_push_to_user
+        try:
+            async with AsyncSessionLocal() as new_db:
+                await send_push_to_user(
+                    new_db,
+                    creador_id_for_push,
+                    "Reclamo rechazado",
+                    mensaje_rechazo,
+                    f"/gestion/reclamos/{reclamo_id_for_push}",
+                    data={"tipo": "reclamo_rechazado", "reclamo_id": reclamo_id_for_push},
+                )
+        except Exception as e:
+            logger.warning("[PUSH] Error push rechazo #%s: %s", reclamo_id_for_push, e)
+
+    asyncio.create_task(_push_rechazo())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
     return result.scalar_one()
@@ -2391,6 +2556,9 @@ async def auto_asignar_reclamo(
     await db.commit()
     await db.refresh(reclamo)
 
+    # T2-F1: miga en historial + notificación al empleado (in-app+push) y al vecino
+    await _notificar_empleado_asignado(db, reclamo, empleado_id, current_user)
+
     return AutoAsignarResponse(
         empleado_id=empleado_id,
         empleado_nombre=top.get("empleado_nombre", ""),
@@ -2444,6 +2612,17 @@ async def asignar_empleado(
                 status_code=400,
                 detail="Si asignás un empleado, fecha y hora de inicio son obligatorias",
             )
+        # Multi-tenant: el empleado tiene que ser del mismo municipio que el
+        # reclamo (evita asignar/notificar a un empleado de otro tenant).
+        from models.empleado import Empleado
+        _emp = await db.execute(
+            select(Empleado).where(
+                Empleado.id == data.empleado_id,
+                Empleado.municipio_id == municipio_id,
+            )
+        )
+        if _emp.scalar_one_or_none() is None:
+            raise HTTPException(status_code=400, detail="El empleado no pertenece a este municipio")
 
     reclamo.empleado_id = data.empleado_id
 
@@ -2472,6 +2651,12 @@ async def asignar_empleado(
         reclamo.hora_fin = None
 
     await db.commit()
+
+    # T2-F1: si se asignó (no desasignó) un empleado, dejar miga en historial y
+    # notificar al empleado (in-app+push) y al vecino (in-app).
+    if data.empleado_id is not None:
+        await _notificar_empleado_asignado(db, reclamo, data.empleado_id, current_user)
+
     return {
         "ok": True,
         "empleado_id": data.empleado_id,
@@ -2771,8 +2956,12 @@ async def sumarse_a_reclamo(
 
     await db.commit()
 
-    # TODO: Enviar notificación a todos los que se sumaron
-    # await notificar_persona_sumada(reclamo_id, current_user, db)
+    # T6-F1: avisar a quienes ya estaban sumados que se unió alguien nuevo.
+    try:
+        from services.notificacion_service import notificar_persona_sumada
+        await notificar_persona_sumada(db, reclamo_id, current_user)
+    except Exception as e:
+        logger.warning("Error notificando personas sumadas (reclamo #%s): %s", reclamo_id, e)
 
     return {
         "success": True,
