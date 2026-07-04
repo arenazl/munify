@@ -140,6 +140,22 @@ inalcanzable** (~100 líneas, Reclamos.tsx:3618-3710, trigger huérfano handleEm
 | D9 | WhatsApp del flujo activo: ¿reactivar llamadas comentadas respetando toggles, o quitar toggles? | F1 | Reactivar respetando config |
 | D10 | Dependencias (jefes de área): ¿operan OT/Tablero/Planificación? Hoy no ven nada de eso | F2 | A confirmar |
 
+### Decisiones YA TOMADAS (2026-07-04, con el dueño — no reabrir)
+
+| # | Decisión | Resolución |
+|---|---|---|
+| D11 | ¿Toggle de existencia de OT o modelo único? | **OT universal transparente** — toda asignación crea OT (implícita 1:1 en el caso simple); el flag `ordenes_trabajo` pasa a ser de SUPERFICIE. Confirmado por el dueño: "no mantener dos modelos" |
+| D12 | ¿Dónde vive la prioridad? | **Una sola entidad: la OT** (enum baja/media/alta/urgente ya vivo). `Reclamo.prioridad` (Integer muerto con doble semántica contradictoria) se depreca |
+| D13 | Jerarquía manual vs POI | Sin scores: reclamo en zona de POI → recomendación de OT consolidada del POI con prioridad **ALTA**; URGENTE reservado manual |
+| D14 | Consolidación por POI | Recomendación con confirmación de un click, nunca automática silenciosa |
+| D15 | Radio POI | Default 2.000 m, editable por POI con slider (100–10.000 m) |
+| D16 | Mapa | Polimórfico por toggle: modo Reclamos (actual, conserva el "dibujar") / modo Puntos (gestión de POIs) |
+
+**Impacto de D11/D12 en otras fases:** F4 (despacho) asume OT universal — su prerrequisito
+pasa a ser F6-Etapa A; el `services/asignacion.py` de F4 opera solo sobre OTs. F5: si el
+escalado revive, escala la prioridad de la OT (no el Integer del reclamo); el DROP definitivo
+de `reclamos.prioridad` va en el barrido de F5.
+
 ## 7. Hoja de ruta (las fases y su lógica)
 
 Cada fase es un documento técnico autosuficiente en esta carpeta. El orden minimiza riesgo:
@@ -154,8 +170,11 @@ lo visible en demo, al final los rediseños.
 | **F3 Cohesión visual** | [05-fase-3-cohesion-visual.md](05-fase-3-cohesion-visual.md) | SSoT de colores, gris de Planificación, SLA/Mapa al patrón canónico, detalle único | F0 (ideal post F2) |
 | **F4 Despacho** | [06-fase-4-despacho.md](06-fase-4-despacho.md) | Service único de asignación con datos reales; OTs en el canvas; experiencia de campo | F0+F1 (D7) |
 | **F5 Máquina de estados** | [07-fase-5-maquina-estados.md](07-fase-5-maquina-estados.md) | Transiciones formales, estados legacy, creación unificada, SLA/escalado vivos | F0+F1 (D5, D6) |
+| **F6 POIs + prioridad única** | [08-fase-6-poi-prioridad-unica.md](08-fase-6-poi-prioridad-unica.md) | Pedido de la clienta: OT universal transparente (Etapa A) + Puntos de Interés con radio, consolidación sugerida y mapa polimórfico (Etapa B) | F0 (decisiones D11-D16 ya tomadas) — **prerrequisito de F4** |
 
 F2 y F3 son independientes entre sí y de F4/F5 — se pueden intercalar según la semana.
+F6 solo depende de F0 y puede ejecutarse temprano; su Etapa A (OT universal) es prerrequisito
+de F4.
 
 ## 8. Reglas del repo que TODA fase debe respetar
 

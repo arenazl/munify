@@ -16,7 +16,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
 | [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
-| [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 6 fases (F0-F5), un doc autosuficiente por fase |
+| [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |
 | [`marketing/`](marketing/) | Brochure comercial |
 | [`reels/`](reels/) | Contexto de reels de promoción (doc vivo entre agentes) |
@@ -39,7 +39,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
 | Entender el estado del universo Reclamos (análisis + decisiones abiertas) | [`reclamos/01-analisis-funcional.md`](reclamos/01-analisis-funcional.md) |
-| Ejecutar una fase de la refacción de Reclamos (F0 bugs → F5 estados) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `07-`, autosuficiente |
+| Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
 | Pitch / argumentario de ventas para intendentes | [`sales/01-producto-munify.md`](sales/01-producto-munify.md) |
 | Prompt del agente de ventas (Bruno) | [`sales/02-sales-agent-prompt.md`](sales/02-sales-agent-prompt.md) |
 | Brochure comercial PDF | [`marketing/Munify_Brochure.pdf`](marketing/Munify_Brochure.pdf) |

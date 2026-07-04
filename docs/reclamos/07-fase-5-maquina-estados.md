@@ -98,6 +98,12 @@ final se unifica en FINALIZADO** (`/confirmar` pasa a dejar FINALIZADO). Con eso
   pidiendo reasignar, o auto-limpiar `Reclamo.empleado_id` dejando miga en historial —
   proponer al user y aplicar. (La bandeja unificada del empleado ya se hizo en F2-T4.)
 
+### T7-bis. Limpieza definitiva de la prioridad deprecada (si F6 ya corrió)
+- F6 depreca `reclamos.prioridad` (Integer con doble semántica) a favor del enum de la OT
+  (decisión D12). En esta fase va el DROP definitivo de la columna + limpieza de
+  `categoria.prioridad_default`/`municipio_dependencia_categoria.prioridad_default` (o su
+  migración final a enum) y de cualquier lector remanente. Si F6 NO corrió aún, saltear.
+
 ### T8. Plantillas de notificación (si F1 no lo resolvió)
 - `backend/config/notificaciones.json` (22 tipos) + `enviar_con_plantilla` con bug de await:
   migrar los envíos reales al sistema de plantillas o borrarlo. Cerrar la deuda.

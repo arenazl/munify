@@ -2,7 +2,11 @@
 
 > **Para un agente que arranca en frío.** Contexto: [01-analisis-funcional.md](01-analisis-funcional.md)
 > §4 (planificación/asignación) y §5 (el panel de disponibilidad es código ZOMBIE, no
-> "datos falsos"). **Prerrequisitos: F0 (multi-tenant) y F1 (notificaciones de asignación).**
+> "datos falsos"). **Prerrequisitos: F0 (multi-tenant), F1 (notificaciones de asignación) y
+> F6-Etapa A (OT universal transparente — decisión D11 del 2026-07-04: un solo modelo, toda
+> asignación crea OT; la prioridad vive solo en la OT, D12). Si F6-A ya corrió, el
+> `services/asignacion.py` de esta fase opera exclusivamente sobre OTs y varios ítems de
+> "doble camino" de este doc quedan simplificados o absorbidos — releer con ese lente.**
 > Decisión que toca: **D7** — el diseño destino. Recomendación ya validada en el análisis:
 > primero "B: asignación con contexto" (datos reales), después evaluar "A: Despacho" (el
 > canvas absorbe todo). No unificar pantallas ANTES de tener el dato real.
