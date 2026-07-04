@@ -457,7 +457,7 @@ export default function MisReclamos() {
                     onClick={() => handleConfirmarVecino(true)}
                     disabled={enviandoConfirmacion}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-                    style={{ backgroundColor: '#10b981', color: '#ffffff' }}
+                    style={{ backgroundColor: estadoColor('finalizado'), color: '#ffffff' }}
                   >
                     {enviandoConfirmacion ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -472,7 +472,7 @@ export default function MisReclamos() {
                     onClick={() => handleConfirmarVecino(false)}
                     disabled={enviandoConfirmacion}
                     className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-medium transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-                    style={{ backgroundColor: '#ef4444', color: '#ffffff' }}
+                    style={{ backgroundColor: estadoColor('rechazado'), color: '#ffffff' }}
                   >
                     {enviandoConfirmacion ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
@@ -532,7 +532,7 @@ export default function MisReclamos() {
                 onClick={openCalificarSheet}
                 className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-all hover:opacity-90 active:scale-95"
                 style={{
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #eab308 100%)',
+                  backgroundColor: theme.primary,
                   color: '#ffffff'
                 }}
               >
@@ -573,7 +573,7 @@ export default function MisReclamos() {
                         className="absolute left-0 w-[14px] h-[14px] rounded-full border-2 flex-shrink-0"
                         style={{
                           backgroundColor: theme.card,
-                          borderColor: isComentario ? '#3b82f6' : isPersonaSumada ? '#10b981' : estadoColor,
+                          borderColor: isComentario || isPersonaSumada ? theme.primary : estadoColor,
                         }}
                         title={h.estado_nuevo ? estadoLabels[h.estado_nuevo] : h.accion}
                       >
@@ -581,7 +581,7 @@ export default function MisReclamos() {
                           <div
                             className="absolute inset-1 rounded-full"
                             style={{
-                              backgroundColor: isComentario ? '#3b82f6' : isPersonaSumada ? '#10b981' : estadoColor
+                              backgroundColor: isComentario || isPersonaSumada ? theme.primary : estadoColor
                             }}
                           />
                         )}
@@ -626,7 +626,7 @@ export default function MisReclamos() {
                             style={{
                               backgroundColor: theme.backgroundSecondary,
                               color: theme.text,
-                              borderLeft: `3px solid #3b82f6`
+                              borderLeft: `3px solid ${theme.primary}`
                             }}
                           >
                             {h.comentario}
@@ -673,7 +673,7 @@ export default function MisReclamos() {
             {selectedReclamo.categoria.nombre}
           </p>
           {selectedReclamo.resolucion && (
-            <p className="text-sm mt-2 italic" style={{ color: '#10b981' }}>
+            <p className="text-sm mt-2 italic" style={{ color: estadoColor('finalizado') }}>
               "{selectedReclamo.resolucion}"
             </p>
           )}
@@ -727,7 +727,7 @@ export default function MisReclamos() {
           disabled={enviandoCalificacion || puntuacion === 0}
           className="w-full py-3 px-4 rounded-xl font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
-            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+            backgroundColor: theme.primary,
             color: 'white',
           }}
         >

@@ -14,14 +14,8 @@
  * (`nuevo`, `asignado`, `en_proceso`, `pendiente_confirmacion`, `resuelto`).
  * Los mapeamos a los nuevos para que la UI los muestre consistentemente.
  */
-import {
-  Clock,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  PauseCircle,
-  type LucideIcon,
-} from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
+import { estadoColors, estadoLabels, estadoIcons } from './enums/reclamo';
 
 /** Estados canónicos del sistema (nuevos, limpios). */
 export type EstadoCanonico =
@@ -47,44 +41,33 @@ export interface EstadoInfo {
 // ============================================================
 // Configuración canónica (los 5 estados nuevos)
 // ============================================================
+// COLOR / LABEL / ICONO salen del SSoT visual (`lib/enums/reclamo.ts`), no de
+// una paleta local — así OrdenesTrabajo y los cross-links de F2 pintan el mismo
+// color/label que las cards de reclamo (una sola verdad). `bg` se deriva del
+// color canónico con un alfa suave (`15`), que es el fondo tenue que este módulo
+// usa para badges. `key`/`bg` y la lógica (normalización + transiciones) son
+// propias de este archivo y se conservan intactas.
 
-const ESTADOS_CANONICOS: Record<EstadoCanonico, EstadoInfo> = {
-  recibido: {
-    key: 'recibido',
-    label: 'Recibido',
-    color: '#3b82f6',
-    bg: '#3b82f615',
-    icon: Clock,
-  },
-  en_curso: {
-    key: 'en_curso',
-    label: 'En curso',
-    color: '#8b5cf6',
-    bg: '#8b5cf615',
-    icon: Loader2,
-  },
-  finalizado: {
-    key: 'finalizado',
-    label: 'Finalizado',
-    color: '#10b981',
-    bg: '#10b98115',
-    icon: CheckCircle2,
-  },
-  pospuesto: {
-    key: 'pospuesto',
-    label: 'Pospuesto',
-    color: '#f59e0b',
-    bg: '#f59e0b15',
-    icon: PauseCircle,
-  },
-  rechazado: {
-    key: 'rechazado',
-    label: 'Rechazado',
-    color: '#ef4444',
-    bg: '#ef444415',
-    icon: XCircle,
-  },
-};
+const CANONICOS: readonly EstadoCanonico[] = [
+  'recibido',
+  'en_curso',
+  'finalizado',
+  'pospuesto',
+  'rechazado',
+];
+
+const ESTADOS_CANONICOS = Object.fromEntries(
+  CANONICOS.map((key) => [
+    key,
+    {
+      key,
+      label: estadoLabels[key],
+      color: estadoColors[key],
+      bg: `${estadoColors[key]}15`,
+      icon: estadoIcons[key],
+    } satisfies EstadoInfo,
+  ]),
+) as Record<EstadoCanonico, EstadoInfo>;
 
 // ============================================================
 // Mapeo legacy → canónico

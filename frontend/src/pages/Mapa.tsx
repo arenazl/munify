@@ -1305,11 +1305,11 @@ function ZonaSnapshot({
           <p className="text-[10px]" style={{ color: theme.textSecondary }}>Total</p>
         </div>
         <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
-          <p className="text-xl font-bold" style={{ color: '#10b981' }}>{resueltos}</p>
+          <p className="text-xl font-bold" style={{ color: estadoColor('finalizado') }}>{resueltos}</p>
           <p className="text-[10px]" style={{ color: theme.textSecondary }}>Resueltos</p>
         </div>
         <div className="text-center p-2 rounded-lg" style={{ backgroundColor: theme.background }}>
-          <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{abiertos}</p>
+          <p className="text-xl font-bold" style={{ color: estadoColor('recibido') }}>{abiertos}</p>
           <p className="text-[10px]" style={{ color: theme.textSecondary }}>Abiertos</p>
         </div>
       </div>

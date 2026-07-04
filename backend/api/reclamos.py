@@ -44,6 +44,112 @@ MOTIVO_RECHAZO_LABELS = {
 }
 
 
+# ===========================================
+# F5-T1: MÁQUINA DE ESTADOS — matriz ÚNICA de transiciones
+# ===========================================
+# Antes esta matriz vivía SOLO dentro del PATCH kanban y cada endpoint dedicado
+# (/asignar, /rechazar, /reasignar, ...) validaba precondiciones de estado
+# propias que la CONTRADECÍAN. Ahora TODOS los endpoints de transición validan
+# la ARISTA de estado contra esta única fuente vía `validar_transicion()`, así
+# un cambio inválido devuelve 400 consistente ANTES de mutar. Las precondiciones
+# de DATOS (motivo de rechazo, texto de resolución) y de PERMISOS/SCOPE (rol,
+# dependencia propia) se mantienen en cada endpoint — acá solo vive la validez
+# estructural de "puedo pasar de X a Y".
+#
+# Decisiones tomadas para los estados LEGACY / en disputa (documentadas):
+#  - NUEVO / ASIGNADO / EN_PROCESO (puertas de entrada legacy):
+#      * NUEVO    -> RECIBIDO (recibir), ASIGNADO (legacy), RECHAZADO.
+#      * ASIGNADO -> RECIBIDO (/asignar lo baja a recibido), EN_CURSO (/iniciar),
+#                    RECHAZADO. (Antes el PATCH permitía ASIGNADO->FINALIZADO;
+#                    se quita: el cierre pasa por en_curso, coherente con el flujo.)
+#      * EN_PROCESO se trata como sinónimo de EN_CURSO.
+#  - PENDIENTE_CONFIRMACION (estado ACTIVO del circuito empleado→supervisor):
+#      -> RESUELTO (/confirmar), FINALIZADO (cierre directo), EN_CURSO (/devolver)
+#         y RECIBIDO (/reasignar reabre para otro empleado). NO -> RECHAZADO
+#         (un trabajo pendiente de confirmar se devuelve o confirma, no se rechaza).
+#  - RESUELTO y FINALIZADO (los dos cierres que hoy conviven):
+#      ambos REABREN a EN_CURSO (kanban) o a RECIBIDO (/reasignar). NO se pueden
+#      RECHAZAR (rechazar un reclamo ya cerrado quedó prohibido — antes /rechazar
+#      permitía FINALIZADO->RECHAZADO).
+#  - RECHAZADO deja de ser 100% terminal: SOLO /reasignar puede reabrirlo
+#      (-> RECIBIDO, con motivo obligatorio). NO se puede RE-rechazar
+#      (RECHAZADO->RECHAZADO prohibido — antes /rechazar lo permitía).
+#
+# Resiliente (regla dura #3): un estado actual no mapeado => sin transiciones
+# válidas (bloquea con 400), en vez de romper con KeyError.
+TRANSICIONES_VALIDAS = {
+    # --- Estados activos ---
+    EstadoReclamo.RECIBIDO: [EstadoReclamo.EN_CURSO, EstadoReclamo.RECHAZADO],
+    EstadoReclamo.EN_CURSO: [
+        EstadoReclamo.FINALIZADO,
+        EstadoReclamo.POSPUESTO,
+        EstadoReclamo.RECHAZADO,
+        EstadoReclamo.PENDIENTE_CONFIRMACION,  # empleado marca "terminado"
+        EstadoReclamo.RECIBIDO,                # /reasignar
+    ],
+    EstadoReclamo.FINALIZADO: [EstadoReclamo.EN_CURSO, EstadoReclamo.RECIBIDO],
+    EstadoReclamo.POSPUESTO: [
+        EstadoReclamo.EN_CURSO,
+        EstadoReclamo.FINALIZADO,
+        EstadoReclamo.RECHAZADO,
+        EstadoReclamo.RECIBIDO,                # /reasignar
+    ],
+    EstadoReclamo.RECHAZADO: [EstadoReclamo.RECIBIDO],  # solo /reasignar reabre
+    # --- Legacy / circuito empleado→supervisor ---
+    EstadoReclamo.NUEVO: [
+        EstadoReclamo.RECIBIDO,
+        EstadoReclamo.ASIGNADO,
+        EstadoReclamo.RECHAZADO,
+    ],
+    EstadoReclamo.ASIGNADO: [
+        EstadoReclamo.RECIBIDO,
+        EstadoReclamo.EN_CURSO,
+        EstadoReclamo.RECHAZADO,
+    ],
+    EstadoReclamo.EN_PROCESO: [  # sinónimo legacy de EN_CURSO
+        EstadoReclamo.FINALIZADO,
+        EstadoReclamo.POSPUESTO,
+        EstadoReclamo.RECHAZADO,
+        EstadoReclamo.PENDIENTE_CONFIRMACION,
+        EstadoReclamo.RECIBIDO,
+    ],
+    EstadoReclamo.PENDIENTE_CONFIRMACION: [
+        EstadoReclamo.RESUELTO,     # /confirmar
+        EstadoReclamo.FINALIZADO,   # cierre directo
+        EstadoReclamo.EN_CURSO,     # /devolver
+        EstadoReclamo.RECIBIDO,     # /reasignar
+    ],
+    EstadoReclamo.RESUELTO: [EstadoReclamo.EN_CURSO, EstadoReclamo.RECIBIDO],
+}
+
+
+def validar_transicion(actual, nuevo, rol=None) -> bool:
+    """Única fuente de verdad de las transiciones de estado de un reclamo.
+
+    Devuelve True si `actual -> nuevo` es una arista permitida por
+    `TRANSICIONES_VALIDAS`. `rol` se acepta para reglas específicas por rol a
+    futuro; hoy la matriz es agnóstica al rol — las reglas por rol (ej. el
+    downgrade EMPLEADO FINALIZADO→PENDIENTE_CONFIRMACION del PATCH) viven en el
+    endpoint, sobre transiciones que igualmente son válidas acá. Resiliente: un
+    estado actual no mapeado devuelve False (no rompe con KeyError).
+    """
+    return nuevo in TRANSICIONES_VALIDAS.get(actual, [])
+
+
+def _assert_transicion(actual, nuevo, rol=None):
+    """Valida `actual -> nuevo` contra la matriz única y lanza 400 uniforme si es
+    inválida. Debe llamarse ANTES de mutar el reclamo, en todos los endpoints de
+    transición, para que ninguna arista prohibida pase silenciosamente."""
+    if not validar_transicion(actual, nuevo, rol):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No se puede cambiar de "
+                f"{getattr(actual, 'value', actual)} a {getattr(nuevo, 'value', nuevo)}"
+            ),
+        )
+
+
 async def _notificar_empleado_asignado(
     db: AsyncSession,
     reclamo: Reclamo,
@@ -752,25 +858,11 @@ async def cambiar_estado_reclamo_drag(
         if not await _empleado_puede_operar(db, reclamo, current_user):
             raise HTTPException(status_code=403, detail="No tienes permiso para modificar este reclamo")
 
-    # Validar transiciones permitidas
-    # Flujo: nuevo → recibido → en_curso → (finalizado | pospuesto | rechazado)
-    transiciones_validas = {
-        EstadoReclamo.NUEVO: [EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.RECIBIDO: [EstadoReclamo.EN_CURSO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.ASIGNADO: [EstadoReclamo.EN_CURSO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Legacy
-        EstadoReclamo.EN_CURSO: [EstadoReclamo.FINALIZADO, EstadoReclamo.POSPUESTO, EstadoReclamo.RECHAZADO],
-        EstadoReclamo.PENDIENTE_CONFIRMACION: [EstadoReclamo.FINALIZADO, EstadoReclamo.EN_CURSO],  # Legacy
-        EstadoReclamo.RESUELTO: [EstadoReclamo.EN_CURSO],  # Legacy
-        EstadoReclamo.FINALIZADO: [EstadoReclamo.EN_CURSO],  # Reabrir si el vecino rechaza la resolución
-        EstadoReclamo.POSPUESTO: [EstadoReclamo.EN_CURSO, EstadoReclamo.FINALIZADO, EstadoReclamo.RECHAZADO],  # Puede retomar
-        EstadoReclamo.RECHAZADO: [],  # Estado final
-    }
-
-    if estado_enum not in transiciones_validas.get(reclamo.estado, []):
-        raise HTTPException(
-            status_code=400,
-            detail=f"No se puede cambiar de {reclamo.estado.value} a {estado_enum.value}"
-        )
+    # Validar la transición contra la matriz ÚNICA (F5-T1). El destino real puede
+    # bajarse luego a PENDIENTE_CONFIRMACION para el rol EMPLEADO (downgrade F0),
+    # pero eso se valida sobre la transición solicitada (estado_enum), que es la
+    # que el usuario pidió mover en el tablero.
+    _assert_transicion(reclamo.estado, estado_enum, current_user.rol)
 
     estado_anterior = reclamo.estado
 
@@ -1631,8 +1723,12 @@ async def asignar_reclamo(
     municipio_id = get_effective_municipio_id(request, current_user)
     reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
+    # Scope semántico del endpoint: asignar dependencia solo tiene sentido en la
+    # entrada (nuevo / asignado legacy). La validez de la ARISTA (→RECIBIDO) la
+    # confirma la matriz única (F5-T1).
     if reclamo.estado not in [EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO]:
         raise HTTPException(status_code=400, detail="El reclamo no puede ser asignado en su estado actual")
+    _assert_transicion(reclamo.estado, EstadoReclamo.RECIBIDO, current_user.rol)
 
     # Verificar permisos
     is_admin_or_supervisor = current_user.rol in [RolUsuario.ADMIN, RolUsuario.SUPERVISOR]
@@ -1781,9 +1877,11 @@ async def iniciar_reclamo(
     municipio_id = get_effective_municipio_id(request, current_user)
     reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
-    # Permitir iniciar desde recibido o asignado (legacy)
+    # Permitir iniciar desde recibido o asignado (legacy). La arista →EN_CURSO la
+    # confirma la matriz única (F5-T1).
     if reclamo.estado not in [EstadoReclamo.RECIBIDO, EstadoReclamo.ASIGNADO]:
         raise HTTPException(status_code=400, detail="El reclamo debe estar recibido para iniciarlo")
+    _assert_transicion(reclamo.estado, EstadoReclamo.EN_CURSO, current_user.rol)
 
     # Verificar que el usuario pertenezca a la dependencia asignada
     if current_user.municipio_dependencia_id:
@@ -1867,6 +1965,16 @@ async def resolver_reclamo(
     if current_user.rol == RolUsuario.EMPLEADO:
         if not await _empleado_puede_operar(db, reclamo, current_user):
             raise HTTPException(status_code=403, detail="No tienes permiso para resolver este reclamo")
+
+    # Destino según rol: empleado deja el trabajo PENDIENTE de confirmación del
+    # supervisor; admin/supervisor finaliza directo. Validar la arista contra la
+    # matriz única (F5-T1) ANTES de mutar.
+    estado_destino_resolver = (
+        EstadoReclamo.PENDIENTE_CONFIRMACION
+        if current_user.rol == RolUsuario.EMPLEADO
+        else EstadoReclamo.FINALIZADO
+    )
+    _assert_transicion(reclamo.estado, estado_destino_resolver, current_user.rol)
 
     estado_anterior = reclamo.estado
     reclamo.resolucion = data.resolucion
@@ -1990,6 +2098,7 @@ async def confirmar_reclamo(
             status_code=400,
             detail="Solo se pueden confirmar reclamos en estado 'pendiente_confirmacion'"
         )
+    _assert_transicion(reclamo.estado, EstadoReclamo.RESUELTO, current_user.rol)
 
     estado_anterior = reclamo.estado
     reclamo.estado = EstadoReclamo.RESUELTO
@@ -2059,6 +2168,7 @@ async def devolver_reclamo(
             status_code=400,
             detail="Solo se pueden devolver reclamos en estado 'pendiente_confirmacion'"
         )
+    _assert_transicion(reclamo.estado, EstadoReclamo.EN_CURSO, current_user.rol)
 
     estado_anterior = reclamo.estado
     reclamo.estado = EstadoReclamo.EN_CURSO
@@ -2143,8 +2253,11 @@ async def rechazar_reclamo(
     municipio_id = get_effective_municipio_id(request, current_user)
     reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
-    if reclamo.estado == EstadoReclamo.RESUELTO:
-        raise HTTPException(status_code=400, detail="No se puede rechazar un reclamo resuelto")
+    # F5-T1: antes solo se bloqueaba RESUELTO, lo que permitía rechazar un
+    # FINALIZADO o RE-rechazar un RECHAZADO. Ahora la matriz única decide: solo
+    # los estados abiertos (recibido/en_curso/pospuesto y las entradas legacy)
+    # pueden ir a RECHAZADO. `data.motivo` sigue validándose por schema.
+    _assert_transicion(reclamo.estado, EstadoReclamo.RECHAZADO, current_user.rol)
 
     estado_anterior = reclamo.estado
     reclamo.estado = EstadoReclamo.RECHAZADO
@@ -2785,11 +2898,16 @@ async def reasignar_reclamo(
     municipio_id = get_effective_municipio_id(request, current_user)
     reclamo = await _get_reclamo(db, reclamo_id, municipio_id)
 
-    # Solo tiene sentido reasignar si ya estaba en un estado posterior
+    # Solo tiene sentido reasignar si ya estaba en un estado posterior. Mensajes
+    # específicos para los dos casos de borde; la validez de la arista (→RECIBIDO
+    # desde en_curso/pospuesto/finalizado/resuelto/rechazado/pendiente/asignado)
+    # la confirma la matriz única (F5-T1). /reasignar es el ÚNICO camino que
+    # reabre un RECHAZADO.
     if reclamo.estado == EstadoReclamo.RECIBIDO:
         raise HTTPException(status_code=400, detail="El reclamo ya está en estado Recibido")
     if reclamo.estado == EstadoReclamo.NUEVO:
         raise HTTPException(status_code=400, detail="El reclamo aun no fue recibido por una dependencia")
+    _assert_transicion(reclamo.estado, EstadoReclamo.RECIBIDO, current_user.rol)
 
     estado_anterior = reclamo.estado
     reclamo.estado = EstadoReclamo.RECIBIDO
