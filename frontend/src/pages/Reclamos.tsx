@@ -21,7 +21,11 @@ import { ModernSelect } from '../components/ui/ModernSelect';
 import { DatePicker } from '../components/ui/DatePicker';
 import { ABMCardSkeleton } from '../components/ui/Skeleton';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
-import { ReclamoCard, estadoColors, estadoLabels, DynamicIcon } from '../components/ui/ReclamoCard';
+import { ReclamoCard, estadoColors, DynamicIcon } from '../components/ui/ReclamoCard';
+// estadoLabels (flat) viene del SSoT canónico (lib/enums/reclamo). estadoColors se sigue
+// tomando del adaptador {bg,text} de ReclamoCard: el Sheet del monolito accede a `.bg`
+// (el SSoT expone color plano vía estadoColor(); no reescribimos la lógica del monolito acá).
+import { estadoLabels } from '../lib/enums/reclamo';
 import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
 import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
 import { InboxLayout } from '../components/inbox/InboxLayout';

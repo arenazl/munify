@@ -4,33 +4,20 @@ import {
   MapPin,
   Calendar,
   Clock,
-  CheckCircle2,
   AlertCircle,
   ChevronRight,
   Loader2,
   ArrowLeft,
   Tag,
+  Building2,
   ClipboardList
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { reclamosApi } from '../../lib/api';
-import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../../types';
-
-const estadoConfig: Record<EstadoReclamo, { icon: typeof Clock; color: string; bgColor: string; label: string }> = {
-  recibido: { icon: CheckCircle2, color: '#0891b2', bgColor: '#cffafe', label: 'Recibido' },
-  en_curso: { icon: Clock, color: '#f59e0b', bgColor: '#fef3c7', label: 'En Curso' },
-  finalizado: { icon: CheckCircle2, color: '#10b981', bgColor: '#d1fae5', label: 'Finalizado' },
-  pospuesto: { icon: Clock, color: '#f97316', bgColor: '#ffedd5', label: 'Pospuesto' },
-  rechazado: { icon: AlertCircle, color: '#ef4444', bgColor: '#fee2e2', label: 'Rechazado' },
-  // Legacy
-  nuevo: { icon: Clock, color: '#6b7280', bgColor: '#f3f4f6', label: 'Nuevo' },
-  asignado: { icon: AlertCircle, color: '#3b82f6', bgColor: '#dbeafe', label: 'Asignado' },
-  en_proceso: { icon: Clock, color: '#f59e0b', bgColor: '#fef3c7', label: 'En Proceso' },
-  pendiente_confirmacion: { icon: Clock, color: '#8b5cf6', bgColor: '#ede9fe', label: 'Pendiente' },
-  resuelto: { icon: CheckCircle2, color: '#10b981', bgColor: '#d1fae5', label: 'Resuelto' },
-};
+import type { Reclamo, HistorialReclamo } from '../../types';
+import { estadoColor, estadoLabel, estadoIcon } from '../../lib/enums/reclamo';
 
 // Formatea el nombre del empleado en formato "L. Lopez"
 const formatEmpleadoNombre = (nombreCompleto: string): string => {
@@ -171,8 +158,8 @@ export default function MobileMisReclamos() {
   }
 
   if (selectedReclamo) {
-    const config = estadoConfig[selectedReclamo.estado];
-    const Icon = config.icon;
+    const color = estadoColor(selectedReclamo.estado);
+    const Icon = estadoIcon(selectedReclamo.estado);
 
     return (
       <div className="min-h-full" style={{ backgroundColor: theme.background }}>
@@ -193,14 +180,14 @@ export default function MobileMisReclamos() {
         <div className="p-4 space-y-4">
           <div
             className="rounded-xl p-4 flex items-center gap-3"
-            style={{ backgroundColor: config.bgColor }}
+            style={{ backgroundColor: `${color}15` }}
           >
-            <Icon className="h-6 w-6" style={{ color: config.color }} />
+            <Icon className="h-6 w-6" style={{ color }} />
             <div>
-              <p className="font-semibold" style={{ color: config.color }}>
-                {config.label}
+              <p className="font-semibold" style={{ color }}>
+                {estadoLabel(selectedReclamo.estado)}
               </p>
-              <p className="text-xs" style={{ color: config.color }}>
+              <p className="text-xs" style={{ color }}>
                 Actualizado: {new Date(selectedReclamo.updated_at || selectedReclamo.created_at).toLocaleDateString()}
               </p>
             </div>
@@ -377,8 +364,8 @@ export default function MobileMisReclamos() {
       ) : (
         <div className="space-y-3">
           {filteredReclamos.map((reclamo) => {
-            const config = estadoConfig[reclamo.estado];
-            const Icon = config.icon;
+            const color = estadoColor(reclamo.estado);
+            const Icon = estadoIcon(reclamo.estado);
             return (
               <button
                 key={reclamo.id}
@@ -394,10 +381,10 @@ export default function MobileMisReclamos() {
                       </span>
                       <span
                         className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
-                        style={{ backgroundColor: config.bgColor, color: config.color }}
+                        style={{ backgroundColor: `${color}15`, color }}
                       >
                         <Icon className="h-3 w-3" />
-                        {config.label}
+                        {estadoLabel(reclamo.estado)}
                       </span>
                     </div>
                     <p className="font-medium truncate" style={{ color: theme.text }}>
@@ -418,7 +405,8 @@ export default function MobileMisReclamos() {
                   </span>
                   {reclamo.dependencia_asignada && (
                     <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                      🏢 {reclamo.dependencia_asignada.nombre}
+                      <Building2 className="h-3 w-3 flex-shrink-0" />
+                      {reclamo.dependencia_asignada.nombre}
                     </span>
                   )}
                   <span className="flex items-center gap-1">

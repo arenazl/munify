@@ -7,6 +7,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ChartSkeleton, DashboardStatSkeleton } from '../components/ui/Skeleton';
 import { ModernSelect } from '../components/ui/ModernSelect';
+import { estadoColor } from '../lib/enums/reclamo';
 import {
   XAxis,
   YAxis,
@@ -594,18 +595,10 @@ export default function Dashboard() {
     },
   ];
 
-  const estadoColors: Record<string, string> = {
-    nuevo: '#6b7280',
-    asignado: '#3b82f6',
-    en_curso: '#f59e0b',
-    resuelto: '#22c55e',
-    rechazado: '#ef4444',
-  };
-
   const estadosData = Object.entries(stats.por_estado).map(([estado, cantidad]) => ({
     name: estado.replace('_', ' '),
     value: cantidad as number,
-    color: estadoColors[estado],
+    color: estadoColor(estado),
   }));
 
   const chartColors = {

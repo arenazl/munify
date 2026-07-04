@@ -1,37 +1,23 @@
 import { MapPin, Calendar, Clock, AlertTriangle, MessageCircle, Building2 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
-import type { Reclamo, EstadoReclamo } from '../../types';
+import type { Reclamo } from '../../types';
 import * as LucideIcons from 'lucide-react';
 import { canalLabel, canalIcon, canalColor } from '../../lib/enums/canal';
+import {
+  estadoColors as estadoColorsHex,
+  estadoLabels,
+  estadoColor,
+  estadoLabel,
+} from '../../lib/enums/reclamo';
 
-// Colores sólidos para estados (compartidos entre vecino y supervisor)
-export const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  recibido: { bg: '#0891b2', text: '#ffffff' },
-  en_curso: { bg: '#f59e0b', text: '#ffffff' },
-  finalizado: { bg: '#10b981', text: '#ffffff' },
-  pospuesto: { bg: '#f97316', text: '#ffffff' },
-  rechazado: { bg: '#ef4444', text: '#ffffff' },
-  // Legacy
-  nuevo: { bg: '#6366f1', text: '#ffffff' },
-  asignado: { bg: '#3b82f6', text: '#ffffff' },
-  en_proceso: { bg: '#f59e0b', text: '#ffffff' },
-  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
-  resuelto: { bg: '#10b981', text: '#ffffff' },
-};
-
-export const estadoLabels: Record<EstadoReclamo, string> = {
-  recibido: 'Recibido',
-  en_curso: 'En Curso',
-  finalizado: 'Finalizado',
-  pospuesto: 'Pospuesto',
-  rechazado: 'Rechazado',
-  // Legacy
-  nuevo: 'Nuevo',
-  asignado: 'Asignado',
-  en_proceso: 'En Proceso',
-  pendiente_confirmacion: 'Pend. Confirmación',
-  resuelto: 'Resuelto',
-};
+// SSoT de colores/labels: `lib/enums/reclamo.ts`. Acá re-exportamos la variante
+// con shape { bg, text } (badge sólido + texto blanco) para no romper a los
+// consumidores que ya importan `estadoColors`/`estadoLabels` desde este módulo
+// (Reclamos.tsx, MisReclamos.tsx, DashboardVecino.tsx).
+export const estadoColors: Record<string, { bg: string; text: string }> = Object.fromEntries(
+  Object.entries(estadoColorsHex).map(([k, v]) => [k, { bg: v, text: '#ffffff' }]),
+);
+export { estadoLabels };
 
 // Componente para iconos dinámicos
 export function DynamicIcon({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) {
@@ -64,7 +50,7 @@ export function ReclamoCard({
   animationDelay = 0,
 }: ReclamoCardProps) {
   const { theme } = useTheme();
-  const estado = estadoColors[r.estado] || estadoColors.recibido;
+  const estadoBg = estadoColor(r.estado);
 
   // Detectar actividad reciente (updated_at > created_at + 1 minuto)
   const tieneActividadReciente = r.updated_at &&
@@ -278,9 +264,9 @@ export function ReclamoCard({
             {/* Estado con color sólido */}
             <span
               className="px-2 py-0.5 text-[10px] font-semibold rounded-md"
-              style={{ backgroundColor: estado.bg, color: estado.text }}
+              style={{ backgroundColor: estadoBg, color: '#ffffff' }}
             >
-              {estadoLabels[r.estado]}
+              {estadoLabel(r.estado)}
             </span>
           </div>
         </div>

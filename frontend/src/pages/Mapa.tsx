@@ -26,8 +26,11 @@ import {
   Inbox,
   PlayCircle,
   CheckCircle,
+  Flame,
+  Pencil,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { estadoColor, estadoLabel, estadoColors, estadoLabels } from '../lib/enums/reclamo';
 import { reclamosApi } from '../lib/api';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { KpiRow, type KpiSpec } from '../components/ui/KpiCard';
@@ -102,68 +105,12 @@ const createPinIcon = (color: string) =>
     popupAnchor: [0, -42],
   });
 
-const STATUS_COLORS: Record<string, string> = {
-  nuevo: '#6366f1',
-  recibido: '#6366f1',
-  asignado: '#3b82f6',
-  en_curso: '#f59e0b',
-  en_proceso: '#f59e0b',
-  pospuesto: '#a855f7',
-  pendiente_confirmacion: '#8b5cf6',
-  finalizado: '#10b981',
-  resuelto: '#10b981',
-  rechazado: '#ef4444',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  nuevo: 'Nuevo',
-  recibido: 'Recibido',
-  asignado: 'Asignado',
-  en_curso: 'En Curso',
-  en_proceso: 'En Proceso',
-  pospuesto: 'Pospuesto',
-  pendiente_confirmacion: 'Pend. Confirm.',
-  finalizado: 'Finalizado',
-  resuelto: 'Resuelto',
-  rechazado: 'Rechazado',
-};
-
-const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
-  baches: { label: 'Baches', color: '#ef4444' },
-  iluminacion: { label: 'Iluminación', color: '#f59e0b' },
-  recoleccion: { label: 'Recolección', color: '#10b981' },
-  espacios: { label: 'Espacios Verdes', color: '#22c55e' },
-  agua: { label: 'Agua y Cloacas', color: '#3b82f6' },
-  semaforos: { label: 'Señalización', color: '#f97316' },
-  zoonosis: { label: 'Zoonosis', color: '#8b5cf6' },
-  veredas: { label: 'Veredas', color: '#78716c' },
-  ruidos: { label: 'Ruidos', color: '#ec4899' },
-  limpieza: { label: 'Limpieza', color: '#14b8a6' },
-  seguridad: { label: 'Seguridad', color: '#dc2626' },
-  obras: { label: 'Obras', color: '#eab308' },
-  salud: { label: 'Salud', color: '#be185d' },
-  transporte: { label: 'Transporte', color: '#0ea5e9' },
-  otros: { label: 'Otros', color: '#64748b' },
-};
-
-function getCategoryKey(categoria: string): string {
-  const cat = categoria.toLowerCase();
-  if (cat.includes('bache') || cat.includes('calzada')) return 'baches';
-  if (cat.includes('iluminacion') || cat.includes('iluminación')) return 'iluminacion';
-  if (cat.includes('recoleccion') || cat.includes('recolección') || cat.includes('residuo')) return 'recoleccion';
-  if (cat.includes('espacio') || cat.includes('verde')) return 'espacios';
-  if (cat.includes('agua') || cat.includes('cloaca')) return 'agua';
-  if (cat.includes('semaforo') || cat.includes('semáforo') || cat.includes('señal') || cat.includes('senal')) return 'semaforos';
-  if (cat.includes('zoonosis') || cat.includes('animal')) return 'zoonosis';
-  if (cat.includes('vereda') || cat.includes('baldio') || cat.includes('baldío')) return 'veredas';
-  if (cat.includes('ruido')) return 'ruidos';
-  if (cat.includes('limpieza')) return 'limpieza';
-  if (cat.includes('seguridad')) return 'seguridad';
-  if (cat.includes('obra')) return 'obras';
-  if (cat.includes('salud')) return 'salud';
-  if (cat.includes('transporte') || cat.includes('parada')) return 'transporte';
-  return 'otros';
-}
+// Estados: color/label canónicos vienen del SSoT `lib/enums/reclamo.ts`.
+// Para los combos/leyendas hijos (MapaFiltrosPanel, MapaStats) se pasa el mapa
+// de colores SIN la key 'default' (que no es un estado real, solo el fallback).
+const ESTADO_COLORS_LISTA: Record<string, string> = Object.fromEntries(
+  Object.entries(estadoColors).filter(([k]) => k !== 'default'),
+);
 
 // =====================================================================
 // Componentes auxiliares dentro del mapa
@@ -252,7 +199,7 @@ function HotspotLayer({ hotspots }: { hotspots: Hotspot[] }) {
         >
           <Tooltip direction="top" permanent={false}>
             <div className="text-xs">
-              <p className="font-bold text-red-600">🔥 Hotspot recurrente</p>
+              <p className="font-bold text-red-600 flex items-center gap-1"><Flame size={12} /> Hotspot recurrente</p>
               <p>{h.recientes} reclamos en 90 días</p>
               {h.topDireccion && <p className="text-gray-600">{h.topDireccion}</p>}
             </div>
@@ -581,7 +528,7 @@ export default function Mapa() {
   // 1) Categoría
   const reclamosPorCategoria = useMemo(() => {
     if (!filtroCategoria) return reclamos;
-    return reclamos.filter(r => getCategoryKey(r.categoria?.nombre || 'Otros') === filtroCategoria);
+    return reclamos.filter(r => String(r.categoria?.id ?? 'otros') === filtroCategoria);
   }, [reclamos, filtroCategoria]);
 
   // 2) Dependencia
@@ -620,14 +567,25 @@ export default function Mapa() {
     [drawnBBox, reclamosFiltrados],
   );
 
-  // Counts
-  const conteosPorCategoria = useMemo(() => {
-    return reclamos.reduce((acc, r) => {
-      const key = getCategoryKey(r.categoria?.nombre || 'Otros');
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-  }, [reclamos]);
+  // Categorías reales del muni (id + color de la DB), con conteo. Cada categoría
+  // tiene su propio filtro/leyenda — no se colapsan en un "Otros" indistinguible.
+  const categoriasDisponibles = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; color: string; count: number }>();
+    for (const r of reclamos) {
+      const c = r.categoria;
+      const key = c?.id != null ? String(c.id) : 'otros';
+      const existing = map.get(key);
+      if (existing) existing.count += 1;
+      else
+        map.set(key, {
+          key,
+          label: c?.nombre || 'Sin categoría',
+          color: c?.color || theme.textSecondary,
+          count: 1,
+        });
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [reclamos, theme.textSecondary]);
 
   const conteosPorEstado = useMemo(() => {
     return reclamosPorTiempo.reduce((acc, r) => {
@@ -822,7 +780,7 @@ export default function Mapa() {
         doc.addPage();
         y = margin;
       }
-      const linea = `${idx + 1}. #${r.id} — ${r.titulo} [${STATUS_LABELS[r.estado] || r.estado}] ${r.direccion || ''}`;
+      const linea = `${idx + 1}. #${r.id} — ${r.titulo} [${estadoLabel(r.estado)}] ${r.direccion || ''}`;
       const split = doc.splitTextToSize(linea, W - margin * 2);
       doc.text(split, margin, y);
       y += split.length * 4 + 2;
@@ -845,11 +803,6 @@ export default function Mapa() {
     const lng = reclamos.reduce((s, r) => s + (r.longitud || 0), 0) / reclamos.length;
     return [lat, lng];
   };
-
-  const categoriasDisponibles = Object.entries(CATEGORY_CONFIG)
-    .map(([key, cfg]) => ({ key, ...cfg, count: conteosPorCategoria[key] || 0 }))
-    .filter(c => c.count > 0)
-    .sort((a, b) => b.count - a.count);
 
   // Cuando cambian los filtros principales, refit del mapa (no en cada cambio de viewMode)
   useEffect(() => {
@@ -878,8 +831,8 @@ export default function Mapa() {
     <MapaFiltrosPanel
       categoriasDisponibles={categoriasDisponibles}
       dependenciasDisponibles={dependenciasDisponibles}
-      statusColors={STATUS_COLORS}
-      statusLabels={STATUS_LABELS}
+      statusColors={ESTADO_COLORS_LISTA}
+      statusLabels={estadoLabels}
       conteosPorEstado={conteosPorEstado}
       totalReclamos={reclamos.length}
       totalEnRangoTiempo={reclamosPorTiempo.length}
@@ -970,7 +923,7 @@ export default function Mapa() {
             label: 'Recibidos',
             value: recibidos.toLocaleString('es-AR'),
             icon: Inbox,
-            color: '#3b82f6',
+            color: estadoColor('recibido'),
             footnote: `${pct(recibidos).toFixed(1)}% del filtro`,
             pct: pct(recibidos),
           },
@@ -978,7 +931,7 @@ export default function Mapa() {
             label: 'En Curso',
             value: enCurso.toLocaleString('es-AR'),
             icon: PlayCircle,
-            color: '#f59e0b',
+            color: estadoColor('en_curso'),
             footnote: `${pct(enCurso).toFixed(1)}% del filtro`,
             pct: pct(enCurso),
           },
@@ -986,7 +939,7 @@ export default function Mapa() {
             label: 'Finalizados',
             value: finalizados.toLocaleString('es-AR'),
             icon: CheckCircle,
-            color: '#22c55e',
+            color: estadoColor('finalizado'),
             footnote: `${pct(finalizados).toFixed(1)}% del filtro`,
             pct: pct(finalizados),
           },
@@ -1025,7 +978,7 @@ export default function Mapa() {
                 <Marker
                   key={r.id}
                   position={[r.latitud!, r.longitud!]}
-                  icon={createPinIcon(STATUS_COLORS[r.estado] || '#6b7280')}
+                  icon={createPinIcon(estadoColor(r.estado))}
                   eventHandlers={{ click: () => handleMarkerClick(r) }}
                 >
                   <Tooltip direction="top" offset={[0, -42]} permanent={false}>
@@ -1076,8 +1029,10 @@ export default function Mapa() {
               </h3>
               <button
                 onClick={clearDrawnBBox}
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="p-1 rounded transition-colors"
                 style={{ color: theme.textSecondary }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.backgroundSecondary; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1114,10 +1069,10 @@ export default function Mapa() {
         {/* Hint mientras dibujás */}
         {drawMode && !drawnBBox && (
           <div
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] px-4 py-2 rounded-full text-xs font-medium shadow-lg pointer-events-none"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] px-4 py-2 rounded-full text-xs font-medium shadow-lg pointer-events-none flex items-center gap-1.5"
             style={{ backgroundColor: theme.primary, color: '#fff' }}
           >
-            ✏ Click + arrastrar para definir el área
+            <Pencil size={12} /> Click + arrastrar para definir el área
           </div>
         )}
       </div>
@@ -1126,8 +1081,8 @@ export default function Mapa() {
       <MapaStats
         reclamos={reclamosFiltrados}
         totalUniverso={reclamos.length}
-        statusColors={STATUS_COLORS}
-        statusLabels={STATUS_LABELS}
+        statusColors={ESTADO_COLORS_LISTA}
+        statusLabels={estadoLabels}
         onZonaClick={c => focusOnZona(c.centerLat, c.centerLng)}
       />
 
@@ -1161,8 +1116,10 @@ export default function Mapa() {
                   </h3>
                   <button
                     onClick={closeSidebar}
-                    className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="p-2 rounded-lg transition-colors"
                     style={{ color: theme.textSecondary }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = theme.backgroundSecondary; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -1172,9 +1129,9 @@ export default function Mapa() {
                   <div className="flex items-center justify-between">
                     <span
                       className="px-3 py-1 text-sm font-medium rounded-full text-white"
-                      style={{ backgroundColor: STATUS_COLORS[selected.estado] || '#6b7280' }}
+                      style={{ backgroundColor: estadoColor(selected.estado) }}
                     >
-                      {STATUS_LABELS[selected.estado] || selected.estado}
+                      {estadoLabel(selected.estado)}
                     </span>
                     <span className="text-xs" style={{ color: theme.textSecondary }}>
                       #{selected.id}

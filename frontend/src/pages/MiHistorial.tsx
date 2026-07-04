@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { Sheet } from '../components/ui/Sheet';
 import { ModernSelect } from '../components/ui/ModernSelect';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
+import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 
 interface TrabajoHistorial {
   id: number;
@@ -25,30 +26,6 @@ interface TrabajoHistorial {
     fecha: string | null;
   } | null;
 }
-
-const estadoColors: Record<string, { bg: string; text: string }> = {
-  nuevo: { bg: '#6366f1', text: '#ffffff' },
-  recibido: { bg: '#0891b2', text: '#ffffff' },
-  asignado: { bg: '#3b82f6', text: '#ffffff' },
-  en_curso: { bg: '#f59e0b', text: '#ffffff' },
-  pendiente_confirmacion: { bg: '#8b5cf6', text: '#ffffff' },
-  resuelto: { bg: '#10b981', text: '#ffffff' },
-  finalizado: { bg: '#10b981', text: '#ffffff' },
-  pospuesto: { bg: '#f97316', text: '#ffffff' },
-  rechazado: { bg: '#ef4444', text: '#ffffff' },
-};
-
-const estadoLabels: Record<string, string> = {
-  nuevo: 'Nuevo',
-  recibido: 'Recibido',
-  asignado: 'Asignado',
-  en_curso: 'En Curso',
-  pendiente_confirmacion: 'Pendiente',
-  resuelto: 'Resuelto',
-  finalizado: 'Finalizado',
-  pospuesto: 'Pospuesto',
-  rechazado: 'Rechazado',
-};
 
 const LIMIT = 20;
 
@@ -211,7 +188,7 @@ export default function MiHistorial() {
                 {/* Indicador de estado */}
                 <div
                   className="w-1 h-full min-h-[60px] rounded-full flex-shrink-0"
-                  style={{ backgroundColor: estadoColors[trabajo.estado]?.bg || theme.primary }}
+                  style={{ backgroundColor: estadoColor(trabajo.estado) }}
                 />
 
                 <div className="flex-1 min-w-0">
@@ -224,11 +201,11 @@ export default function MiHistorial() {
                         <span
                           className="px-2 py-0.5 rounded-full text-xs font-medium"
                           style={{
-                            backgroundColor: estadoColors[trabajo.estado]?.bg || theme.primary,
-                            color: estadoColors[trabajo.estado]?.text || '#fff',
+                            backgroundColor: estadoColor(trabajo.estado),
+                            color: '#ffffff',
                           }}
                         >
-                          {estadoLabels[trabajo.estado] || trabajo.estado}
+                          {estadoLabel(trabajo.estado)}
                         </span>
                         {trabajo.calificacion && (
                           <div className="flex items-center gap-1">
@@ -295,11 +272,11 @@ export default function MiHistorial() {
               <span
                 className="px-3 py-1 rounded-full text-sm font-medium"
                 style={{
-                  backgroundColor: estadoColors[selectedTrabajo.estado]?.bg || theme.primary,
-                  color: estadoColors[selectedTrabajo.estado]?.text || '#fff',
+                  backgroundColor: estadoColor(selectedTrabajo.estado),
+                  color: '#ffffff',
                 }}
               >
-                {estadoLabels[selectedTrabajo.estado] || selectedTrabajo.estado}
+                {estadoLabel(selectedTrabajo.estado)}
               </span>
               {selectedTrabajo.estado === 'resuelto' && (
                 <CheckCircle className="h-5 w-5 text-green-500" />

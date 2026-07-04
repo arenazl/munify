@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Search, GripVertical, Columns3, Filter } from 'lucide-react';
+import { Search, GripVertical, Columns3, Filter, ClipboardList } from 'lucide-react';
 import { reclamosApi } from '../lib/api';
 import { Reclamo, EstadoReclamo } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,57 +9,21 @@ import { useTheme } from '../contexts/ThemeContext';
 import { toast } from 'sonner';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
 import { DateRangePicker } from '../components/ui/DateRangePicker';
+import { estadoColor } from '../lib/enums/reclamo';
 
+// Solo el ORDEN y el título (plural) de cada columna del tablero.
+// El COLOR de cada estado sale del SSoT (lib/enums/reclamo.ts) vía estadoColor().
 interface Columna {
   id: EstadoReclamo;
   titulo: string;
-  color: string;
-  headerClass: string;
-  cardClass: string;
-  badgeClass: string;
 }
 
 const columnas: Columna[] = [
-  {
-    id: 'recibido',
-    titulo: 'Recibidos',
-    color: '#3b82f6',
-    headerClass: 'column-header-blue',
-    cardClass: 'card-gradient-blue',
-    badgeClass: 'badge-gradient-blue',
-  },
-  {
-    id: 'en_curso',
-    titulo: 'En Curso',
-    color: '#f59e0b',
-    headerClass: 'column-header-orange',
-    cardClass: 'card-gradient-orange',
-    badgeClass: 'badge-gradient-orange',
-  },
-  {
-    id: 'pospuesto',
-    titulo: 'Pospuestos',
-    color: '#8b5cf6',
-    headerClass: 'column-header-purple',
-    cardClass: 'card-gradient-purple',
-    badgeClass: 'badge-gradient-purple',
-  },
-  {
-    id: 'finalizado',
-    titulo: 'Finalizados',
-    color: '#22c55e',
-    headerClass: 'column-header-green',
-    cardClass: 'card-gradient-green',
-    badgeClass: 'badge-gradient-green',
-  },
-  {
-    id: 'rechazado',
-    titulo: 'Rechazados',
-    color: '#ef4444',
-    headerClass: 'column-header-red',
-    cardClass: 'card-gradient-red',
-    badgeClass: 'badge-gradient-red',
-  },
+  { id: 'recibido', titulo: 'Recibidos' },
+  { id: 'en_curso', titulo: 'En Curso' },
+  { id: 'pospuesto', titulo: 'Pospuestos' },
+  { id: 'finalizado', titulo: 'Finalizados' },
+  { id: 'rechazado', titulo: 'Rechazados' },
 ];
 
 // Transiciones permitidas entre estados (debe estar alineado con backend/api/reclamos.py)
@@ -94,7 +58,7 @@ export default function Tablero() {
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [fechaDesde, setFechaDesde] = useState(() => getDaysAgoDate(2));
+  const [fechaDesde, setFechaDesde] = useState(() => getDaysAgoDate(30));
   const [fechaHasta, setFechaHasta] = useState(() => getDateString(new Date()));
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [activeColumnIndex, setActiveColumnIndex] = useState(0);
@@ -189,6 +153,12 @@ export default function Tablero() {
 
   const canDrag = user?.rol === 'admin' || user?.rol === 'supervisor';
 
+  // Reclamos que quedan fuera del rango de fechas activo (ignorando la búsqueda).
+  const ocultosPorFecha = reclamos.filter((r) => {
+    const fechaReclamo = new Date(r.created_at).toISOString().split('T')[0];
+    return (fechaDesde && fechaReclamo < fechaDesde) || (fechaHasta && fechaReclamo > fechaHasta);
+  }).length;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -218,6 +188,7 @@ export default function Tablero() {
         {columnas.map((col, index) => {
           const count = getReclamosPorEstado(col.id).length;
           const isActive = activeColumnIndex === index;
+          const color = estadoColor(col.id);
           // Títulos cortos para mobile
           const tituloCorto = col.id === 'recibido' ? 'Recib.' :
                               col.id === 'en_curso' ? 'Curso' :
@@ -229,10 +200,10 @@ export default function Tablero() {
               onClick={() => setActiveColumnIndex(index)}
               className="flex flex-col items-center py-2 px-1 rounded-lg text-xs font-medium transition-all"
               style={{
-                backgroundColor: isActive ? col.color : theme.card,
+                backgroundColor: isActive ? color : theme.card,
                 color: isActive ? '#fff' : theme.textSecondary,
-                border: `1px solid ${isActive ? col.color : theme.border}`,
-                boxShadow: isActive ? `0 2px 8px ${col.color}40` : 'none',
+                border: `1px solid ${isActive ? color : theme.border}`,
+                boxShadow: isActive ? `0 2px 8px ${color}40` : 'none',
               }}
             >
               <span className="font-bold text-sm">{count}</span>
@@ -321,11 +292,26 @@ export default function Tablero() {
         </div>
       </StickyPageHeader>
 
+      {/* Indicador de reclamos ocultos por el filtro de fechas */}
+      {ocultosPorFecha > 0 && (
+        <div
+          className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
+          style={{ backgroundColor: theme.backgroundSecondary, color: theme.textSecondary, border: `1px solid ${theme.border}` }}
+        >
+          <Filter className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>
+            {ocultosPorFecha} {ocultosPorFecha === 1 ? 'reclamo oculto' : 'reclamos ocultos'} por el rango de fechas. Ampliá el rango para verlos.
+          </span>
+        </div>
+      )}
+
       {/* Tablero Kanban */}
       <DragDropContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         {/* En móvil: solo columna activa. En desktop: grid de 5 columnas */}
         <div className="md:grid md:grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3 lg:gap-4">
-          {columnas.map((col, colIndex) => (
+          {columnas.map((col, colIndex) => {
+            const color = estadoColor(col.id);
+            return (
             <Droppable
               droppableId={col.id}
               key={col.id}
@@ -339,15 +325,18 @@ export default function Tablero() {
                   style={{
                     backgroundColor: theme.backgroundSecondary,
                     border: snapshot.isDraggingOver
-                      ? `2px dashed ${col.color}`
+                      ? `2px dashed ${color}`
                       : `1px solid ${theme.border}`,
                     boxShadow: snapshot.isDraggingOver
-                      ? `0 0 20px ${col.color}30`
+                      ? `0 0 20px ${color}30`
                       : '0 4px 12px rgba(0,0,0,0.1)',
                   }}
                 >
-                  {/* Header de columna con gradiente */}
-                  <div className={`${col.headerClass} px-4 py-3 flex items-center justify-between`}>
+                  {/* Header de columna: fondo plano con el color canónico del estado */}
+                  <div
+                    className="px-4 py-3 flex items-center justify-between"
+                    style={{ backgroundColor: color }}
+                  >
                     <h2 className="font-semibold text-white flex items-center gap-2 text-base">
                       <span className="w-2 h-2 rounded-full bg-white/50"></span>
                       <span className="truncate">{col.titulo}</span>
@@ -371,11 +360,13 @@ export default function Tablero() {
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
-                            className={`${col.cardClass} rounded-lg p-4 ${!snapshot.isDragging ? 'hover-lift' : ''} ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                            className={`rounded-lg p-4 ${!snapshot.isDragging ? 'hover-lift' : ''} ${canDrag ? 'cursor-grab active:cursor-grabbing' : ''}`}
                             style={{
                               ...provided.draggableProps.style,
+                              backgroundColor: theme.card,
+                              borderLeft: `3px solid ${color}`,
                               boxShadow: snapshot.isDragging
-                                ? `0 20px 40px rgba(0,0,0,0.3), 0 0 30px ${col.color}50`
+                                ? `0 20px 40px rgba(0,0,0,0.3), 0 0 30px ${color}50`
                                 : '0 2px 8px rgba(0,0,0,0.1)',
                               opacity: snapshot.isDragging ? 0.95 : 1,
                             }}
@@ -386,8 +377,8 @@ export default function Tablero() {
                                 <div
                                   className="mt-1 p-1 rounded hidden md:block"
                                   style={{
-                                    background: `linear-gradient(135deg, ${col.color}30, ${col.color}10)`,
-                                    color: col.color
+                                    backgroundColor: `${color}20`,
+                                    color: color
                                   }}
                                 >
                                   <GripVertical className="w-4 h-4" />
@@ -407,11 +398,11 @@ export default function Tablero() {
                                   className="text-xs md:text-sm mt-1 flex items-start gap-1"
                                   style={{ color: theme.textSecondary }}
                                 >
-                                  <span className="inline-block w-1 h-1 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: col.color }}></span>
+                                  <span className="inline-block w-1 h-1 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }}></span>
                                   <span className="line-clamp-2">{reclamo.direccion}</span>
                                 </p>
 
-                                <div className="mt-3 pt-2 border-t space-y-2" style={{ borderColor: `${col.color}20` }}>
+                                <div className="mt-3 pt-2 border-t space-y-2" style={{ borderColor: `${color}20` }}>
                                   {/* Fecha */}
                                   <span className="text-xs font-medium block" style={{ color: theme.textSecondary }}>
                                     {new Date(reclamo.created_at).toLocaleDateString('es-AR', {
@@ -425,9 +416,9 @@ export default function Tablero() {
                                     <span
                                       className="text-xs px-2.5 py-1.5 rounded-md block w-full font-medium text-center leading-tight line-clamp-2"
                                       style={{
-                                        border: `1px solid ${reclamo.dependencia_asignada.color || col.color}`,
-                                        color: reclamo.dependencia_asignada.color || col.color,
-                                        backgroundColor: `${reclamo.dependencia_asignada.color || col.color}10`,
+                                        border: `1px solid ${reclamo.dependencia_asignada.color || color}`,
+                                        color: reclamo.dependencia_asignada.color || color,
+                                        backgroundColor: `${reclamo.dependencia_asignada.color || color}10`,
                                       }}
                                       title={reclamo.dependencia_asignada.nombre}
                                     >
@@ -460,16 +451,16 @@ export default function Tablero() {
                       <div
                         className="text-center py-12 rounded-lg border-2 border-dashed transition-all"
                         style={{
-                          borderColor: `${col.color}40`,
+                          borderColor: `${color}40`,
                           color: theme.textSecondary,
-                          background: `linear-gradient(135deg, ${col.color}05, ${col.color}10)`,
+                          backgroundColor: theme.card,
                         }}
                       >
                         <div
                           className="w-12 h-12 mx-auto mb-3 rounded-full flex items-center justify-center"
-                          style={{ background: `linear-gradient(135deg, ${col.color}20, ${col.color}10)` }}
+                          style={{ backgroundColor: `${color}20` }}
                         >
-                          <span style={{ color: col.color }}>📋</span>
+                          <ClipboardList className="w-5 h-5" style={{ color: color }} />
                         </div>
                         <p className="text-sm font-medium">Sin reclamos</p>
                         {canDrag && (
@@ -481,7 +472,8 @@ export default function Tablero() {
                 </div>
               )}
             </Droppable>
-          ))}
+            );
+          })}
         </div>
       </DragDropContext>
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, MapPin, Calendar, Eye, X } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 
 export interface ReclamoSimilar {
   id: number;
@@ -26,14 +27,6 @@ interface ReclamosSimilaresProps {
   onViewSimilar: (id: number) => void;
   onSumarse?: (id: number) => Promise<void>;
 }
-
-const estadoConfig: Record<string, { label: string; color: string; bg: string }> = {
-  nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6' },
-  asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe' },
-  en_curso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7' },
-  resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5' },
-  rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2' },
-};
 
 export function ReclamosSimilares({
   similares,
@@ -114,7 +107,7 @@ export function ReclamosSimilares({
         {/* Lista de similares */}
         <div className="p-6 space-y-4">
           {similares.map((reclamo) => {
-            const estadoInfo = estadoConfig[reclamo.estado] || estadoConfig.nuevo;
+            const color = estadoColor(reclamo.estado);
 
             return (
               <div
@@ -137,11 +130,11 @@ export function ReclamosSimilares({
                   <span
                     className="px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap"
                     style={{
-                      backgroundColor: estadoInfo.bg,
-                      color: estadoInfo.color,
+                      backgroundColor: `${color}15`,
+                      color,
                     }}
                   >
-                    {estadoInfo.label}
+                    {estadoLabel(reclamo.estado)}
                   </span>
                 </div>
 

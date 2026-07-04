@@ -27,6 +27,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { toast } from 'sonner';
 import { ModernSelect, SelectOption } from '../components/ui/ModernSelect';
 import { StickyPageHeader, PageTitleIcon, PageTitle, HeaderSeparator } from '../components/ui/StickyPageHeader';
+import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 
 // Tipos
 interface CategoriaMinima {
@@ -116,6 +117,16 @@ const FALLBACK_COLORS = [
   '#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6',
   '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#06b6d4',
 ];
+
+// Semáforo de carga por día (baja/media/alta). Tintes semitransparentes que se
+// componen SOBRE un fondo opaco (theme.card) para no dejar ver el gris de theme.border.
+// TODO(F3): candidato a consolidar en lib/enums/ junto a la paleta de empleados.
+const CARGA_TINT = {
+  baja: '#22c55e',
+  media: '#f59e0b',
+  alta: '#ef4444',
+};
+const AUSENCIA_COLOR = '#ef4444';
 
 const getEmpleadoColor = (empleado: Empleado): string => {
   if (empleado.categoria_principal?.color) return empleado.categoria_principal.color;
@@ -346,12 +357,13 @@ export default function Planificacion() {
     );
   };
 
-  // Calcular carga del empleado por día (colores)
-  const getCargaColor = (cantidad: number): string => {
-    if (cantidad === 0) return 'transparent';
-    if (cantidad <= 2) return '#22c55e20'; // verde claro
-    if (cantidad <= 4) return '#f59e0b20'; // amarillo claro
-    return '#ef444420'; // rojo claro
+  // Calcular carga del empleado por día. Devuelve un `background` OPACO: el día sin
+  // tareas queda en theme.card (antes 'transparent' dejaba ver theme.border = bloque gris),
+  // y los tintes se componen como capa semitransparente sobre theme.card.
+  const getCargaBackground = (cantidad: number): string => {
+    if (cantidad === 0) return theme.card;
+    const tint = cantidad <= 2 ? CARGA_TINT.baja : cantidad <= 4 ? CARGA_TINT.media : CARGA_TINT.alta;
+    return `linear-gradient(${tint}20, ${tint}20), ${theme.card}`;
   };
 
   // Empleados filtrados
@@ -616,10 +628,11 @@ export default function Planificacion() {
               {visibleDates.map(date => (
                 <div
                   key={formatDateKey(date)}
-                  className={`p-3 text-center font-medium ${isToday(date) ? 'ring-2 ring-inset ring-blue-500' : ''}`}
+                  className="p-3 text-center font-medium"
                   style={{
                     backgroundColor: isToday(date) ? `${theme.primary}10` : theme.backgroundSecondary,
                     color: isWeekend(date) ? theme.textSecondary : theme.text,
+                    boxShadow: isToday(date) ? `inset 0 0 0 2px ${theme.primary}` : undefined,
                   }}
                 >
                   <div className="text-sm uppercase">{formatDateDisplay(date)}</div>
@@ -688,11 +701,12 @@ export default function Planificacion() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`p-2 min-h-[100px] transition-colors ${snapshot.isDraggingOver ? 'ring-2 ring-inset ring-blue-500' : ''}`}
+                          className="p-2 min-h-[100px] transition-colors"
                           style={{
-                            backgroundColor: ausencia
-                              ? '#ef444415'
-                              : getCargaColor(tareasDelDia.length),
+                            background: ausencia
+                              ? `linear-gradient(${AUSENCIA_COLOR}15, ${AUSENCIA_COLOR}15), ${theme.card}`
+                              : getCargaBackground(tareasDelDia.length),
+                            boxShadow: snapshot.isDraggingOver ? `inset 0 0 0 2px ${theme.primary}` : undefined,
                           }}
                         >
                           {/* Indicador de ausencia */}
@@ -721,12 +735,13 @@ export default function Planificacion() {
                                 <div
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
-                                  className={`mb-2 p-2 rounded-lg text-xs relative overflow-hidden ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-500' : ''}`}
+                                  className="mb-2 p-2 rounded-lg text-xs relative overflow-hidden"
                                   style={{
                                     ...provided.draggableProps.style,
                                     backgroundColor: `${tareaColor}20`,
                                     border: `1px solid ${tareaColor}40`,
                                     borderLeft: `3px solid ${tareaColor}`,
+                                    boxShadow: snapshot.isDragging ? `0 0 0 2px ${theme.primary}, 0 10px 15px -3px rgba(0,0,0,0.25)` : undefined,
                                   }}
                                 >
                                   <div className="flex items-start gap-1">
@@ -758,18 +773,16 @@ export default function Planificacion() {
                                           <span className="truncate">{tarea.direccion.slice(0, 20)}</span>
                                         </div>
                                       )}
-                                      {/* Estado badge */}
+                                      {/* Estado badge — color/label canónicos desde el SSoT (lib/enums/reclamo) */}
                                       <div className="mt-1">
                                         <span
                                           className="px-1.5 py-0.5 rounded text-[10px] font-medium"
                                           style={{
-                                            backgroundColor: tarea.estado === 'resuelto' ? '#22c55e20' :
-                                              tarea.estado === 'en_curso' ? '#f59e0b20' : '#3b82f620',
-                                            color: tarea.estado === 'resuelto' ? '#22c55e' :
-                                              tarea.estado === 'en_curso' ? '#f59e0b' : '#3b82f6',
+                                            backgroundColor: `${estadoColor(tarea.estado)}20`,
+                                            color: estadoColor(tarea.estado),
                                           }}
                                         >
-                                          {tarea.estado.replace('_', ' ')}
+                                          {estadoLabel(tarea.estado)}
                                         </span>
                                       </div>
                                     </div>
@@ -834,12 +847,13 @@ export default function Planificacion() {
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
-                        className={`p-3 rounded-lg max-w-[200px] ${snapshot.isDragging ? 'shadow-lg ring-2 ring-blue-500' : ''}`}
+                        className="p-3 rounded-lg max-w-[200px]"
                         style={{
                           ...provided.draggableProps.style,
                           backgroundColor: `${tareaColor}15`,
                           border: `1px solid ${tareaColor}40`,
                           borderLeft: `3px solid ${tareaColor}`,
+                          boxShadow: snapshot.isDragging ? `0 0 0 2px ${theme.primary}, 0 10px 15px -3px rgba(0,0,0,0.25)` : undefined,
                         }}
                       >
                         <div className="flex items-start gap-2">
@@ -880,19 +894,19 @@ export default function Planificacion() {
       >
         <span className="text-sm font-medium" style={{ color: theme.text }}>Carga:</span>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#22c55e20', border: '1px solid #22c55e40' }} />
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: `${CARGA_TINT.baja}20`, border: `1px solid ${CARGA_TINT.baja}40` }} />
           <span className="text-xs" style={{ color: theme.textSecondary }}>Baja (1-2)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#f59e0b20', border: '1px solid #f59e0b40' }} />
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: `${CARGA_TINT.media}20`, border: `1px solid ${CARGA_TINT.media}40` }} />
           <span className="text-xs" style={{ color: theme.textSecondary }}>Media (3-4)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ef444420', border: '1px solid #ef444440' }} />
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: `${CARGA_TINT.alta}20`, border: `1px solid ${CARGA_TINT.alta}40` }} />
           <span className="text-xs" style={{ color: theme.textSecondary }}>Alta (5+)</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded" style={{ backgroundColor: theme.backgroundSecondary, border: `1px solid ${theme.border}` }} />
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: `${AUSENCIA_COLOR}20`, border: `1px solid ${AUSENCIA_COLOR}40` }} />
           <span className="text-xs" style={{ color: theme.textSecondary }}>Ausencia</span>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { StickyPageHeader } from '../components/ui/StickyPageHeader';
 import { DynamicIcon } from '../components/ui/ReclamoCard';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
+import { estadoColor, estadoLabel, estadoLabels, estadoIcons } from '../lib/enums/reclamo';
 import type { Reclamo, HistorialReclamo, EstadoReclamo } from '../types';
 
 interface WhatsAppLog {
@@ -92,18 +93,17 @@ const getFriendlyError = (error: string): string => {
   return error;
 };
 
-const estadoConfig: Record<EstadoReclamo, { label: string; color: string; bg: string; icon: typeof CheckCircle }> = {
-  recibido: { label: 'Recibido', color: '#0891b2', bg: '#cffafe', icon: CheckCircle },
-  en_curso: { label: 'En Curso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
-  finalizado: { label: 'Finalizado', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
-  pospuesto: { label: 'Pospuesto', color: '#ea580c', bg: '#ffedd5', icon: Clock },
-  rechazado: { label: 'Rechazado', color: '#dc2626', bg: '#fee2e2', icon: XCircle },
-  // Legacy
-  nuevo: { label: 'Nuevo', color: '#6b7280', bg: '#f3f4f6', icon: AlertCircle },
-  asignado: { label: 'Asignado', color: '#2563eb', bg: '#dbeafe', icon: Users },
-  en_proceso: { label: 'En Proceso', color: '#d97706', bg: '#fef3c7', icon: PlayCircle },
-  pendiente_confirmacion: { label: 'Pendiente', color: '#8b5cf6', bg: '#ede9fe', icon: Clock },
-  resuelto: { label: 'Resuelto', color: '#059669', bg: '#d1fae5', icon: CheckCircle },
+// Config visual de un estado, derivada de la SSoT (lib/enums/reclamo.ts).
+// bg = tinte del color de estado sobre el theme (dark-safe; reemplaza los
+// pasteles hardcodeados que rompían el modo oscuro).
+const estadoVisual = (estado: string) => {
+  const color = estadoColor(estado);
+  return {
+    label: estadoLabel(estado),
+    color,
+    bg: `${color}20`,
+    icon: estadoIcons[estado] || AlertCircle,
+  };
 };
 
 const accionIcons: Record<string, typeof CheckCircle> = {
@@ -264,7 +264,7 @@ export default function ReclamoDetalle() {
         comentarioCambioEstado.trim() || undefined
       );
       setReclamo(response.data);
-      toast.success(`Estado cambiado a "${estadoConfig[nuevoEstado].label}"`);
+      toast.success(`Estado cambiado a "${estadoLabel(nuevoEstado)}"`);
       setShowComentarioModal(false);
       setNuevoEstado(null);
       setComentarioCambioEstado('');
@@ -421,7 +421,7 @@ export default function ReclamoDetalle() {
 
   if (!reclamo) return null;
 
-  const estadoActual = estadoConfig[reclamo.estado];
+  const estadoActual = estadoVisual(reclamo.estado);
   const EstadoIcon = estadoActual.icon;
 
   return (
@@ -441,7 +441,7 @@ export default function ReclamoDetalle() {
         {/* Header del reclamo */}
         <div
           className="p-6 border-b"
-          style={{ borderColor: theme.border, background: `linear-gradient(135deg, ${estadoActual.bg}50 0%, transparent 100%)` }}
+          style={{ borderColor: theme.border, background: `linear-gradient(135deg, ${estadoActual.color}18 0%, transparent 100%)` }}
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex-1">
@@ -474,7 +474,8 @@ export default function ReclamoDetalle() {
                           <div className="px-3 py-2 text-xs font-medium" style={{ color: theme.textSecondary }}>
                             Cambiar estado a:
                           </div>
-                          {(Object.entries(estadoConfig) as [EstadoReclamo, typeof estadoActual][]).map(([estado, config]) => {
+                          {(Object.keys(estadoLabels) as EstadoReclamo[]).map((estado) => {
+                            const config = estadoVisual(estado);
                             const Icon = config.icon;
                             const isCurrentState = estado === reclamo.estado;
                             return (
@@ -855,11 +856,11 @@ export default function ReclamoDetalle() {
                                 <span
                                   className="px-1.5 py-0.5 text-xs rounded"
                                   style={{
-                                    backgroundColor: estadoConfig[item.estado_nuevo]?.bg || theme.backgroundSecondary,
-                                    color: estadoConfig[item.estado_nuevo]?.color || theme.text,
+                                    backgroundColor: `${estadoColor(item.estado_nuevo)}20`,
+                                    color: estadoColor(item.estado_nuevo),
                                   }}
                                 >
-                                  {estadoConfig[item.estado_nuevo]?.label || item.estado_nuevo}
+                                  {estadoLabel(item.estado_nuevo)}
                                 </span>
                               )}
                             </div>
@@ -1122,7 +1123,7 @@ export default function ReclamoDetalle() {
                 >
                   <div className="flex items-center gap-3 mb-4">
                     {(() => {
-                      const config = estadoConfig[nuevoEstado];
+                      const config = estadoVisual(nuevoEstado);
                       const Icon = config.icon;
                       return (
                         <>
@@ -1175,7 +1176,7 @@ export default function ReclamoDetalle() {
                       onClick={handleConfirmarCambioEstado}
                       disabled={cambiandoEstado}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                      style={{ backgroundColor: estadoConfig[nuevoEstado].color, color: '#ffffff' }}
+                      style={{ backgroundColor: estadoColor(nuevoEstado), color: '#ffffff' }}
                     >
                       {cambiandoEstado ? (
                         <>

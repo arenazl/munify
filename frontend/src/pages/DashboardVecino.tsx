@@ -23,7 +23,8 @@ function RecIcono({ nombre, color }: { nombre: string; color: string }) {
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
-import type { Reclamo, EstadoReclamo } from '../types';
+import type { Reclamo } from '../types';
+import { estadoColor, estadoLabel } from '../lib/enums/reclamo';
 
 interface MisEstadisticas {
   total: number;
@@ -94,34 +95,6 @@ function mapNoticia(n: NoticiaApiResponse): NoticiaItem {
     fecha,
   };
 }
-
-const estadoColors: Record<EstadoReclamo, { bg: string; text: string }> = {
-  recibido: { bg: '#cffafe', text: '#0e7490' },
-  en_curso: { bg: '#fef3c7', text: '#92400e' },
-  finalizado: { bg: '#d1fae5', text: '#065f46' },
-  pospuesto: { bg: '#ffedd5', text: '#c2410c' },
-  rechazado: { bg: '#fee2e2', text: '#991b1b' },
-  // Legacy
-  nuevo: { bg: '#e5e7eb', text: '#374151' },
-  asignado: { bg: '#dbeafe', text: '#1e40af' },
-  en_proceso: { bg: '#fef3c7', text: '#92400e' },
-  pendiente_confirmacion: { bg: '#ede9fe', text: '#5b21b6' },
-  resuelto: { bg: '#d1fae5', text: '#065f46' },
-};
-
-const estadoLabels: Record<EstadoReclamo, string> = {
-  recibido: 'Recibido',
-  en_curso: 'En Curso',
-  finalizado: 'Finalizado',
-  pospuesto: 'Pospuesto',
-  rechazado: 'Rechazado',
-  // Legacy
-  nuevo: 'Nuevo',
-  asignado: 'Asignado',
-  en_proceso: 'En Proceso',
-  pendiente_confirmacion: 'Pendiente',
-  resuelto: 'Resuelto',
-};
 
 export default function DashboardVecino() {
   const { theme } = useTheme();
@@ -802,7 +775,6 @@ export default function DashboardVecino() {
           {reclamosPendientes > 0 ? (
             <div>
               {reclamosRecientes.slice(0, 3).map((reclamo, idx) => {
-                const estado = estadoColors[reclamo.estado];
                 return (
                   <div
                     key={reclamo.id}
@@ -815,9 +787,9 @@ export default function DashboardVecino() {
                         <span className="text-[10px] font-mono" style={{ color: theme.textSecondary }}>#{reclamo.id}</span>
                         <span
                           className="px-1.5 py-0.5 text-[9px] font-medium rounded-full"
-                          style={{ backgroundColor: estado.bg, color: estado.text }}
+                          style={{ backgroundColor: estadoColor(reclamo.estado), color: '#ffffff' }}
                         >
-                          {estadoLabels[reclamo.estado]}
+                          {estadoLabel(reclamo.estado)}
                         </span>
                       </div>
                       <p className="font-medium text-xs truncate" style={{ color: theme.text }}>{reclamo.titulo}</p>
@@ -885,15 +857,11 @@ function GestionesCarousel({
   navigate,
   reclamosRecientes,
   reclamosPendientes,
-  estadoColors,
-  estadoLabels,
 }: {
   theme: ReturnType<typeof useTheme>['theme'];
   navigate: ReturnType<typeof useNavigate>;
   reclamosRecientes: Reclamo[];
   reclamosPendientes: number;
-  estadoColors: Record<EstadoReclamo, { bg: string; text: string }>;
-  estadoLabels: Record<EstadoReclamo, string>;
 }) {
   const [activeTab, setActiveTab] = useState<'reclamos' | 'tramites'>('reclamos');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -985,8 +953,7 @@ function GestionesCarousel({
 
             {reclamosPendientes > 0 ? (
               <div>
-                {reclamosRecientes.slice(0, 3).map((reclamo, idx) => {
-                  const estado = estadoColors[reclamo.estado];
+                {reclamosRecientes.slice(0, 3).map((reclamo) => {
                   return (
                     <div
                       key={reclamo.id}
@@ -999,9 +966,9 @@ function GestionesCarousel({
                           <span className="text-[10px] font-mono" style={{ color: theme.textSecondary }}>#{reclamo.id}</span>
                           <span
                             className="px-1.5 py-0.5 text-[9px] font-medium rounded-full"
-                            style={{ backgroundColor: estado.bg, color: estado.text }}
+                            style={{ backgroundColor: estadoColor(reclamo.estado), color: '#ffffff' }}
                           >
-                            {estadoLabels[reclamo.estado]}
+                            {estadoLabel(reclamo.estado)}
                           </span>
                         </div>
                         <p className="font-medium text-xs truncate" style={{ color: theme.text }}>{reclamo.titulo}</p>

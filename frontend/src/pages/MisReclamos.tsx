@@ -8,6 +8,7 @@ import { ABMPage, ABMTable, type ABMTableColumn } from '../components/ui/ABMPage
 import { Sheet } from '../components/ui/Sheet';
 import { PullToRefresh } from '../components/ui/PullToRefresh';
 import { ReclamoCard, DynamicIcon, estadoColors, estadoLabels } from '../components/ui/ReclamoCard';
+import { estadoColor } from '../lib/enums/reclamo';
 import type { Reclamo, EstadoReclamo, HistorialReclamo } from '../types';
 
 // Formatea el nombre del empleado en formato "L. Lopez"
@@ -364,11 +365,11 @@ export default function MisReclamos() {
           )}
 
           {selectedReclamo.resolucion && (
-            <div className="p-3 rounded-lg" style={{ backgroundColor: '#d1fae5' }}>
-              <label className="block text-sm font-medium" style={{ color: '#065f46' }}>Resolución</label>
-              <p className="mt-1" style={{ color: '#064e3b' }}>{selectedReclamo.resolucion}</p>
+            <div className="p-3 rounded-lg" style={{ backgroundColor: `${estadoColor('finalizado')}15` }}>
+              <label className="block text-sm font-medium" style={{ color: estadoColor('finalizado') }}>Resolución</label>
+              <p className="mt-1" style={{ color: theme.text }}>{selectedReclamo.resolucion}</p>
               {selectedReclamo.fecha_resolucion && (
-                <p className="text-sm" style={{ color: '#10b981' }}>
+                <p className="text-sm" style={{ color: estadoColor('finalizado') }}>
                   Resuelto: {new Date(selectedReclamo.fecha_resolucion).toLocaleString()}
                 </p>
               )}
@@ -376,11 +377,11 @@ export default function MisReclamos() {
           )}
 
           {selectedReclamo.motivo_rechazo && (
-            <div className="p-3 rounded-lg" style={{ backgroundColor: '#fee2e2' }}>
-              <label className="block text-sm font-medium" style={{ color: '#991b1b' }}>Motivo de Rechazo</label>
-              <p className="mt-1" style={{ color: '#7f1d1d' }}>{selectedReclamo.motivo_rechazo}</p>
+            <div className="p-3 rounded-lg" style={{ backgroundColor: `${estadoColor('rechazado')}15` }}>
+              <label className="block text-sm font-medium" style={{ color: estadoColor('rechazado') }}>Motivo de Rechazo</label>
+              <p className="mt-1" style={{ color: theme.text }}>{selectedReclamo.motivo_rechazo}</p>
               {selectedReclamo.descripcion_rechazo && (
-                <p className="text-sm mt-1" style={{ color: '#ef4444' }}>{selectedReclamo.descripcion_rechazo}</p>
+                <p className="text-sm mt-1" style={{ color: estadoColor('rechazado') }}>{selectedReclamo.descripcion_rechazo}</p>
               )}
             </div>
           )}
@@ -396,34 +397,39 @@ export default function MisReclamos() {
 
             {selectedReclamo.confirmado_vecino !== null && selectedReclamo.confirmado_vecino !== undefined ? (
               // Ya confirmado - mostrar resultado
+              (() => {
+              const confColor = selectedReclamo.confirmado_vecino ? estadoColor('finalizado') : estadoColor('rechazado');
+              return (
               <div
                 className="p-4 rounded-xl"
                 style={{
-                  backgroundColor: selectedReclamo.confirmado_vecino ? '#d1fae5' : '#fee2e2',
-                  border: `1px solid ${selectedReclamo.confirmado_vecino ? '#10b981' : '#ef4444'}30`
+                  backgroundColor: `${confColor}15`,
+                  border: `1px solid ${confColor}30`
                 }}
               >
                 <div className="flex items-center gap-2 mb-2">
                   {selectedReclamo.confirmado_vecino ? (
-                    <ThumbsUp className="h-5 w-5 text-green-600" />
+                    <ThumbsUp className="h-5 w-5" style={{ color: confColor }} />
                   ) : (
-                    <ThumbsDown className="h-5 w-5 text-red-600" />
+                    <ThumbsDown className="h-5 w-5" style={{ color: confColor }} />
                   )}
-                  <span className="font-medium" style={{ color: selectedReclamo.confirmado_vecino ? '#065f46' : '#991b1b' }}>
+                  <span className="font-medium" style={{ color: confColor }}>
                     {selectedReclamo.confirmado_vecino ? 'Confirmaste que se solucionó' : 'Indicaste que sigue el problema'}
                   </span>
                 </div>
                 {selectedReclamo.comentario_confirmacion_vecino && (
-                  <p className="text-sm italic mt-1" style={{ color: selectedReclamo.confirmado_vecino ? '#047857' : '#b91c1c' }}>
+                  <p className="text-sm italic mt-1" style={{ color: confColor }}>
                     "{selectedReclamo.comentario_confirmacion_vecino}"
                   </p>
                 )}
                 {selectedReclamo.fecha_confirmacion_vecino && (
-                  <p className="text-xs mt-2" style={{ color: selectedReclamo.confirmado_vecino ? '#059669' : '#dc2626' }}>
+                  <p className="text-xs mt-2" style={{ color: confColor }}>
                     Confirmado el {new Date(selectedReclamo.fecha_confirmacion_vecino).toLocaleDateString()}
                   </p>
                 )}
               </div>
+              );
+              })()
             ) : (
               // Pendiente de confirmar
               <div className="space-y-3">
@@ -595,13 +601,13 @@ export default function MisReclamos() {
                             </span>
                           )}
                           {isComentario && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#dbeafe', color: '#2563eb' }}>
-                              💬 Comentario
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+                              Comentario
                             </span>
                           )}
                           {isPersonaSumada && (
-                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#d1fae5', color: '#10b981' }}>
-                              ✓ Persona sumada
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${theme.primary}15`, color: theme.primary }}>
+                              Persona sumada
                             </span>
                           )}
                           <span className="text-xs" style={{ color: theme.textSecondary }}>
