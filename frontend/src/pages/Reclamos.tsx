@@ -1645,10 +1645,14 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
   const handleReasignar = () => {
     if (!selectedReclamo) return;
     const reclamoId = selectedReclamo.id;
+    const pierdeResolucion = selectedReclamo.estado === 'finalizado' || selectedReclamo.estado === 'resuelto';
+    const message = pierdeResolucion
+      ? 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Ojo: se borrará la resolución cargada (el vecino deja de verla). Contanos el motivo (queda en historial).'
+      : 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Contanos el motivo (queda en historial).';
     setConfirmModal({
       isOpen: true,
       title: 'Reasignar reclamo',
-      message: 'El reclamo vuelve a estado "Recibido" y queda disponible para que otro empleado lo tome. Contanos el motivo (queda en historial).',
+      message,
       confirmText: 'Reasignar',
       variant: 'warning',
       promptLabel: 'Motivo de la reasignación',

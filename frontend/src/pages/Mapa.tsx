@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   MapContainer,
   TileLayer,
@@ -28,6 +28,7 @@ import {
   CheckCircle,
   Flame,
   Pencil,
+  Settings,
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { estadoColor, estadoLabel, estadoColors, estadoLabels } from '../lib/enums/reclamo';
@@ -395,6 +396,7 @@ function saveFiltrosToStorage(f: FiltrosPersistidos) {
 export default function Mapa() {
   const { theme } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const isDarkTheme = (() => {
     const hex = theme.background?.replace('#', '') || '';
@@ -1259,6 +1261,19 @@ export default function Mapa() {
                         </div>
                       </div>
                     )}
+
+                  <button
+                    onClick={() => {
+                      const id = selected.id;
+                      closeSidebar();
+                      navigate(`/gestion/reclamos?abrir=${id}`);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium text-white transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: theme.primary }}
+                  >
+                    <Settings className="h-5 w-5" />
+                    Gestionar reclamo
+                  </button>
                 </div>
               </div>
             )}
