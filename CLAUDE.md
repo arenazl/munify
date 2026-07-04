@@ -215,8 +215,18 @@ significa que ya esté deployado en Cloud Run.
 
 **Notas:**
 - El user no testea local — cada cambio significativo va directo a prod.
-- Netlify production branch: `master`. Pushear a otra rama solo genera preview.
+- Netlify production branch: `master` (→ prod). **`qa` NO es un preview: es un ambiente COMPLETO**
+  (backend `munify-api-qa` + DB `sugerenciasmun-qa` + front `munify-qa.netlify.app`). Flujo de
+  trabajo entre ambientes: **`base-compartida/munify/AMBIENTES.md`**. **Podés actualizar `qa`**
+  (desarrollar + pushear a `qa`, e incluso traerte `prod`→`qa` para mantener QA al día — eso nunca
+  toca prod). **Lo que NO hacés es el camino inverso `qa`→`master` (a producción): esa vía es
+  exclusiva de Infra.**
 - Site IDs: app frontend = `edff37c1-2c43-4c01-ba71-d6c59f5cdc85`, landing = `522eac1f-fa1f-43d1-86ca-128e5467a27d`.
+
+**Carpeta compartida:** tu carpeta propia es `base-compartida/munify/` (= tu `id`). Ahí viven tus
+docs de coordinación con Infra (ej. `AMBIENTES.md`). La raíz de `base-compartida/` es solo
+cross-project. Si te dicen "leé tu carpeta en la compartida", andá directo a `base-compartida/munify/`
+— no escanees. Convención: `base-compartida/0-MAPA-CARPETAS.md`.
 
 ### 16. Cuando el user hace varias preguntas
 NO contestar todo de una. Responder de a una y esperar antes de seguir.
