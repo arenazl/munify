@@ -176,6 +176,13 @@ F2 y F3 son independientes entre sí y de F4/F5 — se pueden intercalar según 
 F6 solo depende de F0 y puede ejecutarse temprano; su Etapa A (OT universal) es prerrequisito
 de F4.
 
+**Pasada fina de micro-UX (insumo transversal):** [09-analisis-ux-circuito.md](09-analisis-ux-circuito.md)
+— 49 hallazgos de INTERACCIÓN (botoneras duplicadas, pérdida de contexto de navegación,
+misma transición con reglas distintas por superficie, dead-ends). No es una fase: sus
+hallazgos se reparten entre F0/F1/F2/F3/F5 (ver §7 de ese doc). Tres piezas compartidas
+—matriz de transiciones única, Sheet direccionable por URL con timeline inline, SSoT de
+estados/verbos— resuelven ~30 de los 49 de raíz.
+
 ## 8. Reglas del repo que TODA fase debe respetar
 
 - Leer `CLAUDE.md` (root) y, si toca UI, `BUILD_GUIDE.md` §5-§7 antes de codear.

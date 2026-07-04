@@ -40,6 +40,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
 | Entender el estado del universo Reclamos (análisis + decisiones abiertas) | [`reclamos/01-analisis-funcional.md`](reclamos/01-analisis-funcional.md) |
 | Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
+| Ver las inconsistencias de UX/interacción del circuito (49 hallazgos) | [`reclamos/09-analisis-ux-circuito.md`](reclamos/09-analisis-ux-circuito.md) — insumo transversal repartido entre fases |
 | Pitch / argumentario de ventas para intendentes | [`sales/01-producto-munify.md`](sales/01-producto-munify.md) |
 | Prompt del agente de ventas (Bruno) | [`sales/02-sales-agent-prompt.md`](sales/02-sales-agent-prompt.md) |
 | Brochure comercial PDF | [`marketing/Munify_Brochure.pdf`](marketing/Munify_Brochure.pdf) |
