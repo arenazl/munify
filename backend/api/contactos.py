@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from core.security import get_current_user
 from core.tenancy import get_effective_municipio_id
-from models import Contacto, Gasto, TesoreriaPagoProgramado, TesoreriaTipoEmpleado, User, RolUsuario
+from models import Contacto, Gasto, OrdenPago, TesoreriaPagoProgramado, TesoreriaTipoEmpleado, User, RolUsuario
 from models.contacto import TipoContacto
 from schemas.tesoreria import ContactoCreate, ContactoUpdate, ContactoResponse
 
@@ -363,6 +363,7 @@ class MergeResponse(BaseModel):
     merged_count: int
     gastos_reapuntados: int
     pagos_prog_reapuntados: int
+    ordenes_pago_reapuntadas: int
 
 
 # Campos que se intentan completar en el ganador si están vacíos.
@@ -392,7 +393,8 @@ async def merge_contactos(
          - Sino, toma el primer merged que tenga valor.
       4. UPDATE gastos.destino_contacto_id IN merge_ids -> keep_id.
       5. UPDATE tesoreria_pagos_programados.contacto_id IN merge_ids -> keep_id.
-      6. UPDATE contactos.activo=false WHERE id IN merge_ids (soft delete).
+      6. UPDATE ordenes_pago.destino_contacto_id IN merge_ids -> keep_id.
+      7. UPDATE contactos.activo=false WHERE id IN merge_ids (soft delete).
     """
     _require_admin(current_user)
     municipio_id = get_effective_municipio_id(request, current_user)
@@ -453,6 +455,15 @@ async def merge_contactos(
     )
     pp_count = upd_pp.rowcount or 0
 
+    # Reapuntar ordenes de pago (antes NO se reapuntaban: al fusionar un contacto con
+    # OPs asociadas, esas OPs quedaban orfanas apuntando a un contacto soft-deleted).
+    upd_op = await db.execute(
+        sa_update(OrdenPago)
+        .where(OrdenPago.destino_contacto_id.in_(payload.merge_ids))
+        .values(destino_contacto_id=payload.keep_id)
+    )
+    op_count = upd_op.rowcount or 0
+
     # Soft-delete de los merged
     await db.execute(
         sa_update(Contacto)
@@ -467,6 +478,7 @@ async def merge_contactos(
         merged_count=len(payload.merge_ids),
         gastos_reapuntados=gastos_count,
         pagos_prog_reapuntados=pp_count,
+        ordenes_pago_reapuntadas=op_count,
     )
 
 
