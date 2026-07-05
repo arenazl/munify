@@ -27,7 +27,7 @@ from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo
 from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
 from .enums import (
     EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana,
-    EstadoOrdenTrabajo, PrioridadOT, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
+    EstadoOrdenTrabajo, PrioridadOT, OrigenOT, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
 from .gamificacion import (
     PuntosUsuario, HistorialPuntos, BadgeUsuario,
@@ -90,6 +90,7 @@ __all__ = [
     "OrdenTrabajoTipo",
     "EstadoOrdenTrabajo",
     "PrioridadOT",
+    "OrigenOT",
     # Inventario (activos + consumibles)
     "InventarioCategoria",
     "InventarioItem",

@@ -8,6 +8,7 @@ su circuito propio (resolver → confirmar supervisor → confirmar vecino).
 Aditivo al flujo simple (Reclamo.empleado_id directo) — los munis chicos no
 necesitan OTs. Frontend gated por municipio_modulos 'ordenes_trabajo' (opt-in).
 """
+import logging
 from datetime import datetime, date, time, timezone
 from typing import Optional, List
 
@@ -22,7 +23,7 @@ from core.security import get_current_user, require_roles
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
     OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo, EstadoOrdenTrabajo, PrioridadOT,
-    Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
+    OrigenOT, Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
 from models.enums import RolUsuario, EstadoReclamo
@@ -30,6 +31,7 @@ from services.notificacion_service import NotificacionService
 from services import push_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 ESTADOS_FINALES = (EstadoOrdenTrabajo.COMPLETADA, EstadoOrdenTrabajo.CANCELADA)
 
@@ -485,6 +487,202 @@ async def _cerrar_recursos(db: AsyncSession, ot: OrdenTrabajo, municipio_id: int
             rec.aplicado = True
 
 
+# ---------------------- OT universal · implícita 1:1 (F6) -----------
+#
+# Toda asignación de un reclamo a un empleado crea/actualiza por debajo una OT
+# "implícita" (origen=IMPLICITA) 1:1 con ese reclamo. Es transparente: se filtra
+# de las listas de OT (no es una OT "formal") y ESPEJA el estado de su reclamo.
+# La creación es SILENCIOSA (el aviso de "reclamo asignado" ya lo manda
+# reclamos.py — no se duplica). Se importa lazy desde reclamos.py /
+# planificacion.py (sin ciclo: este módulo no importa esos).
+#
+# MODELO UNIVERSAL (D11) — la OT implícita corre para TODOS los munis por igual,
+# SIN gate per-tenant. El modelo es uno solo; el flag 'ordenes_trabajo' es solo
+# de superficie (qué ve el muni en el menú), NO ramifica el modelo. Que un muni
+# no use el módulo OT no lo excluye del modelo: sus OT implícitas existen igual,
+# transparentes, y no tocan tesorería (tablas distintas). Meter un `if muni` acá
+# sería el primer paso a un modelo Frankenstein.
+#
+# GARANTÍA DURA — todos los hooks públicos (upsert/cancelar/espejar) pasan por
+# _ot_implicita_segura, que la aplica en un solo lugar (SSoT):
+#   AISLAMIENTO DEL FALLO: el trabajo sobre la OT corre en un savepoint
+#   best-effort. Un fallo (incl. la race de _siguiente_numero) se contiene y
+#   JAMÁS aborta la mutación del reclamo que disparó el hook — ningún tenant
+#   puede comerse un 500 por la OT implícita.
+
+# Espejo reclamo → OT implícita. Map resiliente (regla dura #3: .get, no switch).
+_ESPEJO_ESTADO_OT = {
+    EstadoReclamo.EN_CURSO: EstadoOrdenTrabajo.EN_CURSO,
+    EstadoReclamo.FINALIZADO: EstadoOrdenTrabajo.COMPLETADA,
+    EstadoReclamo.RESUELTO: EstadoOrdenTrabajo.COMPLETADA,
+    EstadoReclamo.RECHAZADO: EstadoOrdenTrabajo.CANCELADA,
+}
+
+
+async def _ot_implicita_segura(db: AsyncSession, reclamo: Reclamo, trabajo, ctx: str) -> None:
+    """Corre `trabajo` (callable async sin args, el laburo real sobre la OT) con la
+    garantía del bloque de arriba. Nunca propaga: un fallo se loguea y se ignora
+    (best-effort).
+
+    Detalle fino: se flushea ANTES de abrir el savepoint para que la mutación del
+    reclamo quede persistida en la transacción EXTERNA. Así, si el trabajo de la
+    OT falla, el rollback del savepoint revierte solo la OT — nunca la asignación/
+    cambio de estado del reclamo. El flush del reclamo, si fallara, sí propaga
+    (es un error real del reclamo, no de la OT)."""
+    await db.flush()
+    try:
+        async with db.begin_nested():
+            await trabajo()
+    except Exception:
+        logger.warning(
+            "OT implícita: '%s' falló para reclamo %s (best-effort, ignorado)",
+            ctx, getattr(reclamo, "id", "?"), exc_info=True,
+        )
+
+
+async def crear_ot_core(
+    db: AsyncSession, *, municipio_id: int, creador_id: int, titulo: str,
+    descripcion: Optional[str] = None, prioridad: PrioridadOT = PrioridadOT.MEDIA,
+    tipo_trabajo_id: Optional[int] = None, reclamo_ids: Optional[List[int]] = None,
+    cuadrilla_id: Optional[int] = None, empleado_id: Optional[int] = None,
+    fecha_programada: Optional[date] = None, hora_inicio: Optional[time] = None,
+    hora_fin: Optional[time] = None, materiales=None,
+    horas_estimadas: Optional[float] = None, origen: OrigenOT = OrigenOT.MANUAL,
+) -> tuple:
+    """Crea una OT (manual o implícita) y la vincula a sus reclamos. NO commitea,
+    NO notifica y NO toca recursos/historial — eso lo decide el caller. Devuelve
+    (ot, reclamos) con la OT flusheada (ya tiene id).
+
+    PRECONDICIÓN del caller: empleado_id/cuadrilla_id deben pertenecer a
+    municipio_id. `crear_orden` lo valida con _validar_recursos; el path de OT
+    implícita hereda el empleado ya validado en el call site (reclamos.py /
+    planificacion.py). No se revalida acá para no duplicar el query en el hot path."""
+    numero = await _siguiente_numero(db, municipio_id)
+    estado = (
+        EstadoOrdenTrabajo.ASIGNADA
+        if (cuadrilla_id or empleado_id)
+        else EstadoOrdenTrabajo.PENDIENTE
+    )
+    ot = OrdenTrabajo(
+        municipio_id=municipio_id, numero=numero, estado=estado, origen=origen,
+        titulo=titulo, descripcion=descripcion, prioridad=prioridad,
+        tipo_trabajo_id=tipo_trabajo_id, cuadrilla_id=cuadrilla_id, empleado_id=empleado_id,
+        fecha_programada=fecha_programada, hora_inicio=hora_inicio, hora_fin=hora_fin,
+        materiales=materiales, horas_estimadas=horas_estimadas, creador_id=creador_id,
+    )
+    db.add(ot)
+    await db.flush()
+    reclamos = await _vincular_reclamos(db, ot, reclamo_ids or [], municipio_id)
+    return ot, reclamos
+
+
+async def _ot_implicita_de(db: AsyncSession, reclamo_id: int, municipio_id: int,
+                           incluir_finales: bool = False) -> Optional[OrdenTrabajo]:
+    """La OT implícita 1:1 del reclamo (o None). Por defecto solo la vigente
+    (no completada/cancelada). Carga recursos para poder cerrarlos sin lazy-load."""
+    q = (
+        select(OrdenTrabajo)
+        .options(selectinload(OrdenTrabajo.recursos))
+        .join(OrdenTrabajoReclamo, OrdenTrabajoReclamo.orden_trabajo_id == OrdenTrabajo.id)
+        .where(
+            OrdenTrabajoReclamo.reclamo_id == reclamo_id,
+            OrdenTrabajo.municipio_id == municipio_id,
+            OrdenTrabajo.origen == OrigenOT.IMPLICITA,
+        )
+        .order_by(OrdenTrabajo.id.desc())
+    )
+    if not incluir_finales:
+        q = q.where(OrdenTrabajo.estado.notin_(ESTADOS_FINALES))
+    return (await db.execute(q.limit(1))).scalars().first()
+
+
+async def _upsert_ot_implicita_core(db: AsyncSession, reclamo: Reclamo,
+                                    empleado_id: int, creador_id: int) -> OrdenTrabajo:
+    # PRECONDICIÓN: empleado_id ya viene validado ↔ reclamo.municipio_id por el
+    # call site (asignar_empleado / asignar_fecha_reclamo / auto_asignar_reclamo).
+    ot = await _ot_implicita_de(db, reclamo.id, reclamo.municipio_id)
+    if ot is None:
+        ot, _ = await crear_ot_core(
+            db, municipio_id=reclamo.municipio_id, creador_id=creador_id,
+            titulo=reclamo.titulo, descripcion=reclamo.descripcion,
+            reclamo_ids=[reclamo.id], empleado_id=empleado_id,
+            fecha_programada=reclamo.fecha_programada, hora_inicio=reclamo.hora_inicio,
+            hora_fin=reclamo.hora_fin, origen=OrigenOT.IMPLICITA,
+        )
+    else:
+        ot.empleado_id = empleado_id
+        ot.fecha_programada = reclamo.fecha_programada
+        ot.hora_inicio = reclamo.hora_inicio
+        ot.hora_fin = reclamo.hora_fin
+    # Estado de la OT = espejo del reclamo, o ASIGNADA si el reclamo no mapea.
+    ot.estado = _ESPEJO_ESTADO_OT.get(reclamo.estado, EstadoOrdenTrabajo.ASIGNADA)
+    return ot
+
+
+async def upsert_ot_implicita(db: AsyncSession, reclamo: Reclamo,
+                              empleado_id: int, creador_id: int) -> None:
+    """Hook: crea/actualiza la OT implícita 1:1 de un reclamo recién asignado.
+    Silenciosa (no notifica). Gate + best-effort vía _ot_implicita_segura."""
+    await _ot_implicita_segura(
+        db, reclamo,
+        lambda: _upsert_ot_implicita_core(db, reclamo, empleado_id, creador_id),
+        ctx="upsert",
+    )
+
+
+async def _cancelar_ot_implicita_core(db: AsyncSession, reclamo: Reclamo, motivo: str) -> None:
+    ot = await _ot_implicita_de(db, reclamo.id, reclamo.municipio_id)
+    if ot is None:
+        return
+    ot.estado = EstadoOrdenTrabajo.CANCELADA
+    ot.motivo_cancelacion = motivo
+    ot.empleado_id = None
+    if ot.recursos:
+        await _cerrar_recursos(db, ot, reclamo.municipio_id, descontar_consumos=False)
+
+
+async def cancelar_ot_implicita(db: AsyncSession, reclamo: Reclamo,
+                                motivo: str = "Reclamo desasignado") -> None:
+    """Hook: al desasignar/reasignar (el reclamo vuelve al pool), cancela la OT
+    implícita vigente y libera sus recursos. Gate + best-effort. No-op si no hay
+    OT implícita."""
+    await _ot_implicita_segura(
+        db, reclamo,
+        lambda: _cancelar_ot_implicita_core(db, reclamo, motivo),
+        ctx="cancelar",
+    )
+
+
+async def _espejar_ot_implicita_core(db: AsyncSession, reclamo: Reclamo) -> None:
+    destino = _ESPEJO_ESTADO_OT.get(reclamo.estado)
+    if destino is None:
+        return
+    ot = await _ot_implicita_de(db, reclamo.id, reclamo.municipio_id)
+    if ot is None:
+        return
+    ot.estado = destino
+    if destino == EstadoOrdenTrabajo.COMPLETADA and not ot.fecha_completada:
+        ot.fecha_completada = datetime.now(timezone.utc)
+        if ot.recursos:
+            await _cerrar_recursos(db, ot, reclamo.municipio_id, descontar_consumos=True)
+    elif destino == EstadoOrdenTrabajo.CANCELADA:
+        if not ot.motivo_cancelacion:
+            ot.motivo_cancelacion = "Reclamo rechazado"
+        if ot.recursos:
+            await _cerrar_recursos(db, ot, reclamo.municipio_id, descontar_consumos=False)
+
+
+async def espejar_ot_implicita(db: AsyncSession, reclamo: Reclamo) -> None:
+    """Hook: espeja el estado del reclamo en su OT implícita vigente. Idempotente;
+    no-op si no hay OT o el estado no mapea. Solo toca OTs origen=IMPLICITA (las
+    manuales/consolidadas conservan su ciclo propio). Gate + best-effort."""
+    await _ot_implicita_segura(
+        db, reclamo,
+        lambda: _espejar_ot_implicita_core(db, reclamo),
+        ctx="espejar",
+    )
+
+
 # ============================== Endpoints ==============================
 
 @router.get("", response_model=List[OTResponse])
@@ -504,7 +702,12 @@ async def listar_ordenes(
     current_user: User = Depends(require_roles(["admin", "supervisor", "empleado"])),
 ):
     municipio_id = get_effective_municipio_id(request, current_user)
-    query = _query_base().where(OrdenTrabajo.municipio_id == municipio_id)
+    # Las OT implícitas (espejo 1:1 de un reclamo asignado) son transparentes:
+    # nunca se listan como OTs formales.
+    query = _query_base().where(
+        OrdenTrabajo.municipio_id == municipio_id,
+        OrdenTrabajo.origen != OrigenOT.IMPLICITA,
+    )
 
     es_empleado = current_user.rol == RolUsuario.EMPLEADO
     if es_empleado or solo_mias:
@@ -560,6 +763,7 @@ async def ordenes_de_un_reclamo(
         .where(
             OrdenTrabajoReclamo.reclamo_id == reclamo_id,
             OrdenTrabajo.municipio_id == municipio_id,
+            OrdenTrabajo.origen != OrigenOT.IMPLICITA,
         )
         .order_by(OrdenTrabajo.created_at.desc())
     )).scalars().unique().all()
@@ -589,38 +793,20 @@ async def crear_orden(
     await _validar_recursos(db, municipio_id, data.cuadrilla_id, data.empleado_id)
     await _validar_tipo_trabajo(db, municipio_id, data.tipo_trabajo_id)
 
-    numero = await _siguiente_numero(db, municipio_id)
-    estado = (
-        EstadoOrdenTrabajo.ASIGNADA
-        if (data.cuadrilla_id or data.empleado_id)
-        else EstadoOrdenTrabajo.PENDIENTE
-    )
-
-    ot = OrdenTrabajo(
-        municipio_id=municipio_id,
-        numero=numero,
-        estado=estado,
-        titulo=data.titulo,
-        descripcion=data.descripcion,
-        prioridad=data.prioridad,
-        tipo_trabajo_id=data.tipo_trabajo_id,
-        cuadrilla_id=data.cuadrilla_id,
-        empleado_id=data.empleado_id,
-        fecha_programada=data.fecha_programada,
-        hora_inicio=data.hora_inicio,
+    ot, reclamos = await crear_ot_core(
+        db, municipio_id=municipio_id, creador_id=current_user.id,
+        titulo=data.titulo, descripcion=data.descripcion, prioridad=data.prioridad,
+        tipo_trabajo_id=data.tipo_trabajo_id, reclamo_ids=data.reclamo_ids,
+        cuadrilla_id=data.cuadrilla_id, empleado_id=data.empleado_id,
+        fecha_programada=data.fecha_programada, hora_inicio=data.hora_inicio,
         hora_fin=data.hora_fin,
         materiales=[m.model_dump() for m in data.materiales] if data.materiales else None,
-        horas_estimadas=data.horas_estimadas,
-        creador_id=current_user.id,
+        horas_estimadas=data.horas_estimadas, origen=OrigenOT.MANUAL,
     )
-    db.add(ot)
-    await db.flush()
-
-    reclamos = await _vincular_reclamos(db, ot, data.reclamo_ids, municipio_id)
     _historial_reclamos(
         db, reclamos, current_user.id,
         accion="ot_creada",
-        comentario=f"Orden de trabajo {numero} creada: {data.titulo}",
+        comentario=f"Orden de trabajo {ot.numero} creada: {data.titulo}",
     )
 
     if data.recursos:
@@ -628,7 +814,7 @@ async def crear_orden(
 
     # Si nació ya asignada, avisar al responsable/cuadrilla (matriz: OT asignada).
     push_asig = None
-    if estado == EstadoOrdenTrabajo.ASIGNADA:
+    if ot.estado == EstadoOrdenTrabajo.ASIGNADA:
         push_asig = await _notificar_ot_asignada_inapp(db, ot)
 
     await db.commit()

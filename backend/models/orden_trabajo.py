@@ -5,7 +5,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from core.database import Base
-from .enums import EstadoOrdenTrabajo, PrioridadOT
+from .enums import EstadoOrdenTrabajo, PrioridadOT, OrigenOT
 
 
 class OrdenTrabajo(Base):
@@ -41,6 +41,14 @@ class OrdenTrabajo(Base):
     estado = Column(
         Enum(EstadoOrdenTrabajo, values_callable=lambda x: [e.value for e in x]),
         default=EstadoOrdenTrabajo.PENDIENTE, nullable=False, index=True,
+    )
+
+    # Cómo nació la OT (F6 · OT universal). 'implicita' = espejo 1:1 de un
+    # reclamo asignado (oculta en munis simples); 'manual'/'consolidada_poi'
+    # conservan su ciclo propio con confirmación humana.
+    origen = Column(
+        Enum(OrigenOT, values_callable=lambda x: [e.value for e in x]),
+        default=OrigenOT.MANUAL, nullable=False, index=True,
     )
 
     # Qué hay que hacer

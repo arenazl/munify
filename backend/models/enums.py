@@ -47,6 +47,21 @@ class PrioridadOT(str, enum.Enum):
     URGENTE = "urgente"
 
 
+class OrigenOT(str, enum.Enum):
+    """Cómo nació una OT (F6 · OT universal).
+
+    - MANUAL: la creó un gestor desde la pantalla de Órdenes (ciclo propio,
+      confirmación humana en cada transición).
+    - IMPLICITA: la generó automáticamente una asignación de reclamo (1:1 con
+      su reclamo). Espeja el estado del reclamo y queda oculta en munis simples.
+    - CONSOLIDADA_POI: OT de zona de un Punto de Interés (Etapa B). Agrupa
+      varios reclamos cercanos con prioridad alta.
+    """
+    MANUAL = "manual"
+    IMPLICITA = "implicita"
+    CONSOLIDADA_POI = "consolidada_poi"
+
+
 class NaturalezaInventario(str, enum.Enum):
     """Dos naturalezas de inventario, con mecánicas opuestas.
 

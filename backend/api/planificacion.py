@@ -383,6 +383,9 @@ async def desasignar_reclamo(
     reclamo.fecha_programada = None
     reclamo.hora_inicio = None
     reclamo.hora_fin = None
+    # OT universal (F6): al quitar la asignación, cancelar la OT implícita.
+    from api.ordenes_trabajo import cancelar_ot_implicita
+    await cancelar_ot_implicita(db, reclamo)
     await db.commit()
 
     return {"success": True, "message": "Asignación quitada"}
@@ -451,6 +454,10 @@ async def asignar_fecha_reclamo(
             accion="asignado_empleado",
             comentario=f"Asignado a {nombre_empleado} para el {fecha_programada} (desde planificación)",
         ))
+
+        # OT universal (F6): espejar la asignación en una OT implícita 1:1.
+        from api.ordenes_trabajo import upsert_ot_implicita
+        await upsert_ot_implicita(db, reclamo, empleado_id, current_user.id)
 
         await db.commit()
 

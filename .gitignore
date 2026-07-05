@@ -88,3 +88,6 @@ scripts/gsc-credentials.json
 
 # Cloud Run env file (no secrets but no need to track)
 backend/env.yaml
+
+# Backups de migraciones/curación con datos reales (PII) — NUNCA commitear
+backend/scripts/_backup_*.json

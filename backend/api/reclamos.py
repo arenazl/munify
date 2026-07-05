@@ -892,6 +892,10 @@ async def cambiar_estado_reclamo_drag(
     )
     db.add(historial)
 
+    # OT universal (F6): espejar el nuevo estado del reclamo en su OT implícita.
+    from api.ordenes_trabajo import espejar_ot_implicita
+    await espejar_ot_implicita(db, reclamo)
+
     await db.commit()
 
     # Notificaciones en background (no bloquean respuesta).
@@ -1901,6 +1905,10 @@ async def iniciar_reclamo(
     )
     db.add(historial)
 
+    # OT universal (F6): reclamo iniciado → espejar OT implícita a EN_CURSO.
+    from api.ordenes_trabajo import espejar_ot_implicita
+    await espejar_ot_implicita(db, reclamo)
+
     await db.commit()
 
     # Guardar datos para notificación en background
@@ -2042,6 +2050,10 @@ async def resolver_reclamo(
         )
         db.add(historial)
 
+        # OT universal (F6): reclamo finalizado → espejar OT implícita a completada.
+        from api.ordenes_trabajo import espejar_ot_implicita
+        await espejar_ot_implicita(db, reclamo)
+
         await db.commit()
 
         # Gamificación: otorgar puntos al creador por reclamo resuelto
@@ -2113,6 +2125,10 @@ async def confirmar_reclamo(
         comentario=comentario or "Trabajo confirmado por supervisor"
     )
     db.add(historial)
+
+    # OT universal (F6): reclamo confirmado (resuelto) → espejar OT a completada.
+    from api.ordenes_trabajo import espejar_ot_implicita
+    await espejar_ot_implicita(db, reclamo)
 
     await db.commit()
 
@@ -2274,6 +2290,11 @@ async def rechazar_reclamo(
         comentario=f"Motivo: {data.motivo.value}. {data.descripcion or ''}"
     )
     db.add(historial)
+
+    # OT universal (F6): reclamo rechazado → la OT implícita se espeja a CANCELADA
+    # (vía espejar_ot_implicita, que mapea RECHAZADO→CANCELADA en _ESPEJO_ESTADO_OT).
+    from api.ordenes_trabajo import espejar_ot_implicita
+    await espejar_ot_implicita(db, reclamo)
 
     await db.commit()
 
@@ -2757,6 +2778,9 @@ async def auto_asignar_reclamo(
         raise HTTPException(status_code=404, detail="Reclamo no encontrado")
 
     reclamo.empleado_id = empleado_id
+    # OT universal (F6): espejar la asignación en una OT implícita 1:1 (silenciosa).
+    from api.ordenes_trabajo import upsert_ot_implicita
+    await upsert_ot_implicita(db, reclamo, empleado_id, current_user.id)
     await db.commit()
     await db.refresh(reclamo)
 
@@ -2854,6 +2878,14 @@ async def asignar_empleado(
     elif data.empleado_id is None:
         reclamo.hora_fin = None
 
+    # OT universal (F6): crear/actualizar la OT implícita 1:1 si se asignó, o
+    # cancelarla si se desasignó. Silenciosa (el aviso lo manda la notificación).
+    from api.ordenes_trabajo import upsert_ot_implicita, cancelar_ot_implicita
+    if data.empleado_id is not None:
+        await upsert_ot_implicita(db, reclamo, data.empleado_id, current_user.id)
+    else:
+        await cancelar_ot_implicita(db, reclamo)
+
     await db.commit()
 
     # T2-F1: si se asignó (no desasignó) un empleado, dejar miga en historial y
@@ -2927,6 +2959,9 @@ async def reasignar_reclamo(
         accion="reasignacion",
         comentario=f"Reasignado: {data.motivo.strip()}",
     ))
+    # OT universal (F6): el reclamo vuelve al pool → cancelar su OT implícita.
+    from api.ordenes_trabajo import cancelar_ot_implicita
+    await cancelar_ot_implicita(db, reclamo, motivo=f"Reasignado: {data.motivo.strip()}")
     await db.commit()
     return {
         "ok": True,
