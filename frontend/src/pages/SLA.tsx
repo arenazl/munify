@@ -174,6 +174,9 @@ export default function SLA() {
     }
   };
 
+  // Prioridad del SLA alineada al enum canónico de la OT (F6): baja=1, media=2,
+  // alta=3, urgente=4. Se eliminó el nivel fantasma "5=Crítica" que contradecía
+  // la escala del resto de la app (no existe en el enum baja/media/alta/urgente).
   const getPrioridadLabel = (prioridad: number | null) => {
     if (!prioridad) return 'Todas';
     const labels: Record<number, string> = {
@@ -181,7 +184,6 @@ export default function SLA() {
       2: 'Media',
       3: 'Alta',
       4: 'Urgente',
-      5: 'Crítica',
     };
     return labels[prioridad] || `P${prioridad}`;
   };
@@ -552,7 +554,6 @@ export default function SLA() {
                   <option value="2">Media</option>
                   <option value="3">Alta</option>
                   <option value="4">Urgente</option>
-                  <option value="5">Crítica</option>
                 </select>
               </div>
 

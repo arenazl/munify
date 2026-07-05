@@ -83,15 +83,6 @@ const EMPTY_FORM: ReclamoForm = {
   telefono_solicitante: '',
 };
 
-const PRIORIDAD_LABELS: Record<number, string> = {
-  1: 'Urgente',
-  2: 'Alta',
-  3: 'Normal',
-  4: 'Baja',
-  5: 'Muy baja',
-};
-
-
 /**
  * Wizard de creación de reclamo para vecino logueado.
  *

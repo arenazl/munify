@@ -22,10 +22,21 @@ from models.empleado import Empleado
 from models.configuracion import Configuracion
 from models.municipio import Municipio
 from models.enums import EstadoReclamo, RolUsuario
+from services.prioridad import prioridad_ot_map
 
 from core.tenancy import get_effective_municipio_id  # noqa: E402
 
 router = APIRouter()
+
+# Peso de intensidad del heatmap por prioridad de la OT (F6 · prioridad única).
+# La prioridad canónica vive en la OT; `Reclamo.prioridad` (Integer) está deprecado.
+# Sin OT viva -> se pondera como 'media' (0.5).
+_PESO_PRIORIDAD_OT = {
+    "urgente": 1.0,
+    "alta": 0.8,
+    "media": 0.5,
+    "baja": 0.3,
+}
 
 
 def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
@@ -58,10 +69,10 @@ async def get_heatmap_data(
     fecha_inicio = datetime.utcnow() - timedelta(days=dias)
 
     query = select(
+        Reclamo.id,
         Reclamo.latitud,
         Reclamo.longitud,
         Reclamo.estado,
-        Reclamo.prioridad,
         Categoria.nombre.label('categoria')
     ).join(Categoria, Reclamo.categoria_id == Categoria.id).where(
         and_(
@@ -80,6 +91,10 @@ async def get_heatmap_data(
     result = await db.execute(query)
     reclamos = result.all()
 
+    # Prioridad canónica desde la OT del reclamo (Reclamo.prioridad deprecado en F6).
+    # {reclamo_id: 'baja'|'media'|'alta'|'urgente'}; los reclamos sin OT viva no aparecen.
+    prioridad_ot = await prioridad_ot_map(db, [r.id for r in reclamos], municipio_ids=[municipio_id])
+
     # Calcular intensidad basada en densidad de puntos cercanos
     points = []
     for r in reclamos:
@@ -90,9 +105,8 @@ async def get_heatmap_data(
         elif r.estado == EstadoReclamo.EN_CURSO:
             intensidad = 1.2
 
-        # Ajustar por prioridad (1 = más urgente)
-        if r.prioridad:
-            intensidad *= (6 - r.prioridad) / 5
+        # Ajustar por prioridad de la OT (canónica; sin OT viva -> media = 0.5)
+        intensidad *= _PESO_PRIORIDAD_OT.get(prioridad_ot.get(r.id), 0.5)
 
         points.append({
             "lat": r.latitud,

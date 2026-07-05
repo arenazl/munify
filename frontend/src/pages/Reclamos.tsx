@@ -28,6 +28,7 @@ import { ReclamoCard, estadoColors, DynamicIcon } from '../components/ui/Reclamo
 import { estadoLabels } from '../lib/enums/reclamo';
 import { CANAL_OPTIONS, canalColors, canalLabel, canalIcon, canalColor } from '../lib/enums/canal';
 import { otEstadoLabel, otEstadoColor } from '../lib/enums/ordenTrabajo';
+import { prioridadColor, prioridadLabel, prioridadIcon, PRIORIDAD_OPTIONS } from '../lib/enums/prioridad';
 import { InboxLayout } from '../components/inbox/InboxLayout';
 import { InboxCard } from '../components/inbox/InboxCard';
 import type { Reclamo, Empleado, EstadoReclamo, HistorialReclamo, Categoria, Zona, User as UserType, OrdenTrabajo } from '../types';
@@ -1564,6 +1565,26 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       .then(res => setOtsDelReclamo(res.data || []))
       .catch(() => setOtsDelReclamo([]));
   }, [selectedReclamo?.id, moduloOTActivo]);
+
+  // Cambiar la prioridad del reclamo (F6·A5). La prioridad canónica vive en la
+  // OT, así que el editor escribe en la OT del reclamo y refresca el badge.
+  const handleCambiarPrioridadOT = async (otId: number, prioridad: string) => {
+    if (!selectedReclamo) return;
+    const reclamoId = selectedReclamo.id;
+    try {
+      await ordenesTrabajoApi.update(otId, { prioridad });
+      const [otRes, recRes] = await Promise.all([
+        ordenesTrabajoApi.porReclamo(reclamoId),
+        reclamosApi.getOne(reclamoId),
+      ]);
+      setOtsDelReclamo(otRes.data || []);
+      setSelectedReclamo(recRes.data);
+      fetchReclamos(true);
+      toast.success('Prioridad actualizada');
+    } catch {
+      toast.error('No se pudo actualizar la prioridad');
+    }
+  };
 
   const handleAsignarEmpleadoManual = async (empleadoId: string) => {
     if (!selectedReclamo) return;
@@ -3507,6 +3528,40 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           </ABMInfoPanel>
         )}
 
+        {/* Editor de prioridad (F6·A5). La prioridad canónica vive en la OT, así
+            que el cambio escribe en la OT del reclamo. Editable solo por gestor y
+            cuando el reclamo tiene UNA sola OT viva (implícita 1:1); con varias OTs
+            (consolidación de zona) el destino sería ambiguo → queda solo el badge
+            del header. Sin OT viva no hay dónde escribir → idem. */}
+        {(user?.rol === 'admin' || user?.rol === 'supervisor') && (() => {
+          const otsEditables = otsDelReclamo.filter(
+            (ot) => ot.estado !== 'completada' && ot.estado !== 'cancelada',
+          );
+          if (otsEditables.length !== 1) return null;
+          const ot = otsEditables[0];
+          const PrioIcon = prioridadIcon(ot.prioridad);
+          const prioridadOptions = PRIORIDAD_OPTIONS.map((o) => ({
+            ...o,
+            color: prioridadColor(o.value),
+          }));
+          return (
+            <ABMInfoPanel
+              title="Prioridad del trabajo"
+              icon={<PrioIcon className="h-4 w-4" />}
+              variant="default"
+            >
+              <ModernSelect
+                value={ot.prioridad || 'media'}
+                onChange={(v) => handleCambiarPrioridadOT(ot.id, v)}
+                options={prioridadOptions}
+              />
+              <p className="text-[11px] mt-2" style={{ color: theme.textSecondary }}>
+                Urgente es un escalón manual del supervisor.
+              </p>
+            </ABMInfoPanel>
+          );
+        })()}
+
         {/* Tiempo estimado de resolución - Solo para aceptar reclamos nuevos */}
         {selectedReclamo.estado === 'nuevo' && selectedReclamo.dependencia_asignada && !dependenciaSeleccionada && (
           <ABMInfoPanel
@@ -4046,6 +4101,23 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
           {getCategoryIcon(selectedReclamo.categoria.nombre)}
           {selectedReclamo.categoria.nombre}
         </span>
+        {/* Prioridad — badge canónico leído de la OT del reclamo (F6). Fallback
+            'media' si el reclamo todavía no tiene OT (prioridad_ot null). */}
+        {(() => {
+          const prio = selectedReclamo.prioridad_ot || 'media';
+          const pColor = prioridadColor(prio);
+          const PrioIcon = prioridadIcon(prio);
+          return (
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg"
+              style={{ backgroundColor: `${pColor}15`, color: pColor, border: `1px solid ${pColor}40` }}
+              title={`Prioridad ${prioridadLabel(prio)}`}
+            >
+              <PrioIcon className="h-3.5 w-3.5" />
+              {prioridadLabel(prio)}
+            </span>
+          );
+        })()}
         {/* Canal de ingreso (omnicanalidad) */}
         {selectedReclamo.canal && (() => {
           const CanalIcon = canalIcon(selectedReclamo.canal);
@@ -4486,10 +4558,11 @@ Tono amigable, 3-4 oraciones máximo. Sin saludos ni despedidas.`,
       }
 
       // Capa 3: urgente real — solo entre los que aun no fueron tomados
-      // (recibido / nuevo / asignado / legacy). Prioridad manual = 1 OR
+      // (recibido / nuevo / asignado / legacy). Prioridad de la OT alta/urgente
+      // (F6: la prioridad canónica vive en la OT, no en el campo legacy) OR
       // vence entre -7 y +3 dias.
       const enZonaUrgente = diffMs != null && diffMs >= -7 * dia && diffMs <= 3 * dia;
-      const esUrgente = r.prioridad === 1 || enZonaUrgente;
+      const esUrgente = r.prioridad_ot === 'alta' || r.prioridad_ot === 'urgente' || enZonaUrgente;
       if (esUrgente) {
         urgentes.push(r);
         continue;

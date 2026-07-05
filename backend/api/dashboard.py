@@ -808,6 +808,8 @@ async def get_metricas_accion(
     """Métricas accionables para el resumen del dashboard"""
     from models.empleado import Empleado
     from models.zona import Zona
+    from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+    from models.enums import PrioridadOT, EstadoOrdenTrabajo
     from sqlalchemy import and_, case
 
     municipio_id = get_effective_municipio_id(request, current_user)
@@ -819,12 +821,17 @@ async def get_metricas_accion(
     if dependencia_id:
         base.append(Reclamo.municipio_dependencia_id == dependencia_id)
 
-    # 1. Reclamos urgentes (prioridad alta, no resueltos, más de 3 días)
+    # 1. Reclamos urgentes (prioridad efectiva de OT alta/urgente, no resueltos, más de 3 días).
+    # "Urgente" = el reclamo tiene una OT viva (no cancelada) con prioridad alta o urgente.
+    # La prioridad canónica vive en la OT (F6); Reclamo.prioridad está deprecado.
     urgentes_query = await db.execute(
-        select(func.count(Reclamo.id))
+        select(func.count(func.distinct(Reclamo.id)))
+        .join(OrdenTrabajoReclamo, OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .join(OrdenTrabajo, OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id)
         .where(
             *base,
-            Reclamo.prioridad >= 4,
+            OrdenTrabajo.estado != EstadoOrdenTrabajo.CANCELADA,
+            OrdenTrabajo.prioridad.in_([PrioridadOT.ALTA, PrioridadOT.URGENTE]),
             Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
         )
@@ -939,6 +946,9 @@ async def get_metricas_detalle(
     """Métricas con detalle de reclamos para cada tarjeta"""
     from models.categoria_reclamo import CategoriaReclamo as Categoria
     from models.zona import Zona
+    from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
+    from models.enums import PrioridadOT, EstadoOrdenTrabajo
+    from sqlalchemy import and_, case
     from sqlalchemy.orm import selectinload
 
     municipio_id = get_effective_municipio_id(request, current_user)
@@ -948,6 +958,21 @@ async def get_metricas_detalle(
     base = [Reclamo.municipio_id == municipio_id]
     if dependencia_id:
         base.append(Reclamo.municipio_dependencia_id == dependencia_id)
+
+    # Severidad efectiva de la OT del reclamo (F6): urgente>alta>media>baja.
+    # Un reclamo con varias OTs vivas toma la más alta (func.max). Se excluyen
+    # las OTs canceladas dentro del ON del outer join para no descartar reclamos.
+    prioridad_rank = case(
+        (OrdenTrabajo.prioridad == PrioridadOT.URGENTE, 4),
+        (OrdenTrabajo.prioridad == PrioridadOT.ALTA, 3),
+        (OrdenTrabajo.prioridad == PrioridadOT.MEDIA, 2),
+        (OrdenTrabajo.prioridad == PrioridadOT.BAJA, 1),
+        else_=0,
+    )
+    ot_viva = and_(
+        OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id,
+        OrdenTrabajo.estado != EstadoOrdenTrabajo.CANCELADA,
+    )
 
     async def get_reclamos_resumen(query_result) -> List[dict]:
         """Convierte resultados de query a resumen"""
@@ -965,17 +990,21 @@ async def get_metricas_detalle(
             })
         return reclamos
 
-    # 1. Urgentes (prioridad alta, no resueltos, más de 3 días)
+    # 1. Urgentes (prioridad efectiva de OT alta/urgente, no resueltos, más de 3 días).
+    # Join a la OT viva; se agrupa por reclamo y se toma su severidad máxima.
     urgentes_query = await db.execute(
         select(Reclamo)
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .join(OrdenTrabajoReclamo, OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .join(OrdenTrabajo, ot_viva)
         .where(
             *base,
-            Reclamo.prioridad >= 4,
             Reclamo.estado.in_([EstadoReclamo.NUEVO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.created_at) <= hoy - timedelta(days=3)
         )
-        .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
+        .group_by(Reclamo.id)
+        .having(func.max(prioridad_rank) >= 3)
+        .order_by(func.max(prioridad_rank).desc(), Reclamo.created_at.asc())
         .limit(10)
     )
     urgentes = await get_reclamos_resumen(urgentes_query.scalars().all())
@@ -994,16 +1023,20 @@ async def get_metricas_detalle(
     )
     sin_asignar = await get_reclamos_resumen(sin_asignar_query.scalars().all())
 
-    # 3. Para hoy (programados para hoy)
+    # 3. Para hoy (programados para hoy), ordenados por prioridad efectiva de OT.
+    # Outer join: un reclamo sin OT viva NO se descarta (queda con severidad 0, al final).
     para_hoy_query = await db.execute(
         select(Reclamo)
         .options(selectinload(Reclamo.categoria), selectinload(Reclamo.zona))
+        .outerjoin(OrdenTrabajoReclamo, OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .outerjoin(OrdenTrabajo, ot_viva)
         .where(
             *base,
             Reclamo.estado.in_([EstadoReclamo.ASIGNADO, EstadoReclamo.EN_CURSO]),
             func.date(Reclamo.fecha_programada) == hoy
         )
-        .order_by(Reclamo.prioridad.desc())
+        .group_by(Reclamo.id)
+        .order_by(func.max(prioridad_rank).desc(), Reclamo.created_at.asc())
         .limit(10)
     )
     para_hoy = await get_reclamos_resumen(para_hoy_query.scalars().all())

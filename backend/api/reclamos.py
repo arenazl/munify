@@ -27,6 +27,7 @@ from schemas.reclamo import (
 )
 from schemas.historial import HistorialResponse
 from services.gamificacion_service import GamificacionService
+from services.prioridad import set_prioridad_ot
 
 router = APIRouter()
 
@@ -806,7 +807,10 @@ async def get_reclamos(
     query = query.order_by(Reclamo.created_at.desc())
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.unique().scalars().all()
+    reclamos = result.unique().scalars().all()
+    # F6 · prioridad unica: inyectar la prioridad efectiva leida de la OT.
+    await set_prioridad_ot(db, reclamos)
+    return reclamos
 
 @router.get("/mis-reclamos", response_model=List[ReclamoResponse])
 async def get_mis_reclamos(
@@ -819,7 +823,9 @@ async def get_mis_reclamos(
     query = query.order_by(Reclamo.created_at.desc())
     query = query.offset(skip).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    reclamos = result.scalars().all()
+    await set_prioridad_ot(db, reclamos)
+    return reclamos
 
 
 @router.patch("/{reclamo_id}", response_model=ReclamoResponse)
@@ -915,7 +921,9 @@ async def cambiar_estado_reclamo_drag(
         ))
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 
 # ===========================================
@@ -1400,6 +1408,7 @@ async def get_reclamo(
     if current_user.rol == RolUsuario.VECINO and reclamo.creador_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para ver este reclamo")
 
+    await set_prioridad_ot(db, [reclamo])
     return reclamo
 
 # Acciones internas que el vecino NO debe ver en el historial (cocina interna).
@@ -1679,6 +1688,7 @@ async def create_reclamo(
     # Recargar con relaciones
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo.id))
     reclamo_final = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_final])
     logger.info("Reclamo #%s listo para retornar", reclamo_final.id)
     return reclamo_final
 
@@ -1708,7 +1718,9 @@ async def update_reclamo(
     await db.commit()
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 @router.post("/{reclamo_id}/asignar", response_model=ReclamoResponse)
 async def asignar_reclamo(
@@ -1868,7 +1880,9 @@ async def asignar_reclamo(
     asyncio.create_task(enviar_push_asignacion())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 @router.post("/{reclamo_id}/iniciar", response_model=ReclamoResponse)
 async def iniciar_reclamo(
@@ -1937,7 +1951,9 @@ async def iniciar_reclamo(
     asyncio.create_task(enviar_push_inicio())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 @router.post("/{reclamo_id}/resolver", response_model=ReclamoResponse)
 async def resolver_reclamo(
@@ -2084,7 +2100,9 @@ async def resolver_reclamo(
         asyncio.create_task(enviar_push_resuelto())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 
 @router.post("/{reclamo_id}/confirmar", response_model=ReclamoResponse)
@@ -2159,7 +2177,9 @@ async def confirmar_reclamo(
     asyncio.create_task(enviar_push_confirmado())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 
 @router.post("/{reclamo_id}/devolver", response_model=ReclamoResponse)
@@ -2255,7 +2275,9 @@ async def devolver_reclamo(
             logger.warning("Error notificando devolución (reclamo #%s): %s", reclamo.id, e)
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 
 @router.post("/{reclamo_id}/rechazar", response_model=ReclamoResponse)
@@ -2343,7 +2365,9 @@ async def rechazar_reclamo(
     asyncio.create_task(_push_rechazo())
 
     result = await db.execute(get_reclamos_query().where(Reclamo.id == reclamo_id))
-    return result.scalar_one()
+    reclamo_out = result.scalar_one()
+    await set_prioridad_ot(db, [reclamo_out])
+    return reclamo_out
 
 
 @router.post("/{reclamo_id}/comentario", response_model=HistorialResponse)

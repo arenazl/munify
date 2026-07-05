@@ -3,7 +3,7 @@ API de Planificación Semanal - Calendario visual para supervisores
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func, case
 from sqlalchemy.orm import selectinload
 from datetime import datetime, date, timedelta
 from typing import List, Optional
@@ -13,10 +13,11 @@ from core.database import get_db
 from core.security import get_current_user, require_roles
 from models.reclamo import Reclamo
 from models.empleado import Empleado
+from models.orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo
 from models.municipio_dependencia import MunicipioDependencia
 from models.user import User
 from models.historial import HistorialReclamo
-from models.enums import RolUsuario, EstadoReclamo
+from models.enums import RolUsuario, EstadoReclamo, PrioridadOT, EstadoOrdenTrabajo
 from services.push_service import notificar_asignacion_empleado
 
 router = APIRouter()
@@ -310,6 +311,33 @@ async def get_planificacion_semanal(
         EstadoReclamo.NUEVO,      # legacy
         EstadoReclamo.ASIGNADO,   # legacy
     ]
+    # Orden por prioridad de la OT (F6 · prioridad única): la prioridad canónica del
+    # trabajo vive en la OT (enum baja<media<alta<urgente), NO en el legacy
+    # Reclamo.prioridad (Integer deprecado, con doble semántica contradictoria — ver
+    # docs/reclamos/08-fase-6-poi-prioridad-unica.md §2.1). Ordenar por ese campo legacy
+    # ponía los MENOS urgentes primero (bug vivo). Se ordena por la severidad de la OT
+    # más prioritaria del reclamo (subquery sobre el pivot, max, OTs no canceladas) y
+    # luego por antigüedad. Estos reclamos del pool normalmente NO tienen OT aún (están
+    # sin asignar) → sin OT viva se los trata como 'media' (rank 2) vía coalesce, de modo
+    # que la prioridad manual de una eventual OT alta/urgente sube al tope y el resto
+    # queda ordenado por created_at asc como antes.
+    _ot_rank = case(
+        (OrdenTrabajo.prioridad == PrioridadOT.URGENTE, 4),
+        (OrdenTrabajo.prioridad == PrioridadOT.ALTA, 3),
+        (OrdenTrabajo.prioridad == PrioridadOT.MEDIA, 2),
+        (OrdenTrabajo.prioridad == PrioridadOT.BAJA, 1),
+        else_=2,  # media por defecto ante un valor inesperado
+    )
+    ot_rank_subq = (
+        select(func.max(_ot_rank))
+        .select_from(OrdenTrabajoReclamo)
+        .join(OrdenTrabajo, OrdenTrabajo.id == OrdenTrabajoReclamo.orden_trabajo_id)
+        .where(OrdenTrabajoReclamo.reclamo_id == Reclamo.id)
+        .where(OrdenTrabajo.estado != EstadoOrdenTrabajo.CANCELADA)
+        .correlate(Reclamo)
+        .scalar_subquery()
+    )
+    prioridad_orden = func.coalesce(ot_rank_subq, 2)  # sin OT viva -> 'media'
     query_sin_asignar = (
         select(Reclamo)
         .options(selectinload(Reclamo.categoria))
@@ -318,7 +346,7 @@ async def get_planificacion_semanal(
             Reclamo.estado.in_(estados_activos_sin_asignar),
             Reclamo.empleado_id.is_(None),
         )
-        .order_by(Reclamo.prioridad.desc(), Reclamo.created_at.asc())
+        .order_by(prioridad_orden.desc(), Reclamo.created_at.asc())
         .limit(30)
     )
 

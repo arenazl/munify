@@ -14,7 +14,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -23,7 +23,7 @@ from core.security import get_current_user, require_roles
 from core.tenancy import resolve_municipio_id as get_effective_municipio_id
 from models import (
     OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo, EstadoOrdenTrabajo, PrioridadOT,
-    OrigenOT, Reclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
+    OrigenOT, Reclamo, CategoriaReclamo, HistorialReclamo, Cuadrilla, Empleado, EmpleadoCuadrilla, User,
     InventarioItem, OrdenTrabajoRecurso, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
 )
 from models.enums import RolUsuario, EstadoReclamo
@@ -193,6 +193,19 @@ def _query_base():
         selectinload(OrdenTrabajo.reclamos_vinculados).selectinload(OrdenTrabajoReclamo.reclamo),
         selectinload(OrdenTrabajo.recursos).selectinload(OrdenTrabajoRecurso.item),
     )
+
+
+def _orden_prioridad_ot():
+    """ORDER BY por prioridad de la OT: urgente>alta>media>baja (F6·A6). La
+    prioridad de la OT deja de ser decorativa — encabeza el orden de las listas;
+    el desempate por antigüedad (created_at desc) lo agrega el caller."""
+    return case(
+        (OrdenTrabajo.prioridad == PrioridadOT.URGENTE, 4),
+        (OrdenTrabajo.prioridad == PrioridadOT.ALTA, 3),
+        (OrdenTrabajo.prioridad == PrioridadOT.MEDIA, 2),
+        (OrdenTrabajo.prioridad == PrioridadOT.BAJA, 1),
+        else_=0,
+    ).desc()
 
 
 def _to_response(ot: OrdenTrabajo) -> OTResponse:
@@ -540,9 +553,39 @@ async def _ot_implicita_segura(db: AsyncSession, reclamo: Reclamo, trabajo, ctx:
         )
 
 
+def _prioridad_default_a_ot(valor: Optional[int]) -> PrioridadOT:
+    """Mapea `categoria.prioridad_default` (Integer 1-5, 1=más urgente) al enum de
+    la OT: 1-2→ALTA, 3→MEDIA, 4-5→BAJA. Sin valor → MEDIA. (F6·A6: el default de
+    la categoría deja de ser fantasma — el create de la OT sí lo lee.)"""
+    if valor is None:
+        return PrioridadOT.MEDIA
+    if valor <= 2:
+        return PrioridadOT.ALTA
+    if valor == 3:
+        return PrioridadOT.MEDIA
+    return PrioridadOT.BAJA
+
+
+async def _prioridad_inicial_ot(db: AsyncSession, reclamo_ids: List[int],
+                                municipio_id: int) -> PrioridadOT:
+    """Prioridad inicial de una OT derivada de la categoría de sus reclamos. Toma
+    el `prioridad_default` más urgente (menor valor 1-5) entre las categorías de
+    los reclamos vinculados (multi-tenant: filtra por municipio). Sin reclamos,
+    sin categoría o sin valor → MEDIA. Un solo query, sin N+1."""
+    ids = [rid for rid in reclamo_ids if rid is not None]
+    if not ids:
+        return PrioridadOT.MEDIA
+    valor = (await db.execute(
+        select(func.min(CategoriaReclamo.prioridad_default))
+        .join(Reclamo, Reclamo.categoria_id == CategoriaReclamo.id)
+        .where(Reclamo.id.in_(ids), Reclamo.municipio_id == municipio_id)
+    )).scalar_one_or_none()
+    return _prioridad_default_a_ot(valor)
+
+
 async def crear_ot_core(
     db: AsyncSession, *, municipio_id: int, creador_id: int, titulo: str,
-    descripcion: Optional[str] = None, prioridad: PrioridadOT = PrioridadOT.MEDIA,
+    descripcion: Optional[str] = None, prioridad: Optional[PrioridadOT] = None,
     tipo_trabajo_id: Optional[int] = None, reclamo_ids: Optional[List[int]] = None,
     cuadrilla_id: Optional[int] = None, empleado_id: Optional[int] = None,
     fecha_programada: Optional[date] = None, hora_inicio: Optional[time] = None,
@@ -556,8 +599,14 @@ async def crear_ot_core(
     PRECONDICIÓN del caller: empleado_id/cuadrilla_id deben pertenecer a
     municipio_id. `crear_orden` lo valida con _validar_recursos; el path de OT
     implícita hereda el empleado ya validado en el call site (reclamos.py /
-    planificacion.py). No se revalida acá para no duplicar el query en el hot path."""
+    planificacion.py). No se revalida acá para no duplicar el query en el hot path.
+
+    `prioridad=None` (default): se deriva del `prioridad_default` de la categoría de
+    los reclamos vinculados (F6·A6); sin categoría/valor cae a MEDIA. Los callers
+    que fijan una prioridad explícita (create manual desde el Sheet) la respetan."""
     numero = await _siguiente_numero(db, municipio_id)
+    if prioridad is None:
+        prioridad = await _prioridad_inicial_ot(db, reclamo_ids or [], municipio_id)
     estado = (
         EstadoOrdenTrabajo.ASIGNADA
         if (cuadrilla_id or empleado_id)
@@ -744,7 +793,7 @@ async def listar_ordenes(
         from sqlalchemy import or_
         query = query.where(or_(OrdenTrabajo.numero.ilike(s), OrdenTrabajo.titulo.ilike(s)))
 
-    query = query.order_by(OrdenTrabajo.created_at.desc()).offset(skip).limit(limit)
+    query = query.order_by(_orden_prioridad_ot(), OrdenTrabajo.created_at.desc()).offset(skip).limit(limit)
     ots = (await db.execute(query)).scalars().unique().all()
     return [_to_response(ot) for ot in ots]
 
@@ -765,7 +814,7 @@ async def ordenes_de_un_reclamo(
             OrdenTrabajo.municipio_id == municipio_id,
             OrdenTrabajo.origen != OrigenOT.IMPLICITA,
         )
-        .order_by(OrdenTrabajo.created_at.desc())
+        .order_by(_orden_prioridad_ot(), OrdenTrabajo.created_at.desc())
     )).scalars().unique().all()
     return [_to_response(ot) for ot in ots]
 

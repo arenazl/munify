@@ -170,7 +170,11 @@ class ReclamoResponse(BaseModel):
     titulo: str
     descripcion: str
     estado: EstadoReclamo
-    prioridad: int
+    prioridad: int  # LEGACY (deprecado F6): campo muerto, se lee prioridad_ot
+    # Prioridad efectiva del reclamo, leida de su OT mas prioritaria (F6 ·
+    # prioridad unica). 'baja'|'media'|'alta'|'urgente' o None si no tiene OT
+    # viva (la UI cae a 'media'). Fuente unica: services/prioridad.py.
+    prioridad_ot: Optional[str] = None
     direccion: str
     latitud: Optional[float]
     longitud: Optional[float]

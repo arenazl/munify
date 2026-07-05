@@ -268,7 +268,8 @@ export interface Reclamo {
   titulo: string;
   descripcion: string;
   estado: EstadoReclamo;
-  prioridad: number;
+  prioridad: number; // LEGACY (deprecado F6): no usar. La prioridad canónica es `prioridad_ot`.
+  prioridad_ot?: PrioridadOT | null; // Prioridad canónica, leída de la OT del reclamo (F6).
   canal?: CanalIngreso | null;
   direccion: string;
   latitud?: number;
