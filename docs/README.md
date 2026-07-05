@@ -16,6 +16,7 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | [`integraciones/`](integraciones/) | Contratos con apps externas (Media Studio) |
 | [`turnos/`](turnos/) | Spec del sistema de turnos + calendario |
 | [`campo/`](campo/) | Módulo de campo: órdenes de trabajo + inventario (activos/consumibles) + formato/PDF |
+| [`tesoreria/`](tesoreria/) | Consolidación de tesorería al modelo core (entidad Persona): análisis, plan de ventana única, prueba de paridad |
 | [`reclamos/`](reclamos/) | Universo Reclamos: análisis funcional (2026-07-03) + hoja de ruta técnica en 7 fases (F0-F6), un doc autosuficiente por fase |
 | [`sales/`](sales/) | Dossier de producto y prompt del agente de ventas |
 | [`marketing/`](marketing/) | Brochure comercial |
@@ -38,6 +39,8 @@ por fecha a `historico/` (y `legacy/` quedó congelado como archivo pre-criterio
 | La spec vigente de SalesBot (endpoints vivos) | [`salesbot/01-spec-final.md`](salesbot/01-spec-final.md) |
 | El diseño del turnero consolidado (fase C, trámites+turnos+agenda) | [`turnos/02-turnero-consolidado.md`](turnos/02-turnero-consolidado.md) |
 | Tocar órdenes de trabajo o inventario (guía para arrancar en frío) | [`campo/01-inventario-y-ordenes-trabajo.md`](campo/01-inventario-y-ordenes-trabajo.md) |
+| Consolidar tesorería / entender el plan Persona + prueba de paridad | [`tesoreria/01-consolidacion-analisis.md`](tesoreria/01-consolidacion-analisis.md) |
+| Retomar en frío el trabajo del 2026-07-05 (F6 OT + tesorería) | [`handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md`](handoffs/2026-07-05_handoff-f6-ot-y-consolidacion-tesoreria.md) |
 | Entender el estado del universo Reclamos (análisis + decisiones abiertas) | [`reclamos/01-analisis-funcional.md`](reclamos/01-analisis-funcional.md) |
 | Ejecutar una fase de la refacción de Reclamos (F0 bugs → F6 POIs) | [`reclamos/`](reclamos/) — cada fase tiene su doc `02-` a `08-`, autosuficiente |
 | Ver las inconsistencias de UX/interacción del circuito (49 hallazgos) | [`reclamos/09-analisis-ux-circuito.md`](reclamos/09-analisis-ux-circuito.md) — insumo transversal repartido entre fases |
