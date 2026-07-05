@@ -28,6 +28,8 @@ from schemas.reclamo import (
 from schemas.historial import HistorialResponse
 from services.gamificacion_service import GamificacionService
 from services.prioridad import set_prioridad_ot
+from services.poi_matching import match_reclamo_a_poi
+from utils.geo import haversine_distance
 
 router = APIRouter()
 
@@ -1107,9 +1109,7 @@ async def buscar_reclamos_similares(
                 "apellido": r.creador.apellido
             } if r.creador else None,
             "distancia_metros": round(
-                __import__('utils.geo', fromlist=['haversine_distance']).haversine_distance(
-                    latitud, longitud, r.latitud, r.longitud
-                )
+                haversine_distance(latitud, longitud, r.latitud, r.longitud)
             ) if (latitud and longitud and r.latitud and r.longitud) else None
         }
         for r in reclamos_similares
@@ -1629,6 +1629,15 @@ async def create_reclamo(
     )
     db.add(historial)
 
+    # F6·B — matching geográfico reclamo <-> POI: si el reclamo tiene coords y cae
+    # en el radio de un POI activo del muni, queda vinculado (reclamo.poi_id). Sin
+    # coords o sin POIs activos es un no-op barato. Best-effort, igual que barrio /
+    # dependencia: una falla del matching NO debe impedir crear el reclamo.
+    try:
+        await match_reclamo_a_poi(db, reclamo)
+    except Exception as e:
+        print(f"[POI] Error en matching geografico: {e}", flush=True)
+
     await db.commit()
     logger.info("Reclamo #%s creado exitosamente en BD", reclamo.id)
 
@@ -1714,6 +1723,14 @@ async def update_reclamo(
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(reclamo, key, value)
+
+    # F6·B — si la edición tocó las coords, recalcular el POI en zona del reclamo
+    # (best-effort: no debe tumbar la edición si el matching falla).
+    if "latitud" in update_data or "longitud" in update_data:
+        try:
+            await match_reclamo_a_poi(db, reclamo)
+        except Exception as e:
+            print(f"[POI] Error en matching geografico: {e}", flush=True)
 
     await db.commit()
 

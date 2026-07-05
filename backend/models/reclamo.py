@@ -40,6 +40,11 @@ class Reclamo(Base):
     barrio_id = Column(Integer, ForeignKey("barrios.id"), nullable=True, index=True)
     barrio = relationship("Barrio")
 
+    # Punto de interés en cuya zona (radio) cae el reclamo (F6 · Etapa B).
+    # Desnormalizado: "está dentro de la zona de {POI}". Lo setea el matching
+    # por haversine al crear/editar. SET NULL si se borra el POI.
+    poi_id = Column(Integer, ForeignKey("puntos_interes.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Usuario que creó el reclamo
     creador_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     creador = relationship("User", back_populates="reclamos_creados", foreign_keys=[creador_id])

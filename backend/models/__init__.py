@@ -25,6 +25,7 @@ from .calificacion import Calificacion
 from .escalado import ConfiguracionEscalado, HistorialEscalado
 from .orden_trabajo import OrdenTrabajo, OrdenTrabajoReclamo, OrdenTrabajoTipo
 from .inventario import InventarioCategoria, InventarioItem, OrdenTrabajoRecurso
+from .poi import PoiTipo, PuntoInteres
 from .enums import (
     EstadoReclamo, RolUsuario, MotivoRechazo, TipoAusencia, DiaSemana,
     EstadoOrdenTrabajo, PrioridadOT, OrigenOT, NaturalezaInventario, EstadoActivo, TipoRecursoOT,
@@ -98,6 +99,9 @@ __all__ = [
     "NaturalezaInventario",
     "EstadoActivo",
     "TipoRecursoOT",
+    # Puntos de interés (F6 · Etapa B)
+    "PoiTipo",
+    "PuntoInteres",
     # Gamificación
     "PuntosUsuario",
     "HistorialPuntos",

@@ -1,7 +1,7 @@
 import {
   Home, ClipboardList, FileCheck, Map, ScanLine, Receipt, Wallet,
   LayoutDashboard, CalendarClock, Activity, Sparkles, PiggyBank, Hammer,
-  FileSignature, Users,
+  FileSignature, Users, MapPin,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -36,6 +36,7 @@ export const MODULOS: ModuloDef[] = [
   { key: 'sueldos', label: 'Sueldos', descripcion: 'Liquidaciones, empleados con sueldo y pagos recurrentes', icon: Users, optIn: true },
   { key: 'contaduria', label: 'Contaduría', descripcion: 'Órdenes de pago con autorización formal y sus reportes', icon: FileSignature, optIn: true },
   { key: 'ordenes_trabajo', label: 'Órdenes de trabajo', descripcion: 'OTs de campo con cuadrillas y materiales', icon: Hammer, optIn: true },
+  { key: 'poi', label: 'Puntos de interés', descripcion: 'POIs en el mapa (hospital, escuela, bomberos...) con radio de zona y prioridad', icon: MapPin, optIn: true },
 ];
 
 /** Estado efectivo de un módulo dado el set de filas de la tabla. */

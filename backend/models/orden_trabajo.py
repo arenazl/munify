@@ -66,6 +66,11 @@ class OrdenTrabajo(Base):
     )
     tipo_trabajo = relationship("OrdenTrabajoTipo")
 
+    # Punto de interés de la OT consolidada de zona (F6 · Etapa B). Solo se
+    # setea en OTs origen='consolidada_poi' (una vigente por POI). SET NULL si
+    # se borra el POI.
+    poi_id = Column(Integer, ForeignKey("puntos_interes.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Quién lo hace: cuadrilla y/o empleado responsable individual
     cuadrilla_id = Column(Integer, ForeignKey("cuadrillas.id", ondelete="SET NULL"), nullable=True, index=True)
     cuadrilla = relationship("Cuadrilla")
